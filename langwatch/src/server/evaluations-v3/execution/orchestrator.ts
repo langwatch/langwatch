@@ -87,6 +87,35 @@ export const generateCells = (
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
+  // Handle evaluator scope specially - single evaluator re-run with pre-computed target output
+  if (scope.type === "evaluator") {
+    const targetConfig = state.targets.find(
+      (t: TargetConfig) => t.id === scope.targetId,
+    );
+    const evaluatorConfig = state.evaluators.find(
+      (e) => e.id === scope.evaluatorId,
+    );
+    const datasetEntry = datasetRows[scope.rowIndex];
+
+    if (targetConfig && evaluatorConfig && datasetEntry) {
+      cells.push({
+        rowIndex: scope.rowIndex,
+        targetId: scope.targetId,
+        targetConfig,
+        // Only include the single evaluator
+        evaluatorConfigs: [evaluatorConfig],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        // Skip target execution, use pre-computed output
+        skipTarget: scope.targetOutput !== undefined,
+        precomputedTargetOutput: scope.targetOutput,
+      });
+    }
+    return cells;
+  }
+
   // Determine which rows to process
   const rowIndices =
     scope.type === "full"
@@ -177,66 +206,87 @@ export async function* executeCell(
     // Create set of target nodes for the result mapper
     const targetNodes = new Set([cell.targetId]);
 
-    // Create the execute_component event for the target
+    // Generate trace ID for this cell execution
     const traceId = `trace_${nanoid()}`;
-    const rawEvent = {
-      type: "execute_component" as const,
-      payload: {
-        trace_id: traceId,
-        workflow: {
-          ...workflow,
-          state: { execution: { status: "idle" as const } },
-        },
-        node_id: targetNodeId,
-        inputs: buildTargetInputs(cell),
-      },
-    };
 
-    // Add environment variables and process datasets
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId),
-      projectId,
-    );
-
-    // Execute target and collect events
-    const targetEvents: StudioServerEvent[] = [];
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;
 
-    await studioBackendPostEvent({
-      projectId,
-      message: enrichedEvent,
-      isAborted,
-      onEvent: (serverEvent) => {
-        targetEvents.push(serverEvent);
-
-        // Extract target output from success event
-        if (
-          serverEvent.type === "component_state_change" &&
-          serverEvent.payload.component_id === targetNodeId &&
-          serverEvent.payload.execution_state?.status === "success"
-        ) {
-          targetOutput = serverEvent.payload.execution_state.outputs;
-        } else if (
-          serverEvent.type === "component_state_change" &&
-          serverEvent.payload.component_id === targetNodeId &&
-          serverEvent.payload.execution_state?.status === "error"
-        ) {
-          targetFailed = true;
-        }
-      },
-    });
-
-    // Map and yield target events
-    for (const event of targetEvents) {
-      const mappedEvent = mapNlpEvent(
-        event,
-        cell.rowIndex,
-        targetNodes,
-        resultMapperConfig,
+    // If skipTarget is true, use pre-computed output instead of executing target
+    if (cell.skipTarget && cell.precomputedTargetOutput !== undefined) {
+      logger.debug(
+        { rowIndex: cell.rowIndex, targetId: cell.targetId },
+        "Skipping target execution, using pre-computed output",
       );
-      if (mappedEvent) {
-        yield mappedEvent;
+      // Convert precomputedTargetOutput to the expected format
+      // The target output should be a record with the output field identifier as key
+      if (typeof cell.precomputedTargetOutput === "object" && cell.precomputedTargetOutput !== null) {
+        targetOutput = cell.precomputedTargetOutput as Record<string, unknown>;
+      } else {
+        // If it's a primitive value, wrap it in the expected output field
+        const outputField = cell.targetConfig.outputs?.[0]?.identifier ?? "output";
+        targetOutput = { [outputField]: cell.precomputedTargetOutput };
+      }
+    } else {
+      // Execute target normally
+      // Create the execute_component event for the target
+      const rawEvent = {
+        type: "execute_component" as const,
+        payload: {
+          trace_id: traceId,
+          workflow: {
+            ...workflow,
+            state: { execution: { status: "idle" as const } },
+          },
+          node_id: targetNodeId,
+          inputs: buildTargetInputs(cell),
+        },
+      };
+
+      // Add environment variables and process datasets
+      const enrichedEvent = await loadDatasets(
+        await addEnvs(rawEvent, projectId),
+        projectId,
+      );
+
+      // Execute target and collect events
+      const targetEvents: StudioServerEvent[] = [];
+
+      await studioBackendPostEvent({
+        projectId,
+        message: enrichedEvent,
+        isAborted,
+        onEvent: (serverEvent) => {
+          targetEvents.push(serverEvent);
+
+          // Extract target output from success event
+          if (
+            serverEvent.type === "component_state_change" &&
+            serverEvent.payload.component_id === targetNodeId &&
+            serverEvent.payload.execution_state?.status === "success"
+          ) {
+            targetOutput = serverEvent.payload.execution_state.outputs;
+          } else if (
+            serverEvent.type === "component_state_change" &&
+            serverEvent.payload.component_id === targetNodeId &&
+            serverEvent.payload.execution_state?.status === "error"
+          ) {
+            targetFailed = true;
+          }
+        },
+      });
+
+      // Map and yield target events
+      for (const event of targetEvents) {
+        const mappedEvent = mapNlpEvent(
+          event,
+          cell.rowIndex,
+          targetNodes,
+          resultMapperConfig,
+        );
+        if (mappedEvent) {
+          yield mappedEvent;
+        }
       }
     }
 

@@ -1140,10 +1140,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  loadState: (wizardState: unknown) => {
-    if (!wizardState || typeof wizardState !== "object") return;
+  loadState: (workbenchState: unknown) => {
+    if (!workbenchState || typeof workbenchState !== "object") return;
 
-    const state = wizardState as Record<string, unknown>;
+    const state = workbenchState as Record<string, unknown>;
 
     // Load persisted results if available
     const persistedResults = state.results as

@@ -481,7 +481,7 @@ export type EvaluationsV3Actions = {
   reset: () => void;
 
   // Load state from saved experiment
-  loadState: (wizardState: unknown) => void;
+  loadState: (workbenchState: unknown) => void;
 
   // Update saved dataset records (used when loading from database)
   setSavedDatasetRecords: (datasetId: string, records: SavedRecord[]) => void;
@@ -531,6 +531,12 @@ export type TableMeta = {
   handleRunTarget?: (targetId: string) => void;
   handleRunRow?: (rowIndex: number) => void;
   handleRunCell?: (rowIndex: number, targetId: string) => void;
+  /** Re-run a single evaluator for a specific cell */
+  handleRerunEvaluator?: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => void;
   handleStopExecution?: () => void;
   /** Whether any execution is currently running */
   isExecutionRunning?: boolean;

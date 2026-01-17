@@ -19,7 +19,15 @@ export type ExecutionScope =
   | { type: "full" }
   | { type: "rows"; rowIndices: number[] }
   | { type: "target"; targetId: string }
-  | { type: "cell"; targetId: string; rowIndex: number };
+  | { type: "cell"; targetId: string; rowIndex: number }
+  | {
+      type: "evaluator";
+      targetId: string;
+      rowIndex: number;
+      evaluatorId: string;
+      /** Pre-computed target output to use instead of re-running target */
+      targetOutput?: unknown;
+    };
 
 /**
  * Input to start an evaluation execution.
@@ -102,6 +110,13 @@ export const executionRequestSchema = z.object({
       targetId: z.string(),
       rowIndex: z.number(),
     }),
+    z.object({
+      type: z.literal("evaluator"),
+      targetId: z.string(),
+      rowIndex: z.number(),
+      evaluatorId: z.string(),
+      targetOutput: z.unknown().optional(),
+    }),
   ]),
 });
 
@@ -173,6 +188,10 @@ export type ExecutionCell = {
   targetConfig: TargetConfig;
   evaluatorConfigs: EvaluatorConfig[];
   datasetEntry: Record<string, unknown>;
+  /** If true, skip target execution and use precomputedTargetOutput instead */
+  skipTarget?: boolean;
+  /** Pre-computed target output when re-running only evaluator(s) */
+  precomputedTargetOutput?: unknown;
 };
 
 /**

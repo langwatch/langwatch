@@ -411,4 +411,382 @@ describe("useExecuteEvaluation", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
+
+  describe("rerunEvaluator functionality", () => {
+    it("sets evaluator result to running state immediately for UI feedback", async () => {
+      setupStore();
+
+      // Add an evaluator to the store
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          // Pre-populate with existing target output (so we can rerun)
+          targetOutputs: {
+            "target-1": [{ output: "Hello World" }, { output: "Goodbye" }],
+          },
+          // Pre-populate with existing evaluator result
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 1 },
+                { status: "processed", passed: false, score: 0 },
+              ],
+            },
+          },
+        },
+      }));
+
+      // Setup SSE mock that waits before completing
+      let resolveSSE: () => void;
+      const ssePromise = new Promise<void>((resolve) => {
+        resolveSSE = resolve;
+      });
+
+      mockFetchSSE.mockImplementation(async () => {
+        await ssePromise;
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Verify initial state - evaluator has a completed result
+      const initialResult =
+        useEvaluationsV3Store.getState().results.evaluatorResults["target-1"]?.[
+          "eval-1"
+        ]?.[0];
+      expect(initialResult).toEqual({
+        status: "processed",
+        passed: true,
+        score: 1,
+      });
+
+      // Call rerunEvaluator
+      act(() => {
+        void result.current.rerunEvaluator(0, "target-1", "eval-1");
+      });
+
+      // IMMEDIATELY after calling rerunEvaluator, the evaluator should be in running state
+      // This provides instant UI feedback before the SSE even starts
+      await waitFor(() => {
+        const runningResult =
+          useEvaluationsV3Store.getState().results.evaluatorResults[
+            "target-1"
+          ]?.["eval-1"]?.[0];
+        expect(runningResult).toEqual({ status: "running" });
+      });
+
+      // Cleanup: resolve the SSE promise
+      resolveSSE!();
+    });
+
+    it("passes existing target output to avoid re-running target", async () => {
+      setupStore();
+
+      // Add an evaluator and target output
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [{ output: "Hello World" }],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [{ status: "processed", passed: true, score: 1 }],
+            },
+          },
+        },
+      }));
+
+      let capturedPayload: unknown;
+      mockFetchSSE.mockImplementation(
+        async ({ payload }: { payload: unknown }) => {
+          capturedPayload = payload;
+        },
+      );
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Call rerunEvaluator
+      await act(async () => {
+        await result.current.rerunEvaluator(0, "target-1", "eval-1");
+      });
+
+      // Verify the scope includes targetOutput
+      expect(capturedPayload).toBeDefined();
+      const payload = capturedPayload as { scope: unknown };
+      expect(payload.scope).toEqual({
+        type: "evaluator",
+        rowIndex: 0,
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        targetOutput: { output: "Hello World" },
+      });
+    });
+
+    it("updates evaluator result when evaluator_result event is received", async () => {
+      setupStore();
+
+      // Add an evaluator
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [{ output: "Hello World" }],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [{ status: "processed", passed: true, score: 1 }],
+            },
+          },
+        },
+      }));
+
+      let sseOnEvent: (event: EvaluationV3Event) => void;
+
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          sseOnEvent = onEvent;
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
+          await new Promise(() => {});
+        },
+      );
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Start rerun
+      act(() => {
+        void result.current.rerunEvaluator(0, "target-1", "eval-1");
+      });
+
+      // Verify evaluator is in running state
+      await waitFor(() => {
+        const runningResult =
+          useEvaluationsV3Store.getState().results.evaluatorResults[
+            "target-1"
+          ]?.["eval-1"]?.[0];
+        expect(runningResult).toEqual({ status: "running" });
+      });
+
+      // Simulate execution_started
+      act(() => {
+        sseOnEvent({ type: "execution_started", runId: "run-123", total: 1 });
+      });
+
+      // Simulate evaluator_result with new result
+      act(() => {
+        sseOnEvent({
+          type: "evaluator_result",
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          result: { status: "processed", passed: false, score: 0.5 },
+        });
+      });
+
+      // Verify evaluator result is updated
+      const updatedResult =
+        useEvaluationsV3Store.getState().results.evaluatorResults["target-1"]?.[
+          "eval-1"
+        ]?.[0];
+      expect(updatedResult).toEqual({
+        status: "processed",
+        passed: false,
+        score: 0.5,
+      });
+    });
+
+    it("clears target outputs and evaluator results for partial execution (cell scope)", async () => {
+      setupStore();
+
+      // Add an evaluator and pre-populate results
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [
+              { output: "Hello" },
+              { output: "World" },
+            ],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 1 },
+                { status: "processed", passed: false, score: 0 },
+              ],
+            },
+          },
+        },
+      }));
+
+      // Setup SSE mock
+      mockFetchSSE.mockImplementation(async () => {
+        // Don't resolve - we just want to verify state was cleared
+        await new Promise(() => {});
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Execute with cell scope (partial execution)
+      act(() => {
+        void result.current.execute({
+          type: "cell",
+          rowIndex: 0,
+          targetId: "target-1",
+        });
+      });
+
+      // Wait for state update
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        const targetOutputs = state.results.targetOutputs["target-1"];
+        const evalResults = state.results.evaluatorResults["target-1"]?.["eval-1"];
+
+        // Row 0 should be cleared (undefined) for both target outputs and evaluator results
+        expect(targetOutputs?.[0]).toBeUndefined();
+        expect(evalResults?.[0]).toBeUndefined();
+
+        // Row 1 should still have its values
+        expect(targetOutputs?.[1]).toEqual({ output: "World" });
+        expect(evalResults?.[1]).toEqual({
+          status: "processed",
+          passed: false,
+          score: 0,
+        });
+      });
+    });
+
+    it("clears target outputs and evaluator results for partial execution (rows scope)", async () => {
+      setupStore();
+
+      // Add an evaluator and pre-populate results for 3 rows
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        datasets: [
+          {
+            id: "dataset-1",
+            name: "Test Dataset",
+            type: "inline",
+            columns: [{ id: "input", name: "input", type: "string" }],
+            inline: {
+              columns: [{ id: "input", name: "input", type: "string" }],
+              records: { input: ["A", "B", "C"] },
+            },
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [
+              { output: "A" },
+              { output: "B" },
+              { output: "C" },
+            ],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 1 },
+                { status: "processed", passed: true, score: 1 },
+                { status: "processed", passed: true, score: 1 },
+              ],
+            },
+          },
+        },
+      }));
+
+      // Setup SSE mock
+      mockFetchSSE.mockImplementation(async () => {
+        await new Promise(() => {});
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Execute with rows scope (rows 0 and 2)
+      act(() => {
+        void result.current.execute({
+          type: "rows",
+          rowIndices: [0, 2],
+        });
+      });
+
+      // Wait for state update
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        const targetOutputs = state.results.targetOutputs["target-1"];
+        const evalResults = state.results.evaluatorResults["target-1"]?.["eval-1"];
+
+        // Rows 0 and 2 should be cleared for both target outputs and evaluator results
+        expect(targetOutputs?.[0]).toBeUndefined();
+        expect(targetOutputs?.[2]).toBeUndefined();
+        expect(evalResults?.[0]).toBeUndefined();
+        expect(evalResults?.[2]).toBeUndefined();
+
+        // Row 1 should still have its values
+        expect(targetOutputs?.[1]).toEqual({ output: "B" });
+        expect(evalResults?.[1]).toEqual({
+          status: "processed",
+          passed: true,
+          score: 1,
+        });
+      });
+    });
+  });
 });

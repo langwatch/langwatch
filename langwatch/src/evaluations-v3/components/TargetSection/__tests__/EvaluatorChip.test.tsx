@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "../../../types";
@@ -133,6 +134,147 @@ describe("EvaluatorChip", () => {
       // Should show the evaluator name and no spinner
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
       expect(container.querySelector(".chakra-spinner")).toBeNull();
+    });
+  });
+
+  describe("rerun functionality", () => {
+    it("shows Rerun option in menu when evaluator has completed and onRerun provided", async () => {
+      const onRerun = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "processed", passed: true, score: 1 }}
+          targetHasOutput={true}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRerun={onRerun}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Open the menu by clicking the chip
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+
+      // Should show Rerun option
+      const rerunOption = screen.getByText("Rerun");
+      expect(rerunOption).toBeInTheDocument();
+
+      // Click Rerun should trigger callback
+      await user.click(rerunOption);
+      expect(onRerun).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not show Rerun option when status is pending", async () => {
+      const onRerun = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={undefined}
+          targetHasOutput={false}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRerun={onRerun}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Open the menu
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+
+      // Should NOT show Rerun option
+      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+    });
+
+    it("does not show Rerun option when status is running", async () => {
+      const onRerun = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "running" }}
+          targetHasOutput={true}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRerun={onRerun}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Open the menu
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+
+      // Should NOT show Rerun option
+      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+    });
+
+    it("does not show Rerun option when onRerun is not provided", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "processed", passed: true, score: 1 }}
+          targetHasOutput={true}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Open the menu
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+
+      // Should NOT show Rerun option
+      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+    });
+
+    it("shows spinner when evaluator transitions to running state", () => {
+      const { container } = render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "running" }}
+          targetHasOutput={true}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRerun={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Should show the evaluator name
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
+
+      // Should show a spinner (running indicator)
+      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+    });
+
+    it("shows running status in chip when result has running status object", () => {
+      const { container } = render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "running" }}
+          targetHasOutput={true}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Should show spinner for running state
+      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+
+      // The colored status circle should NOT be visible (spinner replaces it)
+      // In the component, when status is "running", it renders Spinner instead of Circle
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
     });
   });
 });

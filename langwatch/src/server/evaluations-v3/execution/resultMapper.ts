@@ -124,26 +124,34 @@ export const mapEvaluatorResult = (
       : undefined;
 
   // Build SingleEvaluationResult
-  const result: SingleEvaluationResult = executionState.error
-    ? {
-        status: "error",
-        error_type: "EvaluatorError",
-        details: executionState.error,
-        traceback: [],
-      }
-    : {
-        status: "processed",
-        // Strip score for guardrail-type evaluators where score is just 0 or 1
-        score: options?.stripScore
-          ? undefined
-          : (executionState.outputs?.score as number | undefined),
-        passed: executionState.outputs?.passed as boolean | undefined,
-        label: executionState.outputs?.label as string | undefined,
-        details: executionState.outputs?.details as string | undefined,
-        cost: executionState.cost
-          ? { currency: "USD", amount: executionState.cost }
-          : undefined,
-      };
+  // Check for errors: either execution-level error OR evaluator returned error status in outputs
+  const hasExecutionError = !!executionState.error;
+  const hasEvaluatorError = executionState.outputs?.status === "error";
+
+  const result: SingleEvaluationResult =
+    hasExecutionError || hasEvaluatorError
+      ? {
+          status: "error",
+          error_type: "EvaluatorError",
+          details:
+            executionState.error ??
+            (executionState.outputs?.details as string | undefined) ??
+            "Unknown evaluator error",
+          traceback: [],
+        }
+      : {
+          status: "processed",
+          // Strip score for guardrail-type evaluators where score is just 0 or 1
+          score: options?.stripScore
+            ? undefined
+            : (executionState.outputs?.score as number | undefined),
+          passed: executionState.outputs?.passed as boolean | undefined,
+          label: executionState.outputs?.label as string | undefined,
+          details: executionState.outputs?.details as string | undefined,
+          cost: executionState.cost
+            ? { currency: "USD", amount: executionState.cost }
+            : undefined,
+        };
 
   return {
     type: "evaluator_result",

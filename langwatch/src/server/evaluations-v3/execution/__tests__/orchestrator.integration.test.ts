@@ -500,6 +500,126 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(cellEvent.targetId).toBe("target-2");
       }
     }, 60000);
+
+    it("re-runs single evaluator with pre-computed target output", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [
+        { question: "Say hello", expected: "hello" },
+        { question: "Say world", expected: "world" },
+      ];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator on row 1 with pre-computed target output
+      // This simulates a user clicking "Rerun" on an evaluator chip
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 1,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          targetOutput: { output: "world" }, // Pre-computed output matching expected
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should only execute 1 cell (single evaluator)
+      const startEvent = events[0];
+      if (startEvent?.type === "execution_started") {
+        expect(startEvent.total).toBe(1);
+      }
+
+      // Should have cell_started event
+      const cellStartedEvents = events.filter((e) => e.type === "cell_started");
+      expect(cellStartedEvents).toHaveLength(1);
+
+      // Should NOT have target_result event (target was skipped)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents).toHaveLength(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      const evalResult = evaluatorResultEvents[0];
+      if (evalResult?.type === "evaluator_result") {
+        expect(evalResult.rowIndex).toBe(1);
+        expect(evalResult.targetId).toBe("target-1");
+        expect(evalResult.evaluatorId).toBe("eval-1");
+        // With output "world" matching expected "world", should pass
+        expect(evalResult.result.status).toBe("processed");
+        if (evalResult.result.status === "processed") {
+          expect(evalResult.result.passed).toBe(true);
+        }
+      }
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
+
+    it("re-runs single evaluator without pre-computed output (executes target too)", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator without pre-computed output - should execute target too
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          // No targetOutput - should run target
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should have target_result event (target was executed)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents.length).toBeGreaterThan(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
   });
 
   describe("error handling", () => {
@@ -726,6 +846,81 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // Target should still succeed even if evaluator fails
       const targetResults = events.filter((e) => e.type === "target_result");
       expect(targetResults.length).toBeGreaterThanOrEqual(1);
+    }, 120000);
+
+    it("returns error status for invalid/unreachable evaluator type", async () => {
+      // Use an evaluator type that doesn't exist - should return error, not processed
+      const invalidEvaluator: EvaluatorConfig = {
+        id: "eval-invalid",
+        evaluatorType: "langevals/this_evaluator_does_not_exist" as any,
+        name: "Invalid Evaluator",
+        settings: {},
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected_output", type: "str" },
+        ],
+        mappings: {
+          "dataset-1": {
+            "target-1": {
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        },
+      };
+
+      const state = createTestState(
+        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [invalidEvaluator],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: { type: "full" },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should still complete (gracefully handle error)
+      expect(events[events.length - 1]?.type).toBe("done");
+
+      // Target should succeed
+      const targetResults = events.filter((e) => e.type === "target_result");
+      expect(targetResults.length).toBe(1);
+
+      // Evaluator should return ERROR status, not "processed"
+      const evaluatorResults = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResults.length).toBe(1);
+
+      const evalResult = evaluatorResults[0];
+      if (evalResult?.type === "evaluator_result") {
+        // This is the key assertion - invalid evaluator should return error
+        expect(evalResult.result.status).toBe("error");
+        expect(evalResult.result.details).toBeDefined();
+        expect(evalResult.result.details).toContain("404");
+      }
     }, 120000);
   });
 

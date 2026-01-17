@@ -151,7 +151,7 @@ describe("Navigation and autosave interaction", () => {
         id: "existing-experiment-id",
         slug: "existing-evaluation",
         name: "My Important Evaluation",
-        wizardState: {
+        workbenchState: {
           name: "My Important Evaluation",
           datasets: [
             {
@@ -279,7 +279,7 @@ describe("Navigation and autosave interaction", () => {
         id: "my-saved-id",
         slug: "my-saved-evaluation",
         name: "My Saved Evaluation",
-        wizardState: {
+        workbenchState: {
           name: "My Saved Evaluation",
           datasets: [],
           activeDatasetId: null,
@@ -321,7 +321,7 @@ describe("Navigation and autosave interaction", () => {
         id: "new-id",
         slug: "new-evaluation",
         name: "New Evaluation",
-        wizardState: {
+        workbenchState: {
           name: "New Evaluation",
           datasets: [],
           activeDatasetId: null,
@@ -391,7 +391,7 @@ describe("Navigation and autosave interaction", () => {
         id: "the-real-id",
         slug: "the-real-slug",
         name: "Important Evaluation",
-        wizardState: {
+        workbenchState: {
           name: "Important Evaluation",
           datasets: [],
           activeDatasetId: null,
@@ -458,7 +458,7 @@ describe("Navigation and autosave interaction", () => {
         id: "foo-id",
         slug: "foo",
         name: "My Evaluation Foo",
-        wizardState: {
+        workbenchState: {
           name: "My Evaluation Foo",
           datasets: [],
           activeDatasetId: null,
@@ -565,7 +565,7 @@ describe("Navigation and autosave interaction", () => {
         id: "eval-b-id",
         slug: "eval-b",
         name: "Evaluation B",
-        wizardState: {
+        workbenchState: {
           name: "Evaluation B",
           datasets: [],
           activeDatasetId: null,

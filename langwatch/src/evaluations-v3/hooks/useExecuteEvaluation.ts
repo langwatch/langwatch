@@ -42,6 +42,12 @@ export type UseExecuteEvaluationReturn = {
   isAborting: boolean;
   /** Start execution with given scope */
   execute: (scope?: ExecutionScope) => Promise<void>;
+  /** Re-run a single evaluator for a specific cell, using existing target output */
+  rerunEvaluator: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => Promise<void>;
   /** Request abort of current execution */
   abort: () => Promise<void>;
   /** Reset state to idle */
@@ -385,17 +391,63 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       } else {
         // Partial execution: merge new executingCells with any existing ones
         // This allows running multiple targets/cells concurrently
+        // Clear both target outputs and evaluator results for cells being executed
+        // This ensures the correct loading sequence:
+        // 1. Gray (pending) - no target output, no evaluator result
+        // 2. Spinner (running) - target output arrives, evaluator still pending
+        // 3. Final result - evaluator result arrives
         useEvaluationsV3Store.setState((state) => {
           const existingCells = state.results.executingCells;
           const mergedCells = existingCells
             ? new Set([...existingCells, ...executingCellsSet])
             : executingCellsSet;
 
+          // Clear target outputs for cells being executed
+          const newTargetOutputs = { ...state.results.targetOutputs };
+          for (const cell of executionCells) {
+            const outputs = newTargetOutputs[cell.targetId];
+            if (outputs && outputs[cell.rowIndex] !== undefined) {
+              const newOutputs = [...outputs];
+              newOutputs[cell.rowIndex] = undefined;
+              newTargetOutputs[cell.targetId] = newOutputs;
+            }
+          }
+
+          // Clear evaluator results for cells being executed
+          const newEvaluatorResults = { ...state.results.evaluatorResults };
+
+          // Use the evaluators from the store to ensure we clear ALL evaluators
+          const evaluatorIds = state.evaluators.map((e) => e.id);
+
+          for (const cell of executionCells) {
+            // Ensure target entry exists
+            if (!newEvaluatorResults[cell.targetId]) {
+              newEvaluatorResults[cell.targetId] = {};
+            }
+            const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
+
+            // Clear results for ALL evaluators for this cell
+            for (const evaluatorId of evaluatorIds) {
+              const evalResults = newTargetResults[evaluatorId];
+              if (evalResults) {
+                // Clone and clear the specific row
+                const newEvalResults = [...evalResults];
+                newEvalResults[cell.rowIndex] = undefined;
+                newTargetResults[evaluatorId] = newEvalResults;
+              }
+              // If no results array exists yet, that's fine - it will show as pending
+            }
+
+            newEvaluatorResults[cell.targetId] = newTargetResults;
+          }
+
           return {
             results: {
               ...state.results,
               status: "running",
               executingCells: mergedCells,
+              targetOutputs: newTargetOutputs,
+              evaluatorResults: newEvaluatorResults,
               // Note: progress/total are per-execution, not merged
               // The UI should derive progress from executingCells + actual results
             },
@@ -564,6 +616,36 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     clearResults();
   }, [clearResults]);
 
+  /**
+   * Re-run a single evaluator for a specific cell.
+   * Uses the existing target output to avoid re-running the target.
+   */
+  const rerunEvaluator = useCallback(
+    async (rowIndex: number, targetId: string, evaluatorId: string) => {
+      // Get the existing target output from the store
+      const state = useEvaluationsV3Store.getState();
+      const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
+
+      // Immediately set the evaluator result to "running" for UI feedback
+      updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
+        status: "running",
+      });
+
+      // Build the evaluator scope with pre-computed target output
+      const scope: ExecutionScope = {
+        type: "evaluator",
+        rowIndex,
+        targetId,
+        evaluatorId,
+        // Pass target output if available so we don't re-run the target
+        targetOutput,
+      };
+
+      await execute(scope);
+    },
+    [execute, updateEvaluatorResult],
+  );
+
   return {
     status,
     runId,
@@ -572,6 +654,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     error,
     isAborting,
     execute,
+    rerunEvaluator,
     abort,
     reset,
   };

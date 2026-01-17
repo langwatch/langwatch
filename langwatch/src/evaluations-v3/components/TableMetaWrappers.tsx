@@ -147,6 +147,12 @@ export const TargetCellFromMeta = ({
           : undefined
       }
       onStopCell={tableMeta?.handleStopExecution}
+      onRerunEvaluator={
+        tableMeta?.handleRerunEvaluator
+          ? (evaluatorId) =>
+              tableMeta.handleRerunEvaluator?.(rowIndex, targetId, evaluatorId)
+          : undefined
+      }
     />
   );
 };

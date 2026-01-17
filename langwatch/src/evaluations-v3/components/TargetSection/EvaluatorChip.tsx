@@ -14,6 +14,7 @@ import {
   LuCircleAlert,
   LuCircleX,
   LuPencil,
+  LuRefreshCw,
   LuTrash2,
 } from "react-icons/lu";
 
@@ -42,6 +43,8 @@ type EvaluatorChipProps = {
   isExecutionRunning?: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  /** Called when user wants to re-run this evaluator */
+  onRerun?: () => void;
 };
 
 export function EvaluatorChip({
@@ -52,6 +55,7 @@ export function EvaluatorChip({
   isExecutionRunning = false,
   onEdit,
   onRemove,
+  onRerun,
 }: EvaluatorChipProps) {
   const parsed = parseEvaluationResult(result);
 
@@ -212,6 +216,15 @@ export function EvaluatorChip({
             </Box>
             <Box borderTopWidth="1px" borderColor="gray.200" />
           </>
+        )}
+        {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
+        {status !== "pending" && status !== "running" && onRerun && (
+          <Menu.Item value="rerun" onClick={onRerun}>
+            <HStack gap={2}>
+              <LuRefreshCw size={14} />
+              <Text>Rerun</Text>
+            </HStack>
+          </Menu.Item>
         )}
         <Menu.Item value="edit" onClick={onEdit}>
           <HStack gap={2}>

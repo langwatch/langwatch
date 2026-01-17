@@ -2,7 +2,7 @@
  * DSL Adapter for Evaluations V3
  *
  * Converts V3 UI state to the workflow DSL for execution.
- * This is a one-way conversion - state is persisted via wizardState, not DSL.
+ * This is a one-way conversion - state is persisted via workbenchState, not DSL.
  *
  * Key concepts:
  * - Evaluators are global/shared in state - targets reference them by ID

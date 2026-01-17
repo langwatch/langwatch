@@ -18,7 +18,7 @@ const stringifiedInitialState = JSON.stringify(
 
 /**
  * Manages syncing the evaluations v3 state with the database.
- * Uses wizardState field in the Experiment model for persistence.
+ * Uses workbenchState field in the Experiment model for persistence.
  *
  * This hook expects the experiment to already exist - it only loads and saves.
  * New experiments are created by the index page before redirecting here.
@@ -144,8 +144,8 @@ export const useAutosaveEvaluationsV3 = () => {
       setExperimentSlug(existingExperiment.data.slug);
 
       // Load the full wizard state if available
-      if (existingExperiment.data.wizardState && loadState) {
-        loadState(existingExperiment.data.wizardState);
+      if (existingExperiment.data.workbenchState && loadState) {
+        loadState(existingExperiment.data.workbenchState);
       }
     }
   }, [

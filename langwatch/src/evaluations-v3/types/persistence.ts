@@ -108,7 +108,7 @@ const extractPersistedResults = (
 /**
  * Extracts the persistable state from the full store state.
  * Strips savedRecords from datasets - they're loaded on demand from DB,
- * not stored in the experiment's wizardState.
+ * not stored in the experiment's workbenchState.
  */
 export const extractPersistedState = (
   state: EvaluationsV3State,
