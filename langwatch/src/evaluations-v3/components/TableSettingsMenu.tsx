@@ -207,24 +207,27 @@ export function TableSettingsMenu({
         open={popoverOpen}
         onOpenChange={(e) => setPopoverOpen(e.open)}
       >
-        <Popover.Trigger asChild>
-          <Tooltip
-            content="Workbench settings"
-            positioning={{ placement: "bottom" }}
-            openDelay={100}
-          >
-            <IconButton
-              variant="ghost"
-              size="sm"
-              color="gray.500"
-              _hover={{ color: "gray.700", bg: "gray.100" }}
-              disabled={disabled}
-              aria-label="Table settings"
-            >
-              <SlidersHorizontal size={18} />
-            </IconButton>
-          </Tooltip>
-        </Popover.Trigger>
+        <Tooltip
+          content="Workbench settings"
+          positioning={{ placement: "bottom" }}
+          openDelay={100}
+        >
+          {/* The additional Box element is here to fix the tooltip: https://github.com/chakra-ui/chakra-ui/issues/2843 */}
+          <Box display="inline-block">
+            <Popover.Trigger asChild>
+              <IconButton
+                variant="ghost"
+                size="sm"
+                color="gray.500"
+                _hover={{ color: "gray.700", bg: "gray.100" }}
+                disabled={disabled}
+                aria-label="Workbench settings"
+              >
+                <SlidersHorizontal size={18} />
+              </IconButton>
+            </Popover.Trigger>
+          </Box>
+        </Tooltip>
         <Popover.Content width="auto" padding={3}>
           <VStack align="stretch" gap={3}>
             {/* Row Height Section */}
