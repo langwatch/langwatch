@@ -42,6 +42,7 @@ export const useAutosaveEvaluationsV3 = () => {
     targets,
     results,
     hiddenColumns,
+    concurrency,
     setExperimentId,
     setExperimentSlug,
     setName,
@@ -58,6 +59,7 @@ export const useAutosaveEvaluationsV3 = () => {
       targets: state.targets,
       results: state.results,
       hiddenColumns: state.ui.hiddenColumns,
+      concurrency: state.ui.concurrency,
       setExperimentId: state.setExperimentId,
       setExperimentSlug: state.setExperimentSlug,
       setName: state.setName,
@@ -83,7 +85,7 @@ export const useAutosaveEvaluationsV3 = () => {
       expandedCells: new Set(),
       hiddenColumns,
       autosaveStatus: { evaluation: "idle", dataset: "idle" },
-      concurrency: 10,
+      concurrency,
     },
   });
 

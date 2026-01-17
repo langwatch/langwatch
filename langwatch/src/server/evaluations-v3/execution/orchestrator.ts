@@ -594,6 +594,23 @@ export async function* runOrchestrator(
         error: event.error ?? null,
         trace_id: event.traceId ?? null,
       });
+    } else if (event.type === "error") {
+      // Store error events as dataset entries with the error message
+      // This captures errors that occur during cell execution (e.g., network errors)
+      if (event.rowIndex !== undefined && event.targetId) {
+        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+
+        pendingDataset.push({
+          index: event.rowIndex,
+          target_id: event.targetId,
+          entry: datasetEntry,
+          predicted: undefined,
+          cost: null,
+          duration: null,
+          error: event.message,
+          trace_id: null,
+        });
+      }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
       // Find the evaluator config to get the human-readable name

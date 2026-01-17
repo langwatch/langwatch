@@ -1668,5 +1668,142 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         });
       }
     }, 120000);
+
+    it("stores errors to Elasticsearch when cell execution fails", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
+
+      const experimentId = `exp_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "Error Storage Test",
+          slug: `error-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        // Create a target with an invalid model to cause an error
+        const targetConfig: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          name: "Failing Target",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+            },
+          },
+          localPromptConfig: {
+            llm: {
+              model: "openai/invalid-model-that-does-not-exist",
+              temperature: 0,
+              maxTokens: 50,
+            },
+            messages: [
+              { role: "user", content: "{{input}}" },
+            ],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        };
+
+        const state = createTestState([targetConfig]);
+        const datasetRows = [{ question: "Test question" }];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+        ];
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          saveToEs: true,
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed (even with errors)
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+
+        // Verify there was an error
+        const errorEvents = events.filter(
+          (e) =>
+            e.type === "error" ||
+            (e.type === "target_result" && (e as any).error),
+        );
+        expect(errorEvents.length).toBeGreaterThan(0);
+
+        // Get the run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify error was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        expect(storedRun).not.toBeNull();
+
+        // Verify dataset entry has error field populated
+        expect(storedRun?.dataset).toBeDefined();
+        expect(storedRun?.dataset?.length).toBeGreaterThan(0);
+
+        const entryWithError = storedRun?.dataset?.find(
+          (d) => d.error !== null && d.error !== undefined,
+        );
+        expect(entryWithError).toBeDefined();
+        expect(entryWithError?.error).toBeTruthy();
+        expect(typeof entryWithError?.error).toBe("string");
+
+        // Clean up ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
+      }
+    }, 120000);
   });
 });

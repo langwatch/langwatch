@@ -1185,6 +1185,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         ? new Set(state.hiddenColumns as string[])
         : current.ui.hiddenColumns;
 
+      // Load concurrency from persisted state
+      const concurrency =
+        typeof state.concurrency === "number"
+          ? state.concurrency
+          : current.ui.concurrency;
+
       return {
         ...current,
         experimentId: (state.experimentId as string) ?? current.experimentId,
@@ -1204,13 +1210,18 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           current.targets,
         // Load persisted results if available
         results: loadedResults ?? current.results,
-        // Load hidden columns into UI state
+        // Load UI settings
         ui: {
           ...current.ui,
           hiddenColumns,
+          concurrency,
         },
       };
     });
+
+    // Clear undo/redo history after loading state
+    // This prevents undoing back to the pre-load state
+    useEvaluationsV3Store.temporal.getState().clear();
   },
 
   setSavedDatasetRecords: (datasetId: string, records) => {

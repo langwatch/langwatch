@@ -40,6 +40,8 @@ export const persistedEvaluationsV3StateSchema = z.object({
   results: persistedResultsSchema.optional(),
   // Hidden columns - stored as array for JSON serialization, converted to Set on load
   hiddenColumns: z.array(z.string()).optional(),
+  // Concurrency setting for parallel execution
+  concurrency: z.number().min(1).max(24).optional(),
 });
 
 // ============================================================================
@@ -64,6 +66,8 @@ export type PersistedEvaluationsV3State = Omit<
   results?: PersistedResults;
   // Hidden columns - stored as array for JSON serialization
   hiddenColumns?: string[];
+  // Concurrency setting for parallel execution
+  concurrency?: number;
 };
 
 /**
@@ -133,5 +137,7 @@ export const extractPersistedState = (
     results: persistedResults,
     // Convert Set to array for JSON serialization
     hiddenColumns: Array.from(ui.hiddenColumns),
+    // Persist concurrency setting
+    concurrency: ui.concurrency,
   };
 };
