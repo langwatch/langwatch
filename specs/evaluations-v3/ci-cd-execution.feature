@@ -45,7 +45,7 @@ Feature: CI/CD Execution of Platform Evaluations
   Scenario: Load evaluation by slug
     When I POST to /api/evaluations/v3/my-evaluation/run
     Then the backend loads experiment with slug "my-evaluation"
-    And extracts targets, evaluators, and dataset from wizardState
+    And extracts targets, evaluators, and dataset from workbenchState
 
   Scenario: Evaluation not found returns 404
     When I POST to /api/evaluations/v3/non-existent/run

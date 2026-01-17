@@ -11,19 +11,19 @@ import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccor
 
 export function EvaluationStep() {
   const {
-    wizardState,
+    workbenchState,
     setWizardState,
     getFirstEvaluatorNode: getFirstEvaluator,
   } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState, getFirstEvaluatorNode }) => ({
-      wizardState,
+    ({ workbenchState, setWizardState, getFirstEvaluatorNode }) => ({
+      workbenchState,
       setWizardState,
       getFirstEvaluatorNode,
     }),
   );
   const firstEvaluator: Node<Component> | undefined = getFirstEvaluator();
   const [accordeonValue, setAccordeonValue] = useState<string[]>(
-    wizardState.evaluatorCategory
+    workbenchState.evaluatorCategory
       ? firstEvaluator
         ? ["selection"]
         : ["settings"]

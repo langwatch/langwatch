@@ -84,6 +84,9 @@ const isRunFinished = (timestamps: {
   return false;
 };
 
+/** Grace period after run finishes to continue refetching for final results */
+const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
+
 export function BatchEvaluationResults({
   project,
   experiment,
@@ -93,6 +96,9 @@ export function BatchEvaluationResults({
 }: BatchEvaluationResultsProps) {
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
+
+  // Track when the selected run finished (for grace period)
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
   // Column visibility state - initialize with defaults
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
@@ -166,6 +172,46 @@ export function BatchEvaluationResults({
     return isRunFinished(selectedRun.timestamps);
   }, [selectedRun]);
 
+  // Track when the run finished and reset when run changes or becomes not finished
+  useEffect(() => {
+    if (isFinished && finishedAt === null) {
+      // Run just finished, record the time
+      setFinishedAt(Date.now());
+    } else if (!isFinished) {
+      // Run is not finished (new run or restarted), reset
+      setFinishedAt(null);
+    }
+  }, [isFinished, finishedAt]);
+
+  // Reset finishedAt when selected run changes
+  useEffect(() => {
+    setFinishedAt(null);
+  }, [selectedRunId]);
+
+  // Force re-render after grace period expires to stop refetching
+  useEffect(() => {
+    if (finishedAt === null) return;
+
+    const timeUntilGraceExpires = REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
+    if (timeUntilGraceExpires <= 0) return;
+
+    const timer = setTimeout(() => {
+      // Force re-render by setting finishedAt to a new value (same time but new reference won't work since it's a number)
+      // Instead, we set it to -1 to indicate grace period has expired
+      setFinishedAt(-1);
+    }, timeUntilGraceExpires);
+
+    return () => clearTimeout(timer);
+  }, [finishedAt]);
+
+  // Determine if we're still in the grace period after finish
+  // finishedAt > 0 means we have a valid timestamp, and we check if it's within grace period
+  const isInGracePeriod =
+    isFinished &&
+    finishedAt !== null &&
+    finishedAt > 0 &&
+    Date.now() - finishedAt < REFETCH_GRACE_PERIOD_MS;
+
   // Update isSomeRunning state
   useEffect(() => {
     const hasRunning = runsQuery.data?.runs.some(
@@ -173,6 +219,12 @@ export function BatchEvaluationResults({
     );
     setIsSomeRunning(!!hasRunning);
   }, [runsQuery.data?.runs]);
+
+  // Determine refetch interval for run data
+  // - 1000ms while running
+  // - 1000ms during grace period after finish (to catch final results)
+  // - false (disabled) after grace period
+  const runDataRefetchInterval = !isFinished || isInGracePeriod ? 1000 : false;
 
   // Fetch selected run data
   const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
@@ -183,7 +235,7 @@ export function BatchEvaluationResults({
     },
     {
       enabled: !!selectedRunId,
-      refetchInterval: !isFinished ? 1000 : false,
+      refetchInterval: runDataRefetchInterval,
     },
   );
 

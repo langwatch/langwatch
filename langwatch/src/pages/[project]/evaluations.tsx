@@ -273,7 +273,7 @@ function EvaluationsV2() {
                                         void router.push({
                                           pathname: `/${project?.slug}/evaluations/v3/${experiment.slug}`,
                                         });
-                                      } else if (experiment.wizardState) {
+                                      } else if (experiment.workbenchState) {
                                         void router.push({
                                           pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
                                         });
@@ -298,9 +298,9 @@ function EvaluationsV2() {
                                         colorPalette="gray"
                                         variant="outline"
                                       >
-                                        {experiment.wizardState?.task
+                                        {experiment.workbenchState?.task
                                           ? taskTypeToLabel[
-                                              experiment.wizardState.task
+                                              experiment.workbenchState.task
                                             ]
                                           : experimentTypeToLabel[
                                               experiment.type

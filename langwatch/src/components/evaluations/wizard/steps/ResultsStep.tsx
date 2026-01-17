@@ -24,10 +24,10 @@ import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 
 export function ResultsStep() {
-  const { name, wizardState, setWizardState, getDSL } =
-    useEvaluationWizardStore(({ wizardState, setWizardState, getDSL }) => ({
-      name: wizardState.name,
-      wizardState,
+  const { name, workbenchState, setWizardState, getDSL } =
+    useEvaluationWizardStore(({ workbenchState, setWizardState, getDSL }) => ({
+      name: workbenchState.name,
+      workbenchState,
       setWizardState,
       getDSL,
     }));
@@ -98,7 +98,7 @@ export function ResultsStep() {
             nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
           />
         )}
-        {wizardState.executionMethod?.startsWith("realtime") && (
+        {workbenchState.executionMethod?.startsWith("realtime") && (
           <Alert.Root colorPalette="blue">
             <Alert.Content>
               <Alert.Description>

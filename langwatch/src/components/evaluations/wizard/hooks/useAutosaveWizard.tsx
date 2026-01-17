@@ -13,7 +13,7 @@ import {
 } from "./evaluation-wizard-store/useEvaluationWizardStore";
 
 const stringifiedInitialState = JSON.stringify({
-  wizardState: initialState.wizardState,
+  workbenchState: initialState.workbenchState,
   dsl: getWorkflow(initialState.workflowStore),
 });
 
@@ -26,7 +26,7 @@ const useAutosaveWizard = () => {
   const { project } = useOrganizationTeamProject();
   const {
     experimentSlug,
-    wizardState,
+    workbenchState,
     dsl,
     autosaveDisabled,
     setExperimentId,
@@ -39,7 +39,7 @@ const useAutosaveWizard = () => {
     useShallow(
       ({
         experimentSlug,
-        wizardState,
+        workbenchState,
         getDSL,
         autosaveDisabled,
         setExperimentId,
@@ -50,7 +50,7 @@ const useAutosaveWizard = () => {
         workflowStore,
       }) => ({
         experimentSlug,
-        wizardState,
+        workbenchState,
         dsl: getDSL(),
         autosaveDisabled,
         setExperimentId,
@@ -64,7 +64,7 @@ const useAutosaveWizard = () => {
   );
 
   const stringifiedState = JSON.stringify({
-    wizardState,
+    workbenchState,
     dsl,
   });
 
@@ -97,7 +97,7 @@ const useAutosaveWizard = () => {
     if (!project) return;
     if ((!!experimentSlug || !!routerSlug) && !experiment.data) return;
     if (autosaveDisabled) return;
-    if (experimentSlug && !wizardState.name) return;
+    if (experimentSlug && !workbenchState.name) return;
 
     const now = Date.now();
     if (now - lastAutosave < 100) return;
@@ -110,7 +110,7 @@ const useAutosaveWizard = () => {
           const updatedExperiment = await saveExperiment.mutateAsync({
             projectId: project.id,
             experimentId: experiment.data?.id,
-            wizardState,
+            workbenchState,
             dsl: {
               ...dsl,
               icon,
@@ -144,7 +144,7 @@ const useAutosaveWizard = () => {
             extra: {
               context: "Failed to autosave evaluation",
               projectId: project.id,
-              wizardState,
+              workbenchState,
               dsl,
             },
           });

@@ -10,10 +10,10 @@ import { ColorfulBlockIcon } from "../../../../optimization_studio/components/Co
 import { StepButton } from "../components/StepButton";
 
 export function TaskStep() {
-  const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
+  const { workbenchState, setWizardState, setDSL } = useEvaluationWizardStore();
 
-  const handleTaskSelection = (task: State["wizardState"]["task"]) => {
-    if (task !== wizardState.task) {
+  const handleTaskSelection = (task: State["workbenchState"]["task"]) => {
+    if (task !== workbenchState.task) {
       // Reset the workflow
       // TODO: delete the executor node only
       setDSL({
@@ -40,9 +40,9 @@ export function TaskStep() {
         <Text>Select what evaluation flow you want to follow</Text>
       </VStack>
       <RadioCard.Root
-        value={wizardState.task}
+        value={workbenchState.task}
         onValueChange={(e) =>
-          handleTaskSelection(e.value as State["wizardState"]["task"])
+          handleTaskSelection(e.value as State["workbenchState"]["task"])
         }
       >
         <VStack width="full" gap={3}>

@@ -170,7 +170,8 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const { execute, abort, status, isAborting } = useExecuteEvaluation();
+  const { execute, abort, status, isAborting, rerunEvaluator } =
+    useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -192,6 +193,14 @@ export function EvaluationsV3Table({
       void execute({ type: "cell", rowIndex, targetId });
     },
     [execute],
+  );
+
+  // Handler for re-running a single evaluator
+  const handleRerunEvaluator = useCallback(
+    (rowIndex: number, targetId: string, evaluatorId: string) => {
+      void rerunEvaluator(rowIndex, targetId, evaluatorId);
+    },
+    [rerunEvaluator],
   );
 
   // Handler for stopping execution
@@ -740,6 +749,7 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleRerunEvaluator,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,
@@ -764,6 +774,7 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleRerunEvaluator,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,

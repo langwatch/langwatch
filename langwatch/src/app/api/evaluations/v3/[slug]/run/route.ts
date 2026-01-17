@@ -84,29 +84,29 @@ const loadExperiment = async (projectId: string, slug: string) => {
     return { error: "Evaluation not found", status: 404 as const };
   }
 
-  // Parse and validate wizardState
+  // Parse and validate workbenchState
   const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-    experiment.wizardState,
+    experiment.workbenchState,
   );
   if (!parseResult.success) {
     logger.error(
       { slug, errors: parseResult.error.errors },
-      "Invalid wizardState",
+      "Invalid workbenchState",
     );
     return { error: "Invalid evaluation configuration", status: 400 as const };
   }
 
-  return { experiment, wizardState: parseResult.data };
+  return { experiment, workbenchState: parseResult.data };
 };
 
 /**
- * Load execution data (dataset, prompts, agents) from wizardState
+ * Load execution data (dataset, prompts, agents) from workbenchState
  */
 const loadExecutionData = async (
   projectId: string,
-  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>,
+  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
 ) => {
-  const dataset = wizardState.datasets[0];
+  const dataset = workbenchState.datasets[0];
   if (!dataset) {
     return { error: "No dataset configured", status: 400 as const };
   }
@@ -141,7 +141,7 @@ const loadExecutionData = async (
   const loadedPrompts = new Map<string, VersionedPrompt>();
   const promptService = new PromptService(prisma);
 
-  for (const target of wizardState.targets) {
+  for (const target of workbenchState.targets) {
     if (target.type === "prompt" && target.promptId) {
       try {
         const prompt = await promptService.getPromptByIdOrHandle({
@@ -184,7 +184,7 @@ const loadExecutionData = async (
   const loadedAgents = new Map<string, TypedAgent>();
   const agentService = AgentService.create(prisma);
 
-  for (const target of wizardState.targets) {
+  for (const target of workbenchState.targets) {
     if (target.type === "agent" && target.dbAgentId) {
       const agent = await agentService.getById({
         id: target.dbAgentId,
@@ -203,16 +203,16 @@ const loadExecutionData = async (
  * Build state object for orchestrator
  */
 const buildState = (
-  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>,
+  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
 ): EvaluationsV3State => {
-  const dataset = wizardState.datasets[0]!;
+  const dataset = workbenchState.datasets[0]!;
 
   return {
-    name: wizardState.name,
-    datasets: wizardState.datasets as EvaluationsV3State["datasets"],
+    name: workbenchState.name,
+    datasets: workbenchState.datasets as EvaluationsV3State["datasets"],
     activeDatasetId: dataset.id ?? "dataset-1",
-    targets: wizardState.targets as EvaluationsV3State["targets"],
-    evaluators: wizardState.evaluators as EvaluationsV3State["evaluators"],
+    targets: workbenchState.targets as EvaluationsV3State["targets"],
+    evaluators: workbenchState.evaluators as EvaluationsV3State["evaluators"],
     results: {
       status: "running",
       targetOutputs: {},
@@ -256,10 +256,10 @@ app.post("/:slug/run", async (c) => {
   if ("error" in loadResult) {
     return c.json({ error: loadResult.error }, { status: loadResult.status });
   }
-  const { experiment, wizardState } = loadResult;
+  const { experiment, workbenchState } = loadResult;
 
   // Load execution data
-  const dataResult = await loadExecutionData(project.id, wizardState);
+  const dataResult = await loadExecutionData(project.id, workbenchState);
   if ("error" in dataResult) {
     return c.json({ error: dataResult.error }, { status: dataResult.status });
   }
@@ -267,7 +267,7 @@ app.post("/:slug/run", async (c) => {
     dataResult;
 
   // Build state for orchestrator
-  const state = buildState(wizardState);
+  const state = buildState(workbenchState);
 
   // Check if SSE mode is requested
   const acceptHeader = c.req.header("Accept") ?? "";
@@ -279,7 +279,7 @@ app.post("/:slug/run", async (c) => {
   );
 
   // Calculate total cells
-  const totalCells = datasetRows.length * wizardState.targets.length;
+  const totalCells = datasetRows.length * workbenchState.targets.length;
 
   if (isSSE) {
     // SSE streaming mode
