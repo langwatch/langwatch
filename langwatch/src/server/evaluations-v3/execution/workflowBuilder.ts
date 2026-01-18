@@ -50,7 +50,6 @@ export const buildCellWorkflow = (
   const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
 
   const workflowId = `eval_v3_${nanoid(8)}`;
-  const _traceId = `trace_${nanoid()}`;
 
   // Build entry node with the single row of data
   const entryNode = buildEntryNode(datasetColumns, datasetEntry);

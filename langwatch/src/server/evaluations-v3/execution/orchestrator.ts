@@ -23,6 +23,7 @@ import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger";
+import { generateOtelTraceId } from "~/utils/trace";
 import type {
   BatchEvaluationRepository,
   DatasetEntry,
@@ -208,8 +209,8 @@ export async function* executeCell(
     // Create set of target nodes for the result mapper
     const targetNodes = new Set([cell.targetId]);
 
-    // Generate trace ID for this cell execution
-    const traceId = `trace_${nanoid()}`;
+    // Generate OTEL-compliant trace ID for this cell execution
+    const traceId = generateOtelTraceId();
 
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;
