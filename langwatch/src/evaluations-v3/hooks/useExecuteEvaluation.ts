@@ -105,6 +105,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   /**
    * Helper to update target output in the store.
    * Uses functional update to properly merge with existing state.
+   * Also marks all evaluators for this cell as "running" since they start after target output.
    */
   const updateTargetOutput = useCallback(
     (
@@ -132,20 +133,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           };
         }
 
-        // Remove this cell from executingCells since target output is now ready.
-        // This allows the cell to display its output immediately while evaluators
-        // continue running in the background (their chips show spinners independently).
-        let newExecutingCells = state.results.executingCells;
-        if (newExecutingCells) {
-          const cellKey = `${rowIndex}:${targetId}`;
-          if (newExecutingCells.has(cellKey)) {
-            newExecutingCells = new Set(newExecutingCells);
-            newExecutingCells.delete(cellKey);
-            // If no cells remain, set to undefined
-            if (newExecutingCells.size === 0) {
-              newExecutingCells = undefined;
-            }
-          }
+        // Mark all evaluators for this cell as "running"
+        // They will be removed when their results arrive
+        const newRunningEvaluators = new Set(
+          state.results.runningEvaluators ?? [],
+        );
+        for (const evaluator of state.evaluators) {
+          newRunningEvaluators.add(`${rowIndex}:${targetId}:${evaluator.id}`);
         }
 
         return {
@@ -156,7 +150,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               [targetId]: newOutputs,
             },
             targetMetadata: newMetadata,
-            executingCells: newExecutingCells,
+            runningEvaluators: newRunningEvaluators,
           },
         };
       });
@@ -174,20 +168,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const newErrors = [...existingErrors];
         newErrors[rowIndex] = errorMsg;
 
-        // Remove this cell from executingCells since we have a result (error).
-        // Same logic as updateTargetOutput - the cell should show the error,
-        // not a loading skeleton.
-        let newExecutingCells = state.results.executingCells;
-        if (newExecutingCells) {
-          const cellKey = `${rowIndex}:${targetId}`;
-          if (newExecutingCells.has(cellKey)) {
-            newExecutingCells = new Set(newExecutingCells);
-            newExecutingCells.delete(cellKey);
-            if (newExecutingCells.size === 0) {
-              newExecutingCells = undefined;
-            }
-          }
-        }
+        // NOTE: We do NOT remove the cell from executingCells here.
+        // The cell stays in executingCells until execution cleanup happens.
+        // TargetCell's isLoading checks for both (cell in executingCells AND no output/error).
 
         return {
           results: {
@@ -196,7 +179,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               ...state.results.errors,
               [targetId]: newErrors,
             },
-            executingCells: newExecutingCells,
+            // Keep executingCells unchanged
           },
         };
       });
@@ -206,6 +189,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Helper to update evaluator result in the store.
+   * Also removes the evaluator from runningEvaluators since it has completed.
    */
   const updateEvaluatorResult = useCallback(
     (
@@ -221,6 +205,19 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const newEvalResults = [...existingEvalResults];
         newEvalResults[rowIndex] = result;
 
+        // Remove this evaluator from runningEvaluators
+        let newRunningEvaluators = state.results.runningEvaluators;
+        if (newRunningEvaluators) {
+          const evaluatorKey = `${rowIndex}:${targetId}:${evaluatorId}`;
+          if (newRunningEvaluators.has(evaluatorKey)) {
+            newRunningEvaluators = new Set(newRunningEvaluators);
+            newRunningEvaluators.delete(evaluatorKey);
+            if (newRunningEvaluators.size === 0) {
+              newRunningEvaluators = undefined;
+            }
+          }
+        }
+
         return {
           results: {
             ...state.results,
@@ -231,6 +228,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 [evaluatorId]: newEvalResults,
               },
             },
+            runningEvaluators: newRunningEvaluators,
           },
         };
       });
@@ -325,15 +323,23 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         case "stopped":
           setStatus("stopped");
           setIsAborting(false); // Clear aborting state when stop is confirmed
-          // Update store status and clear executing cells
-          setResults({ status: "stopped", executingCells: undefined });
+          // Update store status and clear executing cells and running evaluators
+          setResults({
+            status: "stopped",
+            executingCells: undefined,
+            runningEvaluators: undefined,
+          });
           break;
 
         case "done":
           setStatus("completed");
           setIsAborting(false); // Clear aborting state on completion too
-          // Update store status and clear executing cells
-          setResults({ status: "success", executingCells: undefined });
+          // Update store status and clear executing cells and running evaluators
+          setResults({
+            status: "success",
+            executingCells: undefined,
+            runningEvaluators: undefined,
+          });
           break;
       }
     },
@@ -509,9 +515,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           id: e.id,
           evaluatorType: e.evaluatorType,
           name: e.name,
-          settings: e.settings,
           inputs: e.inputs,
           mappings: e.mappings,
+          dbEvaluatorId: e.dbEvaluatorId,
         })),
         scope,
         concurrency,

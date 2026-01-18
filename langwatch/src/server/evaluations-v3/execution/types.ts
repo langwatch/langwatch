@@ -1,9 +1,11 @@
 import { z } from "zod";
-import type {
-  DatasetReference,
-  EvaluatorConfig,
-  FieldMapping,
-  TargetConfig,
+import {
+  evaluatorConfigSchema,
+  targetConfigSchema,
+  type DatasetReference,
+  type EvaluatorConfig,
+  type FieldMapping,
+  type TargetConfig,
 } from "~/evaluations-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
@@ -71,38 +73,9 @@ export const executionRequestSchema = z.object({
       .array(z.object({ id: z.string() }).passthrough())
       .optional(),
   }),
-  targets: z.array(
-    z.object({
-      id: z.string(),
-      type: z.enum(["prompt", "agent"]),
-      name: z.string(),
-      promptId: z.string().optional(),
-      promptVersionId: z.string().optional(),
-      promptVersionNumber: z.number().optional(),
-      dbAgentId: z.string().optional(),
-      inputs: z
-        .array(z.object({ identifier: z.string(), type: z.string() }))
-        .optional(),
-      outputs: z
-        .array(z.object({ identifier: z.string(), type: z.string() }))
-        .optional(),
-      mappings: z.record(z.string(), z.record(z.string(), z.any())),
-      localPromptConfig: z.any().optional(),
-    }),
-  ),
-  evaluators: z.array(
-    z.object({
-      id: z.string(),
-      evaluatorType: z.string(),
-      name: z.string(),
-      settings: z.record(z.string(), z.any()),
-      inputs: z.array(z.object({ identifier: z.string(), type: z.string() })),
-      mappings: z.record(
-        z.string(),
-        z.record(z.string(), z.record(z.string(), z.any())),
-      ),
-    }),
-  ),
+  // Use shared schemas to avoid duplication and ensure consistency
+  targets: z.array(targetConfigSchema),
+  evaluators: z.array(evaluatorConfigSchema),
   scope: z.discriminatedUnion("type", [
     z.object({ type: z.literal("full") }),
     z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),

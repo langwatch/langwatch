@@ -1,3 +1,4 @@
+import type { Evaluator } from "@prisma/client";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -25,6 +26,7 @@ import {
   runOrchestrator,
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
+import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import {
   PromptService,
   type VersionedPrompt,
@@ -77,6 +79,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   let datasetColumns: Array<{ id: string; name: string; type: string }>;
   let loadedPrompts: Map<string, VersionedPrompt>;
   let loadedAgents: Map<string, TypedAgent>;
+  let loadedEvaluators: Map<string, Evaluator>;
 
   try {
     // Load dataset
@@ -165,6 +168,21 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         }
       }
     }
+
+    // Load evaluators from DB (settings are always fetched fresh from DB)
+    loadedEvaluators = new Map();
+    const evaluatorService = EvaluatorService.create(prisma);
+    for (const evaluator of request.evaluators) {
+      if (evaluator.dbEvaluatorId) {
+        const dbEvaluator = await evaluatorService.getById({
+          id: evaluator.dbEvaluatorId,
+          projectId,
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluator.dbEvaluatorId, dbEvaluator);
+        }
+      }
+    }
   } catch (error) {
     logger.error({ error, projectId }, "Failed to load execution data");
     captureException(error, { extra: { projectId } });
@@ -205,6 +223,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         datasetColumns,
         loadedPrompts: loadedPrompts as any,
         loadedAgents: loadedAgents as any,
+        loadedEvaluators,
         saveToEs: shouldSaveToEs,
         concurrency: request.concurrency,
       });

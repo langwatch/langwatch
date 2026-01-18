@@ -86,7 +86,6 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
     id: "eval-1",
     evaluatorType: "langevals/exact_match", // Use full evaluator type
     name: "Exact Match",
-    settings: {},
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },

@@ -55,6 +55,14 @@ const DEFAULT_CONCURRENCY = parseInt(
 );
 
 /**
+ * Evaluator DB config type - settings stored in DB
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: string;
+  settings?: Record<string, unknown>;
+};
+
+/**
  * Input data required to run the orchestrator.
  */
 export type OrchestratorInput = {
@@ -67,6 +75,8 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
+  /** Evaluators loaded from DB - settings are fetched fresh from here */
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>;
   /** Enable saving results to Elasticsearch */
   saveToEs?: boolean;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
@@ -184,7 +194,11 @@ export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
-  loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
+  loadedData: {
+    prompt?: VersionedPrompt;
+    agent?: TypedAgent;
+    evaluators?: Map<string, { id: string; config: unknown }>;
+  },
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
@@ -477,6 +491,7 @@ export async function* runOrchestrator(
     datasetColumns,
     loadedPrompts,
     loadedAgents,
+    loadedEvaluators,
     saveToEs = false,
     runId: providedRunId,
     concurrency: requestedConcurrency,
@@ -740,11 +755,14 @@ export async function* runOrchestrator(
             }
 
             // Get loaded data for this target
-            const loadedData = getLoadedDataForTarget(
-              cell.targetConfig,
-              loadedPrompts,
-              loadedAgents,
-            );
+            const loadedData = {
+              ...getLoadedDataForTarget(
+                cell.targetConfig,
+                loadedPrompts,
+                loadedAgents,
+              ),
+              evaluators: loadedEvaluators,
+            };
 
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);

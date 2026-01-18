@@ -141,6 +141,10 @@ export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 /**
  * Zod schema for evaluator config validation.
  *
+ * Note: Settings are NOT used at execution time - they are always fetched
+ * fresh from the database via dbEvaluatorId. This prevents sync issues.
+ * The settings field is kept for backward compatibility but is ignored.
+ *
  * Mappings are stored per-dataset AND per-target:
  * mappings[datasetId][targetId][inputFieldName] = FieldMapping
  *
@@ -152,13 +156,15 @@ export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
   name: z.string(),
-  settings: z.record(z.string(), z.unknown()),
+  /** @deprecated Settings are fetched from DB at execution time, not from workbench state */
+  settings: z.record(z.string(), z.unknown()).optional(),
   inputs: z.array(fieldSchema),
   // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
   mappings: z.record(
     z.string(),
     z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
   ),
+  /** Reference to the database evaluator - settings are fetched from here */
   dbEvaluatorId: z.string().optional(),
 });
 export type EvaluatorConfig = Omit<
@@ -246,11 +252,17 @@ export type EvaluationResults = {
   progress?: number;
   total?: number;
   /**
-   * Set of cells currently being executed.
+   * Set of cells currently being executed (waiting for target output).
    * Key format: "rowIndex:targetId"
-   * This is the single source of truth for determining which cells show loading state.
+   * Used to show loading skeleton on target cells.
    */
   executingCells?: Set<string>;
+  /**
+   * Set of evaluators currently running (waiting for evaluator result).
+   * Key format: "rowIndex:targetId:evaluatorId"
+   * Used to show spinner on evaluator chips.
+   */
+  runningEvaluators?: Set<string>;
   // Per-row results - arrays can have holes (undefined) for rows not yet executed
   targetOutputs: Record<string, Array<unknown>>;
   // Per-row metadata - arrays can have holes (undefined/null) for rows not yet executed
@@ -547,6 +559,12 @@ export type TableMeta = {
   isTargetExecuting?: (targetId: string) => boolean;
   /** Check if a specific cell is being executed */
   isCellExecuting?: (rowIndex: number, targetId: string) => boolean;
+  /** Check if a specific evaluator is currently running */
+  isEvaluatorRunning?: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => boolean;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;

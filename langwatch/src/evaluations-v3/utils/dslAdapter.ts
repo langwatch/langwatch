@@ -222,7 +222,7 @@ const createEvaluatorNode = (
       inputs,
       outputs: [{ identifier: "passed", type: "bool" }],
       evaluator: evaluator.evaluatorType,
-      ...evaluator.settings,
+      // Note: settings are fetched from DB at execution time, not stored in workbench state
     },
     position: { x: 600, y: targetIndex * 200 + evalIndex * 100 },
   };

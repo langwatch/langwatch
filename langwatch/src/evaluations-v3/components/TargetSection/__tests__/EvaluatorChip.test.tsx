@@ -22,7 +22,6 @@ const createEvaluator = (
   dbEvaluatorId: "db-eval-1",
   mappings: {},
   inputs: [],
-  settings: {},
   ...overrides,
 });
 
@@ -32,12 +31,12 @@ describe("EvaluatorChip", () => {
   });
 
   describe("Status Display", () => {
-    it("shows gray circle for pending status when target has no output", () => {
+    it("shows gray circle for pending status when not running", () => {
       const { container } = render(
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={undefined}
-          targetHasOutput={false}
+          isRunning={false}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -51,13 +50,12 @@ describe("EvaluatorChip", () => {
       expect(container.querySelector(".chakra-spinner")).toBeNull();
     });
 
-    it("shows spinner when target has output but evaluator result is undefined and execution is running", () => {
+    it("shows spinner when isRunning is true and no result yet", () => {
       const { container } = render(
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={undefined}
-          targetHasOutput={true}
-          isExecutionRunning={true}
+          isRunning={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -69,20 +67,19 @@ describe("EvaluatorChip", () => {
       expect(container.querySelector(".chakra-spinner")).not.toBeNull();
     });
 
-    it("shows pending (gray circle) when target has output but execution is stopped", () => {
+    it("shows pending (gray circle) when isRunning is false", () => {
       const { container } = render(
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={undefined}
-          targetHasOutput={true}
-          isExecutionRunning={false}
+          isRunning={false}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      // Should NOT show spinner - execution has stopped
+      // Should NOT show spinner - not running
       expect(container.querySelector(".chakra-spinner")).toBeNull();
     });
 
@@ -91,7 +88,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result="running"
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -107,7 +103,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ passed: true, score: 1.0 }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -124,7 +119,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ error: "API timeout" }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -146,7 +140,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "processed", passed: true, score: 1 }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
           onRerun={onRerun}
@@ -175,7 +168,7 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={undefined}
-          targetHasOutput={false}
+          isRunning={false}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
           onRerun={onRerun}
@@ -199,7 +192,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "running" }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
           onRerun={onRerun}
@@ -222,7 +214,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "processed", passed: true, score: 1 }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -237,12 +228,12 @@ describe("EvaluatorChip", () => {
       expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
     });
 
-    it("shows spinner when evaluator transitions to running state", () => {
+    it("shows spinner when isRunning is true", () => {
       const { container } = render(
         <EvaluatorChip
           evaluator={createEvaluator()}
-          result={{ status: "running" }}
-          targetHasOutput={true}
+          result={undefined}
+          isRunning={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
           onRerun={vi.fn()}
@@ -262,7 +253,6 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "running" }}
-          targetHasOutput={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,

@@ -1237,7 +1237,6 @@ const createTestEvaluator = (
   id,
   evaluatorType: evaluatorType as EvaluatorConfig["evaluatorType"],
   name: `Evaluator ${id}`,
-  settings: {},
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
   mappings,
 });

@@ -32,6 +32,14 @@ import type {
 // ============================================================================
 
 /**
+ * Evaluator DB config type
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: string;
+  settings?: Record<string, unknown>;
+};
+
+/**
  * Builds a mini-workflow for executing a single cell (row + target + evaluators).
  *
  * The workflow structure:
@@ -44,6 +52,7 @@ export const buildCellWorkflow = (
   loadedData: {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
+    evaluators?: Map<string, { id: string; config: unknown }>;
   },
 ): WorkflowBuilderOutput => {
   const { cell, datasetColumns } = input;
@@ -66,6 +75,7 @@ export const buildCellWorkflow = (
     evaluatorConfigs,
     targetConfig.id,
     cell,
+    loadedData.evaluators,
   );
 
   // Build edges
@@ -387,6 +397,7 @@ const buildEvaluatorNodes = (
   evaluatorConfigs: EvaluatorConfig[],
   targetId: string,
   cell: ExecutionCell,
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
 ): {
   evaluatorNodes: Array<Node<Evaluator>>;
   evaluatorNodeIds: Record<string, string>;
@@ -399,7 +410,21 @@ const buildEvaluatorNodes = (
     const nodeId = `${targetId}.${evaluator.id}`;
     evaluatorNodeIds[evaluator.id] = nodeId;
 
-    const node = buildEvaluatorNode(evaluator, nodeId, targetId, cell, index);
+    // Get settings from loaded evaluator (DB) instead of workbench state
+    const dbEvaluator = evaluator.dbEvaluatorId
+      ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
+      : undefined;
+    const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
+    const settings = dbConfig?.settings ?? {};
+
+    const node = buildEvaluatorNode(
+      evaluator,
+      nodeId,
+      targetId,
+      cell,
+      index,
+      settings,
+    );
     evaluatorNodes.push(node);
   });
 
@@ -408,6 +433,7 @@ const buildEvaluatorNodes = (
 
 /**
  * Builds a single evaluator node.
+ * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
  */
 export const buildEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -415,6 +441,7 @@ export const buildEvaluatorNode = (
   targetId: string,
   cell: ExecutionCell,
   index: number,
+  settings: Record<string, unknown> = {},
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef =
@@ -425,6 +452,15 @@ export const buildEvaluatorNode = (
     identifier: input.identifier,
     type: input.type,
     value: getEvaluatorInputValue(input.identifier, evaluator, targetId, cell),
+  }));
+
+  // Convert evaluator settings to parameters format expected by langwatch_nlp
+  // Settings like { model: "...", prompt: "...", max_tokens: 100 } become:
+  // [{ identifier: "model", type: "str", value: "..." }, ...]
+  const parameters: Field[] = Object.entries(settings).map(([key, value]) => ({
+    identifier: key,
+    type: "str" as const, // Settings are treated as strings by default
+    value,
   }));
 
   return {
@@ -441,7 +477,7 @@ export const buildEvaluatorNode = (
         { identifier: "label", type: "str" },
       ],
       evaluator: evaluator.evaluatorType,
-      ...evaluator.settings,
+      parameters,
     },
   };
 };

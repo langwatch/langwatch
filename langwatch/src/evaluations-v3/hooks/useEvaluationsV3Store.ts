@@ -814,6 +814,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         targetMetadata: {},
         evaluatorResults: {},
         errors: {},
+        executingCells: undefined,
+        runningEvaluators: undefined,
       },
     });
   },

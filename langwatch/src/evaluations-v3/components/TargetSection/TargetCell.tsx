@@ -49,8 +49,8 @@ type TargetCellContentProps = {
   traceId?: string | null;
   /** Duration/latency for this execution in milliseconds */
   duration?: number | null;
-  /** Whether the overall execution is running */
-  isExecutionRunning?: boolean;
+  /** Check if a specific evaluator is currently running */
+  isEvaluatorRunning?: (evaluatorId: string) => boolean;
   onAddEvaluator?: () => void;
   /** Handler for running this specific cell */
   onRunCell?: () => void;
@@ -68,7 +68,7 @@ export function TargetCellContent({
   isLoading,
   traceId,
   duration,
-  isExecutionRunning,
+  isEvaluatorRunning,
   onAddEvaluator,
   onRunCell,
   onStopCell,
@@ -359,8 +359,7 @@ export function TargetCellContent({
           evaluator={evaluator}
           result={evaluatorResults[evaluator.id]}
           hasMissingMappings={missingMappingsSet.has(evaluator.id)}
-          targetHasOutput={output !== undefined && output !== null}
-          isExecutionRunning={isExecutionRunning}
+          isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
           onEdit={() => {
             const mappingsConfig = createMappingsConfig(evaluator);
             openDrawer("evaluatorEditor", {

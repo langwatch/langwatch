@@ -11,6 +11,7 @@
  * - SSE: Add "Accept: text/event-stream" header for real-time streaming
  */
 
+import type { Evaluator } from "@prisma/client";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -30,6 +31,7 @@ import { prisma } from "~/server/db";
 import { runOrchestrator } from "~/server/evaluations-v3/execution/orchestrator";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
+import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import {
   PromptService,
   type VersionedPrompt,
@@ -196,7 +198,30 @@ const loadExecutionData = async (
     }
   }
 
-  return { datasetRows, datasetColumns, loadedPrompts, loadedAgents, dataset };
+  // Load evaluators from DB (settings are always fetched fresh)
+  const loadedEvaluators = new Map<string, Evaluator>();
+  const evaluatorService = EvaluatorService.create(prisma);
+
+  for (const evaluator of workbenchState.evaluators) {
+    if (evaluator.dbEvaluatorId) {
+      const dbEvaluator = await evaluatorService.getById({
+        id: evaluator.dbEvaluatorId,
+        projectId,
+      });
+      if (dbEvaluator) {
+        loadedEvaluators.set(evaluator.dbEvaluatorId, dbEvaluator);
+      }
+    }
+  }
+
+  return {
+    datasetRows,
+    datasetColumns,
+    loadedPrompts,
+    loadedAgents,
+    loadedEvaluators,
+    dataset,
+  };
 };
 
 /**
@@ -263,8 +288,13 @@ app.post("/:slug/run", async (c) => {
   if ("error" in dataResult) {
     return c.json({ error: dataResult.error }, { status: dataResult.status });
   }
-  const { datasetRows, datasetColumns, loadedPrompts, loadedAgents } =
-    dataResult;
+  const {
+    datasetRows,
+    datasetColumns,
+    loadedPrompts,
+    loadedAgents,
+    loadedEvaluators,
+  } = dataResult;
 
   // Build state for orchestrator
   const state = buildState(workbenchState);
@@ -294,6 +324,7 @@ app.post("/:slug/run", async (c) => {
           datasetColumns,
           loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
           loadedAgents: loadedAgents as Map<string, TypedAgent>,
+          loadedEvaluators,
           saveToEs: true,
         });
 
@@ -336,6 +367,7 @@ app.post("/:slug/run", async (c) => {
         datasetColumns,
         loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
         loadedAgents: loadedAgents as Map<string, TypedAgent>,
+        loadedEvaluators,
         saveToEs: true,
         runId, // Pass the run ID we generated
       });

@@ -67,7 +67,6 @@ const _createTestEvaluator = (
   id,
   evaluatorType: "langevals/exact_match",
   name: `Evaluator ${id}`,
-  settings: {},
   inputs,
   mappings,
 });

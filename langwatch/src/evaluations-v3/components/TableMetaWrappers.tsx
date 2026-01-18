@@ -138,7 +138,14 @@ export const TargetCellFromMeta = ({
       isLoading={data?.isLoading}
       traceId={data?.traceId}
       duration={data?.duration}
-      isExecutionRunning={tableMeta?.isExecutionRunning}
+      // Pass a callback to check if a specific evaluator is running
+      isEvaluatorRunning={
+        tableMeta?.isEvaluatorRunning
+          ? (evaluatorId) =>
+              tableMeta.isEvaluatorRunning?.(rowIndex, targetId, evaluatorId) ??
+              false
+          : undefined
+      }
       row={rowIndex}
       onAddEvaluator={tableMeta?.handleAddEvaluator}
       onRunCell={
