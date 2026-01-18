@@ -323,23 +323,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         case "stopped":
           setStatus("stopped");
           setIsAborting(false); // Clear aborting state when stop is confirmed
-          // Update store status and clear executing cells and running evaluators
-          setResults({
-            status: "stopped",
-            executingCells: undefined,
-            runningEvaluators: undefined,
-          });
+          // Update store status immediately for UI feedback
+          // NOTE: Don't clear executingCells/runningEvaluators here!
+          // cleanupThisExecution() handles removing only THIS execution's state
+          // to preserve concurrent executions.
+          setResults({ status: "stopped" });
           break;
 
         case "done":
           setStatus("completed");
           setIsAborting(false); // Clear aborting state on completion too
-          // Update store status and clear executing cells and running evaluators
-          setResults({
-            status: "success",
-            executingCells: undefined,
-            runningEvaluators: undefined,
-          });
+          // Update store status immediately for UI feedback
+          // NOTE: Don't clear executingCells/runningEvaluators here!
+          // cleanupThisExecution() handles removing only THIS execution's state
+          // to preserve concurrent executions.
+          setResults({ status: "success" });
           break;
       }
     },
@@ -523,26 +521,59 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         concurrency,
       };
 
-      // Helper to remove this execution's cells from executingCells when done
-      const cleanupExecutingCells = () => {
+      // Helper to remove this execution's cells and evaluators from state when done
+      // This only removes state for THIS execution, preserving concurrent executions
+      const cleanupThisExecution = () => {
         useEvaluationsV3Store.setState((state) => {
-          if (!state.results.executingCells) return state;
-
           // Remove only the cells from THIS execution
-          const remainingCells = new Set(
-            [...state.results.executingCells].filter(
-              (cellKey) => !executingCellsSet.has(cellKey),
-            ),
-          );
+          let remainingCells: Set<string> | undefined = state.results
+            .executingCells
+            ? new Set(
+                [...state.results.executingCells].filter(
+                  (cellKey) => !executingCellsSet.has(cellKey),
+                ),
+              )
+            : undefined;
+          if (remainingCells?.size === 0) remainingCells = undefined;
 
-          // If no cells remain, set to undefined and status to idle/success
-          const hasRemainingCells = remainingCells.size > 0;
+          // Remove runningEvaluators for THIS execution's cells
+          // Key format: "rowIndex:targetId:evaluatorId"
+          let remainingEvaluators: Set<string> | undefined = state.results
+            .runningEvaluators
+            ? new Set(
+                [...state.results.runningEvaluators].filter((evalKey) => {
+                  // Extract rowIndex:targetId from the evaluator key
+                  const parts = evalKey.split(":");
+                  if (parts.length >= 2) {
+                    const cellKey = `${parts[0]}:${parts[1]}`;
+                    return !executingCellsSet.has(cellKey);
+                  }
+                  return true;
+                }),
+              )
+            : undefined;
+          if (remainingEvaluators?.size === 0) remainingEvaluators = undefined;
+
+          // Determine if there's remaining work from other concurrent executions
+          const hasRemainingWork =
+            (remainingCells?.size ?? 0) > 0 ||
+            (remainingEvaluators?.size ?? 0) > 0;
+
+          // Determine the final status:
+          // - If there's remaining work, keep current status
+          // - If status was explicitly set to "stopped", keep it
+          // - Otherwise, set to "success"
+          const shouldKeepCurrentStatus =
+            hasRemainingWork || state.results.status === "stopped";
 
           return {
             results: {
               ...state.results,
-              executingCells: hasRemainingCells ? remainingCells : undefined,
-              status: hasRemainingCells ? state.results.status : "success",
+              executingCells: remainingCells,
+              runningEvaluators: remainingEvaluators,
+              status: shouldKeepCurrentStatus
+                ? state.results.status
+                : "success",
             },
           };
         });
@@ -561,7 +592,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             setStatus("error");
             setError(err.message);
             setIsAborting(false); // Clear aborting state on error
-            cleanupExecutingCells();
+            cleanupThisExecution();
             toaster.create({
               title: "Execution Failed",
               description: err.message,
@@ -571,13 +602,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         });
 
         // Clean up this execution's cells when SSE completes
-        cleanupExecutingCells();
+        cleanupThisExecution();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
         setError(message);
         setIsAborting(false); // Clear aborting state on error
-        cleanupExecutingCells();
+        cleanupThisExecution();
       }
     },
     [

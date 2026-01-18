@@ -244,17 +244,26 @@ describe("useExecuteEvaluation", () => {
       setupStore();
 
       let sseOnEvent: (event: EvaluationV3Event) => void;
+      let resolveSSE: (() => void) | null = null;
 
       mockFetchSSE.mockImplementation(
         async ({
           onEvent,
+          shouldStopProcessing,
         }: {
           onEvent: (event: EvaluationV3Event) => void;
+          shouldStopProcessing?: (event: EvaluationV3Event) => boolean;
         }) => {
-          sseOnEvent = onEvent;
-          // Don't resolve - let us control when events arrive
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
-          await new Promise(() => {});
+          sseOnEvent = (event: EvaluationV3Event) => {
+            onEvent(event);
+            // Resolve when shouldStopProcessing returns true (simulates real fetchSSE behavior)
+            if (shouldStopProcessing?.(event)) {
+              resolveSSE?.();
+            }
+          };
+          await new Promise<void>((resolve) => {
+            resolveSSE = resolve;
+          });
         },
       );
 
@@ -274,14 +283,17 @@ describe("useExecuteEvaluation", () => {
       expect(useEvaluationsV3Store.getState().results.status).toBe("running");
 
       // Simulate stopped event (what happens when abort succeeds)
+      // This will also resolve the SSE promise, triggering cleanup
       act(() => {
         sseOnEvent({ type: "stopped", reason: "user" });
       });
 
-      // Verify hook status is stopped
-      expect(result.current.status).toBe("stopped");
+      // Wait for cleanup to complete
+      await waitFor(() => {
+        expect(result.current.status).toBe("stopped");
+      });
 
-      // Verify store status is also stopped (this was the bug!)
+      // Verify store status is also stopped
       expect(useEvaluationsV3Store.getState().results.status).toBe("stopped");
 
       // Verify executingCells is cleared
@@ -343,16 +355,26 @@ describe("useExecuteEvaluation", () => {
       setupStore();
 
       let sseOnEvent: (event: EvaluationV3Event) => void;
+      let resolveSSE: (() => void) | null = null;
 
       mockFetchSSE.mockImplementation(
         async ({
           onEvent,
+          shouldStopProcessing,
         }: {
           onEvent: (event: EvaluationV3Event) => void;
+          shouldStopProcessing?: (event: EvaluationV3Event) => boolean;
         }) => {
-          sseOnEvent = onEvent;
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
-          await new Promise(() => {});
+          sseOnEvent = (event: EvaluationV3Event) => {
+            onEvent(event);
+            // Resolve when shouldStopProcessing returns true (simulates real fetchSSE behavior)
+            if (shouldStopProcessing?.(event)) {
+              resolveSSE?.();
+            }
+          };
+          await new Promise<void>((resolve) => {
+            resolveSSE = resolve;
+          });
         },
       );
 
@@ -368,7 +390,7 @@ describe("useExecuteEvaluation", () => {
         sseOnEvent({ type: "execution_started", runId: "run-123", total: 2 });
       });
 
-      // Simulate done event
+      // Simulate done event - this will also resolve SSE and trigger cleanup
       act(() => {
         sseOnEvent({
           type: "done",
@@ -386,8 +408,10 @@ describe("useExecuteEvaluation", () => {
         });
       });
 
-      // Verify hook status is completed
-      expect(result.current.status).toBe("completed");
+      // Wait for cleanup to complete
+      await waitFor(() => {
+        expect(result.current.status).toBe("completed");
+      });
 
       // Verify store status is success
       expect(useEvaluationsV3Store.getState().results.status).toBe("success");
@@ -941,6 +965,170 @@ describe("useExecuteEvaluation", () => {
         // Row 1 metadata should still exist
         expect(targetMetadata?.[1]).toEqual({ cost: 0.02, latency: 200 });
       });
+    });
+  });
+
+  describe("Concurrent Execution", () => {
+    /**
+     * This tests that when two cells are executed concurrently,
+     * completing one execution doesn't clear the other's state.
+     *
+     * Bug scenario:
+     * 1. Start cell A execution
+     * 2. Start cell B execution (while A is still running)
+     * 3. Cell A receives "done" event
+     * 4. Cell B should STILL show loading state (not cleared by A's done)
+     */
+    it("does not clear other execution's state when one concurrent execution completes", async () => {
+      setupStore();
+
+      // Add a second target for clarity
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        targets: [
+          ...state.targets,
+          {
+            id: "target-2",
+            name: "Target 2",
+            type: "prompt",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {
+              "dataset-1": {
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "input",
+                },
+              },
+            },
+          },
+        ],
+      }));
+
+      // We'll track which execution's events we're handling
+      let executionAOnEvent: ((event: EvaluationV3Event) => void) | null = null;
+      let executionBOnEvent: ((event: EvaluationV3Event) => void) | null = null;
+      let executionAResolve: (() => void) | null = null;
+      let executionBResolve: (() => void) | null = null;
+      let executionCount = 0;
+
+      mockFetchSSE.mockImplementation(
+        async ({ onEvent, shouldStopProcessing }) => {
+          executionCount++;
+          if (executionCount === 1) {
+            executionAOnEvent = (event: EvaluationV3Event) => {
+              onEvent(event);
+              // Resolve when shouldStopProcessing returns true (simulating fetchSSE behavior)
+              if (shouldStopProcessing?.(event)) {
+                executionAResolve?.();
+              }
+            };
+            await new Promise<void>((resolve) => {
+              executionAResolve = resolve;
+            });
+          } else {
+            executionBOnEvent = (event: EvaluationV3Event) => {
+              onEvent(event);
+              if (shouldStopProcessing?.(event)) {
+                executionBResolve?.();
+              }
+            };
+            await new Promise<void>((resolve) => {
+              executionBResolve = resolve;
+            });
+          }
+        },
+      );
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Step 1: Start execution A (cell at row 0, target-1)
+      act(() => {
+        void result.current.execute({
+          type: "cell",
+          rowIndex: 0,
+          targetId: "target-1",
+        });
+      });
+
+      // Wait for execution A to start
+      await waitFor(() => {
+        expect(executionAOnEvent).not.toBeNull();
+      });
+
+      // Verify cell A is in executingCells
+      let state = useEvaluationsV3Store.getState();
+      expect(state.results.executingCells?.has("0:target-1")).toBe(true);
+
+      // Step 2: Start execution B (cell at row 1, target-1) while A is still running
+      act(() => {
+        void result.current.execute({
+          type: "cell",
+          rowIndex: 1,
+          targetId: "target-1",
+        });
+      });
+
+      // Wait for execution B to start
+      await waitFor(() => {
+        expect(executionBOnEvent).not.toBeNull();
+      });
+
+      // Verify BOTH cells are in executingCells
+      state = useEvaluationsV3Store.getState();
+      expect(state.results.executingCells?.has("0:target-1")).toBe(true);
+      expect(state.results.executingCells?.has("1:target-1")).toBe(true);
+
+      // Step 3: Execution A receives events and completes
+      act(() => {
+        executionAOnEvent!({
+          type: "execution_started",
+          runId: "run-A",
+          total: 1,
+        });
+        executionAOnEvent!({
+          type: "target_result",
+          rowIndex: 0,
+          targetId: "target-1",
+          output: "Output A",
+        });
+        executionAOnEvent!({
+          type: "evaluator_result",
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          result: { status: "processed", passed: true, score: 1.0 },
+        });
+        executionAOnEvent!({ type: "done", summary: {} as any });
+      });
+
+      // Wait for A's events to be processed
+      await waitFor(() => {
+        const s = useEvaluationsV3Store.getState();
+        return s.results.targetOutputs["target-1"]?.[0] === "Output A";
+      });
+
+      // CRITICAL: Execution B should STILL be in executingCells
+      // This is the bug - the "done" event from A clears ALL executingCells
+      state = useEvaluationsV3Store.getState();
+      expect(state.results.executingCells?.has("1:target-1")).toBe(true);
+
+      // Cell A should be removed from executingCells (it's done)
+      expect(state.results.executingCells?.has("0:target-1")).toBe(false);
+
+      // Cell B should still be loading (no output yet)
+      expect(state.results.targetOutputs["target-1"]?.[1]).toBeUndefined();
     });
   });
 });

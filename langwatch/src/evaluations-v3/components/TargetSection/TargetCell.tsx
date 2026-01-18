@@ -318,8 +318,8 @@ export function TargetCellContent({
             <Box
               position="absolute"
               bottom={0}
-              left={"-12px"}
-              right={"-12px"}
+              left={"-10px"}
+              right={"-10px"}
               height="40px"
               cursor="pointer"
               onClick={handleExpandOutput}
