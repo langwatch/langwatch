@@ -314,7 +314,6 @@ describe("useExecuteEvaluation", () => {
           onEvent: (event: EvaluationV3Event) => void;
         }) => {
           sseOnEvent = onEvent;
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
           await new Promise(() => {});
         },
       );
@@ -635,7 +634,6 @@ describe("useExecuteEvaluation", () => {
           onEvent: (event: EvaluationV3Event) => void;
         }) => {
           sseOnEvent = onEvent;
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
           await new Promise(() => {});
         },
       );

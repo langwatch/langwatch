@@ -402,7 +402,13 @@ export function BatchEvaluationResults({
         isLoading: false,
       },
     ];
-  }, [compareMode, transformedData, targetCount, stableRunColorMap, runNameMap]);
+  }, [
+    compareMode,
+    transformedData,
+    targetCount,
+    stableRunColorMap,
+    runNameMap,
+  ]);
 
   // Chart data to display - either comparison data or single run data
   const chartDisplayData = compareMode ? comparisonData : singleRunChartData;

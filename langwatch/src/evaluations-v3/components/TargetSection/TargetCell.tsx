@@ -277,7 +277,12 @@ export function TargetCellContent({
         // Expanded view - scrollable, no max height
         return (
           <VStack flex={1} overflowY="auto" minHeight={0} align="start">
-            <Text fontSize="11px" color="gray.500" fontWeight="700" textTransform="uppercase">
+            <Text
+              fontSize="11px"
+              color="gray.500"
+              fontWeight="700"
+              textTransform="uppercase"
+            >
               Output
             </Text>
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">

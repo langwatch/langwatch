@@ -1,11 +1,11 @@
 import { z } from "zod";
 import {
-  evaluatorConfigSchema,
-  targetConfigSchema,
   type DatasetReference,
   type EvaluatorConfig,
+  evaluatorConfigSchema,
   type FieldMapping,
   type TargetConfig,
+  targetConfigSchema,
 } from "~/evaluations-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";

@@ -803,7 +803,9 @@ describe("PromptEditorDrawer", () => {
       });
 
       // Apply button should be visible
-      expect(screen.getByRole("button", { name: /apply/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /apply/i }),
+      ).toBeInTheDocument();
     });
 
     it("does not show Apply button outside evaluations context", async () => {
@@ -811,10 +813,7 @@ describe("PromptEditorDrawer", () => {
       mockDrawerParams = {};
 
       renderWithProviders(
-        <PromptEditorDrawer
-          open={true}
-          promptId="prompt-123"
-        />,
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
 
       // Wait for drawer to load
@@ -823,7 +822,9 @@ describe("PromptEditorDrawer", () => {
       });
 
       // Apply button should NOT be visible
-      expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /apply/i }),
+      ).not.toBeInTheDocument();
     });
 
     it("closes drawer when Apply button is clicked", async () => {

@@ -55,14 +55,6 @@ const DEFAULT_CONCURRENCY = parseInt(
 );
 
 /**
- * Evaluator DB config type - settings stored in DB
- */
-type EvaluatorDbConfig = {
-  evaluatorType?: string;
-  settings?: Record<string, unknown>;
-};
-
-/**
  * Input data required to run the orchestrator.
  */
 export type OrchestratorInput = {

@@ -58,7 +58,8 @@ export function EvaluatorChip({
 
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
   // If result already exists, it overrides isRunning (evaluator completed)
-  const status = isRunning && parsed.status === "pending" ? "running" : parsed.status;
+  const status =
+    isRunning && parsed.status === "pending" ? "running" : parsed.status;
   const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];

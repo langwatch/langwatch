@@ -1523,7 +1523,6 @@ describe("Evaluation Execution", () => {
         });
       });
 
-
       // CRITICAL ASSERTIONS:
 
       // 1. Cell B's evaluator should STILL be spinning (only 1 spinner remains)
@@ -1539,9 +1538,11 @@ describe("Evaluation Execution", () => {
 
       // 3. Cell A's evaluator result is in the store (UI verification would require
       //    checking the actual chip content, which may involve tooltip/popover)
-      expect(
-        finalState.evaluatorResults["target-1"]?.["eval-1"]?.[0],
-      ).toEqual({ status: "processed", passed: true, score: 0.88 });
+      expect(finalState.evaluatorResults["target-1"]?.["eval-1"]?.[0]).toEqual({
+        status: "processed",
+        passed: true,
+        score: 0.88,
+      });
     });
   });
 });

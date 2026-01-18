@@ -988,10 +988,7 @@ export const ComparisonCharts = ({
                   Total Cost
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart
-                    data={chartData}
-                    margin={{ left: 10, right: 10 }}
-                  >
+                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
@@ -1063,10 +1060,7 @@ export const ComparisonCharts = ({
                   Avg Latency
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart
-                    data={chartData}
-                    margin={{ left: 10, right: 10 }}
-                  >
+                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}

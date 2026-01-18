@@ -37,7 +37,9 @@ describe("TableSettingsMenu", () => {
     it("renders a settings button", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       expect(button).toBeInTheDocument();
     });
 
@@ -45,7 +47,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       await waitFor(() => {
@@ -57,7 +61,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       await waitFor(() => {
@@ -70,7 +76,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       await waitFor(() => {
@@ -86,7 +94,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       await waitFor(() => {
@@ -101,7 +111,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Find the button containing "Expanded" text
@@ -120,7 +132,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Find the button containing "Compact" text
@@ -140,7 +154,9 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       // Open settings menu
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Click CI/CD option - find the button containing "Run in CI/CD" text
@@ -162,7 +178,9 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       // Open settings menu
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Verify popover is open by finding content
@@ -184,7 +202,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Find the button containing "Run in CI/CD" text
@@ -203,7 +223,9 @@ describe("TableSettingsMenu", () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       await user.click(button);
 
       // Find the button containing "Run in CI/CD" text
@@ -225,7 +247,9 @@ describe("TableSettingsMenu", () => {
     it("disables button when disabled prop is true", () => {
       render(<TableSettingsMenu disabled />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", { name: /workbench settings/i });
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
       expect(button).toBeDisabled();
     });
   });

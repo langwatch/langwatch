@@ -314,7 +314,6 @@ describe("TargetCellContent", () => {
         right: 500,
         x: 200,
         y: 100,
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for mock
         toJSON: () => {},
       }));
     });
@@ -439,7 +438,6 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
           traceId="trace_123"
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test
           onRunCell={() => {}}
         />,
         { wrapper: Wrapper },
@@ -572,7 +570,6 @@ describe("TargetCellContent", () => {
         right: 500,
         x: 200,
         y: 100,
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for mock
         toJSON: () => {},
       }));
 

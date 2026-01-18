@@ -77,7 +77,11 @@ describe("buildEvaluatorNode", () => {
 
     // Settings should be in parameters array (format expected by langwatch_nlp)
     const parameters = (node.data as Record<string, unknown>)
-      .parameters as Array<{ identifier: string; type: string; value: unknown }>;
+      .parameters as Array<{
+      identifier: string;
+      type: string;
+      value: unknown;
+    }>;
     expect(parameters).toBeDefined();
     expect(parameters.length).toBe(3);
 
@@ -112,7 +116,11 @@ describe("buildEvaluatorNode", () => {
 
     // Should have empty parameters array when no settings
     const parameters = (node.data as Record<string, unknown>)
-      .parameters as Array<{ identifier: string; type: string; value: unknown }>;
+      .parameters as Array<{
+      identifier: string;
+      type: string;
+      value: unknown;
+    }>;
     expect(parameters).toEqual([]);
 
     // Should still have required fields
