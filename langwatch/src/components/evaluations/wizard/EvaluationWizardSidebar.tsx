@@ -60,10 +60,10 @@ export const WizardSidebar = memo(function WizardSidebar({
       return {
         setWizardState: state.setWizardState,
         nextStep: state.nextStep,
-        step: state.wizardState.step,
+        step: state.workbenchState.step,
         previousStep: state.previousStep,
-        task: state.wizardState.task,
-        executionMethod: state.wizardState.executionMethod,
+        task: state.workbenchState.task,
+        executionMethod: state.workbenchState.executionMethod,
         isAutosaving: state.isAutosaving,
         experimentId: state.experimentId,
         evaluatorNode: state.getFirstEvaluatorNode(),

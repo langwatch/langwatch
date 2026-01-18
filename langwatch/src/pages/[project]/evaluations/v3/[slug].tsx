@@ -8,10 +8,9 @@ import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/evaluations-v3/components/HistoryButton";
-import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
 import { RunEvaluationButton } from "~/evaluations-v3/components/RunEvaluationButton";
-import { RunFromCICDButton } from "~/evaluations-v3/components/RunFromCICDButton";
 import { SavedDatasetLoaders } from "~/evaluations-v3/components/SavedDatasetLoaders";
+import { TableSettingsMenu } from "~/evaluations-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
 import { useAutosaveEvaluationsV3 } from "~/evaluations-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
@@ -126,8 +125,7 @@ export default function EvaluationsV3Page() {
               datasetError={autosaveStatus.datasetError}
             />
             <UndoRedo />
-            <RowHeightToggle />
-            <RunFromCICDButton disabled={isLoadingExperiment} />
+            <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
             <RunEvaluationButton
               disabled={isLoadingExperiment || isLoadingDatasets}

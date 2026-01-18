@@ -500,6 +500,126 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(cellEvent.targetId).toBe("target-2");
       }
     }, 60000);
+
+    it("re-runs single evaluator with pre-computed target output", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [
+        { question: "Say hello", expected: "hello" },
+        { question: "Say world", expected: "world" },
+      ];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator on row 1 with pre-computed target output
+      // This simulates a user clicking "Rerun" on an evaluator chip
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 1,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          targetOutput: { output: "world" }, // Pre-computed output matching expected
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should only execute 1 cell (single evaluator)
+      const startEvent = events[0];
+      if (startEvent?.type === "execution_started") {
+        expect(startEvent.total).toBe(1);
+      }
+
+      // Should have cell_started event
+      const cellStartedEvents = events.filter((e) => e.type === "cell_started");
+      expect(cellStartedEvents).toHaveLength(1);
+
+      // Should NOT have target_result event (target was skipped)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents).toHaveLength(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      const evalResult = evaluatorResultEvents[0];
+      if (evalResult?.type === "evaluator_result") {
+        expect(evalResult.rowIndex).toBe(1);
+        expect(evalResult.targetId).toBe("target-1");
+        expect(evalResult.evaluatorId).toBe("eval-1");
+        // With output "world" matching expected "world", should pass
+        expect(evalResult.result.status).toBe("processed");
+        if (evalResult.result.status === "processed") {
+          expect(evalResult.result.passed).toBe(true);
+        }
+      }
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
+
+    it("re-runs single evaluator without pre-computed output (executes target too)", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator without pre-computed output - should execute target too
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          // No targetOutput - should run target
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should have target_result event (target was executed)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents.length).toBeGreaterThan(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
   });
 
   describe("error handling", () => {
@@ -726,6 +846,81 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // Target should still succeed even if evaluator fails
       const targetResults = events.filter((e) => e.type === "target_result");
       expect(targetResults.length).toBeGreaterThanOrEqual(1);
+    }, 120000);
+
+    it("returns error status for invalid/unreachable evaluator type", async () => {
+      // Use an evaluator type that doesn't exist - should return error, not processed
+      const invalidEvaluator: EvaluatorConfig = {
+        id: "eval-invalid",
+        evaluatorType: "langevals/this_evaluator_does_not_exist" as any,
+        name: "Invalid Evaluator",
+        settings: {},
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected_output", type: "str" },
+        ],
+        mappings: {
+          "dataset-1": {
+            "target-1": {
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        },
+      };
+
+      const state = createTestState(
+        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [invalidEvaluator],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: { type: "full" },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should still complete (gracefully handle error)
+      expect(events[events.length - 1]?.type).toBe("done");
+
+      // Target should succeed
+      const targetResults = events.filter((e) => e.type === "target_result");
+      expect(targetResults.length).toBe(1);
+
+      // Evaluator should return ERROR status, not "processed"
+      const evaluatorResults = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResults.length).toBe(1);
+
+      const evalResult = evaluatorResults[0];
+      if (evalResult?.type === "evaluator_result") {
+        // This is the key assertion - invalid evaluator should return error
+        expect(evalResult.result.status).toBe("error");
+        expect(evalResult.result.details).toBeDefined();
+        expect(evalResult.result.details).toContain("404");
+      }
     }, 120000);
   });
 
@@ -1448,6 +1643,141 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(storedRun?.targets?.length).toBe(1);
         expect(storedRun?.targets?.[0]?.name).toBe("Saved Prompt Target");
         expect(storedRun?.targets?.[0]?.model).toBe("openai/gpt-4-turbo");
+
+        // Clean up ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("stores errors to Elasticsearch when cell execution fails", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
+
+      const experimentId = `exp_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "Error Storage Test",
+          slug: `error-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        // Create a target with an invalid model to cause an error
+        const targetConfig: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          name: "Failing Target",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+            },
+          },
+          localPromptConfig: {
+            llm: {
+              model: "openai/invalid-model-that-does-not-exist",
+              temperature: 0,
+              maxTokens: 50,
+            },
+            messages: [{ role: "user", content: "{{input}}" }],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        };
+
+        const state = createTestState([targetConfig]);
+        const datasetRows = [{ question: "Test question" }];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+        ];
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          saveToEs: true,
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed (even with errors)
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+
+        // Verify there was an error
+        const errorEvents = events.filter(
+          (e) =>
+            e.type === "error" ||
+            (e.type === "target_result" && (e as any).error),
+        );
+        expect(errorEvents.length).toBeGreaterThan(0);
+
+        // Get the run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify error was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        expect(storedRun).not.toBeNull();
+
+        // Verify dataset entry has error field populated
+        expect(storedRun?.dataset).toBeDefined();
+        expect(storedRun?.dataset?.length).toBeGreaterThan(0);
+
+        const entryWithError = storedRun?.dataset?.find(
+          (d) => d.error !== null && d.error !== undefined,
+        );
+        expect(entryWithError).toBeDefined();
+        expect(entryWithError?.error).toBeTruthy();
+        expect(typeof entryWithError?.error).toBe("string");
 
         // Clean up ES document
         const { esClient, BATCH_EVALUATION_INDEX } = await import(

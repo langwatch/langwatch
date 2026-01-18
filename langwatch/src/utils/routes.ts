@@ -39,6 +39,16 @@ export const projectRoutes = {
     title: "Editing Evaluation",
     parent: "evaluations",
   },
+  evaluations_v3: {
+    path: "/[project]/evaluations/v3/[slug]",
+    title: "Evaluation Workbench",
+    parent: "evaluations",
+  },
+  evaluations_wizard: {
+    path: "/[project]/evaluations/wizard/[slug]",
+    title: "Evaluation Wizard",
+    parent: "evaluations",
+  },
   experiments: {
     path: "/[project]/experiments",
     title: "Experiments",

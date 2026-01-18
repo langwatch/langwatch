@@ -15,6 +15,8 @@ import type {
  */
 export type ComparisonRunData = {
   runId: string;
+  /** Human-readable name for display (e.g., commit message or run ID) */
+  runName: string;
   color: string;
   data: BatchEvaluationData | null;
   isLoading: boolean;

@@ -166,7 +166,6 @@ const setupStoreWithConfiguredEvaluation = () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -209,6 +208,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };

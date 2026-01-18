@@ -181,6 +181,8 @@ export const computeTargetAggregates = (
       let errors = 0;
       let scoreSum = 0;
       let scoreCount = 0;
+      // Count results that have explicit pass/fail for pass rate calculation
+      let passFailCount = 0;
 
       for (let i = 0; i < rowCount; i++) {
         const result = evalResults[i];
@@ -194,11 +196,14 @@ export const computeTargetAggregates = (
 
         if (parsed.status === "passed") {
           passed++;
+          passFailCount++;
         } else if (parsed.status === "failed") {
           failed++;
+          passFailCount++;
         } else if (parsed.status === "error") {
           errors++;
         }
+        // "processed" and "skipped" don't count towards pass rate
 
         if (parsed.score !== undefined && parsed.score !== null) {
           scoreSum += parsed.score;
@@ -213,20 +218,22 @@ export const computeTargetAggregates = (
         passed,
         failed,
         errors,
-        passRate: total > 0 ? (passed / total) * 100 : null,
+        // Pass rate only counts results with explicit pass/fail, not score-only ("processed")
+        passRate: passFailCount > 0 ? (passed / passFailCount) * 100 : null,
         averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
       };
     },
   );
 
-  // Compute overall pass rate (sum of all passed / sum of all total)
-  const totalEvaluations = evaluatorAggregates.reduce(
-    (sum, e) => sum + e.total,
+  // Compute overall pass rate (sum of passed / sum of passed+failed)
+  // Only count evaluators that have explicit pass/fail results, not score-only
+  const totalPassFail = evaluatorAggregates.reduce(
+    (sum, e) => sum + e.passed + e.failed,
     0,
   );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
   const overallPassRate =
-    totalEvaluations > 0 ? (totalPassed / totalEvaluations) * 100 : null;
+    totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 
   // Compute overall average score (across all evaluators with scores)
   const _allScoreSums = evaluatorAggregates.reduce(

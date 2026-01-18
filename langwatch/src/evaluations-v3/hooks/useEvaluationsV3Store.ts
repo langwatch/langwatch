@@ -814,6 +814,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         targetMetadata: {},
         evaluatorResults: {},
         errors: {},
+        executingCells: undefined,
+        runningEvaluators: undefined,
       },
     });
   },
@@ -1068,6 +1070,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setConcurrency: (concurrency) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        concurrency,
+      },
+    }));
+  },
+
   toggleCellExpanded: (row, columnId) => {
     set((state) => {
       const key = `${row}-${columnId}`;
@@ -1140,10 +1151,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  loadState: (wizardState: unknown) => {
-    if (!wizardState || typeof wizardState !== "object") return;
+  loadState: (workbenchState: unknown) => {
+    if (!workbenchState || typeof workbenchState !== "object") return;
 
-    const state = wizardState as Record<string, unknown>;
+    const state = workbenchState as Record<string, unknown>;
 
     // Load persisted results if available
     const persistedResults = state.results as
@@ -1176,6 +1187,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         ? new Set(state.hiddenColumns as string[])
         : current.ui.hiddenColumns;
 
+      // Load concurrency from persisted state
+      const concurrency =
+        typeof state.concurrency === "number"
+          ? state.concurrency
+          : current.ui.concurrency;
+
       return {
         ...current,
         experimentId: (state.experimentId as string) ?? current.experimentId,
@@ -1195,13 +1212,18 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           current.targets,
         // Load persisted results if available
         results: loadedResults ?? current.results,
-        // Load hidden columns into UI state
+        // Load UI settings
         ui: {
           ...current.ui,
           hiddenColumns,
+          concurrency,
         },
       };
     });
+
+    // Clear undo/redo history after loading state
+    // This prevents undoing back to the pre-load state
+    useEvaluationsV3Store.temporal.getState().clear();
   },
 
   setSavedDatasetRecords: (datasetId: string, records) => {

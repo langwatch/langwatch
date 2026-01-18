@@ -96,7 +96,7 @@ export const TracesMapping = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const { task } = useEvaluationWizardStore((state) => ({
-    task: state.wizardState.task,
+    task: state.workbenchState.task,
   }));
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(

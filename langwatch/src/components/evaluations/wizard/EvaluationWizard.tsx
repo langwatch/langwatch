@@ -31,7 +31,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const { name } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
-        name: state.wizardState.name,
+        name: state.workbenchState.name,
         workflowId: state.getDSL().workflow_id,
       };
     }),

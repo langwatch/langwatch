@@ -54,6 +54,7 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
       content={hasRuns ? "View run history" : "No runs yet"}
       showArrow
       positioning={{ placement: "bottom" }}
+      openDelay={100}
     >
       <Button
         size="xs"

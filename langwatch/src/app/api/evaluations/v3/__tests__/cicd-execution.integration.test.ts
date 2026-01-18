@@ -35,7 +35,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         name: "CI/CD Test Evaluation",
         slug: testSlug,
         type: ExperimentType.EVALUATIONS_V3,
-        wizardState: {
+        workbenchState: {
           experimentId: undefined,
           experimentSlug: testSlug,
           name: "CI/CD Test Evaluation",

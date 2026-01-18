@@ -42,6 +42,12 @@ export type UseExecuteEvaluationReturn = {
   isAborting: boolean;
   /** Start execution with given scope */
   execute: (scope?: ExecutionScope) => Promise<void>;
+  /** Re-run a single evaluator for a specific cell, using existing target output */
+  rerunEvaluator: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => Promise<void>;
   /** Request abort of current execution */
   abort: () => Promise<void>;
   /** Reset state to idle */
@@ -74,6 +80,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     activeDatasetId,
     targets,
     evaluators,
+    concurrency,
     setResults,
     clearResults,
   } = useEvaluationsV3Store(
@@ -85,6 +92,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       activeDatasetId: state.activeDatasetId,
       targets: state.targets,
       evaluators: state.evaluators,
+      concurrency: state.ui.concurrency,
       setResults: state.setResults,
       clearResults: state.clearResults,
     })),
@@ -97,6 +105,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   /**
    * Helper to update target output in the store.
    * Uses functional update to properly merge with existing state.
+   * Also marks all evaluators for this cell as "running" since they start after target output.
    */
   const updateTargetOutput = useCallback(
     (
@@ -124,20 +133,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           };
         }
 
-        // Remove this cell from executingCells since target output is now ready.
-        // This allows the cell to display its output immediately while evaluators
-        // continue running in the background (their chips show spinners independently).
-        let newExecutingCells = state.results.executingCells;
-        if (newExecutingCells) {
-          const cellKey = `${rowIndex}:${targetId}`;
-          if (newExecutingCells.has(cellKey)) {
-            newExecutingCells = new Set(newExecutingCells);
-            newExecutingCells.delete(cellKey);
-            // If no cells remain, set to undefined
-            if (newExecutingCells.size === 0) {
-              newExecutingCells = undefined;
-            }
-          }
+        // Mark all evaluators for this cell as "running"
+        // They will be removed when their results arrive
+        const newRunningEvaluators = new Set(
+          state.results.runningEvaluators ?? [],
+        );
+        for (const evaluator of state.evaluators) {
+          newRunningEvaluators.add(`${rowIndex}:${targetId}:${evaluator.id}`);
         }
 
         return {
@@ -148,7 +150,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               [targetId]: newOutputs,
             },
             targetMetadata: newMetadata,
-            executingCells: newExecutingCells,
+            runningEvaluators: newRunningEvaluators,
           },
         };
       });
@@ -166,20 +168,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const newErrors = [...existingErrors];
         newErrors[rowIndex] = errorMsg;
 
-        // Remove this cell from executingCells since we have a result (error).
-        // Same logic as updateTargetOutput - the cell should show the error,
-        // not a loading skeleton.
-        let newExecutingCells = state.results.executingCells;
-        if (newExecutingCells) {
-          const cellKey = `${rowIndex}:${targetId}`;
-          if (newExecutingCells.has(cellKey)) {
-            newExecutingCells = new Set(newExecutingCells);
-            newExecutingCells.delete(cellKey);
-            if (newExecutingCells.size === 0) {
-              newExecutingCells = undefined;
-            }
-          }
-        }
+        // NOTE: We do NOT remove the cell from executingCells here.
+        // The cell stays in executingCells until execution cleanup happens.
+        // TargetCell's isLoading checks for both (cell in executingCells AND no output/error).
 
         return {
           results: {
@@ -188,7 +179,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               ...state.results.errors,
               [targetId]: newErrors,
             },
-            executingCells: newExecutingCells,
+            // Keep executingCells unchanged
           },
         };
       });
@@ -198,6 +189,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Helper to update evaluator result in the store.
+   * Also removes the evaluator from runningEvaluators since it has completed.
    */
   const updateEvaluatorResult = useCallback(
     (
@@ -213,6 +205,19 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const newEvalResults = [...existingEvalResults];
         newEvalResults[rowIndex] = result;
 
+        // Remove this evaluator from runningEvaluators
+        let newRunningEvaluators = state.results.runningEvaluators;
+        if (newRunningEvaluators) {
+          const evaluatorKey = `${rowIndex}:${targetId}:${evaluatorId}`;
+          if (newRunningEvaluators.has(evaluatorKey)) {
+            newRunningEvaluators = new Set(newRunningEvaluators);
+            newRunningEvaluators.delete(evaluatorKey);
+            if (newRunningEvaluators.size === 0) {
+              newRunningEvaluators = undefined;
+            }
+          }
+        }
+
         return {
           results: {
             ...state.results,
@@ -223,6 +228,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 [evaluatorId]: newEvalResults,
               },
             },
+            runningEvaluators: newRunningEvaluators,
           },
         };
       });
@@ -317,15 +323,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         case "stopped":
           setStatus("stopped");
           setIsAborting(false); // Clear aborting state when stop is confirmed
-          // Update store status and clear executing cells
-          setResults({ status: "stopped", executingCells: undefined });
+          // Update store status immediately for UI feedback
+          // NOTE: Don't clear executingCells/runningEvaluators here!
+          // cleanupThisExecution() handles removing only THIS execution's state
+          // to preserve concurrent executions.
+          setResults({ status: "stopped" });
           break;
 
         case "done":
           setStatus("completed");
           setIsAborting(false); // Clear aborting state on completion too
-          // Update store status and clear executing cells
-          setResults({ status: "success", executingCells: undefined });
+          // Update store status immediately for UI feedback
+          // NOTE: Don't clear executingCells/runningEvaluators here!
+          // cleanupThisExecution() handles removing only THIS execution's state
+          // to preserve concurrent executions.
+          setResults({ status: "success" });
           break;
       }
     },
@@ -383,21 +395,84 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           errors: {},
         });
       } else {
-        // Partial execution: merge new executingCells with any existing ones
-        // This allows running multiple targets/cells concurrently
+        // Partial execution: clear ALL data for cells being executed
+        // This ensures the correct loading sequence:
+        // 1. Gray (pending) - no data at all
+        // 2. Spinner (running) - target output arrives, evaluators pending
+        // 3. Final result - evaluator results arrive
         useEvaluationsV3Store.setState((state) => {
           const existingCells = state.results.executingCells;
           const mergedCells = existingCells
             ? new Set([...existingCells, ...executingCellsSet])
             : executingCellsSet;
 
+          // Helper to clear a specific cell from an array-based record
+          const clearCellFromArrayRecord = <T>(
+            record: Record<string, (T | undefined | null)[]>,
+            targetId: string,
+            rowIndex: number,
+          ): Record<string, (T | undefined | null)[]> => {
+            const arr = record[targetId];
+            if (!arr || arr[rowIndex] === undefined) return record;
+            const newArr = [...arr];
+            newArr[rowIndex] = undefined;
+            return { ...record, [targetId]: newArr };
+          };
+
+          let newTargetOutputs = { ...state.results.targetOutputs };
+          let newTargetMetadata = { ...state.results.targetMetadata };
+          let newErrors = { ...state.results.errors };
+          let newEvaluatorResults = { ...state.results.evaluatorResults };
+
+          const evaluatorIds = state.evaluators.map((e) => e.id);
+
+          for (const cell of executionCells) {
+            // Clear target output
+            newTargetOutputs = clearCellFromArrayRecord(
+              newTargetOutputs,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear target metadata
+            newTargetMetadata = clearCellFromArrayRecord(
+              newTargetMetadata,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear errors (also array-based with holes)
+            newErrors = clearCellFromArrayRecord(
+              newErrors,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear evaluator results for ALL evaluators
+            if (!newEvaluatorResults[cell.targetId]) {
+              newEvaluatorResults[cell.targetId] = {};
+            }
+            const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
+            for (const evaluatorId of evaluatorIds) {
+              const evalResults = newTargetResults[evaluatorId];
+              if (evalResults && evalResults[cell.rowIndex] !== undefined) {
+                const newEvalResults = [...evalResults];
+                newEvalResults[cell.rowIndex] = undefined;
+                newTargetResults[evaluatorId] = newEvalResults;
+              }
+            }
+            newEvaluatorResults[cell.targetId] = newTargetResults;
+          }
+
           return {
             results: {
               ...state.results,
               status: "running",
               executingCells: mergedCells,
-              // Note: progress/total are per-execution, not merged
-              // The UI should derive progress from executingCells + actual results
+              targetOutputs: newTargetOutputs,
+              targetMetadata: newTargetMetadata,
+              errors: newErrors,
+              evaluatorResults: newEvaluatorResults,
             },
           };
         });
@@ -438,33 +513,67 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           id: e.id,
           evaluatorType: e.evaluatorType,
           name: e.name,
-          settings: e.settings,
           inputs: e.inputs,
           mappings: e.mappings,
+          dbEvaluatorId: e.dbEvaluatorId,
         })),
         scope,
+        concurrency,
       };
 
-      // Helper to remove this execution's cells from executingCells when done
-      const cleanupExecutingCells = () => {
+      // Helper to remove this execution's cells and evaluators from state when done
+      // This only removes state for THIS execution, preserving concurrent executions
+      const cleanupThisExecution = () => {
         useEvaluationsV3Store.setState((state) => {
-          if (!state.results.executingCells) return state;
-
           // Remove only the cells from THIS execution
-          const remainingCells = new Set(
-            [...state.results.executingCells].filter(
-              (cellKey) => !executingCellsSet.has(cellKey),
-            ),
-          );
+          let remainingCells: Set<string> | undefined = state.results
+            .executingCells
+            ? new Set(
+                [...state.results.executingCells].filter(
+                  (cellKey) => !executingCellsSet.has(cellKey),
+                ),
+              )
+            : undefined;
+          if (remainingCells?.size === 0) remainingCells = undefined;
 
-          // If no cells remain, set to undefined and status to idle/success
-          const hasRemainingCells = remainingCells.size > 0;
+          // Remove runningEvaluators for THIS execution's cells
+          // Key format: "rowIndex:targetId:evaluatorId"
+          let remainingEvaluators: Set<string> | undefined = state.results
+            .runningEvaluators
+            ? new Set(
+                [...state.results.runningEvaluators].filter((evalKey) => {
+                  // Extract rowIndex:targetId from the evaluator key
+                  const parts = evalKey.split(":");
+                  if (parts.length >= 2) {
+                    const cellKey = `${parts[0]}:${parts[1]}`;
+                    return !executingCellsSet.has(cellKey);
+                  }
+                  return true;
+                }),
+              )
+            : undefined;
+          if (remainingEvaluators?.size === 0) remainingEvaluators = undefined;
+
+          // Determine if there's remaining work from other concurrent executions
+          const hasRemainingWork =
+            (remainingCells?.size ?? 0) > 0 ||
+            (remainingEvaluators?.size ?? 0) > 0;
+
+          // Determine the final status:
+          // - If there's remaining work, keep current status
+          // - If status was explicitly set to "stopped", keep it
+          // - Otherwise, set to "success"
+          const shouldKeepCurrentStatus =
+            hasRemainingWork || state.results.status === "stopped";
 
           return {
             results: {
               ...state.results,
-              executingCells: hasRemainingCells ? remainingCells : undefined,
-              status: hasRemainingCells ? state.results.status : "success",
+              executingCells: remainingCells,
+              runningEvaluators: remainingEvaluators,
+              status: shouldKeepCurrentStatus
+                ? state.results.status
+                : "success",
             },
           };
         });
@@ -483,7 +592,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             setStatus("error");
             setError(err.message);
             setIsAborting(false); // Clear aborting state on error
-            cleanupExecutingCells();
+            cleanupThisExecution();
             toaster.create({
               title: "Execution Failed",
               description: err.message,
@@ -493,13 +602,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         });
 
         // Clean up this execution's cells when SSE completes
-        cleanupExecutingCells();
+        cleanupThisExecution();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
         setError(message);
         setIsAborting(false); // Clear aborting state on error
-        cleanupExecutingCells();
+        cleanupThisExecution();
       }
     },
     [
@@ -510,6 +619,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       name,
       targets,
       evaluators,
+      concurrency,
       handleEvent,
       setResults,
     ],
@@ -564,6 +674,36 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     clearResults();
   }, [clearResults]);
 
+  /**
+   * Re-run a single evaluator for a specific cell.
+   * Uses the existing target output to avoid re-running the target.
+   */
+  const rerunEvaluator = useCallback(
+    async (rowIndex: number, targetId: string, evaluatorId: string) => {
+      // Get the existing target output from the store
+      const state = useEvaluationsV3Store.getState();
+      const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
+
+      // Immediately set the evaluator result to "running" for UI feedback
+      updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
+        status: "running",
+      });
+
+      // Build the evaluator scope with pre-computed target output
+      const scope: ExecutionScope = {
+        type: "evaluator",
+        rowIndex,
+        targetId,
+        evaluatorId,
+        // Pass target output if available so we don't re-run the target
+        targetOutput,
+      };
+
+      await execute(scope);
+    },
+    [execute, updateEvaluatorResult],
+  );
+
   return {
     status,
     runId,
@@ -572,6 +712,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     error,
     isAborting,
     execute,
+    rerunEvaluator,
     abort,
     reset,
   };

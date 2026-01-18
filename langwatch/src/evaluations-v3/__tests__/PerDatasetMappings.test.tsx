@@ -309,7 +309,6 @@ describe("Per-Dataset Mappings", () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [{ identifier: "output", type: "str" }],
         mappings: {},
       });
@@ -357,7 +356,6 @@ describe("Per-Dataset Mappings", () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected", type: "str" },

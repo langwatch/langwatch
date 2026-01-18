@@ -180,7 +180,6 @@ const createTestEvaluator = (
   id: "evaluator-1",
   evaluatorType: "langevals/exact_match",
   name: "Exact Match",
-  settings: {},
   inputs: [
     { identifier: "output", type: "str" },
     { identifier: "expected_output", type: "str" },
@@ -357,7 +356,6 @@ describe("Evaluator Mappings", () => {
             id: "evaluator-1",
             evaluatorType: "langevals/llm_answer_match" as const,
             name: "LLM Answer Match",
-            settings: {},
             inputs: [
               { identifier: "output", type: "str" as const },
               { identifier: "expected_output", type: "str" as const },

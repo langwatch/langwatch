@@ -218,6 +218,107 @@ describe("computeTargetAggregates", () => {
     expect(aggregates.evaluators[0]?.total).toBe(3);
   });
 
+  it("returns null passRate for score-only evaluators (no pass/fail)", () => {
+    // This is the case for LLM-as-judge Score evaluators that only return a score
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-1": [
+            { score: 0.8 }, // No passed field - should be "processed"
+            { score: 0.6 },
+            { score: 0.9 },
+          ],
+        },
+      },
+    });
+    const evaluators = [{ id: "eval-1", name: "LLM Score" }];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
+
+    // Score-only results should have null passRate
+    expect(aggregates.evaluators[0]?.passRate).toBeNull();
+    expect(aggregates.evaluators[0]?.passed).toBe(0);
+    expect(aggregates.evaluators[0]?.failed).toBe(0);
+    expect(aggregates.evaluators[0]?.total).toBe(3);
+    // But averageScore should still work
+    expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.767, 2);
+    // Overall passRate should also be null when no evaluators have pass/fail
+    expect(aggregates.overallPassRate).toBeNull();
+  });
+
+  it("excludes score-only results from pass rate but includes pass/fail results", () => {
+    // Mix of pass/fail evaluator and score-only evaluator
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-pass-fail": [
+            { status: "processed", passed: true },
+            { status: "processed", passed: false },
+          ],
+          "eval-score-only": [
+            { score: 0.8 }, // No passed field
+            { score: 0.6 },
+          ],
+        },
+      },
+    });
+    const evaluators = [
+      { id: "eval-pass-fail", name: "Exact Match" },
+      { id: "eval-score-only", name: "LLM Score" },
+    ];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
+
+    // Pass/fail evaluator should have pass rate
+    expect(aggregates.evaluators[0]?.passRate).toBe(50); // 1 passed / 2 total
+    expect(aggregates.evaluators[0]?.passed).toBe(1);
+    expect(aggregates.evaluators[0]?.failed).toBe(1);
+
+    // Score-only evaluator should have null pass rate
+    expect(aggregates.evaluators[1]?.passRate).toBeNull();
+    expect(aggregates.evaluators[1]?.passed).toBe(0);
+    expect(aggregates.evaluators[1]?.failed).toBe(0);
+    expect(aggregates.evaluators[1]?.averageScore).toBeCloseTo(0.7, 2);
+
+    // Overall pass rate should only count the pass/fail evaluator
+    expect(aggregates.overallPassRate).toBe(50); // 1 passed / 2 (passed+failed)
+  });
+
+  it("handles status: 'processed' with passed: null as score-only", () => {
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-1": [
+            { status: "processed", passed: null, score: 1 },
+            { status: "processed", passed: null, score: 0.5 },
+          ],
+        },
+      },
+    });
+    const evaluators = [{ id: "eval-1", name: "Score Evaluator" }];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
+
+    // passed: null should be treated as score-only, not pass/fail
+    expect(aggregates.evaluators[0]?.passRate).toBeNull();
+    expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.75, 2);
+  });
+
   it("handles multiple evaluators", () => {
     const results = createResults({
       evaluatorResults: {

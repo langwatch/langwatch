@@ -16,7 +16,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
   type WizardState,
-  wizardStateSchema,
+  workbenchStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { persistedEvaluationsV3StateSchema } from "../../../evaluations-v3/types/persistence";
 import {
@@ -52,7 +52,7 @@ export const experimentsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         experimentId: z.string().optional(),
-        wizardState: wizardStateSchema,
+        workbenchState: workbenchStateSchema,
         dsl: workflowJsonSchema,
         commitMessage: z.string().optional(),
       }),
@@ -61,7 +61,7 @@ export const experimentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       let workflowId = input.dsl.workflow_id;
       const name =
-        input.wizardState.name ?? (await findNextDraftName(input.projectId));
+        input.workbenchState.name ?? (await findNextDraftName(input.projectId));
       const slug = slugify(name);
 
       if (input.experimentId) {
@@ -159,7 +159,7 @@ export const experimentsRouter = createTRPCRouter({
         projectId: input.projectId,
         type: ExperimentType.BATCH_EVALUATION_V2,
         workflowId,
-        wizardState: input.wizardState,
+        workbenchState: input.workbenchState,
       };
 
       await prisma.experiment.upsert({
@@ -225,13 +225,13 @@ export const experimentsRouter = createTRPCRouter({
       }
 
       // Convert to plain JSON for Prisma storage
-      const wizardStateJson = JSON.parse(JSON.stringify(input.state));
+      const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
       const experimentData = {
         name,
         slug,
         projectId: input.projectId,
         type: ExperimentType.EVALUATIONS_V3,
-        wizardState: wizardStateJson,
+        workbenchState: workbenchStateJson,
       };
 
       await prisma.experiment.upsert({
@@ -286,7 +286,7 @@ export const experimentsRouter = createTRPCRouter({
 
       return {
         ...experiment,
-        wizardState: experiment.wizardState as z.infer<
+        workbenchState: experiment.workbenchState as z.infer<
           typeof persistedEvaluationsV3StateSchema
         > | null,
       };
@@ -322,7 +322,9 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const wizardState = experiment.wizardState as WizardState | undefined;
+      const workbenchState = experiment.workbenchState as
+        | WizardState
+        | undefined;
       const dsl = experiment.workflow?.currentVersion?.dsl as
         | Workflow
         | undefined;
@@ -330,7 +332,7 @@ export const experimentsRouter = createTRPCRouter({
         | Node<Evaluator>
         | undefined;
 
-      if (!wizardState || !dsl || !evaluator || !evaluator.data.evaluator) {
+      if (!workbenchState || !dsl || !evaluator || !evaluator.data.evaluator) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Experiment is not ready to be saved as a monitor",
@@ -341,15 +343,15 @@ export const experimentsRouter = createTRPCRouter({
         name: experiment.name ?? "Unknown",
         checkType: evaluator.data.evaluator,
         slug: experiment.slug,
-        preconditions: wizardState.realTimeExecution?.preconditions ?? [],
+        preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
         parameters: Object.fromEntries(
           (evaluator.data.parameters ?? []).map((param) => [
             param.identifier,
             param.value,
           ]),
         ) as Record<string, any>,
-        mappings: wizardState.realTimeTraceMappings ?? {},
-        sample: wizardState.realTimeExecution?.sample ?? 1,
+        mappings: workbenchState.realTimeTraceMappings ?? {},
+        sample: workbenchState.realTimeExecution?.sample ?? 1,
         enabled: true,
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
       };
@@ -440,7 +442,7 @@ export const experimentsRouter = createTRPCRouter({
 
       return {
         ...experiment,
-        wizardState: experiment.wizardState as WizardState | undefined,
+        workbenchState: experiment.workbenchState as WizardState | undefined,
         dsl: workflow?.currentVersion?.dsl as Workflow | undefined,
       };
     }),
@@ -535,7 +537,9 @@ export const experimentsRouter = createTRPCRouter({
 
           return {
             ...experiment,
-            wizardState: experiment.wizardState as WizardState | undefined,
+            workbenchState: experiment.workbenchState as
+              | WizardState
+              | undefined,
             runsSummary: {
               count: runs.length,
               primaryMetric,
@@ -1052,8 +1056,8 @@ export const experimentsRouter = createTRPCRouter({
           projectId: input.projectId,
           type: experiment.type,
           workflowId,
-          ...(experiment.wizardState && {
-            wizardState: experiment.wizardState as Prisma.InputJsonValue,
+          ...(experiment.workbenchState && {
+            workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
           }),
         },
       });

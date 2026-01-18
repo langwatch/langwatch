@@ -16,7 +16,7 @@ export const EvaluatorSelectionAccordion = ({
   setAccordeonValue: (value: string[]) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
+  const { workbenchState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
   const focusElementById = useAnimatedFocusElementById();
@@ -35,8 +35,8 @@ export const EvaluatorSelectionAccordion = ({
       availableEvaluators,
     );
     const nextStep =
-      wizardState.task == "real_time" &&
-      wizardState.dataSource == "from_production"
+      workbenchState.task == "real_time" &&
+      workbenchState.dataSource == "from_production"
         ? ["settings"]
         : ["mappings"];
     setTimeout(() => {
@@ -51,7 +51,7 @@ export const EvaluatorSelectionAccordion = ({
 
   const evaluatorCategories = useEvaluatorCategories();
   const evaluators =
-    evaluatorCategories.find((c) => c.id === wizardState.evaluatorCategory)
+    evaluatorCategories.find((c) => c.id === workbenchState.evaluatorCategory)
       ?.evaluators ?? [];
 
   return (
@@ -60,7 +60,7 @@ export const EvaluatorSelectionAccordion = ({
       width="full"
       borderColor="green.400"
       title="Evaluator Selection"
-      showTrigger={!!wizardState.evaluatorCategory}
+      showTrigger={!!workbenchState.evaluatorCategory}
     >
       <RadioCard.Root
         variant="outline"
@@ -101,7 +101,7 @@ export const EvaluatorSelectionAccordion = ({
               }
             />
           ))}
-          {wizardState.evaluatorCategory === "custom_evaluators" &&
+          {workbenchState.evaluatorCategory === "custom_evaluators" &&
             evaluators.length === 0 && (
               <EmptyState.Root>
                 <EmptyState.Content>

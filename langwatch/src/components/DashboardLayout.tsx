@@ -167,6 +167,24 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               );
 
                               if (hasProjectInRoute) {
+                                // Check if route has other dynamic segments beyond [project]
+                                // If so, redirect to parent route to avoid 404
+                                const hasOtherDynamicSegments =
+                                  currentRoute?.path
+                                    .replace("[project]", "")
+                                    .includes("[");
+
+                                if (
+                                  hasOtherDynamicSegments &&
+                                  currentRoute?.parent
+                                ) {
+                                  const parentRoute =
+                                    projectRoutes[currentRoute.parent];
+                                  return parentRoute.path
+                                    .replace("[project]", project_.slug)
+                                    .replace(/\/\/+/g, "/");
+                                }
+
                                 return currentRoute?.path
                                   .replace("[project]", project_.slug)
                                   .replace(/\/\/+/g, "/");

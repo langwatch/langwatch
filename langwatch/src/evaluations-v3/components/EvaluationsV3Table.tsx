@@ -170,7 +170,8 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const { execute, abort, status, isAborting } = useExecuteEvaluation();
+  const { execute, abort, status, isAborting, rerunEvaluator } =
+    useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -192,6 +193,14 @@ export function EvaluationsV3Table({
       void execute({ type: "cell", rowIndex, targetId });
     },
     [execute],
+  );
+
+  // Handler for re-running a single evaluator
+  const handleRerunEvaluator = useCallback(
+    (rowIndex: number, targetId: string, evaluatorId: string) => {
+      void rerunEvaluator(rowIndex, targetId, evaluatorId);
+    },
+    [rerunEvaluator],
   );
 
   // Handler for stopping execution
@@ -367,12 +376,12 @@ export function EvaluationsV3Table({
       ];
 
       // Create a new EvaluatorConfig from the Prisma evaluator
+      // Note: settings are NOT stored in workbench state - always fetched fresh from DB
       const evaluatorConfig: EvaluatorConfig = {
         id: `evaluator_${Date.now()}`,
         evaluatorType: (config?.evaluatorType ??
           "custom/unknown") as EvaluatorConfig["evaluatorType"],
         name: evaluator.name,
-        settings: config?.settings ?? {},
         inputs: inputFields.map((field) => ({
           identifier: field,
           type: "str" as const, // Default all evaluator inputs to string
@@ -573,13 +582,18 @@ export function EvaluationsV3Table({
   );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
-  // Set up row virtualization
+  // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
     count: displayRowCount,
     getScrollElement,
     estimateSize,
     overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
     enabled: !!scrollContainer, // Only enable when scroll container is available
+    // Enable dynamic measurement - measures actual row heights as they render
+    measureElement:
+      typeof window !== "undefined"
+        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        : undefined,
   });
 
   const selectedRows = ui.selectedRows;
@@ -652,11 +666,13 @@ export function EvaluationsV3Table({
               ),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
-              // Loading if this specific cell is in the executing set
-              // Uses the executingCells set as single source of truth
+              // Loading if this specific cell is in the executing set AND has no output/error yet
+              // Once target output or error arrives, show it instead of skeleton
               isLoading:
                 results.executingCells !== undefined &&
-                isCellInExecution(results.executingCells, index, target.id),
+                isCellInExecution(results.executingCells, index, target.id) &&
+                results.targetOutputs[target.id]?.[index] === undefined &&
+                results.errors[target.id]?.[index] === undefined,
               // Trace ID for viewing the execution trace
               traceId:
                 results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
@@ -726,6 +742,17 @@ export function EvaluationsV3Table({
     [results.executingCells],
   );
 
+  // Helper to check if a specific evaluator is running
+  const isEvaluatorRunning = useCallback(
+    (rowIndex: number, targetId: string, evaluatorId: string): boolean => {
+      if (!results.runningEvaluators) return false;
+      return results.runningEvaluators.has(
+        `${rowIndex}:${targetId}:${evaluatorId}`,
+      );
+    },
+    [results.runningEvaluators],
+  );
+
   const tableMeta: TableMeta = useMemo(
     () => ({
       // Target data
@@ -740,10 +767,12 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleRerunEvaluator,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,
       isCellExecuting,
+      isEvaluatorRunning,
       // Selection data
       selectedRows,
       allSelected,
@@ -764,10 +793,12 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleRerunEvaluator,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,
       isCellExecuting,
+      isEvaluatorRunning,
       selectedRows,
       allSelected,
       someSelected,
@@ -1255,6 +1286,7 @@ export function EvaluationsV3Table({
                     <tr
                       key={row.id}
                       data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
                       data-selected={
                         selectedRows.has(row.index) ? "true" : undefined
                       }

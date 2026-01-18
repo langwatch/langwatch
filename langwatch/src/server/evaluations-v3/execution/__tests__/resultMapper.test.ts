@@ -153,7 +153,7 @@ describe("resultMapper", () => {
       }
     });
 
-    it("maps evaluator error result", () => {
+    it("maps evaluator error result from execution-level error", () => {
       const result = mapEvaluatorResult("target-1.eval-1", 0, {
         status: "error",
         error: "Evaluator timeout",
@@ -167,6 +167,47 @@ describe("resultMapper", () => {
           details: "Evaluator timeout",
           traceback: [],
         });
+      }
+    });
+
+    it("maps evaluator error result from outputs.status === 'error'", () => {
+      // This covers the case where the NLP execution succeeds but the evaluator
+      // returns an error in its outputs (e.g., langevals returns 404)
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success", // Execution succeeded
+        outputs: {
+          status: "error", // But evaluator itself returned error
+          details:
+            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+        },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result).toEqual({
+          status: "error",
+          error_type: "EvaluatorError",
+          details:
+            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+          traceback: [],
+        });
+      }
+    });
+
+    it("prefers execution-level error over outputs.status error", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "error",
+        error: "Execution failed",
+        outputs: {
+          status: "error",
+          details: "Evaluator error",
+        },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        // Should use execution-level error
+        expect(result.result.details).toBe("Execution failed");
       }
     });
 

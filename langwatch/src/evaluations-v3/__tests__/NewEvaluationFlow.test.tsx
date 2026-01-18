@@ -24,7 +24,7 @@ let mockQueryState = {
     id: string;
     slug: string;
     name: string;
-    wizardState: null;
+    workbenchState: null;
   } | null,
   isLoading: false,
   error: null as { data?: { code: string; httpStatus: number } } | null,
@@ -139,7 +139,7 @@ describe("Loading existing evaluation (/v3/[slug])", () => {
         id: "existing-id",
         slug: "existing-slug",
         name: "Existing Evaluation",
-        wizardState: null,
+        workbenchState: null,
       },
       isLoading: false,
       error: null,

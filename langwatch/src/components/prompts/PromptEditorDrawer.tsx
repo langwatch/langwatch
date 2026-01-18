@@ -1064,6 +1064,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             </FormProvider>
           )}
         </Drawer.Body>
+
+        {/* Footer with Apply button - only shown in evaluations context */}
+        {targetId && (
+          <Drawer.Footer
+            borderTopWidth="1px"
+            borderColor="gray.200"
+            paddingX={4}
+            paddingY={3}
+          >
+            <HStack justify="flex-end" width="full">
+              <Button colorPalette="blue" onClick={handleClose}>
+                Apply
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        )}
       </Drawer.Content>
     </Drawer.Root>
   );

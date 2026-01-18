@@ -242,7 +242,6 @@ describe("DSL Adapter", () => {
               id: "eval-1",
               evaluatorType: "langevals/exact_match",
               name: "Exact Match",
-              settings: {},
               inputs: [
                 { identifier: "output", type: "str" },
                 { identifier: "expected", type: "str" },

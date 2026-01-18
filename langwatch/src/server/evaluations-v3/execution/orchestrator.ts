@@ -23,6 +23,7 @@ import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger";
+import { generateOtelTraceId } from "~/utils/trace";
 import type {
   BatchEvaluationRepository,
   DatasetEntry,
@@ -47,9 +48,9 @@ import { buildCellWorkflow } from "./workflowBuilder";
 
 const logger = createLogger("evaluations-v3:orchestrator");
 
-// Default concurrency limit (can be overridden via environment variable)
+// Default concurrency limit (can be overridden via environment variable or request)
 const DEFAULT_CONCURRENCY = parseInt(
-  process.env.EVAL_V3_CONCURRENCY ?? "5",
+  process.env.EVAL_V3_CONCURRENCY ?? "10",
   10,
 );
 
@@ -66,10 +67,14 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
+  /** Evaluators loaded from DB - settings are fetched fresh from here */
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>;
   /** Enable saving results to Elasticsearch */
   saveToEs?: boolean;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
+  /** Concurrency limit for parallel execution (default 10) */
+  concurrency?: number;
 };
 
 /**
@@ -86,6 +91,35 @@ export const generateCells = (
   const cells: ExecutionCell[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+
+  // Handle evaluator scope specially - single evaluator re-run with pre-computed target output
+  if (scope.type === "evaluator") {
+    const targetConfig = state.targets.find(
+      (t: TargetConfig) => t.id === scope.targetId,
+    );
+    const evaluatorConfig = state.evaluators.find(
+      (e) => e.id === scope.evaluatorId,
+    );
+    const datasetEntry = datasetRows[scope.rowIndex];
+
+    if (targetConfig && evaluatorConfig && datasetEntry) {
+      cells.push({
+        rowIndex: scope.rowIndex,
+        targetId: scope.targetId,
+        targetConfig,
+        // Only include the single evaluator
+        evaluatorConfigs: [evaluatorConfig],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        // Skip target execution, use pre-computed output
+        skipTarget: scope.targetOutput !== undefined,
+        precomputedTargetOutput: scope.targetOutput,
+      });
+    }
+    return cells;
+  }
 
   // Determine which rows to process
   const rowIndices =
@@ -152,7 +186,11 @@ export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
-  loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
+  loadedData: {
+    prompt?: VersionedPrompt;
+    agent?: TypedAgent;
+    evaluators?: Map<string, { id: string; config: unknown }>;
+  },
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
@@ -177,66 +215,91 @@ export async function* executeCell(
     // Create set of target nodes for the result mapper
     const targetNodes = new Set([cell.targetId]);
 
-    // Create the execute_component event for the target
-    const traceId = `trace_${nanoid()}`;
-    const rawEvent = {
-      type: "execute_component" as const,
-      payload: {
-        trace_id: traceId,
-        workflow: {
-          ...workflow,
-          state: { execution: { status: "idle" as const } },
-        },
-        node_id: targetNodeId,
-        inputs: buildTargetInputs(cell),
-      },
-    };
+    // Generate OTEL-compliant trace ID for this cell execution
+    const traceId = generateOtelTraceId();
 
-    // Add environment variables and process datasets
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId),
-      projectId,
-    );
-
-    // Execute target and collect events
-    const targetEvents: StudioServerEvent[] = [];
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;
 
-    await studioBackendPostEvent({
-      projectId,
-      message: enrichedEvent,
-      isAborted,
-      onEvent: (serverEvent) => {
-        targetEvents.push(serverEvent);
-
-        // Extract target output from success event
-        if (
-          serverEvent.type === "component_state_change" &&
-          serverEvent.payload.component_id === targetNodeId &&
-          serverEvent.payload.execution_state?.status === "success"
-        ) {
-          targetOutput = serverEvent.payload.execution_state.outputs;
-        } else if (
-          serverEvent.type === "component_state_change" &&
-          serverEvent.payload.component_id === targetNodeId &&
-          serverEvent.payload.execution_state?.status === "error"
-        ) {
-          targetFailed = true;
-        }
-      },
-    });
-
-    // Map and yield target events
-    for (const event of targetEvents) {
-      const mappedEvent = mapNlpEvent(
-        event,
-        cell.rowIndex,
-        targetNodes,
-        resultMapperConfig,
+    // If skipTarget is true, use pre-computed output instead of executing target
+    if (cell.skipTarget && cell.precomputedTargetOutput !== undefined) {
+      logger.debug(
+        { rowIndex: cell.rowIndex, targetId: cell.targetId },
+        "Skipping target execution, using pre-computed output",
       );
-      if (mappedEvent) {
-        yield mappedEvent;
+      // Convert precomputedTargetOutput to the expected format
+      // The target output should be a record with the output field identifier as key
+      if (
+        typeof cell.precomputedTargetOutput === "object" &&
+        cell.precomputedTargetOutput !== null
+      ) {
+        targetOutput = cell.precomputedTargetOutput as Record<string, unknown>;
+      } else {
+        // If it's a primitive value, wrap it in the expected output field
+        const outputField =
+          cell.targetConfig.outputs?.[0]?.identifier ?? "output";
+        targetOutput = { [outputField]: cell.precomputedTargetOutput };
+      }
+    } else {
+      // Execute target normally
+      // Create the execute_component event for the target
+      const rawEvent = {
+        type: "execute_component" as const,
+        payload: {
+          trace_id: traceId,
+          workflow: {
+            ...workflow,
+            state: { execution: { status: "idle" as const } },
+          },
+          node_id: targetNodeId,
+          inputs: buildTargetInputs(cell),
+        },
+      };
+
+      // Add environment variables and process datasets
+      const enrichedEvent = await loadDatasets(
+        await addEnvs(rawEvent, projectId),
+        projectId,
+      );
+
+      // Execute target and collect events
+      const targetEvents: StudioServerEvent[] = [];
+
+      await studioBackendPostEvent({
+        projectId,
+        message: enrichedEvent,
+        isAborted,
+        onEvent: (serverEvent) => {
+          targetEvents.push(serverEvent);
+
+          // Extract target output from success event
+          if (
+            serverEvent.type === "component_state_change" &&
+            serverEvent.payload.component_id === targetNodeId &&
+            serverEvent.payload.execution_state?.status === "success"
+          ) {
+            targetOutput = serverEvent.payload.execution_state.outputs;
+          } else if (
+            serverEvent.type === "component_state_change" &&
+            serverEvent.payload.component_id === targetNodeId &&
+            serverEvent.payload.execution_state?.status === "error"
+          ) {
+            targetFailed = true;
+          }
+        },
+      });
+
+      // Map and yield target events
+      for (const event of targetEvents) {
+        const mappedEvent = mapNlpEvent(
+          event,
+          cell.rowIndex,
+          targetNodes,
+          resultMapperConfig,
+        );
+        if (mappedEvent) {
+          yield mappedEvent;
+        }
       }
     }
 
@@ -420,9 +483,14 @@ export async function* runOrchestrator(
     datasetColumns,
     loadedPrompts,
     loadedAgents,
+    loadedEvaluators,
     saveToEs = false,
     runId: providedRunId,
+    concurrency: requestedConcurrency,
   } = input;
+
+  // Use requested concurrency, environment variable, or default
+  const concurrency = requestedConcurrency ?? DEFAULT_CONCURRENCY;
 
   // Use provided run ID or generate a human-readable one like "swift-fox-42"
   const runId = providedRunId ?? generateHumanReadableId();
@@ -538,6 +606,23 @@ export async function* runOrchestrator(
         error: event.error ?? null,
         trace_id: event.traceId ?? null,
       });
+    } else if (event.type === "error") {
+      // Store error events as dataset entries with the error message
+      // This captures errors that occur during cell execution (e.g., network errors)
+      if (event.rowIndex !== undefined && event.targetId) {
+        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+
+        pendingDataset.push({
+          index: event.rowIndex,
+          target_id: event.targetId,
+          entry: datasetEntry,
+          predicted: undefined,
+          cost: null,
+          duration: null,
+          error: event.message,
+          trace_id: null,
+        });
+      }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
       // Find the evaluator config to get the human-readable name
@@ -586,7 +671,7 @@ export async function* runOrchestrator(
   let aborted = false;
 
   logger.info(
-    { runId, totalCells, concurrency: DEFAULT_CONCURRENCY, experimentId },
+    { runId, totalCells, concurrency, experimentId },
     "Starting evaluation execution",
   );
 
@@ -633,7 +718,7 @@ export async function* runOrchestrator(
   };
 
   // Create semaphore for rate limiting
-  const semaphore = createSemaphore(DEFAULT_CONCURRENCY);
+  const semaphore = createSemaphore(concurrency);
 
   // Track active cell executions
   const activeCells = new Set<Promise<void>>();
@@ -662,11 +747,14 @@ export async function* runOrchestrator(
             }
 
             // Get loaded data for this target
-            const loadedData = getLoadedDataForTarget(
-              cell.targetConfig,
-              loadedPrompts,
-              loadedAgents,
-            );
+            const loadedData = {
+              ...getLoadedDataForTarget(
+                cell.targetConfig,
+                loadedPrompts,
+                loadedAgents,
+              ),
+              evaluators: loadedEvaluators,
+            };
 
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);
@@ -733,7 +821,9 @@ export async function* runOrchestrator(
         })();
 
         activeCells.add(cellPromise);
-        await cellPromise.finally(() => activeCells.delete(cellPromise));
+        // Don't await here - let cells run in parallel
+        // Clean up when cell completes
+        void cellPromise.finally(() => activeCells.delete(cellPromise));
       }
 
       // Wait for all remaining cells to complete

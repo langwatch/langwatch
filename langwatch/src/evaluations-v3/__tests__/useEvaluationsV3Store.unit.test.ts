@@ -200,7 +200,6 @@ describe("useEvaluationsV3Store", () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Evaluator 1",
-        settings: {},
         inputs: [],
         // Per-dataset, per-target mappings: datasetId -> targetId -> inputField -> FieldMapping
         mappings: {
@@ -398,7 +397,6 @@ describe("useEvaluationsV3Store", () => {
       id,
       evaluatorType: "langevals/exact_match",
       name: `Evaluator ${id}`,
-      settings: {},
       inputs: [{ identifier: "output", type: "str" }],
       mappings: {},
     });
@@ -453,7 +451,6 @@ describe("useEvaluationsV3Store", () => {
       id,
       evaluatorType: "langevals/exact_match",
       name: `Evaluator ${id}`,
-      settings: {},
       inputs: [{ identifier: "output", type: "str" }],
       mappings: {},
     });
@@ -773,7 +770,6 @@ const createTestEvaluator = (id: string): EvaluatorConfig => ({
   id,
   evaluatorType: "langevals/exact_match",
   name: `Evaluator ${id}`,
-  settings: {},
   inputs: [{ identifier: "output", type: "str" }],
   mappings: {},
 });

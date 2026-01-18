@@ -129,7 +129,6 @@ vi.mock("~/utils/api", () => ({
             projectId: "test-project",
             config: {
               evaluatorType: "langevals/exact_match",
-              settings: {},
             },
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -364,7 +363,6 @@ describe("New Evaluator Added to Workbench", () => {
           id: "evaluator_123",
           evaluatorType: "langevals/exact_match",
           name: "My Custom Evaluator",
-          settings: {},
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },
