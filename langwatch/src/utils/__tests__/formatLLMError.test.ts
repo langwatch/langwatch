@@ -42,6 +42,28 @@ describe("parseLLMError", () => {
     });
   });
 
+  describe("when parsing XAI/Grok error format", () => {
+    it("extracts error string from XaiException JSON", () => {
+      const raw = `litellm.RateLimitError: XaiException - {"code":"Some resource has been exhausted","error":"Your team 4cdc57fa-7861-42af-a252-d3f661688f9b has either used all available credits or reached its monthly spending limit. To continue making API requests, please purchase more credits or raise your spending limit."}`;
+
+      expect(parseLLMError(raw)).toEqual({
+        type: "rate_limit",
+        message:
+          "Your team 4cdc57fa-7861-42af-a252-d3f661688f9b has either used all available credits or reached its monthly spending limit. To continue making API requests, please purchase more credits or raise your spending limit.",
+      });
+    });
+
+    it("extracts error string from nested RateLimitError format", () => {
+      const raw = `litellm.RateLimitError: RateLimitError: XaiException - {"code":"Some resource has been exhausted","error":"Your team 4cdc57fa-7861-42af-a252-d3f661688f9b has either used all available credits or reached its monthly spending limit. To continue making API requests, please purchase more credits or raise your spending limit."}`;
+
+      expect(parseLLMError(raw)).toEqual({
+        type: "rate_limit",
+        message:
+          "Your team 4cdc57fa-7861-42af-a252-d3f661688f9b has either used all available credits or reached its monthly spending limit. To continue making API requests, please purchase more credits or raise your spending limit.",
+      });
+    });
+  });
+
   it("returns unknown type for non-litellm errors", () => {
     const raw = "Connection refused";
 

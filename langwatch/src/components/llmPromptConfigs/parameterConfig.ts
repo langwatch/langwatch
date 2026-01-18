@@ -14,7 +14,10 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
-import { parameterRegistry } from "./parameterRegistry";
+import {
+  parameterRegistry,
+  type ParameterDefinition,
+} from "./parameterRegistry";
 
 // ============================================================================
 // Parameter Name Mapping (snake_case ↔ camelCase)
@@ -60,32 +63,17 @@ export function toInternalKey(camelCaseKey: string): string {
 }
 
 // ============================================================================
-// Types
+// Types (re-exported from parameterRegistry for backward compatibility)
 // ============================================================================
 
-export type SliderParameterConfig = {
-  type: "slider";
-  min: number;
-  max: number;
-  step: number;
-  default: number;
-  label: string;
-  helper: string;
-  /** If true, max is determined by model's maxCompletionTokens */
-  dynamicMax?: boolean;
-};
-
-export type SelectParameterConfig = {
-  type: "select";
-  options: readonly string[];
-  default: string;
-  label: string;
-  helper: string;
-  /** If true, options come from model's reasoningConfig */
-  dynamicOptions?: boolean;
-};
-
-export type ParameterConfig = SliderParameterConfig | SelectParameterConfig;
+/**
+ * @deprecated Use SliderParameterDefinition from parameterRegistry.ts
+ */
+export type {
+  SliderParameterDefinition as SliderParameterConfig,
+  SelectParameterDefinition as SelectParameterConfig,
+  ParameterDefinition as ParameterConfig,
+} from "./parameterRegistry";
 
 // ============================================================================
 // Parameter Definitions (derived from registry)
@@ -97,8 +85,8 @@ export type ParameterConfig = SliderParameterConfig | SelectParameterConfig;
  *
  * @deprecated Use parameterRegistry.getConfig(name) instead
  */
-export const PARAMETER_CONFIG: Record<string, ParameterConfig> =
-  parameterRegistry.buildParameterConfig() as Record<string, ParameterConfig>;
+export const PARAMETER_CONFIG: Record<string, ParameterDefinition> =
+  parameterRegistry.buildParameterConfig() as Record<string, ParameterDefinition>;
 
 // ============================================================================
 // Default Parameters (derived from registry)
@@ -156,7 +144,7 @@ export function getParameterIcon(paramName: string): ParameterIcon {
  */
 export function getParameterConfig(
   paramName: string,
-): ParameterConfig | undefined {
+): ParameterDefinition | undefined {
   return PARAMETER_CONFIG[paramName];
 }
 
@@ -181,7 +169,7 @@ const REASONING_PARAMETER_LABELS: Record<string, string> = {
 export function getParameterConfigWithModelOverrides(
   paramName: string,
   reasoningConfig?: ReasoningConfig,
-): ParameterConfig | undefined {
+): ParameterDefinition | undefined {
   const baseConfig = PARAMETER_CONFIG[paramName];
   if (!baseConfig) return undefined;
 
@@ -215,21 +203,7 @@ export function getDisplayParameters(supportedParameters: string[]): string[] {
   if (!supportedParameters || supportedParameters.length === 0) {
     return DEFAULT_SUPPORTED_PARAMETERS;
   }
-
-  // Filter to only configured parameters that the model supports
-  const configuredParams = supportedParameters.filter(
-    (param) => PARAMETER_CONFIG[param] !== undefined,
-  );
-
-  // Sort by display order
-  return configuredParams.sort((a, b) => {
-    const aIndex = PARAMETER_DISPLAY_ORDER.indexOf(a);
-    const bIndex = PARAMETER_DISPLAY_ORDER.indexOf(b);
-    // If not in order list, put at end
-    const aOrder = aIndex === -1 ? 999 : aIndex;
-    const bOrder = bIndex === -1 ? 999 : bIndex;
-    return aOrder - bOrder;
-  });
+  return parameterRegistry.getDisplayParameters(supportedParameters);
 }
 
 /**

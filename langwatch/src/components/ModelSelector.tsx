@@ -6,12 +6,12 @@ import {
   Input,
   Text,
 } from "@chakra-ui/react";
-import { Settings } from "lucide-react";
+import { Search, Settings } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Search } from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { allLitellmModels } from "../server/modelProviders/registry";
+import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import {
@@ -278,7 +278,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           <Box
             padding={2}
             position="sticky"
-            bottom={"-1"}
+            bottom="-1px"
             bg="white"
             borderTop="1px solid"
             borderColor="gray.200"
@@ -287,7 +287,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           >
             <Link
               href="/settings/model-providers"
-              target="_blank"
+              isExternal
               _hover={{ textDecoration: "none" }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -317,7 +317,7 @@ export const ModelSelector = React.memo(function ModelSelector({
 });
 
 const getCustomModels = (
-  modelProviders: Record<string, any>,
+  modelProviders: Record<string, MaybeStoredModelProvider>,
   options: string[],
   mode: "chat" | "embedding" = "chat",
 ) => {
@@ -326,23 +326,22 @@ const getCustomModels = (
   const customProviders: string[] = [];
 
   for (const provider of Object.keys(modelProviders)) {
-    if (
-      modelProviders[provider].enabled &&
-      modelProviders[provider].models &&
-      mode === "chat"
-    ) {
-      modelProviders[provider].models.forEach((model: string) => {
+    const providerConfig = modelProviders[provider];
+    if (!providerConfig) continue;
+
+    if (providerConfig.enabled && providerConfig.models && mode === "chat") {
+      providerConfig.models.forEach((model: string) => {
         models.push(`${provider}/${model}`);
         customProviders.push(provider);
       });
     }
 
     if (
-      modelProviders[provider].enabled &&
-      modelProviders[provider].embeddingsModels &&
+      providerConfig.enabled &&
+      providerConfig.embeddingsModels &&
       mode === "embedding"
     ) {
-      modelProviders[provider].embeddingsModels?.forEach((model: string) => {
+      providerConfig.embeddingsModels.forEach((model: string) => {
         models.push(`${provider}/${model}`);
         customProviders.push(provider);
       });

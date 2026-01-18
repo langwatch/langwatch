@@ -7,6 +7,7 @@
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 
+import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { Popover } from "../ui/popover";
 import { ParameterPopoverContent } from "./ParameterPopoverContent";
 import { getParameterIcon, type ParameterConfig } from "./parameterConfig";
@@ -45,17 +46,17 @@ function formatParameterValue(
   value: number | string | undefined,
   config: ParameterConfig,
 ): string {
-  if (value === undefined) {
-    return String(config.default);
-  }
-  if (typeof value === "number") {
+  const displayValue = value ?? config.default;
+
+  if (typeof displayValue === "number") {
     // Format to reasonable precision
-    return Number.isInteger(value)
-      ? String(value)
-      : value.toFixed(2).replace(/\.?0+$/, "");
+    return Number.isInteger(displayValue)
+      ? String(displayValue)
+      : displayValue.toFixed(2).replace(/\.?0+$/, "");
   }
+
   // Capitalize first letter for select values
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  return uppercaseFirstLetter(String(displayValue));
 }
 
 // ============================================================================

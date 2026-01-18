@@ -14,11 +14,14 @@ export interface ParsedLLMError {
 /**
  * Parses litellm error strings into structured data.
  * Pattern: "litellm.ErrorType: ProviderException - actual message"
+ * Also handles nested patterns like: "litellm.ErrorType: ErrorType: ProviderException - actual message"
  * Also handles Python-style errors: "ErrorType('message', ...)"
  */
 export function parseLLMError(raw: string): ParsedLLMError {
   // Try litellm format first
-  const litellmMatch = raw.match(/litellm\.(\w+):\s*\w+\s*-\s*(.*)/s);
+  // Match: litellm.ErrorType: <anything> - <message>
+  // The middle part can be "XaiException" or "RateLimitError: XaiException" etc.
+  const litellmMatch = raw.match(/litellm\.(\w+):\s*.+?\s+-\s+(.*)/s);
   if (litellmMatch) {
     const [, errorType, rawMessage] = litellmMatch;
     const message = extractJsonMessage(rawMessage ?? raw);
@@ -41,7 +44,14 @@ function extractJsonMessage(raw: string): string {
 
   try {
     const json = JSON.parse(raw);
-    return json.error?.message ?? raw;
+    // Handle different provider error formats:
+    // - Groq/OpenAI: {"error": {"message": "..."}}
+    // - XAI/Grok: {"code": "...", "error": "..."} where error is a string
+    // - Generic: {"message": "..."}
+    if (typeof json.error === "string") {
+      return json.error;
+    }
+    return json.error?.message ?? json.message ?? raw;
   } catch {
     return raw;
   }

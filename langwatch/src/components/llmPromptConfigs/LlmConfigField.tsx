@@ -1,5 +1,5 @@
 import { Box, HStack } from "@chakra-ui/react";
-import { ChevronDown } from "react-feather";
+import { ChevronDown } from "lucide-react";
 
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";

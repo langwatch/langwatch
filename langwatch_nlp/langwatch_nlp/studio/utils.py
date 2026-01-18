@@ -266,8 +266,11 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
             ),
         }
     return {
-        "temperature": llm_config.temperature or 0,
-        "max_tokens": llm_config.max_tokens or 2048,
+        # Use explicit None check to allow temperature=0 as a valid value
+        # Default to 1 to match UI default (parameterRegistry temperature.default = 1)
+        "temperature": llm_config.temperature if llm_config.temperature is not None else 1,
+        # Default to 4096 to match UI default (parameterRegistry max_tokens.default = 4096)
+        "max_tokens": llm_config.max_tokens if llm_config.max_tokens is not None else 4096,
     }
 
 
@@ -308,6 +311,22 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
         "max_tokens": corrected["max_tokens"],
         "temperature": corrected["temperature"],
     }
+
+    # Pass optional sampling parameters if set
+    if llm_config.top_p is not None:
+        dspy_kwargs["top_p"] = llm_config.top_p
+    if llm_config.frequency_penalty is not None:
+        dspy_kwargs["frequency_penalty"] = llm_config.frequency_penalty
+    if llm_config.presence_penalty is not None:
+        dspy_kwargs["presence_penalty"] = llm_config.presence_penalty
+    if llm_config.seed is not None:
+        dspy_kwargs["seed"] = llm_config.seed
+    if llm_config.top_k is not None:
+        dspy_kwargs["top_k"] = llm_config.top_k
+    if llm_config.min_p is not None:
+        dspy_kwargs["min_p"] = llm_config.min_p
+    if llm_config.repetition_penalty is not None:
+        dspy_kwargs["repetition_penalty"] = llm_config.repetition_penalty
 
     # Normalize reasoning from any provider-specific field (for backward compatibility)
     # Then map to the appropriate provider-specific parameter at runtime boundary

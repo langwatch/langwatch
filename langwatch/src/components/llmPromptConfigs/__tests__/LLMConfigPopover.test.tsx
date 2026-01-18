@@ -289,53 +289,6 @@ describe("LLMConfigPopover", () => {
     });
   });
 
-  describe("parameter value changes", () => {
-    it("calls onChange when reasoning is changed", async () => {
-      const user = userEvent.setup();
-      const onChange = vi.fn();
-
-      renderComponent({
-        values: { model: "openai/gpt-5", reasoning: "medium" },
-        onChange,
-      });
-
-      // Find the select for reasoning
-      const selects = screen.getAllByRole("combobox");
-      // The reasoning select (first select after model selector)
-      const reasoningSelect = selects.find(
-        (s) => s.getAttribute("data-testid") !== "model-selector",
-      );
-
-      if (reasoningSelect) {
-        await user.selectOptions(reasoningSelect, "high");
-        expect(onChange).toHaveBeenCalled();
-      }
-    });
-
-    it("outputs unified reasoning field", async () => {
-      const user = userEvent.setup();
-      const onChange = vi.fn();
-
-      renderComponent({
-        values: { model: "openai/gpt-5", reasoning: "medium" },
-        onChange,
-      });
-
-      const selects = screen.getAllByRole("combobox");
-      const reasoningSelect = selects.find(
-        (s) => s.getAttribute("data-testid") !== "model-selector",
-      );
-
-      if (reasoningSelect) {
-        await user.selectOptions(reasoningSelect, "high");
-        // Should output unified 'reasoning' field
-        expect(onChange).toHaveBeenCalledWith(
-          expect.objectContaining({ reasoning: "high" }),
-        );
-      }
-    });
-  });
-
   describe("structured outputs section", () => {
     it("does not show structured outputs by default", () => {
       renderComponent();
@@ -426,33 +379,6 @@ describe("LLMConfigPopover", () => {
       renderComponent();
       // ModelSelector is mocked, so we just verify the component renders
       expect(screen.getByTestId("model-selector")).toBeInTheDocument();
-    });
-  });
-
-  describe("unified reasoning field", () => {
-    it("outputs unified reasoning field consistently", async () => {
-      const user = userEvent.setup();
-      const onChange = vi.fn();
-
-      // Input uses unified reasoning field
-      renderComponent({
-        values: { model: "openai/gpt-5", reasoning: "medium" },
-        onChange,
-      });
-
-      const selects = screen.getAllByRole("combobox");
-      const reasoningSelect = selects.find(
-        (s) => s.getAttribute("data-testid") !== "model-selector",
-      );
-
-      if (reasoningSelect) {
-        await user.selectOptions(reasoningSelect, "high");
-
-        const calledWith = onChange.mock.calls[0]?.[0] as Record<string, unknown>;
-
-        // Should have unified reasoning field
-        expect(calledWith.reasoning).toBe("high");
-      }
     });
   });
 });

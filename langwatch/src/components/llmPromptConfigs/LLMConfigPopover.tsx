@@ -171,7 +171,10 @@ export function LLMConfigPopover({
           <ModelSelector
             model={values?.model ?? ""}
             options={allModelOptions}
-            onChange={(model) => onChange(buildModelChangeValues(model))}
+            onChange={(model) => {
+              const newModelMetadata = modelMetadata?.[model];
+              onChange(buildModelChangeValues(model, undefined, newModelMetadata));
+            }}
             mode="chat"
             size="full"
             showConfigureAction={true}
