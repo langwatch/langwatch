@@ -198,11 +198,11 @@ class TestReasoningModelConfig:
         call_kwargs = mock_dspy_lm.call_args.kwargs
         assert call_kwargs.get("effort") == "high"
 
-    def test_legacy_reasoning_fallback_to_reasoning_effort(self, mock_dspy_lm):
-        """Given legacy 'reasoning' field (deprecated), it should map to reasoning_effort."""
+    def test_unified_reasoning_maps_to_provider_specific_param(self, mock_dspy_lm):
+        """Given unified 'reasoning' field (canonical), it should map to provider-specific param."""
         config = LLMConfig(
             model="openai/gpt-5",
-            reasoning="medium",  # Legacy field
+            reasoning="medium",  # Canonical unified field
             max_tokens=16000,
         )
 
@@ -210,7 +210,7 @@ class TestReasoningModelConfig:
 
         mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
-        # Should be mapped to reasoning_effort
+        # Should be mapped to provider-specific param (reasoning_effort for OpenAI)
         assert call_kwargs.get("reasoning_effort") == "medium"
         assert "reasoning" not in call_kwargs
 

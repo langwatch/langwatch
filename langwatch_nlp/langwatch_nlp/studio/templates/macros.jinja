@@ -7,17 +7,19 @@
 dspy.LM(
             max_tokens={{ corrected_params["max_tokens"] }},
             temperature={{ corrected_params["temperature"] }},
-            {% if llm_config.reasoning_effort %}
-            reasoning_effort={{ llm_config.reasoning_effort.__repr__() }},
-            {% elif llm_config.reasoning %}
-            {# FALLBACK: Handle legacy 'reasoning' field (deprecated) #}
-            reasoning_effort={{ llm_config.reasoning.__repr__() }},
+            {# Normalize reasoning with correct priority: reasoning > reasoning_effort > thinkingLevel > effort #}
+            {% set normalized_reasoning = llm_config.reasoning or llm_config.reasoning_effort or llm_config.thinkingLevel or llm_config.effort %}
+            {% if normalized_reasoning %}
+            {# Map to provider-specific param based on model #}
+            {% set model_str = llm_config.model or '' %}
+            {% set provider = model_str.split('/')[0].lower() if '/' in model_str else '' %}
+            {% if provider == 'google' or provider == 'gemini' %}
+            thinkingLevel={{ normalized_reasoning.__repr__() }},
+            {% elif provider == 'anthropic' %}
+            effort={{ normalized_reasoning.__repr__() }},
+            {% else %}
+            reasoning_effort={{ normalized_reasoning.__repr__() }},
             {% endif %}
-            {% if llm_config.thinkingLevel %}
-            thinkingLevel={{ llm_config.thinkingLevel.__repr__() }},
-            {% endif %}
-            {% if llm_config.effort %}
-            effort={{ llm_config.effort.__repr__() }},
             {% endif %}
             {% for key, value in llm_params.items() %}
             {{ key }}={{ value.__repr__() }},
