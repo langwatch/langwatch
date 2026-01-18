@@ -772,4 +772,83 @@ describe("PromptEditorDrawer", () => {
       });
     });
   });
+
+  describe("Apply button (evaluations context)", () => {
+    const mockOnLocalConfigChange = vi.fn();
+
+    beforeEach(() => {
+      mockGetByIdOrHandle.mockReturnValue({
+        data: mockPromptDataWithMessages,
+        isLoading: false,
+      });
+      mockOnLocalConfigChange.mockClear();
+      mockCloseDrawer.mockClear();
+    });
+
+    it("shows Apply button when in evaluations context (targetId present)", async () => {
+      // Set targetId to indicate evaluations context
+      mockDrawerParams = { targetId: "target-1" };
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          onLocalConfigChange={mockOnLocalConfigChange}
+        />,
+      );
+
+      // Wait for drawer to load
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Apply button should be visible
+      expect(screen.getByRole("button", { name: /apply/i })).toBeInTheDocument();
+    });
+
+    it("does not show Apply button outside evaluations context", async () => {
+      // No targetId - not in evaluations context
+      mockDrawerParams = {};
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+        />,
+      );
+
+      // Wait for drawer to load
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Apply button should NOT be visible
+      expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
+    });
+
+    it("closes drawer when Apply button is clicked", async () => {
+      // Set targetId to indicate evaluations context
+      mockDrawerParams = { targetId: "target-1" };
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          onLocalConfigChange={mockOnLocalConfigChange}
+        />,
+      );
+
+      // Wait for drawer to load
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Click Apply button
+      const applyButton = screen.getByRole("button", { name: /apply/i });
+      await userEvent.click(applyButton);
+
+      // Should have called closeDrawer
+      expect(mockCloseDrawer).toHaveBeenCalled();
+    });
+  });
 });
