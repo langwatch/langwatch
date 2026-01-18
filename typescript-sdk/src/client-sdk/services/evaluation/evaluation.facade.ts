@@ -118,13 +118,22 @@ export class EvaluationFacade {
     if (runUrl) {
       console.log(`Follow live: ${runUrl}`);
     }
-    options.onProgress?.(0, startResponse.total);
+
+    const total = startResponse.total;
+    let lastProgress = 0;
+
+    // Print initial progress
+    if (total > 0) {
+      process.stdout.write(`Progress: 0/${total} (0%)`);
+    }
+    options.onProgress?.(0, total);
 
     const startTime = Date.now();
 
     // Poll until complete
     while (true) {
       if (Date.now() - startTime > timeout) {
+        console.log(); // Newline after progress
         const finalStatus = await this.getRunStatus(runId);
         throw new EvaluationTimeoutError(runId, finalStatus.progress, finalStatus.total);
       }
@@ -132,18 +141,30 @@ export class EvaluationFacade {
       await this.sleep(pollInterval);
 
       const status = await this.getRunStatus(runId);
+      const progress = status.progress;
+
+      // Update progress display if changed
+      if (progress !== lastProgress && status.total > 0) {
+        const percentage = Math.round((progress / status.total) * 100);
+        process.stdout.write(`\rProgress: ${progress}/${status.total} (${percentage}%)`);
+        lastProgress = progress;
+      }
+
       options.onProgress?.(status.progress, status.total);
 
       if (status.status === "completed") {
+        console.log(); // Newline after progress
         const summary = status.summary!;
         return this.buildResult(runId, "completed", summary, runUrl ?? "");
       }
 
       if (status.status === "failed") {
+        console.log(); // Newline after progress
         throw new EvaluationRunFailedError(runId, status.error ?? "Unknown error");
       }
 
       if (status.status === "stopped") {
+        console.log(); // Newline after progress
         return this.buildResult(runId, "stopped", status.summary ?? {
           runId,
           totalCells: status.total,

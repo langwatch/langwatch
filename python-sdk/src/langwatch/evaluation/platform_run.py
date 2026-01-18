@@ -222,6 +222,13 @@ def evaluate(
     print(f"Started evaluation run: {run_id}")
     if run_url:
         print(f"Follow live: {run_url}")
+
+    # Track last progress for change detection
+    last_progress = 0
+
+    # Print initial progress
+    if total > 0:
+        print(f"Progress: 0/{total} (0%)", end="", flush=True)
     if on_progress:
         on_progress(0, total)
 
@@ -229,6 +236,7 @@ def evaluate(
     start_time = time.time()
     while True:
         if time.time() - start_time > timeout:
+            print()  # Newline after progress
             status = _get_run_status(run_id, endpoint, effective_api_key)
             raise EvaluationTimeoutError(
                 run_id, status.get("progress", 0), status.get("total", 0)
@@ -240,21 +248,31 @@ def evaluate(
         progress = status.get("progress", 0)
         total = status.get("total", total)
 
+        # Update progress display if changed
+        if progress != last_progress and total > 0:
+            percentage = (progress / total) * 100
+            # Use carriage return to overwrite the line
+            print(f"\rProgress: {progress}/{total} ({percentage:.0f}%)", end="", flush=True)
+            last_progress = progress
+
         if on_progress:
             on_progress(progress, total)
 
         run_status = status.get("status")
 
         if run_status == "completed":
+            print()  # Newline after progress
             summary_data = status.get("summary", {})
             return _build_result(run_id, "completed", summary_data, run_url)
 
         if run_status == "failed":
+            print()  # Newline after progress
             raise EvaluationRunFailedError(
                 run_id, status.get("error", "Unknown error")
             )
 
         if run_status == "stopped":
+            print()  # Newline after progress
             summary_data = status.get("summary", {})
             return _build_result(run_id, "stopped", summary_data, run_url)
 
