@@ -276,7 +276,10 @@ export function TargetCellContent({
       if (expanded) {
         // Expanded view - scrollable, no max height
         return (
-          <Box flex={1} overflowY="auto" minHeight={0}>
+          <VStack flex={1} overflowY="auto" minHeight={0} align="start">
+            <Text fontSize="11px" color="gray.500" fontWeight="700" textTransform="uppercase">
+              Output
+            </Text>
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
@@ -285,19 +288,20 @@ export function TargetCellContent({
                 </Box>
               )}
             </Text>
-          </Box>
+          </VStack>
         );
       }
 
       // Collapsed view - with max-height and fade
       return (
         <Box position="relative">
-          <Box
+          <VStack
             ref={outputRef}
             maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
             overflow="hidden"
             cursor={isOverflowing ? "pointer" : undefined}
             onClick={isOverflowing ? handleExpandOutput : undefined}
+            align="start"
           >
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
@@ -307,7 +311,7 @@ export function TargetCellContent({
                 </Box>
               )}
             </Text>
-          </Box>
+          </VStack>
 
           {/* Fade overlay for overflowing content */}
           {isOverflowing && (
@@ -417,9 +421,10 @@ export function TargetCellContent({
       className={inExpandedView ? undefined : "cell-action-btn"}
       opacity={inExpandedView ? 1 : 0}
       transition="opacity 0.15s"
-      bg="gray.50/90"
+      bg={inExpandedView ? "transparent" : "gray.50"}
       borderRadius="md"
-      px={0.5}
+      paddingLeft={2}
+      paddingRight={0.5}
     >
       {/* Latency display - shows when duration is available */}
       {duration !== null && duration !== undefined && (
