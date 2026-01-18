@@ -39,12 +39,12 @@ export function OptimizationStudioLLMConfigField({
   }));
 
   const { modelProviders } = useOrganizationTeamProject();
-  const hasCustomKeys = Object.values(modelProviders ?? {}).some(
+  const providerIsConfigured = Object.values(modelProviders ?? {}).some(
     (modelProvider) =>
       model.split("/")[0] === modelProvider.provider &&
-      modelProvider.customKeys,
+      (modelProvider.enabled || modelProvider.customKeys),
   );
-  const requiresCustomKey = hasCodeNodes && !hasCustomKeys;
+  const requiresCustomKey = hasCodeNodes && !providerIsConfigured;
 
   const handleChange = useCallback(
     (newLlmConfig: LLMConfig) => {
