@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -26,6 +27,7 @@ const stringifiedInitialState = JSON.stringify(
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track which slug we've successfully loaded in THIS component instance
@@ -159,7 +161,9 @@ export const useAutosaveEvaluationsV3 = () => {
     loadState,
   ]);
 
-  // Clear timeouts on unmount
+  // Clear timeouts and invalidate query cache on unmount
+  // Invalidating the cache ensures that when user navigates back,
+  // fresh data is fetched from DB instead of returning stale cached data
   useEffect(() => {
     return () => {
       if (savedTimeoutRef.current) {
@@ -168,8 +172,26 @@ export const useAutosaveEvaluationsV3 = () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
+      // Invalidate the query cache for this experiment so that when
+      // user navigates back, it fetches fresh data instead of stale cache
+      if (routerSlug) {
+        // Use a predicate to match the query key pattern for tRPC queries
+        // tRPC query keys are arrays like [["experiments", "getEvaluationsV3BySlug"], { input: {...}, type: "query" }]
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey;
+            if (!Array.isArray(key) || key.length < 2) return false;
+            const [path] = key;
+            if (!Array.isArray(path)) return false;
+            return (
+              path[0] === "experiments" &&
+              path[1] === "getEvaluationsV3BySlug"
+            );
+          },
+        });
+      }
     };
-  }, []);
+  }, [queryClient, routerSlug]);
 
   // Transition to "saved" then back to "idle" after delay
   const markSaved = useCallback(() => {
