@@ -14,6 +14,7 @@ import { TableSettingsMenu } from "~/evaluations-v3/components/TableSettingsMenu
 import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
 import { useAutosaveEvaluationsV3 } from "~/evaluations-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import { useLambdaWarmup } from "~/evaluations-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -46,6 +47,9 @@ export default function EvaluationsV3Page() {
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
+
+  // Warm up lambda instances in the background (invisible to user)
+  useLambdaWarmup();
 
   // Reset store when leaving the page
   useEffect(() => {
