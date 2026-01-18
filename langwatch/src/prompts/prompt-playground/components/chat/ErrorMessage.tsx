@@ -1,4 +1,5 @@
-import { Alert, Link } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Link } from "~/components/ui/link";
 import type { ParsedLLMError } from "~/utils/formatLLMError";
 
 interface ErrorMessageProps {

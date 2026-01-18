@@ -48,6 +48,11 @@ function formatParameterValue(
 ): string {
   const displayValue = value ?? config.default;
 
+  // Handle undefined/null values early
+  if (displayValue === undefined || displayValue === null) {
+    return "";
+  }
+
   if (typeof displayValue === "number") {
     // Format to reasonable precision
     return Number.isInteger(displayValue)

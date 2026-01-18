@@ -15,8 +15,8 @@ Feature: Model Selector UX Improvements
     And the trigger should display "gpt-5" as the model name
 
   Scenario: Shows key parameter value in trigger subtitle
-    Given the selected model is "openai/gpt-5" with reasoning_effort "minimal"
-    Then the trigger should display "Minimal effort" as subtitle
+    Given the selected model is "openai/gpt-5" with reasoning_effort "low"
+    Then the trigger should display "Low effort" as subtitle
 
   Scenario: Shows temperature in trigger for traditional models
     Given the selected model is "openai/gpt-4.1" with temperature 0.7

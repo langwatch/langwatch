@@ -151,6 +151,11 @@ export function getParameterConfig(
 /**
  * Maps provider-specific parameter names to display labels.
  * Used for showing provider-appropriate labels in the UI.
+ *
+ * Note: Keys match the exact parameter names from each provider's API:
+ * - reasoning_effort: OpenAI
+ * - thinkingLevel: Gemini (camelCase is the actual Gemini API format)
+ * - effort: Anthropic
  */
 const REASONING_PARAMETER_LABELS: Record<string, string> = {
   reasoning_effort: "Reasoning Effort",
