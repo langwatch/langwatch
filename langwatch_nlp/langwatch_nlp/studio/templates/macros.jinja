@@ -8,21 +8,28 @@ dspy.LM(
             max_tokens={{ corrected_params["max_tokens"] }},
             temperature={{ corrected_params["temperature"] }},
             {# Normalize reasoning with correct priority: reasoning > reasoning_effort > thinkingLevel > effort #}
-            {% set normalized_reasoning = llm_config.reasoning or llm_config.reasoning_effort or llm_config.thinkingLevel or llm_config.effort %}
-            {% if normalized_reasoning %}
-            {# Map to provider-specific param based on model #}
-            {% set model_str = llm_config.model or '' %}
+            {# Use 'is not none' to preserve zero values #}
+            {% set normalized_reasoning = llm_config.reasoning if llm_config.reasoning is not none else (llm_config.reasoning_effort if llm_config.reasoning_effort is not none else (llm_config.thinkingLevel if llm_config.thinkingLevel is not none else llm_config.effort)) %}
+            {# Get effective model from llm_params first, fallback to llm_config.model #}
+            {% set model_str = llm_params.get('model') or llm_config.model or '' %}
             {% set provider = model_str.split('/')[0].lower() if '/' in model_str else '' %}
+            {# Determine target key based on provider #}
             {% if provider == 'google' or provider == 'gemini' %}
-            thinkingLevel={{ normalized_reasoning.__repr__() }},
+            {% set target_key = 'thinkingLevel' %}
             {% elif provider == 'anthropic' %}
-            effort={{ normalized_reasoning.__repr__() }},
+            {% set target_key = 'effort' %}
             {% else %}
-            reasoning_effort={{ normalized_reasoning.__repr__() }},
+            {% set target_key = 'reasoning_effort' %}
             {% endif %}
+            {# Emit reasoning param only if normalized_reasoning is not none and not already in llm_params #}
+            {% if normalized_reasoning is not none and llm_params.get(target_key) is none %}
+            {{ target_key }}={{ normalized_reasoning.__repr__() }},
             {% endif %}
+            {# Loop llm_params but skip target_key to avoid duplicates #}
             {% for key, value in llm_params.items() %}
+            {% if key != target_key %}
             {{ key }}={{ value.__repr__() }},
+            {% endif %}
             {% endfor %}
         )
 {% endmacro %}
