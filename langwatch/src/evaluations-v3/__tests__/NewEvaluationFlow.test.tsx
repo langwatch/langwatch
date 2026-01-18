@@ -84,10 +84,21 @@ vi.mock("../../utils/posthogErrorCapture", () => ({
 }));
 
 // Import hook after mocks
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <QueryClientProvider client={queryClient}>
+    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  </QueryClientProvider>
 );
 
 // Test component that displays the hook's state for /v3/[slug] page
@@ -118,6 +129,7 @@ describe("Loading existing evaluation (/v3/[slug])", () => {
 
     // Reset store
     useEvaluationsV3Store.getState().reset();
+    queryClient.clear();
 
     // Reset mutation mock
     mockMutateAsync.mockResolvedValue({

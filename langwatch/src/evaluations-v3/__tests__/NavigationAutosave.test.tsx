@@ -84,10 +84,21 @@ vi.mock("../../utils/posthogErrorCapture", () => ({
 }));
 
 // Import hook after mocks
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <QueryClientProvider client={queryClient}>
+    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  </QueryClientProvider>
 );
 
 // Test component that uses the autosave hook
@@ -105,6 +116,7 @@ describe("Navigation and autosave interaction", () => {
     mockExistingExperimentData = null;
     mockExistingExperimentLoading = true;
     useEvaluationsV3Store.getState().reset();
+    queryClient.clear();
   });
 
   afterEach(() => {
