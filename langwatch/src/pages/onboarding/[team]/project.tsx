@@ -26,6 +26,7 @@ import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
+import { isAtMaxProjects } from "../../../utils/limits";
 import { trackEvent } from "../../../utils/tracking";
 
 type RadioCardProps = {
@@ -130,7 +131,7 @@ export default function ProjectOnboarding() {
             return;
           }
 
-          void router.push(`/${data.projectSlug}/messages`);
+          void router.push(`/${data.projectSlug}`);
         },
       },
     );
@@ -148,35 +149,33 @@ export default function ProjectOnboarding() {
           <Heading as="h1" fontSize="x-large">
             Create New Project
           </Heading>
-          {usage.data &&
-            usage.data.projectsCount >= usage.data.activePlan.maxProjects &&
-            !usage.data.activePlan.overrideAddingLimitations && (
-              <Alert.Root>
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Text>
-                    You have reached the maximum number of projects allowed by
-                    your plan. Please{" "}
-                    <Link
-                      href={`/settings/subscription`}
-                      textDecoration="underline"
-                      _hover={{
-                        textDecoration: "none",
-                      }}
-                      onClick={() => {
-                        trackEvent("subscription_hook_click", {
-                          project_id: project?.id,
-                          hook: "new_project_limit_reached",
-                        });
-                      }}
-                    >
-                      upgrade your plan
-                    </Link>{" "}
-                    to create more projects.
-                  </Text>
-                </Alert.Content>
-              </Alert.Root>
-            )}
+          {isAtMaxProjects(usage.data) && (
+            <Alert.Root>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You have reached the maximum number of projects allowed by
+                  your plan. Please{" "}
+                  <Link
+                    href={`/settings/subscription`}
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "new_project_limit_reached",
+                      });
+                    }}
+                  >
+                    upgrade your plan
+                  </Link>{" "}
+                  to create more projects.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
           <Text paddingBottom={4} fontSize="14px">
             You can set up separate projects for each service or LLM feature of
             your application (for example, one for your ChatBot, another for
@@ -220,8 +219,7 @@ export default function ProjectOnboarding() {
           <HStack width="full">
             <Tooltip
               content={
-                usage.data &&
-                usage.data.projectsCount >= usage.data.activePlan.maxProjects
+                isAtMaxProjects(usage.data)
                   ? "You reached the limit of max new projects, upgrade your plan to add more projects"
                   : ""
               }
@@ -231,11 +229,7 @@ export default function ProjectOnboarding() {
                 colorPalette="orange"
                 type="submit"
                 disabled={
-                  createProject.isLoading ||
-                  (usage.data &&
-                    usage.data.projectsCount >=
-                      usage.data.activePlan.maxProjects &&
-                    !usage.data.activePlan.overrideAddingLimitations)
+                  createProject.isLoading || isAtMaxProjects(usage.data)
                 }
               >
                 {createProject.isLoading || createProject.isSuccess

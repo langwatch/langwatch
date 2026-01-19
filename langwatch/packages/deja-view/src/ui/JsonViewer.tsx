@@ -1,5 +1,5 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 
 interface JsonViewerProps {
   data: unknown;
@@ -33,7 +33,7 @@ function tokenizeJson(jsonStr: string): JsonToken[][] {
 
     // Capture leading whitespace
     const indentMatch = line.match(/^(\s*)/);
-    if (indentMatch && indentMatch[1]) {
+    if (indentMatch?.[1]) {
       tokens.push({ type: "indent", value: indentMatch[1] });
       i = indentMatch[1].length;
     }
@@ -67,7 +67,9 @@ function tokenizeJson(jsonStr: string): JsonToken[][] {
 
       // Number
       if (/[0-9-]/.test(char ?? "")) {
-        const numMatch = line.slice(i).match(/^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/);
+        const numMatch = line
+          .slice(i)
+          .match(/^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/);
         if (numMatch) {
           tokens.push({ type: "number", value: numMatch[0] });
           i += numMatch[0].length;
@@ -133,7 +135,11 @@ const TokenRenderer: React.FC<{ token: JsonToken; dimmed?: boolean }> = ({
   dimmed = false,
 }) => {
   const color = getTokenColor(token.type);
-  return <Text color={color} dimColor={dimmed}>{token.value}</Text>;
+  return (
+    <Text color={color} dimColor={dimmed}>
+      {token.value}
+    </Text>
+  );
 };
 
 /**
@@ -152,7 +158,10 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   const tokenizedLines = tokenizeJson(jsonStr);
 
   // Apply scroll offset - only limit lines if maxLines is explicitly set AND content exceeds it
-  const startLine = Math.min(scrollOffset, Math.max(0, tokenizedLines.length - 1));
+  const startLine = Math.min(
+    scrollOffset,
+    Math.max(0, tokenizedLines.length - 1),
+  );
 
   // If maxLines is set, we need to account for scroll indicators in the total
   let effectiveMaxLines: number | undefined = undefined;
@@ -168,7 +177,10 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
     effectiveMaxLines = Math.max(1, maxLines - indicatorLines);
   }
 
-  const endLine = effectiveMaxLines !== undefined ? startLine + effectiveMaxLines : tokenizedLines.length;
+  const endLine =
+    effectiveMaxLines !== undefined
+      ? startLine + effectiveMaxLines
+      : tokenizedLines.length;
   const displayLines = tokenizedLines.slice(startLine, endLine);
 
   const hasMoreAbove = startLine > 0;
@@ -176,9 +188,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
 
   return (
     <Box flexDirection="column" flexShrink={0}>
-      {hasMoreAbove && (
-        <Text dimColor>↑ ({startLine} lines above)</Text>
-      )}
+      {hasMoreAbove && <Text dimColor>↑ ({startLine} lines above)</Text>}
       {displayLines.map((lineTokens, lineIndex) => (
         <Text key={startLine + lineIndex}>
           {lineTokens.map((token, tokenIndex) => (
@@ -187,11 +197,8 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
         </Text>
       ))}
       {hasMoreBelow && (
-        <Text dimColor>
-          ↓ ({tokenizedLines.length - endLine} lines below)
-        </Text>
+        <Text dimColor>↓ ({tokenizedLines.length - endLine} lines below)</Text>
       )}
     </Box>
   );
 };
-

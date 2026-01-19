@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import type { Field } from "~/optimization_studio/types/dsl";
+import type { DatasetColumnType } from "~/server/datasets/types";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
@@ -109,7 +109,7 @@ export const localPromptConfigSchema = z.object({
     z.object({
       role: z.enum(["user", "assistant", "system"]),
       content: z.string(),
-    })
+    }),
   ),
   inputs: z.array(
     z.object({
@@ -126,20 +126,24 @@ export const localPromptConfigSchema = z.object({
         "dict",
         "list",
       ]),
-    })
+    }),
   ),
   outputs: z.array(
     z.object({
       identifier: z.string(),
       type: z.enum(["str", "float", "bool", "json_schema"]),
       json_schema: z.unknown().optional(),
-    })
+    }),
   ),
 });
 export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 /**
  * Zod schema for evaluator config validation.
+ *
+ * Note: Settings are NOT used at execution time - they are always fetched
+ * fresh from the database via dbEvaluatorId. This prevents sync issues.
+ * The settings field is kept for backward compatibility but is ignored.
  *
  * Mappings are stored per-dataset AND per-target:
  * mappings[datasetId][targetId][inputFieldName] = FieldMapping
@@ -152,13 +156,15 @@ export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
   name: z.string(),
-  settings: z.record(z.string(), z.unknown()),
+  /** @deprecated Settings are fetched from DB at execution time, not from workbench state */
+  settings: z.record(z.string(), z.unknown()).optional(),
   inputs: z.array(fieldSchema),
   // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
   mappings: z.record(
     z.string(),
-    z.record(z.string(), z.record(z.string(), fieldMappingSchema))
+    z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
   ),
+  /** Reference to the database evaluator - settings are fetched from here */
   dbEvaluatorId: z.string().optional(),
 });
 export type EvaluatorConfig = Omit<
@@ -216,7 +222,12 @@ export type TargetConfig = Omit<
 // Execution Results Types
 // ============================================================================
 
-export type EvaluationResultStatus = "idle" | "running" | "success" | "error" | "stopped";
+export type EvaluationResultStatus =
+  | "idle"
+  | "running"
+  | "success"
+  | "error"
+  | "stopped";
 
 /**
  * Schema for per-row metadata for a target execution.
@@ -241,11 +252,17 @@ export type EvaluationResults = {
   progress?: number;
   total?: number;
   /**
-   * Set of cells currently being executed.
+   * Set of cells currently being executed (waiting for target output).
    * Key format: "rowIndex:targetId"
-   * This is the single source of truth for determining which cells show loading state.
+   * Used to show loading skeleton on target cells.
    */
   executingCells?: Set<string>;
+  /**
+   * Set of evaluators currently running (waiting for evaluator result).
+   * Key format: "rowIndex:targetId:evaluatorId"
+   * Used to show spinner on evaluator chips.
+   */
+  runningEvaluators?: Set<string>;
   // Per-row results - arrays can have holes (undefined) for rows not yet executed
   targetOutputs: Record<string, Array<unknown>>;
   // Per-row metadata - arrays can have holes (undefined/null) for rows not yet executed
@@ -305,6 +322,8 @@ export type UIState = {
   hiddenColumns: Set<string>;
   // Autosave status for evaluation state and dataset records
   autosaveStatus: AutosaveStatus;
+  // Concurrency limit for parallel execution (default 10)
+  concurrency: number;
 };
 
 // ============================================================================
@@ -354,7 +373,10 @@ export type EvaluationsV3Actions = {
   addDataset: (dataset: DatasetReference) => void;
   removeDataset: (datasetId: string) => void;
   setActiveDataset: (datasetId: string) => void;
-  updateDataset: (datasetId: string, updates: Partial<DatasetReference>) => void;
+  updateDataset: (
+    datasetId: string,
+    updates: Partial<DatasetReference>,
+  ) => void;
   exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
 
   // Dataset cell/column actions (works for both inline and saved)
@@ -362,7 +384,7 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     row: number,
     columnId: string,
-    value: string
+    value: string,
   ) => void;
   getCellValue: (datasetId: string, row: number, columnId: string) => string;
   getRowCount: (datasetId: string) => number;
@@ -372,10 +394,13 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     rowIndex: number,
     columnId: string,
-    value: string
+    value: string,
   ) => void;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
-  getSavedRecordInfo: (datasetId: string, rowIndex: number) => {
+  getSavedRecordInfo: (
+    datasetId: string,
+    rowIndex: number,
+  ) => {
     dbDatasetId: string;
     recordId: string;
   } | null;
@@ -387,7 +412,7 @@ export type EvaluationsV3Actions = {
   updateColumnType: (
     datasetId: string,
     columnId: string,
-    type: DatasetColumnType
+    type: DatasetColumnType,
   ) => void;
 
   // Target actions
@@ -399,20 +424,20 @@ export type EvaluationsV3Actions = {
     targetId: string,
     datasetId: string,
     inputField: string,
-    mapping: FieldMapping
+    mapping: FieldMapping,
   ) => void;
   /** Remove a mapping for a target input field for a specific dataset */
   removeTargetMapping: (
     targetId: string,
     datasetId: string,
-    inputField: string
+    inputField: string,
   ) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
   updateEvaluator: (
     evaluatorId: string,
-    updates: Partial<EvaluatorConfig>
+    updates: Partial<EvaluatorConfig>,
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
 
@@ -422,14 +447,14 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     targetId: string,
     inputField: string,
-    mapping: FieldMapping
+    mapping: FieldMapping,
   ) => void;
   /** Remove a mapping for an evaluator input field for a specific dataset and target */
   removeEvaluatorMapping: (
     evaluatorId: string,
     datasetId: string,
     targetId: string,
-    inputField: string
+    inputField: string,
   ) => void;
 
   // Results actions
@@ -440,7 +465,7 @@ export type EvaluationsV3Actions = {
   openOverlay: (
     type: OverlayType,
     targetId?: string,
-    evaluatorId?: string
+    evaluatorId?: string,
   ) => void;
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
@@ -450,25 +475,28 @@ export type EvaluationsV3Actions = {
   clearRowSelection: () => void;
   deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
-    expanded: { targetId: string; evaluatorId: string; row: number } | undefined
+    expanded:
+      | { targetId: string; evaluatorId: string; row: number }
+      | undefined,
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
   setRowHeightMode: (mode: RowHeightMode) => void;
+  setConcurrency: (concurrency: number) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleColumnVisibility: (columnName: string) => void;
   setHiddenColumns: (columnNames: Set<string>) => void;
   setAutosaveStatus: (
     type: "evaluation" | "dataset",
     state: AutosaveState,
-    error?: string
+    error?: string,
   ) => void;
 
   // Reset
   reset: () => void;
 
   // Load state from saved experiment
-  loadState: (wizardState: unknown) => void;
+  loadState: (workbenchState: unknown) => void;
 
   // Update saved dataset records (used when loading from database)
   setSavedDatasetRecords: (datasetId: string, records: SavedRecord[]) => void;
@@ -518,6 +546,12 @@ export type TableMeta = {
   handleRunTarget?: (targetId: string) => void;
   handleRunRow?: (rowIndex: number) => void;
   handleRunCell?: (rowIndex: number, targetId: string) => void;
+  /** Re-run a single evaluator for a specific cell */
+  handleRerunEvaluator?: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => void;
   handleStopExecution?: () => void;
   /** Whether any execution is currently running */
   isExecutionRunning?: boolean;
@@ -525,6 +559,12 @@ export type TableMeta = {
   isTargetExecuting?: (targetId: string) => boolean;
   /** Check if a specific cell is being executed */
   isCellExecuting?: (rowIndex: number, targetId: string) => boolean;
+  /** Check if a specific evaluator is currently running */
+  isEvaluatorRunning?: (
+    rowIndex: number,
+    targetId: string,
+    evaluatorId: string,
+  ) => boolean;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;
@@ -579,6 +619,9 @@ export const createInitialResults = (): EvaluationResults => ({
   errors: {},
 });
 
+// Default concurrency limit for parallel execution
+export const DEFAULT_CONCURRENCY = 10;
+
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),
   columnWidths: {},
@@ -589,6 +632,7 @@ export const createInitialUIState = (): UIState => ({
     evaluation: "idle",
     dataset: "idle",
   },
+  concurrency: DEFAULT_CONCURRENCY,
 });
 
 export const createInitialState = (): EvaluationsV3State => ({

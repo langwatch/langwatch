@@ -12,7 +12,7 @@ export const ROW_HEIGHT = 180;
  */
 export const calculateMinTableWidth = (
   datasetColCount: number,
-  targetColCount: number
+  targetColCount: number,
 ): number => {
   return 40 + datasetColCount * 210 + targetColCount * 300;
 };

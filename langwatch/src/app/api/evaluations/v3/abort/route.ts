@@ -5,13 +5,13 @@
  * Sets a Redis flag that the orchestrator checks between cell executions.
  */
 
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { abortManager } from "~/server/evaluations-v3/execution/abortManager";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { authOptions } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { abortManager } from "~/server/evaluations-v3/execution/abortManager";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("evaluations-v3:abort");
@@ -29,7 +29,7 @@ export const POST = async (request: NextRequest) => {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid request body", details: parsed.error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,7 +40,7 @@ export const POST = async (request: NextRequest) => {
     if (!session) {
       return NextResponse.json(
         { error: "You must be logged in to access this endpoint." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -48,12 +48,12 @@ export const POST = async (request: NextRequest) => {
     const hasPermission = await hasProjectPermission(
       { prisma, session },
       projectId,
-      "evaluations:manage"
+      "evaluations:manage",
     );
     if (!hasPermission) {
       return NextResponse.json(
         { error: "You do not have permission to access this endpoint." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -71,7 +71,7 @@ export const POST = async (request: NextRequest) => {
     logger.error({ error }, "Failed to process abort request");
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };

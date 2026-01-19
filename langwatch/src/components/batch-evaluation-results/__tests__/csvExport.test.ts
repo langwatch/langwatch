@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ESBatchEvaluation } from "~/server/experiments/types";
 import {
-  buildCsvHeaders,
   buildCsvData,
+  buildCsvHeaders,
   generateCsvContent,
 } from "../csvExport";
 import type { BatchEvaluationData, BatchTargetOutput } from "../types";
 import { transformBatchEvaluationData } from "../types";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
 
 const createMinimalData = (
-  overrides: Partial<BatchEvaluationData> = {}
+  overrides: Partial<BatchEvaluationData> = {},
 ): BatchEvaluationData => ({
   runId: "run-1",
   experimentId: "exp-1",
@@ -24,7 +24,7 @@ const createMinimalData = (
 });
 
 const createTargetOutput = (
-  overrides: Partial<BatchTargetOutput> = {}
+  overrides: Partial<BatchTargetOutput> = {},
 ): BatchTargetOutput => ({
   targetId: "target-1",
   output: null,
@@ -318,8 +318,14 @@ describe("csvExport", () => {
             index: 0,
             datasetEntry: {},
             targets: {
-              t1: createTargetOutput({ targetId: "t1", output: { response: "gpt response" } }),
-              t2: createTargetOutput({ targetId: "t2", output: { response: "claude response" } }),
+              t1: createTargetOutput({
+                targetId: "t1",
+                output: { response: "gpt response" },
+              }),
+              t2: createTargetOutput({
+                targetId: "t2",
+                output: { response: "claude response" },
+              }),
             },
           },
         ],
@@ -334,9 +340,24 @@ describe("csvExport", () => {
     it("exports multiple targets with specific output fields", () => {
       const data = createMinimalData({
         targetColumns: [
-          { id: "gpt-4", name: "GPT-4", type: "prompt", outputFields: ["output"] },
-          { id: "gpt-3.5", name: "GPT-3.5", type: "prompt", outputFields: ["output"] },
-          { id: "claude", name: "Claude", type: "prompt", outputFields: ["output"] },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "prompt",
+            outputFields: ["output"],
+          },
+          {
+            id: "gpt-3.5",
+            name: "GPT-3.5",
+            type: "prompt",
+            outputFields: ["output"],
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "prompt",
+            outputFields: ["output"],
+          },
         ],
         rows: [
           {
@@ -355,7 +376,7 @@ describe("csvExport", () => {
                 cost: 0.0005,
                 duration: 200,
               }),
-              "claude": createTargetOutput({
+              claude: createTargetOutput({
                 targetId: "claude",
                 output: { output: "Claude says 4" },
                 cost: 0.0008,
@@ -389,10 +410,20 @@ describe("csvExport", () => {
     it("exports multiple targets with evaluator results per target", () => {
       const data = createMinimalData({
         targetColumns: [
-          { id: "gpt-4", name: "GPT-4", type: "prompt", outputFields: ["output"] },
-          { id: "claude", name: "Claude", type: "prompt", outputFields: ["output"] },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "prompt",
+            outputFields: ["output"],
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "prompt",
+            outputFields: ["output"],
+          },
         ],
-        evaluatorNames: { "quality": "Quality Check" },
+        evaluatorNames: { quality: "Quality Check" },
         rows: [
           {
             index: 0,
@@ -411,7 +442,7 @@ describe("csvExport", () => {
                   },
                 ],
               }),
-              "claude": createTargetOutput({
+              claude: createTargetOutput({
                 targetId: "claude",
                 output: { output: "Claude answer" },
                 evaluatorResults: [
@@ -581,7 +612,9 @@ describe("csvExport", () => {
   });
 
   describe("multi-target CSV export from ES data", () => {
-    const createESData = (overrides: Partial<ESBatchEvaluation> = {}): ESBatchEvaluation => ({
+    const createESData = (
+      overrides: Partial<ESBatchEvaluation> = {},
+    ): ESBatchEvaluation => ({
       project_id: "project-1",
       experiment_id: "exp-1",
       run_id: "run-1",
@@ -600,20 +633,74 @@ describe("csvExport", () => {
       // Simulate ES data with multiple targets at the same index (as stored by log_results)
       const esData = createESData({
         targets: [
-          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
-          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
-          { id: "claude", name: "Claude", type: "custom", metadata: { model: "anthropic/claude-3" } },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "custom",
+            metadata: { model: "openai/gpt-4" },
+          },
+          {
+            id: "gpt-3.5",
+            name: "GPT-3.5",
+            type: "custom",
+            metadata: { model: "openai/gpt-3.5-turbo" },
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "custom",
+            metadata: { model: "anthropic/claude-3" },
+          },
         ],
         dataset: [
           // All targets at index 0 with their own predictions
-          { index: 0, target_id: "gpt-4", entry: { question: "Q1" }, predicted: { output: "GPT-4 answer" }, duration: 500 },
-          { index: 0, target_id: "gpt-3.5", entry: { question: "Q1" }, predicted: { output: "GPT-3.5 answer" }, duration: 200 },
-          { index: 0, target_id: "claude", entry: { question: "Q1" }, predicted: { output: "Claude answer" }, duration: 300 },
+          {
+            index: 0,
+            target_id: "gpt-4",
+            entry: { question: "Q1" },
+            predicted: { output: "GPT-4 answer" },
+            duration: 500,
+          },
+          {
+            index: 0,
+            target_id: "gpt-3.5",
+            entry: { question: "Q1" },
+            predicted: { output: "GPT-3.5 answer" },
+            duration: 200,
+          },
+          {
+            index: 0,
+            target_id: "claude",
+            entry: { question: "Q1" },
+            predicted: { output: "Claude answer" },
+            duration: 300,
+          },
         ],
         evaluations: [
-          { evaluator: "quality", name: "Quality", target_id: "gpt-4", index: 0, status: "processed", score: 0.9 },
-          { evaluator: "quality", name: "Quality", target_id: "gpt-3.5", index: 0, status: "processed", score: 0.8 },
-          { evaluator: "quality", name: "Quality", target_id: "claude", index: 0, status: "processed", score: 0.85 },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-4",
+            index: 0,
+            status: "processed",
+            score: 0.9,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-3.5",
+            index: 0,
+            status: "processed",
+            score: 0.8,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "claude",
+            index: 0,
+            status: "processed",
+            score: 0.85,
+          },
         ],
       });
 
@@ -622,7 +709,11 @@ describe("csvExport", () => {
 
       // Verify transformation captured all targets
       expect(transformed.targetColumns).toHaveLength(3);
-      expect(transformed.targetColumns.map(t => t.name)).toEqual(["GPT-4", "GPT-3.5", "Claude"]);
+      expect(transformed.targetColumns.map((t) => t.name)).toEqual([
+        "GPT-4",
+        "GPT-3.5",
+        "Claude",
+      ]);
 
       // Verify each target has its output field detected
       expect(transformed.targetColumns[0]?.outputFields).toContain("output");
@@ -633,8 +724,12 @@ describe("csvExport", () => {
       expect(transformed.rows).toHaveLength(1);
       const row = transformed.rows[0]!;
       expect(row.targets["gpt-4"]?.output).toEqual({ output: "GPT-4 answer" });
-      expect(row.targets["gpt-3.5"]?.output).toEqual({ output: "GPT-3.5 answer" });
-      expect(row.targets["claude"]?.output).toEqual({ output: "Claude answer" });
+      expect(row.targets["gpt-3.5"]?.output).toEqual({
+        output: "GPT-3.5 answer",
+      });
+      expect(row.targets.claude?.output).toEqual({
+        output: "Claude answer",
+      });
 
       // Verify CSV export includes all target outputs
       const { headers, rows } = buildCsvData(transformed);
@@ -666,11 +761,31 @@ describe("csvExport", () => {
         ],
         dataset: [
           // Row 0
-          { index: 0, target_id: "gpt-4", entry: { question: "Q1" }, predicted: { answer: "GPT-4 answer 1" } },
-          { index: 0, target_id: "claude", entry: { question: "Q1" }, predicted: { answer: "Claude answer 1" } },
+          {
+            index: 0,
+            target_id: "gpt-4",
+            entry: { question: "Q1" },
+            predicted: { answer: "GPT-4 answer 1" },
+          },
+          {
+            index: 0,
+            target_id: "claude",
+            entry: { question: "Q1" },
+            predicted: { answer: "Claude answer 1" },
+          },
           // Row 1
-          { index: 1, target_id: "gpt-4", entry: { question: "Q2" }, predicted: { answer: "GPT-4 answer 2" } },
-          { index: 1, target_id: "claude", entry: { question: "Q2" }, predicted: { answer: "Claude answer 2" } },
+          {
+            index: 1,
+            target_id: "gpt-4",
+            entry: { question: "Q2" },
+            predicted: { answer: "GPT-4 answer 2" },
+          },
+          {
+            index: 1,
+            target_id: "claude",
+            entry: { question: "Q2" },
+            predicted: { answer: "Claude answer 2" },
+          },
         ],
         evaluations: [],
       });
@@ -693,10 +808,25 @@ describe("csvExport", () => {
         ],
         dataset: [
           // Row 0 - both targets have predictions
-          { index: 0, target_id: "gpt-4", entry: { question: "Q1" }, predicted: { answer: "GPT-4 answer" } },
-          { index: 0, target_id: "claude", entry: { question: "Q1" }, predicted: { answer: "Claude answer" } },
+          {
+            index: 0,
+            target_id: "gpt-4",
+            entry: { question: "Q1" },
+            predicted: { answer: "GPT-4 answer" },
+          },
+          {
+            index: 0,
+            target_id: "claude",
+            entry: { question: "Q1" },
+            predicted: { answer: "Claude answer" },
+          },
           // Row 1 - only GPT-4 has prediction (Claude is still processing or errored)
-          { index: 1, target_id: "gpt-4", entry: { question: "Q2" }, predicted: { answer: "GPT-4 answer 2" } },
+          {
+            index: 1,
+            target_id: "gpt-4",
+            entry: { question: "Q2" },
+            predicted: { answer: "GPT-4 answer 2" },
+          },
         ],
         evaluations: [],
       });

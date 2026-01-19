@@ -29,7 +29,7 @@
  * </Tooltip>
  * ```
  */
-import { useState, useRef, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 
 /**
  * Hook to manage interactive tooltip state with proper hover behavior.

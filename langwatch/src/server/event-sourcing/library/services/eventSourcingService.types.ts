@@ -1,4 +1,5 @@
 import type { createLogger } from "../../../../utils/logger";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { EventHandlerDefinitions } from "../eventHandler.types";
@@ -11,7 +12,6 @@ import type { EventSourcedQueueProcessor } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
 import type { DistributedLock } from "../utils/distributedLock";
-import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Default time-to-live for distributed locks used during projection updates.
@@ -67,7 +67,7 @@ export interface ReplayEventsOptions<_EventType extends Event = Event> {
  */
 export interface EventSourcingServiceOptions<
   EventType extends Event = Event,
-  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap
+  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
 > {
   /**
    * The pipeline name for this service.
@@ -170,7 +170,7 @@ export interface EventSourcingServiceOptions<
       };
       options?: { concurrency?: number };
       spanAttributes?: (
-        payload: Payload
+        payload: Payload,
       ) => Record<string, string | number | boolean>;
     }): EventSourcedQueueProcessor<Payload>;
   };

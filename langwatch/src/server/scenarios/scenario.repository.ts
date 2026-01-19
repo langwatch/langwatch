@@ -48,7 +48,7 @@ export class ScenarioRepository {
   async update(
     id: string,
     projectId: string,
-    data: UpdateScenarioInput
+    data: UpdateScenarioInput,
   ): Promise<Scenario> {
     return this.prisma.scenario.update({
       where: { id, projectId },
@@ -56,4 +56,3 @@ export class ScenarioRepository {
     });
   }
 }
-

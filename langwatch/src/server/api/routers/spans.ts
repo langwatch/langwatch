@@ -22,7 +22,11 @@ export const spansRouter = createTRPCRouter({
       });
 
       const traceService = TraceService.create(ctx.prisma);
-      const traces = await traceService.getTracesWithSpans(input.projectId, [input.traceId], protections);
+      const traces = await traceService.getTracesWithSpans(
+        input.projectId,
+        [input.traceId],
+        protections,
+      );
       if (traces.length === 0) {
         return [];
       }
@@ -71,7 +75,7 @@ export const spansRouter = createTRPCRouter({
       const result = await traceService.getSpanForPromptStudio(
         projectId,
         spanId,
-        protections
+        protections,
       );
 
       if (!result) {

@@ -1,6 +1,6 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import type { IndexSpec } from "../src/server/elasticsearch";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const recreateIndexAndMigrate = async ({
   indexSpec,
@@ -31,17 +31,17 @@ export const recreateIndexAndMigrate = async ({
     });
   } else {
     console.log(
-      `Index ${newIndex} already exists, continuing with interrupted migration`
+      `Index ${newIndex} already exists, continuing with interrupted migration`,
     );
     const aliasInfo: Record<string, unknown> = await client.indices.getAlias({
       name: indexSpec.alias,
     });
     previousIndex = Object.keys(aliasInfo).find(
-      (index) => !index.endsWith("-temp") && index !== newIndex
+      (index) => !index.endsWith("-temp") && index !== newIndex,
     );
     if (!previousIndex) {
       throw new Error(
-        `No existing previous index found for alias ${indexSpec.alias}`
+        `No existing previous index found for alias ${indexSpec.alias}`,
       );
     }
   }
@@ -67,14 +67,14 @@ export const getCurrentWriteIndex = async ({
     name: indexSpec.alias,
   });
   const currentIndices = Object.keys(aliasInfo).filter(
-    (index) => !index.endsWith("-temp") && index !== newIndex
+    (index) => !index.endsWith("-temp") && index !== newIndex,
   );
 
   // Sort indices and get the most recent one
   const previousIndex = currentIndices.sort().pop();
   if (!previousIndex) {
     throw new Error(
-      `No existing write index found for alias ${indexSpec.alias}`
+      `No existing write index found for alias ${indexSpec.alias}`,
     );
   }
   return previousIndex;
@@ -134,7 +134,7 @@ export const reindexWithAlias = async ({
 
   if (!taskId) {
     throw new Error(
-      `Reindex task failed to be created: ${JSON.stringify(response)}`
+      `Reindex task failed to be created: ${JSON.stringify(response)}`,
     );
   }
 
@@ -178,8 +178,8 @@ export const reindexWithAlias = async ({
         } else {
           throw new Error(
             `Reindex task failed: ${JSON.stringify(
-              task.error ?? task.response
-            )}`
+              task.error ?? task.response,
+            )}`,
           );
         }
       } else {
@@ -206,18 +206,22 @@ export const reindexWithAlias = async ({
             hasChildTasks = true;
 
             // Aggregate progress from all child tasks
-            for (const nodeId in allTasksResponse.nodes) {
-              const nodeTasks = allTasksResponse.nodes[nodeId]!.tasks;
-              for (const childTaskId in nodeTasks) {
-                const childTask = nodeTasks[childTaskId]!;
-                if (childTask.status) {
-                  totalCreated += childTask.status.created || 0;
-                  totalUpdated += childTask.status.updated || 0;
-                  totalVersionConflicts += childTask.status.version_conflicts || 0;
+            for (const [_nodeId, nodeData] of Object.entries(
+              allTasksResponse.nodes,
+            )) {
+              const nodeTasks = nodeData!.tasks;
+              for (const [_childTaskId, childTask] of Object.entries(
+                nodeTasks,
+              )) {
+                if (childTask!.status) {
+                  totalCreated += childTask!.status.created || 0;
+                  totalUpdated += childTask!.status.updated || 0;
+                  totalVersionConflicts +=
+                    childTask!.status.version_conflicts || 0;
                   totalProcessed +=
-                    (childTask.status.created || 0) +
-                    (childTask.status.updated || 0) +
-                    (childTask.status.version_conflicts || 0);
+                    (childTask!.status.created || 0) +
+                    (childTask!.status.updated || 0) +
+                    (childTask!.status.version_conflicts || 0);
                 }
               }
             }
@@ -225,21 +229,21 @@ export const reindexWithAlias = async ({
         } catch (childTaskError) {
           console.warn(
             "⚠️ Could not fetch child task progress:",
-            (childTaskError as any).message
+            (childTaskError as any).message,
           );
         }
 
         // Show progress
         if (hasChildTasks && totalProcessed > 0) {
           console.log(
-            `[${new Date().toISOString()}] Reindex progress: ${totalProcessed} processed [Created: ${totalCreated}, Updated: ${totalUpdated}, Version Conflicts: ${totalVersionConflicts}]`
+            `[${new Date().toISOString()}] Reindex progress: ${totalProcessed} processed [Created: ${totalCreated}, Updated: ${totalUpdated}, Version Conflicts: ${totalVersionConflicts}]`,
           );
         } else {
           // Fallback to parent task status if no child tasks found
           console.log(
             `[${new Date().toISOString()}] Reindex task status: ${JSON.stringify(
-              task.task.status
-            )}`
+              task.task.status,
+            )}`,
           );
         }
 

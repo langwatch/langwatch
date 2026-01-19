@@ -1,5 +1,8 @@
 import type { ProjectionHandlerClass } from "../../../../src/server/event-sourcing/library/domain/handlers/projectionHandlerClass";
-import type { Event, Projection } from "../../../../src/server/event-sourcing/library/domain/types";
+import type {
+  Event,
+  Projection,
+} from "../../../../src/server/event-sourcing/library/domain/types";
 
 /**
  * Metadata for a projection discovered on disk.
@@ -23,16 +26,17 @@ export interface DiscoveredProjection {
  * const map = await buildPipelineAggregateTypeMap();
  * const expectedType = map["trace_processing"]; // "trace"
  */
-export async function buildPipelineAggregateTypeMap(): Promise<Record<string, string>> {
+export async function buildPipelineAggregateTypeMap(): Promise<
+  Record<string, string>
+> {
   const { discoverPipelines } = await import("./pipelines");
   const pipelines = await discoverPipelines();
   const map: Record<string, string> = {};
   for (const pipeline of pipelines) {
     // Use metadata for aggregate type - works even when runtime is disabled
-    const aggregateType = pipeline.pipeline.metadata?.aggregateType ?? pipeline.aggregateType;
+    const aggregateType =
+      pipeline.pipeline.metadata?.aggregateType ?? pipeline.aggregateType;
     map[pipeline.name] = aggregateType;
   }
   return map;
 }
-
-

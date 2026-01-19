@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  isRowEmpty,
-  getNonEmptyRowIndices,
   filterEmptyRows,
+  getNonEmptyRowIndices,
+  isRowEmpty,
 } from "../emptyRowDetection";
 
 describe("isRowEmpty", () => {
@@ -67,8 +67,17 @@ describe("isRowEmpty", () => {
     // Row with id and non-empty content is not empty
     expect(isRowEmpty({ id: "abc123", input: "hello" })).toBe(false);
     // Mixed internal fields
-    expect(isRowEmpty({ id: "abc123", _datasetId: "ds1", input: "", expected: "" })).toBe(true);
-    expect(isRowEmpty({ id: "abc123", _datasetId: "ds1", input: "test", expected: "" })).toBe(false);
+    expect(
+      isRowEmpty({ id: "abc123", _datasetId: "ds1", input: "", expected: "" }),
+    ).toBe(true);
+    expect(
+      isRowEmpty({
+        id: "abc123",
+        _datasetId: "ds1",
+        input: "test",
+        expected: "",
+      }),
+    ).toBe(false);
   });
 
   it("returns false for arrays (even empty ones)", () => {
@@ -106,11 +115,11 @@ describe("getNonEmptyRowIndices", () => {
 
   it("returns only non-empty row indices", () => {
     const rows = [
-      { input: "hello", output: "" },      // index 0: non-empty
-      { input: "", output: "" },           // index 1: empty
-      { input: "", output: "world" },      // index 2: non-empty
-      { input: "", output: null },         // index 3: empty
-      { input: "test", output: "data" },   // index 4: non-empty
+      { input: "hello", output: "" }, // index 0: non-empty
+      { input: "", output: "" }, // index 1: empty
+      { input: "", output: "world" }, // index 2: non-empty
+      { input: "", output: null }, // index 3: empty
+      { input: "test", output: "data" }, // index 4: non-empty
     ];
     expect(getNonEmptyRowIndices(rows)).toEqual([0, 2, 4]);
   });
@@ -123,9 +132,9 @@ describe("filterEmptyRows", () => {
 
   it("filters out empty rows and preserves original indices", () => {
     const rows = [
-      { input: "hello", output: "" },      // index 0: non-empty
-      { input: "", output: "" },           // index 1: empty (filtered)
-      { input: "", output: "world" },      // index 2: non-empty
+      { input: "hello", output: "" }, // index 0: non-empty
+      { input: "", output: "" }, // index 1: empty (filtered)
+      { input: "", output: "world" }, // index 2: non-empty
     ];
 
     const result = filterEmptyRows(rows);

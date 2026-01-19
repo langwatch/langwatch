@@ -13,9 +13,9 @@
  * - langwatch.span.type (from openinference.span.kind)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { ALLOWED_SPAN_TYPES } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
+import { ALLOWED_SPAN_TYPES } from "./_helpers";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
   readonly id = "openinference";

@@ -4,13 +4,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-import { BatchSummaryFooter } from "../BatchSummaryFooter";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BatchRunSummary } from "../BatchRunsSidebar";
+import { BatchSummaryFooter } from "../BatchSummaryFooter";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -19,7 +18,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 // Helper to create run summary
 const createRunSummary = (
-  overrides: Partial<BatchRunSummary> = {}
+  overrides: Partial<BatchRunSummary> = {},
 ): BatchRunSummary => ({
   runId: "run-1",
   timestamps: {

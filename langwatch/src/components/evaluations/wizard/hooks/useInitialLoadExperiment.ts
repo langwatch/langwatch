@@ -76,7 +76,7 @@ export const useInitialLoadExperiment = () => {
     if (initialLoadExperiment.data) {
       // Prevent autosave from being called on initial load
       skipNextAutosave();
-      setWizardState(initialLoadExperiment.data.wizardState ?? {});
+      setWizardState(initialLoadExperiment.data.workbenchState ?? {});
       setDSL(initialLoadExperiment.data.dsl ?? {});
       setExperimentId(initialLoadExperiment.data.id);
       setExperimentSlug(initialLoadExperiment.data.slug);

@@ -737,10 +737,6 @@ class DSPyTracer:
             dspy.Module.__original_call__ = dspy.Module.__call__  # type: ignore
             dspy.Module.__call__ = self.patched_module_call()
 
-        if not hasattr(dspy.Predict, "__original_forward__"):
-            dspy.Predict.__original_forward__ = dspy.Predict.forward  # type: ignore
-            dspy.Predict.forward = self.patched_predict_forward()
-
         language_model_classes = dspy.LM.__subclasses__()
         for lm in language_model_classes:
             if not hasattr(lm, "__original_basic_request__") and hasattr(
@@ -776,7 +772,7 @@ class DSPyTracer:
     def patched_module_call(self):
         self_ = self
 
-        @langwatch.span(ignore_missing_trace_warning=True, type="module")
+        @langwatch.span(ignore_missing_trace_warning=True, type="module", capture_output=False)
         def __call__(self: dspy.Module, *args, **kwargs):
             span = self_.safe_get_current_span()
             signature = (
@@ -801,34 +797,10 @@ class DSPyTracer:
 
         return __call__
 
-    def patched_predict_forward(self):
-        self_ = self
-
-        @langwatch.span(ignore_missing_trace_warning=True, type="module")
-        def forward(self: dspy.Predict, **kwargs):
-            span = self_.safe_get_current_span()
-            signature = kwargs.get("signature", self.signature)
-
-            if span and signature and hasattr(signature, "__name__"):
-                span.update(name=f"{self.__class__.__name__}({signature.__name__})")
-            elif span:
-                span.update(name=f"{self.__class__.__name__}.forward")
-
-            prediction = self.__class__.__original_forward__(self, **kwargs)  # type: ignore
-
-            if span and isinstance(prediction, dspy.Prediction):
-                span.update(output=prediction._store)  # type: ignore
-            elif span:
-                span.update(output=prediction)  # type: ignore
-
-            return prediction
-
-        return forward
-
     def patched_language_model_call(self):
         self_ = self
 
-        @langwatch.span(ignore_missing_trace_warning=True, type="llm")
+        @langwatch.span(ignore_missing_trace_warning=True, type="llm", capture_output=False)
         def call(self: dspy.LM, prompt=None, messages=None, **kwargs):
             all_kwargs = self.kwargs | kwargs
             model = self.model
@@ -895,7 +867,7 @@ class DSPyTracer:
     def patched_legacy_language_model_request(self):
         self_ = self
 
-        @langwatch.span(ignore_missing_trace_warning=True, type="llm")
+        @langwatch.span(ignore_missing_trace_warning=True, type="llm", capture_output=False)
         def basic_request(self: dspy.LM, prompt, **kwargs):
             all_kwargs = self.kwargs | kwargs
             model = all_kwargs.get("model", None)
@@ -947,7 +919,7 @@ class DSPyTracer:
             ) is not getattr(dspy.Retrieve, "forward", None):
                 return self.__class__.__original_forward__(self, *args, **kwargs)  # type: ignore
 
-            @langwatch.span(ignore_missing_trace_warning=True, type="rag")
+            @langwatch.span(ignore_missing_trace_warning=True, type="rag", capture_output=False)
             def forward(self, *args, **kwargs):
                 result = self.__class__.__original_forward__(self, *args, **kwargs)  # type: ignore
 

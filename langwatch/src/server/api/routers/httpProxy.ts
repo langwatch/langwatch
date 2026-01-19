@@ -1,11 +1,11 @@
-import { z } from "zod";
 import { JSONPath } from "jsonpath-plus";
-import { checkProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { z } from "zod";
 import { createLogger } from "~/utils/logger";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-const logger = createLogger("langwatch:httpProxy");
+const _logger = createLogger("langwatch:httpProxy");
 
 /**
  * HTTP Proxy Router
@@ -50,7 +50,7 @@ export const httpProxyRouter = createTRPCRouter({
           .optional(),
         body: z.string(),
         outputPath: z.string().optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input }) => {
@@ -78,7 +78,7 @@ export const httpProxyRouter = createTRPCRouter({
             break;
           case "bearer":
             if (auth.token) {
-              requestHeaders["Authorization"] = `Bearer ${auth.token}`;
+              requestHeaders.Authorization = `Bearer ${auth.token}`;
             }
             break;
           case "api_key":
@@ -89,9 +89,9 @@ export const httpProxyRouter = createTRPCRouter({
           case "basic":
             if (auth.username && auth.password) {
               const encoded = Buffer.from(
-                `${auth.username}:${auth.password}`
+                `${auth.username}:${auth.password}`,
               ).toString("base64");
-              requestHeaders["Authorization"] = `Basic ${encoded}`;
+              requestHeaders.Authorization = `Basic ${encoded}`;
             }
             break;
           default: {
@@ -126,7 +126,10 @@ export const httpProxyRouter = createTRPCRouter({
         } catch (ssrfError) {
           return {
             success: false,
-            error: ssrfError instanceof Error ? ssrfError.message : "URL validation failed",
+            error:
+              ssrfError instanceof Error
+                ? ssrfError.message
+                : "URL validation failed",
           };
         }
         const duration = Date.now() - startTime;
@@ -148,7 +151,7 @@ export const httpProxyRouter = createTRPCRouter({
 
         // Extract output if path provided
         let extractedOutput: string | undefined;
-        if (outputPath && outputPath.trim() && responseData) {
+        if (outputPath?.trim() && responseData) {
           try {
             const result = JSONPath({ path: outputPath, json: responseData });
             if (result && result.length > 0) {

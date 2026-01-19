@@ -1,24 +1,25 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { toaster } from "../../components/ui/toaster";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
 const stringifiedInitialState = JSON.stringify(
-  extractPersistedState(createInitialState())
+  extractPersistedState(createInitialState()),
 );
 
 /**
  * Manages syncing the evaluations v3 state with the database.
- * Uses wizardState field in the Experiment model for persistence.
+ * Uses workbenchState field in the Experiment model for persistence.
  *
  * This hook expects the experiment to already exist - it only loads and saves.
  * New experiments are created by the index page before redirecting here.
@@ -26,6 +27,7 @@ const stringifiedInitialState = JSON.stringify(
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track which slug we've successfully loaded in THIS component instance
@@ -42,6 +44,7 @@ export const useAutosaveEvaluationsV3 = () => {
     targets,
     results,
     hiddenColumns,
+    concurrency,
     setExperimentId,
     setExperimentSlug,
     setName,
@@ -58,12 +61,13 @@ export const useAutosaveEvaluationsV3 = () => {
       targets: state.targets,
       results: state.results,
       hiddenColumns: state.ui.hiddenColumns,
+      concurrency: state.ui.concurrency,
       setExperimentId: state.setExperimentId,
       setExperimentSlug: state.setExperimentSlug,
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
       loadState: state.loadState,
-    }))
+    })),
   );
 
   const persistedState = extractPersistedState({
@@ -83,6 +87,7 @@ export const useAutosaveEvaluationsV3 = () => {
       expandedCells: new Set(),
       hiddenColumns,
       autosaveStatus: { evaluation: "idle", dataset: "idle" },
+      concurrency,
     },
   });
 
@@ -118,7 +123,7 @@ export const useAutosaveEvaluationsV3 = () => {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
     },
-    { enabled: shouldLoadExisting }
+    { enabled: shouldLoadExisting },
   );
 
   // Update URL when experiment slug changes (for URL sync after save)
@@ -127,7 +132,7 @@ export const useAutosaveEvaluationsV3 = () => {
       void router.replace(
         `/${project.slug}/evaluations/v3/${experimentSlug}`,
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,8 +149,8 @@ export const useAutosaveEvaluationsV3 = () => {
       setExperimentSlug(existingExperiment.data.slug);
 
       // Load the full wizard state if available
-      if (existingExperiment.data.wizardState && loadState) {
-        loadState(existingExperiment.data.wizardState);
+      if (existingExperiment.data.workbenchState && loadState) {
+        loadState(existingExperiment.data.workbenchState);
       }
     }
   }, [
@@ -156,7 +161,9 @@ export const useAutosaveEvaluationsV3 = () => {
     loadState,
   ]);
 
-  // Clear timeouts on unmount
+  // Clear timeouts and invalidate query cache on unmount
+  // Invalidating the cache ensures that when user navigates back,
+  // fresh data is fetched from DB instead of returning stale cached data
   useEffect(() => {
     return () => {
       if (savedTimeoutRef.current) {
@@ -165,8 +172,26 @@ export const useAutosaveEvaluationsV3 = () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
+      // Invalidate the query cache for this experiment so that when
+      // user navigates back, it fetches fresh data instead of stale cache
+      if (routerSlug) {
+        // Use a predicate to match the query key pattern for tRPC queries
+        // tRPC query keys are arrays like [["experiments", "getEvaluationsV3BySlug"], { input: {...}, type: "query" }]
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey;
+            if (!Array.isArray(key) || key.length < 2) return false;
+            const [path] = key;
+            if (!Array.isArray(path)) return false;
+            return (
+              path[0] === "experiments" &&
+              path[1] === "getEvaluationsV3BySlug"
+            );
+          },
+        });
+      }
     };
-  }, []);
+  }, [queryClient, routerSlug]);
 
   // Transition to "saved" then back to "idle" after delay
   const markSaved = useCallback(() => {
@@ -228,7 +253,7 @@ export const useAutosaveEvaluationsV3 = () => {
           setAutosaveStatus(
             "evaluation",
             "error",
-            error instanceof Error ? error.message : "Unknown error"
+            error instanceof Error ? error.message : "Unknown error",
           );
           toaster.create({
             title: "Failed to autosave evaluation",

@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BatchTargetHeader } from "../BatchTargetHeader";
 import type { BatchTargetAggregate } from "../computeBatchAggregates";
@@ -19,7 +19,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 // Helper to create target column
 const createTargetColumn = (
-  overrides: Partial<BatchTargetColumn> = {}
+  overrides: Partial<BatchTargetColumn> = {},
 ): BatchTargetColumn => ({
   id: "target-1",
   name: "Test Target",
@@ -30,7 +30,7 @@ const createTargetColumn = (
 
 // Helper to create aggregates
 const createAggregate = (
-  overrides: Partial<BatchTargetAggregate> = {}
+  overrides: Partial<BatchTargetAggregate> = {},
 ): BatchTargetAggregate => ({
   targetId: "target-1",
   completedRows: 5,
@@ -61,10 +61,9 @@ describe("BatchTargetHeader", () => {
     it("renders target name", () => {
       const target = createTargetColumn({ name: "My Prompt Target" });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={null} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={null} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("My Prompt Target")).toBeInTheDocument();
     });
@@ -72,10 +71,9 @@ describe("BatchTargetHeader", () => {
     it("renders prompt icon for prompt type", () => {
       const target = createTargetColumn({ type: "prompt" });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={null} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={null} />, {
+        wrapper: Wrapper,
+      });
 
       // Just verify the header renders without error
       expect(screen.getByText(target.name)).toBeInTheDocument();
@@ -84,10 +82,9 @@ describe("BatchTargetHeader", () => {
     it("renders agent icon for agent type", () => {
       const target = createTargetColumn({ type: "agent" });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={null} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={null} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText(target.name)).toBeInTheDocument();
     });
@@ -95,10 +92,9 @@ describe("BatchTargetHeader", () => {
     it("renders legacy icon for legacy type", () => {
       const target = createTargetColumn({ type: "legacy" });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={null} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={null} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText(target.name)).toBeInTheDocument();
     });
@@ -108,12 +104,13 @@ describe("BatchTargetHeader", () => {
     it("does not render summary when aggregates is null", () => {
       const target = createTargetColumn();
 
-      render(
-        <BatchTargetHeader target={target} aggregates={null} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={null} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(screen.queryByTestId("target-summary-badge")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("target-summary-badge"),
+      ).not.toBeInTheDocument();
     });
 
     it("does not render summary when no results", () => {
@@ -124,12 +121,13 @@ describe("BatchTargetHeader", () => {
         totalCost: null,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(screen.queryByTestId("target-summary-badge")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("target-summary-badge"),
+      ).not.toBeInTheDocument();
     });
 
     it("renders summary badge when there are completed rows", () => {
@@ -140,10 +138,9 @@ describe("BatchTargetHeader", () => {
         overallPassRate: 80,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("target-summary-badge")).toBeInTheDocument();
     });
@@ -155,10 +152,9 @@ describe("BatchTargetHeader", () => {
         overallPassRate: 75,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("75%")).toBeInTheDocument();
     });
@@ -170,10 +166,9 @@ describe("BatchTargetHeader", () => {
         overallAverageScore: 0.85,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("0.85")).toBeInTheDocument();
     });
@@ -185,10 +180,9 @@ describe("BatchTargetHeader", () => {
         errorRows: 2,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("2 errors")).toBeInTheDocument();
     });
@@ -200,10 +194,9 @@ describe("BatchTargetHeader", () => {
         errorRows: 1,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("1 error")).toBeInTheDocument();
     });
@@ -217,10 +210,9 @@ describe("BatchTargetHeader", () => {
         overallAverageScore: null,
       });
 
-      render(
-        <BatchTargetHeader target={target} aggregates={aggregates} />,
-        { wrapper: Wrapper }
-      );
+      render(<BatchTargetHeader target={target} aggregates={aggregates} />, {
+        wrapper: Wrapper,
+      });
 
       // Cost is formatted with more precision
       expect(screen.getByText("$0.0125")).toBeInTheDocument();

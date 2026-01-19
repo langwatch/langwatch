@@ -48,7 +48,8 @@ export function TargetSelector({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
     if (!searchValue) return sorted;
     return sorted.filter((p) =>
@@ -167,12 +168,7 @@ export function TargetSelector({
                 HTTP Agents
               </Text>
               {filteredAgents.length === 0 ? (
-                <Text
-                  fontSize="sm"
-                  color="gray.400"
-                  paddingX={3}
-                  paddingY={2}
-                >
+                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
                   {searchValue ? "No agents found" : "No agents available"}
                 </Text>
               ) : (
@@ -188,9 +184,7 @@ export function TargetSelector({
                         : "transparent"
                     }
                     _hover={{ bg: "gray.100" }}
-                    onClick={() =>
-                      handleSelect({ type: "http", id: agent.id })
-                    }
+                    onClick={() => handleSelect({ type: "http", id: agent.id })}
                   >
                     <Globe size={14} color="var(--chakra-colors-gray-500)" />
                     <Text fontSize="sm" flex={1}>
@@ -237,12 +231,7 @@ export function TargetSelector({
                 Prompts
               </Text>
               {filteredPrompts.length === 0 ? (
-                <Text
-                  fontSize="sm"
-                  color="gray.400"
-                  paddingX={3}
-                  paddingY={2}
-                >
+                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
                   {searchValue ? "No prompts found" : "No prompts available"}
                 </Text>
               ) : (
@@ -262,10 +251,7 @@ export function TargetSelector({
                       handleSelect({ type: "prompt", id: prompt.id })
                     }
                   >
-                    <BookText
-                      size={14}
-                      color="var(--chakra-colors-gray-500)"
-                    />
+                    <BookText size={14} color="var(--chakra-colors-gray-500)" />
                     <Text fontSize="sm" flex={1}>
                       {prompt.handle ?? prompt.id}
                     </Text>

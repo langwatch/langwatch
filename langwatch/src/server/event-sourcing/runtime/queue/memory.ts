@@ -46,7 +46,10 @@ export class EventSourcedQueueProcessorMemory<Payload>
   // Simple queue state
   private readonly queue: QueuedJob<Payload>[] = [];
   /** Map of deduplication ID to job for deduplication */
-  private readonly pendingJobsByDeduplicationId = new Map<string, QueuedJob<Payload>>();
+  private readonly pendingJobsByDeduplicationId = new Map<
+    string,
+    QueuedJob<Payload>
+  >();
   private activeCount = 0;
   private shutdownRequested = false;
 
@@ -88,7 +91,8 @@ export class EventSourcedQueueProcessorMemory<Payload>
 
     // Simple job deduplication: replace existing job with same deduplication ID
     if (deduplicationId) {
-      const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
+      const existingJob =
+        this.pendingJobsByDeduplicationId.get(deduplicationId);
       if (existingJob) {
         existingJob.payload = payload;
         this.logger.debug(

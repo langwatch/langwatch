@@ -1,16 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type {
+  EvaluatorConfig,
+  LocalPromptConfig,
+  TargetConfig,
+} from "~/evaluations-v3/types";
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { ExecutionCell, WorkflowBuilderInput } from "../types";
 import {
   buildCellWorkflow,
-  buildSignatureNodeFromLocalConfig,
-  buildSignatureNodeFromPrompt,
   buildCodeNodeFromAgent,
   buildEvaluatorNode,
+  buildSignatureNodeFromLocalConfig,
+  buildSignatureNodeFromPrompt,
 } from "../workflowBuilder";
-import type { WorkflowBuilderInput, ExecutionCell } from "../types";
-import type { TargetConfig, EvaluatorConfig, LocalPromptConfig } from "~/evaluations-v3/types";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 
 describe("WorkflowBuilder", () => {
   const createBasicLocalPromptConfig = (): LocalPromptConfig => ({
@@ -27,7 +31,9 @@ describe("WorkflowBuilder", () => {
     outputs: [{ identifier: "output", type: "str" }],
   });
 
-  const createBasicTargetConfig = (overrides?: Partial<TargetConfig>): TargetConfig => ({
+  const createBasicTargetConfig = (
+    overrides?: Partial<TargetConfig>,
+  ): TargetConfig => ({
     id: "target-1",
     type: "prompt",
     name: "Test Prompt",
@@ -35,7 +41,12 @@ describe("WorkflowBuilder", () => {
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
       "dataset-1": {
-        input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "user_input" },
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "user_input",
+        },
       },
     },
     localPromptConfig: createBasicLocalPromptConfig(),
@@ -54,14 +65,26 @@ describe("WorkflowBuilder", () => {
     mappings: {
       "dataset-1": {
         "target-1": {
-          output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-          expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+          output: {
+            type: "source",
+            source: "target",
+            sourceId: "target-1",
+            sourceField: "output",
+          },
+          expected_output: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "expected",
+          },
         },
       },
     },
   });
 
-  const createBasicCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
+  const createBasicCell = (
+    overrides?: Partial<ExecutionCell>,
+  ): ExecutionCell => ({
     rowIndex: 0,
     targetId: "target-1",
     targetConfig: createBasicTargetConfig(),
@@ -74,7 +97,9 @@ describe("WorkflowBuilder", () => {
     ...overrides,
   });
 
-  const createBasicInput = (overrides?: Partial<WorkflowBuilderInput>): WorkflowBuilderInput => ({
+  const createBasicInput = (
+    overrides?: Partial<WorkflowBuilderInput>,
+  ): WorkflowBuilderInput => ({
     projectId: "test-project",
     cell: createBasicCell(),
     datasetColumns: [
@@ -90,7 +115,11 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       expect(result.workflow.nodes).toHaveLength(3);
-      expect(result.workflow.nodes.map((n) => n.type)).toEqual(["entry", "signature", "evaluator"]);
+      expect(result.workflow.nodes.map((n) => n.type)).toEqual([
+        "entry",
+        "signature",
+        "evaluator",
+      ]);
     });
 
     it("sets correct workflow metadata", () => {
@@ -115,7 +144,7 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       const entryToTargetEdge = result.workflow.edges.find(
-        (e) => e.source === "entry" && e.target === "target-1"
+        (e) => e.source === "entry" && e.target === "target-1",
       );
       expect(entryToTargetEdge).toBeDefined();
     });
@@ -125,7 +154,7 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       const targetToEvalEdge = result.workflow.edges.find(
-        (e) => e.source === "target-1" && e.target === "target-1.eval-1"
+        (e) => e.source === "target-1" && e.target === "target-1.eval-1",
       );
       expect(targetToEvalEdge).toBeDefined();
     });
@@ -135,7 +164,7 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       const entryToEvalEdge = result.workflow.edges.find(
-        (e) => e.source === "entry" && e.target === "target-1.eval-1"
+        (e) => e.source === "entry" && e.target === "target-1.eval-1",
       );
       expect(entryToEvalEdge).toBeDefined();
     });
@@ -152,7 +181,7 @@ describe("WorkflowBuilder", () => {
         "Test Prompt",
         config,
         targetConfig,
-        cell
+        cell,
       );
 
       expect(node.id).toBe("test-node");
@@ -170,11 +199,11 @@ describe("WorkflowBuilder", () => {
         "Test Prompt",
         config,
         targetConfig,
-        cell
+        cell,
       );
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
-        (p) => p.identifier === "llm"
+        (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
         model: "openai/gpt-4o-mini",
@@ -194,12 +223,12 @@ describe("WorkflowBuilder", () => {
         "Test Prompt",
         config,
         targetConfig,
-        cell
+        cell,
       );
 
-      const instructionsParam = (node.data as LlmPromptConfigComponent).parameters.find(
-        (p) => p.identifier === "instructions"
-      );
+      const instructionsParam = (
+        node.data as LlmPromptConfigComponent
+      ).parameters.find((p) => p.identifier === "instructions");
       expect(instructionsParam?.value).toBe("You are a helpful assistant.");
     });
 
@@ -213,12 +242,12 @@ describe("WorkflowBuilder", () => {
         "Test Prompt",
         config,
         targetConfig,
-        cell
+        cell,
       );
 
-      const messagesParam = (node.data as LlmPromptConfigComponent).parameters.find(
-        (p) => p.identifier === "messages"
-      );
+      const messagesParam = (
+        node.data as LlmPromptConfigComponent
+      ).parameters.find((p) => p.identifier === "messages");
       expect(messagesParam?.value).toEqual([
         { role: "user", content: "Answer: {{input}}" },
       ]);
@@ -234,7 +263,7 @@ describe("WorkflowBuilder", () => {
         "Test Prompt",
         config,
         targetConfig,
-        cell
+        cell,
       );
 
       expect(node.data.inputs).toHaveLength(1);
@@ -259,9 +288,7 @@ describe("WorkflowBuilder", () => {
       prompt: "You are a helpful assistant.",
       projectId: "project-1",
       organizationId: "org-1",
-      messages: [
-        { role: "user", content: "Hello {{input}}" },
-      ],
+      messages: [{ role: "user", content: "Hello {{input}}" }],
       authorId: null,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
@@ -278,7 +305,7 @@ describe("WorkflowBuilder", () => {
         "test-node",
         prompt,
         targetConfig,
-        cell
+        cell,
       );
 
       expect(node.id).toBe("test-node");
@@ -295,11 +322,11 @@ describe("WorkflowBuilder", () => {
         "test-node",
         prompt,
         targetConfig,
-        cell
+        cell,
       );
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
-        (p) => p.identifier === "llm"
+        (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
         model: "openai/gpt-4o",
@@ -314,7 +341,13 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+      const node = buildEvaluatorNode(
+        evaluator,
+        "target-1.eval-1",
+        "target-1",
+        cell,
+        0,
+      );
 
       expect(node.id).toBe("target-1.eval-1");
       expect(node.type).toBe("evaluator");
@@ -325,7 +358,13 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+      const node = buildEvaluatorNode(
+        evaluator,
+        "target-1.eval-1",
+        "target-1",
+        cell,
+        0,
+      );
 
       // Full evaluator type including namespace
       expect(node.data.evaluator).toBe("langevals/exact_match");
@@ -335,19 +374,38 @@ describe("WorkflowBuilder", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+      const node = buildEvaluatorNode(
+        evaluator,
+        "target-1.eval-1",
+        "target-1",
+        cell,
+        0,
+      );
 
       expect(node.data.inputs).toHaveLength(2);
-      expect(node.data.inputs?.map((i) => i.identifier)).toEqual(["output", "expected_output"]);
+      expect(node.data.inputs?.map((i) => i.identifier)).toEqual([
+        "output",
+        "expected_output",
+      ]);
     });
 
     it("sets standard evaluator outputs", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
 
-      const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
+      const node = buildEvaluatorNode(
+        evaluator,
+        "target-1.eval-1",
+        "target-1",
+        cell,
+        0,
+      );
 
-      expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
+      expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
+        "passed",
+        "score",
+        "label",
+      ]);
     });
   });
 
@@ -360,12 +418,12 @@ describe("WorkflowBuilder", () => {
       expect(entryNode?.data.outputs).toBeDefined();
 
       const userInputOutput = entryNode?.data.outputs?.find(
-        (o) => o.identifier === "user_input"
+        (o) => o.identifier === "user_input",
       );
       expect(userInputOutput?.value).toBe("What is 2+2?");
 
       const expectedOutput = entryNode?.data.outputs?.find(
-        (o) => o.identifier === "expected"
+        (o) => o.identifier === "expected",
       );
       expect(expectedOutput?.value).toBe("4");
     });
@@ -393,7 +451,12 @@ describe("WorkflowBuilder", () => {
         mappings: {
           "dataset-1": {
             "target-1": {
-              output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
             },
           },
         },
@@ -405,9 +468,14 @@ describe("WorkflowBuilder", () => {
       const input = createBasicInput({ cell });
       const result = buildCellWorkflow(input, {});
 
-      const evaluatorNodes = result.workflow.nodes.filter((n) => n.type === "evaluator");
+      const evaluatorNodes = result.workflow.nodes.filter(
+        (n) => n.type === "evaluator",
+      );
       expect(evaluatorNodes).toHaveLength(2);
-      expect(evaluatorNodes.map((n) => n.id)).toEqual(["target-1.eval-1", "target-1.eval-2"]);
+      expect(evaluatorNodes.map((n) => n.id)).toEqual([
+        "target-1.eval-1",
+        "target-1.eval-2",
+      ]);
     });
   });
 
@@ -443,7 +511,12 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
+      const node = buildCodeNodeFromAgent(
+        "test-node",
+        agent,
+        targetConfig,
+        cell,
+      );
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("code");
@@ -459,7 +532,12 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
+      const node = buildCodeNodeFromAgent(
+        "test-node",
+        agent,
+        targetConfig,
+        cell,
+      );
 
       expect(node.data.inputs).toHaveLength(1);
       expect(node.data.inputs?.[0]?.identifier).toBe("input");
@@ -476,7 +554,12 @@ describe("WorkflowBuilder", () => {
       });
       const cell = createBasicCell({ targetConfig });
 
-      const node = buildCodeNodeFromAgent("test-node", agent, targetConfig, cell);
+      const node = buildCodeNodeFromAgent(
+        "test-node",
+        agent,
+        targetConfig,
+        cell,
+      );
 
       expect(node.data.parameters).toBeDefined();
       expect(node.data.parameters?.length).toBeGreaterThan(0);
@@ -503,12 +586,14 @@ describe("WorkflowBuilder", () => {
 
   describe("error cases", () => {
     it("throws when prompt target has no local config or loaded prompt", () => {
-      const targetConfig = createBasicTargetConfig({ localPromptConfig: undefined });
+      const targetConfig = createBasicTargetConfig({
+        localPromptConfig: undefined,
+      });
       const cell = createBasicCell({ targetConfig });
       const input = createBasicInput({ cell });
 
       expect(() => buildCellWorkflow(input, {})).toThrow(
-        "Prompt target target-1 has no local config and no loaded prompt"
+        "Prompt target target-1 has no local config and no loaded prompt",
       );
     });
 
@@ -522,7 +607,7 @@ describe("WorkflowBuilder", () => {
       const input = createBasicInput({ cell });
 
       expect(() => buildCellWorkflow(input, {})).toThrow(
-        "Agent target target-1 has no loaded agent"
+        "Agent target target-1 has no loaded agent",
       );
     });
   });

@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +22,7 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { RunEvaluationButton } from "../components/RunEvaluationButton";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { EvaluatorConfig, TargetConfig, DatasetReference } from "../types";
+import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../types";
 
 // Track opened drawer
 let openedDrawerType: string | null = null;
@@ -148,7 +154,9 @@ const createTestTarget = (overrides?: Partial<TargetConfig>): TargetConfig => ({
   ...overrides,
 });
 
-const createTestDataset = (overrides?: Partial<DatasetReference>): DatasetReference => ({
+const createTestDataset = (
+  overrides?: Partial<DatasetReference>,
+): DatasetReference => ({
   id: "test-data",
   name: "Test Data",
   type: "inline",
@@ -166,11 +174,12 @@ const createTestDataset = (overrides?: Partial<DatasetReference>): DatasetRefere
   ...overrides,
 });
 
-const createTestEvaluator = (overrides?: Partial<EvaluatorConfig>): EvaluatorConfig => ({
+const createTestEvaluator = (
+  overrides?: Partial<EvaluatorConfig>,
+): EvaluatorConfig => ({
   id: "evaluator-1",
   evaluatorType: "langevals/exact_match",
   name: "Exact Match",
-  settings: {},
   inputs: [
     { identifier: "output", type: "str" },
     { identifier: "expected_output", type: "str" },
@@ -273,7 +282,9 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for the table to render (multiple instances, one per row)
       await waitFor(() => {
@@ -281,7 +292,9 @@ describe("Evaluator Mappings", () => {
       });
 
       // Look for the alert icon (there may be multiple, one per row)
-      const alertIcons = screen.getAllByTestId("evaluator-missing-mapping-alert-evaluator-1");
+      const alertIcons = screen.getAllByTestId(
+        "evaluator-missing-mapping-alert-evaluator-1",
+      );
       expect(alertIcons.length).toBeGreaterThan(0);
     });
 
@@ -315,7 +328,9 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for the table to render
       await waitFor(() => {
@@ -323,7 +338,9 @@ describe("Evaluator Mappings", () => {
       });
 
       // Alert icon should not be present
-      const alertIcons = screen.queryAllByTestId("evaluator-missing-mapping-alert-evaluator-1");
+      const alertIcons = screen.queryAllByTestId(
+        "evaluator-missing-mapping-alert-evaluator-1",
+      );
       expect(alertIcons.length).toBe(0);
     });
 
@@ -339,7 +356,6 @@ describe("Evaluator Mappings", () => {
             id: "evaluator-1",
             evaluatorType: "langevals/llm_answer_match" as const,
             name: "LLM Answer Match",
-            settings: {},
             inputs: [
               { identifier: "output", type: "str" as const },
               { identifier: "expected_output", type: "str" as const },
@@ -369,15 +385,21 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for the table to render
       await waitFor(() => {
-        expect(screen.getAllByText("LLM Answer Match").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("LLM Answer Match").length).toBeGreaterThan(
+          0,
+        );
       });
 
       // Alert icon should NOT be present (optional field missing is OK)
-      const alertIcons = screen.queryAllByTestId("evaluator-missing-mapping-alert-evaluator-1");
+      const alertIcons = screen.queryAllByTestId(
+        "evaluator-missing-mapping-alert-evaluator-1",
+      );
       expect(alertIcons.length).toBe(0);
     });
   });
@@ -394,7 +416,9 @@ describe("Evaluator Mappings", () => {
         evaluators: [createTestEvaluator()],
       });
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for the evaluator chips to render (multiple, one per row)
       await waitFor(() => {

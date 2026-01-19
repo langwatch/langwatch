@@ -51,6 +51,7 @@ export class DashboardService {
   /**
    * Creates a new dashboard with auto-incremented order.
    */
+  // biome-ignore lint/suspicious/useAdjacentOverloadSignatures: not an overload - static create() creates service, instance create() creates dashboard
   async create(projectId: string, name: string) {
     const lastDashboard = await this.repository.findLast({ projectId });
     const newOrder = (lastDashboard?.order ?? -1) + 1;
@@ -146,4 +147,3 @@ export class DashboardService {
     });
   }
 }
-

@@ -1,4 +1,7 @@
-import type { AggregateType, ParentLink } from "../../../../src/server/event-sourcing/library";
+import type {
+  AggregateType,
+  ParentLink,
+} from "../../../../src/server/event-sourcing/library";
 import type { Event } from "../lib/types";
 
 /**
@@ -42,7 +45,9 @@ export interface AggregateLinkInfo {
  * const links = await discoverLinks();
  * // Returns map of aggregate type -> link info
  */
-export async function discoverLinks(): Promise<Map<AggregateType, AggregateLinkInfo>> {
+export async function discoverLinks(): Promise<
+  Map<AggregateType, AggregateLinkInfo>
+> {
   const linkMap = new Map<AggregateType, AggregateLinkInfo>();
 
   // Import pipelines dynamically
@@ -68,7 +73,9 @@ export async function discoverLinks(): Promise<Map<AggregateType, AggregateLinkI
       linkInfo.parentLinks.push({
         fromAggregateType: aggregateType,
         toAggregateType: parentLink.targetAggregateType,
-        extractParentId: parentLink.extractParentId as (event: Event) => string | null,
+        extractParentId: parentLink.extractParentId as (
+          event: Event,
+        ) => string | null,
       });
 
       // Create/update inverse (child) link on the parent aggregate type
@@ -105,10 +112,12 @@ export async function getLinksForAggregate(
 /**
  * Imports all pipelines and extracts their link information.
  */
-async function importPipelines(): Promise<Array<{
-  aggregateType: AggregateType;
-  parentLinks: ParentLink<any>[];
-}>> {
+async function importPipelines(): Promise<
+  Array<{
+    aggregateType: AggregateType;
+    parentLinks: ParentLink<any>[];
+  }>
+> {
   const { discoverPipelines } = await import("./pipelines");
   const pipelines = await discoverPipelines();
   return pipelines.map((p) => ({
@@ -116,4 +125,3 @@ async function importPipelines(): Promise<Array<{
     parentLinks: p.parentLinks as ParentLink<any>[],
   }));
 }
-

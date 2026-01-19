@@ -8,20 +8,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  LuCircleAlert,
-  LuChevronDown,
-  LuPencil,
-  LuTrash2,
-  LuCircleX,
-} from "react-icons/lu";
 import { keyframes } from "@emotion/react";
+import {
+  LuChevronDown,
+  LuCircleAlert,
+  LuCircleX,
+  LuPencil,
+  LuRefreshCw,
+  LuTrash2,
+} from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import type { EvaluatorConfig } from "../../types";
 
@@ -36,31 +37,29 @@ type EvaluatorChipProps = {
   result: unknown;
   /** Whether this evaluator has missing required mappings */
   hasMissingMappings?: boolean;
-  /** Whether the target has finished and this evaluator should be running */
-  targetHasOutput?: boolean;
-  /** Whether the overall execution is still running */
-  isExecutionRunning?: boolean;
+  /** Whether this specific evaluator is currently running (from runningEvaluators state) */
+  isRunning?: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  /** Called when user wants to re-run this evaluator */
+  onRerun?: () => void;
 };
 
 export function EvaluatorChip({
   evaluator,
   result,
   hasMissingMappings = false,
-  targetHasOutput = false,
-  isExecutionRunning = false,
+  isRunning = false,
   onEdit,
   onRemove,
+  onRerun,
 }: EvaluatorChipProps) {
   const parsed = parseEvaluationResult(result);
 
-  // If target has finished but evaluator hasn't returned yet AND execution is still running, show as running
-  // If execution has stopped but we have no result, show as pending (skipped)
+  // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
+  // If result already exists, it overrides isRunning (evaluator completed)
   const status =
-    parsed.status === "pending" && targetHasOutput && isExecutionRunning
-      ? "running"
-      : parsed.status;
+    isRunning && parsed.status === "pending" ? "running" : parsed.status;
   const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];
@@ -76,9 +75,7 @@ export function EvaluatorChip({
 
     // Show error icon for error status
     if (status === "error") {
-      return (
-        <Icon as={LuCircleX} color={statusColor} boxSize="12px" />
-      );
+      return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
     }
 
     if (score !== undefined) {
@@ -90,12 +87,7 @@ export function EvaluatorChip({
     }
     if (label) {
       return (
-        <Text
-          fontSize="10px"
-          fontWeight="medium"
-          maxWidth="60px"
-          truncate
-        >
+        <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
           {label}
         </Text>
       );
@@ -172,10 +164,7 @@ export function EvaluatorChip({
                     <Text fontSize="12px" color="gray.600">
                       Score:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {score.toFixed(2)}
                     </Text>
                   </HStack>
@@ -185,10 +174,7 @@ export function EvaluatorChip({
                     <Text fontSize="12px" color="gray.600">
                       Label:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {label}
                     </Text>
                   </HStack>
@@ -214,7 +200,7 @@ export function EvaluatorChip({
                       fontSize="11px"
                       color="gray.600"
                       whiteSpace="pre-wrap"
-                      maxHeight="100px"
+                      maxHeight="200px"
                       overflow="auto"
                     >
                       {details}
@@ -225,6 +211,15 @@ export function EvaluatorChip({
             </Box>
             <Box borderTopWidth="1px" borderColor="gray.200" />
           </>
+        )}
+        {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
+        {status !== "pending" && status !== "running" && onRerun && (
+          <Menu.Item value="rerun" onClick={onRerun}>
+            <HStack gap={2}>
+              <LuRefreshCw size={14} />
+              <Text>Rerun</Text>
+            </HStack>
+          </Menu.Item>
         )}
         <Menu.Item value="edit" onClick={onEdit}>
           <HStack gap={2}>

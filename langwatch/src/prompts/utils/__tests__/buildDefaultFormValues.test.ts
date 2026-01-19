@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildDefaultFormValues } from "../buildDefaultFormValues";
 
 describe("buildDefaultFormValues", () => {
@@ -26,7 +26,7 @@ describe("buildDefaultFormValues", () => {
     it("creates system message with default content", () => {
       const defaults = buildDefaultFormValues();
       const systemMessage = defaults.version.configData.messages.find(
-        (m) => m.role === "system"
+        (m) => m.role === "system",
       );
 
       expect(systemMessage).toBeDefined();
@@ -36,7 +36,7 @@ describe("buildDefaultFormValues", () => {
     it("creates user message with {{input}} variable", () => {
       const defaults = buildDefaultFormValues();
       const userMessage = defaults.version.configData.messages.find(
-        (m) => m.role === "user"
+        (m) => m.role === "user",
       );
 
       expect(userMessage).toBeDefined();
@@ -63,7 +63,7 @@ describe("buildDefaultFormValues", () => {
       });
 
       expect(defaults.version.configData.llm.model).toBe(
-        "anthropic/claude-sonnet-4-20250514"
+        "anthropic/claude-sonnet-4-20250514",
       );
       // Other defaults should be preserved
       expect(defaults.version.configData.inputs[0]?.identifier).toBe("input");

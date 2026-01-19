@@ -20,7 +20,6 @@ import {
 import { type ZodType, z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
-import { PropertySectionTitle } from "../ui/PropertySectionTitle";
 import type {
   EvaluatorDefinition,
   Evaluators,
@@ -36,6 +35,7 @@ import {
   useModelSelectionOptions,
 } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
+import { PropertySectionTitle } from "../ui/PropertySectionTitle";
 import { Switch } from "../ui/switch";
 import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";

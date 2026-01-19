@@ -71,26 +71,33 @@ export class TraceService {
   async getById(
     projectId: string,
     traceId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const traces = await this.clickHouseService.getTracesWithSpans(
             projectId,
             [traceId],
-            protections
+            protections,
           );
           return traces?.[0];
         }
 
-        return this.elasticsearchService.getById(projectId, traceId, protections);
-      }
+        return this.elasticsearchService.getById(
+          projectId,
+          traceId,
+          protections,
+        );
+      },
     );
   }
 
@@ -105,20 +112,25 @@ export class TraceService {
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
-      { attributes: { "tenant.id": projectId, "trace.count": traceIds.length } },
+      {
+        attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
+      },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const traces = await this.clickHouseService.getTracesWithSpans(
             projectId,
             traceIds,
-            protections
+            protections,
           );
           return traces ?? [];
         }
@@ -126,9 +138,9 @@ export class TraceService {
         return this.elasticsearchService.getTracesWithSpans(
           projectId,
           traceIds,
-          protections
+          protections,
         );
-      }
+      },
     );
   }
 
@@ -143,20 +155,23 @@ export class TraceService {
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const traces = await this.clickHouseService.getTracesByThreadId(
             projectId,
             threadId,
-            protections
+            protections,
           );
           if (traces !== null) {
             return traces;
@@ -164,16 +179,16 @@ export class TraceService {
           // Fall back to Elasticsearch if ClickHouse returns null
           this.logger.warn(
             { projectId, threadId },
-            "ClickHouse enabled but returned null for getTracesByThreadId, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null for getTracesByThreadId, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getTracesByThreadId(
           projectId,
           threadId,
-          protections
+          protections,
         );
-      }
+      },
     );
   }
 
@@ -192,19 +207,22 @@ export class TraceService {
       downloadMode?: boolean;
       includeSpans?: boolean;
       scrollId?: string | null;
-    } = {}
+    } = {},
   ): Promise<TracesForProjectResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getAllTracesForProject(
             input,
-            protections
+            protections,
           );
           if (result !== null) {
             return result;
@@ -212,16 +230,16 @@ export class TraceService {
           // If ClickHouse returns null (e.g., client not available), fall back
           this.logger.warn(
             { projectId: input.projectId },
-            "ClickHouse enabled but returned null, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getAllTracesForProject(
           input,
           protections,
-          options
+          options,
         );
-      }
+      },
     );
   }
 
@@ -236,19 +254,21 @@ export class TraceService {
   async getEvaluationsMultiple(
     projectId: string,
     traceIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Record<string, Evaluation[]>> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationsMultiple",
-      { attributes: { "tenant.id": projectId, "trace.count": traceIds.length } },
+      {
+        attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
+      },
       async () => {
         // Evaluations are only in Elasticsearch for now
         return this.elasticsearchService.getEvaluationsMultiple(
           projectId,
           traceIds,
-          protections
+          protections,
         );
-      }
+      },
     );
   }
 
@@ -263,37 +283,46 @@ export class TraceService {
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
-      { attributes: { "tenant.id": projectId, "thread.count": threadIds.length } },
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "thread.count": threadIds.length,
+        },
+      },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesWithSpansByThreadIds(
-            projectId,
-            threadIds,
-            protections
-          );
+          const traces =
+            await this.clickHouseService.getTracesWithSpansByThreadIds(
+              projectId,
+              threadIds,
+              protections,
+            );
           if (traces !== null) {
             return traces;
           }
           // Fall back to Elasticsearch if ClickHouse returns null
           this.logger.warn(
             { projectId, threadIds },
-            "ClickHouse enabled but returned null for getTracesWithSpansByThreadIds, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null for getTracesWithSpansByThreadIds, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getTracesWithSpansByThreadIds(
           projectId,
           threadIds,
-          protections
+          protections,
         );
-      }
+      },
     );
   }
 
@@ -303,13 +332,18 @@ export class TraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult with topic and subtopic aggregations
    */
-  async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
+  async getTopicCounts(
+    input: AggregationFiltersInput,
+  ): Promise<TopicCountsResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getTopicCounts(input);
@@ -318,12 +352,12 @@ export class TraceService {
           }
           this.logger.warn(
             { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getTopicCounts, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null for getTopicCounts, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getTopicCounts(input);
-      }
+      },
     );
   }
 
@@ -333,27 +367,33 @@ export class TraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult with unique customer IDs and labels
    */
-  async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
+  async getCustomersAndLabels(
+    input: AggregationFiltersInput,
+  ): Promise<CustomersAndLabelsResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
-          const result = await this.clickHouseService.getCustomersAndLabels(input);
+          const result =
+            await this.clickHouseService.getCustomersAndLabels(input);
           if (result !== null) {
             return result;
           }
           this.logger.warn(
             { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getCustomersAndLabels, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null for getCustomersAndLabels, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getCustomersAndLabels(input);
-      }
+      },
     );
   }
 
@@ -368,20 +408,23 @@ export class TraceService {
   async getSpanForPromptStudio(
     projectId: string,
     spanId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<PromptStudioSpanResult | null> {
     return this.tracer.withActiveSpan(
       "TraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getSpanForPromptStudio(
             projectId,
             spanId,
-            protections
+            protections,
           );
           if (result !== null) {
             return result;
@@ -389,16 +432,16 @@ export class TraceService {
           // Fall back to Elasticsearch - span might not be found in ClickHouse
           this.logger.debug(
             { projectId, spanId },
-            "Span not found in ClickHouse, falling back to Elasticsearch"
+            "Span not found in ClickHouse, falling back to Elasticsearch",
           );
         }
 
         return this.elasticsearchService.getSpanForPromptStudio(
           projectId,
           spanId,
-          protections
+          protections,
         );
-      }
+      },
     );
   }
 }

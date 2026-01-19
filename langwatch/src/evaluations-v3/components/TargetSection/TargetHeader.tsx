@@ -25,16 +25,16 @@ import {
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { TargetConfig } from "../../types";
-import { targetHasMissingMappings } from "../../utils/mappingValidation";
 import { computeTargetAggregates } from "../../utils/computeAggregates";
 import { isRowEmpty } from "../../utils/emptyRowDetection";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import { TargetSummary } from "./TargetSummary";
 import { countCellsForTarget } from "../../utils/executionScope";
+import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { TargetSummary } from "./TargetSummary";
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -310,10 +310,7 @@ export const TargetHeader = memo(function TargetHeader({
 
       {/* Summary statistics (positioned on the right before play button) */}
       {hasAggregates && (
-        <TargetSummary
-          aggregates={aggregates}
-          isRunning={isRunning}
-        />
+        <TargetSummary aggregates={aggregates} isRunning={isRunning} />
       )}
 
       {/* Play/Stop button on far right */}
@@ -322,8 +319,8 @@ export const TargetHeader = memo(function TargetHeader({
           isRunning
             ? "Stop evaluation"
             : hasMissingMappings
-            ? "Configure missing mappings first"
-            : "Run evaluation"
+              ? "Configure missing mappings first"
+              : "Run evaluation"
         }
         positioning={{ placement: "top" }}
         openDelay={200}

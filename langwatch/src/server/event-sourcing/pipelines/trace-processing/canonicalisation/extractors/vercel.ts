@@ -25,16 +25,16 @@
  * - span.name is mapped to langwatch.span.type
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import { ATTR_KEYS } from "./_constants";
 import {
-  safeJsonParse,
-  isRecord,
-  normaliseModelFromAiModelObject,
+  extractModelToBoth,
   extractUsageTokens,
   inferSpanTypeIfAbsent,
-  extractModelToBoth,
+  isRecord,
+  normaliseModelFromAiModelObject,
+  safeJsonParse,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const AI_SDK_SPAN_TYPE_MAP: Record<string, string> = {
   // Text generation spans

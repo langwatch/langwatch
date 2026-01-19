@@ -1,14 +1,17 @@
 /**
  * Utilities to convert between store FieldMapping and UI FieldMapping formats.
  */
-import type { FieldMapping as StoreFieldMapping } from "../types";
+
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { FieldMapping as StoreFieldMapping } from "../types";
 
 /**
  * Convert store FieldMapping to UI FieldMapping format.
  * Used when displaying mappings in the UI.
  */
-export const convertToUIMapping = (mapping: StoreFieldMapping): UIFieldMapping => {
+export const convertToUIMapping = (
+  mapping: StoreFieldMapping,
+): UIFieldMapping => {
   if (mapping.type === "value") {
     return { type: "value", value: mapping.value };
   }

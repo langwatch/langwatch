@@ -13,8 +13,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { Event } from "../../library";
 import type { TenantId } from "../../library/domain/tenantId";
 import {
-  createMockEventStore,
   createMockDistributedLock,
+  createMockEventStore,
 } from "../../library/services/__tests__/testHelpers";
 import { DisabledPipelineBuilder } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
@@ -201,7 +201,7 @@ describe("EventSourcing", () => {
       interface TestEvent extends Event {
         data: { test: string };
       }
-      interface TestProjection {
+      interface _TestProjection {
         id: string;
         aggregateId: string;
         tenantId: TenantId;

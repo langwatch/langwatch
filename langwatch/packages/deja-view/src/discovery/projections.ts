@@ -1,6 +1,6 @@
 import path from "node:path";
-import type { DiscoveredProjection } from "./projections.types";
 import { discoverPipelines } from "./pipelines";
+import type { DiscoveredProjection } from "./projections.types";
 
 /**
  * Discovers projection handler classes by reading static pipeline definitions.
@@ -24,7 +24,8 @@ export async function discoverProjections(): Promise<DiscoveredProjection[]> {
 
     // The static pipeline definition already has the handler classes in the projections Map!
     // Just iterate over them directly
-    for (const [projectionName, projectionDef] of pipeline.pipeline.projections) {
+    for (const [projectionName, projectionDef] of pipeline.pipeline
+      .projections) {
       const id = `${pipelineName}:${projectionName}`;
 
       results.push({

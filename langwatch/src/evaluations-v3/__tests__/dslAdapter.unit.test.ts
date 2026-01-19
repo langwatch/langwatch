@@ -5,7 +5,7 @@ import {
   DEFAULT_TEST_DATA_ID,
   type EvaluationsV3State,
 } from "../types";
-import { stateToWorkflow, getActiveDatasetData } from "../utils/dslAdapter";
+import { getActiveDatasetData, stateToWorkflow } from "../utils/dslAdapter";
 
 describe("DSL Adapter", () => {
   describe("stateToWorkflow", () => {
@@ -104,7 +104,7 @@ describe("DSL Adapter", () => {
       const state = createInitialState();
 
       expect(() => stateToWorkflow(state, "non-existent")).toThrow(
-        "Dataset with id non-existent not found"
+        "Dataset with id non-existent not found",
       );
     });
 
@@ -164,13 +164,13 @@ describe("DSL Adapter", () => {
 
         // Question should NOT have a value (it's mapped to dataset)
         const questionInput = codeNode?.data.inputs?.find(
-          (i) => i.identifier === "question"
+          (i) => i.identifier === "question",
         );
         expect(questionInput?.value).toBeUndefined();
 
         // Context SHOULD have a value (hardcoded)
         const contextInput = codeNode?.data.inputs?.find(
-          (i) => i.identifier === "context"
+          (i) => i.identifier === "context",
         );
         expect(contextInput?.value).toBe("This is hardcoded context");
       });
@@ -242,7 +242,6 @@ describe("DSL Adapter", () => {
               id: "eval-1",
               evaluatorType: "langevals/exact_match",
               name: "Exact Match",
-              settings: {},
               inputs: [
                 { identifier: "output", type: "str" },
                 { identifier: "expected", type: "str" },
@@ -271,19 +270,19 @@ describe("DSL Adapter", () => {
         const workflow = stateToWorkflow(state);
 
         const evaluatorNode = workflow.nodes.find(
-          (n) => n.id === "target-1.eval-1"
+          (n) => n.id === "target-1.eval-1",
         );
         expect(evaluatorNode).toBeDefined();
 
         // Output should NOT have a value (it's mapped to target)
         const outputInput = evaluatorNode?.data.inputs?.find(
-          (i) => i.identifier === "output"
+          (i) => i.identifier === "output",
         );
         expect(outputInput?.value).toBeUndefined();
 
         // Expected SHOULD have a value (hardcoded)
         const expectedInput = evaluatorNode?.data.inputs?.find(
-          (i) => i.identifier === "expected"
+          (i) => i.identifier === "expected",
         );
         expect(expectedInput?.value).toBe("expected result");
       });
@@ -297,7 +296,7 @@ describe("DSL Adapter", () => {
 
       expect(data).toBeDefined();
       expect(data?.columns).toHaveLength(2);
-      expect(data?.records["input"]).toBeDefined();
+      expect(data?.records.input).toBeDefined();
     });
 
     it("returns undefined for saved dataset", () => {

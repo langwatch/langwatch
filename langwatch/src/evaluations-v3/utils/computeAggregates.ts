@@ -20,13 +20,19 @@ export type MetricStats = {
 /**
  * Computes percentile from a sorted array.
  */
-const computePercentile = (sortedValues: number[], percentile: number): number => {
+const computePercentile = (
+  sortedValues: number[],
+  percentile: number,
+): number => {
   if (sortedValues.length === 0) return 0;
   const index = (percentile / 100) * (sortedValues.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   if (lower === upper) return sortedValues[lower]!;
-  return sortedValues[lower]! + (sortedValues[upper]! - sortedValues[lower]!) * (index - lower);
+  return (
+    sortedValues[lower]! +
+    (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
+  );
 };
 
 /**
@@ -34,10 +40,10 @@ const computePercentile = (sortedValues: number[], percentile: number): number =
  */
 export const computeMetricStats = (values: number[]): MetricStats | null => {
   if (values.length === 0) return null;
-  
+
   const sorted = [...values].sort((a, b) => a - b);
   const total = values.reduce((sum, v) => sum + v, 0);
-  
+
   return {
     min: sorted[0]!,
     max: sorted[sorted.length - 1]!,
@@ -110,7 +116,7 @@ export const computeTargetAggregates = (
   targetId: string,
   results: EvaluationResults,
   evaluators: Array<{ id: string; name: string }>,
-  rowCount: number
+  rowCount: number,
 ): TargetAggregate => {
   const targetOutputs = results.targetOutputs[targetId] ?? [];
   const targetMetadata = results.targetMetadata?.[targetId] ?? [];
@@ -125,7 +131,8 @@ export const computeTargetAggregates = (
   const latencyValues: number[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const hasOutput = targetOutputs[i] !== undefined && targetOutputs[i] !== null;
+    const hasOutput =
+      targetOutputs[i] !== undefined && targetOutputs[i] !== null;
     const hasError = !!targetErrors[i];
 
     // Check if all evaluators have completed for this row
@@ -164,72 +171,92 @@ export const computeTargetAggregates = (
   const costStats = computeMetricStats(costValues);
 
   // Compute per-evaluator aggregates
-  const evaluatorAggregates: EvaluatorAggregate[] = evaluators.map((evaluator) => {
-    const evalResults = evaluatorResults[evaluator.id] ?? [];
+  const evaluatorAggregates: EvaluatorAggregate[] = evaluators.map(
+    (evaluator) => {
+      const evalResults = evaluatorResults[evaluator.id] ?? [];
 
-    let total = 0;
-    let passed = 0;
-    let failed = 0;
-    let errors = 0;
-    let scoreSum = 0;
-    let scoreCount = 0;
+      let total = 0;
+      let passed = 0;
+      let failed = 0;
+      let errors = 0;
+      let scoreSum = 0;
+      let scoreCount = 0;
+      // Count results that have explicit pass/fail for pass rate calculation
+      let passFailCount = 0;
 
-    for (let i = 0; i < rowCount; i++) {
-      const result = evalResults[i];
-      if (result === undefined || result === null) continue;
+      for (let i = 0; i < rowCount; i++) {
+        const result = evalResults[i];
+        if (result === undefined || result === null) continue;
 
-      const parsed = parseEvaluationResult(result);
-      if (parsed.status === "pending" || parsed.status === "running") continue;
+        const parsed = parseEvaluationResult(result);
+        if (parsed.status === "pending" || parsed.status === "running")
+          continue;
 
-      total++;
+        total++;
 
-      if (parsed.status === "passed") {
-        passed++;
-      } else if (parsed.status === "failed") {
-        failed++;
-      } else if (parsed.status === "error") {
-        errors++;
+        if (parsed.status === "passed") {
+          passed++;
+          passFailCount++;
+        } else if (parsed.status === "failed") {
+          failed++;
+          passFailCount++;
+        } else if (parsed.status === "error") {
+          errors++;
+        }
+        // "processed" and "skipped" don't count towards pass rate
+
+        if (parsed.score !== undefined && parsed.score !== null) {
+          scoreSum += parsed.score;
+          scoreCount++;
+        }
       }
 
-      if (parsed.score !== undefined && parsed.score !== null) {
-        scoreSum += parsed.score;
-        scoreCount++;
-      }
-    }
+      return {
+        evaluatorId: evaluator.id,
+        evaluatorName: evaluator.name,
+        total,
+        passed,
+        failed,
+        errors,
+        // Pass rate only counts results with explicit pass/fail, not score-only ("processed")
+        passRate: passFailCount > 0 ? (passed / passFailCount) * 100 : null,
+        averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
+      };
+    },
+  );
 
-    return {
-      evaluatorId: evaluator.id,
-      evaluatorName: evaluator.name,
-      total,
-      passed,
-      failed,
-      errors,
-      passRate: total > 0 ? (passed / total) * 100 : null,
-      averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
-    };
-  });
-
-  // Compute overall pass rate (sum of all passed / sum of all total)
-  const totalEvaluations = evaluatorAggregates.reduce((sum, e) => sum + e.total, 0);
+  // Compute overall pass rate (sum of passed / sum of passed+failed)
+  // Only count evaluators that have explicit pass/fail results, not score-only
+  const totalPassFail = evaluatorAggregates.reduce(
+    (sum, e) => sum + e.passed + e.failed,
+    0,
+  );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate = totalEvaluations > 0 ? (totalPassed / totalEvaluations) * 100 : null;
+  const overallPassRate =
+    totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 
   // Compute overall average score (across all evaluators with scores)
-  const allScoreSums = evaluatorAggregates.reduce(
+  const _allScoreSums = evaluatorAggregates.reduce(
     (acc, e) => {
       if (e.averageScore !== null) {
-        return { sum: acc.sum + e.averageScore * e.total, count: acc.count + e.total };
+        return {
+          sum: acc.sum + e.averageScore * e.total,
+          count: acc.count + e.total,
+        };
       }
       return acc;
     },
-    { sum: 0, count: 0 }
+    { sum: 0, count: 0 },
   );
   // Actually we want the average of the individual scores, not weighted by total
   // Let's just average the non-null averageScores
-  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
+  const scoresWithValues = evaluatorAggregates.filter(
+    (e) => e.averageScore !== null,
+  );
   const overallAverageScore =
     scoresWithValues.length > 0
-      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scoresWithValues.length
+      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
+        scoresWithValues.length
       : null;
 
   return {
@@ -259,7 +286,7 @@ export const formatPassRate = (passRate: number | null): string => {
 
 // Re-export shared formatters for backward compatibility
 export {
-  formatScore,
   formatCost,
   formatLatency,
+  formatScore,
 } from "~/components/shared/formatters";

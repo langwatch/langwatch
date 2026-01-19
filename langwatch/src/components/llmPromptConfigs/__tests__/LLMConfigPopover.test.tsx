@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,7 +39,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 // Mock next-auth
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: { user: { id: "test-user" } }, status: "authenticated" }),
+  useSession: () => ({
+    data: { user: { id: "test-user" } },
+    status: "authenticated",
+  }),
 }));
 
 // Mock ModelSelector to simplify testing
@@ -68,11 +71,15 @@ vi.mock("../../ModelSelector", () => ({
   ),
 }));
 
-import { LLMConfigPopover, type LLMConfigValues, type Output } from "../LLMConfigPopover";
 import { Popover } from "../../ui/popover";
+import {
+  LLMConfigPopover,
+  type LLMConfigValues,
+  type Output,
+} from "../LLMConfigPopover";
 
 const renderComponent = (
-  props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {}
+  props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {},
 ) => {
   const defaultProps: Parameters<typeof LLMConfigPopover>[0] = {
     values: { model: "gpt-4o", temperature: 0.7, max_tokens: 1024 },
@@ -87,7 +94,7 @@ const renderComponent = (
         </Popover.Trigger>
         <LLMConfigPopover {...defaultProps} {...props} />
       </Popover.Root>
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -128,7 +135,7 @@ describe("LLMConfigPopover", () => {
       fireEvent.change(selector, { target: { value: "claude-3-opus" } });
 
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ model: "claude-3-opus" })
+        expect.objectContaining({ model: "claude-3-opus" }),
       );
     });
   });
@@ -148,14 +155,14 @@ describe("LLMConfigPopover", () => {
       it("shows message that temperature is fixed for GPT-5", () => {
         renderComponent({ values: { model: "gpt-5", temperature: 1 } });
         expect(
-          screen.getByText("Temperature is fixed to 1 for GPT-5 models")
+          screen.getByText("Temperature is fixed to 1 for GPT-5 models"),
         ).toBeInTheDocument();
       });
 
       it("does not show GPT-5 message for other models", () => {
         renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
         expect(
-          screen.queryByText("Temperature is fixed to 1 for GPT-5 models")
+          screen.queryByText("Temperature is fixed to 1 for GPT-5 models"),
         ).not.toBeInTheDocument();
       });
     });
@@ -253,10 +260,12 @@ describe("LLMConfigPopover", () => {
   describe("error display", () => {
     it("shows temperature error when provided", () => {
       renderComponent({
-        errors: { temperature: { message: "Temperature must be between 0 and 2" } },
+        errors: {
+          temperature: { message: "Temperature must be between 0 and 2" },
+        },
       });
       expect(
-        screen.getByText("Temperature must be between 0 and 2")
+        screen.getByText("Temperature must be between 0 and 2"),
       ).toBeInTheDocument();
     });
 
@@ -265,7 +274,7 @@ describe("LLMConfigPopover", () => {
         errors: { maxTokens: { message: "Max tokens must be positive" } },
       });
       expect(
-        screen.getByText("Max tokens must be positive")
+        screen.getByText("Max tokens must be positive"),
       ).toBeInTheDocument();
     });
   });

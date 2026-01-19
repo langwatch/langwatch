@@ -1,5 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
@@ -26,7 +27,6 @@ import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
 import { QueueProcessorManager } from "./queues/queueProcessorManager";
 import { EventProcessorValidator } from "./validation/eventProcessorValidator";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 
 /**
  * Main service that orchestrates event sourcing.

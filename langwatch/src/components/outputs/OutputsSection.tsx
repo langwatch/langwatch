@@ -11,8 +11,8 @@ import {
 } from "@chakra-ui/react";
 import Ajv from "ajv";
 import { Plus, X } from "lucide-react";
-import { LuBraces } from "react-icons/lu";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
 import { Dialog } from "~/components/ui/dialog";
@@ -20,8 +20,15 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import type { Field } from "~/optimization_studio/types/dsl";
+import {
+  TYPE_LABELS,
+  VariableTypeIcon,
+} from "~/prompts/components/ui/VariableTypeIcon";
 import { outputsSchema } from "~/prompts/schemas";
-import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
+import {
+  generateUniqueIdentifier,
+  normalizeIdentifier,
+} from "~/utils/identifierUtils";
 
 // ============================================================================
 // Types
@@ -56,20 +63,32 @@ export type OutputsSectionProps = {
 // ============================================================================
 
 const ALL_OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
-  { value: "str", label: TYPE_LABELS["str"] ?? "Text" },
-  { value: "float", label: TYPE_LABELS["float"] ?? "Number" },
-  { value: "bool", label: TYPE_LABELS["bool"] ?? "Boolean" },
-  { value: "json_schema", label: TYPE_LABELS["json_schema"] ?? "JSON Schema" },
-  { value: "dict", label: TYPE_LABELS["dict"] ?? "Object" },
-  { value: "list", label: TYPE_LABELS["list"] ?? "List" },
-  { value: "image", label: TYPE_LABELS["image"] ?? "Image" },
+  { value: "str", label: TYPE_LABELS.str ?? "Text" },
+  { value: "float", label: TYPE_LABELS.float ?? "Number" },
+  { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
+  { value: "json_schema", label: TYPE_LABELS.json_schema ?? "JSON Schema" },
+  { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
+  { value: "list", label: TYPE_LABELS.list ?? "List" },
+  { value: "image", label: TYPE_LABELS.image ?? "Image" },
 ];
 
 /** Default types for LLM outputs (with structured output support) */
-export const LLM_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "json_schema"];
+export const LLM_OUTPUT_TYPES: OutputType[] = [
+  "str",
+  "float",
+  "bool",
+  "json_schema",
+];
 
 /** Types for code block outputs */
-export const CODE_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "dict", "list", "image"];
+export const CODE_OUTPUT_TYPES: OutputType[] = [
+  "str",
+  "float",
+  "bool",
+  "dict",
+  "list",
+  "image",
+];
 
 const DEFAULT_JSON_SCHEMA = {
   type: "object",
@@ -79,29 +98,6 @@ const DEFAULT_JSON_SCHEMA = {
     },
   },
   required: ["result"],
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const generateUniqueIdentifier = (
-  baseName: string,
-  existingIdentifiers: string[],
-): string => {
-  if (!existingIdentifiers.includes(baseName)) {
-    return baseName;
-  }
-
-  let counter = 1;
-  while (existingIdentifiers.includes(`${baseName}_${counter}`)) {
-    counter++;
-  }
-  return `${baseName}_${counter}`;
-};
-
-const normalizeIdentifier = (value: string): string => {
-  return value.replace(/ /g, "_").toLowerCase();
 };
 
 // ============================================================================
@@ -118,17 +114,22 @@ export const OutputsSection = ({
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const jsonSchemaDialog = useDisclosure();
-  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(null);
+  const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<
+    number | null
+  >(null);
 
   // Filter type options based on availableTypes prop
   const typeOptions = ALL_OUTPUT_TYPE_OPTIONS.filter((opt) =>
-    availableTypes.includes(opt.value)
+    availableTypes.includes(opt.value),
   );
 
   const handleAddOutput = useCallback(
     (type: OutputType) => {
       const existingIdentifiers = outputs.map((o) => o.identifier);
-      const newIdentifier = generateUniqueIdentifier("output", existingIdentifiers);
+      const newIdentifier = generateUniqueIdentifier(
+        "output",
+        existingIdentifiers,
+      );
 
       const newOutput: Output = {
         identifier: newIdentifier,
@@ -197,9 +198,10 @@ export const OutputsSection = ({
     }
   };
 
-  const currentJsonSchema = editingJsonSchemaIndex !== null
-    ? outputs[editingJsonSchemaIndex]?.json_schema ?? DEFAULT_JSON_SCHEMA
-    : DEFAULT_JSON_SCHEMA;
+  const currentJsonSchema =
+    editingJsonSchemaIndex !== null
+      ? (outputs[editingJsonSchemaIndex]?.json_schema ?? DEFAULT_JSON_SCHEMA)
+      : DEFAULT_JSON_SCHEMA;
 
   // Check if we can delete (must have at least one output)
   const canDelete = outputs.length > 1;
@@ -263,7 +265,9 @@ export const OutputsSection = ({
               isEditing={editingId === output.identifier}
               onStartEdit={() => setEditingId(output.identifier)}
               onEndEdit={() => setEditingId(null)}
-              onUpdate={(updates) => handleUpdateOutput(output.identifier, updates)}
+              onUpdate={(updates) =>
+                handleUpdateOutput(output.identifier, updates)
+              }
               onRemove={() => handleRemoveOutput(output.identifier)}
               onEditJsonSchema={() => handleEditJsonSchema(index)}
               typeOptions={typeOptions}
@@ -463,7 +467,9 @@ const OutputRow = ({
       {/* Delete Button */}
       {!readOnly && (
         <Tooltip
-          content={canRemove ? "Remove output" : "At least one output is required"}
+          content={
+            canRemove ? "Remove output" : "At least one output is required"
+          }
           positioning={{ placement: "top" }}
         >
           <Button
@@ -497,7 +503,8 @@ const checkForJsonSchemaErrors = (jsonSchemaString: string) => {
     if (!valid) {
       return ajv.errorsText();
     }
-    const jsonSchemaValidation = outputsSchema.shape.json_schema.safeParse(schema);
+    const jsonSchemaValidation =
+      outputsSchema.shape.json_schema.safeParse(schema);
     if (!jsonSchemaValidation.success) {
       const validationError = fromZodError(jsonSchemaValidation.error);
       return validationError.message;

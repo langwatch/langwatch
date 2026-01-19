@@ -1,40 +1,47 @@
-import type { Node, Edge } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-
 import type {
-  Workflow,
-  Entry,
-  Signature,
-  Code,
-  Evaluator,
-  Field,
-  LlmPromptConfigComponent,
-  LLMConfig,
-} from "~/optimization_studio/types/dsl";
-import type { ChatMessage } from "~/server/tracer/types";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import type {
-  WorkflowBuilderInput,
-  WorkflowBuilderOutput,
-  ExecutionCell,
-} from "./types";
-import type {
-  TargetConfig,
   EvaluatorConfig,
   FieldMapping,
   LocalPromptConfig,
+  TargetConfig,
 } from "~/evaluations-v3/types";
+import type {
+  Code,
+  Entry,
+  Evaluator,
+  Field,
+  LLMConfig,
+  LlmPromptConfigComponent,
+  Signature,
+  Workflow,
+} from "~/optimization_studio/types/dsl";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { ChatMessage } from "~/server/tracer/types";
+import type {
+  ExecutionCell,
+  WorkflowBuilderInput,
+  WorkflowBuilderOutput,
+} from "./types";
 
 // ============================================================================
 // Main Workflow Builder
 // ============================================================================
 
 /**
+ * Evaluator DB config type
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: string;
+  settings?: Record<string, unknown>;
+};
+
+/**
  * Builds a mini-workflow for executing a single cell (row + target + evaluators).
- * 
+ *
  * The workflow structure:
  * - Entry node: Contains the single row of dataset data
  * - Target node: Either a signature (prompt) or code (agent) node
@@ -45,13 +52,13 @@ export const buildCellWorkflow = (
   loadedData: {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
-  }
+    evaluators?: Map<string, { id: string; config: unknown }>;
+  },
 ): WorkflowBuilderOutput => {
-  const { projectId, cell, datasetColumns } = input;
+  const { cell, datasetColumns } = input;
   const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
 
   const workflowId = `eval_v3_${nanoid(8)}`;
-  const traceId = `trace_${nanoid()}`;
 
   // Build entry node with the single row of data
   const entryNode = buildEntryNode(datasetColumns, datasetEntry);
@@ -60,14 +67,15 @@ export const buildCellWorkflow = (
   const { targetNode, targetNodeId } = buildTargetNode(
     targetConfig,
     loadedData,
-    cell
+    cell,
   );
 
   // Build evaluator nodes
   const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes(
     evaluatorConfigs,
     targetConfig.id,
-    cell
+    cell,
+    loadedData.evaluators,
   );
 
   // Build edges
@@ -77,7 +85,7 @@ export const buildCellWorkflow = (
     targetConfig,
     evaluatorConfigs,
     evaluatorNodeIds,
-    cell
+    cell,
   );
 
   const workflow: Workflow = {
@@ -115,7 +123,7 @@ export const buildCellWorkflow = (
  */
 const buildEntryNode = (
   columns: Array<{ id: string; name: string; type: string }>,
-  datasetEntry: Record<string, unknown>
+  datasetEntry: Record<string, unknown>,
 ): Node<Entry> => {
   const outputs: Field[] = columns.map((col) => ({
     identifier: col.id,
@@ -141,7 +149,7 @@ const buildEntryNode = (
             columns.map((col) => [
               col.id,
               [String(datasetEntry[col.name] ?? datasetEntry[col.id] ?? "")],
-            ])
+            ]),
           ),
           columnTypes: columns.map((col) => ({
             name: col.name,
@@ -163,7 +171,7 @@ const buildEntryNode = (
 const buildTargetNode = (
   targetConfig: TargetConfig,
   loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): { targetNode: Node<Signature | Code>; targetNodeId: string } => {
   const targetNodeId = targetConfig.id;
 
@@ -176,7 +184,7 @@ const buildTargetNode = (
           targetConfig.name,
           targetConfig.localPromptConfig,
           targetConfig,
-          cell
+          cell,
         ),
         targetNodeId,
       };
@@ -186,13 +194,13 @@ const buildTargetNode = (
           targetNodeId,
           loadedData.prompt,
           targetConfig,
-          cell
+          cell,
         ),
         targetNodeId,
       };
     } else {
       throw new Error(
-        `Prompt target ${targetConfig.id} has no local config and no loaded prompt`
+        `Prompt target ${targetConfig.id} has no local config and no loaded prompt`,
       );
     }
   } else {
@@ -203,7 +211,7 @@ const buildTargetNode = (
           targetNodeId,
           loadedData.agent,
           targetConfig,
-          cell
+          cell,
         ),
         targetNodeId,
       };
@@ -220,7 +228,7 @@ export const buildSignatureNodeFromPrompt = (
   nodeId: string,
   prompt: VersionedPrompt,
   targetConfig: TargetConfig,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): Node<Signature> => {
   const inputs = (prompt.inputs ?? []).map((input) => ({
     identifier: input.identifier,
@@ -282,7 +290,7 @@ export const buildSignatureNodeFromLocalConfig = (
   name: string,
   localConfig: LocalPromptConfig,
   targetConfig: TargetConfig,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): Node<Signature> => {
   const inputs = localConfig.inputs.map((input) => ({
     identifier: input.identifier,
@@ -306,7 +314,7 @@ export const buildSignatureNodeFromLocalConfig = (
   // Extract system prompt from messages if present
   const systemMessage = localConfig.messages.find((m) => m.role === "system");
   const nonSystemMessages = localConfig.messages.filter(
-    (m) => m.role !== "system"
+    (m) => m.role !== "system",
   );
 
   return {
@@ -348,7 +356,7 @@ export const buildCodeNodeFromAgent = (
   nodeId: string,
   agent: TypedAgent,
   targetConfig: TargetConfig,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): Node<Code> => {
   const config = agent.config;
 
@@ -388,7 +396,8 @@ export const buildCodeNodeFromAgent = (
 const buildEvaluatorNodes = (
   evaluatorConfigs: EvaluatorConfig[],
   targetId: string,
-  cell: ExecutionCell
+  cell: ExecutionCell,
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
 ): {
   evaluatorNodes: Array<Node<Evaluator>>;
   evaluatorNodeIds: Record<string, string>;
@@ -401,7 +410,21 @@ const buildEvaluatorNodes = (
     const nodeId = `${targetId}.${evaluator.id}`;
     evaluatorNodeIds[evaluator.id] = nodeId;
 
-    const node = buildEvaluatorNode(evaluator, nodeId, targetId, cell, index);
+    // Get settings from loaded evaluator (DB) instead of workbench state
+    const dbEvaluator = evaluator.dbEvaluatorId
+      ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
+      : undefined;
+    const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
+    const settings = dbConfig?.settings ?? {};
+
+    const node = buildEvaluatorNode(
+      evaluator,
+      nodeId,
+      targetId,
+      cell,
+      index,
+      settings,
+    );
     evaluatorNodes.push(node);
   });
 
@@ -410,22 +433,34 @@ const buildEvaluatorNodes = (
 
 /**
  * Builds a single evaluator node.
+ * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
  */
 export const buildEvaluatorNode = (
   evaluator: EvaluatorConfig,
   nodeId: string,
   targetId: string,
   cell: ExecutionCell,
-  index: number
+  index: number,
+  settings: Record<string, unknown> = {},
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
-  const evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  const _evaluatorDef =
+    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
   // Build inputs with value mappings applied
   const inputs: Field[] = evaluator.inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
     value: getEvaluatorInputValue(input.identifier, evaluator, targetId, cell),
+  }));
+
+  // Convert evaluator settings to parameters format expected by langwatch_nlp
+  // Settings like { model: "...", prompt: "...", max_tokens: 100 } become:
+  // [{ identifier: "model", type: "str", value: "..." }, ...]
+  const parameters: Field[] = Object.entries(settings).map(([key, value]) => ({
+    identifier: key,
+    type: "str" as const, // Settings are treated as strings by default
+    value,
   }));
 
   return {
@@ -442,7 +477,7 @@ export const buildEvaluatorNode = (
         { identifier: "label", type: "str" },
       ],
       evaluator: evaluator.evaluatorType,
-      ...evaluator.settings,
+      parameters,
     },
   };
 };
@@ -460,14 +495,14 @@ const buildEdges = (
   targetConfig: TargetConfig,
   evaluatorConfigs: EvaluatorConfig[],
   evaluatorNodeIds: Record<string, string>,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): Edge[] => {
   const edges: Edge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
   // Build edges from entry to target based on target mappings
   const targetMappings = datasetId
-    ? targetConfig.mappings[datasetId] ?? {}
+    ? (targetConfig.mappings[datasetId] ?? {})
     : {};
 
   // Python NLP expects handles in format "outputs.field" and "inputs.field"
@@ -490,7 +525,7 @@ const buildEdges = (
     if (!evaluatorNodeId) continue;
 
     const evaluatorMappings = datasetId
-      ? evaluator.mappings[datasetId]?.[targetConfig.id] ?? {}
+      ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
       : {};
 
     for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
@@ -505,7 +540,10 @@ const buildEdges = (
             targetHandle: `inputs.${inputField}`,
             type: "default",
           });
-        } else if (mapping.source === "target" && mapping.sourceId === targetConfig.id) {
+        } else if (
+          mapping.source === "target" &&
+          mapping.sourceId === targetConfig.id
+        ) {
           // From target output
           edges.push({
             id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,
@@ -554,7 +592,7 @@ const columnTypeToFieldType = (colType: string): Field["type"] => {
 const getInputValue = (
   inputIdentifier: string,
   targetConfig: TargetConfig,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): unknown => {
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return undefined;
@@ -577,7 +615,7 @@ const getEvaluatorInputValue = (
   inputIdentifier: string,
   evaluator: EvaluatorConfig,
   targetId: string,
-  cell: ExecutionCell
+  cell: ExecutionCell,
 ): unknown => {
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return undefined;

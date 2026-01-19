@@ -7,10 +7,15 @@
  * - Cost and duration per target
  * - Evaluator results per target (score, passed, details)
  */
-import Parse from "papaparse";
-import numeral from "numeral";
 
-import type { BatchEvaluationData, BatchResultRow, BatchTargetOutput } from "./types";
+import numeral from "numeral";
+import Parse from "papaparse";
+
+import type {
+  BatchEvaluationData,
+  BatchResultRow,
+  BatchTargetOutput,
+} from "./types";
 
 /**
  * Stringify a value for CSV output
@@ -119,7 +124,7 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
  */
 const buildCsvRow = (
   row: BatchResultRow,
-  data: BatchEvaluationData
+  data: BatchEvaluationData,
 ): string[] => {
   const values: string[] = [];
 
@@ -141,7 +146,9 @@ const buildCsvRow = (
     }
     if (target.promptId) {
       values.push(target.promptId);
-      values.push(target.promptVersion != null ? String(target.promptVersion) : "");
+      values.push(
+        target.promptVersion != null ? String(target.promptVersion) : "",
+      );
     }
     // Custom metadata values
     if (target.metadata) {
@@ -184,7 +191,7 @@ const buildCsvRow = (
 
     for (const evalId of evaluatorIds) {
       const evalResult = targetOutput?.evaluatorResults.find(
-        (e) => e.evaluatorId === evalId
+        (e) => e.evaluatorId === evalId,
       );
 
       if (!evalResult) {
@@ -219,7 +226,7 @@ const buildCsvRow = (
  * Build complete CSV data from BatchEvaluationData
  */
 export const buildCsvData = (
-  data: BatchEvaluationData
+  data: BatchEvaluationData,
 ): { headers: string[]; rows: string[][] } => {
   const headers = buildCsvHeaders(data);
   const rows = data.rows.map((row) => buildCsvRow(row, data));
@@ -242,7 +249,7 @@ export const generateCsvContent = (data: BatchEvaluationData): string => {
  */
 export const downloadCsv = (
   data: BatchEvaluationData,
-  experimentName: string
+  experimentName: string,
 ): void => {
   const csvContent = generateCsvContent(data);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });

@@ -509,7 +509,7 @@ model Experiment {
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
     batchEvaluations BatchEvaluation[]
-    wizardState      Json?
+    workbenchState   Json?
     monitor          Monitor?
 
     @@unique([projectId, slug])
@@ -941,18 +941,18 @@ model Evaluator {
 }
 
 model Scenario {
-    id          String    @id @default(nanoid())
-    projectId   String
-    project     Project   @relation(fields: [projectId], references: [id])
-    name        String
-    situation   String
-    criteria    String[]
-    labels      String[]
+    id              String    @id @default(nanoid())
+    projectId       String
+    project         Project   @relation(fields: [projectId], references: [id])
+    name            String
+    situation       String
+    criteria        String[]
+    labels          String[]
     lastUpdatedById String?
     lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
-    archivedAt  DateTime?
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @default(now()) @updatedAt
+    archivedAt      DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @default(now()) @updatedAt
 
     @@index([projectId])
 }

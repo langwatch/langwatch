@@ -2,19 +2,20 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, it, expect, afterEach } from "vitest";
-
-import { TargetSummary } from "../TargetSummary";
+import { afterEach, describe, expect, it } from "vitest";
 import type { TargetAggregate } from "../../../utils/computeAggregates";
+import { TargetSummary } from "../TargetSummary";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const createAggregate = (overrides: Partial<TargetAggregate> = {}): TargetAggregate => ({
+const createAggregate = (
+  overrides: Partial<TargetAggregate> = {},
+): TargetAggregate => ({
   targetId: "target-1",
   completedRows: 0,
   totalRows: 10,
@@ -38,9 +39,13 @@ describe("TargetSummary", () => {
 
   it("renders nothing when no results and not running", () => {
     const aggregates = createAggregate({ completedRows: 0 });
-    const { container } = render(<TargetSummary aggregates={aggregates} />, { wrapper: Wrapper });
+    const { container } = render(<TargetSummary aggregates={aggregates} />, {
+      wrapper: Wrapper,
+    });
     // The wrapper is there but the component itself returns null
-    expect(container.querySelector('[data-testid="target-summary"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="target-summary"]'),
+    ).toBeNull();
   });
 
   it("renders when there are completed rows", () => {
@@ -51,7 +56,9 @@ describe("TargetSummary", () => {
 
   it("renders progress when running", () => {
     const aggregates = createAggregate({ completedRows: 3, totalRows: 10 });
-    render(<TargetSummary aggregates={aggregates} isRunning />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} isRunning />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("3/10").length).toBeGreaterThanOrEqual(1);
   });
@@ -102,7 +109,9 @@ describe("TargetSummary", () => {
       totalRows: 10,
       averageLatency: 1500,
     });
-    render(<TargetSummary aggregates={aggregates} isRunning />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} isRunning />, {
+      wrapper: Wrapper,
+    });
     // When running, the progress indicator should be visible
     expect(screen.getAllByText("5/10").length).toBeGreaterThanOrEqual(1);
   });
@@ -193,7 +202,9 @@ describe("TargetSummary", () => {
 
     // Wait for tooltip to appear and check content
     await waitFor(() => {
-      expect(screen.getAllByText("Execution Time").length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText("Execution Time").length,
+      ).toBeGreaterThanOrEqual(1);
     });
     expect(screen.getAllByText("2.5s").length).toBeGreaterThanOrEqual(1);
   });
@@ -225,9 +236,13 @@ describe("TargetSummary", () => {
 
     // Wait for tooltip to appear and check content
     await waitFor(() => {
-      expect(screen.getAllByText("Avg Latency").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Avg Latency").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
-    expect(screen.getAllByText("Execution Time").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Execution Time").length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getAllByText("500ms").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("1.5s").length).toBeGreaterThanOrEqual(1);
   });
@@ -282,7 +297,9 @@ describe("TargetSummary", () => {
 
     // Wait for tooltip to appear and check content includes cost
     await waitFor(() => {
-      expect(screen.getAllByText("Total Cost").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Total Cost").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
   });
 });

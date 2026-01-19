@@ -110,7 +110,9 @@ const isRunFinished = (timestamps: BatchRunSummary["timestamps"]): boolean => {
 /**
  * Check if a run was interrupted (no explicit finish/stop but stale)
  */
-const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean => {
+const isRunInterrupted = (
+  timestamps: BatchRunSummary["timestamps"],
+): boolean => {
   // Has explicit finish or stop - not interrupted
   if (timestamps.finished_at ?? timestamps.stopped_at) {
     return false;
@@ -134,7 +136,7 @@ const formatEvalSummary = (
     averageScore?: number | null;
     averagePassed?: number | null;
   },
-  compact: boolean = false,
+  compact = false,
 ): string => {
   if (
     evaluation.averagePassed !== undefined &&
@@ -254,12 +256,7 @@ export function BatchRunsSidebar({
       {isLoading && (
         <VStack gap={0.5} align="stretch" paddingX={2}>
           {Array.from({ length: 6 }).map((_, index) => (
-            <HStack
-              key={index}
-              paddingX={2}
-              paddingY={2}
-              gap={2}
-            >
+            <HStack key={index} paddingX={2} paddingY={2} gap={2}>
               <VStack align="start" gap={1} flex={1} minWidth={0}>
                 {/* Line 1: Color square + name + version */}
                 <HStack gap={1} width="100%">
@@ -298,7 +295,7 @@ export function BatchRunsSidebar({
           runs.map((run) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
-            const runCost =
+            const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
 
@@ -326,8 +323,9 @@ export function BatchRunsSidebar({
             const runColor = run.timestamps.stopped_at
               ? "red.400"
               : interrupted
-              ? "orange.400"
-              : runColors[run.runId] ?? getColorForString("colors", run.runId).color;
+                ? "orange.400"
+                : (runColors[run.runId] ??
+                  getColorForString("colors", run.runId).color);
 
             return (
               <HStack
@@ -340,15 +338,15 @@ export function BatchRunsSidebar({
                   compareMode && isSelectedForComparison
                     ? "blue.50"
                     : isSelected
-                    ? "blue.50"
-                    : "transparent"
+                      ? "blue.50"
+                      : "transparent"
                 }
                 color={
                   compareMode && isSelectedForComparison
                     ? "blue.700"
                     : isSelected
-                    ? "blue.700"
-                    : "gray.700"
+                      ? "blue.700"
+                      : "gray.700"
                 }
                 borderRadius="md"
                 _hover={{
@@ -356,8 +354,8 @@ export function BatchRunsSidebar({
                     compareMode && isSelectedForComparison
                       ? "blue.100"
                       : isSelected
-                      ? "blue.100"
-                      : "gray.100",
+                        ? "blue.100"
+                        : "gray.100",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}

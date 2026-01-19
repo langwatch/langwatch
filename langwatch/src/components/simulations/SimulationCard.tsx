@@ -36,13 +36,7 @@ function SimulationCardHeader({
   }[status ?? ScenarioRunStatus.IN_PROGRESS];
 
   return (
-    <Box
-      py={3}
-      px={4}
-      w="100%"
-      position="relative"
-      zIndex={25}
-    >
+    <Box py={3} px={4} w="100%" position="relative" zIndex={25}>
       <HStack justify="space-between" align="center" w="100%" gap={4}>
         <Text
           fontSize="sm"
@@ -69,7 +63,13 @@ function SimulationCardHeader({
 
 function SimulationCardContent({ children }: { children: React.ReactNode }) {
   return (
-    <Card.Body p={0} height="100%" overflow="hidden" position="relative" w="100%">
+    <Card.Body
+      p={0}
+      height="100%"
+      overflow="hidden"
+      position="relative"
+      w="100%"
+    >
       <Box height="100%" width="100%" position="relative">
         {children}
       </Box>
@@ -97,8 +97,10 @@ export function SimulationCard({
         inset: 0,
         borderRadius: "xl",
         padding: "1px",
-        background: "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.3) 100%)",
-        WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+        background:
+          "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.3) 100%)",
+        WebkitMask:
+          "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
         WebkitMaskComposite: "xor",
         maskComposite: "exclude",
         pointerEvents: "none",
@@ -106,9 +108,7 @@ export function SimulationCard({
     >
       <VStack height="100%" gap={0}>
         <SimulationCardHeader title={title} status={status} />
-        <SimulationCardContent>
-          {children}
-        </SimulationCardContent>
+        <SimulationCardContent>{children}</SimulationCardContent>
       </VStack>
       {status && <SimulationStatusOverlay status={status} />}
     </Card.Root>

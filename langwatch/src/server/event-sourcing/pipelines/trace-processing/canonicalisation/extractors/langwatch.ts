@@ -25,15 +25,15 @@
  * - gen_ai.request.system_instruction (extracted from first system message)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import {
-  safeJsonParse,
-  isRecord,
-  extractSystemInstructionFromMessages,
-  normalizeToMessages,
-  ALLOWED_SPAN_TYPES,
-} from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
+import {
+  ALLOWED_SPAN_TYPES,
+  extractSystemInstructionFromMessages,
+  isRecord,
+  normalizeToMessages,
+  safeJsonParse,
+} from "./_helpers";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 /**
  * Type guard for LangWatch SDK structured input/output format.

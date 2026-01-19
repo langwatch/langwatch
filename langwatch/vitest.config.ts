@@ -1,7 +1,7 @@
-import { join } from "path";
-import { configDefaults, defineConfig } from "vitest/config";
 import { config } from "dotenv";
 import os from "os";
+import { join } from "path";
+import { configDefaults, defineConfig } from "vitest/config";
 
 config();
 

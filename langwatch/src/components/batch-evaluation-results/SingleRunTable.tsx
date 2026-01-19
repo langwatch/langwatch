@@ -4,7 +4,8 @@
  * Displays dataset columns followed by target columns with inline evaluator chips.
  * Target headers include summary statistics.
  */
-import { useMemo, useState, useCallback } from "react";
+
+import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -12,30 +13,29 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Box, HStack, Text } from "@chakra-ui/react";
-
+import { useCallback, useMemo, useState } from "react";
+import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
+import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
-import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
-import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import {
-  computeAllBatchAggregates,
   type BatchTargetAggregate,
+  computeAllBatchAggregates,
 } from "./computeBatchAggregates";
-import type {
-  BatchEvaluationData,
-  BatchResultRow,
-  BatchDatasetColumn,
-  BatchTargetColumn,
-} from "./types";
+import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 import { TableSkeleton } from "./TableSkeleton";
 import {
-  ROW_HEIGHT,
   calculateMinTableWidth,
   getTableStyles,
   inferColumnType,
+  ROW_HEIGHT,
 } from "./tableUtils";
+import type {
+  BatchDatasetColumn,
+  BatchEvaluationData,
+  BatchResultRow,
+  BatchTargetColumn,
+} from "./types";
 
 type SingleRunTableProps = {
   /** Transformed batch evaluation data */
@@ -62,7 +62,7 @@ const buildColumns = (
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
-  targetColors?: Record<string, string>
+  targetColors?: Record<string, string>,
 ) => {
   const columns = [];
 
@@ -73,11 +73,16 @@ const buildColumns = (
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="gray.500" textAlign="right" paddingRight={1}>
+        <Text
+          fontSize="12px"
+          color="gray.500"
+          textAlign="right"
+          paddingRight={1}
+        >
           {row.index + 1}
         </Text>
       ),
-    })
+    }),
   );
 
   // Dataset columns with type icons (skip hidden columns)
@@ -130,7 +135,7 @@ const buildColumns = (
           // Use expandable cell for text content
           return <ExpandableDatasetCell value={value} columnName={col.name} />;
         },
-      })
+      }),
     );
   }
 
@@ -162,7 +167,7 @@ const buildColumns = (
           }
           return <BatchTargetCell targetOutput={targetOutput} />;
         },
-      })
+      }),
     );
   }
 
@@ -194,7 +199,7 @@ export function SingleRunTable({
       aggregatesMap,
       data.rows,
       hiddenColumns,
-      showTargetColors ? targetColors : undefined
+      showTargetColors ? targetColors : undefined,
     );
   }, [data, aggregatesMap, hiddenColumns, showTargetColors, targetColors]);
 
@@ -209,7 +214,9 @@ export function SingleRunTable({
   });
 
   // State for scroll container - using state triggers re-render when mounted
-  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   // Callback ref to set the scroll container
   const scrollContainerRef = useCallback((node: HTMLDivElement | null) => {
@@ -221,16 +228,24 @@ export function SingleRunTable({
   // const rowCount = table.getRowModel().rows.length;
 
   // Stable callbacks for virtualizer
-  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
+  const getScrollElement = useCallback(
+    () => scrollContainer,
+    [scrollContainer],
+  );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
-  // TEMPORARILY DISABLED: Testing if virtualization causes scroll/flicker issues
+  // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement,
     estimateSize,
-    overscan: 5,
+    overscan: 10,
     enabled: !!scrollContainer,
+    // Enable dynamic measurement - measures actual row heights as they render
+    measureElement:
+      typeof window !== "undefined"
+        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        : undefined,
   });
 
   // Loading state
@@ -249,7 +264,7 @@ export function SingleRunTable({
 
   // Calculate minimum table width
   const datasetColCount = data.datasetColumns.filter(
-    (c) => !hiddenColumns.has(c.name)
+    (c) => !hiddenColumns.has(c.name),
   ).length;
   const targetColCount = data.targetColumns.length;
   const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
@@ -262,8 +277,7 @@ export function SingleRunTable({
   const columnCount = table.getAllColumns().length;
 
   // Calculate padding to maintain scroll position (only when virtualizing)
-  const paddingTop =
-    virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
     virtualRows.length > 0
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
@@ -288,7 +302,7 @@ export function SingleRunTable({
                     ? null
                     : flexRender(
                         header.column.columnDef.header,
-                        header.getContext()
+                        header.getContext(),
                       )}
                 </th>
               ))}
@@ -323,10 +337,20 @@ export function SingleRunTable({
                 const row = rows[virtualRow.index];
                 if (!row) return null;
                 return (
-                  <tr key={row.id} data-index={virtualRow.index}>
+                  <tr
+                    key={row.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                  >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <td
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </td>
                     ))}
                   </tr>

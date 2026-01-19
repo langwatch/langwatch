@@ -44,6 +44,7 @@ jobs:
           LANGWATCH_DEBUG: "true"
           LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
           LANGWATCH_PROMPT_ID: ${{ secrets.PYTHON_SDK_LANGWATCH_PROMPT_ID }}
+          TEST_EVALUATION_SLUG: "test-evaluation"
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}

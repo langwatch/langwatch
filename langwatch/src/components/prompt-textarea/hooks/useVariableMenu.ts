@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
-import type { AvailableSource, FieldType } from "../../variables/VariableMappingInput";
-import type { Variable } from "../../variables/VariablesSection";
 import type { SelectedField } from "../../variables/VariableInsertMenu";
+import type {
+  AvailableSource,
+  FieldType,
+} from "../../variables/VariableMappingInput";
+import type { Variable } from "../../variables/VariablesSection";
 import type { PromptTextAreaOnAddMention } from "../types";
 import { setTextareaValueUndoable } from "../utils";
 
@@ -110,16 +113,19 @@ export const useVariableMenu = ({
   }, [menuQuery]);
 
   // Handle selection change from RichTextarea
-  const handleSelectionChange = useCallback((pos: CaretPosition) => {
-    caretPositionRef.current = pos;
-    // Track user cursor position for "Add variable" button via native textarea
-    if (pos.focused) {
-      const nativeTextarea = containerRef.current?.querySelector("textarea");
-      if (nativeTextarea?.selectionStart !== undefined) {
-        lastUserCursorPosRef.current = nativeTextarea.selectionStart;
+  const handleSelectionChange = useCallback(
+    (pos: CaretPosition) => {
+      caretPositionRef.current = pos;
+      // Track user cursor position for "Add variable" button via native textarea
+      if (pos.focused) {
+        const nativeTextarea = containerRef.current?.querySelector("textarea");
+        if (nativeTextarea?.selectionStart !== undefined) {
+          lastUserCursorPosRef.current = nativeTextarea.selectionStart;
+        }
       }
-    }
-  }, [containerRef]);
+    },
+    [containerRef],
+  );
 
   // Calculate caret position for menu
   const getCaretCoordinates = useCallback(() => {
@@ -163,7 +169,12 @@ export const useVariableMenu = ({
 
   // Insert variable at current position (undo-able via Ctrl+Z)
   const insertVariable = useCallback(
-    (fieldName: string, fieldType: FieldType, sourceId: string, isOtherNodeField: boolean) => {
+    (
+      fieldName: string,
+      fieldType: FieldType,
+      sourceId: string,
+      isOtherNodeField: boolean,
+    ) => {
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
@@ -260,7 +271,12 @@ export const useVariableMenu = ({
         otherNodesFields,
         option.source.id,
       );
-      insertVariable(option.field.name, option.field.type, option.source.id, isOtherNodeField);
+      insertVariable(
+        option.field.name,
+        option.field.type,
+        option.source.id,
+        isOtherNodeField,
+      );
     } else if (option.type === "create" && onCreateVariable) {
       const normalizedName = option.name.replace(/ /g, "_").toLowerCase();
       if (triggerStart === null) return;
@@ -312,7 +328,12 @@ export const useVariableMenu = ({
         otherNodesFields,
         field.sourceId,
       );
-      insertVariable(field.fieldName, field.fieldType, field.sourceId, isOtherNodeField);
+      insertVariable(
+        field.fieldName,
+        field.fieldType,
+        field.sourceId,
+        isOtherNodeField,
+      );
     },
     [insertVariable, otherNodesFields],
   );
@@ -414,4 +435,3 @@ export const useVariableMenu = ({
     handleAddVariableClick,
   };
 };
-

@@ -54,7 +54,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("messages");
-        const parsed = JSON.parse(result["messages"] as string);
+        const parsed = JSON.parse(result.messages as string);
         expect(parsed).toEqual([{ content: "Hello", role: "user" }]);
       });
 
@@ -81,7 +81,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("data");
-        const parsed = JSON.parse(result["data"] as string);
+        const parsed = JSON.parse(result.data as string);
         expect(parsed).toEqual([
           { a: { b: { c: "value1", d: "value2" } } },
           { a: { b: { c: "value3", d: "value4" } } },
@@ -234,7 +234,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("metrics");
-        const parsed = JSON.parse(result["metrics"] as string);
+        const parsed = JSON.parse(result.metrics as string);
         expect(parsed).toEqual([
           { name: "latency", value: 123.45 },
           { name: "count", value: 42 },
@@ -267,7 +267,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("flags");
-        const parsed = JSON.parse(result["flags"] as string);
+        const parsed = JSON.parse(result.flags as string);
         expect(parsed).toEqual([
           { name: "enabled", active: true },
           { name: "also_enabled", active: true },
@@ -315,8 +315,8 @@ describe("traceRequest.utils", () => {
         expect(result).toHaveProperty("input");
         expect(result).toHaveProperty("output");
 
-        const parsedInput = JSON.parse(result["input"] as string);
-        const parsedOutput = JSON.parse(result["output"] as string);
+        const parsedInput = JSON.parse(result.input as string);
+        const parsedOutput = JSON.parse(result.output as string);
 
         expect(parsedInput).toEqual([{ text: "hello" }, { text: "world" }]);
         expect(parsedOutput).toEqual([{ text: "foo" }, { text: "bar" }]);
@@ -337,7 +337,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("tags");
-        const parsed = JSON.parse(result["tags"] as string);
+        const parsed = JSON.parse(result.tags as string);
         expect(parsed).toEqual([{ value: "tag1" }, { value: "tag2" }]);
       });
     });

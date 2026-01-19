@@ -23,12 +23,7 @@ export function PromptPlaygroundMainContent() {
   if (hasNoTabs) return <MainContentEmptyState />;
 
   return (
-    <HStack
-      width="full"
-      height="full"
-      gap={0}
-      overflowX="scroll"
-    >
+    <HStack width="full" height="full" gap={0} overflowX="scroll">
       <PromptPlaygroundBrowser />
     </HStack>
   );

@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import { OutputsSection, type Output, type OutputType } from "./OutputsSection";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
+import { type Output, OutputsSection, type OutputType } from "./OutputsSection";
 
 // Type for the json_schema as expected by the form schema
 type JsonSchemaType = { type: string } & Record<string, unknown>;
@@ -83,7 +83,9 @@ export const FormOutputsSection = ({
         // Removed an output - find which one
         for (let i = 0; i < currentFields.length; i++) {
           const currentField = currentFields[i];
-          if (!newOutputs.some((o) => o.identifier === currentField?.identifier)) {
+          if (
+            !newOutputs.some((o) => o.identifier === currentField?.identifier)
+          ) {
             remove(i);
             break;
           }
@@ -98,7 +100,8 @@ export const FormOutputsSection = ({
             currentField &&
             (newOutput.identifier !== currentField.identifier ||
               newOutput.type !== currentField.type ||
-              JSON.stringify(newOutput.json_schema) !== JSON.stringify(currentField.json_schema))
+              JSON.stringify(newOutput.json_schema) !==
+                JSON.stringify(currentField.json_schema))
           ) {
             update(i, {
               identifier: newOutput.identifier,
@@ -109,7 +112,7 @@ export const FormOutputsSection = ({
         }
       }
     },
-    [getValues, append, remove, update]
+    [getValues, append, remove, update],
   );
 
   return (

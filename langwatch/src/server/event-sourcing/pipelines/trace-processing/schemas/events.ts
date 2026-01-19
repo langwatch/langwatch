@@ -1,8 +1,10 @@
 import { z } from "zod";
+
 1;
+
 import { EventSchema } from "../../../library/domain/types";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./constants";
+import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 /**
  * Zod schema for EventMetadataBase.

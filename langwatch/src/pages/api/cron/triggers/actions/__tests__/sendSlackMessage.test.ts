@@ -1,4 +1,4 @@
-import { TriggerAction, type AlertType } from "@prisma/client";
+import { type AlertType, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "../../types";
 import { handleSendSlackMessage } from "../sendSlackMessage";
@@ -113,4 +113,3 @@ describe("handleSendSlackMessage", () => {
     });
   });
 });
-

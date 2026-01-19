@@ -15,20 +15,20 @@ import {
 } from "@chakra-ui/react";
 
 import {
-  Play,
+  AlertCircle,
+  Check,
   ChevronDown,
   ChevronRight,
-  Copy,
-  Check,
   Clock,
-  AlertCircle,
+  Copy,
+  Play,
 } from "lucide-react";
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  TestMessagesBuilder,
   messagesToJson,
   type TestMessage,
+  TestMessagesBuilder,
 } from "./TestMessagesBuilder";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
@@ -65,7 +65,7 @@ export type HttpTestPanelProps = {
  */
 export function renderTemplate(
   template: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
 ): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {

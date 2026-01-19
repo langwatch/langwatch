@@ -11,9 +11,10 @@
  * - /v3/ (index) creates experiment on server, then redirects to /v3/[slug]
  * - /v3/[slug] ONLY loads existing experiments, shows 404 if not found
  */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
@@ -23,7 +24,7 @@ let mockQueryState = {
     id: string;
     slug: string;
     name: string;
-    wizardState: null;
+    workbenchState: null;
   } | null,
   isLoading: false,
   error: null as { data?: { code: string; httpStatus: number } } | null,
@@ -83,10 +84,21 @@ vi.mock("../../utils/posthogErrorCapture", () => ({
 }));
 
 // Import hook after mocks
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <QueryClientProvider client={queryClient}>
+    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  </QueryClientProvider>
 );
 
 // Test component that displays the hook's state for /v3/[slug] page
@@ -101,9 +113,7 @@ const TestSlugPage = () => {
       {isError && <div data-testid="error">Error: {error?.message}</div>}
       {!isLoading && !isNotFound && !isError && (
         <div data-testid="content">
-          <div data-testid="experiment-id">
-            {store.experimentId ?? "no-id"}
-          </div>
+          <div data-testid="experiment-id">{store.experimentId ?? "no-id"}</div>
           <div data-testid="experiment-slug">
             {store.experimentSlug ?? "no-slug"}
           </div>
@@ -119,6 +129,7 @@ describe("Loading existing evaluation (/v3/[slug])", () => {
 
     // Reset store
     useEvaluationsV3Store.getState().reset();
+    queryClient.clear();
 
     // Reset mutation mock
     mockMutateAsync.mockResolvedValue({
@@ -140,7 +151,7 @@ describe("Loading existing evaluation (/v3/[slug])", () => {
         id: "existing-id",
         slug: "existing-slug",
         name: "Existing Evaluation",
-        wizardState: null,
+        workbenchState: null,
       },
       isLoading: false,
       error: null,

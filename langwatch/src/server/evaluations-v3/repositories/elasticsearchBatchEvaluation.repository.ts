@@ -9,14 +9,14 @@ import {
 } from "~/server/elasticsearch";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import { eSBatchEvaluationSchema } from "~/server/experiments/types.generated";
-import { safeTruncate } from "~/utils/truncate";
 import { createLogger } from "~/utils/logger";
+import { safeTruncate } from "~/utils/truncate";
 import type {
+  BatchEvaluation,
   BatchEvaluationRepository,
   CreateBatchEvaluationParams,
-  UpsertResultsParams,
   MarkCompleteParams,
-  BatchEvaluation,
+  UpsertResultsParams,
 } from "./batchEvaluation.repository";
 
 const logger = createLogger("evaluations-v3:es-batch-evaluation-repository");
@@ -26,7 +26,9 @@ const logger = createLogger("evaluations-v3:es-batch-evaluation-repository");
  */
 export const createElasticsearchBatchEvaluationRepository =
   (): BatchEvaluationRepository => {
-    const create = async (params: CreateBatchEvaluationParams): Promise<void> => {
+    const create = async (
+      params: CreateBatchEvaluationParams,
+    ): Promise<void> => {
       const {
         projectId,
         experimentId,
@@ -66,10 +68,15 @@ export const createElasticsearchBatchEvaluationRepository =
         body: validated,
       });
 
-      logger.debug({ runId, total, targetCount: targets?.length }, "Created batch evaluation");
+      logger.debug(
+        { runId, total, targetCount: targets?.length },
+        "Created batch evaluation",
+      );
     };
 
-    const upsertResults = async (params: UpsertResultsParams): Promise<void> => {
+    const upsertResults = async (
+      params: UpsertResultsParams,
+    ): Promise<void> => {
       const { projectId, experimentId, runId, dataset, evaluations, progress } =
         params;
 
@@ -164,7 +171,7 @@ export const createElasticsearchBatchEvaluationRepository =
           evaluationsCount: truncatedEvaluations.length,
           progress,
         },
-        "Upserted batch evaluation results"
+        "Upserted batch evaluation results",
       );
     };
 
@@ -201,7 +208,7 @@ export const createElasticsearchBatchEvaluationRepository =
 
       logger.debug(
         { runId, finishedAt, stoppedAt },
-        "Marked batch evaluation complete"
+        "Marked batch evaluation complete",
       );
     };
 

@@ -17,6 +17,7 @@ import type { ChatMessage } from "~/server/tracer/types";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { DeletableMessage } from "./DeletableMessage";
+import { StructuredOutputDisplay } from "./StructuredOutputDisplay";
 import { SyncedChatInput } from "./SyncedChatInput";
 
 interface PromptPlaygroundChatProps extends BoxProps {
@@ -147,15 +148,23 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
       <CopilotChat
         Input={SyncedChatInput}
         AssistantMessage={(props) => {
+          const isStreaming = props.isLoading || props.isGenerating;
+          const content = props.rawData?.content?.toString();
+
           return (
             <>
               <DeletableMessage
                 messageId={props.rawData.id}
                 onDelete={deleteMessage}
               >
-                <AssistantMessage {...props} />
+                <StructuredOutputDisplay
+                  content={content}
+                  isStreaming={isStreaming}
+                >
+                  <AssistantMessage {...props} />
+                </StructuredOutputDisplay>
               </DeletableMessage>
-              {!props.isLoading && !props.isGenerating && (
+              {!isStreaming && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
             </>

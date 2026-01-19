@@ -13,7 +13,7 @@ import type {
   Projection,
   ProjectionHandlerClass,
 } from "../../library";
-import type { PipelineMetadata } from "./types";
+import type { ExtractProjectionHandlerProjection } from "../../library/domain/handlers/projectionHandlerClass";
 import type {
   EventHandlerDefinition,
   EventHandlerOptions,
@@ -24,13 +24,16 @@ import type {
   ProjectionOptions,
   ProjectionTypeMap,
 } from "../../library/projection.types";
-import type { ExtractProjectionHandlerProjection } from "../../library/domain/handlers/projectionHandlerClass";
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
 import { EventSourcingPipeline } from "../pipeline";
 import type { QueueProcessorFactory } from "../queue";
-import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./types";
+import type {
+  PipelineMetadata,
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
+} from "./types";
 
 export interface PipelineBuilderOptions<EventType extends Event = Event> {
   eventStore: EventStore<EventType>;

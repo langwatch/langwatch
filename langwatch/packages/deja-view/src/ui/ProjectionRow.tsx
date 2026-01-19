@@ -1,5 +1,5 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { ProjectionTimelineTypes } from "../runner/projectionTimeline.types";
 import { JsonViewer } from "./JsonViewer";
 
@@ -39,8 +39,9 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
   const { projection } = timeline;
   // Find snapshot matching the current event's aggregate, or fall back to first
   const snapshot = currentAggregateId
-    ? currentStep?.projectionStateByAggregate.find(s => s.aggregateId === currentAggregateId)
-      ?? currentStep?.projectionStateByAggregate[0]
+    ? (currentStep?.projectionStateByAggregate.find(
+        (s) => s.aggregateId === currentAggregateId,
+      ) ?? currentStep?.projectionStateByAggregate[0])
     : currentStep?.projectionStateByAggregate[0];
   const hasData = snapshot?.data !== void 0;
 
@@ -60,7 +61,8 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
     (stale ? 1 : 0);
 
   // Calculate how many lines the content box can have (including JsonViewer + its indicators)
-  const contentBoxMaxLines = maxLines !== undefined ? maxLines - titleLines : undefined;
+  const contentBoxMaxLines =
+    maxLines !== undefined ? maxLines - titleLines : undefined;
 
   // Calculate how many lines JsonViewer can display (it will add indicators if needed)
   const jsonMaxLines =
@@ -69,23 +71,37 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
       : undefined;
 
   return (
-    <Box flexDirection="column" flexShrink={0} flexGrow={isExpanded && hasData ? 1 : 0}>
+    <Box
+      flexDirection="column"
+      flexShrink={0}
+      flexGrow={isExpanded && hasData ? 1 : 0}
+    >
       <Box flexShrink={0}>
         {/* Focus indicator - always visible even when dimmed */}
         <Text color="cyan" bold={isFocused}>
           {isFocused ? " " : " "}
         </Text>
-        <Text color={isDimmed ? "gray" : isFocused ? "cyan" : undefined} bold={!isDimmed && isFocused} dimColor={isDimmed} wrap="truncate">
-          {expandIndicator} {projection.pipelineName}/{projection.projectionName}
+        <Text
+          color={isDimmed ? "gray" : isFocused ? "cyan" : undefined}
+          bold={!isDimmed && isFocused}
+          dimColor={isDimmed}
+          wrap="truncate"
+        >
+          {expandIndicator} {projection.pipelineName}/
+          {projection.projectionName}
         </Text>
-        <Text color="gray">
-          {hasData && `v${snapshot.version}`}
-        </Text>
+        <Text color="gray">{hasData && `v${snapshot.version}`}</Text>
         {hasData && stale && (
-          <Text color="gray" dimColor> (unchanged)</Text>
+          <Text color="gray" dimColor>
+            {" "}
+            (unchanged)
+          </Text>
         )}
         {!isCompatible && expectedAggregateType && (
-          <Text color="yellow" dimColor wrap="truncate"> (expects {expectedAggregateType})</Text>
+          <Text color="yellow" dimColor wrap="truncate">
+            {" "}
+            (expects {expectedAggregateType})
+          </Text>
         )}
         {isFocused && isExpanded && scrollOffset > 0 && (
           <Text dimColor> (scroll: {scrollOffset})</Text>
@@ -102,7 +118,15 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
         <Box
           marginLeft={2}
           borderStyle="round"
-          borderColor={!isCompatible ? "yellow" : stale ? "gray" : isFocused ? "cyan" : "gray"}
+          borderColor={
+            !isCompatible
+              ? "yellow"
+              : stale
+                ? "gray"
+                : isFocused
+                  ? "cyan"
+                  : "gray"
+          }
           paddingX={1}
           flexDirection="column"
           flexGrow={1}
@@ -113,14 +137,11 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
         >
           {!isCompatible && (
             <Text color="yellow">
-              ⚠ This projection expects "{expectedAggregateType}" aggregate events
+              ⚠ This projection expects "{expectedAggregateType}" aggregate
+              events
             </Text>
           )}
-          {stale && (
-            <Text dimColor>
-              ↳ State unchanged by this event
-            </Text>
-          )}
+          {stale && <Text dimColor>↳ State unchanged by this event</Text>}
           <Text dimColor>
             Aggregate: {snapshot.aggregateId} | Tenant: {snapshot.tenantId}
           </Text>

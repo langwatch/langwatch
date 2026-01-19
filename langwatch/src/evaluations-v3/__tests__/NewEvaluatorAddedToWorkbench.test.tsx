@@ -15,7 +15,7 @@
  *   And the evaluator chip appears inside the agent cell
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, act } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,7 +50,9 @@ const flowCallbacksStore: Record<string, Record<string, unknown>> = {};
 // Mock next/router
 vi.mock("next/router", () => ({
   useRouter: () => ({
-    query: currentDrawer ? { "drawer.open": currentDrawer, ...drawerProps } : {},
+    query: currentDrawer
+      ? { "drawer.open": currentDrawer, ...drawerProps }
+      : {},
     push: vi.fn((url: string) => {
       // Parse drawer from URL
       if (url.includes("drawer.open")) {
@@ -87,12 +89,16 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
   useDrawerParams: () => drawerProps,
   getComplexProps: () => drawerProps,
-  setFlowCallbacks: vi.fn((drawer: string, callbacks: Record<string, unknown>) => {
-    flowCallbacksStore[drawer] = callbacks;
-  }),
+  setFlowCallbacks: vi.fn(
+    (drawer: string, callbacks: Record<string, unknown>) => {
+      flowCallbacksStore[drawer] = callbacks;
+    },
+  ),
   getFlowCallbacks: vi.fn((drawer: string) => flowCallbacksStore[drawer]),
   clearFlowCallbacks: vi.fn(() => {
-    Object.keys(flowCallbacksStore).forEach((key) => delete flowCallbacksStore[key]);
+    Object.keys(flowCallbacksStore).forEach(
+      (key) => delete flowCallbacksStore[key],
+    );
   }),
 }));
 
@@ -123,7 +129,6 @@ vi.mock("~/utils/api", () => ({
             projectId: "test-project",
             config: {
               evaluatorType: "langevals/exact_match",
-              settings: {},
             },
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -220,7 +225,9 @@ describe("New Evaluator Added to Workbench", () => {
   beforeEach(() => {
     currentDrawer = null;
     drawerProps = {};
-    Object.keys(flowCallbacksStore).forEach((key) => delete flowCallbacksStore[key]);
+    Object.keys(flowCallbacksStore).forEach(
+      (key) => delete flowCallbacksStore[key],
+    );
     vi.clearAllMocks();
 
     // Reset store state
@@ -251,7 +258,11 @@ describe("New Evaluator Added to Workbench", () => {
           inline: {
             columns: [
               { id: "input", name: "input", type: "string" },
-              { id: "expected_output", name: "expected_output", type: "string" },
+              {
+                id: "expected_output",
+                name: "expected_output",
+                type: "string",
+              },
             ],
             records: {
               input: ["test value"],
@@ -275,7 +286,9 @@ describe("New Evaluator Added to Workbench", () => {
 
     // Wait for the table to render with the target
     await waitFor(() => {
-      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
     });
 
     // Click the Add evaluator button
@@ -283,12 +296,14 @@ describe("New Evaluator Added to Workbench", () => {
     await user.click(buttons[0]!);
 
     // Verify that setFlowCallbacks was called for evaluatorList with onSelect
-    const { setFlowCallbacks: mockSetFlowCallbacks } = await import("~/hooks/useDrawer");
+    const { setFlowCallbacks: mockSetFlowCallbacks } = await import(
+      "~/hooks/useDrawer"
+    );
     expect(mockSetFlowCallbacks).toHaveBeenCalledWith(
       "evaluatorList",
       expect.objectContaining({
         onSelect: expect.any(Function),
-      })
+      }),
     );
 
     // The key assertion: setFlowCallbacks should ALSO be called for evaluatorEditor with onSave
@@ -297,7 +312,7 @@ describe("New Evaluator Added to Workbench", () => {
       "evaluatorEditor",
       expect.objectContaining({
         onSave: expect.any(Function),
-      })
+      }),
     );
   });
 
@@ -307,7 +322,9 @@ describe("New Evaluator Added to Workbench", () => {
 
     // Wait for the table to render
     await waitFor(() => {
-      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
     });
 
     // Click the Add evaluator button to set up flow callbacks
@@ -315,9 +332,11 @@ describe("New Evaluator Added to Workbench", () => {
     await user.click(buttons[0]!);
 
     // Get the onSave callback that was registered for evaluatorEditor
-    const evaluatorEditorCallbacks = flowCallbacksStore["evaluatorEditor"] as {
-      onSave?: (evaluator: { id: string; name: string }) => Promise<void>;
-    } | undefined;
+    const evaluatorEditorCallbacks = flowCallbacksStore.evaluatorEditor as
+      | {
+          onSave?: (evaluator: { id: string; name: string }) => Promise<void>;
+        }
+      | undefined;
 
     // Simulate what happens when a new evaluator is created and saved
     // The EvaluatorEditorDrawer calls onSave with the new evaluator's id and name
@@ -344,7 +363,6 @@ describe("New Evaluator Added to Workbench", () => {
           id: "evaluator_123",
           evaluatorType: "langevals/exact_match",
           name: "My Custom Evaluator",
-          settings: {},
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },

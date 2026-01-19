@@ -18,10 +18,7 @@ import { LuBookOpen, LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RecentItem, RecentItemType } from "~/server/home/types";
 import { api } from "~/utils/api";
-import {
-  featureIcons,
-  recentItemTypeToFeature,
-} from "~/utils/featureIcons";
+import { featureIcons, recentItemTypeToFeature } from "~/utils/featureIcons";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { HomeCard } from "./HomeCard";
 
@@ -34,7 +31,14 @@ const getIconForType = (type: RecentItemType): ReactNode => {
   if (config) {
     return <Icon as={config.icon} width="14px" height="14px" display="block" />;
   }
-  return <Icon as={featureIcons.home.icon} width="14px" height="14px" display="block" />;
+  return (
+    <Icon
+      as={featureIcons.home.icon}
+      width="14px"
+      height="14px"
+      display="block"
+    />
+  );
 };
 
 /**
@@ -160,7 +164,7 @@ function RecentItemsSkeleton() {
 /**
  * Empty state when no recent items
  */
-function RecentItemsEmptyState() {
+function _RecentItemsEmptyState() {
   return (
     <EmptyState.Root size="sm">
       <EmptyState.Content>

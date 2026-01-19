@@ -1,15 +1,15 @@
 import {
+  type Prisma,
   type Project,
   type Trigger,
   TriggerAction,
-  Prisma,
 } from "@prisma/client";
-import { timeseries } from "~/server/analytics/timeseries";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { timeseries } from "~/server/analytics/timeseries";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -44,7 +44,6 @@ export const processCustomGraphTrigger = async (
     projectId,
     action,
     actionParams,
-    name,
     customGraphId,
   } = trigger;
 

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { validateProviderApiKey } from "../providerValidation";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import { validateProviderApiKey } from "../providerValidation";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -92,7 +92,7 @@ describe("validateProviderApiKey", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer sk-valid-key",
           }),
-        })
+        }),
       );
     });
 
@@ -162,7 +162,7 @@ describe("validateProviderApiKey", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://custom.openai.com/v1/models",
-        expect.anything()
+        expect.anything(),
       );
     });
   });
@@ -187,7 +187,7 @@ describe("validateProviderApiKey", () => {
             "x-api-key": "sk-ant-valid-key",
             "anthropic-version": "2023-06-01",
           }),
-        })
+        }),
       );
     });
 
@@ -218,7 +218,7 @@ describe("validateProviderApiKey", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://custom-anthropic.example.com/models",
-        expect.anything()
+        expect.anything(),
       );
     });
   });
@@ -237,7 +237,7 @@ describe("validateProviderApiKey", () => {
       expect(result).toEqual({ valid: true });
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("key=gemini-valid-key"),
-        expect.anything()
+        expect.anything(),
       );
     });
 
@@ -273,7 +273,7 @@ describe("validateProviderApiKey", () => {
         status: 200,
       });
 
-      const result = await validateProviderApiKey("custom", {
+      const _result = await validateProviderApiKey("custom", {
         CUSTOM_API_KEY: "",
         CUSTOM_BASE_URL: "https://custom-llm.example.com/v1",
       });

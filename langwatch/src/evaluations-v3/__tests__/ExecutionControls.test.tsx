@@ -10,7 +10,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
 vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
@@ -30,10 +38,10 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { RunEvaluationButton } from "../components/RunEvaluationButton";
 import { SelectionToolbar } from "../components/SelectionToolbar";
-import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -143,7 +151,12 @@ const setupStoreWithConfiguredEvaluation = () => {
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "test-dataset": {
-            input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "test-dataset",
+              sourceField: "input",
+            },
           },
         },
       },
@@ -153,7 +166,6 @@ const setupStoreWithConfiguredEvaluation = () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -161,8 +173,18 @@ const setupStoreWithConfiguredEvaluation = () => {
         mappings: {
           "test-dataset": {
             "target-1": {
-              output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-              expected_output: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "expected_output" },
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "test-dataset",
+                sourceField: "expected_output",
+              },
             },
           },
         },
@@ -186,6 +208,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };
@@ -270,7 +293,7 @@ describe("Execution Controls", () => {
           onDelete={vi.fn()}
           onClear={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(container.firstChild).toBeNull();
@@ -284,7 +307,7 @@ describe("Execution Controls", () => {
           onDelete={vi.fn()}
           onClear={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("2 selected")).toBeInTheDocument();
@@ -303,7 +326,7 @@ describe("Execution Controls", () => {
           onDelete={vi.fn()}
           onClear={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("selection-run-btn"));
@@ -321,7 +344,7 @@ describe("Execution Controls", () => {
           onClear={vi.fn()}
           isRunning={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Stop")).toBeInTheDocument();
@@ -340,7 +363,7 @@ describe("Execution Controls", () => {
           onClear={vi.fn()}
           isRunning={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("selection-run-btn"));
@@ -357,7 +380,7 @@ describe("Execution Controls", () => {
           onClear={vi.fn()}
           isRunning={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("selection-delete-btn")).toBeDisabled();

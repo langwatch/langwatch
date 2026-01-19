@@ -15,11 +15,3 @@ export interface DiscoveredEventHandler {
   eventTypes?: readonly string[];
   filePath?: string;
 }
-
-
-
-
-
-
-
-

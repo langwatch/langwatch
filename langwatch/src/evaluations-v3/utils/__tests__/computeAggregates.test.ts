@@ -1,16 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { EvaluationResults } from "../../types";
 import {
-  computeTargetAggregates,
   computeMetricStats,
-  formatPassRate,
-  formatScore,
+  computeTargetAggregates,
   formatCost,
   formatLatency,
+  formatPassRate,
+  formatScore,
 } from "../computeAggregates";
-import type { EvaluationResults } from "../../types";
 
 describe("computeTargetAggregates", () => {
-  const createResults = (overrides: Partial<EvaluationResults> = {}): EvaluationResults => ({
+  const createResults = (
+    overrides: Partial<EvaluationResults> = {},
+  ): EvaluationResults => ({
     status: "success",
     targetOutputs: {},
     targetMetadata: {},
@@ -23,7 +25,12 @@ describe("computeTargetAggregates", () => {
     const results = createResults();
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.completedRows).toBe(0);
     expect(aggregates.totalRows).toBe(3);
@@ -47,7 +54,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.totalRows).toBe(3);
@@ -68,7 +80,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 2);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
 
     // Only 1 row is complete (row 0 has both target and evaluator done)
     expect(aggregates.completedRows).toBe(1);
@@ -84,7 +101,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.totalRows).toBe(3);
@@ -96,12 +118,21 @@ describe("computeTargetAggregates", () => {
         "target-1": ["output 1", undefined, undefined],
       },
       errors: {
-        "target-1": [undefined, "error message", undefined] as unknown as string[],
+        "target-1": [
+          undefined,
+          "error message",
+          undefined,
+        ] as unknown as string[],
       },
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.errorRows).toBe(1);
@@ -124,7 +155,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.evaluators[0]?.total).toBe(3);
     expect(aggregates.evaluators[0]?.passed).toBe(2);
@@ -147,7 +183,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Score Evaluator" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.667, 2);
   });
@@ -166,10 +207,116 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.evaluators[0]?.errors).toBe(1);
     expect(aggregates.evaluators[0]?.total).toBe(3);
+  });
+
+  it("returns null passRate for score-only evaluators (no pass/fail)", () => {
+    // This is the case for LLM-as-judge Score evaluators that only return a score
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-1": [
+            { score: 0.8 }, // No passed field - should be "processed"
+            { score: 0.6 },
+            { score: 0.9 },
+          ],
+        },
+      },
+    });
+    const evaluators = [{ id: "eval-1", name: "LLM Score" }];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
+
+    // Score-only results should have null passRate
+    expect(aggregates.evaluators[0]?.passRate).toBeNull();
+    expect(aggregates.evaluators[0]?.passed).toBe(0);
+    expect(aggregates.evaluators[0]?.failed).toBe(0);
+    expect(aggregates.evaluators[0]?.total).toBe(3);
+    // But averageScore should still work
+    expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.767, 2);
+    // Overall passRate should also be null when no evaluators have pass/fail
+    expect(aggregates.overallPassRate).toBeNull();
+  });
+
+  it("excludes score-only results from pass rate but includes pass/fail results", () => {
+    // Mix of pass/fail evaluator and score-only evaluator
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-pass-fail": [
+            { status: "processed", passed: true },
+            { status: "processed", passed: false },
+          ],
+          "eval-score-only": [
+            { score: 0.8 }, // No passed field
+            { score: 0.6 },
+          ],
+        },
+      },
+    });
+    const evaluators = [
+      { id: "eval-pass-fail", name: "Exact Match" },
+      { id: "eval-score-only", name: "LLM Score" },
+    ];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
+
+    // Pass/fail evaluator should have pass rate
+    expect(aggregates.evaluators[0]?.passRate).toBe(50); // 1 passed / 2 total
+    expect(aggregates.evaluators[0]?.passed).toBe(1);
+    expect(aggregates.evaluators[0]?.failed).toBe(1);
+
+    // Score-only evaluator should have null pass rate
+    expect(aggregates.evaluators[1]?.passRate).toBeNull();
+    expect(aggregates.evaluators[1]?.passed).toBe(0);
+    expect(aggregates.evaluators[1]?.failed).toBe(0);
+    expect(aggregates.evaluators[1]?.averageScore).toBeCloseTo(0.7, 2);
+
+    // Overall pass rate should only count the pass/fail evaluator
+    expect(aggregates.overallPassRate).toBe(50); // 1 passed / 2 (passed+failed)
+  });
+
+  it("handles status: 'processed' with passed: null as score-only", () => {
+    const results = createResults({
+      evaluatorResults: {
+        "target-1": {
+          "eval-1": [
+            { status: "processed", passed: null, score: 1 },
+            { status: "processed", passed: null, score: 0.5 },
+          ],
+        },
+      },
+    });
+    const evaluators = [{ id: "eval-1", name: "Score Evaluator" }];
+
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
+
+    // passed: null should be treated as score-only, not pass/fail
+    expect(aggregates.evaluators[0]?.passRate).toBeNull();
+    expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.75, 2);
   });
 
   it("handles multiple evaluators", () => {
@@ -192,7 +339,12 @@ describe("computeTargetAggregates", () => {
       { id: "eval-2", name: "Evaluator 2" },
     ];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 2);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
 
     expect(aggregates.evaluators).toHaveLength(2);
     expect(aggregates.evaluators[0]?.passRate).toBe(100);
@@ -216,7 +368,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     expect(aggregates.averageCost).toBeCloseTo(0.002, 6);
     expect(aggregates.totalCost).toBeCloseTo(0.006, 6);
@@ -243,7 +400,12 @@ describe("computeTargetAggregates", () => {
       { id: "eval-2", name: "Evaluator 2" },
     ];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 2);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
 
     // eval-1 avg = 1.0, eval-2 avg = 0.0, overall avg = 0.5
     expect(aggregates.overallAverageScore).toBeCloseTo(0.5, 2);
@@ -264,7 +426,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     // Only 2 rows have cost
     expect(aggregates.averageCost).toBeCloseTo(0.002, 6);
@@ -288,7 +455,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 3);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      3,
+    );
 
     // Total duration should be sum: 500 + 300 + 700 = 1500
     expect(aggregates.totalDuration).toBe(1500);
@@ -310,7 +482,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates("target-1", results, evaluators, 2);
+    const aggregates = computeTargetAggregates(
+      "target-1",
+      results,
+      evaluators,
+      2,
+    );
 
     expect(aggregates.totalDuration).toBeNull();
     expect(aggregates.averageLatency).toBeNull();
@@ -432,7 +609,9 @@ describe("computeMetricStats", () => {
 });
 
 describe("computeTargetAggregates latencyStats and costStats", () => {
-  const createResults = (overrides: Partial<EvaluationResults> = {}): EvaluationResults => ({
+  const createResults = (
+    overrides: Partial<EvaluationResults> = {},
+  ): EvaluationResults => ({
     status: "success",
     targetOutputs: {},
     targetMetadata: {},

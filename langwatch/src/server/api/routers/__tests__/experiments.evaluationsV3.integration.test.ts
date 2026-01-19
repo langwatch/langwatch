@@ -150,7 +150,7 @@ describe("Evaluations V3 Endpoints", () => {
       expect(result.id).toMatch(/^eval_/);
     });
 
-    it("saves the wizardState correctly", async () => {
+    it("saves the workbenchState correctly", async () => {
       const state = createValidState({
         name: "State Test",
         datasets: [
@@ -182,15 +182,17 @@ describe("Evaluations V3 Endpoints", () => {
       });
       createdExperimentIds.push(result.id);
 
-      // Fetch the experiment to verify wizardState was saved
+      // Fetch the experiment to verify workbenchState was saved
       const saved = await prisma.experiment.findUnique({
         where: { id: result.id, projectId },
       });
 
-      expect(saved?.wizardState).toBeDefined();
-      const wizardState = saved?.wizardState as Record<string, unknown>;
-      expect(wizardState.name).toBe("State Test");
-      expect((wizardState.datasets as Array<{ id: string }>)[0]?.id).toBe("custom-data");
+      expect(saved?.workbenchState).toBeDefined();
+      const workbenchState = saved?.workbenchState as Record<string, unknown>;
+      expect(workbenchState.name).toBe("State Test");
+      expect((workbenchState.datasets as Array<{ id: string }>)[0]?.id).toBe(
+        "custom-data",
+      );
     });
   });
 
@@ -213,7 +215,7 @@ describe("Evaluations V3 Endpoints", () => {
       expect(found.id).toBe(created.id);
       expect(found.slug).toBe(created.slug);
       expect(found.name).toBe("Findable Experiment");
-      expect(found.wizardState).toBeDefined();
+      expect(found.workbenchState).toBeDefined();
     });
 
     it("throws NOT_FOUND for non-existent slug", async () => {
@@ -221,7 +223,7 @@ describe("Evaluations V3 Endpoints", () => {
         caller.experiments.getEvaluationsV3BySlug({
           projectId,
           experimentSlug: "nonexistent-slug-12345",
-        })
+        }),
       ).rejects.toThrow("Experiment not found");
     });
 
@@ -242,7 +244,7 @@ describe("Evaluations V3 Endpoints", () => {
         caller.experiments.getEvaluationsV3BySlug({
           projectId,
           experimentSlug: dspyExperiment.slug,
-        })
+        }),
       ).rejects.toThrow("Experiment is not an EVALUATIONS_V3 type");
     });
   });

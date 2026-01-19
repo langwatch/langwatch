@@ -10,9 +10,24 @@
  * - Abort handling
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within, act } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 import { createExecutionCellSet } from "../utils/executionScope";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
@@ -33,10 +48,10 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -207,7 +222,12 @@ const setupStoreWithConfiguredEvaluation = () => {
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "test-dataset": {
-            input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "test-dataset",
+              sourceField: "input",
+            },
           },
         },
       },
@@ -217,7 +237,6 @@ const setupStoreWithConfiguredEvaluation = () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -225,8 +244,18 @@ const setupStoreWithConfiguredEvaluation = () => {
         mappings: {
           "test-dataset": {
             "target-1": {
-              output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-              expected_output: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "expected_output" },
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "test-dataset",
+                sourceField: "expected_output",
+              },
             },
           },
         },
@@ -250,6 +279,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };
@@ -270,7 +300,7 @@ const renderTable = () => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <EvaluationsV3Table disableVirtualization />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -385,7 +415,11 @@ describe("Evaluation Execution", () => {
         },
         evaluatorResults: {
           "target-1": {
-            "eval-1": [{ status: "processed", passed: true, score: 1.0 }, undefined, undefined],
+            "eval-1": [
+              { status: "processed", passed: true, score: 1.0 },
+              undefined,
+              undefined,
+            ],
           },
         },
       });
@@ -467,7 +501,11 @@ describe("Evaluation Execution", () => {
         evaluatorResults: {
           "target-1": {
             "eval-1": [
-              { status: "error", error_type: "EvaluatorError", details: "Missing expected_output" },
+              {
+                status: "error",
+                error_type: "EvaluatorError",
+                details: "Missing expected_output",
+              },
               undefined,
               undefined,
             ],
@@ -546,7 +584,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -609,7 +652,7 @@ describe("Evaluation Execution", () => {
       expect(results.targetOutputs["target-1"]).toHaveLength(3);
       expect(results.evaluatorResults["target-1"]?.["eval-1"]).toHaveLength(3);
       expect(results.evaluatorResults["target-1"]?.["eval-1"]?.[1]).toEqual(
-        expect.objectContaining({ passed: false, score: 0.5 })
+        expect.objectContaining({ passed: false, score: 0.5 }),
       );
     });
   });
@@ -696,7 +739,9 @@ describe("Evaluation Execution", () => {
 
       // TargetSummary shows errors as "X errors"
       await waitFor(() => {
-        expect(screen.getAllByText("2 errors").length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText("2 errors").length).toBeGreaterThanOrEqual(
+          1,
+        );
       });
     });
 
@@ -807,7 +852,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -856,7 +906,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -905,8 +960,8 @@ describe("Evaluation Execution", () => {
                 { id: "expected", name: "expected", type: "string" },
               ],
               records: {
-                input: ["Hello", "", "World"],    // Row 1 is empty
-                expected: ["Hi", "", "There"],    // Row 1 is empty
+                input: ["Hello", "", "World"], // Row 1 is empty
+                expected: ["Hi", "", "There"], // Row 1 is empty
               },
             },
           },
@@ -943,6 +998,7 @@ describe("Evaluation Execution", () => {
           expandedCells: new Set(),
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
+          concurrency: 10,
         },
       });
 
@@ -972,7 +1028,7 @@ describe("Evaluation Execution", () => {
             inline: {
               columns: [{ id: "input", name: "input", type: "string" }],
               records: {
-                input: ["A", "", "B", "", ""],  // 2 non-empty rows out of 5
+                input: ["A", "", "B", "", ""], // 2 non-empty rows out of 5
               },
             },
           },
@@ -1006,6 +1062,7 @@ describe("Evaluation Execution", () => {
           expandedCells: new Set(),
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
+          concurrency: 10,
         },
       });
 
@@ -1038,7 +1095,9 @@ describe("Evaluation Execution", () => {
       expect(state.results.targetMetadata["target-1"]?.[0]?.cost).toBe(0.001);
       expect(state.results.targetMetadata["target-1"]?.[0]?.duration).toBe(500);
       expect(state.results.targetMetadata["target-1"]?.[1]?.cost).toBe(0.002);
-      expect(state.results.targetMetadata["target-1"]?.[2]?.duration).toBe(1500);
+      expect(state.results.targetMetadata["target-1"]?.[2]?.duration).toBe(
+        1500,
+      );
     });
 
     it("merges targetMetadata correctly with existing results", () => {
@@ -1049,7 +1108,11 @@ describe("Evaluation Execution", () => {
         status: "running",
         targetOutputs: { "target-1": ["Output 1", undefined, undefined] },
         targetMetadata: {
-          "target-1": [{ cost: 0.001, duration: 500 }, undefined, undefined] as any,
+          "target-1": [
+            { cost: 0.001, duration: 500 },
+            undefined,
+            undefined,
+          ] as any,
         },
       });
 
@@ -1085,6 +1148,401 @@ describe("Evaluation Execution", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.results.targetMetadata).toEqual({});
+    });
+  });
+
+  describe("Evaluator Spinner State During Execution", () => {
+    /**
+     * This test verifies that evaluator spinners are shown correctly:
+     * 1. When a SINGLE cell is being executed, only that cell's evaluators should spin
+     * 2. Other cells' evaluators should NOT show spinners
+     * 3. After target output arrives, evaluators for that cell should spin while processing
+     */
+    it("shows spinner only on executing cell's evaluators, not other cells", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      // Setup: Multiple targets to test isolation
+      const currentState = useEvaluationsV3Store.getState();
+      useEvaluationsV3Store.setState({
+        ...currentState,
+        targets: [
+          ...currentState.targets,
+          {
+            id: "target-2",
+            name: "Second Prompt",
+            type: "prompt",
+            promptId: "prompt-456",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {
+              "test-dataset": {
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
+              },
+            },
+          },
+        ],
+      });
+
+      // Simulate: Only cell (row 0, target-1) is executing
+      // Other cells should NOT show spinners
+      const executingCells = createExecutionCellSet([
+        { rowIndex: 0, targetId: "target-1" },
+      ]);
+
+      useEvaluationsV3Store.getState().setResults({
+        status: "running",
+        executingCells,
+        targetOutputs: {},
+        evaluatorResults: {},
+      });
+
+      renderTable();
+
+      // Get all evaluator chips - there should be chips for multiple cells
+      const allEvalChips = screen.getAllByText("Exact Match");
+      expect(allEvalChips.length).toBeGreaterThanOrEqual(3); // At least 3 rows
+
+      // Only the executing cell's evaluator should potentially show spinner
+      // The test verifies that non-executing cells don't show spinners
+      // (they should show gray circle for pending state)
+
+      // Count spinners - should be 0 at this point because target output hasn't arrived yet
+      const spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBe(0); // No spinners - target output not yet received
+    });
+
+    it("shows spinner on evaluator AFTER target output arrives for that cell", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      // Simulate: Cell (row 0, target-1) has received target output
+      // and evaluator is now running (added to runningEvaluators)
+      const executingCells = createExecutionCellSet([
+        { rowIndex: 0, targetId: "target-1" },
+      ]);
+
+      // Mark the evaluator as running (this happens when target output arrives)
+      const runningEvaluators = new Set(["0:target-1:eval-1"]);
+
+      useEvaluationsV3Store.getState().setResults({
+        status: "running",
+        executingCells,
+        runningEvaluators,
+        targetOutputs: {
+          "target-1": ["Output for row 0", undefined, undefined],
+        },
+        evaluatorResults: {
+          "target-1": {
+            "eval-1": [undefined, undefined, undefined], // No result yet for row 0
+          },
+        },
+      });
+
+      renderTable();
+
+      // Wait for render
+      await waitFor(() => {
+        expect(screen.getByText("Output for row 0")).toBeInTheDocument();
+      });
+
+      // The evaluator chip for row 0 should show spinner
+      // because it's in runningEvaluators
+      const spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("does NOT show spinner on other rows when only one cell is executing", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      // Setup: Row 1 already has results (completed previously)
+      // Only row 0 is currently executing with evaluator running
+      const executingCells = createExecutionCellSet([
+        { rowIndex: 0, targetId: "target-1" },
+      ]);
+
+      // Only row 0's evaluator is running
+      const runningEvaluators = new Set(["0:target-1:eval-1"]);
+
+      useEvaluationsV3Store.getState().setResults({
+        status: "running",
+        executingCells,
+        runningEvaluators,
+        targetOutputs: {
+          "target-1": [
+            "Output for row 0", // Row 0 - currently executing
+            "Previous output row 1", // Row 1 - completed previously
+            undefined, // Row 2 - not yet executed
+          ],
+        },
+        evaluatorResults: {
+          "target-1": {
+            "eval-1": [
+              undefined, // Row 0 - evaluator still running
+              { status: "processed", passed: true, score: 1.0 }, // Row 1 - completed
+              undefined, // Row 2 - not yet executed
+            ],
+          },
+        },
+      });
+
+      renderTable();
+
+      // Wait for outputs to render
+      await waitFor(() => {
+        expect(screen.getByText("Output for row 0")).toBeInTheDocument();
+        expect(screen.getByText("Previous output row 1")).toBeInTheDocument();
+      });
+
+      // Row 1's evaluator should show "1.00" (result), not a spinner
+      expect(screen.getByText("1.00")).toBeInTheDocument();
+
+      // Row 0's evaluator should show spinner (it's in runningEvaluators)
+      const spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBe(1); // Only ONE spinner - for the running evaluator
+
+      // Row 2's evaluator should NOT have spinner (not in runningEvaluators)
+    });
+
+    it("shows no spinner when evaluator has result and runningEvaluators is undefined", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      // Set results with completed evaluator (no runningEvaluators)
+      useEvaluationsV3Store.getState().setResults({
+        status: "success",
+        targetOutputs: {
+          "target-1": ["Output row 0", "Output row 1", "Output row 2"],
+        },
+        evaluatorResults: {
+          "target-1": {
+            "eval-1": [
+              { status: "processed", passed: true, score: 0.95 },
+              { status: "processed", passed: true, score: 0.85 },
+              { status: "processed", passed: false, score: 0.45 },
+            ],
+          },
+        },
+      });
+
+      renderTable();
+
+      // Should see outputs and scores
+      await waitFor(() => {
+        expect(screen.getByText("Output row 0")).toBeInTheDocument();
+        expect(screen.getByText("0.95")).toBeInTheDocument();
+      });
+
+      // Should have no spinners since runningEvaluators is undefined
+      const spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBe(0);
+    });
+  });
+
+  describe("Concurrent Execution", () => {
+    /**
+     * Full integration test that verifies when two cells are executed concurrently,
+     * completing one execution does NOT clear the other's loading/spinner state.
+     *
+     * User scenario:
+     * 1. User clicks to run cell A (row 0)
+     * 2. While A is running, user clicks to run cell B (row 1)
+     * 3. Cell A completes (target output + evaluator result)
+     * 4. Cell B should STILL show skeleton (waiting for output) - not disappear!
+     *
+     * This was a real bug where the "done" event from execution A would clear
+     * ALL executingCells/runningEvaluators, breaking cell B's UI state.
+     */
+    it("does not clear cell B's loading state when cell A's concurrent execution completes", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      renderTable();
+
+      // Step 1: Start executing cell A (row 0)
+      act(() => {
+        useEvaluationsV3Store.getState().setResults({
+          status: "running",
+          executingCells: new Set(["0:target-1"]),
+          targetOutputs: {},
+          evaluatorResults: {},
+        });
+      });
+
+      // Verify cell A shows skeleton (loading state)
+      await waitFor(() => {
+        const skeletons = document.querySelectorAll(".chakra-skeleton");
+        expect(skeletons.length).toBeGreaterThan(0);
+      });
+
+      // Step 2: While A is running, start executing cell B (row 1)
+      act(() => {
+        const current = useEvaluationsV3Store.getState().results;
+        useEvaluationsV3Store.getState().setResults({
+          executingCells: new Set([...current.executingCells!, "1:target-1"]),
+        });
+      });
+
+      // Verify both cells show loading state (skeletons)
+      await waitFor(() => {
+        const skeletons = document.querySelectorAll(".chakra-skeleton");
+        // Both rows should show skeletons for their target cells
+        expect(skeletons.length).toBeGreaterThanOrEqual(2);
+      });
+
+      // Step 3: Cell A gets target output and evaluator starts running
+      act(() => {
+        const current = useEvaluationsV3Store.getState().results;
+        useEvaluationsV3Store.getState().setResults({
+          targetOutputs: {
+            ...current.targetOutputs,
+            "target-1": ["Output from cell A", undefined, undefined],
+          },
+          runningEvaluators: new Set(["0:target-1:eval-1"]),
+        });
+      });
+
+      // Verify cell A's output is shown and evaluator is spinning
+      await waitFor(() => {
+        expect(screen.getByText("Output from cell A")).toBeInTheDocument();
+      });
+      let spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBe(1); // Cell A's evaluator spinning
+
+      // Step 4: Cell A's evaluator completes (simulating cleanupThisExecution for cell A only)
+      act(() => {
+        const current = useEvaluationsV3Store.getState().results;
+        // Remove cell A from executingCells
+        const newExecutingCells = new Set(current.executingCells);
+        newExecutingCells.delete("0:target-1");
+
+        // Remove cell A's evaluator from runningEvaluators
+        const newRunningEvals = new Set(current.runningEvaluators);
+        newRunningEvals.delete("0:target-1:eval-1");
+
+        useEvaluationsV3Store.getState().setResults({
+          executingCells: newExecutingCells,
+          runningEvaluators: newRunningEvals,
+          evaluatorResults: {
+            ...current.evaluatorResults,
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 0.95 },
+                undefined, // Cell B still pending
+                undefined,
+              ],
+            },
+          },
+        });
+      });
+
+      // CRITICAL ASSERTIONS - Verify from user perspective:
+
+      // 1. Cell A's evaluator should NOT be spinning anymore
+      await waitFor(() => {
+        spinners = document.querySelectorAll(".chakra-spinner");
+        expect(spinners.length).toBe(0); // A is done, B hasn't started evaluators yet
+      });
+
+      // 2. Cell B should STILL be in executingCells (this is the main bug fix!)
+      // This is what causes cell B to show skeleton - if executingCells was cleared,
+      // cell B would show "No output yet" instead of skeleton
+      const finalState = useEvaluationsV3Store.getState().results;
+      expect(finalState.executingCells?.has("1:target-1")).toBe(true);
+      expect(finalState.executingCells?.has("0:target-1")).toBe(false); // A is done
+
+      // 3. Cell A's output should still be visible (it wasn't cleared)
+      expect(screen.getByText("Output from cell A")).toBeInTheDocument();
+
+      // 4. Cell B's row still has no output (it's still pending) - verified via state
+      // The UI would show skeleton because executingCells still contains "1:target-1"
+      expect(finalState.targetOutputs["target-1"]?.[1]).toBeUndefined();
+
+      // 5. Verify cell A's result is stored correctly
+      expect(finalState.evaluatorResults["target-1"]?.["eval-1"]?.[0]).toEqual({
+        status: "processed",
+        passed: true,
+        score: 0.95,
+      });
+    });
+
+    /**
+     * Full integration test for the scenario where both cells have target outputs
+     * and both evaluators are running, then one completes.
+     */
+    it("keeps cell B's evaluator spinning when cell A's evaluator completes", async () => {
+      setupStoreWithConfiguredEvaluation();
+
+      // Set up: Both cells have target output and both evaluators are running
+      useEvaluationsV3Store.getState().setResults({
+        status: "running",
+        executingCells: new Set(["0:target-1", "1:target-1"]),
+        runningEvaluators: new Set(["0:target-1:eval-1", "1:target-1:eval-1"]),
+        targetOutputs: {
+          "target-1": ["Output A", "Output B", undefined],
+        },
+        evaluatorResults: {},
+      });
+
+      renderTable();
+
+      // Verify both outputs are shown
+      await waitFor(() => {
+        expect(screen.getByText("Output A")).toBeInTheDocument();
+        expect(screen.getByText("Output B")).toBeInTheDocument();
+      });
+
+      // Both evaluators should show spinners
+      let spinners = document.querySelectorAll(".chakra-spinner");
+      expect(spinners.length).toBe(2);
+
+      // Cell A's evaluator completes (but cell B's is still running)
+      act(() => {
+        const current = useEvaluationsV3Store.getState().results;
+
+        // Only remove cell A's state
+        const newExecutingCells = new Set(current.executingCells);
+        newExecutingCells.delete("0:target-1");
+
+        const newRunningEvals = new Set(current.runningEvaluators);
+        newRunningEvals.delete("0:target-1:eval-1");
+
+        useEvaluationsV3Store.getState().setResults({
+          executingCells: newExecutingCells,
+          runningEvaluators: newRunningEvals,
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 0.88 },
+                undefined, // Cell B's evaluator still running
+                undefined,
+              ],
+            },
+          },
+        });
+      });
+
+      // CRITICAL ASSERTIONS:
+
+      // 1. Cell B's evaluator should STILL be spinning (only 1 spinner remains)
+      await waitFor(() => {
+        const currentSpinners = document.querySelectorAll(".chakra-spinner");
+        expect(currentSpinners.length).toBe(1);
+      });
+
+      // 2. State should reflect cell B is still running
+      const finalState = useEvaluationsV3Store.getState().results;
+      expect(finalState.executingCells?.has("1:target-1")).toBe(true);
+      expect(finalState.runningEvaluators?.has("1:target-1:eval-1")).toBe(true);
+
+      // 3. Cell A's evaluator result is in the store (UI verification would require
+      //    checking the actual chip content, which may involve tooltip/popover)
+      expect(finalState.evaluatorResults["target-1"]?.["eval-1"]?.[0]).toEqual({
+        status: "processed",
+        passed: true,
+        score: 0.88,
+      });
     });
   });
 });

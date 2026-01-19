@@ -1,34 +1,33 @@
-import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import {
   Box,
   Button,
   HStack,
+  Portal,
+  Skeleton,
   Text,
   VStack,
-  Skeleton,
-  Portal,
 } from "@chakra-ui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  LuPlus,
+  LuCheck,
   LuCircleAlert,
+  LuCopy,
   LuListTree,
   LuPlay,
+  LuPlus,
   LuSquare,
-  LuCopy,
-  LuCheck,
 } from "react-icons/lu";
-
-import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import type { EvaluatorConfig, TargetConfig } from "../../types";
+import { formatLatency } from "../../utils/computeAggregates";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
-import { formatLatency } from "../../utils/computeAggregates";
-import type { TargetConfig, EvaluatorConfig } from "../../types";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
 // Max characters to display for performance reasons
@@ -50,13 +49,15 @@ type TargetCellContentProps = {
   traceId?: string | null;
   /** Duration/latency for this execution in milliseconds */
   duration?: number | null;
-  /** Whether the overall execution is running */
-  isExecutionRunning?: boolean;
+  /** Check if a specific evaluator is currently running */
+  isEvaluatorRunning?: (evaluatorId: string) => boolean;
   onAddEvaluator?: () => void;
   /** Handler for running this specific cell */
   onRunCell?: () => void;
   /** Handler for stopping execution */
   onStopCell?: () => void;
+  /** Handler for re-running a specific evaluator on this cell */
+  onRerunEvaluator?: (evaluatorId: string) => void;
 };
 
 export function TargetCellContent({
@@ -67,10 +68,11 @@ export function TargetCellContent({
   isLoading,
   traceId,
   duration,
-  isExecutionRunning,
+  isEvaluatorRunning,
   onAddEvaluator,
   onRunCell,
   onStopCell,
+  onRerunEvaluator,
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const {
@@ -228,8 +230,8 @@ export function TargetCellContent({
     output === null || output === undefined
       ? ""
       : typeof output === "object"
-      ? JSON.stringify(output, null, 2)
-      : String(output);
+        ? JSON.stringify(output, null, 2)
+        : String(output);
 
   // Truncate for performance (but keep full text for expanded view)
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
@@ -274,7 +276,15 @@ export function TargetCellContent({
       if (expanded) {
         // Expanded view - scrollable, no max height
         return (
-          <Box flex={1} overflowY="auto" minHeight={0}>
+          <VStack flex={1} overflowY="auto" minHeight={0} align="start">
+            <Text
+              fontSize="11px"
+              color="gray.500"
+              fontWeight="700"
+              textTransform="uppercase"
+            >
+              Output
+            </Text>
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
@@ -283,19 +293,20 @@ export function TargetCellContent({
                 </Box>
               )}
             </Text>
-          </Box>
+          </VStack>
         );
       }
 
       // Collapsed view - with max-height and fade
       return (
         <Box position="relative">
-          <Box
+          <VStack
             ref={outputRef}
             maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
             overflow="hidden"
             cursor={isOverflowing ? "pointer" : undefined}
             onClick={isOverflowing ? handleExpandOutput : undefined}
+            align="start"
           >
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
@@ -305,25 +316,29 @@ export function TargetCellContent({
                 </Box>
               )}
             </Text>
-          </Box>
+          </VStack>
 
           {/* Fade overlay for overflowing content */}
           {isOverflowing && (
             <Box
               position="absolute"
               bottom={0}
-              left={"-12px"}
-              right={"-12px"}
+              left={"-10px"}
+              right={"-10px"}
               height="40px"
               cursor="pointer"
               onClick={handleExpandOutput}
               className="cell-fade-overlay"
               css={{
-                background:
-                  "linear-gradient(to bottom, transparent, white)",
+                background: "linear-gradient(to bottom, transparent, white)",
                 "tr:hover &": {
                   background:
                     "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+                },
+                // Selected row takes priority over hover
+                "tr[data-selected='true'] &": {
+                  background:
+                    "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-50))",
                 },
               }}
             />
@@ -349,8 +364,7 @@ export function TargetCellContent({
           evaluator={evaluator}
           result={evaluatorResults[evaluator.id]}
           hasMissingMappings={missingMappingsSet.has(evaluator.id)}
-          targetHasOutput={output !== undefined && output !== null}
-          isExecutionRunning={isExecutionRunning}
+          isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
           onEdit={() => {
             const mappingsConfig = createMappingsConfig(evaluator);
             openDrawer("evaluatorEditor", {
@@ -360,6 +374,9 @@ export function TargetCellContent({
             });
           }}
           onRemove={() => removeEvaluator(evaluator.id)}
+          onRerun={
+            onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined
+          }
         />
       ))}
       <Button
@@ -408,9 +425,10 @@ export function TargetCellContent({
       className={inExpandedView ? undefined : "cell-action-btn"}
       opacity={inExpandedView ? 1 : 0}
       transition="opacity 0.15s"
-      bg="gray.50/90"
+      bg={inExpandedView ? "transparent" : "gray.50"}
       borderRadius="md"
-      px={0.5}
+      paddingLeft={2}
+      paddingRight={0.5}
     >
       {/* Latency display - shows when duration is available */}
       {duration !== null && duration !== undefined && (

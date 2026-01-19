@@ -16,8 +16,8 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetColumn } from "../types";
 
 // Mock next/router
@@ -167,11 +167,15 @@ describe("Column visibility", () => {
 
       // First hide the column
       store.toggleColumnVisibility("input");
-      expect(useEvaluationsV3Store.getState().ui.hiddenColumns.has("input")).toBe(true);
+      expect(
+        useEvaluationsV3Store.getState().ui.hiddenColumns.has("input"),
+      ).toBe(true);
 
       // Toggle again to show
       store.toggleColumnVisibility("input");
-      expect(useEvaluationsV3Store.getState().ui.hiddenColumns.has("input")).toBe(false);
+      expect(
+        useEvaluationsV3Store.getState().ui.hiddenColumns.has("input"),
+      ).toBe(false);
     });
 
     it("setHiddenColumns replaces all hidden columns", () => {
@@ -188,7 +192,9 @@ describe("Column visibility", () => {
 
   describe("Table rendering", () => {
     it("shows all columns when none are hidden", () => {
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Default columns are 'input' and 'expected_output'
       expect(screen.getByText("input")).toBeInTheDocument();
@@ -199,7 +205,9 @@ describe("Column visibility", () => {
       // Hide the 'input' column before rendering
       useEvaluationsV3Store.getState().toggleColumnVisibility("input");
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // 'input' should not be visible, but 'expected_output' should be
       expect(screen.queryByText("input")).not.toBeInTheDocument();
@@ -210,12 +218,19 @@ describe("Column visibility", () => {
       // Set up some data
       const store = useEvaluationsV3Store.getState();
       store.setCellValue("test-data", 0, "input", "test input value");
-      store.setCellValue("test-data", 0, "expected_output", "test output value");
+      store.setCellValue(
+        "test-data",
+        0,
+        "expected_output",
+        "test output value",
+      );
 
       // Hide the 'input' column
       store.toggleColumnVisibility("input");
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // The input value cell should not exist (no data-testid="cell-0-input")
       expect(screen.queryByTestId("cell-0-input")).not.toBeInTheDocument();
@@ -230,7 +245,9 @@ describe("Column visibility", () => {
       store.toggleColumnVisibility("input");
       store.toggleColumnVisibility("input");
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("input")).toBeInTheDocument();
       expect(screen.getByText("expected_output")).toBeInTheDocument();
@@ -243,7 +260,9 @@ describe("Column visibility", () => {
       store.toggleColumnVisibility("input");
       store.toggleColumnVisibility("expected_output");
 
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Neither column header should be visible
       expect(screen.queryByText("input")).not.toBeInTheDocument();
@@ -253,7 +272,9 @@ describe("Column visibility", () => {
 
   describe("Dynamic column visibility", () => {
     it("updates table when column visibility changes after render", async () => {
-      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Initially both columns visible
       expect(screen.getByText("input")).toBeInTheDocument();

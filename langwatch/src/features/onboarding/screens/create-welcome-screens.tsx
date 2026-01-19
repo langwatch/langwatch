@@ -188,7 +188,7 @@ export const useCreateWelcomeScreens = ({
       [OnboardingScreenIndex.ORGANIZATION]: {
         id: "organization",
         required: true,
-        heading: "Welcome Aboard 👋",
+        heading: "Welcome aboard 👋",
         subHeading: "Let's kick off by creating your organization",
         component: OrganizationScreen,
       },

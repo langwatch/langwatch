@@ -3,11 +3,11 @@ import "./env-defaults";
 import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
-import { discoverProjections } from "./discovery/projections";
 import { discoverEventHandlers } from "./discovery/eventHandlers";
+import { discoverProjections } from "./discovery/projections";
 import { buildPipelineAggregateTypeMap } from "./discovery/projections.types";
-import { Root } from "./ui/Root";
 import type { Environment } from "./io/secrets";
+import { Root } from "./ui/Root";
 
 import "dotenv/config";
 
@@ -46,15 +46,18 @@ async function main() {
 
   // Validate environment
   if (!["dev", "staging", "prod"].includes(options.env)) {
-    console.error(`Invalid environment: ${options.env}. Must be dev, staging, or prod.`);
+    console.error(
+      `Invalid environment: ${options.env}. Must be dev, staging, or prod.`,
+    );
     process.exit(1);
   }
 
-  const [projections, eventHandlers, pipelineAggregateTypes] = await Promise.all([
-    discoverProjections(),
-    discoverEventHandlers(),
-    buildPipelineAggregateTypeMap(),
-  ]);
+  const [projections, eventHandlers, pipelineAggregateTypes] =
+    await Promise.all([
+      discoverProjections(),
+      discoverEventHandlers(),
+      buildPipelineAggregateTypeMap(),
+    ]);
 
   render(
     <Root
@@ -62,7 +65,7 @@ async function main() {
       projections={projections}
       eventHandlers={eventHandlers}
       pipelineAggregateTypes={pipelineAggregateTypes}
-    />
+    />,
   );
 }
 
@@ -70,5 +73,3 @@ main().catch((error) => {
   console.error("Failed to start deja-view:", error);
   process.exit(1);
 });
-
-

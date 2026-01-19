@@ -21,10 +21,10 @@ import { LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
   type ParsedEvaluationResult,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 
 export type EvaluationStatus = ParsedEvaluationResult["status"];
@@ -119,14 +119,14 @@ export function EvaluatorResultChip({
         </HStack>
         {details && (
           <Box marginTop={1}>
-            <Text fontSize="11px" color="gray.400" marginBottom={0.5}>
+            <Text fontSize="12px" color="gray.400" marginBottom={0.5}>
               Details:
             </Text>
             <Text
-              fontSize="11px"
+              fontSize="12px"
               color="gray.300"
               whiteSpace="pre-wrap"
-              maxHeight="100px"
+              maxHeight="200px"
               overflow="auto"
             >
               {details}
@@ -171,6 +171,7 @@ export function EvaluatorResultChip({
       content={tooltipContent}
       positioning={{ placement: "top" }}
       openDelay={200}
+      closeDelay={200}
       interactive
     >
       {chipContent}

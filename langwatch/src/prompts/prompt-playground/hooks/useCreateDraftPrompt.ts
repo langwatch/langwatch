@@ -66,7 +66,7 @@ export function useCreateDraftPrompt() {
     // Focus the system prompt textarea after the tab is rendered
     setTimeout(() => {
       const textarea = document.querySelector<HTMLTextAreaElement>(
-        'textarea[data-role="system"]'
+        'textarea[data-role="system"]',
       );
       textarea?.focus();
     }, 100);

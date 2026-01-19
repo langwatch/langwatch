@@ -1,12 +1,14 @@
 import { z } from "zod";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import type {
-  TargetConfig,
-  EvaluatorConfig,
-  DatasetReference,
-  FieldMapping,
+import {
+  type DatasetReference,
+  type EvaluatorConfig,
+  evaluatorConfigSchema,
+  type FieldMapping,
+  type TargetConfig,
+  targetConfigSchema,
 } from "~/evaluations-v3/types";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 
 // ============================================================================
 // Execution Request Types
@@ -19,7 +21,15 @@ export type ExecutionScope =
   | { type: "full" }
   | { type: "rows"; rowIndices: number[] }
   | { type: "target"; targetId: string }
-  | { type: "cell"; targetId: string; rowIndex: number };
+  | { type: "cell"; targetId: string; rowIndex: number }
+  | {
+      type: "evaluator";
+      targetId: string;
+      rowIndex: number;
+      evaluatorId: string;
+      /** Pre-computed target output to use instead of re-running target */
+      targetOutput?: unknown;
+    };
 
 /**
  * Input to start an evaluation execution.
@@ -34,6 +44,8 @@ export type ExecutionRequest = {
   targets: TargetConfig[];
   evaluators: EvaluatorConfig[];
   scope: ExecutionScope;
+  /** Concurrency limit for parallel execution (default 10) */
+  concurrency?: number;
 };
 
 export const executionRequestSchema = z.object({
@@ -45,41 +57,43 @@ export const executionRequestSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(["inline", "saved"]),
-    inline: z.object({
-      columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
-      records: z.record(z.string(), z.array(z.string())),
-    }).optional(),
+    inline: z
+      .object({
+        columns: z.array(
+          z.object({ id: z.string(), name: z.string(), type: z.string() }),
+        ),
+        records: z.record(z.string(), z.array(z.string())),
+      })
+      .optional(),
     datasetId: z.string().optional(),
-    columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
-    savedRecords: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+    columns: z.array(
+      z.object({ id: z.string(), name: z.string(), type: z.string() }),
+    ),
+    savedRecords: z
+      .array(z.object({ id: z.string() }).passthrough())
+      .optional(),
   }),
-  targets: z.array(z.object({
-    id: z.string(),
-    type: z.enum(["prompt", "agent"]),
-    name: z.string(),
-    promptId: z.string().optional(),
-    promptVersionId: z.string().optional(),
-    promptVersionNumber: z.number().optional(),
-    dbAgentId: z.string().optional(),
-    inputs: z.array(z.object({ identifier: z.string(), type: z.string() })).optional(),
-    outputs: z.array(z.object({ identifier: z.string(), type: z.string() })).optional(),
-    mappings: z.record(z.string(), z.record(z.string(), z.any())),
-    localPromptConfig: z.any().optional(),
-  })),
-  evaluators: z.array(z.object({
-    id: z.string(),
-    evaluatorType: z.string(),
-    name: z.string(),
-    settings: z.record(z.string(), z.any()),
-    inputs: z.array(z.object({ identifier: z.string(), type: z.string() })),
-    mappings: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.any()))),
-  })),
+  // Use shared schemas to avoid duplication and ensure consistency
+  targets: z.array(targetConfigSchema),
+  evaluators: z.array(evaluatorConfigSchema),
   scope: z.discriminatedUnion("type", [
     z.object({ type: z.literal("full") }),
     z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
     z.object({ type: z.literal("target"), targetId: z.string() }),
-    z.object({ type: z.literal("cell"), targetId: z.string(), rowIndex: z.number() }),
+    z.object({
+      type: z.literal("cell"),
+      targetId: z.string(),
+      rowIndex: z.number(),
+    }),
+    z.object({
+      type: z.literal("evaluator"),
+      targetId: z.string(),
+      rowIndex: z.number(),
+      evaluatorId: z.string(),
+      targetOutput: z.unknown().optional(),
+    }),
   ]),
+  concurrency: z.number().min(1).max(24).optional(),
 });
 
 // ============================================================================
@@ -150,6 +164,10 @@ export type ExecutionCell = {
   targetConfig: TargetConfig;
   evaluatorConfigs: EvaluatorConfig[];
   datasetEntry: Record<string, unknown>;
+  /** If true, skip target execution and use precomputedTargetOutput instead */
+  skipTarget?: boolean;
+  /** Pre-computed target output when re-running only evaluator(s) */
+  precomputedTargetOutput?: unknown;
 };
 
 /**
@@ -224,7 +242,9 @@ export const getCellKey = (rowIndex: number, targetId: string): string =>
 /**
  * Parse a cell key back to its components.
  */
-export const parseCellKey = (key: string): { rowIndex: number; targetId: string } => {
+export const parseCellKey = (
+  key: string,
+): { rowIndex: number; targetId: string } => {
   const dashIndex = key.indexOf("-");
   return {
     rowIndex: parseInt(key.substring(0, dashIndex), 10),
@@ -237,7 +257,7 @@ export const parseCellKey = (key: string): { rowIndex: number; targetId: string 
  */
 export const createInitialCellState = (
   rowIndex: number,
-  targetId: string
+  targetId: string,
 ): CellExecutionState => ({
   rowIndex,
   targetId,

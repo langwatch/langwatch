@@ -1,12 +1,20 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import type { Project } from "@prisma/client";
-import { runOrchestrator, type OrchestratorInput } from "../orchestrator";
-import { abortManager } from "../abortManager";
-import type { EvaluationV3Event, ExecutionScope } from "../types";
-import type { EvaluationsV3State, LocalPromptConfig, TargetConfig, EvaluatorConfig } from "~/evaluations-v3/types";
-import { createInitialUIState, createInitialResults } from "~/evaluations-v3/types";
+import { beforeAll, describe, expect, it } from "vitest";
+import type {
+  EvaluationsV3State,
+  EvaluatorConfig,
+  LocalPromptConfig,
+  TargetConfig,
+} from "~/evaluations-v3/types";
+import {
+  createInitialResults,
+  createInitialUIState,
+} from "~/evaluations-v3/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { getTestProject } from "~/utils/testUtils";
+import { abortManager } from "../abortManager";
+import { type OrchestratorInput, runOrchestrator } from "../orchestrator";
+import type { EvaluationV3Event, ExecutionScope } from "../types";
 
 /**
  * Integration tests for the orchestrator against langwatch_nlp.
@@ -44,7 +52,11 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       maxTokens: 50,
     },
     messages: [
-      { role: "system", content: "You are a helpful assistant. Respond with only the exact word requested." },
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant. Respond with only the exact word requested.",
+      },
       { role: "user", content: "{{input}}" },
     ],
     inputs: [{ identifier: "input", type: "str" }],
@@ -60,7 +72,12 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
       "dataset-1": {
-        input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
       },
     },
     localPromptConfig: createPromptConfig(),
@@ -79,12 +96,32 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     mappings: {
       "dataset-1": {
         "target-1": {
-          output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-          expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+          output: {
+            type: "source",
+            source: "target",
+            sourceId: "target-1",
+            sourceField: "output",
+          },
+          expected_output: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "expected",
+          },
         },
         "target-2": {
-          output: { type: "source", source: "target", sourceId: "target-2", sourceField: "output" },
-          expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+          output: {
+            type: "source",
+            source: "target",
+            sourceId: "target-2",
+            sourceField: "output",
+          },
+          expected_output: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "expected",
+          },
         },
       },
     },
@@ -93,13 +130,15 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   // Helper to create test state
   const createTestState = (
     targets: TargetConfig[],
-    evaluators: EvaluatorConfig[] = []
+    evaluators: EvaluatorConfig[] = [],
   ): EvaluationsV3State => ({
     name: "Test Evaluation",
-    datasets: [{
-      id: "dataset-1",
-      name: "Test Dataset",
-    } as EvaluationsV3State["datasets"][0]],
+    datasets: [
+      {
+        id: "dataset-1",
+        name: "Test Dataset",
+      } as EvaluationsV3State["datasets"][0],
+    ],
     activeDatasetId: "dataset-1",
     targets,
     evaluators,
@@ -109,7 +148,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   });
 
   // Helper to collect all events from orchestrator
-  const collectEvents = async (input: OrchestratorInput): Promise<EvaluationV3Event[]> => {
+  const collectEvents = async (
+    input: OrchestratorInput,
+  ): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
     for await (const event of runOrchestrator(input)) {
       events.push(event);
@@ -119,7 +160,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
   describe("single target execution", () => {
     it("executes single row with single target", async () => {
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -156,12 +199,16 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const doneEvent = events[events.length - 1];
       if (doneEvent?.type === "done") {
         expect(doneEvent.summary.totalCells).toBe(1);
-        expect(doneEvent.summary.completedCells + doneEvent.summary.failedCells).toBe(1);
+        expect(
+          doneEvent.summary.completedCells + doneEvent.summary.failedCells,
+        ).toBe(1);
       }
     }, 60000);
 
     it("executes multiple rows with single target", async () => {
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
         { question: "Say world", expected: "world" },
@@ -202,7 +249,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     }, 120000);
 
     it("includes duration and traceId in target_result events", async () => {
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -222,9 +271,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const events = await collectEvents(input);
 
       // Find target_result events
-      const targetResults = events.filter((e) => e.type === "target_result") as Array<
-        Extract<EvaluationV3Event, { type: "target_result" }>
-      >;
+      const targetResults = events.filter(
+        (e) => e.type === "target_result",
+      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
       expect(targetResults.length).toBeGreaterThan(0);
 
       // Check that duration is present and positive
@@ -277,7 +326,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       expect(cellStartedEvents).toHaveLength(2);
 
       const targetIds = cellStartedEvents.map((e) =>
-        e.type === "cell_started" ? e.targetId : null
+        e.type === "cell_started" ? e.targetId : null,
       );
       expect(targetIds).toContain("target-1");
       expect(targetIds).toContain("target-2");
@@ -325,7 +374,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
   describe("partial execution scopes", () => {
     it("executes only specified rows", async () => {
-      const state = createTestState([createTargetConfig("target-1", "Target 1")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "Target 1"),
+      ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
         { question: "Say two", expected: "two" },
@@ -358,7 +409,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       expect(cellStartedEvents).toHaveLength(2);
 
       const rowIndices = cellStartedEvents.map((e) =>
-        e.type === "cell_started" ? e.rowIndex : null
+        e.type === "cell_started" ? e.rowIndex : null,
       );
       expect(rowIndices).toContain(0);
       expect(rowIndices).toContain(2);
@@ -449,6 +500,126 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(cellEvent.targetId).toBe("target-2");
       }
     }, 60000);
+
+    it("re-runs single evaluator with pre-computed target output", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [
+        { question: "Say hello", expected: "hello" },
+        { question: "Say world", expected: "world" },
+      ];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator on row 1 with pre-computed target output
+      // This simulates a user clicking "Rerun" on an evaluator chip
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 1,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          targetOutput: { output: "world" }, // Pre-computed output matching expected
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should only execute 1 cell (single evaluator)
+      const startEvent = events[0];
+      if (startEvent?.type === "execution_started") {
+        expect(startEvent.total).toBe(1);
+      }
+
+      // Should have cell_started event
+      const cellStartedEvents = events.filter((e) => e.type === "cell_started");
+      expect(cellStartedEvents).toHaveLength(1);
+
+      // Should NOT have target_result event (target was skipped)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents).toHaveLength(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      const evalResult = evaluatorResultEvents[0];
+      if (evalResult?.type === "evaluator_result") {
+        expect(evalResult.rowIndex).toBe(1);
+        expect(evalResult.targetId).toBe("target-1");
+        expect(evalResult.evaluatorId).toBe("eval-1");
+        // With output "world" matching expected "world", should pass
+        expect(evalResult.result.status).toBe("processed");
+        if (evalResult.result.status === "processed") {
+          expect(evalResult.result.passed).toBe(true);
+        }
+      }
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
+
+    it("re-runs single evaluator without pre-computed output (executes target too)", async () => {
+      const state = createTestState(
+        [createTargetConfig("target-1", "Target 1")],
+        [createEvaluatorConfig()],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      // Re-run evaluator without pre-computed output - should execute target too
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: {
+          type: "evaluator",
+          rowIndex: 0,
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          // No targetOutput - should run target
+        },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should have target_result event (target was executed)
+      const targetResultEvents = events.filter(
+        (e) => e.type === "target_result",
+      );
+      expect(targetResultEvents.length).toBeGreaterThan(0);
+
+      // Should have evaluator_result event
+      const evaluatorResultEvents = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResultEvents).toHaveLength(1);
+
+      // Should complete successfully
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
   });
 
   describe("error handling", () => {
@@ -462,11 +633,20 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "dataset-1": {
-            input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "question",
+            },
           },
         },
         localPromptConfig: {
-          llm: { model: "openai/nonexistent-model-xyz", temperature: 0, maxTokens: 50 },
+          llm: {
+            model: "openai/nonexistent-model-xyz",
+            temperature: 0,
+            maxTokens: 50,
+          },
           messages: [{ role: "user", content: "{{input}}" }],
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
@@ -500,7 +680,11 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       // Should have at least one successful result and one error
       const targetResults = events.filter((e) => e.type === "target_result");
-      const errors = events.filter((e) => e.type === "error" || (e.type === "target_result" && (e as any).error));
+      const errors = events.filter(
+        (e) =>
+          e.type === "error" ||
+          (e.type === "target_result" && (e as any).error),
+      );
 
       expect(targetResults.length + errors.length).toBeGreaterThan(0);
 
@@ -516,10 +700,10 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     it("executes evaluators after target and returns evaluator_result events", async () => {
       const state = createTestState(
         [createTargetConfig("target-1", "GPT-4o Mini")],
-        [createEvaluatorConfig()]  // Add exact_match evaluator
+        [createEvaluatorConfig()], // Add exact_match evaluator
       );
       const datasetRows = [
-        { question: "Say hello", expected: "hello" },  // May or may not match
+        { question: "Say hello", expected: "hello" }, // May or may not match
       ];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -543,7 +727,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       expect(targetResults.length).toBeGreaterThanOrEqual(1);
 
       // Should have evaluator_result events (one per row per evaluator per target)
-      const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
+      const evaluatorResults = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
       expect(evaluatorResults.length).toBeGreaterThanOrEqual(1);
 
       // Each evaluator result should have the correct structure
@@ -567,11 +753,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // as it's redundant with the passed field
       const state = createTestState(
         [createTargetConfig("target-1", "GPT-4o Mini")],
-        [createEvaluatorConfig()]
+        [createEvaluatorConfig()],
       );
-      const datasetRows = [
-        { question: "Say hello", expected: "hello" },
-      ];
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
         { id: "expected", name: "expected", type: "string" },
@@ -590,12 +774,17 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const events = await collectEvents(input);
 
       // Get the evaluator results
-      const evaluatorResults = events.filter((e) => e.type === "evaluator_result");
+      const evaluatorResults = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
       expect(evaluatorResults.length).toBeGreaterThanOrEqual(1);
 
       // Each evaluator result should NOT have a score (score should be stripped)
       for (const event of evaluatorResults) {
-        if (event.type === "evaluator_result" && event.result.status === "processed") {
+        if (
+          event.type === "evaluator_result" &&
+          event.result.status === "processed"
+        ) {
           expect(event.result.score).toBeUndefined();
           // But should still have passed field
           expect(event.result.passed).toBeDefined();
@@ -618,7 +807,12 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           "dataset-1": {
             "target-1": {
               // Missing output mapping - should cause error or be handled gracefully
-              expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
             },
           },
         },
@@ -626,7 +820,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       const state = createTestState(
         [createTargetConfig("target-1", "GPT-4o Mini")],
-        [evaluatorWithBadMapping]
+        [evaluatorWithBadMapping],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -653,11 +847,88 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const targetResults = events.filter((e) => e.type === "target_result");
       expect(targetResults.length).toBeGreaterThanOrEqual(1);
     }, 120000);
+
+    it("returns error status for invalid/unreachable evaluator type", async () => {
+      // Use an evaluator type that doesn't exist - should return error, not processed
+      const invalidEvaluator: EvaluatorConfig = {
+        id: "eval-invalid",
+        evaluatorType: "langevals/this_evaluator_does_not_exist" as any,
+        name: "Invalid Evaluator",
+        settings: {},
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected_output", type: "str" },
+        ],
+        mappings: {
+          "dataset-1": {
+            "target-1": {
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        },
+      };
+
+      const state = createTestState(
+        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [invalidEvaluator],
+      );
+      const datasetRows = [{ question: "Say hello", expected: "hello" }];
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: { type: "full" },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should still complete (gracefully handle error)
+      expect(events[events.length - 1]?.type).toBe("done");
+
+      // Target should succeed
+      const targetResults = events.filter((e) => e.type === "target_result");
+      expect(targetResults.length).toBe(1);
+
+      // Evaluator should return ERROR status, not "processed"
+      const evaluatorResults = events.filter(
+        (e) => e.type === "evaluator_result",
+      );
+      expect(evaluatorResults.length).toBe(1);
+
+      const evalResult = evaluatorResults[0];
+      if (evalResult?.type === "evaluator_result") {
+        // This is the key assertion - invalid evaluator should return error
+        expect(evalResult.result.status).toBe("error");
+        expect(evalResult.result.details).toBeDefined();
+        expect(evalResult.result.details).toContain("404");
+      }
+    }, 120000);
   });
 
   describe("execution summary", () => {
     it("provides accurate summary with duration", async () => {
-      const state = createTestState([createTargetConfig("target-1", "Target 1")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "Target 1"),
+      ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -687,9 +958,13 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Human-readable run IDs like "quick-agile-lynx" (adjective-adjective-noun pattern)
         expect(summary.runId).toMatch(/^[a-z]+-[a-z]+-[a-z]+$/);
         expect(summary.duration).toBeGreaterThan(0);
-        expect(summary.duration).toBeLessThanOrEqual(endTime - startTime + 1000);
+        expect(summary.duration).toBeLessThanOrEqual(
+          endTime - startTime + 1000,
+        );
         expect(summary.timestamps.startedAt).toBeGreaterThanOrEqual(startTime);
-        expect(summary.timestamps.finishedAt).toBeLessThanOrEqual(endTime + 1000);
+        expect(summary.timestamps.finishedAt).toBeLessThanOrEqual(
+          endTime + 1000,
+        );
       }
     }, 60000);
   });
@@ -697,7 +972,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("abort functionality", () => {
     it("stops execution when abort flag is set and emits stopped event", async () => {
       // Create state with multiple rows to ensure we can abort mid-execution
-      const state = createTestState([createTargetConfig("target-1", "Target 1")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "Target 1"),
+      ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
         { question: "Say two", expected: "two" },
@@ -754,7 +1031,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     }, 120000);
 
     it("preserves partial results when aborted", async () => {
-      const state = createTestState([createTargetConfig("target-1", "Target 1")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "Target 1"),
+      ]);
       const datasetRows = [
         { question: "Say alpha", expected: "alpha" },
         { question: "Say beta", expected: "beta" },
@@ -795,7 +1074,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       // Collect all successful target results
       const successfulResults = events.filter(
-        (e) => e.type === "target_result" && !("error" in e && e.error)
+        (e) => e.type === "target_result" && !("error" in e && e.error),
       );
 
       // Should have at least one result preserved
@@ -812,7 +1091,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("stops quickly even with many rows when abort is requested immediately", async () => {
       // This test verifies that abort is responsive even with many pending cells
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       // Create 20 rows - without abort this would take a long time
       const datasetRows = Array.from({ length: 20 }, (_, i) => ({
         question: `Say number ${i + 1}`,
@@ -869,13 +1150,15 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
   describe("empty row handling", () => {
     it("skips completely empty rows in full execution", async () => {
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [
-        { question: "Say hello", expected: "hello" },  // row 0 - non-empty
-        { question: "", expected: "" },                // row 1 - empty (skipped)
-        { question: "Say world", expected: "world" },  // row 2 - non-empty
-        { question: null, expected: null },            // row 3 - empty (skipped)
-        { question: "   ", expected: "   " },          // row 4 - whitespace only (skipped)
+        { question: "Say hello", expected: "hello" }, // row 0 - non-empty
+        { question: "", expected: "" }, // row 1 - empty (skipped)
+        { question: "Say world", expected: "world" }, // row 2 - non-empty
+        { question: null, expected: null }, // row 3 - empty (skipped)
+        { question: "   ", expected: "   " }, // row 4 - whitespace only (skipped)
       ];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -905,9 +1188,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       expect(cellStartedEvents).toHaveLength(2);
 
       // Should only have results for rows 0 and 2
-      const targetResults = events.filter((e) => e.type === "target_result") as Array<
-        Extract<EvaluationV3Event, { type: "target_result" }>
-      >;
+      const targetResults = events.filter(
+        (e) => e.type === "target_result",
+      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
       expect(targetResults).toHaveLength(2);
 
       const resultRowIndices = targetResults.map((r) => r.rowIndex).sort();
@@ -926,9 +1209,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         createTargetConfig("target-2", "GPT-4o Mini 2"),
       ]);
       const datasetRows = [
-        { question: "Say hello", expected: "hello" },  // row 0 - non-empty
-        { question: "", expected: "" },                // row 1 - empty (skipped)
-        { question: "Say world", expected: "world" },  // row 2 - non-empty
+        { question: "Say hello", expected: "hello" }, // row 0 - non-empty
+        { question: "", expected: "" }, // row 1 - empty (skipped)
+        { question: "Say world", expected: "world" }, // row 2 - non-empty
       ];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -954,9 +1237,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       }
 
       // Verify results are for correct rows
-      const targetResults = events.filter((e) => e.type === "target_result") as Array<
-        Extract<EvaluationV3Event, { type: "target_result" }>
-      >;
+      const targetResults = events.filter(
+        (e) => e.type === "target_result",
+      ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
       const resultRowIndices = targetResults.map((r) => r.rowIndex).sort();
       expect(resultRowIndices).toEqual([0, 2]);
     }, 60000);
@@ -965,9 +1248,11 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // When user explicitly requests a cell, we should attempt it even if empty
       // This test verifies the behavior - currently we skip empty rows in all scopes
       // If we want to change this behavior for explicit cell execution, we can adjust
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [
-        { question: "", expected: "" },  // row 0 - empty
+        { question: "", expected: "" }, // row 0 - empty
       ];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -994,7 +1279,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     }, 30000);
 
     it("handles dataset with all empty rows", async () => {
-      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      const state = createTestState([
+        createTargetConfig("target-1", "GPT-4o Mini"),
+      ]);
       const datasetRows = [
         { question: "", expected: "" },
         { question: null, expected: null },
@@ -1037,7 +1324,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // Import required modules for ES verification
       const { prisma } = await import("~/server/db");
       const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
 
       // Create a real experiment in the database (required for ES storage)
       const experimentId = `exp_${nanoid()}`;
@@ -1052,7 +1341,10 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       });
 
       try {
-        const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")], [createEvaluatorConfig()]);
+        const state = createTestState(
+          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createEvaluatorConfig()],
+        );
         const datasetRows = [
           { question: "Say hello", expected: "hello" },
           { question: "Say world", expected: "world" },
@@ -1064,14 +1356,14 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         const input: OrchestratorInput = {
           projectId: project.id,
-          experimentId,  // Pass experiment ID to enable storage
+          experimentId, // Pass experiment ID to enable storage
           scope: { type: "full" },
           state,
           datasetRows,
           datasetColumns,
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
-          saveToEs: true,  // Enable ES storage!
+          saveToEs: true, // Enable ES storage!
         };
 
         const events = await collectEvents(input);
@@ -1083,7 +1375,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         // Get the run ID from the execution_started event
         const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
         const runId = startEvent.runId;
 
         // Wait for ES to index
@@ -1137,7 +1430,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(storedRun?.timestamps.finished_at).toBeDefined();
 
         // Clean up - delete the ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import("~/server/elasticsearch");
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
         const client = await esClient({ projectId: project.id });
         await client.deleteByQuery({
           index: BATCH_EVALUATION_INDEX.alias,
@@ -1154,14 +1449,18 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         });
       } finally {
         // Clean up experiment
-        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
       }
     }, 120000);
 
     it("does not store to Elasticsearch when saveToEs is false", async () => {
       const { prisma } = await import("~/server/db");
       const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
 
       const experimentId = `exp_${nanoid()}`;
       await prisma.experiment.create({
@@ -1175,7 +1474,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       });
 
       try {
-        const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+        const state = createTestState([
+          createTargetConfig("target-1", "GPT-4o Mini"),
+        ]);
         const datasetRows = [{ question: "Say hello", expected: "hello" }];
         const datasetColumns = [
           { id: "question", name: "question", type: "string" },
@@ -1191,14 +1492,15 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           datasetColumns,
           loadedPrompts: new Map(),
           loadedAgents: new Map(),
-          saveToEs: false,  // Explicitly disabled
+          saveToEs: false, // Explicitly disabled
         };
 
         const events = await collectEvents(input);
 
         // Get run ID
         const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
         const runId = startEvent.runId;
 
         // Wait a bit
@@ -1214,14 +1516,18 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         expect(storedRun).toBeNull();
       } finally {
-        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
       }
     }, 60000);
 
     it("stores model from loadedPrompts when target has no localPromptConfig", async () => {
       const { prisma } = await import("~/server/db");
       const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
 
       const experimentId = `exp_${nanoid()}`;
       const promptId = `prompt_${nanoid()}`;
@@ -1241,14 +1547,19 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           id: "target-1",
           type: "prompt",
           name: "Saved Prompt Target",
-          promptId: promptId,  // Reference to saved prompt
+          promptId: promptId, // Reference to saved prompt
           promptVersionId: "version-1",
           promptVersionNumber: 1,
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {
             "dataset-1": {
-              input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
             },
           },
           // NOTE: no localPromptConfig - this is the scenario we're testing
@@ -1270,7 +1581,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           version: 1,
           versionId: "version-1",
           versionCreatedAt: new Date(),
-          model: "openai/gpt-4-turbo",  // This should be stored
+          model: "openai/gpt-4-turbo", // This should be stored
           temperature: 0.7,
           maxTokens: 100,
           prompt: "You are a helpful assistant.",
@@ -1298,7 +1609,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           state,
           datasetRows,
           datasetColumns,
-          loadedPrompts,  // Pass loaded prompts
+          loadedPrompts, // Pass loaded prompts
           loadedAgents: new Map(),
           saveToEs: true,
         };
@@ -1311,7 +1622,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         // Get the run ID
         const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
         const runId = startEvent.runId;
 
         // Wait for ES to index
@@ -1333,7 +1645,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(storedRun?.targets?.[0]?.model).toBe("openai/gpt-4-turbo");
 
         // Clean up ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import("~/server/elasticsearch");
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
         const client = await esClient({ projectId: project.id });
         await client.deleteByQuery({
           index: BATCH_EVALUATION_INDEX.alias,
@@ -1349,7 +1663,144 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           },
         });
       } finally {
-        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("stores errors to Elasticsearch when cell execution fails", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
+
+      const experimentId = `exp_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "Error Storage Test",
+          slug: `error-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        // Create a target with an invalid model to cause an error
+        const targetConfig: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          name: "Failing Target",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+            },
+          },
+          localPromptConfig: {
+            llm: {
+              model: "openai/invalid-model-that-does-not-exist",
+              temperature: 0,
+              maxTokens: 50,
+            },
+            messages: [{ role: "user", content: "{{input}}" }],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        };
+
+        const state = createTestState([targetConfig]);
+        const datasetRows = [{ question: "Test question" }];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+        ];
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          saveToEs: true,
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed (even with errors)
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+
+        // Verify there was an error
+        const errorEvents = events.filter(
+          (e) =>
+            e.type === "error" ||
+            (e.type === "target_result" && (e as any).error),
+        );
+        expect(errorEvents.length).toBeGreaterThan(0);
+
+        // Get the run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify error was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        expect(storedRun).not.toBeNull();
+
+        // Verify dataset entry has error field populated
+        expect(storedRun?.dataset).toBeDefined();
+        expect(storedRun?.dataset?.length).toBeGreaterThan(0);
+
+        const entryWithError = storedRun?.dataset?.find(
+          (d) => d.error !== null && d.error !== undefined,
+        );
+        expect(entryWithError).toBeDefined();
+        expect(entryWithError?.error).toBeTruthy();
+        expect(typeof entryWithError?.error).toBe("string");
+
+        // Clean up ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
       }
     }, 120000);
   });

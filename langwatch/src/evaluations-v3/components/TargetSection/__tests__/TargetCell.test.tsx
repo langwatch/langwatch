@@ -2,13 +2,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-import { TargetCellContent } from "../TargetCell";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TargetConfig } from "../../../types";
+import { TargetCellContent } from "../TargetCell";
 
 // Mock hooks
 const mockOpenDrawer = vi.fn();
@@ -69,7 +68,7 @@ describe("TargetCellContent", () => {
           row={0}
           traceId="trace_abc123"
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const traceButton = screen.getByTestId("trace-link-target-1");
@@ -77,7 +76,9 @@ describe("TargetCellContent", () => {
     });
 
     it("opens trace drawer when trace button is clicked", async () => {
-      const user = (await import("@testing-library/user-event")).default.setup();
+      const user = (
+        await import("@testing-library/user-event")
+      ).default.setup();
       const target = createTarget();
 
       render(
@@ -88,13 +89,15 @@ describe("TargetCellContent", () => {
           row={0}
           traceId="trace_abc123"
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const traceButton = screen.getByTestId("trace-link-target-1");
       await user.click(traceButton);
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("traceDetails", { traceId: "trace_abc123" });
+      expect(mockOpenDrawer).toHaveBeenCalledWith("traceDetails", {
+        traceId: "trace_abc123",
+      });
     });
 
     it("does not render trace button when traceId is null", () => {
@@ -108,10 +111,12 @@ describe("TargetCellContent", () => {
           row={0}
           traceId={null}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
-      expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("trace-link-target-1"),
+      ).not.toBeInTheDocument();
     });
 
     it("does not render trace button when traceId is undefined", () => {
@@ -124,10 +129,12 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
-      expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("trace-link-target-1"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -142,7 +149,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Hello world")).toBeInTheDocument();
@@ -158,7 +165,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("No output yet")).toBeInTheDocument();
@@ -175,11 +182,13 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Skeleton elements should be present
-      expect(container.querySelector('[class*="skeleton"]')).toBeInTheDocument();
+      expect(
+        container.querySelector('[class*="skeleton"]'),
+      ).toBeInTheDocument();
     });
 
     it("renders error message when error is provided", () => {
@@ -193,7 +202,7 @@ describe("TargetCellContent", () => {
           row={0}
           error="Something went wrong"
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
@@ -210,7 +219,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should contain the JSON key
@@ -232,7 +241,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show truncated indicator
@@ -249,7 +258,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.queryByText("(truncated)")).not.toBeInTheDocument();
@@ -267,7 +276,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Output text should be present
@@ -285,7 +294,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // The text should be in the document (pre-wrap preserves newlines)
@@ -332,7 +341,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Find and click the output text
@@ -341,7 +350,9 @@ describe("TargetCellContent", () => {
 
       // Expanded view should appear - indicated by having 2 Add evaluator buttons
       await waitFor(() => {
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+        const addButtons = screen.getAllByTestId(
+          `add-evaluator-button-${target.id}`,
+        );
         expect(addButtons.length).toBe(2);
       });
     });
@@ -358,7 +369,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -367,7 +378,9 @@ describe("TargetCellContent", () => {
 
       // Wait for expanded view to appear
       await waitFor(() => {
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+        const addButtons = screen.getAllByTestId(
+          `add-evaluator-button-${target.id}`,
+        );
         expect(addButtons.length).toBe(2);
       });
 
@@ -377,7 +390,9 @@ describe("TargetCellContent", () => {
 
       // Expanded view should close - only 1 Add evaluator button
       await waitFor(() => {
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+        const addButtons = screen.getAllByTestId(
+          `add-evaluator-button-${target.id}`,
+        );
         expect(addButtons.length).toBe(1);
       });
     });
@@ -394,7 +409,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -404,7 +419,9 @@ describe("TargetCellContent", () => {
       // Should still show Add evaluator button in expanded view
       await waitFor(() => {
         // There should be 2 Add evaluator buttons now (one in collapsed, one in expanded)
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+        const addButtons = screen.getAllByTestId(
+          `add-evaluator-button-${target.id}`,
+        );
         expect(addButtons.length).toBe(2);
       });
     });
@@ -423,7 +440,7 @@ describe("TargetCellContent", () => {
           traceId="trace_123"
           onRunCell={() => {}}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -454,7 +471,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Click the output text
@@ -462,7 +479,9 @@ describe("TargetCellContent", () => {
       await user.click(outputText);
 
       // Expanded view should NOT appear (only 1 Add evaluator button)
-      const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+      const addButtons = screen.getAllByTestId(
+        `add-evaluator-button-${target.id}`,
+      );
       expect(addButtons.length).toBe(1);
     });
   });
@@ -489,7 +508,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Find the fade overlay element by class
@@ -509,7 +528,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Fade overlay should not be present
@@ -528,7 +547,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const fadeOverlay = container.querySelector(".cell-fade-overlay");
@@ -561,7 +580,7 @@ describe("TargetCellContent", () => {
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Click the fade overlay
@@ -573,7 +592,9 @@ describe("TargetCellContent", () => {
 
       // Expanded view should appear (2 Add evaluator buttons)
       await waitFor(() => {
-        const addButtons = screen.getAllByTestId(`add-evaluator-button-${target.id}`);
+        const addButtons = screen.getAllByTestId(
+          `add-evaluator-button-${target.id}`,
+        );
         expect(addButtons.length).toBe(2);
       });
     });
@@ -591,7 +612,7 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
@@ -613,7 +634,7 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
@@ -622,7 +643,9 @@ describe("TargetCellContent", () => {
 
       // Should NOT show the existing output text
       expect(
-        screen.queryByText("This is existing output that should be hidden during loading")
+        screen.queryByText(
+          "This is existing output that should be hidden during loading",
+        ),
       ).not.toBeInTheDocument();
     });
 
@@ -637,7 +660,7 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={false}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should NOT show skeleton

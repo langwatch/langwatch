@@ -5,20 +5,21 @@
  * Each evaluator gets its own chart (score or pass rate).
  * Supports different X-axis groupings (by run, target, model, prompt, custom metadata).
  */
-import { useMemo, useState, useEffect, useRef } from "react";
+
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
 } from "recharts";
 
-import type { ComparisonRunData, BatchEvaluationData } from "./types";
+import type { BatchEvaluationData, ComparisonRunData } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
 /** Metric types that can be displayed */
@@ -71,8 +72,19 @@ const calculateYAxisWidth = (
   return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
 };
 
-/** Threshold for rotating X-axis labels */
+/** Threshold for rotating X-axis labels (item count) */
 const ROTATE_LABELS_THRESHOLD = 3;
+
+/** Max label length before truncating (normal) */
+const MAX_LABEL_LENGTH = 14;
+/** Max label length when rotated */
+const MAX_LABEL_LENGTH_ROTATED = 10;
+
+/** Truncate a label and add ellipsis if too long */
+const truncateLabel = (label: string, maxLength = MAX_LABEL_LENGTH): string => {
+  if (label.length <= maxLength) return label;
+  return label.slice(0, maxLength - 1) + "…";
+};
 
 /** Chart height when labels are rotated (needs more space) */
 const CHART_HEIGHT_ROTATED = 190;
@@ -101,11 +113,6 @@ type ComparisonChartsProps = {
   onXAxisOptionChange?: (option: XAxisOption) => void;
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
-};
-
-type ChartDataPoint = {
-  name: string;
-  [key: string]: string | number | undefined;
 };
 
 type EvaluatorMetrics = {
@@ -305,7 +312,7 @@ export const ComparisonCharts = ({
 
   const [internalVisible, setInternalVisible] = useState(shouldShowByDefault);
   const isVisible = controlledVisible ?? internalVisible;
-  const setIsVisible = (visible: boolean) => {
+  const _setIsVisible = (visible: boolean) => {
     if (onVisibilityChange) {
       onVisibilityChange(visible);
     } else {
@@ -369,6 +376,7 @@ export const ComparisonCharts = ({
       .filter((run) => run.data !== null)
       .map((run) => ({
         runId: run.runId,
+        runName: run.runName,
         color: run.color,
         createdAt: run.data!.createdAt,
         metrics: computeRunMetrics(run.data!),
@@ -422,7 +430,7 @@ export const ComparisonCharts = ({
   const chartData = useMemo(() => {
     if (xAxisOption === "runs") {
       return runMetrics.map((run) => ({
-        name: run.runId.slice(0, 15),
+        name: run.runName,
         color: run.color,
         cost: run.metrics.totalCost,
         latency: run.metrics.avgLatency,
@@ -516,110 +524,130 @@ export const ComparisonCharts = ({
       }));
     }
 
-    // Group by target property or metadata value
-    // For model, prompt - we group by the value across all targets
-    const groups = new Map<string, typeof runMetrics>();
-    for (const run of runMetrics) {
-      // Get the value from targets - check both top-level properties and metadata
-      let value: string | number | boolean | undefined;
+    // Group by target property or metadata value (model, prompt, custom metadata)
+    // This works per-target (like "target" grouping), grouping by the property value
+    // E.g., for "model": all targets with model="openai/gpt-4" are grouped together
+    const propertyGroups = new Map<
+      string,
+      {
+        displayName: string;
+        costs: number[];
+        latencies: number[];
+        scores: Record<string, number[]>;
+        passRates: Record<string, number[]>;
+      }
+    >();
 
-      for (const targetCol of run.targetColumns) {
-        // Check top-level properties first
-        if (xAxisOption === "model" && targetCol.model) {
-          value = targetCol.model;
-          break;
-        }
-        // For prompt, combine promptId and version to create unique key
-        if (xAxisOption === "prompt" && targetCol.promptId) {
-          const version = targetCol.promptVersion;
-          value =
-            version !== undefined && version !== null
-              ? `${targetCol.promptId}::v${version}`
-              : targetCol.promptId;
-          break;
-        }
-        // Check metadata
-        if (targetCol.metadata?.[xAxisOption] !== undefined) {
-          value = targetCol.metadata[xAxisOption];
-          break;
-        }
+    // Helper to get the grouping key from a target
+    const getGroupKey = (
+      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
+    ): string | undefined => {
+      // Check top-level model property first
+      if (xAxisOption === "model") {
+        if (targetCol.model) return targetCol.model;
+        if (targetCol.metadata?.model) return String(targetCol.metadata.model);
+        return undefined;
       }
 
-      const key = String(value ?? "unknown");
-      const existing = groups.get(key) ?? [];
-      existing.push(run);
-      groups.set(key, existing);
-    }
-
-    // Average metrics within each group
-    return Array.from(groups.entries()).map(([key, runs]) => {
-      const avgCost =
-        runs.reduce((a, r) => a + r.metrics.totalCost, 0) / runs.length;
-      const avgLatency =
-        runs.reduce((a, r) => a + r.metrics.avgLatency, 0) / runs.length;
-
-      // Average each evaluator score
-      const allScoreIds = new Set(
-        runs.flatMap((r) => Object.keys(r.metrics.avgScores)),
-      );
-      const avgScores: Record<string, number> = {};
-      for (const evalId of allScoreIds) {
-        const scores = runs
-          .map((r) => r.metrics.avgScores[evalId])
-          .filter((s): s is number => s !== undefined);
-        if (scores.length > 0) {
-          avgScores[`score_${evalId}`] =
-            scores.reduce((a, b) => a + b, 0) / scores.length;
+      // For prompt, combine promptId and version
+      if (xAxisOption === "prompt") {
+        if (!targetCol.promptId) {
+          // Check metadata for prompt_id
+          if (targetCol.metadata?.prompt_id) {
+            const version =
+              targetCol.promptVersion ?? targetCol.metadata?.version;
+            return version !== undefined && version !== null
+              ? `${targetCol.metadata.prompt_id}::v${version}`
+              : String(targetCol.metadata.prompt_id);
+          }
+          return undefined;
         }
+        const version = targetCol.promptVersion;
+        return version !== undefined && version !== null
+          ? `${targetCol.promptId}::v${version}`
+          : targetCol.promptId;
       }
 
-      // Average each evaluator pass rate
-      const allPassIds = new Set(
-        runs.flatMap((r) => Object.keys(r.metrics.passRates)),
-      );
-      const avgPassRates: Record<string, number> = {};
-      for (const evalId of allPassIds) {
-        const rates = runs
-          .map((r) => r.metrics.passRates[evalId])
-          .filter((s): s is number => s !== undefined);
-        if (rates.length > 0) {
-          avgPassRates[`pass_${evalId}`] =
-            rates.reduce((a, b) => a + b, 0) / rates.length;
-        }
+      // For custom metadata keys
+      if (targetCol.metadata?.[xAxisOption] !== undefined) {
+        return String(targetCol.metadata[xAxisOption]);
       }
 
-      // Format name for prompt (shows "promptName (v1)" format)
-      let displayName = key;
+      return undefined;
+    };
+
+    // Helper to get display name for a group key
+    const getDisplayName = (
+      key: string,
+      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
+    ): string => {
       if (xAxisOption === "prompt") {
         // Key is in format "promptId::vN" or just "promptId"
         const [promptId, versionPart] = key.split("::");
-
-        // Build prompt name from targetColumns - find target with matching promptId
-        let resolvedPromptName: string =
-          promptNames[promptId ?? ""] ?? promptId ?? key;
-        for (const run of runs) {
-          for (const targetCol of run.targetColumns) {
-            if (targetCol.promptId === promptId && targetCol.name) {
-              resolvedPromptName = targetCol.name;
-              break;
-            }
-          }
-          if (resolvedPromptName !== promptId) break;
-        }
-
-        displayName = versionPart
+        const resolvedPromptName =
+          promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
+        return versionPart
           ? `${resolvedPromptName} (${versionPart})`
           : resolvedPromptName;
       }
+      return key;
+    };
 
-      return {
-        name: displayName,
-        cost: avgCost,
-        latency: avgLatency,
-        ...avgScores,
-        ...avgPassRates,
-      };
-    });
+    for (const run of runMetrics) {
+      for (const targetCol of run.targetColumns) {
+        const key = getGroupKey(targetCol);
+        if (!key) continue;
+
+        // Compute metrics for THIS target only
+        const targetMetrics = computeTargetMetrics(run.rows, targetCol.id);
+
+        const existing = propertyGroups.get(key) ?? {
+          displayName: getDisplayName(key, targetCol),
+          costs: [],
+          latencies: [],
+          scores: {},
+          passRates: {},
+        };
+
+        // Add this target's metrics
+        existing.costs.push(targetMetrics.totalCost);
+        if (targetMetrics.avgLatency > 0) {
+          existing.latencies.push(targetMetrics.avgLatency);
+        }
+
+        // Aggregate evaluator metrics
+        for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
+          if (!existing.scores[evalId]) existing.scores[evalId] = [];
+          existing.scores[evalId]!.push(score);
+        }
+        for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
+          if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
+          existing.passRates[evalId]!.push(rate);
+        }
+
+        propertyGroups.set(key, existing);
+      }
+    }
+
+    return Array.from(propertyGroups.entries()).map(([_key, data]) => ({
+      name: data.displayName,
+      cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
+      latency:
+        data.latencies.reduce((a, b) => a + b, 0) /
+        (data.latencies.length || 1),
+      ...Object.fromEntries(
+        Object.entries(data.scores).map(([k, v]) => [
+          `score_${k}`,
+          v.reduce((a, b) => a + b, 0) / v.length,
+        ]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(data.passRates).map(([k, v]) => [
+          `pass_${k}`,
+          v.reduce((a, b) => a + b, 0) / v.length,
+        ]),
+      ),
+    }));
   }, [runMetrics, xAxisOption, promptNames]);
 
   // Calculate dynamic Y-axis widths based on data
@@ -776,7 +804,13 @@ export const ComparisonCharts = ({
 
   return (
     isVisible && (
-      <VStack width="100%" align="stretch" gap={4} marginBottom={4} flexShrink={0}>
+      <VStack
+        width="100%"
+        align="stretch"
+        gap={4}
+        marginBottom={4}
+        flexShrink={0}
+      >
         <VStack width="100%" align="stretch" gap={2}>
           {/* Controls row: Group by selector + Metrics selector */}
           <HStack wrap="wrap" gap={2} paddingX={2}>
@@ -954,7 +988,7 @@ export const ComparisonCharts = ({
                   Total Cost
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
@@ -969,6 +1003,14 @@ export const ComparisonCharts = ({
                       angle={shouldRotateLabels ? -45 : 0}
                       textAnchor={shouldRotateLabels ? "end" : "middle"}
                       height={shouldRotateLabels ? 60 : 25}
+                      tickFormatter={(value) =>
+                        truncateLabel(
+                          String(value),
+                          shouldRotateLabels
+                            ? MAX_LABEL_LENGTH_ROTATED
+                            : MAX_LABEL_LENGTH,
+                        )
+                      }
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1018,7 +1060,7 @@ export const ComparisonCharts = ({
                   Avg Latency
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
@@ -1033,6 +1075,14 @@ export const ComparisonCharts = ({
                       angle={shouldRotateLabels ? -45 : 0}
                       textAnchor={shouldRotateLabels ? "end" : "middle"}
                       height={shouldRotateLabels ? 60 : 25}
+                      tickFormatter={(value) =>
+                        truncateLabel(
+                          String(value),
+                          shouldRotateLabels
+                            ? MAX_LABEL_LENGTH_ROTATED
+                            : MAX_LABEL_LENGTH,
+                        )
+                      }
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1085,7 +1135,10 @@ export const ComparisonCharts = ({
                       {ev.name} (Score)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData}>
+                      <BarChart
+                        data={chartData}
+                        margin={{ left: 10, right: 10 }}
+                      >
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1100,6 +1153,14 @@ export const ComparisonCharts = ({
                           angle={shouldRotateLabels ? -45 : 0}
                           textAnchor={shouldRotateLabels ? "end" : "middle"}
                           height={shouldRotateLabels ? 60 : 25}
+                          tickFormatter={(value) =>
+                            truncateLabel(
+                              String(value),
+                              shouldRotateLabels
+                                ? MAX_LABEL_LENGTH_ROTATED
+                                : MAX_LABEL_LENGTH,
+                            )
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1153,7 +1214,10 @@ export const ComparisonCharts = ({
                       {ev.name} (Pass Rate)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData}>
+                      <BarChart
+                        data={chartData}
+                        margin={{ left: 10, right: 10 }}
+                      >
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1168,6 +1232,14 @@ export const ComparisonCharts = ({
                           angle={shouldRotateLabels ? -45 : 0}
                           textAnchor={shouldRotateLabels ? "end" : "middle"}
                           height={shouldRotateLabels ? 60 : 25}
+                          tickFormatter={(value) =>
+                            truncateLabel(
+                              String(value),
+                              shouldRotateLabels
+                                ? MAX_LABEL_LENGTH_ROTATED
+                                : MAX_LABEL_LENGTH,
+                            )
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}

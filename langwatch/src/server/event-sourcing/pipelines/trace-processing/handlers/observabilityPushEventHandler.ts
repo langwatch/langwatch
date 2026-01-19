@@ -1,10 +1,10 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { sseService } from "../../../../../server/services/sse.service";
 import { createLogger } from "../../../../../utils/logger";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
-import type { SpanReceivedEvent } from "../schemas/events";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
-import { sseService } from "../../../../../server/services/sse.service";
+import type { SpanReceivedEvent } from "../schemas/events";
 
 /**
  * Event handler that broadcasts trace update notifications via SSE.

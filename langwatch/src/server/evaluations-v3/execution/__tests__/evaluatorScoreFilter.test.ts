@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { shouldStripScore, buildStripScoreEvaluatorIds } from "../evaluatorScoreFilter";
+import { describe, expect, it } from "vitest";
+import {
+  buildStripScoreEvaluatorIds,
+  shouldStripScore,
+} from "../evaluatorScoreFilter";
 
 describe("evaluatorScoreFilter", () => {
   describe("shouldStripScore", () => {

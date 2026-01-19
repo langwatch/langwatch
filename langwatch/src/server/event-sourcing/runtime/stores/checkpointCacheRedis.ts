@@ -1,5 +1,5 @@
-import type { Cluster } from "ioredis";
 import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import { createLogger } from "../../../../utils/logger";
 
 /**

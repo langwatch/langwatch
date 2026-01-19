@@ -8,13 +8,13 @@ import {
 } from "@chakra-ui/react";
 import { CheckSquare, Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
-import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
-import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
-import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
+import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
+import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
+import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
+import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -120,7 +120,9 @@ function Page() {
 
       {/* Evaluator management drawers */}
       <EvaluatorListDrawer open={drawerOpen("evaluatorList")} />
-      <EvaluatorCategorySelectorDrawer open={drawerOpen("evaluatorCategorySelector")} />
+      <EvaluatorCategorySelectorDrawer
+        open={drawerOpen("evaluatorCategorySelector")}
+      />
       <EvaluatorTypeSelectorDrawer open={drawerOpen("evaluatorTypeSelector")} />
       <EvaluatorEditorDrawer open={drawerOpen("evaluatorEditor")} />
     </DashboardLayout>

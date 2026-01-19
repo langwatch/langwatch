@@ -5,7 +5,13 @@
  * This tests the full rendering path, not just the store update.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,8 +22,8 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -242,9 +248,13 @@ describe("Cell editing display - saved dataset", () => {
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-question_0")).toHaveTextContent("What is 2+2?");
+      expect(screen.getByTestId("cell-0-question_0")).toHaveTextContent(
+        "What is 2+2?",
+      );
       expect(screen.getByTestId("cell-0-answer_1")).toHaveTextContent("4");
-      expect(screen.getByTestId("cell-1-question_0")).toHaveTextContent("What is the capital?");
+      expect(screen.getByTestId("cell-1-question_0")).toHaveTextContent(
+        "What is the capital?",
+      );
     });
   });
 
@@ -307,7 +317,9 @@ describe("Auto-add empty row at end", () => {
       await user.type(textarea, `row ${i}`);
       await user.keyboard("{Enter}");
       await waitFor(() => {
-        expect(screen.getByTestId(`cell-${i}-input`)).toHaveTextContent(`row ${i}`);
+        expect(screen.getByTestId(`cell-${i}-input`)).toHaveTextContent(
+          `row ${i}`,
+        );
       });
     }
 
@@ -329,9 +341,7 @@ describe("Saved dataset - adding new rows", () => {
       name: "Small Dataset",
       type: "saved",
       datasetId: "db-123",
-      columns: [
-        { id: "col1_0", name: "col1", type: "string" },
-      ],
+      columns: [{ id: "col1_0", name: "col1", type: "string" }],
       savedRecords: [
         { id: "rec1", col1: "value1" },
         { id: "rec2", col1: "value2" },
@@ -363,7 +373,7 @@ describe("Saved dataset - adding new rows", () => {
     // Wait for initial render
     await waitFor(
       () => {
-      expect(screen.getByTestId("cell-2-col1_0")).toBeInTheDocument();
+        expect(screen.getByTestId("cell-2-col1_0")).toBeInTheDocument();
       },
       { timeout: 5000 },
     );
@@ -378,7 +388,9 @@ describe("Saved dataset - adding new rows", () => {
     // Value should appear
     await waitFor(
       () => {
-      expect(screen.getByTestId("cell-2-col1_0")).toHaveTextContent("new value");
+        expect(screen.getByTestId("cell-2-col1_0")).toHaveTextContent(
+          "new value",
+        );
       },
       { timeout: 5000 },
     );
@@ -460,9 +472,9 @@ describe("Saved dataset - DB sync sends full record", () => {
 
     // CRITICAL: The updatedRecord should contain ALL columns, not just the changed one
     expect(mutationCall.updatedRecord).toEqual({
-      foo: "foo_value",  // Unchanged - should still be present
-      bar: "bar_value",  // Unchanged - should still be present
-      baz: "qux",        // Changed
+      foo: "foo_value", // Unchanged - should still be present
+      bar: "bar_value", // Unchanged - should still be present
+      baz: "qux", // Changed
     });
   });
 
@@ -484,7 +496,9 @@ describe("Saved dataset - DB sync sends full record", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-foo_0")).toHaveTextContent("updated_foo");
+      expect(screen.getByTestId("cell-0-foo_0")).toHaveTextContent(
+        "updated_foo",
+      );
     });
 
     // Edit 'bar' column
@@ -496,7 +510,9 @@ describe("Saved dataset - DB sync sends full record", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-bar_1")).toHaveTextContent("updated_bar");
+      expect(screen.getByTestId("cell-0-bar_1")).toHaveTextContent(
+        "updated_bar",
+      );
     });
 
     // Advance timers to trigger sync
@@ -508,11 +524,12 @@ describe("Saved dataset - DB sync sends full record", () => {
     });
 
     // Get the last call (after both edits)
-    const lastCall = mockUpdateMutate.mock.calls[mockUpdateMutate.mock.calls.length - 1]?.[0];
+    const lastCall =
+      mockUpdateMutate.mock.calls[mockUpdateMutate.mock.calls.length - 1]?.[0];
     expect(lastCall.updatedRecord).toEqual({
       foo: "updated_foo",
       bar: "updated_bar",
-      baz: "baz_value",  // Should still have original value
+      baz: "baz_value", // Should still have original value
     });
   });
 });

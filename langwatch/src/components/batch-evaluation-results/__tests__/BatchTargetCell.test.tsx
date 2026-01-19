@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchTargetCell } from "../BatchTargetCell";
 import type { BatchTargetOutput } from "../types";
@@ -25,7 +25,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 // Helper to create target output data
 const createTargetOutput = (
-  overrides: Partial<BatchTargetOutput> = {}
+  overrides: Partial<BatchTargetOutput> = {},
 ): BatchTargetOutput => ({
   targetId: "target-1",
   output: { response: "Test output" },
@@ -189,9 +189,7 @@ describe("BatchTargetCell", () => {
       });
 
       // Latency is shown in action buttons on hover, check data-testid
-      expect(
-        screen.getByTestId("latency-target-1")
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("latency-target-1")).toBeInTheDocument();
       expect(screen.getByText("1.5s")).toBeInTheDocument();
     });
   });

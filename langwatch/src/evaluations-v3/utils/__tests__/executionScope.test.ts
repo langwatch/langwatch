@@ -1,22 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ExecutionScope } from "~/server/evaluations-v3/execution/types";
 import {
   computeExecutionCells,
   createExecutionCellSet,
-  isCellInExecution,
   getExecutionCellCount,
   getExecutionRowIndices,
   getExecutionTargetIds,
+  isCellInExecution,
 } from "../executionScope";
-import type { ExecutionScope } from "~/server/evaluations-v3/execution/types";
 
 describe("executionScope utilities", () => {
   // Sample data for tests
   const targetIds = ["target-1", "target-2"];
   const datasetRows = [
-    { question: "Hello", expected: "Hi" },         // row 0 - non-empty
-    { question: "World", expected: "Earth" },      // row 1 - non-empty
-    { question: "", expected: "" },                // row 2 - empty (should be skipped)
-    { question: "Foo", expected: "Bar" },          // row 3 - non-empty
+    { question: "Hello", expected: "Hi" }, // row 0 - non-empty
+    { question: "World", expected: "Earth" }, // row 1 - non-empty
+    { question: "", expected: "" }, // row 2 - empty (should be skipped)
+    { question: "Foo", expected: "Bar" }, // row 3 - non-empty
   ];
 
   describe("computeExecutionCells", () => {
@@ -69,7 +69,10 @@ describe("executionScope utilities", () => {
       });
 
       it("filters out invalid row indices", () => {
-        const scope: ExecutionScope = { type: "rows", rowIndices: [0, 100, -1] };
+        const scope: ExecutionScope = {
+          type: "rows",
+          rowIndices: [0, 100, -1],
+        };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         // Only row 0 is valid
@@ -109,7 +112,10 @@ describe("executionScope utilities", () => {
       });
 
       it("returns empty array for non-existent target", () => {
-        const scope: ExecutionScope = { type: "target", targetId: "target-999" };
+        const scope: ExecutionScope = {
+          type: "target",
+          targetId: "target-999",
+        };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         expect(cells).toHaveLength(0);
@@ -118,7 +124,11 @@ describe("executionScope utilities", () => {
 
     describe("cell scope", () => {
       it("returns exactly one cell for a single cell execution", () => {
-        const scope: ExecutionScope = { type: "cell", targetId: "target-1", rowIndex: 0 };
+        const scope: ExecutionScope = {
+          type: "cell",
+          targetId: "target-1",
+          rowIndex: 0,
+        };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         expect(cells).toHaveLength(1);
@@ -126,21 +136,33 @@ describe("executionScope utilities", () => {
       });
 
       it("returns empty array when cell row is empty", () => {
-        const scope: ExecutionScope = { type: "cell", targetId: "target-1", rowIndex: 2 }; // row 2 is empty
+        const scope: ExecutionScope = {
+          type: "cell",
+          targetId: "target-1",
+          rowIndex: 2,
+        }; // row 2 is empty
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         expect(cells).toHaveLength(0);
       });
 
       it("returns empty array for non-existent target in cell scope", () => {
-        const scope: ExecutionScope = { type: "cell", targetId: "target-999", rowIndex: 0 };
+        const scope: ExecutionScope = {
+          type: "cell",
+          targetId: "target-999",
+          rowIndex: 0,
+        };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         expect(cells).toHaveLength(0);
       });
 
       it("returns empty array for out-of-bounds row index", () => {
-        const scope: ExecutionScope = { type: "cell", targetId: "target-1", rowIndex: 100 };
+        const scope: ExecutionScope = {
+          type: "cell",
+          targetId: "target-1",
+          rowIndex: 100,
+        };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
 
         expect(cells).toHaveLength(0);
@@ -150,14 +172,22 @@ describe("executionScope utilities", () => {
     describe("edge cases", () => {
       it("handles empty dataset", () => {
         const scope: ExecutionScope = { type: "full" };
-        const cells = computeExecutionCells({ scope, targetIds, datasetRows: [] });
+        const cells = computeExecutionCells({
+          scope,
+          targetIds,
+          datasetRows: [],
+        });
 
         expect(cells).toHaveLength(0);
       });
 
       it("handles empty targets list", () => {
         const scope: ExecutionScope = { type: "full" };
-        const cells = computeExecutionCells({ scope, targetIds: [], datasetRows });
+        const cells = computeExecutionCells({
+          scope,
+          targetIds: [],
+          datasetRows,
+        });
 
         expect(cells).toHaveLength(0);
       });
@@ -168,7 +198,11 @@ describe("executionScope utilities", () => {
           { question: "   ", expected: null },
         ];
         const scope: ExecutionScope = { type: "full" };
-        const cells = computeExecutionCells({ scope, targetIds, datasetRows: allEmptyRows });
+        const cells = computeExecutionCells({
+          scope,
+          targetIds,
+          datasetRows: allEmptyRows,
+        });
 
         expect(cells).toHaveLength(0);
       });
@@ -200,7 +234,11 @@ describe("executionScope utilities", () => {
     });
 
     it("returns correct count for single cell", () => {
-      const scope: ExecutionScope = { type: "cell", targetId: "target-1", rowIndex: 0 };
+      const scope: ExecutionScope = {
+        type: "cell",
+        targetId: "target-1",
+        rowIndex: 0,
+      };
       const count = getExecutionCellCount({ scope, targetIds, datasetRows });
 
       expect(count).toBe(1);
@@ -248,7 +286,11 @@ describe("executionScope utilities", () => {
   describe("real-world scenarios", () => {
     it("scenario: user runs single cell on row that already has results", () => {
       // Row 0 already has results, user clicks to re-run just target-1
-      const scope: ExecutionScope = { type: "cell", targetId: "target-1", rowIndex: 0 };
+      const scope: ExecutionScope = {
+        type: "cell",
+        targetId: "target-1",
+        rowIndex: 0,
+      };
       const cells = computeExecutionCells({ scope, targetIds, datasetRows });
       const cellSet = createExecutionCellSet(cells);
 

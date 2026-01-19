@@ -1,12 +1,16 @@
-import React, { createContext, useContext } from "react";
 import { Box, useStdout } from "ink";
+import type React from "react";
+import { createContext, useContext } from "react";
 
 interface TerminalDimensions {
   width: number;
   height: number;
 }
 
-const TerminalContext = createContext<TerminalDimensions>({ width: 80, height: 24 });
+const TerminalContext = createContext<TerminalDimensions>({
+  width: 80,
+  height: 24,
+});
 
 /**
  * Hook to access terminal dimensions from any child component.
@@ -31,7 +35,9 @@ interface FullscreenLayoutProps {
  *   <Text>Content fills terminal</Text>
  * </FullscreenLayout>
  */
-export const FullscreenLayout: React.FC<FullscreenLayoutProps> = ({ children }) => {
+export const FullscreenLayout: React.FC<FullscreenLayoutProps> = ({
+  children,
+}) => {
   const { stdout } = useStdout();
   const height = stdout?.rows ?? 24;
   const width = stdout?.columns ?? 80;
@@ -50,11 +56,3 @@ export const FullscreenLayout: React.FC<FullscreenLayoutProps> = ({ children }) 
     </TerminalContext.Provider>
   );
 };
-
-
-
-
-
-
-
-

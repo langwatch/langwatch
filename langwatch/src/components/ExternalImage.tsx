@@ -98,7 +98,10 @@ export const ExternalImage = ({
   const [error, setError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   // Store center point of original image
-  const [expandedPosition, setExpandedPosition] = useState({ centerX: 0, centerY: 0 });
+  const [expandedPosition, setExpandedPosition] = useState({
+    centerX: 0,
+    centerY: 0,
+  });
   // Offset to apply after clamping to viewport (0,0 means perfectly centered)
   const [clampOffset, setClampOffset] = useState({ top: 0, left: 0 });
   const [isPositioned, setIsPositioned] = useState(false);
@@ -136,7 +139,7 @@ export const ExternalImage = ({
 
         // Push left if overflowing right
         if (currentRight > viewportWidth - VIEWPORT_MARGIN) {
-          offsetLeft = (viewportWidth - VIEWPORT_MARGIN) - currentRight;
+          offsetLeft = viewportWidth - VIEWPORT_MARGIN - currentRight;
         }
         // Push right if overflowing left
         if (currentLeft + offsetLeft < VIEWPORT_MARGIN) {
@@ -144,7 +147,7 @@ export const ExternalImage = ({
         }
         // Push up if overflowing bottom
         if (currentBottom > viewportHeight - VIEWPORT_MARGIN) {
-          offsetTop = (viewportHeight - VIEWPORT_MARGIN) - currentBottom;
+          offsetTop = viewportHeight - VIEWPORT_MARGIN - currentBottom;
         }
         // Push down if overflowing top
         if (currentTop + offsetTop < VIEWPORT_MARGIN) {

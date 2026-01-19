@@ -5,7 +5,11 @@
  * the transformed BatchEvaluationData format.
  */
 import type { MetricStats } from "~/components/shared/MetricStatsTooltip";
-import type { BatchEvaluationData, BatchTargetColumn, BatchResultRow } from "./types";
+import type {
+  BatchEvaluationData,
+  BatchResultRow,
+  BatchTargetColumn,
+} from "./types";
 
 /**
  * Aggregate statistics for a target's evaluator results.
@@ -61,13 +65,19 @@ export type BatchTargetAggregate = {
 /**
  * Computes percentile from a sorted array.
  */
-const computePercentile = (sortedValues: number[], percentile: number): number => {
+const computePercentile = (
+  sortedValues: number[],
+  percentile: number,
+): number => {
   if (sortedValues.length === 0) return 0;
   const index = (percentile / 100) * (sortedValues.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
   if (lower === upper) return sortedValues[lower]!;
-  return sortedValues[lower]! + (sortedValues[upper]! - sortedValues[lower]!) * (index - lower);
+  return (
+    sortedValues[lower]! +
+    (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
+  );
 };
 
 /**
@@ -98,7 +108,7 @@ const computeMetricStats = (values: number[]): MetricStats | null => {
  */
 export const computeBatchTargetAggregates = (
   targetColumn: BatchTargetColumn,
-  rows: BatchResultRow[]
+  rows: BatchResultRow[],
 ): BatchTargetAggregate => {
   const targetId = targetColumn.id;
 
@@ -108,15 +118,18 @@ export const computeBatchTargetAggregates = (
   const latencyValues: number[] = [];
 
   // Collect evaluator results by evaluator ID
-  const evaluatorResultsMap = new Map<string, {
-    name: string;
-    total: number;
-    passed: number;
-    failed: number;
-    errors: number;
-    scoreSum: number;
-    scoreCount: number;
-  }>();
+  const evaluatorResultsMap = new Map<
+    string,
+    {
+      name: string;
+      total: number;
+      passed: number;
+      failed: number;
+      errors: number;
+      scoreSum: number;
+      scoreCount: number;
+    }
+  >();
 
   for (const row of rows) {
     const targetOutput = row.targets[targetId];
@@ -182,7 +195,7 @@ export const computeBatchTargetAggregates = (
 
   // Build evaluator aggregates
   const evaluatorAggregates: BatchEvaluatorAggregate[] = Array.from(
-    evaluatorResultsMap.entries()
+    evaluatorResultsMap.entries(),
   ).map(([evalId, agg]) => ({
     evaluatorId: evalId,
     evaluatorName: agg.name,
@@ -195,15 +208,22 @@ export const computeBatchTargetAggregates = (
   }));
 
   // Compute overall pass rate
-  const totalEvaluations = evaluatorAggregates.reduce((sum, e) => sum + e.total, 0);
+  const totalEvaluations = evaluatorAggregates.reduce(
+    (sum, e) => sum + e.total,
+    0,
+  );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate = totalEvaluations > 0 ? (totalPassed / totalEvaluations) * 100 : null;
+  const overallPassRate =
+    totalEvaluations > 0 ? (totalPassed / totalEvaluations) * 100 : null;
 
   // Compute overall average score
-  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
+  const scoresWithValues = evaluatorAggregates.filter(
+    (e) => e.averageScore !== null,
+  );
   const overallAverageScore =
     scoresWithValues.length > 0
-      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scoresWithValues.length
+      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
+        scoresWithValues.length
       : null;
 
   return {
@@ -227,14 +247,14 @@ export const computeBatchTargetAggregates = (
  * Compute aggregates for all targets in batch data.
  */
 export const computeAllBatchAggregates = (
-  data: BatchEvaluationData
+  data: BatchEvaluationData,
 ): Map<string, BatchTargetAggregate> => {
   const aggregates = new Map<string, BatchTargetAggregate>();
 
   for (const targetCol of data.targetColumns) {
     aggregates.set(
       targetCol.id,
-      computeBatchTargetAggregates(targetCol, data.rows)
+      computeBatchTargetAggregates(targetCol, data.rows),
     );
   }
 

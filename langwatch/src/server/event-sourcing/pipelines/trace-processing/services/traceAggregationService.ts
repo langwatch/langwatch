@@ -2,9 +2,9 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import { ValidationError } from "../../../library/services/errorHandling";
-import type { NormalizedSpan, } from "../schemas/spans";
-import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
+import type { NormalizedSpan } from "../schemas/spans";
+import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 import { traceIOExtractionService } from "./traceIOExtractionService";
 
 // ============================================================================

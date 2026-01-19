@@ -1,9 +1,9 @@
-import { Ksuid, Instance, getEnvironment } from "@langwatch/ksuid";
+import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createHash } from "crypto";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { EventUtils } from "../../../library";
 import type { SpanReceivedEvent } from "../schemas/events";
 import { TraceRequestUtils } from "./traceRequest.utils";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
  * Generates a deterministic span record ID from a SpanReceivedEvent.

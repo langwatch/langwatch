@@ -566,7 +566,7 @@ class Evaluation:
         Example:
             ```python
             for index, row in evaluation.loop(df.iterrows()):
-                def evaluate(index, row):
+                def task(index, row):
                     # Compare GPT-4 and Claude
                     with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
                         response = call_gpt4(row["question"])
@@ -579,7 +579,7 @@ class Evaluation:
                         evaluation.log("quality", index=index, score=0.85,
                                        data={"output": response})
 
-                evaluation.submit(evaluate, index, row)
+                evaluation.submit(task, index, row)
             ```
         """
         # On FIRST target() call ever in this evaluation:

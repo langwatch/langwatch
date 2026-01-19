@@ -3,21 +3,21 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
-  type DragStartEvent,
   DragOverlay,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-import { useState } from "react";
 import { BarChart2 } from "lucide-react";
+import { useState } from "react";
+import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 import {
   DraggableGraphCard,
   type GraphData,
   type SizeOption,
 } from "./DraggableGraphCard";
-import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 interface ReportGridProps {
   graphs: GraphData[];
@@ -44,7 +44,7 @@ export function ReportGrid({
       activationConstraint: {
         distance: 8,
       },
-    })
+    }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {

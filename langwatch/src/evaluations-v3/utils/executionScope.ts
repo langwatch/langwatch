@@ -1,7 +1,7 @@
 /**
  * Utilities for determining which cells will be executed based on execution scope.
  * This is the single source of truth for execution cell calculation on the frontend.
- * 
+ *
  * The same logic exists on the backend in orchestrator.ts - these must stay in sync.
  */
 
@@ -33,7 +33,7 @@ export type ComputeExecutionCellsParams = {
  * This accounts for:
  * - The execution scope type (full, rows, target, cell)
  * - Empty row filtering (empty rows are always skipped)
- * 
+ *
  * Returns an array of cell identifiers that will be executed.
  */
 export const computeExecutionCells = ({
@@ -50,7 +50,9 @@ export const computeExecutionCells = ({
       rowIndices = datasetRows.map((_, i) => i);
       break;
     case "rows":
-      rowIndices = scope.rowIndices.filter((i) => i >= 0 && i < datasetRows.length);
+      rowIndices = scope.rowIndices.filter(
+        (i) => i >= 0 && i < datasetRows.length,
+      );
       break;
     case "target":
       rowIndices = datasetRows.map((_, i) => i);
@@ -110,7 +112,7 @@ export const createExecutionCellSet = (cells: CellId[]): Set<string> => {
 export const isCellInExecution = (
   cellSet: Set<string>,
   rowIndex: number,
-  targetId: string
+  targetId: string,
 ): boolean => {
   return cellSet.has(`${rowIndex}:${targetId}`);
 };
@@ -119,7 +121,9 @@ export const isCellInExecution = (
  * Get the count of cells that will be executed.
  * This is useful for progress display.
  */
-export const getExecutionCellCount = (params: ComputeExecutionCellsParams): number => {
+export const getExecutionCellCount = (
+  params: ComputeExecutionCellsParams,
+): number => {
   return computeExecutionCells(params).length;
 };
 
@@ -145,7 +149,7 @@ export const getExecutionTargetIds = (cells: CellId[]): Set<string> => {
 export const countCellsForTarget = (
   cellSet: Set<string>,
   targetId: string,
-  maxRowIndex: number
+  maxRowIndex: number,
 ): number => {
   let count = 0;
   for (let i = 0; i <= maxRowIndex; i++) {
@@ -167,7 +171,7 @@ export const countCompletedCellsForTarget = (
     targetOutputs: Record<string, unknown[]>;
     errors: Record<string, string[]>;
   },
-  maxRowIndex: number
+  maxRowIndex: number,
 ): number => {
   let count = 0;
   for (let i = 0; i <= maxRowIndex; i++) {

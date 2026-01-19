@@ -1,4 +1,4 @@
-import { AlertType, TriggerAction, Prisma } from "@prisma/client";
+import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -265,7 +265,7 @@ export const graphsRouter = createTRPCRouter({
       });
 
       let alertData = undefined;
-      if (trigger && trigger.active && !trigger.deleted) {
+      if (trigger?.active && !trigger.deleted) {
         const actionParams =
           trigger.actionParams as unknown as AlertActionParams & {
             threshold: number;
