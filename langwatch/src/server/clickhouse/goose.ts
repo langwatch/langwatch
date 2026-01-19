@@ -1,6 +1,6 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { spawnSync } from "child_process";
-import * as path from "path";
+import { spawnSync } from "node:child_process";
+import * as path from "node:path";
 
 import { createLogger } from "../../utils/logger";
 
@@ -511,7 +511,7 @@ export async function getMigrateStatus(
 export async function runMigrationsIfConfigured(
   options: GooseOptions = {}
 ): Promise<void> {
-  if (!process.env.ENABLE_CLICKHOUSE) {
+  if (process.env.ENABLE_CLICKHOUSE !== "true") {
     logger.info(
       "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations."
     );
