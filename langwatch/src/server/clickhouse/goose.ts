@@ -12,15 +12,14 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  * Bootstrap & Migration Flow:
  * 1. Pre-flight: Validates config, checks connectivity, verifies goose binary
  * 2. Bootstrap: Creates Replicated database and goose_db_version table (if replicated)
- * 3. Verify: Checks existing database/table engines match expected configuration
- * 4. Migrations: Goose connects to the database and runs migrations
+ * 3. Migrations: Goose connects to the database and runs migrations
  *
  * This ensures goose_db_version is created with ReplicatedMergeTree engine
  * so migration state is consistent across all cluster nodes.
  *
  * Configuration via environment variables:
  * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/dbname)
- * - CLICKHOUSE_REPLICATED: 'true' for ReplicatedMergeTree (HA with Keeper)
+ * - CLICKHOUSE_CLUSTER: Cluster name for ReplicatedMergeTree (HA with Keeper). If set, enables replication.
  * - TIERED_*_TABLE_HOT_DAYS: TTL configuration for tiered storage (optional, defaults to 2)
  *
  * @see https://github.com/pressly/goose
@@ -48,8 +47,8 @@ interface ClickHouseConfig {
   database: string;
   serverUrl: string; // For bootstrap (no database in path)
   databaseUrl: string; // For bootstrap with database context
-  gooseConnectionString: string; // clickhouse:// protocol for goose
-  replicated: boolean;
+  gooseConnectionString: string; // HTTP connection string for goose
+  clusterName: string | undefined; // If set, enables replication with this cluster name
 }
 
 /**
@@ -78,10 +77,10 @@ async function withClient<T>(
   }
 }
 
-function validateDatabaseName(name: string): void {
+function validateIdentifier(name: string, label: string): void {
   if (!VALID_DB_NAME.test(name)) {
     throw new MigrationError(
-      `Invalid database name: "${name}". Must start with letter/underscore, contain only alphanumeric/underscore.`,
+      `Invalid ${label}: "${name}". Must start with letter/underscore, contain only alphanumeric/underscore.`,
       "preflight"
     );
   }
@@ -133,22 +132,11 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
   dbParsed.pathname = `/${database}`;
   const databaseUrl = dbParsed.toString();
 
-  // Goose connection string (clickhouse:// protocol)
+  // Goose connection string - keep HTTP protocol as the NLB only exposes port 8123
+  // The clickhouse-go driver supports both http:// and clickhouse:// protocols
   const gooseParsed = new URL(url);
-  if (
-    gooseParsed.protocol === "http:" ||
-    gooseParsed.protocol === "https:"
-  ) {
-    gooseParsed.protocol = "clickhouse:";
-  }
-  // Use query parameter for database - goose ClickHouse driver doesn't read from path
   gooseParsed.pathname = "/";
   gooseParsed.searchParams.set("database", database);
-
-  // Set secure=true for HTTPS connections
-  if (parsed.protocol === "https:" && !gooseParsed.searchParams.has("secure")) {
-    gooseParsed.searchParams.set("secure", "true");
-  }
 
   const gooseConnectionString = gooseParsed.toString();
 
@@ -157,7 +145,7 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
     serverUrl,
     databaseUrl,
     gooseConnectionString,
-    replicated: process.env.CLICKHOUSE_REPLICATED === "true",
+    clusterName: process.env.CLICKHOUSE_CLUSTER || undefined,
   };
 }
 
@@ -202,14 +190,10 @@ interface DatabaseInfo {
   engine: string;
 }
 
-interface TableInfo {
-  engine: string;
-}
-
 async function verifyDatabaseEngine(
   client: ClickHouseClient,
   database: string,
-  replicated: boolean
+  clusterName: string | undefined
 ): Promise<void> {
   const result = await client.query({
     query: `SELECT engine FROM system.databases WHERE name = {database:String}`,
@@ -224,47 +208,19 @@ async function verifyDatabaseEngine(
 
   const actualEngine = firstRow.engine;
 
-  if (replicated && !actualEngine.startsWith("Replicated")) {
+  if (clusterName && !actualEngine.startsWith("Replicated")) {
     throw new MigrationError(
-      `Database "${database}" exists with engine "${actualEngine}", but CLICKHOUSE_REPLICATED=true requires Replicated engine. Manual intervention required: DROP DATABASE ${database}`,
+      `Database "${database}" exists with engine "${actualEngine}", but CLICKHOUSE_CLUSTER is set which requires Replicated engine. Manual intervention required: DROP DATABASE ${database}`,
       "verify"
     );
   }
 
   // Warn if DB is replicated but env var not set (works but may be misconfigured)
-  if (!replicated && actualEngine.startsWith("Replicated")) {
-    logger.warn({ database, actualEngine }, "Database is Replicated but CLICKHOUSE_REPLICATED is not set");
+  if (!clusterName && actualEngine.startsWith("Replicated")) {
+    logger.warn({ database, actualEngine }, "Database is Replicated but CLICKHOUSE_CLUSTER is not set");
   }
 
   logger.debug({ database, engine: actualEngine }, "Database engine verified");
-}
-
-async function verifyGooseTableEngine(
-  client: ClickHouseClient,
-  database: string,
-  replicated: boolean
-): Promise<void> {
-  const result = await client.query({
-    query: `SELECT engine FROM system.tables WHERE database = {database:String} AND name = 'goose_db_version'`,
-    query_params: { database },
-    format: "JSONEachRow",
-  });
-
-  const rows = (await result.json()) as TableInfo[];
-
-  const firstRow = rows[0];
-  if (!firstRow) return;
-
-  const actualEngine = firstRow.engine;
-
-  if (replicated && !actualEngine.startsWith("Replicated")) {
-    throw new MigrationError(
-      `Table "${database}.goose_db_version" exists with engine "${actualEngine}", but CLICKHOUSE_REPLICATED=true requires ReplicatedMergeTree. Manual intervention required: DROP TABLE ${database}.goose_db_version`,
-      "verify"
-    );
-  }
-
-  logger.debug({ database, table: "goose_db_version", engine: actualEngine }, "Table engine verified");
 }
 
 async function executeBootstrapSQL(
@@ -284,23 +240,25 @@ async function bootstrapDatabase(
   verbose?: boolean
 ): Promise<void> {
   logger.info(
-    { database: config.database, replicated: config.replicated },
+    { database: config.database, clusterName: config.clusterName },
     "Bootstrapping ClickHouse database"
   );
 
   // Use a single client for all bootstrap operations to ensure we hit the same node
   // (NLB can route each connection to a different node, causing issues with Replicated DBs)
   await withClient(config.serverUrl, async (client) => {
-    await verifyDatabaseEngine(client, config.database, config.replicated);
+    await verifyDatabaseEngine(client, config.database, config.clusterName);
 
     // Create database with appropriate engine
-    const databaseEngine = config.replicated
+    // For replicated setup, use ON CLUSTER to ensure all nodes register the database
+    const databaseEngine = config.clusterName
       ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
       : "";
+    const onCluster = config.clusterName ? `ON CLUSTER ${config.clusterName}` : "";
 
     await executeBootstrapSQL(
       client,
-      `CREATE DATABASE IF NOT EXISTS ${config.database} ${databaseEngine}`,
+      `CREATE DATABASE IF NOT EXISTS ${config.database} ${onCluster} ${databaseEngine}`,
       verbose
     );
 
@@ -314,32 +272,61 @@ async function bootstrapDatabase(
 
     if (dbRows.length === 0) {
       throw new MigrationError(
-        config.replicated
-          ? `Failed to create Replicated database "${config.database}". ClickHouse Keeper may not be configured. Either configure Keeper or set CLICKHOUSE_REPLICATED=false for local development.`
+        config.clusterName
+          ? `Failed to create Replicated database "${config.database}". ClickHouse Keeper may not be configured. Either configure Keeper or unset CLICKHOUSE_CLUSTER for local development.`
           : `Failed to create database "${config.database}".`,
         "bootstrap"
       );
     }
 
-    await verifyGooseTableEngine(client, config.database, config.replicated);
-
+    // Create default.goose_db_version as ReplicatedMergeTree
+    // Goose uses the default database for its version table, and we need it replicated
+    // Since 'default' database is Atomic (not Replicated), we must specify explicit Keeper paths
     // Schema must match goose's ClickHouse table: https://github.com/pressly/goose
-    // In Replicated databases, use ReplicatedMergeTree() without args - DB handles replication
-    // Use fully qualified table name to avoid timing issues with Replicated DB
-    const tableEngine = config.replicated ? "ReplicatedMergeTree()" : "MergeTree()";
+    //
+    // Note: We check if the table exists first because CREATE TABLE IF NOT EXISTS
+    // can still fail with REPLICA_ALREADY_EXISTS on replicated tables when the
+    // ZooKeeper path exists but the local table doesn't (e.g., after node recovery)
+    const tableExistsResult = await client.query({
+      query: `SELECT 1 FROM system.tables WHERE database = 'default' AND name = 'goose_db_version'`,
+      format: "JSONEachRow",
+    });
+    const tableExists = (await tableExistsResult.json()).length > 0;
 
-    await executeBootstrapSQL(
-      client,
-      `CREATE TABLE IF NOT EXISTS ${config.database}.goose_db_version (
-        version_id Int64,
-        is_applied UInt8,
-        date Date DEFAULT now(),
-        tstamp DateTime DEFAULT now()
-      ) ENGINE = ${tableEngine}
-      ORDER BY date
-      SETTINGS index_granularity = 8192`,
-      verbose
-    );
+    if (!tableExists) {
+      if (config.clusterName) {
+        // Don't use ON CLUSTER here - create table locally only.
+        // Each node creates its own replica when it runs migrations.
+        // The {replica} macro ensures unique replica paths in ZooKeeper.
+        await executeBootstrapSQL(
+          client,
+          `CREATE TABLE IF NOT EXISTS default.goose_db_version (
+            version_id Int64,
+            is_applied UInt8,
+            date Date DEFAULT now(),
+            tstamp DateTime DEFAULT now()
+          ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/default/goose_db_version', '{replica}')
+          ORDER BY date
+          SETTINGS index_granularity = 8192`,
+          verbose
+        );
+      } else {
+        await executeBootstrapSQL(
+          client,
+          `CREATE TABLE IF NOT EXISTS default.goose_db_version (
+            version_id Int64,
+            is_applied UInt8,
+            date Date DEFAULT now(),
+            tstamp DateTime DEFAULT now()
+          ) ENGINE = MergeTree()
+          ORDER BY date
+          SETTINGS index_granularity = 8192`,
+          verbose
+        );
+      }
+    } else {
+      logger.debug("goose_db_version table already exists, skipping creation");
+    }
   });
 
   logger.info("Bootstrap completed");
@@ -359,13 +346,13 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
 
     // ClickHouse vars
     CLICKHOUSE_DATABASE: config.database,
-    CLICKHOUSE_DATABASE_ENGINE: config.replicated
+    CLICKHOUSE_DATABASE_ENGINE: config.clusterName
       ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
       : "",
-    CLICKHOUSE_ENGINE_MERGETREE: config.replicated
+    CLICKHOUSE_ENGINE_MERGETREE: config.clusterName
       ? "ReplicatedMergeTree()"
       : "MergeTree()",
-    CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.replicated
+    CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.clusterName
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
 
@@ -383,7 +370,7 @@ function logConfig(config: ClickHouseConfig): void {
   logger.info(
     {
       database: config.database,
-      replicated: config.replicated,
+      clusterName: config.clusterName,
     },
     "ClickHouse migration configuration"
   );
@@ -399,6 +386,10 @@ function executeGoose(
 
   if (options.verbose) {
     logConfig(config);
+    logger.info({ migrationsDir, __dirname }, "Goose migrations directory");
+    // Log connection string with password masked
+    const maskedConnStr = config.gooseConnectionString.replace(/:([^:@]+)@/, ':***@');
+    logger.info({ connectionString: maskedConnStr }, "Goose connection string");
   }
 
   const args = [
@@ -413,9 +404,10 @@ function executeGoose(
     args.unshift("-v");
   }
 
+  // Always pipe output so we can check for specific messages
   const result = spawnSync("goose", args, {
     encoding: "utf-8",
-    stdio: options.verbose ? "inherit" : "pipe",
+    stdio: "pipe",
     env: envVars,
   });
 
@@ -426,12 +418,23 @@ function executeGoose(
     throw new MigrationError(`Goose migration failed: ${message}`, "migrate");
   }
 
+  const output = [result.stderr, result.stdout].filter(Boolean).join("\n");
+
+  // In verbose mode, print the output
+  if (options.verbose) {
+    logger.info({ gooseOutput: output, exitCode: result.status }, "Goose output");
+  }
+
   if (result.status !== 0) {
-    const errorOutput = [result.stderr, result.stdout]
-      .filter(Boolean)
-      .join("\n");
+    // "no next version found" means all migrations are already applied - not an error
+    if (output.includes("no next version found") ||
+        output.includes("no migrations to run")) {
+      logger.info("All migrations are already applied");
+      return output;
+    }
+
     throw new MigrationError(
-      `Goose migration failed:\n${errorOutput || "Unknown error"}`,
+      `Goose migration failed:\n${output || "Unknown error"}`,
       "migrate"
     );
   }

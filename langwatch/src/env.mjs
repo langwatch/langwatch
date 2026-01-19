@@ -102,7 +102,7 @@ export const env = createEnv({
     ENABLE_CLICKHOUSE: z.boolean().optional(),
 
     // ClickHouse Migration Configuration
-    CLICKHOUSE_REPLICATED: z.boolean().optional(),
+    CLICKHOUSE_CLUSTER: z.string().optional(),
   },
 
   /**
@@ -202,9 +202,7 @@ export const env = createEnv({
     ENABLE_CLICKHOUSE:
       process.env.ENABLE_CLICKHOUSE === "true" ||
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
-    CLICKHOUSE_REPLICATED:
-      process.env.CLICKHOUSE_REPLICATED === "true" ||
-      process.env.CLICKHOUSE_REPLICATED?.toLowerCase() === "true",
+    CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
