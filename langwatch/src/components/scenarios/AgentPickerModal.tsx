@@ -43,7 +43,7 @@ export function AgentPickerModal({
   // Focus search input when modal opens
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 0);
+      requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setSearchValue("");
     }

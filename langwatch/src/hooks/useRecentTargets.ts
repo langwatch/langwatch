@@ -1,12 +1,23 @@
 import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
-interface RecentTarget {
-  id: string;
-  timestamp: number;
-}
-
 const MAX_RECENT_ITEMS = 5;
+
+/**
+ * Creates a function that adds an ID to the front of a recent list,
+ * removing duplicates and limiting to MAX_RECENT_ITEMS.
+ */
+function createAddRecent(
+  setter: React.Dispatch<React.SetStateAction<string[]>>,
+) {
+  return (id: string) => {
+    setter((prev) => {
+      const filtered = prev.filter((existingId) => existingId !== id);
+      const updated = [id, ...filtered];
+      return updated.slice(0, MAX_RECENT_ITEMS);
+    });
+  };
+}
 
 /**
  * Hook for tracking recently used targets globally (not per scenario).
@@ -23,37 +34,22 @@ export function useRecentTargets() {
     ? `langwatch:recent-agents:${project.id}`
     : "langwatch:recent-agents:temp";
 
-  const [recentPrompts, setRecentPrompts] = useLocalStorage<RecentTarget[]>(
+  const [recentPromptIds, setRecentPromptIds] = useLocalStorage<string[]>(
     promptStorageKey,
     [],
   );
 
-  const [recentAgents, setRecentAgents] = useLocalStorage<RecentTarget[]>(
+  const [recentAgentIds, setRecentAgentIds] = useLocalStorage<string[]>(
     agentStorageKey,
     [],
   );
 
-  const addRecentPrompt = (promptId: string) => {
-    setRecentPrompts((prev) => {
-      // Remove if already exists, then add to front
-      const filtered = prev.filter((p) => p.id !== promptId);
-      const updated = [{ id: promptId, timestamp: Date.now() }, ...filtered];
-      return updated.slice(0, MAX_RECENT_ITEMS);
-    });
-  };
-
-  const addRecentAgent = (agentId: string) => {
-    setRecentAgents((prev) => {
-      // Remove if already exists, then add to front
-      const filtered = prev.filter((a) => a.id !== agentId);
-      const updated = [{ id: agentId, timestamp: Date.now() }, ...filtered];
-      return updated.slice(0, MAX_RECENT_ITEMS);
-    });
-  };
+  const addRecentPrompt = createAddRecent(setRecentPromptIds);
+  const addRecentAgent = createAddRecent(setRecentAgentIds);
 
   return {
-    recentPromptIds: recentPrompts.map((p) => p.id),
-    recentAgentIds: recentAgents.map((a) => a.id),
+    recentPromptIds,
+    recentAgentIds,
     addRecentPrompt,
     addRecentAgent,
   };

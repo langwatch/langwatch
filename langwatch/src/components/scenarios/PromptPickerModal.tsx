@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BookText, Plus, Search } from "lucide-react";
+import { BookText, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRecentTargets } from "../../hooks/useRecentTargets";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -38,7 +38,7 @@ export function PromptPickerModal({
   // Focus search input when modal opens
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 0);
+      requestAnimationFrame(() => inputRef.current?.focus());
     } else {
       setSearchValue("");
     }

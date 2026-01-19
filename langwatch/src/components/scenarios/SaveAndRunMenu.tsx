@@ -7,7 +7,7 @@ import {
   RotateCcw,
   Save,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
@@ -204,7 +204,7 @@ export function SaveAndRunMenu({
 }
 
 interface MenuButtonProps {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   description: string;
   onClick: () => void;

@@ -143,10 +143,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           persistTarget(target);
 
           // Track in recent targets for global picker
-          if (target.type === "prompt") {
-            addRecentPrompt(target.id);
-          } else {
-            addRecentAgent(target.id);
+          switch (target.type) {
+            case "prompt":
+              addRecentPrompt(target.id);
+              break;
+            case "http":
+              addRecentAgent(target.id);
+              break;
+            default: {
+              const _exhaustiveCheck: never = target.type;
+              return _exhaustiveCheck;
+            }
           }
 
           await runScenario(savedScenario.id, target);
