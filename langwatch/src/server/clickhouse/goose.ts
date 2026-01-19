@@ -120,7 +120,12 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
   }
 
   const database = parsed.pathname.replace(/^\//, "") || DEFAULT_DATABASE;
-  validateDatabaseName(database);
+  validateIdentifier(database, "database name");
+
+  const clusterName = process.env.CLICKHOUSE_CLUSTER || undefined;
+  if (clusterName) {
+    validateIdentifier(clusterName, "cluster name");
+  }
 
   // Server URL (no database path) - for bootstrap operations
   const serverParsed = new URL(url);
@@ -145,7 +150,7 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
     serverUrl,
     databaseUrl,
     gooseConnectionString,
-    clusterName: process.env.CLICKHOUSE_CLUSTER || undefined,
+    clusterName,
   };
 }
 
