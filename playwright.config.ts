@@ -12,7 +12,7 @@ import path from "path";
  *   pnpm exec playwright test --ui
  */
 
-const BASE_URL = process.env.BASE_URL ?? "http://localhost:5560";
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const AUTH_FILE = path.join(__dirname, "agentic-e2e-tests", ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 

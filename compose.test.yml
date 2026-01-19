@@ -21,10 +21,13 @@ services:
       INSTALL_METHOD: docker-test
       NODE_ENV: test
       NEXTAUTH_SECRET: test-secret-for-e2e-testing
-      NEXTAUTH_URL: http://localhost:5560
+      NEXTAUTH_URL: http://localhost:5570
+      NEXTAUTH_URL_INTERNAL: http://localhost:5560
       API_TOKEN_JWT_SECRET: test-jwt-secret-for-e2e
     ports:
-      - "5560:5560"  # Use same port internally and externally for NEXTAUTH_URL
+      - "5570:5560"  # Test port (dev uses 5560)
+    extra_hosts:
+      - "localhost:host-gateway"  # Allow container to reach host's localhost:5570
     depends_on:
       postgres:
         condition: service_healthy

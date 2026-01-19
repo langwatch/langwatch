@@ -55,12 +55,15 @@ setup("authenticate", async ({ page, request }) => {
   // Wait for the sign in form to be ready
   await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
 
-  // Fill in credentials
-  await page.getByLabel(/email/i).fill(TEST_USER.email);
-  await page.getByLabel(/password/i).fill(TEST_USER.password);
+  // Fill in credentials using input type selectors (custom Chakra form layout)
+  await page.locator('input[type="email"]').fill(TEST_USER.email);
+  await page.locator('input[type="password"]').fill(TEST_USER.password);
 
   // Submit the form
   await page.getByRole("button", { name: /sign in/i }).click();
+
+  // Wait a moment for the form submission to process
+  await page.waitForTimeout(2000);
 
   // Wait for successful authentication - should redirect away from signin
   await expect(page).not.toHaveURL(/\/auth\/signin/);
@@ -106,7 +109,7 @@ setup("authenticate", async ({ page, request }) => {
     if (await nextButton.isVisible().catch(() => false)) {
       // Multi-screen onboarding flow
       await nextButton.click();
-      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(2000);
       console.log("  - Clicked Next");
 
       // Handle subsequent screens
@@ -133,7 +136,7 @@ setup("authenticate", async ({ page, request }) => {
 
         if (await skipBtn.isVisible().catch(() => false)) {
           await skipBtn.click();
-          await page.waitForLoadState("networkidle");
+          await page.waitForTimeout(2000);
           console.log("  - Clicked Skip");
           continue;
         }
@@ -141,7 +144,7 @@ setup("authenticate", async ({ page, request }) => {
         if (await nextBtn.isVisible().catch(() => false)) {
           if (!(await nextBtn.isDisabled())) {
             await nextBtn.click();
-            await page.waitForLoadState("networkidle");
+            await page.waitForTimeout(2000);
             console.log("  - Clicked Next");
             continue;
           }
@@ -159,14 +162,15 @@ setup("authenticate", async ({ page, request }) => {
     }
 
     // Wait for onboarding to complete
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
     console.log("Onboarding completed");
   } else {
     console.log("No onboarding detected, user already set up");
   }
 
   // Step 5: Handle any additional setup screens (project creation, etc.)
-  await page.waitForLoadState("networkidle");
+  // Wait a moment for page to settle, then check for project creation screen
+  await page.waitForTimeout(3000);
 
   const needsProject = await page
     .getByRole("heading", { name: /create.*project/i })
@@ -179,15 +183,14 @@ setup("authenticate", async ({ page, request }) => {
     if (await projectNameInput.isVisible()) {
       await projectNameInput.fill("E2E Test Project");
       await page.getByRole("button", { name: /create/i }).click();
-      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(3000);
     }
     console.log("Project created");
   }
 
   // Step 6: Verify we're in the main app before saving
-  // Wait a bit for any final redirects
+  // Wait for navigation to appear (indicates main app is loaded)
   await page.waitForTimeout(2000);
-  await page.waitForLoadState("networkidle");
 
   // Make sure we're not on onboarding anymore
   const stillOnboarding = await page

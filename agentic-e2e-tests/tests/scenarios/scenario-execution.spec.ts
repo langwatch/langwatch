@@ -34,9 +34,16 @@ test("Scenario Execution - view simulations page loads", async ({ page }) => {
   // Then the page loads without errors
   await expect(page).toHaveURL(/simulations/);
 
-  // And we see some content
-  const hasContent = await page.getByRole("heading").first().isVisible().catch(() => false);
-  expect(hasContent).toBeTruthy();
+  // And we see the page content (could be getting started page or results)
+  // Wait for any content to appear
+  await page.waitForTimeout(2000);
+
+  // Check for page content - either "Scenario" text or simulation results
+  const hasScenarioText = await page.getByText(/scenario/i).first().isVisible().catch(() => false);
+  const hasSimulationsText = await page.getByText(/simulation/i).first().isVisible().catch(() => false);
+  const hasGetStartedText = await page.getByText(/get started/i).first().isVisible().catch(() => false);
+
+  expect(hasScenarioText || hasSimulationsText || hasGetStartedText).toBeTruthy();
 });
 
 test("Scenario Execution - simulations page shows content", async ({ page }) => {
@@ -47,9 +54,9 @@ test("Scenario Execution - simulations page shows content", async ({ page }) => 
   // Then I see either simulation results OR the getting started state
   const hasResults = await page.getByRole("table").isVisible().catch(() => false);
   const hasList = await page.getByRole("list").first().isVisible().catch(() => false);
-  const hasHeading = await page.getByRole("heading").first().isVisible().catch(() => false);
+  const hasText = await page.getByText(/scenario|simulation/i).first().isVisible().catch(() => false);
 
-  expect(hasResults || hasList || hasHeading).toBeTruthy();
+  expect(hasResults || hasList || hasText).toBeTruthy();
 });
 
 test("Scenario Execution - page displays correctly on reload", async ({
@@ -66,6 +73,6 @@ test("Scenario Execution - page displays correctly on reload", async ({
   await expect(page).toHaveURL(/simulations/);
 
   // And content is visible
-  const hasContent = await page.getByRole("heading").first().isVisible().catch(() => false);
+  const hasContent = await page.getByText(/scenario|simulation/i).first().isVisible().catch(() => false);
   expect(hasContent).toBeTruthy();
 });

@@ -1,139 +1,249 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Feature: Scenario Editor / Simulations Page
+ * Feature: Scenario Editor
  * Source: specs/scenarios/scenario-editor.feature
  *
- * Note: The LangWatch Scenario feature uses a code-based SDK approach.
- * Scenarios are created programmatically via the Scenario SDK, not through UI forms.
- * These tests verify the Simulations page displays correctly and provides
- * guidance for using the Scenario SDK.
+ * As a LangWatch user
+ * I want to create and edit scenario specifications
+ * So that I can define behavioral test cases for my agents
+ *
+ * These tests specify the V1 Scenario Editor UI (3-Part Spec).
+ * Tests marked with test.fixme() will fail until the feature is implemented.
  */
 
-// Helper to navigate to simulations page via sidebar
-async function navigateToSimulations(page: import("@playwright/test").Page) {
-  await page.goto("/");
-
-  const simulationsLink = page.getByRole("link", {
-    name: "Simulations",
-    exact: true,
+test.describe("Scenario Editor", () => {
+  // Background: logged into project
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await expect(page).not.toHaveURL(/\/auth\//);
   });
-  await expect(simulationsLink).toBeVisible({ timeout: 15000 });
-  await simulationsLink.click();
 
-  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
-}
-
-// ============================================================================
-// Simulations Page - Empty/Getting Started State
-// ============================================================================
-
-test("Scenario Editor - view simulations page", async ({ page }) => {
-  // When I navigate to the simulations page
-  await navigateToSimulations(page);
-
-  // Then I see the Scenario introduction/getting started content
-  const scenarioHeading = page.getByRole("heading", {
-    name: /scenario|simulations/i,
-  });
-  await expect(scenarioHeading.first()).toBeVisible({ timeout: 10000 });
-});
-
-test("Scenario Editor - view scenario documentation link", async ({ page }) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
-
-  // Then I see a link to learn more about Scenario
-  const docsLink = page.getByRole("link", {
-    name: /learn more|documentation|docs|get started/i,
-  });
-  await expect(docsLink.first()).toBeVisible({ timeout: 10000 });
-});
-
-test("Scenario Editor - view scenario features list", async ({ page }) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
-
-  // Then I see information about what Scenario can do
-  const featuresList = page.getByRole("list");
-  const hasFeatures = await featuresList.first().isVisible().catch(() => false);
-
-  // Either we have a features list or some descriptive text
-  const hasDescription = await page
-    .getByText(/simulate|test|agent/i)
-    .first()
-    .isVisible()
-    .catch(() => false);
-
-  expect(hasFeatures || hasDescription).toBeTruthy();
-});
-
-test("Scenario Editor - view empty state message", async ({ page }) => {
-  // Given I am on the simulations page with no runs
-  await navigateToSimulations(page);
-
-  // Then I see a message about simulations appearing after running Scenario
-  const emptyStateText = page.getByText(
-    /simulations will appear|once you start|get started|no simulations/i
-  );
-  const hasEmptyState = await emptyStateText
-    .first()
-    .isVisible()
-    .catch(() => false);
-
-  // Or we might have actual simulation results
-  const hasResults = await page
-    .getByRole("table")
-    .isVisible()
-    .catch(() => false);
-
-  expect(hasEmptyState || hasResults).toBeTruthy();
-});
-
-// ============================================================================
-// Simulations Page - With Results (if scenarios have been run)
-// ============================================================================
-
-test("Scenario Editor - view simulation results if present", async ({
-  page,
-}) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
-  await page.waitForTimeout(2000);
-
-  // Then I see either simulation results or the getting started state
-  const resultsTable = page.getByRole("table");
-  const resultsList = page.getByRole("list");
-  const gettingStarted = page.getByText(/scenario|simulations/i);
-
-  const hasTable = await resultsTable.isVisible().catch(() => false);
-  const hasList = await resultsList.first().isVisible().catch(() => false);
-  const hasGettingStarted = await gettingStarted
-    .first()
-    .isVisible()
-    .catch(() => false);
-
-  expect(hasTable || hasList || hasGettingStarted).toBeTruthy();
-});
-
-test("Scenario Editor - click documentation link opens new tab", async ({
-  page,
-}) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
-
-  // When I find the documentation link
-  const docsLink = page
-    .getByRole("link", { name: /learn more|scenario/i })
-    .first();
-  const hasLink = await docsLink.isVisible().catch(() => false);
-
-  if (hasLink) {
-    // Check that the link points to Scenario docs
-    const href = await docsLink.getAttribute("href");
-    expect(href).toMatch(/scenario|langwatch|docs/i);
+  // Helper to navigate to scenarios list
+  async function goToScenariosList(page: import("@playwright/test").Page) {
+    await page.getByRole("link", { name: "Simulations", exact: true }).click();
+    await expect(page).toHaveURL(/simulations/);
   }
 
-  // Test passes - we verified the docs link exists or not
-  expect(true).toBeTruthy();
+  // ===========================================================================
+  // Create Scenario
+  // ===========================================================================
+
+  // FIXME: V1 Scenario Editor UI not implemented - "New Scenario" button doesn't exist yet
+  test.fixme("navigate to create form", async ({ page }) => {
+    // Given I am on the scenarios list page
+    await goToScenariosList(page);
+
+    // When I click "New Scenario"
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // Then I navigate to the scenario editor
+    await expect(page).toHaveURL(/simulations\/new|scenarios\/create/);
+
+    // And I see an empty scenario form
+    const nameField = page.getByLabel(/name/i);
+    await expect(nameField).toBeVisible();
+    await expect(nameField).toHaveValue("");
+  });
+
+  // FIXME: V1 Scenario Editor UI not implemented - form fields don't exist yet
+  test.fixme("view scenario form fields", async ({ page }) => {
+    // When I am on the create scenario page
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // Then I see the following fields:
+    // | field     | type              |
+    // | Name      | text input        |
+    const nameField = page.getByLabel(/name/i);
+    await expect(nameField).toBeVisible();
+
+    // | Situation | textarea          |
+    const situationField = page.getByLabel(/situation/i);
+    await expect(situationField).toBeVisible();
+
+    // | Criteria  | list (add/remove) |
+    const criteriaSection = page.getByText(/criteria/i);
+    await expect(criteriaSection).toBeVisible();
+    const addCriterionButton = page.getByRole("button", {
+      name: /add criterion/i,
+    });
+    await expect(addCriterionButton).toBeVisible();
+
+    // | Labels    | tag input         |
+    const labelsField = page.getByLabel(/labels/i);
+    await expect(labelsField).toBeVisible();
+  });
+
+  // FIXME: V1 Scenario Editor UI not implemented - create/save flow doesn't exist yet
+  test.fixme("save new scenario", async ({ page }) => {
+    // Given I am on the create scenario page
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // When I fill in "Name" with "Refund Request Test"
+    await page.getByLabel(/name/i).fill("Refund Request Test");
+
+    // And I fill in "Situation" with description
+    await page
+      .getByLabel(/situation/i)
+      .fill("User requests a refund for a defective product");
+
+    // And I add criterion "Agent acknowledges the issue"
+    await page.getByLabel(/criterion/i).fill("Agent acknowledges the issue");
+    await page.getByRole("button", { name: /add criterion/i }).click();
+
+    // And I add criterion "Agent offers a solution"
+    await page.getByLabel(/criterion/i).fill("Agent offers a solution");
+    await page.getByRole("button", { name: /add criterion/i }).click();
+
+    // And I click "Save"
+    await page.getByRole("button", { name: /save/i }).click();
+
+    // Then I navigate back to the scenarios list
+    await expect(page).toHaveURL(/simulations(?!\/new)/);
+
+    // And "Refund Request Test" appears in the list
+    const scenarioRow = page.getByRole("row", { name: /refund request test/i });
+    await expect(scenarioRow).toBeVisible();
+  });
+
+  // ===========================================================================
+  // Edit Scenario
+  // ===========================================================================
+
+  // FIXME: V1 Scenario Editor UI not implemented - edit flow doesn't exist yet
+  // Also needs API seeding for test data
+  test.fixme("load existing scenario for editing", async ({ page }) => {
+    // Given scenario "Refund Flow" exists (seeded via API)
+    // TODO: Seed scenario via API before test
+
+    // When I navigate to edit "Refund Flow"
+    await goToScenariosList(page);
+    await page.getByRole("row", { name: /refund flow/i }).click();
+
+    // Then the form is populated with the existing data
+    const nameField = page.getByLabel(/name/i);
+    await expect(nameField).toHaveValue(/refund flow/i);
+
+    const situationField = page.getByLabel(/situation/i);
+    await expect(situationField).not.toBeEmpty();
+  });
+
+  // FIXME: V1 Scenario Editor UI not implemented - update flow doesn't exist yet
+  // Also needs API seeding for test data
+  test.fixme("update scenario name", async ({ page }) => {
+    // Given I am editing scenario "Refund Flow" (seeded via API)
+    // TODO: Seed scenario via API before test
+    await goToScenariosList(page);
+    await page.getByRole("row", { name: /refund flow/i }).click();
+
+    // When I change the name to "Refund Flow (Updated)"
+    const nameField = page.getByLabel(/name/i);
+    await nameField.clear();
+    await nameField.fill("Refund Flow (Updated)");
+
+    // And I click "Save"
+    await page.getByRole("button", { name: /save/i }).click();
+
+    // Then I see the updated name in the list
+    await expect(page).toHaveURL(/simulations(?!\/)/);
+    const updatedRow = page.getByRole("row", {
+      name: /refund flow \(updated\)/i,
+    });
+    await expect(updatedRow).toBeVisible();
+  });
+
+  // ===========================================================================
+  // Criteria Management
+  // ===========================================================================
+
+  // FIXME: V1 Scenario Editor UI not implemented - criteria list doesn't exist yet
+  test.fixme("add criterion to list", async ({ page }) => {
+    // Given I am on the scenario editor
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // When I type criterion "Agent must apologize"
+    await page.getByLabel(/criterion/i).fill("Agent must apologize");
+
+    // And I click the add button
+    await page.getByRole("button", { name: /add criterion/i }).click();
+
+    // Then the criterion appears in the criteria list
+    const criteriaList = page.locator('[data-testid="criteria-list"]');
+    await expect(criteriaList).toContainText("Agent must apologize");
+
+    // And I can add more criteria (input is cleared)
+    const criterionInput = page.getByLabel(/criterion/i);
+    await expect(criterionInput).toHaveValue("");
+  });
+
+  // FIXME: V1 Scenario Editor UI not implemented - criteria removal doesn't exist yet
+  test.fixme("remove criterion from list", async ({ page }) => {
+    // Given criteria ["Criterion A", "Criterion B"] exist in the form
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // Add two criteria
+    await page.getByLabel(/criterion/i).fill("Criterion A");
+    await page.getByRole("button", { name: /add criterion/i }).click();
+    await page.getByLabel(/criterion/i).fill("Criterion B");
+    await page.getByRole("button", { name: /add criterion/i }).click();
+
+    // When I click remove on "Criterion A"
+    const criterionA = page.locator('[data-testid="criterion-item"]', {
+      hasText: "Criterion A",
+    });
+    await criterionA.getByRole("button", { name: /remove|delete|×/i }).click();
+
+    // Then only "Criterion B" remains in the list
+    const criteriaList = page.locator('[data-testid="criteria-list"]');
+    await expect(criteriaList).not.toContainText("Criterion A");
+    await expect(criteriaList).toContainText("Criterion B");
+  });
+
+  // ===========================================================================
+  // Target Configuration
+  // ===========================================================================
+
+  // FIXME: V1 Scenario Editor UI not implemented - target selector doesn't exist yet
+  // Also needs API seeding for prompts
+  test.fixme("configure prompt as target", async ({ page }) => {
+    // Given I am on the scenario editor
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // And prompts exist in the project (seeded via API)
+    // TODO: Seed prompts via API before test
+
+    // When I open the target selector
+    const targetSelector = page.getByRole("button", { name: /select target/i });
+    await targetSelector.click();
+
+    // Then I can select an existing prompt config
+    const promptOption = page.getByRole("option", { name: /prompt/i });
+    await expect(promptOption.first()).toBeVisible();
+  });
+
+  // FIXME: V1 Scenario Editor UI not implemented - HTTP agent target doesn't exist yet
+  test.fixme("configure HTTP agent as target", async ({ page }) => {
+    // Given I am on the scenario editor
+    await goToScenariosList(page);
+    await page.getByRole("button", { name: /new scenario/i }).click();
+
+    // When I open the target selector
+    const targetSelector = page.getByRole("button", { name: /select target/i });
+    await targetSelector.click();
+
+    // And I select "HTTP Agent"
+    await page.getByRole("option", { name: /http agent/i }).click();
+
+    // Then I can configure the HTTP endpoint details
+    const urlField = page.getByLabel(/url|endpoint/i);
+    await expect(urlField).toBeVisible();
+
+    const methodField = page.getByLabel(/method/i);
+    await expect(methodField).toBeVisible();
+  });
 });
