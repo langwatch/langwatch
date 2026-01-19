@@ -190,6 +190,18 @@ export const promptsRouter = createTRPCRouter({
           model: z.string().optional(),
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
+          // Traditional sampling parameters
+          topP: z.number().optional(),
+          frequencyPenalty: z.number().optional(),
+          presencePenalty: z.number().optional(),
+          // Other sampling parameters
+          seed: z.number().optional(),
+          topK: z.number().optional(),
+          minP: z.number().optional(),
+          repetitionPenalty: z.number().optional(),
+          // Reasoning parameter (canonical/unified field)
+          reasoning: z.string().optional(),
+          verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
@@ -229,6 +241,18 @@ export const promptsRouter = createTRPCRouter({
           model: z.string().optional(),
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
+          // Traditional sampling parameters
+          topP: z.number().optional(),
+          frequencyPenalty: z.number().optional(),
+          presencePenalty: z.number().optional(),
+          // Other sampling parameters
+          seed: z.number().optional(),
+          topK: z.number().optional(),
+          minP: z.number().optional(),
+          repetitionPenalty: z.number().optional(),
+          // Reasoning parameter (canonical/unified field)
+          reasoning: z.string().optional(),
+          verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
@@ -460,6 +484,18 @@ export const promptsRouter = createTRPCRouter({
         model: sourcePrompt.model ?? undefined,
         temperature: sourcePrompt.temperature ?? undefined,
         maxTokens: sourcePrompt.maxTokens ?? undefined,
+        // Traditional sampling parameters
+        topP: sourcePrompt.topP ?? undefined,
+        frequencyPenalty: sourcePrompt.frequencyPenalty ?? undefined,
+        presencePenalty: sourcePrompt.presencePenalty ?? undefined,
+        // Other sampling parameters
+        seed: sourcePrompt.seed ?? undefined,
+        topK: sourcePrompt.topK ?? undefined,
+        minP: sourcePrompt.minP ?? undefined,
+        repetitionPenalty: sourcePrompt.repetitionPenalty ?? undefined,
+        // Reasoning parameter (canonical/unified field)
+        reasoning: sourcePrompt.reasoning ?? undefined,
+        verbosity: sourcePrompt.verbosity ?? undefined,
         promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
         demonstrations: sourcePrompt.demonstrations ?? undefined,
         responseFormat: sourcePrompt.responseFormat ?? undefined,
@@ -569,7 +605,6 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Normalize prompt/messages to avoid system prompt conflict
-      // Normalize prompt/messages to avoid system prompt conflict
       const { normalizedPrompt, normalizedMessages } = normalizePromptData({
         prompt: sourcePrompt.prompt,
         messages: sourcePrompt.messages,
@@ -589,14 +624,36 @@ export const promptsRouter = createTRPCRouter({
           outputs: sourcePrompt.outputs,
           model: sourcePrompt.model,
           temperature: sourcePrompt.temperature,
-          ...(sourcePrompt.maxTokens !== undefined && {
+          ...(sourcePrompt.maxTokens != null && {
             maxTokens: sourcePrompt.maxTokens,
           }),
-          ...(sourcePrompt.promptingTechnique !== undefined && {
+          // Traditional sampling parameters
+          ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
+          ...(sourcePrompt.frequencyPenalty != null && {
+            frequencyPenalty: sourcePrompt.frequencyPenalty,
+          }),
+          ...(sourcePrompt.presencePenalty != null && {
+            presencePenalty: sourcePrompt.presencePenalty,
+          }),
+          // Other sampling parameters
+          ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
+          ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
+          ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
+          ...(sourcePrompt.repetitionPenalty != null && {
+            repetitionPenalty: sourcePrompt.repetitionPenalty,
+          }),
+          // Reasoning parameter (canonical/unified field)
+          ...(sourcePrompt.reasoning != null && {
+            reasoning: sourcePrompt.reasoning,
+          }),
+          ...(sourcePrompt.verbosity != null && {
+            verbosity: sourcePrompt.verbosity,
+          }),
+          ...(sourcePrompt.promptingTechnique != null && {
             promptingTechnique: sourcePrompt.promptingTechnique,
           }),
           demonstrations: sourcePrompt.demonstrations,
-          ...(sourcePrompt.responseFormat !== undefined && {
+          ...(sourcePrompt.responseFormat != null && {
             responseFormat: sourcePrompt.responseFormat,
           }),
           authorId,
@@ -691,7 +748,6 @@ export const promptsRouter = createTRPCRouter({
         }
 
         // Normalize prompt/messages to avoid system prompt conflict
-        // Normalize prompt/messages to avoid system prompt conflict
         const { normalizedPrompt, normalizedMessages } = normalizePromptData({
           prompt: sourcePrompt.prompt,
           messages: sourcePrompt.messages,
@@ -711,14 +767,36 @@ export const promptsRouter = createTRPCRouter({
             outputs: sourcePrompt.outputs,
             model: sourcePrompt.model,
             temperature: sourcePrompt.temperature,
-            ...(sourcePrompt.maxTokens !== undefined && {
+            ...(sourcePrompt.maxTokens != null && {
               maxTokens: sourcePrompt.maxTokens,
             }),
-            ...(sourcePrompt.promptingTechnique !== undefined && {
+            // Traditional sampling parameters
+            ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
+            ...(sourcePrompt.frequencyPenalty != null && {
+              frequencyPenalty: sourcePrompt.frequencyPenalty,
+            }),
+            ...(sourcePrompt.presencePenalty != null && {
+              presencePenalty: sourcePrompt.presencePenalty,
+            }),
+            // Other sampling parameters
+            ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
+            ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
+            ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
+            ...(sourcePrompt.repetitionPenalty != null && {
+              repetitionPenalty: sourcePrompt.repetitionPenalty,
+            }),
+            // Reasoning parameter (canonical/unified field)
+            ...(sourcePrompt.reasoning != null && {
+              reasoning: sourcePrompt.reasoning,
+            }),
+            ...(sourcePrompt.verbosity != null && {
+              verbosity: sourcePrompt.verbosity,
+            }),
+            ...(sourcePrompt.promptingTechnique != null && {
               promptingTechnique: sourcePrompt.promptingTechnique,
             }),
             demonstrations: sourcePrompt.demonstrations,
-            ...(sourcePrompt.responseFormat !== undefined && {
+            ...(sourcePrompt.responseFormat != null && {
               responseFormat: sourcePrompt.responseFormat,
             }),
             authorId,

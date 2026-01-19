@@ -9,15 +9,20 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import React, { useMemo } from "react";
-import { Info, Plus, Trash2, X } from "react-feather";
+import React, { useCallback, useMemo } from "react";
+import { ChevronDown, Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
   type FieldErrors,
   useFieldArray,
   useFormContext,
+  useWatch,
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
+import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
+import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import { Popover } from "~/components/ui/popover";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import type {
@@ -77,6 +82,73 @@ const ModelSelectorWithWarning = ({
         />
       )}
     </VStack>
+  );
+};
+
+/**
+ * Bridging component that connects react-hook-form's flat structure
+ * with LLMConfigPopover's object-based API.
+ *
+ * Renders a compact model selector (like ModelSelectFieldMini) that
+ * reads model and max_tokens from form context, constructs LLMConfig
+ * object, and updates both fields on change.
+ */
+const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
+  const { setValue, control } = useFormContext();
+
+  // Watch both fields for changes
+  const model = useWatch({ control, name: `${prefix}.model` }) as
+    | string
+    | undefined;
+  const maxTokens = useWatch({ control, name: `${prefix}.max_tokens` }) as
+    | number
+    | undefined;
+
+  // Construct LLMConfig object
+  const llmConfig: LLMConfig = useMemo(
+    () => ({
+      model: model ?? "",
+      max_tokens: maxTokens,
+    }),
+    [model, maxTokens],
+  );
+
+  // Handle changes from LLMConfigPopover
+  const handleChange = useCallback(
+    (newConfig: LLMConfig) => {
+      setValue(`${prefix}.model`, newConfig.model, { shouldDirty: true });
+      if (newConfig.max_tokens !== undefined) {
+        setValue(`${prefix}.max_tokens`, newConfig.max_tokens, {
+          shouldDirty: true,
+        });
+      }
+    },
+    [prefix, setValue],
+  );
+
+  return (
+    <Popover.Root positioning={{ placement: "bottom-start" }}>
+      <Popover.Trigger asChild>
+        <HStack
+          width="full"
+          paddingY={2}
+          paddingX={3}
+          borderRadius="md"
+          border="1px solid"
+          borderColor="gray.200"
+          cursor="pointer"
+          _hover={{ bg: "gray.50" }}
+          transition="background 0.15s"
+          justify="space-between"
+        >
+          <LLMModelDisplay model={model ?? ""} />
+          <Box color="gray.500">
+            <ChevronDown size={16} />
+          </Box>
+        </HStack>
+      </Popover.Trigger>
+      <LLMConfigPopover values={llmConfig} onChange={handleChange} />
+    </Popover.Root>
   );
 };
 
@@ -416,7 +488,44 @@ const DynamicZodForm = ({
         evaluatorType,
       ) as EvaluatorDefinition<T>;
 
-      return Object.keys(schema.shape)
+      const keys = Object.keys(schema.shape);
+
+      // Detect model + max_tokens pattern (but NOT embeddings_model)
+      // These should be rendered as a unified LLMConfigField
+      const hasModelField = keys.includes("model");
+      const hasMaxTokensField = keys.includes("max_tokens");
+      const shouldUseCompositeField = hasModelField && hasMaxTokensField;
+
+      // Filter out model/max_tokens when using composite field
+      const fieldsToRender = shouldUseCompositeField
+        ? keys.filter((k) => k !== "model" && k !== "max_tokens")
+        : keys;
+
+      // Render the composite LLM config field (if applicable)
+      const compositeField = shouldUseCompositeField ? (
+        variant === "studio" ? (
+          <VStack key="llm-config" as="form" align="start" gap={3} width="full">
+            <HStack width="full">
+              <PropertySectionTitle>Model</PropertySectionTitle>
+            </HStack>
+            <Field.Root>
+              <EvaluatorLLMConfigField prefix={prefix} />
+            </Field.Root>
+          </VStack>
+        ) : (
+          <React.Fragment key="llm-config">
+            <HorizontalFormControl
+              label="Model"
+              helper="The model to use for evaluation"
+            >
+              <EvaluatorLLMConfigField prefix={prefix} />
+            </HorizontalFormControl>
+          </React.Fragment>
+        )
+      ) : null;
+
+      // Render remaining fields
+      const renderedFields = fieldsToRender
         .filter((key) => !skipFields?.includes(key))
         .filter((key) => (onlyFields ? onlyFields.includes(key) : true))
         .map((key) => {
@@ -478,6 +587,14 @@ const DynamicZodForm = ({
             </React.Fragment>
           );
         });
+
+      // Return composite field first (if any), then remaining fields
+      return (
+        <>
+          {compositeField}
+          {renderedFields}
+        </>
+      );
     }
     return null;
   };

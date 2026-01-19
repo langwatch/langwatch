@@ -5,6 +5,7 @@ import {
 } from "../../server/api/routers/modelProviders";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 
@@ -125,24 +126,8 @@ const addLiteLLMParams = async ({
     throw new Error(`Custom API key required for ${provider}`);
   }
 
-  // Normalize to snake_case format (DSPy expects max_tokens not maxTokens)
-  const normalizedLLM: LLMConfig = {
-    model: llm.model,
-  };
-
-  if (llm.temperature !== undefined) {
-    normalizedLLM.temperature = llm.temperature;
-  }
-
-  // Handle both camelCase (maxTokens) and snake_case (max_tokens)
-  const maxTokens = (llm as any).maxTokens ?? llm.max_tokens;
-  if (maxTokens !== undefined) {
-    normalizedLLM.max_tokens = maxTokens;
-  }
-
-  if (llm.litellm_params !== undefined) {
-    normalizedLLM.litellm_params = llm.litellm_params;
-  }
+  // Normalize to snake_case format and preserve all parameters (OCP compliant)
+  const normalizedLLM = normalizeToSnakeCase(llm);
 
   return {
     ...normalizedLLM,

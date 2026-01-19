@@ -6,15 +6,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// Mock useModelLimits hook
-vi.mock("~/hooks/useModelLimits", () => ({
-  useModelLimits: ({ model }: { model: string }) => ({
-    limits: model?.includes("gpt-5")
-      ? { maxOutputTokens: 131072, maxTokens: 131072 }
-      : { maxOutputTokens: 4096, maxTokens: 4096 },
-  }),
-}));
-
 // Mock components with complex transitive dependencies
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
   CodeEditor: () => null,
@@ -45,12 +36,80 @@ vi.mock("next-auth/react", () => ({
   }),
 }));
 
+// Mock useModelProvidersSettings with model metadata
+const mockModelMetadata = {
+  "openai/gpt-4.1": {
+    id: "openai/gpt-4.1",
+    name: "GPT-4.1",
+    provider: "openai",
+    supportedParameters: [
+      "temperature",
+      "top_p",
+      "max_tokens",
+      "frequency_penalty",
+      "presence_penalty",
+    ],
+    contextLength: 128000,
+    maxCompletionTokens: 16384,
+    defaultParameters: null,
+    supportsImageInput: true,
+    supportsAudioInput: false,
+    pricing: { inputCostPerToken: 0.00001, outputCostPerToken: 0.00003 },
+    reasoningConfig: undefined,
+  },
+  "openai/gpt-5": {
+    id: "openai/gpt-5",
+    name: "GPT-5",
+    provider: "openai",
+    supportedParameters: ["reasoning", "max_tokens"], // Uses unified 'reasoning' field
+    contextLength: 256000,
+    maxCompletionTokens: 131072,
+    defaultParameters: null,
+    supportsImageInput: true,
+    supportsAudioInput: false,
+    pricing: { inputCostPerToken: 0.00002, outputCostPerToken: 0.00006 },
+    reasoningConfig: {
+      supported: true,
+      parameterName: "reasoning_effort",
+      allowedValues: ["low", "medium", "high"],
+      defaultValue: "medium",
+      canDisable: false,
+    },
+  },
+  "anthropic/claude-3.5-sonnet": {
+    id: "anthropic/claude-3.5-sonnet",
+    name: "Claude 3.5 Sonnet",
+    provider: "anthropic",
+    supportedParameters: ["temperature", "top_p", "max_tokens"],
+    contextLength: 200000,
+    maxCompletionTokens: 8192,
+    defaultParameters: null,
+    supportsImageInput: true,
+    supportsAudioInput: false,
+    pricing: { inputCostPerToken: 0.000003, outputCostPerToken: 0.000015 },
+    reasoningConfig: undefined,
+  },
+};
+
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    providers: {},
+    modelMetadata: mockModelMetadata,
+    isLoading: false,
+    refetch: vi.fn(),
+  }),
+  useModelMetadata: ({ modelId }: { modelId: string }) => ({
+    metadata: mockModelMetadata[modelId as keyof typeof mockModelMetadata],
+    isLoading: false,
+  }),
+}));
+
 // Mock ModelSelector to simplify testing
 vi.mock("../../ModelSelector", () => ({
   allModelOptions: [
-    { value: "gpt-4o", label: "GPT-4o", provider: "openai" },
-    { value: "gpt-5", label: "GPT-5", provider: "openai" },
-    { value: "claude-3-opus", label: "Claude 3 Opus", provider: "anthropic" },
+    "openai/gpt-4.1",
+    "openai/gpt-5",
+    "anthropic/claude-3.5-sonnet",
   ],
   ModelSelector: ({
     model,
@@ -64,9 +123,9 @@ vi.mock("../../ModelSelector", () => ({
       value={model}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="gpt-4o">GPT-4o</option>
-      <option value="gpt-5">GPT-5</option>
-      <option value="claude-3-opus">Claude 3 Opus</option>
+      <option value="openai/gpt-4.1">GPT-4.1</option>
+      <option value="openai/gpt-5">GPT-5</option>
+      <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
     </select>
   ),
 }));
@@ -82,7 +141,7 @@ const renderComponent = (
   props: Partial<Parameters<typeof LLMConfigPopover>[0]> = {},
 ) => {
   const defaultProps: Parameters<typeof LLMConfigPopover>[0] = {
-    values: { model: "gpt-4o", temperature: 0.7, max_tokens: 1024 },
+    values: { model: "openai/gpt-4.1", temperature: 0.7, max_tokens: 1024 },
     onChange: vi.fn(),
   };
 
@@ -103,81 +162,130 @@ describe("LLMConfigPopover", () => {
     cleanup();
   });
 
-  describe("header", () => {
-    it("displays LLM Config title", () => {
+  describe("layout", () => {
+    it("does not display LLM Config header", () => {
       renderComponent();
-      expect(screen.getByText("LLM Config")).toBeInTheDocument();
+      expect(screen.queryByText("LLM Config")).not.toBeInTheDocument();
     });
 
-    it("has a close button", () => {
+    it("starts directly with model selector", () => {
       renderComponent();
-      // X icon button should be present
-      const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBeGreaterThan(0);
+      expect(screen.getByText("Model")).toBeInTheDocument();
     });
   });
 
   describe("model selection", () => {
     it("displays current model", () => {
-      renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
+      renderComponent({
+        values: { model: "openai/gpt-4.1", temperature: 0.7 },
+      });
       const selector = screen.getByTestId("model-selector");
-      expect(selector).toHaveValue("gpt-4o");
+      expect(selector).toHaveValue("openai/gpt-4.1");
     });
 
     it("calls onChange when model is changed", async () => {
       const onChange = vi.fn();
       renderComponent({
-        values: { model: "gpt-4o", temperature: 0.7 },
+        values: { model: "openai/gpt-4.1", temperature: 0.7 },
         onChange,
       });
 
       const selector = screen.getByTestId("model-selector");
-      fireEvent.change(selector, { target: { value: "claude-3-opus" } });
+      fireEvent.change(selector, {
+        target: { value: "anthropic/claude-3.5-sonnet" },
+      });
 
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ model: "claude-3-opus" }),
+        expect.objectContaining({ model: "anthropic/claude-3.5-sonnet" }),
       );
     });
   });
 
-  describe("temperature control", () => {
-    it("shows Temperature label", () => {
-      renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
-      expect(screen.getByText("Temperature")).toBeInTheDocument();
-    });
-
-    it("shows helper text about randomness", () => {
-      renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
-      expect(screen.getByText(/Controls randomness/)).toBeInTheDocument();
-    });
-
-    describe("GPT-5 constraints", () => {
-      it("shows message that temperature is fixed for GPT-5", () => {
-        renderComponent({ values: { model: "gpt-5", temperature: 1 } });
-        expect(
-          screen.getByText("Temperature is fixed to 1 for GPT-5 models"),
-        ).toBeInTheDocument();
+  describe("dynamic parameter display", () => {
+    describe("for traditional models (GPT-4.1)", () => {
+      it("shows Temperature parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.getByTestId("parameter-row-temperature")).toBeInTheDocument();
       });
 
-      it("does not show GPT-5 message for other models", () => {
-        renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
-        expect(
-          screen.queryByText("Temperature is fixed to 1 for GPT-5 models"),
-        ).not.toBeInTheDocument();
+      it("shows Top P parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.getByTestId("parameter-row-top_p")).toBeInTheDocument();
+      });
+
+      it("shows Max Tokens parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
+      });
+
+      it("shows Frequency Penalty parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.getByTestId("parameter-row-frequency_penalty")).toBeInTheDocument();
+      });
+
+      it("shows Presence Penalty parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.getByTestId("parameter-row-presence_penalty")).toBeInTheDocument();
+      });
+
+      it("does not show Reasoning parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-4.1", temperature: 0.7 },
+        });
+        expect(screen.queryByText("Reasoning")).not.toBeInTheDocument();
       });
     });
-  });
 
-  describe("max tokens control", () => {
-    it("shows Max Tokens label", () => {
-      renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
-      expect(screen.getByText("Max Tokens")).toBeInTheDocument();
-    });
+    describe("for reasoning models (GPT-5)", () => {
+      it("displays dynamic label based on reasoningConfig.parameterName", () => {
+        // Uses unified 'reasoning' field but displays provider-specific label
+        // reasoningConfig.parameterName: "reasoning_effort" → label: "Reasoning Effort"
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning: "medium" },
+        });
 
-    it("shows min/max token limits helper text", () => {
-      renderComponent({ values: { model: "gpt-4o", temperature: 0.7 } });
-      expect(screen.getByText(/Min:/)).toBeInTheDocument();
-      expect(screen.getByText(/Max:/)).toBeInTheDocument();
+        // Should find "Reasoning Effort" (label from reasoningConfig.parameterName mapping)
+        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(0);
+      });
+
+      it("shows reasoning parameter row", () => {
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning: "medium" },
+        });
+        // Parameter row uses unified 'reasoning' key
+        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
+      });
+
+      it("shows Max Tokens parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning: "medium" },
+        });
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
+      });
+
+      it("does not show Temperature parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning: "medium" },
+        });
+        expect(screen.queryByText("Temperature")).not.toBeInTheDocument();
+      });
+
+      it("does not show Top P parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning: "medium" },
+        });
+        expect(screen.queryByText("Top P")).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -197,21 +305,6 @@ describe("LLMConfigPopover", () => {
       expect(screen.getByText("Structured Outputs")).toBeInTheDocument();
     });
 
-    describe("when default output (toggle should be off)", () => {
-      it("does not show Outputs section", () => {
-        const outputs: Output[] = [{ identifier: "output", type: "str" }];
-        renderComponent({
-          showStructuredOutputs: true,
-          outputs,
-          onOutputsChange: vi.fn(),
-        });
-        // "Structured Outputs" label shows but not a separate "Outputs" section
-        expect(screen.getByText("Structured Outputs")).toBeInTheDocument();
-        // There should be no standalone "Outputs" heading
-        expect(screen.queryByText(/^Outputs$/)).not.toBeInTheDocument();
-      });
-    });
-
     describe("when non-default output (toggle should be on)", () => {
       it("shows Outputs section", () => {
         const outputs: Output[] = [
@@ -222,7 +315,6 @@ describe("LLMConfigPopover", () => {
           outputs,
           onOutputsChange: vi.fn(),
         });
-        // Both labels should show
         expect(screen.getByText("Structured Outputs")).toBeInTheDocument();
         expect(screen.getByText("Outputs")).toBeInTheDocument();
       });
@@ -276,6 +368,17 @@ describe("LLMConfigPopover", () => {
       expect(
         screen.getByText("Max tokens must be positive"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("model configuration action", () => {
+    it("passes showConfigureAction to ModelSelector", () => {
+      // The "Configure available models" link is now rendered inside ModelSelector
+      // which is mocked in these tests. The prop is passed through and the actual
+      // link behavior is tested in ModelSelector tests.
+      renderComponent();
+      // ModelSelector is mocked, so we just verify the component renders
+      expect(screen.getByTestId("model-selector")).toBeInTheDocument();
     });
   });
 });

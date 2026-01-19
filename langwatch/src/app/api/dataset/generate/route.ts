@@ -90,7 +90,7 @@ ${dataset}`,
     },
     providerOptions: {
       openai: {
-        reasoningEffort: "minimal",
+        reasoningEffort: "low",
       } satisfies OpenAIResponsesProviderOptions,
     },
   });

@@ -93,6 +93,23 @@ export const llmConfigSchema = z.object({
   model: z.string(),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
+  // Traditional sampling parameters
+  top_p: z.number().optional(),
+  frequency_penalty: z.number().optional(),
+  presence_penalty: z.number().optional(),
+  // Other sampling parameters
+  seed: z.number().optional(),
+  top_k: z.number().optional(),
+  min_p: z.number().optional(),
+  repetition_penalty: z.number().optional(),
+  // Reasoning parameter (canonical/unified field)
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+  reasoning: z.string().optional(),
+  // Provider-specific fields - kept for backward compatibility
+  reasoning_effort: z.string().optional(), // OpenAI (legacy)
+  thinkingLevel: z.string().optional(), // Gemini (legacy)
+  effort: z.string().optional(), // Anthropic (legacy)
+  verbosity: z.string().optional(),
   litellm_params: z.record(z.string()).optional(),
 });
 

@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Box, HStack } from "@chakra-ui/react";
 import React, { useCallback } from "react";
 import { ChevronDown } from "react-feather";
 import {
@@ -33,7 +33,7 @@ type ModelSelectFieldMiniProps = {
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
 }: ModelSelectFieldMiniProps) {
-  const { control, formState, trigger, getValues } =
+  const { control, formState, trigger } =
     useFormContext<PromptConfigFormValues>();
 
   // Outputs field array for structured outputs
@@ -58,70 +58,15 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   // Handle outputs change from LLMConfigPopover
   const handleOutputsChange = useCallback(
     (newOutputs: Output[]) => {
-      const currentFields = getValues("version.configData.outputs");
-      const lengthDiff = newOutputs.length - currentFields.length;
-
-      // If removing multiple outputs at once (e.g., disabling structured outputs),
-      // replace the entire array
-      if (lengthDiff < -1 || (lengthDiff === -1 && newOutputs.length === 1)) {
-        // Replace all outputs - use replace method for efficiency
-        outputsFieldArray.replace(
-          newOutputs.map((o) => ({
-            identifier: o.identifier,
-            type: o.type as LlmConfigOutputType,
-            json_schema: o.json_schema as { type: string } | undefined,
-          })),
-        );
-        return;
-      }
-
-      // If length changed, handle add/remove
-      if (newOutputs.length > currentFields.length) {
-        // Added an output
-        const newOutput = newOutputs[newOutputs.length - 1];
-        if (newOutput) {
-          outputsFieldArray.append({
-            identifier: newOutput.identifier,
-            type: newOutput.type as LlmConfigOutputType,
-            json_schema: newOutput.json_schema as { type: string } | undefined,
-          });
-        }
-      } else if (newOutputs.length < currentFields.length) {
-        // Removed a single output - find which one
-        for (let i = 0; i < currentFields.length; i++) {
-          const currentField = currentFields[i];
-          if (
-            !newOutputs.some((o) => o.identifier === currentField?.identifier)
-          ) {
-            outputsFieldArray.remove(i);
-            break;
-          }
-        }
-      } else {
-        // Same length - check for updates
-        for (let i = 0; i < newOutputs.length; i++) {
-          const newOutput = newOutputs[i];
-          const currentField = currentFields[i];
-          if (
-            newOutput &&
-            currentField &&
-            (newOutput.identifier !== currentField.identifier ||
-              newOutput.type !== currentField.type ||
-              JSON.stringify(newOutput.json_schema) !==
-                JSON.stringify(currentField.json_schema))
-          ) {
-            outputsFieldArray.update(i, {
-              identifier: newOutput.identifier,
-              type: newOutput.type as LlmConfigOutputType,
-              json_schema: newOutput.json_schema as
-                | { type: string }
-                | undefined,
-            });
-          }
-        }
-      }
+      outputsFieldArray.replace(
+        newOutputs.map((o) => ({
+          identifier: o.identifier,
+          type: o.type as LlmConfigOutputType,
+          json_schema: o.json_schema as { type: string } | undefined,
+        }))
+      );
     },
-    [getValues, outputsFieldArray],
+    [outputsFieldArray]
   );
 
   return (
@@ -132,16 +77,25 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
       render={({ field }) => {
         const llmErrors = formState.errors.version?.configData?.llm;
         return (
-          <Popover.Root positioning={{ placement: "bottom" }}>
+          <Popover.Root positioning={{ placement: "bottom-start" }}>
             <Popover.Trigger asChild>
-              <Button
-                variant="outline"
-                fontWeight="normal"
-                _active={{ bg: "gray.50" }}
+              <HStack
+                width="2/3"
+                paddingY={2}
+                paddingX={3}
+                borderRadius="md"
+                border="1px solid"
+                borderColor="gray.200"
+                cursor="pointer"
+                _hover={{ bg: "gray.50" }}
+                transition="background 0.15s"
+                justify="space-between"
               >
                 <LLMModelDisplay model={field.value?.model ?? ""} />
-                <ChevronDown size={16} />
-              </Button>
+                <Box color="gray.500">
+                  <ChevronDown size={16} />
+                </Box>
+              </HStack>
             </Popover.Trigger>
             <LLMConfigPopover
               values={field.value}

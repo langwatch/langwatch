@@ -211,10 +211,9 @@ export const OutputsSection = ({
       {/* Header */}
       <HStack width="full">
         <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="gray.500"
+          fontSize="sm"
+          fontWeight="medium"
+          color="gray.600"
         >
           {title}
         </Text>

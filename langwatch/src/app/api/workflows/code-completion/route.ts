@@ -65,7 +65,7 @@ app.post("/code-completion", async (c) => {
         temperature: 0,
         providerOptions: {
           openai: {
-            reasoningEffort: "minimal",
+            reasoningEffort: "low",
           } satisfies OpenAIResponsesProviderOptions,
         },
       });

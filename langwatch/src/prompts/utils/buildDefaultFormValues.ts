@@ -17,10 +17,11 @@ export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
     configData: {
       llm: {
         model: DEFAULT_MODEL,
-        // GPT-5 models require temperature 1, so we use 1 as the default
-        // since DEFAULT_MODEL is openai/gpt-5
-        temperature: 1,
-        maxTokens: 1000,
+        // Temperature is omitted - not all models support it (e.g., reasoning models)
+        // The UI will apply model-appropriate defaults based on supportedParameters
+        temperature: undefined,
+        // Sensible default for most models - the UI will adjust based on model's maxCompletionTokens
+        maxTokens: 4096,
       },
       messages: [
         { role: "system", content: "You are a helpful assistant." },

@@ -63,3 +63,53 @@ Feature: Reasoning Model LLM Configuration
     When creating a DSPy LM instance
     Then temperature should be 0
     And max_tokens should be 2048
+
+  # Integration: Reasoning parameters passthrough
+
+  @integration
+  Scenario: reasoning_effort is passed to dspy.LM (OpenAI)
+    Given an LLM config with model "openai/gpt-5" and reasoning_effort "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="high"
+
+  @integration
+  Scenario: thinkingLevel is passed to dspy.LM (Gemini)
+    Given an LLM config with model "google/gemini-pro" and thinkingLevel "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include thinkingLevel="high"
+
+  @integration
+  Scenario: effort is passed to dspy.LM (Anthropic)
+    Given an LLM config with model "anthropic/claude-3" and effort "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include effort="high"
+
+  # Unified reasoning field mapping (canonical approach)
+  # The 'reasoning' field is the canonical/unified field that gets mapped to provider-specific parameters
+
+  @integration
+  Scenario: Unified reasoning field maps to reasoning_effort for OpenAI
+    Given an LLM config with model "openai/gpt-5" and reasoning "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="high"
+    # Note: The unified 'reasoning' field is mapped to provider-specific parameters at the boundary
+
+  @integration
+  Scenario: Unified reasoning field maps to thinkingLevel for Gemini
+    Given an LLM config with model "google/gemini-pro" and reasoning "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include thinkingLevel="high"
+
+  @integration
+  Scenario: Unified reasoning field maps to effort for Anthropic
+    Given an LLM config with model "anthropic/claude-3" and reasoning "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include effort="high"
+
+  # Backward compatibility with provider-specific fields in existing data
+  @integration
+  Scenario: Provider-specific reasoning_effort still works for backward compatibility
+    Given an LLM config with model "openai/gpt-5" and reasoning_effort "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="high"
+    # Note: Old data with provider-specific fields continues to work

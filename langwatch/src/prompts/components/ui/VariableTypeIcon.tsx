@@ -16,48 +16,44 @@ import {
  */
 export const VariableTypeIcon = ({
   type,
-  size = 14,
+  size = 16,
 }: {
   type: string;
   size?: number;
 }) => {
-  const iconProps = { size, strokeWidth: 2.5 };
+  const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };
 
   switch (type) {
     case "str":
     case "string":
-      return <Type {...iconProps} color="var(--chakra-colors-blue-500)" />;
+      return <Type {...iconProps} />;
 
     case "float":
     case "int":
     case "number":
-      return <Hash {...iconProps} color="var(--chakra-colors-green-500)" />;
+      return <Hash {...iconProps} />;
 
     case "bool":
     case "boolean":
-      return (
-        <ToggleLeft {...iconProps} color="var(--chakra-colors-orange-500)" />
-      );
+      return <ToggleLeft {...iconProps} />;
 
     case "list":
     case "list[str]":
     case "list[float]":
     case "list[int]":
     case "list[bool]":
-      return <List {...iconProps} color="var(--chakra-colors-purple-500)" />;
+      return <List {...iconProps} />;
 
     case "dict":
     case "json":
     case "json_schema":
-      return <Braces {...iconProps} color="var(--chakra-colors-cyan-500)" />;
+      return <Braces {...iconProps} />;
 
     case "chat_messages":
-      return (
-        <MessageSquare {...iconProps} color="var(--chakra-colors-pink-500)" />
-      );
+      return <MessageSquare {...iconProps} />;
 
     default:
-      return <Type {...iconProps} color="var(--chakra-colors-gray-400)" />;
+      return <Type {...iconProps} />;
   }
 };
 

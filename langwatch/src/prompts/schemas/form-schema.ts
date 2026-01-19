@@ -19,6 +19,21 @@ const llmSchema = z.object({
   // Derive from DB schema to stay in sync
   temperature: latestConfigVersionSchema.shape.configData.shape.temperature,
   maxTokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
+  // Traditional sampling parameters
+  topP: latestConfigVersionSchema.shape.configData.shape.top_p,
+  frequencyPenalty:
+    latestConfigVersionSchema.shape.configData.shape.frequency_penalty,
+  presencePenalty:
+    latestConfigVersionSchema.shape.configData.shape.presence_penalty,
+  // Other sampling parameters
+  seed: latestConfigVersionSchema.shape.configData.shape.seed,
+  topK: latestConfigVersionSchema.shape.configData.shape.top_k,
+  minP: latestConfigVersionSchema.shape.configData.shape.min_p,
+  repetitionPenalty:
+    latestConfigVersionSchema.shape.configData.shape.repetition_penalty,
+  // Reasoning parameter (canonical/unified field)
+  reasoning: latestConfigVersionSchema.shape.configData.shape.reasoning,
+  verbosity: latestConfigVersionSchema.shape.configData.shape.verbosity,
   litellmParams: z.record(z.string()).optional(),
 });
 
@@ -78,31 +93,31 @@ export function refinedFormSchemaWithModelLimits(
   return baseFormSchema.extend({
     version: baseFormSchema.shape.version.extend({
       configData: baseFormSchema.shape.version.shape.configData.extend({
-        llm: z
-          .object({
-            model: llmSchema.shape.model,
-            temperature: llmSchema.shape.temperature,
-            maxTokens: llmSchema.shape.maxTokens
-              .refine((val) => val !== undefined && val <= maxTokenLimit, {
-                message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
-              })
-              .refine((val) => val !== undefined && val >= MIN_MAX_TOKENS, {
-                message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
-              }),
-            // Additional params attached to the LLM config
-            litellmParams: llmSchema.shape.litellmParams,
-          })
-          .refine(
-            (data) => {
-              const isGpt5 = data.model.includes("gpt-5");
-              if (!isGpt5) return true;
-              return isGpt5 && data.temperature !== 1 ? false : true;
-            },
-            {
-              message: "Temperature must be 1 for GPT-5 models",
-              path: ["temperature"],
-            },
-          ),
+        llm: z.object({
+          model: llmSchema.shape.model,
+          temperature: llmSchema.shape.temperature,
+          maxTokens: llmSchema.shape.maxTokens
+            .refine((val) => val === undefined || val <= maxTokenLimit, {
+              message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
+            })
+            .refine((val) => val === undefined || val >= MIN_MAX_TOKENS, {
+              message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
+            }),
+          // Traditional sampling parameters
+          topP: llmSchema.shape.topP,
+          frequencyPenalty: llmSchema.shape.frequencyPenalty,
+          presencePenalty: llmSchema.shape.presencePenalty,
+          // Other sampling parameters
+          seed: llmSchema.shape.seed,
+          topK: llmSchema.shape.topK,
+          minP: llmSchema.shape.minP,
+          repetitionPenalty: llmSchema.shape.repetitionPenalty,
+          // Reasoning parameter (canonical/unified field)
+          reasoning: llmSchema.shape.reasoning,
+          verbosity: llmSchema.shape.verbosity,
+          // Additional params attached to the LLM config
+          litellmParams: llmSchema.shape.litellmParams,
+        }),
       }),
     }),
   });

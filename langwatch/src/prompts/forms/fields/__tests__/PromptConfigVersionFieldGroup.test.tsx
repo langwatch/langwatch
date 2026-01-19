@@ -44,7 +44,7 @@ let testFormMethods: ReturnType<typeof useForm<PromptConfigFormValues>> | null =
 const defaultLlmConfig = {
   model: "openai/gpt-4o-mini",
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
 };
 
 // Wrapper with Chakra provider and FormProvider

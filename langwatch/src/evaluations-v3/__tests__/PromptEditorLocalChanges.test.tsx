@@ -71,7 +71,7 @@ const mockPromptData = {
   versionCreatedAt: new Date(),
   model: "gpt-4",
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
   prompt: "You are a helpful assistant.",
   projectId: "test-project",
   messages: [{ role: "system", content: "You are a helpful assistant." }],
@@ -164,6 +164,28 @@ vi.mock("~/utils/api", () => ({
       getAllForProject: {
         useQuery: () => ({
           data: [{ provider: "openai", enabled: true }],
+          isLoading: false,
+        }),
+      },
+      getAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: {
+            providers: { openai: { provider: "openai", enabled: true } },
+            modelMetadata: {
+              "openai/gpt-4": {
+                id: "openai/gpt-4",
+                name: "GPT-4",
+                provider: "openai",
+                supportedParameters: ["temperature", "top_p", "max_tokens"],
+                contextLength: 128000,
+                maxCompletionTokens: 8192,
+                defaultParameters: null,
+                supportsImageInput: false,
+                supportsAudioInput: false,
+                pricing: { inputCostPerToken: 0.00003, outputCostPerToken: 0.00006 },
+              },
+            },
+          },
           isLoading: false,
         }),
       },
@@ -486,7 +508,7 @@ describe("Prompt Editor Local Changes", () => {
         llm: {
           model: "openai/gpt-4",
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: 4096,
         },
         messages: [{ role: "user", content: "LOCAL UNSAVED CONTENT" }],
         inputs: [{ identifier: "input", type: "str" }],

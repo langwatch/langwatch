@@ -68,7 +68,7 @@ function TestWrapper({ defaultMessages }: WrapperProps) {
       scope: "PROJECT",
       version: {
         configData: {
-          llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+          llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
           messages: defaultMessages ?? [
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: "{{input}}" },
@@ -117,7 +117,7 @@ function TestWrapperWithDelayedReset({
       scope: "PROJECT",
       version: {
         configData: {
-          llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+          llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
           // Start with default messages (system + user with {{input}}) -> defaults to Prompt mode
           messages: [
             { role: "system", content: "You are a helpful assistant." },
@@ -143,7 +143,7 @@ function TestWrapperWithDelayedReset({
         scope: "PROJECT",
         version: {
           configData: {
-            llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+            llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
             messages: messagesAfterReset,
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

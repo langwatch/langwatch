@@ -124,7 +124,7 @@ const mockPromptDataWithMessages = {
   outputs: [{ identifier: "answer", type: "str" }],
   model: "openai/gpt-4o",
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
   demonstrations: [],
   promptingTechnique: null,
   responseFormat: null,

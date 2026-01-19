@@ -17,7 +17,7 @@ const signatureConfig = {
   llm: {
     model: "openai/gpt-4o",
     temperature: 0.7,
-    maxTokens: 1000,
+    maxTokens: 4096,
   },
   prompt: "You are a helpful assistant",
   inputs: [{ identifier: "input", type: "str" }],
