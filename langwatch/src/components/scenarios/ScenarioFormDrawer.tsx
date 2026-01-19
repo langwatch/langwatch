@@ -1,6 +1,6 @@
 import { Grid, GridItem, Heading } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -30,7 +30,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
-  const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
+  const [formInstance, setFormInstance] = useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
@@ -119,7 +119,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
-      const form = formRef.current;
+      const form = formInstance;
       if (!form || !project?.id) return;
       if (!target) {
         toaster.create({
@@ -151,10 +151,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, persistTarget, runScenario],
+    [handleSave, project?.id, persistTarget, runScenario, formInstance],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
-    const form = formRef.current;
+    const form = formInstance;
     if (!form) return;
     await form.handleSubmit(async (data) => {
       const saved = await handleSave(data);
@@ -166,9 +166,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     })();
-  }, [handleSave, scenario]);
+  }, [handleSave, scenario, formInstance]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
-    formRef.current = form;
+    setFormInstance(form);
   }, []);
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || isRunning;
@@ -208,7 +208,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="gray.50">
-              <ScenarioEditorSidebar />
+              <ScenarioEditorSidebar form={formInstance} />
             </GridItem>
           </Grid>
         </Drawer.Body>

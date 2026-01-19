@@ -1,6 +1,4 @@
 import {
-  Box,
-  Button,
   Card,
   HStack,
   Icon,
@@ -12,53 +10,26 @@ import {
   Check,
   CircleDot,
   MessageSquare,
-  Sparkles,
   TriangleAlert,
   Users,
 } from "lucide-react";
+import type { UseFormReturn } from "react-hook-form";
+import { ScenarioAIGeneration } from "./ScenarioAIGeneration";
+import type { ScenarioFormData } from "./ScenarioForm";
 
-/**
- * Card prompting user to generate scenarios with AI.
- * Currently hidden until AI generation is implemented.
- */
-function _GenerateWithAICard() {
-  return (
-    <Card.Root>
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack gap={3}>
-            <Box p={2} bg="blue.50" borderRadius="md" color="blue.500">
-              <Icon as={Sparkles} boxSize={5} />
-            </Box>
-            <VStack align="start" gap={0}>
-              <Text fontWeight="semibold" fontSize="sm">
-                Need Help?
-              </Text>
-              <Text fontSize="xs" color="gray.600">
-                Our AI can help you write better scenarios based on your
-                agent&apos;s purpose and common user patterns.
-              </Text>
-            </VStack>
-          </HStack>
-          <Button variant="outline" width="full" size="sm">
-            <Sparkles size={14} />
-            Generate with AI
-          </Button>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
-  );
-}
+type ScenarioEditorSidebarProps = {
+  form?: UseFormReturn<ScenarioFormData> | null;
+};
 
 /**
  * Help sidebar for the scenario editor.
  * Provides tips and best practices for writing scenarios.
  */
-export function ScenarioEditorSidebar() {
+export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
   return (
     <VStack align="stretch" gap={4}>
-      {/* TODO: Uncomment when AI generation is implemented */}
-      {/* <GenerateWithAICard /> */}
+      {/* AI Generation */}
+      <ScenarioAIGeneration form={form ?? null} />
 
       {/* Writing Great Scenarios */}
       <Card.Root>
