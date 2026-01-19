@@ -7,7 +7,7 @@
 -- ============================================================================
 -- OpenTelemetry span storage for distributed tracing.
 --
--- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_REPLICATED)
+-- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_CLUSTER)
 -- - DDL replication handled by Replicated database engine
 -- - Data replication handled by ReplicatedReplacingMergeTree when enabled
 -- ============================================================================

@@ -7,7 +7,7 @@
 -- ============================================================================
 -- Stores immutable events with tenant isolation and aggregate grouping.
 --
--- Engine: MergeTree / ReplicatedMergeTree (based on CLICKHOUSE_REPLICATED)
+-- Engine: MergeTree / ReplicatedMergeTree (based on CLICKHOUSE_CLUSTER)
 -- - DDL replication handled by Replicated database engine
 -- - Data replication handled by ReplicatedMergeTree when enabled
 -- ============================================================================

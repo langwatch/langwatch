@@ -7,7 +7,7 @@
 -- ============================================================================
 -- Tracks event processing state for each processor/handler.
 --
--- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_REPLICATED)
+-- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_CLUSTER)
 -- - DDL replication handled by Replicated database engine
 -- - Data replication handled by ReplicatedReplacingMergeTree when enabled
 -- ============================================================================
