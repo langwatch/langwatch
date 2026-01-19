@@ -1,46 +1,25 @@
 # Test environment with isolated ports
-# Does not conflict with local development (compose.yml)
+# Infrastructure services only - run Next.js app locally
 #
 # Usage:
 #   docker compose -f compose.test.yml up -d
+#   cd langwatch && pnpm dev  # or: pnpm build && pnpm start
 #   cd agentic-e2e-tests && pnpm test
 #   docker compose -f compose.test.yml down
+#
+# The Next.js app runs on the host at localhost:5570 (set via PORT=5570)
 
 services:
-  app:
-    image: langwatch/langwatch:latest
-    environment:
-      SKIP_ENV_VALIDATION: true
-      DISABLE_PII_REDACTION: true
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/testdb?schema=testdb
-      ELASTICSEARCH_NODE_URL: http://opensearch:9200
-      IS_OPENSEARCH: true
-      REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-      LANGEVALS_ENDPOINT: http://langevals:5562
-      INSTALL_METHOD: docker-test
-      NODE_ENV: test
-      NEXTAUTH_SECRET: test-secret-for-e2e-testing
-      NEXTAUTH_URL: http://localhost:5570
-      NEXTAUTH_URL_INTERNAL: http://localhost:5560
-      API_TOKEN_JWT_SECRET: test-jwt-secret-for-e2e
-    ports:
-      - "5570:5560"  # Test port (dev uses 5560)
-    extra_hosts:
-      - "localhost:host-gateway"  # Allow container to reach host's localhost:5570
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      opensearch:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5560/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+  # Note: The app service is commented out - run Next.js locally for faster iteration
+  # Uncomment and use `build: .` if you need a fully containerized test environment
+  #
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     NODE_OPTIONS: "--max-old-space-size=4096"
+  #     ...
 
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
@@ -48,7 +27,7 @@ services:
       - "5563:5561"  # Test port (dev uses 5561)
     restart: always
     environment:
-      - LANGWATCH_ENDPOINT=http://app:5560
+      - LANGWATCH_ENDPOINT=http://host.docker.internal:5570
 
   langevals:
     image: langwatch/langevals:latest

@@ -9,17 +9,24 @@ import { test, expect } from "@playwright/test";
  * These tests verify the simulation results page displays correctly.
  */
 
-// Helper to navigate to simulations page via sidebar
+// Helper to navigate to simulations page
 async function navigateToSimulations(page: import("@playwright/test").Page) {
   await page.goto("/");
 
-  const simulationsLink = page.getByRole("link", {
-    name: "Simulations",
-    exact: true,
-  });
-  await expect(simulationsLink).toBeVisible({ timeout: 15000 });
-  await simulationsLink.click();
+  // Wait for navigation to appear - look for Home link which always exists
+  const homeLink = page.getByRole("link", { name: "Home", exact: true });
+  await expect(homeLink).toBeVisible({ timeout: 15000 });
 
+  // Get the project URL from the Home link
+  const href = await homeLink.getAttribute("href");
+  const projectSlug = href?.replace(/^\//, "") || "";
+
+  if (!projectSlug) {
+    throw new Error("Could not extract project slug from Home link");
+  }
+
+  // Navigate directly to simulations page
+  await page.goto(`/${projectSlug}/simulations`);
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
 

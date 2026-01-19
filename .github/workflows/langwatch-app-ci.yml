@@ -341,3 +341,140 @@ jobs:
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
           key: ${{ steps.next-cache.outputs.cache-primary-key }}
+
+  # =============================================================================
+  # E2E Tests (Playwright)
+  # =============================================================================
+  # Tests are self-contained: they create their own test user via API.
+  # No secrets required - just remove `if: false` to enable.
+  test-e2e:
+    if: false  # Disabled - remove this line to enable E2E tests
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      # App configuration
+      DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9201"
+      IS_OPENSEARCH: "true"
+      REDIS_URL: "redis://localhost:6380"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5563"
+      LANGEVALS_ENDPOINT: "http://localhost:5564"
+      NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
+      NEXTAUTH_URL: "http://localhost:5570"
+      API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      SKIP_ENV_VALIDATION: "true"
+      DISABLE_PII_REDACTION: "true"
+      NODE_ENV: "development"
+      SKIP_ELASTIC_MIGRATE: "true"
+      SKIP_CLICKHOUSE_MIGRATE: "true"
+      # Test runner configuration
+      BASE_URL: "http://localhost:5570"
+      CI: "true"
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      opensearch:
+        image: langwatch/opensearch-lite:latest
+        ports:
+          - 9201:9200
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
+          cluster.routing.allocation.disk.threshold_enabled: "false"
+          bootstrap.memory_lock: "false"
+          node.store.allow_mmap: "false"
+        options: >-
+          --health-cmd "curl -s http://localhost:9200 || exit 1"
+          --health-interval 30s
+          --health-timeout 30s
+          --health-retries 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: CI=true pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: langwatch
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: pnpm start:prepare:files
+
+      - name: Setup database
+        working-directory: langwatch
+        run: pnpm prisma:migrate
+
+      - name: Build app
+        working-directory: langwatch
+        run: pnpm build
+
+      - name: Run E2E tests
+        working-directory: langwatch
+        run: |
+          # Start the app in background
+          PORT=5570 pnpm start &
+          APP_PID=$!
+
+          # Global setup in playwright.config.ts waits for app readiness
+          # Run tests
+          pnpm exec playwright test --config=../playwright.config.ts
+
+          # Cleanup
+          kill $APP_PID || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: agentic-e2e-tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: agentic-e2e-tests/test-results/
+          retention-days: 7

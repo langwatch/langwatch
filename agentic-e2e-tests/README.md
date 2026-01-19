@@ -1,222 +1,251 @@
 # Agentic E2E Tests
 
-AI-maintained end-to-end tests for LangWatch using Playwright.
+End-to-end tests for LangWatch using Playwright, designed to be authored and maintained with AI assistance.
 
-## Overview
+## Quick Start
 
-This directory contains E2E tests that are **authored and maintained by AI agents**. The workflow uses three specialized agents:
+```bash
+# 1. Start infrastructure services
+docker compose -f compose.test.yml up -d
 
-| Agent | Role | When Invoked |
-|-------|------|--------------|
-| **Planner** | Explores the app, creates detailed test plans | New `@e2e` scenario in `.feature` file |
-| **Generator** | Executes steps in browser, writes `.spec.ts` | New test plan in `plans/` |
-| **Healer** | Debugs failures, fixes broken tests | Test failure in CI or locally |
+# 2. Run database migrations (first time only)
+cd langwatch
+pnpm prisma:migrate
 
-### Agentic Exploration vs Scripted Tests
+# 3. Start the app (in langwatch/ directory)
+PORT=5570 pnpm dev
 
-Agents enable two complementary testing modes:
+# 4. Run tests (from repo root)
+cd langwatch && pnpm playwright test --config=../playwright.config.ts
+```
 
-| Mode | Speed | Purpose |
-|------|-------|---------|
-| **Exploration** | Slow (real-time) | Validate new features, discover issues, smoke testing |
-| **Scripted Tests** | Fast | Reproducible regression protection in CI |
+## Architecture
 
-The workflow: Agents **explore** the app to validate functionality and discover edge cases, then **capture** what they find as scripted Playwright tests for speed and reproducibility in CI.
+### Test Environment
 
-## Directory Structure
+Tests run against a **locally-running Next.js dev server** with Docker providing infrastructure:
+
+| Service | Dev Port | Test Port | Notes |
+|---------|----------|-----------|-------|
+| Next.js App | 5560 | 5570 | Runs on host, not in Docker |
+| PostgreSQL | 5432 | 5433 | Docker |
+| Redis | 6379 | 6380 | Docker |
+| OpenSearch | 9200 | 9201 | Docker |
+| NLP Service | 5561 | 5563 | Docker |
+
+**Why local app instead of Docker?**
+- Faster iteration during test development
+- Avoids Docker build memory issues
+- Tests run against current source code (not a built image)
+- Easier debugging with hot reload
+
+### Directory Structure
 
 ```
 agentic-e2e-tests/
-├── plans/              # Test plans (planner output)
-│   └── scenarios/      # Plans for scenarios feature
-├── tests/              # Playwright specs (generator output)
-│   └── scenarios/      # Tests for scenarios feature
-├── seeds/              # Entry point setup files
-├── .auth/              # Auth state (gitignored)
-├── playwright.config.ts
-├── package.json
-└── README.md
+├── tests/
+│   └── scenarios/
+│       ├── steps.ts              # Gherkin-style step definitions
+│       ├── scenario-editor.spec.ts
+│       ├── scenario-library.spec.ts
+│       └── scenario-execution.spec.ts
+├── .auth/                        # Auth state (gitignored)
+├── playwright-report/            # HTML test reports
+└── test-results/                 # Artifacts from failed tests
 ```
 
-## Workflow
+## Test Design
 
-### 1. Spec First (Human)
+### Feature File Mapping
 
-Define what to test in a `.feature` file:
+Tests map directly to Gherkin scenarios in `specs/`:
 
-```gherkin
-# specs/scenarios/scenario-library.feature
-@e2e
-Scenario: User can create a new scenario
-  Given I am logged in
-  When I navigate to the scenarios page
-  And I click "New Scenario"
-  And I fill in the scenario form
-  And I click "Save"
-  Then I see the scenario in the list
+```
+specs/scenarios/scenario-editor.feature  →  tests/scenarios/scenario-editor.spec.ts
+specs/scenarios/scenario-library.feature →  tests/scenarios/scenario-library.spec.ts
 ```
 
-### 2. Planner Agent
-
-The planner reads `@e2e` scenarios and creates detailed test plans:
-
-```markdown
-# plans/scenarios/create-scenario.plan.md
-
-## Test: User can create a new scenario
-Seed: seeds/scenarios-list.seed.ts
-
-### Steps:
-1. Click "New Scenario" button
-2. Fill "Name" field with "Test Scenario"
-3. Fill "Situation" textarea with "User wants help"
-4. Click "Add Criterion" button
-5. Fill criterion with "Agent responds helpfully"
-6. Click "Save" button
-
-### Expected Results:
-- Redirect to scenarios list
-- "Test Scenario" appears in the list
-```
-
-### 3. Generator Agent
-
-The generator executes the plan in a real browser and writes the test:
+Each test has doc comments linking to the source feature file:
 
 ```typescript
-// tests/scenarios/create-scenario.spec.ts
-import { test, expect } from "@playwright/test";
-
-test.describe("Scenario Library", () => {
-  test("User can create a new scenario", async ({ page }) => {
-    // 1. Click "New Scenario" button
-    await page.getByRole("button", { name: "New Scenario" }).click();
-
-    // 2. Fill "Name" field
-    await page.getByLabel("Name").fill("Test Scenario");
-
-    // ... rest of steps
-  });
+/**
+ * Scenario: Navigate to create form
+ * Source: scenario-editor.feature lines 14-18
+ */
+test("navigate to create form", async ({ page }) => {
+  // ...
 });
 ```
 
-### 4. Healer Agent
+### Step-Based Architecture
 
-When tests fail, the healer:
-1. Runs the failing test with `--debug`
-2. Analyzes the error and page state
-3. Updates selectors, assertions, or waits
-4. Verifies the fix
+Tests use **Gherkin-style step functions** from `steps.ts`:
 
-## Running Tests
+```typescript
+// steps.ts - Named to match feature file language
+export async function givenIAmOnTheScenariosListPage(page: Page) { ... }
+export async function whenIClickNewScenario(page: Page) { ... }
+export async function thenISeeTheScenarioEditor(page: Page) { ... }
 
-```bash
-# Install dependencies
-pnpm install
+// scenario-editor.spec.ts - Reads like the feature file
+test("navigate to create form", async ({ page }) => {
+  await givenIAmOnTheScenariosListPage(page);
+  await whenIClickNewScenario(page);
+  await thenISeeTheScenarioEditor(page);
+});
+```
 
-# Run all tests
-pnpm test
+**Benefits:**
+- **Traceability** - Clear mapping from tests to specs
+- **Readability** - Tests read like Gherkin (Given/When/Then)
+- **Reusability** - Steps compose into different tests
+- **Maintainability** - Change selectors in one place
 
-# Run with UI (interactive)
-pnpm test:ui
+### Workflow Tests
 
-# Run specific test file
-pnpm test tests/scenarios/create-scenario.spec.ts
+For scenarios that would require seeded data, we use **workflow tests** that combine multiple feature scenarios into one self-contained test:
 
-# Debug a failing test
-pnpm test:debug
+```typescript
+/**
+ * Workflow test covering:
+ * - scenario-editor.feature: "Save new scenario"
+ * - scenario-library.feature: "Click scenario row to edit"
+ * - scenario-editor.feature: "Load existing scenario for editing"
+ * - scenario-editor.feature: "Update scenario name"
+ */
+test("scenario lifecycle: create, view in list, edit, and verify", async ({ page }) => {
+  // Create scenario
+  await givenIAmOnTheScenariosListPage(page);
+  await whenIClickNewScenario(page);
+  await whenIFillInNameWith(page, "Refund Request Test");
+  await whenIClickSave(page);
+
+  // Verify in list
+  await thenScenarioAppearsInList(page, "Refund Request Test");
+
+  // Edit scenario
+  await whenIClickOnScenarioInList(page, "Refund Request Test");
+  await whenIChangeNameTo(page, "Refund Request (Updated)");
+  await whenIClickSave(page);
+
+  // Verify update
+  await thenScenarioAppearsInList(page, "Refund Request (Updated)");
+});
+```
+
+**Why workflow tests instead of seeded data?**
+- No API exists for creating scenarios programmatically
+- Single test is self-contained and can run independently
+- Tests a real user journey end-to-end
+- Avoids test interdependencies (Test A creates data for Test B)
+
+### Handling Chakra UI Duplicate Dialogs
+
+Chakra UI renders duplicate dialog elements (mobile/desktop). Steps use `.last()` to target the topmost visible dialog:
+
+```typescript
+// Target the visible dialog's elements
+await page.getByRole("textbox", { name: "Name" }).last().fill("...");
+await page.getByRole("button", { name: /save and run/i }).last().click();
 ```
 
 ## Authentication
 
-Tests require authentication. The setup project handles this:
+Tests are **self-contained** - they create their own test user automatically. No environment variables or secrets are required.
 
-1. **First run**: Creates `.auth/user.json` with session state
-2. **Subsequent runs**: Reuses the auth state
+The `auth.setup.ts` handles this:
+1. Registers a test user via the `/api/trpc/user.register` API
+2. Signs in through the UI
+3. Completes onboarding if shown
+4. Saves session state to `.auth/user.json`
+5. Subsequent runs reuse the saved auth state
 
-For CI, set these environment variables:
-- `TEST_USER_EMAIL` - Test account email
-- `TEST_USER_PASSWORD` - Test account password
+To reset authentication, delete `.auth/user.json` and re-run tests.
 
-## Test Environment
-
-Tests use **isolated ports** to avoid interfering with local development:
-
-| Service | Dev Port | Test Port |
-|---------|----------|-----------|
-| App | 5560 | 5561 |
-| Postgres | 5432 | 5433 |
-| Redis | 6379 | 6380 |
-| Elasticsearch | 9200 | 9201 |
-
-### Running Test Environment
+## Running Tests
 
 ```bash
-# Start test services (from repo root)
-docker compose -f compose.test.yml up -d
+# Run all tests
+cd langwatch && pnpm playwright test --config=../playwright.config.ts
 
-# Run tests against test environment
-BASE_URL=http://localhost:5561 pnpm test
+# Run specific test file
+pnpm playwright test --config=../playwright.config.ts tests/scenarios/scenario-editor.spec.ts
+
+# Run with UI mode (interactive)
+pnpm playwright test --config=../playwright.config.ts --ui
+
+# Debug a specific test
+pnpm playwright test --config=../playwright.config.ts --debug
+
+# View last test report
+pnpm playwright show-report agentic-e2e-tests/playwright-report
 ```
 
 ## CI Integration
 
-Tests run in GitHub Actions with:
-- Services: postgres, redis, elasticsearch (test ports)
-- App: Built Docker image on port 5561
-- Browser: Chromium (+ Firefox on CI)
+E2E tests are configured to run in CI with:
+- Infrastructure services via GitHub Actions service containers
+- Chromium + Firefox browsers
+- Retries on failure (2 retries in CI)
+- Global setup that validates environment and waits for app readiness
 
 See `.github/workflows/langwatch-app-ci.yml` for the full configuration.
 
-## Seed Files
+**To enable in CI:** Remove the `if: false` condition from the `test-e2e` job. No secrets are required - tests create their own user.
 
-Seed files set up the initial state for tests:
-
-```typescript
-// seeds/scenarios-list.seed.ts
-import { test as setup } from "@playwright/test";
-
-setup("navigate to scenarios list", async ({ page }) => {
-  await page.goto("/my-project/simulations");
-  await page.waitForSelector('[data-testid="scenarios-list"]');
-});
-```
-
-Reference seeds in test plans so the generator knows the starting point.
-
-## Best Practices
-
-### For Agents
-
-1. **Use semantic locators**: `getByRole`, `getByLabel`, `getByText` over CSS selectors
-2. **Wait for state**: Use `waitForSelector` or `expect().toBeVisible()` before interactions
-3. **One assertion per logical check**: Don't combine unrelated assertions
-4. **Clear step comments**: Each action should have a comment from the plan
-
-### For Humans
-
-1. **Write clear scenarios**: Agents work better with unambiguous steps
-2. **Keep scenarios independent**: Each test should work in isolation
-3. **Use descriptive names**: "User can create scenario" not "test1"
+**Global Setup (`global-setup.ts`):**
+- Validates environment configuration
+- Waits for the app to be ready (up to 60 seconds)
+- Fails fast with helpful error messages if something is wrong
 
 ## Troubleshooting
 
-### Tests timing out
+### Auth issues / session expired
+Delete `.auth/user.json` and re-run tests. The auth setup will create a fresh session.
 
-Increase timeouts in `playwright.config.ts` or add explicit waits:
-
+### Element not found / strict mode violation
+Chakra renders duplicate elements. Use `.first()` or `.last()`:
 ```typescript
-await page.waitForLoadState("networkidle");
+await page.getByRole("button", { name: "Save" }).last().click();
 ```
 
-### Selectors not finding elements
+### Tests timing out
+1. Ensure infrastructure is running: `docker compose -f compose.test.yml ps`
+2. Ensure app is running on port 5570: `curl http://localhost:5570`
+3. Check for console errors in the browser
 
-Use the Playwright inspector to find better selectors:
-
+### Database issues
+Reset the test database:
 ```bash
-pnpm test:debug
+docker compose -f compose.test.yml down -v
+docker compose -f compose.test.yml up -d
+cd langwatch && pnpm prisma:migrate
 ```
 
-### Auth issues
+## For AI Agents
 
-Delete `.auth/user.json` and run tests again to regenerate auth state.
+### Adding New Tests
+
+1. Check the feature file in `specs/` for the scenario to implement
+2. Add step functions to `steps.ts` if needed (use Gherkin naming)
+3. Write the test in the appropriate `.spec.ts` file
+4. Add doc comments linking to the feature file
+
+### Fixing Failing Tests
+
+1. Check `test-results/*/error-context.md` for page snapshot
+2. Look for duplicate elements (use `.first()` or `.last()`)
+3. Verify selectors match the current UI
+4. Run with `--debug` to step through interactively
+
+### Test Coverage Status
+
+| Feature | Tests | Status |
+|---------|-------|--------|
+| Scenario Editor - Navigate | ✅ | Passing |
+| Scenario Editor - Form fields | ✅ | Passing |
+| Scenario Editor - Create/Edit lifecycle | ✅ | Passing (workflow) |
+| Scenario Editor - Add criterion | ✅ | Passing |
+| Scenario Library - Navigation | ✅ | Passing |
+| Scenario Library - Empty state | ✅ | Passing |
+| Scenario Execution - Page loads | ✅ | Passing |

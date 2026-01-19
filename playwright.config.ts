@@ -19,6 +19,9 @@ const IS_CI = !!process.env.CI;
 export default defineConfig({
   testDir: "./agentic-e2e-tests/tests",
 
+  /* Global setup - validates environment before running tests */
+  globalSetup: require.resolve("./agentic-e2e-tests/tests/global-setup.ts"),
+
   /* Ignore the MCP seed file - it's only for planning exploration */
   testIgnore: ["**/seed.spec.ts"],
 
