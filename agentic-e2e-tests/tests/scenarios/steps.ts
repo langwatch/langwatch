@@ -31,6 +31,9 @@ export async function givenIAmLoggedIntoProject(page: Page) {
  * When I am on the scenarios list page
  */
 export async function givenIAmOnTheScenariosListPage(page: Page) {
+  // Navigate to root first, then find the project slug from Home link
+  await page.goto("/");
+
   // Get project slug from Home link
   const homeLink = page.getByRole("link", { name: "Home", exact: true });
   await expect(homeLink).toBeVisible({ timeout: 15000 });

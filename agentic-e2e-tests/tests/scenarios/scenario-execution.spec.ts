@@ -9,24 +9,17 @@ import { test, expect } from "@playwright/test";
  * These tests verify the simulation results page displays correctly.
  */
 
-// Helper to navigate to simulations page
+// Helper to navigate to simulations page via sidebar
 async function navigateToSimulations(page: import("@playwright/test").Page) {
   await page.goto("/");
 
-  // Wait for navigation to appear - look for Home link which always exists
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 15000 });
+  const simulationsLink = page.getByRole("link", {
+    name: "Simulations",
+    exact: true,
+  });
+  await expect(simulationsLink).toBeVisible({ timeout: 15000 });
+  await simulationsLink.click();
 
-  // Get the project URL from the Home link
-  const href = await homeLink.getAttribute("href");
-  const projectSlug = href?.replace(/^\//, "") || "";
-
-  if (!projectSlug) {
-    throw new Error("Could not extract project slug from Home link");
-  }
-
-  // Navigate directly to simulations page
-  await page.goto(`/${projectSlug}/simulations`);
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
 
@@ -41,29 +34,25 @@ test("Scenario Execution - view simulations page loads", async ({ page }) => {
   // Then the page loads without errors
   await expect(page).toHaveURL(/simulations/);
 
-  // And we see the page content (could be getting started page or results)
-  // Wait for any content to appear
-  await page.waitForTimeout(2000);
+  // And we see the page content - either the empty state info card or simulation results
+  // The empty state shows "Scenario: Agentic Simulations" heading
+  // Wait for either the info card heading or simulation set cards to appear
+  const infoCardHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
+  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
 
-  // Check for page content - either "Scenario" text or simulation results
-  const hasScenarioText = await page.getByText(/scenario/i).first().isVisible().catch(() => false);
-  const hasSimulationsText = await page.getByText(/simulation/i).first().isVisible().catch(() => false);
-  const hasGetStartedText = await page.getByText(/get started/i).first().isVisible().catch(() => false);
-
-  expect(hasScenarioText || hasSimulationsText || hasGetStartedText).toBeTruthy();
+  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
 });
 
 test("Scenario Execution - simulations page shows content", async ({ page }) => {
   // Given I am on the simulations page
   await navigateToSimulations(page);
-  await page.waitForTimeout(1000);
 
-  // Then I see either simulation results OR the getting started state
-  const hasResults = await page.getByRole("table").isVisible().catch(() => false);
-  const hasList = await page.getByRole("list").first().isVisible().catch(() => false);
-  const hasText = await page.getByText(/scenario|simulation/i).first().isVisible().catch(() => false);
+  // Then I see either simulation results OR the getting started info card
+  // The info card has specific text about what Scenario can do
+  const infoCardText = page.getByText("Your simulations will appear here");
+  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
 
-  expect(hasResults || hasList || hasText).toBeTruthy();
+  await expect(infoCardText.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
 });
 
 test("Scenario Execution - page displays correctly on reload", async ({
@@ -72,14 +61,17 @@ test("Scenario Execution - page displays correctly on reload", async ({
   // Given I am on the simulations page
   await navigateToSimulations(page);
 
+  // Wait for initial content to load
+  const infoCardHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
+  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
+
   // When I reload the page
   await page.reload();
-  await page.waitForTimeout(2000);
 
   // Then the page still displays correctly
   await expect(page).toHaveURL(/simulations/);
 
-  // And content is visible
-  const hasContent = await page.getByText(/scenario|simulation/i).first().isVisible().catch(() => false);
-  expect(hasContent).toBeTruthy();
+  // And the same content is visible again after reload
+  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
 });
