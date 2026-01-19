@@ -93,6 +93,7 @@ export function CriteriaInput({
           placeholder={placeholder}
           flex={1}
           onKeyDown={handleKeyDown}
+          _placeholder={{ color: "gray.400", fontStyle: "italic" }}
         />
         <Button
           type="button"
