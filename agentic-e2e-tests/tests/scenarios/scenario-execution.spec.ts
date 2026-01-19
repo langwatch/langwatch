@@ -13,12 +13,18 @@ import { test, expect } from "@playwright/test";
 async function navigateToSimulations(page: import("@playwright/test").Page) {
   await page.goto("/");
 
-  const simulationsLink = page.getByRole("link", {
-    name: "Simulations",
-    exact: true,
-  });
-  await expect(simulationsLink).toBeVisible({ timeout: 15000 });
-  await simulationsLink.click();
+  // Wait for the dashboard to load
+  await expect(page.getByRole("heading", { name: /hello/i })).toBeVisible({ timeout: 15000 });
+
+  // Click the "Expand Simulations" button in the sidebar to open submenu
+  const simulationsButton = page.getByRole("button", { name: /expand simulations/i });
+  await expect(simulationsButton).toBeVisible({ timeout: 5000 });
+  await simulationsButton.click();
+
+  // Click "Runs" link to go to /simulations (main simulations page)
+  const runsLink = page.getByRole("link", { name: "Runs", exact: true });
+  await expect(runsLink).toBeVisible({ timeout: 5000 });
+  await runsLink.click();
 
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
