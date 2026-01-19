@@ -26,7 +26,6 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  */
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
-const DEFAULT_DATABASE = "langwatch";
 const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 const TTL_ENV_VARS = [
@@ -37,7 +36,6 @@ const TTL_ENV_VARS = [
 ] as const;
 
 export interface GooseOptions {
-  database?: string;
   connectionUrl?: string;
   migrationsDir?: string;
   verbose?: boolean;
@@ -119,7 +117,13 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
     );
   }
 
-  const database = parsed.pathname.replace(/^\//, "") || DEFAULT_DATABASE;
+  const database = parsed.pathname.replace(/^\//, "");
+  if (!database) {
+    throw new MigrationError(
+      "Database name must be specified in CLICKHOUSE_URL path (e.g., http://host:8123/langwatch)",
+      "preflight"
+    );
+  }
   validateIdentifier(database, "database name");
 
   const clusterName = process.env.CLICKHOUSE_CLUSTER || undefined;
