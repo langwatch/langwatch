@@ -1,10 +1,19 @@
-import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Globe, Play, Plus, Save } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  BookText,
+  ChevronDown,
+  Globe,
+  Play,
+  RotateCcw,
+  Save,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
+import { AgentPickerModal } from "./AgentPickerModal";
+import { PromptPickerModal } from "./PromptPickerModal";
 import type { TargetValue } from "./TargetSelector";
 
 interface SaveAndRunMenuProps {
@@ -19,7 +28,7 @@ interface SaveAndRunMenuProps {
 
 /**
  * Combined "Save and Run" dropdown menu with target selection.
- * Shows prompts and agents directly in the menu - clicking runs immediately.
+ * Button-style menu items that open picker modals for prompts and agents.
  */
 export function SaveAndRunMenu({
   selectedTarget,
@@ -37,244 +46,192 @@ export function SaveAndRunMenu({
     { enabled: !!project?.id },
   );
 
-  const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
 
-  // Filter and sort prompts (only published ones with version > 0, sorted by updatedAt desc)
-  const filteredPrompts = useMemo(() => {
-    const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
-    const sorted = [...publishedPrompts].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
-    if (!searchValue) return sorted;
-    return sorted.filter((p) =>
-      (p.handle ?? p.id).toLowerCase().includes(searchValue.toLowerCase()),
-    );
-  }, [prompts, searchValue]);
+  // Get the name of the previous target for display
+  const previousTargetInfo = useMemo(() => {
+    if (!selectedTarget) return null;
 
-  // Filter HTTP agents (already sorted by updatedAt desc from backend)
-  const filteredAgents = useMemo(() => {
-    const httpAgents = agents?.filter((a) => a.type === "http") ?? [];
-    if (!searchValue) return httpAgents;
-    return httpAgents.filter((a) =>
-      a.name.toLowerCase().includes(searchValue.toLowerCase()),
-    );
-  }, [agents, searchValue]);
+    if (selectedTarget.type === "prompt") {
+      const prompt = prompts?.find((p) => p.id === selectedTarget.id);
+      return {
+        name: prompt?.handle ?? prompt?.id ?? "Unknown prompt",
+        type: "prompt" as const,
+      };
+    } else {
+      const agent = agents?.find((a) => a.id === selectedTarget.id);
+      return {
+        name: agent?.name ?? "Unknown agent",
+        type: "agent" as const,
+      };
+    }
+  }, [selectedTarget, prompts, agents]);
 
-  const handleSelectAndRun = (target: TargetValue) => {
-    onTargetChange(target);
+  const handleRunPrevious = () => {
+    if (selectedTarget) {
+      setOpen(false);
+      onSaveAndRun(selectedTarget);
+    }
+  };
+
+  const handleOpenPromptModal = () => {
     setOpen(false);
-    setSearchValue("");
+    setPromptModalOpen(true);
+  };
+
+  const handleOpenAgentModal = () => {
+    setOpen(false);
+    setAgentModalOpen(true);
+  };
+
+  const handleSelectPrompt = (promptId: string) => {
+    const target: TargetValue = { type: "prompt", id: promptId };
+    onTargetChange(target);
+    onSaveAndRun(target);
+  };
+
+  const handleSelectAgent = (agentId: string) => {
+    const target: TargetValue = { type: "http", id: agentId };
+    onTargetChange(target);
     onSaveAndRun(target);
   };
 
   const handleSaveWithoutRunning = () => {
     setOpen(false);
-    setSearchValue("");
     onSaveWithoutRunning();
   };
 
   const handleCreateAgent = () => {
-    setOpen(false);
-    setSearchValue("");
+    setAgentModalOpen(false);
     onCreateAgent();
   };
 
   const handleCreatePrompt = () => {
-    setOpen(false);
-    setSearchValue("");
+    setPromptModalOpen(false);
     onCreatePrompt?.();
   };
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(e) => {
-        setOpen(e.open);
-        if (e.open) {
-          // Focus search input and reset scroll when opening
-          setTimeout(() => {
-            inputRef.current?.focus();
-            scrollContainerRef.current?.scrollTo(0, 0);
-          }, 0);
-        }
-      }}
-      positioning={{ placement: "top-end" }}
+    <>
+      <Popover.Root
+        open={open}
+        onOpenChange={(e) => setOpen(e.open)}
+        positioning={{ placement: "top-end" }}
+      >
+        <Popover.Trigger asChild>
+          <Button colorPalette="blue" size="sm" loading={isLoading}>
+            <Play size={14} />
+            Save and Run
+            <ChevronDown size={14} />
+          </Button>
+        </Popover.Trigger>
+
+        <Portal>
+          <Popover.Content width="320px" padding={3}>
+            <VStack gap={2} align="stretch">
+              {/* Run Previous - only shown if there's a previous target */}
+              {previousTargetInfo && (
+                <>
+                  <MenuButton
+                    icon={<RotateCcw size={16} />}
+                    title="Run previous"
+                    description={`${previousTargetInfo.name} (${previousTargetInfo.type})`}
+                    onClick={handleRunPrevious}
+                  />
+                  <Box
+                    borderBottomWidth="1px"
+                    borderColor="gray.200"
+                    marginY={1}
+                  />
+                </>
+              )}
+
+              {/* Run against prompt */}
+              <MenuButton
+                icon={<BookText size={16} />}
+                title="Run against prompt"
+                description="Test with a prompt config"
+                onClick={handleOpenPromptModal}
+              />
+
+              {/* Run against agent */}
+              <MenuButton
+                icon={<Globe size={16} />}
+                title="Run against agent"
+                description="Test with an HTTP endpoint"
+                onClick={handleOpenAgentModal}
+              />
+
+              {/* Save only */}
+              <Box borderBottomWidth="1px" borderColor="gray.200" marginY={1} />
+              <HStack
+                paddingX={2}
+                paddingY={2}
+                cursor="pointer"
+                borderRadius="md"
+                _hover={{ bg: "gray.50" }}
+                onClick={handleSaveWithoutRunning}
+              >
+                <Save size={14} color="var(--chakra-colors-gray-500)" />
+                <Text fontSize="sm" color="gray.600">
+                  Save only
+                </Text>
+              </HStack>
+            </VStack>
+          </Popover.Content>
+        </Portal>
+      </Popover.Root>
+
+      {/* Prompt Picker Modal */}
+      <PromptPickerModal
+        open={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        onSelect={handleSelectPrompt}
+        onCreateNew={handleCreatePrompt}
+      />
+
+      {/* Agent Picker Modal */}
+      <AgentPickerModal
+        open={agentModalOpen}
+        onClose={() => setAgentModalOpen(false)}
+        onSelect={handleSelectAgent}
+        onCreateNew={handleCreateAgent}
+      />
+    </>
+  );
+}
+
+interface MenuButtonProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}
+
+function MenuButton({ icon, title, description, onClick }: MenuButtonProps) {
+  return (
+    <HStack
+      padding={3}
+      cursor="pointer"
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="gray.200"
+      bg="white"
+      _hover={{ bg: "gray.50", borderColor: "gray.300" }}
+      onClick={onClick}
+      gap={3}
     >
-      <Popover.Trigger asChild>
-        <Button colorPalette="blue" size="sm" loading={isLoading}>
-          <Play size={14} />
-          Save and Run
-          <ChevronDown size={14} />
-        </Button>
-      </Popover.Trigger>
-
-      <Portal>
-        <Popover.Content width="320px" padding={0}>
-          {/* Search Input - Sticky at top */}
-          <Box
-            padding={2}
-            borderBottomWidth="1px"
-            borderColor="border"
-            position="sticky"
-            top={0}
-            bg="white"
-            zIndex={10}
-          >
-            <Input
-              ref={inputRef}
-              size="sm"
-              placeholder="Search prompts or agents..."
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-            />
-          </Box>
-
-          {/* Scrollable Content */}
-          <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
-            {/* Agents Section - First (typically fewer items) */}
-            <Box>
-              <Text
-                fontSize="xs"
-                fontWeight="bold"
-                textTransform="uppercase"
-                color="fg.muted"
-                paddingX={3}
-                paddingY={2}
-                bg="bg.subtle"
-                position="sticky"
-                top={0}
-                zIndex={5}
-              >
-                Run against HTTP Agent
-              </Text>
-              {filteredAgents.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
-                  {searchValue ? "No agents found" : "No agents available"}
-                </Text>
-              ) : (
-                filteredAgents.map((agent) => (
-                  <HStack
-                    key={agent.id}
-                    paddingX={3}
-                    paddingY={2}
-                    cursor="pointer"
-                    bg={
-                      selectedTarget?.type === "http" &&
-                      selectedTarget.id === agent.id
-                        ? "blue.50"
-                        : "transparent"
-                    }
-                    _hover={{ bg: "gray.100" }}
-                    onClick={() =>
-                      handleSelectAndRun({ type: "http", id: agent.id })
-                    }
-                  >
-                    <Globe size={14} color="var(--chakra-colors-gray-500)" />
-                    <Text fontSize="sm" flex={1}>
-                      {agent.name}
-                    </Text>
-                    <Play size={12} color="var(--chakra-colors-blue-500)" />
-                  </HStack>
-                ))
-              )}
-              {/* Add New Agent Button */}
-              <HStack
-                paddingX={3}
-                paddingY={2}
-                cursor="pointer"
-                _hover={{ bg: "gray.100" }}
-                borderTopWidth="1px"
-                borderColor="border.muted"
-                color="blue.500"
-                onClick={handleCreateAgent}
-              >
-                <Plus size={14} />
-                <Text fontSize="sm">Add New Agent</Text>
-              </HStack>
-            </Box>
-
-            {/* Prompts Section */}
-            <Box borderTopWidth="1px" borderColor="border">
-              <Text
-                fontSize="xs"
-                fontWeight="bold"
-                textTransform="uppercase"
-                color="fg.muted"
-                paddingX={3}
-                paddingY={2}
-                bg="bg.subtle"
-                position="sticky"
-                top={0}
-                zIndex={5}
-              >
-                Run against Prompt
-              </Text>
-              {filteredPrompts.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
-                  {searchValue ? "No prompts found" : "No prompts available"}
-                </Text>
-              ) : (
-                filteredPrompts.map((prompt) => (
-                  <HStack
-                    key={prompt.id}
-                    paddingX={3}
-                    paddingY={2}
-                    cursor="pointer"
-                    bg={
-                      selectedTarget?.type === "prompt" &&
-                      selectedTarget.id === prompt.id
-                        ? "blue.50"
-                        : "transparent"
-                    }
-                    _hover={{ bg: "gray.100" }}
-                    onClick={() =>
-                      handleSelectAndRun({ type: "prompt", id: prompt.id })
-                    }
-                  >
-                    <BookText size={14} color="var(--chakra-colors-gray-500)" />
-                    <Text fontSize="sm" flex={1}>
-                      {prompt.handle ?? prompt.id}
-                    </Text>
-                    <Play size={12} color="var(--chakra-colors-blue-500)" />
-                  </HStack>
-                ))
-              )}
-              {/* Add New Prompt */}
-              <HStack
-                paddingX={3}
-                paddingY={2}
-                cursor="pointer"
-                _hover={{ bg: "gray.100" }}
-                borderTopWidth="1px"
-                borderColor="border.muted"
-                color="blue.500"
-                onClick={handleCreatePrompt}
-              >
-                <Plus size={14} />
-                <Text fontSize="sm">Add New Prompt</Text>
-              </HStack>
-            </Box>
-          </Box>
-
-          {/* Save without running option */}
-          <Box borderTopWidth="1px" borderColor="border">
-            <HStack
-              paddingX={3}
-              paddingY={3}
-              cursor="pointer"
-              _hover={{ bg: "gray.50" }}
-              onClick={handleSaveWithoutRunning}
-            >
-              <Save size={14} color="var(--chakra-colors-gray-500)" />
-              <Text fontSize="sm">Save without running</Text>
-            </HStack>
-          </Box>
-        </Popover.Content>
-      </Portal>
-    </Popover.Root>
+      <Box color="gray.500">{icon}</Box>
+      <VStack align="start" gap={0} flex={1}>
+        <Text fontSize="sm" fontWeight="medium">
+          {title}
+        </Text>
+        <Text fontSize="xs" color="gray.500">
+          {description}
+        </Text>
+      </VStack>
+    </HStack>
   );
 }

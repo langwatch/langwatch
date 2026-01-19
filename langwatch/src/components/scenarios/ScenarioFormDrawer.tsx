@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRecentTargets } from "../../hooks/useRecentTargets";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
@@ -30,7 +31,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
-  const [formInstance, setFormInstance] = useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const [formInstance, setFormInstance] =
+    useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
@@ -40,6 +42,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
+  const { addRecentPrompt, addRecentAgent } = useRecentTargets();
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
@@ -139,6 +142,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
+          // Track in recent targets for global picker
+          if (target.type === "prompt") {
+            addRecentPrompt(target.id);
+          } else {
+            addRecentAgent(target.id);
+          }
+
           await runScenario(savedScenario.id, target);
         })();
       } catch (error) {
@@ -151,7 +161,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, persistTarget, runScenario, formInstance],
+    [
+      handleSave,
+      project?.id,
+      persistTarget,
+      addRecentPrompt,
+      addRecentAgent,
+      runScenario,
+      formInstance,
+    ],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
