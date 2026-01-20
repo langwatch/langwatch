@@ -91,6 +91,55 @@ Use drawers for resource selection, creation, and editing flows. Drawers maintai
 - Use `placement="end"` (right side) for most drawers
 - Common sizes: `md`, `lg`, `xl`
 
+### Nested Drawer Navigation
+
+LangWatch uses a drawer navigation system that allows drawers to navigate to other drawers while maintaining a back button. This is preferred over true nested/stacked drawers.
+
+**Key Concepts:**
+
+1. **Drawer Stack** - Navigation history is tracked in a stack
+2. **URL-based state** - Drawer state is stored in URL params for shareability
+3. **Flow Callbacks** - Callbacks can persist across drawer navigation
+4. **Back Button** - Automatically appears when there's navigation history
+
+**When to use drawer navigation:**
+
+- Multi-step selection flows (e.g., select type → select item → configure)
+- Drill-down interfaces (list → details → edit)
+- Wizard-like flows within drawers
+
+**Implementation:**
+
+```tsx
+import { useDrawer } from "~/hooks/useDrawer";
+
+function ParentDrawer() {
+  const { openDrawer, canGoBack, goBack, closeDrawer } = useDrawer();
+
+  return (
+    <Drawer.Root>
+      <Drawer.Header>
+        <HStack gap={2}>
+          {canGoBack && (
+            <Button variant="ghost" size="sm" onClick={goBack}>
+              <LuArrowLeft />
+            </Button>
+          )}
+          <Heading>Select Type</Heading>
+        </HStack>
+      </Drawer.Header>
+      <Drawer.Body>
+        <Button onClick={() => openDrawer("childDrawer", { id: "123" })}>
+          Open Child
+        </Button>
+      </Drawer.Body>
+    </Drawer.Root>
+  );
+}
+```
+
+See [components.md](./components.md) for detailed `useDrawer` hook documentation.
+
 ## 4. Page Layout Standards
 
 All pages should follow a consistent layout structure.

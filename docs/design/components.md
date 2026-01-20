@@ -108,6 +108,79 @@ import {
 </Dialog.Root>
 ```
 
+## Drawer Navigation (useDrawer Hook)
+
+LangWatch uses a centralized drawer system with URL-based state management. Drawers can navigate to other drawers while maintaining back button functionality.
+
+### Basic Usage
+
+```tsx
+import { useDrawer } from "~/hooks/useDrawer";
+
+function MyComponent() {
+  const { openDrawer, closeDrawer, canGoBack, goBack, currentDrawer } = useDrawer();
+
+  // Open a drawer
+  openDrawer("promptEditor", { promptId: "abc123" });
+
+  // Navigate to another drawer (adds to stack)
+  openDrawer("promptList");
+
+  // Go back to previous drawer
+  goBack();
+
+  // Close drawer entirely (clears stack)
+  closeDrawer();
+}
+```
+
+### Hook API
+
+| Function/Property | Description |
+|-------------------|-------------|
+| `openDrawer(type, props?, options?)` | Open a drawer with optional props |
+| `closeDrawer()` | Close drawer and clear navigation stack |
+| `goBack()` | Return to previous drawer in stack |
+| `canGoBack` | Boolean - true if there's history to go back to |
+| `currentDrawer` | Currently open drawer type |
+| `setFlowCallbacks(type, callbacks)` | Register callbacks that persist across navigation |
+| `getFlowCallbacks(type)` | Retrieve persisted callbacks |
+
+### Options
+
+```tsx
+// Replace current drawer instead of pushing to stack
+openDrawer("promptEditor", { promptId: "abc" }, { replace: true });
+
+// Reset stack (no back button will show)
+openDrawer("targetTypeSelector", {}, { resetStack: true });
+```
+
+### Flow Callbacks
+
+For callbacks that need to persist across drawer navigation:
+
+```tsx
+// In parent component - set callbacks before opening first drawer
+const { setFlowCallbacks, openDrawer } = useDrawer();
+
+const handleSelectPrompt = (prompt) => {
+  // Handle selection
+};
+
+setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
+openDrawer("targetTypeSelector");
+
+// In PromptListDrawer - retrieve the callback
+const { getFlowCallbacks } = useDrawer();
+const callbacks = getFlowCallbacks("promptList");
+callbacks?.onSelect?.(selectedPrompt);
+```
+
+### Registered Drawers
+
+Drawers must be registered in `src/components/drawerRegistry.ts` to be used with `useDrawer`. See that file for the full list of available drawer types.
+
 ## Page Layout Components
 
 Use `PageLayout` for consistent page structure.

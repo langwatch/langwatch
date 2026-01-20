@@ -378,6 +378,115 @@ export function ResourceForm({ onSubmit, onCancel }) {
 }
 ```
 
+## Nested Drawer Navigation
+
+Pattern for multi-step drawer flows with back button:
+
+```tsx
+import { Button, Heading, HStack, VStack } from "@chakra-ui/react";
+import { LuArrowLeft } from "react-icons/lu";
+import { Drawer } from "../../components/ui/drawer";
+import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
+
+// Step 1: Parent component that initiates the flow
+export function InitiateDrawerFlow() {
+  const { openDrawer, setFlowCallbacks } = useDrawer();
+
+  const handleStartFlow = () => {
+    // Set callbacks that will be available in child drawers
+    setFlowCallbacks("itemSelector", {
+      onSelect: (item) => {
+        console.log("Selected:", item);
+        // Handle selection
+      },
+    });
+
+    // Open the first drawer in the flow
+    openDrawer("categorySelector");
+  };
+
+  return <Button onClick={handleStartFlow}>Select Item</Button>;
+}
+
+// Step 2: First drawer - Category selection
+export function CategorySelectorDrawer() {
+  const { openDrawer, closeDrawer, canGoBack, goBack } = useDrawer();
+
+  const handleSelectCategory = (categoryId: string) => {
+    // Navigate to next drawer, maintaining the stack
+    openDrawer("itemSelector", { categoryId });
+  };
+
+  return (
+    <Drawer.Root open onOpenChange={({ open }) => !open && closeDrawer()}>
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
+          <HStack gap={2}>
+            {canGoBack && (
+              <Button variant="ghost" size="sm" onClick={goBack} padding={1}>
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>Select Category</Heading>
+          </HStack>
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={2}>
+            <Button onClick={() => handleSelectCategory("cat-1")}>
+              Category 1
+            </Button>
+            <Button onClick={() => handleSelectCategory("cat-2")}>
+              Category 2
+            </Button>
+          </VStack>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
+// Step 3: Second drawer - Item selection (uses flow callbacks)
+export function ItemSelectorDrawer() {
+  const { closeDrawer, canGoBack, goBack, getFlowCallbacks } = useDrawer();
+
+  // Retrieve callbacks set by the parent
+  const callbacks = getFlowCallbacks("itemSelector");
+
+  const handleSelectItem = (item: Item) => {
+    callbacks?.onSelect?.(item);
+    closeDrawer(); // Close entire flow
+  };
+
+  return (
+    <Drawer.Root open onOpenChange={({ open }) => !open && closeDrawer()}>
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
+          <HStack gap={2}>
+            {canGoBack && (
+              <Button variant="ghost" size="sm" onClick={goBack} padding={1}>
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>Select Item</Heading>
+          </HStack>
+        </Drawer.Header>
+        <Drawer.Body>
+          {/* Item list */}
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+```
+
+**Key points:**
+- Use `canGoBack` to conditionally show the back button
+- Use `goBack()` to return to previous drawer
+- Use `closeDrawer()` to close the entire flow
+- Use `setFlowCallbacks()` / `getFlowCallbacks()` for callbacks that persist across navigation
+
 ## Popover Pattern
 
 For inline information or quick actions:
