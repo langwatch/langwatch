@@ -112,6 +112,18 @@ import {
 
 LangWatch uses a centralized drawer system with URL-based state management. Drawers can navigate to other drawers while maintaining back button functionality.
 
+### Architecture
+
+The system consists of two parts:
+
+1. **`CurrentDrawer`** - A global component (in `DashboardLayout`) that reads URL params and renders the appropriate drawer
+2. **`useDrawer`** - A hook for opening/closing drawers and managing navigation
+
+**Important:** Don't render drawers explicitly in pages - `CurrentDrawer` handles rendering automatically based on URL state. This ensures:
+- Browser back/forward buttons work naturally
+- URLs are shareable (drawer state is in the URL)
+- No duplicate drawer rendering
+
 ### Basic Usage
 
 ```tsx
@@ -180,6 +192,24 @@ callbacks?.onSelect?.(selectedPrompt);
 ### Registered Drawers
 
 Drawers must be registered in `src/components/drawerRegistry.ts` to be used with `useDrawer`. See that file for the full list of available drawer types.
+
+### Reference Implementation: Evaluations V3
+
+The **evaluations-v3** module is the canonical example of this drawer pattern. Study these files:
+
+| File | Purpose |
+|------|---------|
+| `src/evaluations-v3/hooks/useOpenTargetEditor.ts` | Sets up flow callbacks and opens prompt/agent editor drawers |
+| `src/evaluations-v3/utils/promptEditorCallbacks.ts` | Centralizes callback creation for prompt editor |
+| `src/components/targets/TargetTypeSelectorDrawer.tsx` | Multi-step flow: type → list → editor |
+
+**Flow example (selecting/creating prompts):**
+1. User clicks "Add Target" → opens `targetTypeSelector`
+2. User selects "Prompt" → navigates to `promptList`
+3. User selects a prompt → navigates to `promptEditor`
+4. Back button returns through the stack, or user closes to exit flow
+
+This pattern should be followed for any multi-step selection/creation flows.
 
 ## Page Layout Components
 
