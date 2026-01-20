@@ -288,6 +288,30 @@ export class LockError extends RecoverableError {
 }
 
 /**
+ * Error thrown when no events are found for an aggregate.
+ * This typically occurs due to ClickHouse replication lag - events exist
+ * but aren't yet visible. This is a recoverable condition that should be retried.
+ */
+export class NoEventsFoundError extends RecoverableError {
+  readonly aggregateId: string;
+  readonly tenantId: string;
+
+  constructor(
+    aggregateId: string,
+    tenantId: string,
+    context: Record<string, unknown> = {},
+  ) {
+    super(`No events found for aggregate ${aggregateId}`, {
+      ...context,
+      aggregateId,
+      tenantId,
+    });
+    this.aggregateId = aggregateId;
+    this.tenantId = tenantId;
+  }
+}
+
+/**
  * Error thrown for queue operation failures.
  */
 export class QueueError extends RecoverableError {
@@ -403,26 +427,18 @@ export class PublishingError extends NonCriticalError {
  * Determines if an error is a sequential ordering violation.
  * These are critical errors that must cause the operation to fail.
  */
-export function isSequentialOrderingError(error: unknown): boolean {
-  return (
-    error instanceof SequentialOrderingError ||
-    (typeof error === "object" &&
-      error !== null &&
-      (error as { name?: string }).name === "SequentialOrderingError")
-  );
+export function isSequentialOrderingError(
+  error: unknown,
+): error is SequentialOrderingError {
+  return error instanceof SequentialOrderingError;
 }
 
 /**
  * Type guard to check if an error is a LockError.
  * Lock errors are expected when concurrent processes try to update the same resource.
  */
-export function isLockError(error: unknown): boolean {
-  return (
-    error instanceof LockError ||
-    (typeof error === "object" &&
-      error !== null &&
-      (error as { name?: string }).name === "LockError")
-  );
+export function isLockError(error: unknown): error is LockError {
+  return error instanceof LockError;
 }
 
 /**
@@ -437,6 +453,15 @@ export function extractPreviousSequenceNumber(error: unknown): number | null {
     return error.previousSequenceNumber;
   }
   return null;
+}
+
+/**
+ * Type guard to check if an error is a NoEventsFoundError.
+ * This error occurs when events haven't yet become visible in ClickHouse
+ * due to replication lag, even though a checkpoint was created for them.
+ */
+export function isNoEventsFoundError(error: unknown): error is NoEventsFoundError {
+  return error instanceof NoEventsFoundError;
 }
 
 /**

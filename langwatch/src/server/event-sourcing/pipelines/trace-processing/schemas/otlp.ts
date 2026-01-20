@@ -38,7 +38,8 @@ export const bytesSchema = z.instanceof(Uint8Array);
 
 export const idSchema = z.union([
   z.string(),
-  bytesSchema,
+  // Transform Uint8Array to hex string for JSON serialization safety
+  bytesSchema.transform((bytes) => Buffer.from(bytes).toString("hex")),
   // This is needed, because JSON.stringify converts Uint8Array to an object, lol.
   z
     .record(z.string(), z.number())
