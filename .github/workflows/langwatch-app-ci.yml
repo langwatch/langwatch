@@ -469,7 +469,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: agentic-e2e-tests/playwright-report/
+          path: langwatch/agentic-e2e-tests/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -477,5 +477,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: agentic-e2e-tests/test-results/
+          path: langwatch/agentic-e2e-tests/test-results/
           retention-days: 7

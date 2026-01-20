@@ -34,9 +34,9 @@ prompts/**
 .claude/settings.local.json
 
 # Playwright E2E tests
-agentic-e2e-tests/test-results/
-agentic-e2e-tests/playwright-report/
-agentic-e2e-tests/.auth/
-agentic-e2e-tests/debug-*.png
-agentic-e2e-tests/tests/seed.spec.ts
+langwatch/agentic-e2e-tests/test-results/
+langwatch/agentic-e2e-tests/playwright-report/
+langwatch/agentic-e2e-tests/.auth/
+langwatch/agentic-e2e-tests/debug-*.png
+langwatch/agentic-e2e-tests/tests/seed.spec.ts
 seed.spec.ts

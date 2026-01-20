@@ -4,8 +4,7 @@ import path from "path";
 /**
  * Playwright Config for E2E Tests
  *
- * This config lives in langwatch/ where @playwright/test is installed.
- * Tests live in ../agentic-e2e-tests/tests/
+ * Tests and config live in langwatch/ where @playwright/test is installed.
  *
  * Usage:
  *   pnpm exec playwright test
@@ -13,14 +12,14 @@ import path from "path";
  */
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
-const AUTH_FILE = path.join(__dirname, "..", "agentic-e2e-tests", ".auth", "user.json");
+const AUTH_FILE = path.join(__dirname, "agentic-e2e-tests", ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
 export default defineConfig({
-  testDir: "../agentic-e2e-tests/tests",
+  testDir: "./agentic-e2e-tests/tests",
 
   /* Global setup - validates environment before running tests */
-  globalSetup: require.resolve("../agentic-e2e-tests/tests/global-setup.ts"),
+  globalSetup: require.resolve("./agentic-e2e-tests/tests/global-setup.ts"),
 
   /* Ignore the MCP seed file - it's only for planning exploration */
   testIgnore: ["**/seed.spec.ts"],
@@ -37,7 +36,7 @@ export default defineConfig({
 
   /* Reporter configuration */
   reporter: [
-    ["html", { outputFolder: "../agentic-e2e-tests/playwright-report" }],
+    ["html", { outputFolder: "./agentic-e2e-tests/playwright-report" }],
     ["list"],
   ],
 
@@ -103,5 +102,5 @@ export default defineConfig({
   },
 
   /* Output directory for test artifacts */
-  outputDir: "../agentic-e2e-tests/test-results",
+  outputDir: "./agentic-e2e-tests/test-results",
 });
