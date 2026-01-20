@@ -4,6 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PromptPickerModal } from "../PromptPickerModal";
 
@@ -29,25 +30,25 @@ const mockPrompts = [
     id: "prompt-1",
     handle: "greeting-prompt",
     version: 1,
-    defaultModelName: "gpt-4",
+    model: "gpt-4",
   },
   {
     id: "prompt-2",
     handle: "summary-prompt",
     version: 2,
-    defaultModelName: "gpt-3.5-turbo",
+    model: "gpt-3.5-turbo",
   },
   {
     id: "prompt-3",
     handle: null,
     version: 1,
-    defaultModelName: null,
+    model: "gpt-4o",
   },
   {
     id: "prompt-draft",
     handle: "draft-prompt",
     version: 0, // Not published
-    defaultModelName: "gpt-4",
+    model: "gpt-4",
   },
 ];
 
@@ -59,7 +60,7 @@ vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
 }));
 
 // Wrapper with Chakra provider
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
@@ -258,7 +259,7 @@ describe("PromptPickerModal", () => {
       vi.mocked(useAllPromptsForProject).mockReturnValue({
         data: [],
         isLoading: false,
-      } as ReturnType<typeof useAllPromptsForProject>);
+      } as unknown as ReturnType<typeof useAllPromptsForProject>);
 
       renderModal();
 
@@ -281,7 +282,7 @@ describe("PromptPickerModal", () => {
       vi.mocked(useAllPromptsForProject).mockReturnValue({
         data: undefined,
         isLoading: true,
-      } as ReturnType<typeof useAllPromptsForProject>);
+      } as unknown as ReturnType<typeof useAllPromptsForProject>);
 
       renderModal();
 

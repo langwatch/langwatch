@@ -167,10 +167,12 @@ export function SaveAndRunMenu({
               {/* Save only */}
               <Box borderBottomWidth="1px" borderColor="gray.200" marginY={1} />
               <HStack
+                as="button"
                 paddingX={2}
                 paddingY={2}
                 cursor="pointer"
                 borderRadius="md"
+                width="100%"
                 _hover={{ bg: "gray.50" }}
                 onClick={handleSaveWithoutRunning}
               >

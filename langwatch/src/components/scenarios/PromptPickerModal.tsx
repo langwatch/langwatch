@@ -75,7 +75,7 @@ export function PromptPickerModal({
 interface Prompt {
   id: string;
   handle: string | null;
-  defaultModelName: string | null;
+  model: string;
 }
 
 interface PromptSectionsProps {
@@ -122,7 +122,7 @@ function PromptSections({ prompts, recentIds, onSelect }: PromptSectionsProps) {
               key={prompt.id}
               icon={<BookText size={16} />}
               name={prompt.handle ?? prompt.id}
-              secondaryText={prompt.defaultModelName ?? undefined}
+              secondaryText={prompt.model}
               onClick={() => onSelect(prompt.id)}
               testId={`prompt-row-${prompt.id}`}
             />
@@ -142,7 +142,7 @@ function PromptSections({ prompts, recentIds, onSelect }: PromptSectionsProps) {
               key={prompt.id}
               icon={<BookText size={16} />}
               name={prompt.handle ?? prompt.id}
-              secondaryText={prompt.defaultModelName ?? undefined}
+              secondaryText={prompt.model}
               onClick={() => onSelect(prompt.id)}
               testId={`prompt-row-${prompt.id}`}
             />
