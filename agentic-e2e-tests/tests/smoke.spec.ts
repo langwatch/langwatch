@@ -13,16 +13,13 @@ test("Smoke - application is accessible and user is authenticated", async ({
   // Navigate to the app - should be redirected to projects or onboarding
   await page.goto("/");
 
-  // Wait for the page to load
-  await page.waitForLoadState("networkidle");
-
   // Verify we're not on the login page (auth setup should have authenticated us)
   await expect(page).not.toHaveURL(/\/auth\/signin/);
 
   // Verify some core UI element is visible (adjust based on actual app structure)
   // This could be the sidebar, header, or main content area
   const mainContent = page.locator("main, [role='main'], #__next");
-  await expect(mainContent).toBeVisible();
+  await expect(mainContent).toBeVisible({ timeout: 15000 });
 });
 
 test("Smoke - API health endpoint responds", async ({ request }) => {

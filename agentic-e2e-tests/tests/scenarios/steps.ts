@@ -35,7 +35,9 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
   await page.goto("/");
 
   // Get project slug from Home link
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
+  // The Home link contains a paragraph with text "Home"
+  // Use filter to find the link that has exactly "Home" as accessible name
+  const homeLink = page.getByRole("link").filter({ hasText: "Home" }).first();
   await expect(homeLink).toBeVisible({ timeout: 15000 });
   const href = await homeLink.getAttribute("href");
   const projectSlug = href?.replace(/^\//, "") || "";
@@ -100,12 +102,12 @@ export async function thenISeeScenarioFormFields(page: Page) {
 
   // Situation field
   await expect(
-    page.getByRole("textbox", { name: /describe the context/i }).first()
+    page.getByPlaceholder(/a frustrated premium subscriber/i).first()
   ).toBeVisible();
 
   // Criteria field
   await expect(
-    page.getByRole("textbox", { name: /add a criterion/i }).first()
+    page.getByPlaceholder(/must apologize for the inconvenience/i).first()
   ).toBeVisible();
 }
 
@@ -124,7 +126,7 @@ export async function whenIFillInNameWith(page: Page, name: string) {
  */
 export async function whenIFillInSituationWith(page: Page, situation: string) {
   await page
-    .getByRole("textbox", { name: /describe the context/i })
+    .getByPlaceholder(/a frustrated premium subscriber/i)
     .last()
     .fill(situation);
 }
@@ -134,7 +136,7 @@ export async function whenIFillInSituationWith(page: Page, situation: string) {
  */
 export async function whenIAddCriterion(page: Page, criterion: string) {
   await page
-    .getByRole("textbox", { name: /add a criterion/i })
+    .getByPlaceholder(/must apologize for the inconvenience/i)
     .last()
     .fill(criterion);
   await page.getByRole("button", { name: "Add" }).last().click();

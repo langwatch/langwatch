@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 /**
  * Default seed for test planning.
@@ -6,5 +6,6 @@ import { test } from "@playwright/test";
  */
 test("seed", async ({ page }) => {
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  // Wait for the main app to load by checking for navigation
+  await expect(page.locator("main, [role='main'], #__next")).toBeVisible({ timeout: 15000 });
 });
