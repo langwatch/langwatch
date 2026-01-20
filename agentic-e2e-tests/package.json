@@ -1,0 +1,12 @@
+{
+  "name": "langwatch-e2e-tests",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
+  }
+}

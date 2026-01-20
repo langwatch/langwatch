@@ -1,11 +1,11 @@
 # Test environment with isolated ports
 # Infrastructure services only - run Next.js app locally
 #
-# Usage:
-#   docker compose -f compose.test.yml up -d
-#   cd langwatch && pnpm dev  # or: pnpm build && pnpm start
-#   cd agentic-e2e-tests && pnpm test
-#   docker compose -f compose.test.yml down
+# Usage (from agentic-e2e-tests/ directory):
+#   docker compose up -d
+#   cd ../langwatch && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
+#   cd ../agentic-e2e-tests && pnpm test
+#   docker compose down
 #
 # The Next.js app runs on the host at localhost:5570 (set via PORT=5570)
 

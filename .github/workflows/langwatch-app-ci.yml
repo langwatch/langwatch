@@ -427,12 +427,16 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
-      - name: Install dependencies
+      - name: Install app dependencies
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
+      - name: Install E2E test dependencies
+        working-directory: agentic-e2e-tests
+        run: pnpm install --frozen-lockfile
+
       - name: Install Playwright browsers
-        working-directory: langwatch
+        working-directory: agentic-e2e-tests
         run: pnpm exec playwright install --with-deps chromium firefox
 
       - name: Prepare files
@@ -453,14 +457,16 @@ jobs:
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
-        working-directory: langwatch
         run: |
           # Start the app in background
-          PORT=5570 pnpm start &
+          cd langwatch && PORT=5570 pnpm start &
           APP_PID=$!
 
-          # Run tests (config is now in langwatch/playwright.config.ts)
-          pnpm exec playwright test
+          # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
+          sleep 5
+
+          # Run tests from the self-contained e2e package
+          cd agentic-e2e-tests && pnpm test
           TEST_EXIT=$?
 
           # Cleanup
@@ -472,7 +478,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: langwatch/agentic-e2e-tests/playwright-report/
+          path: agentic-e2e-tests/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -480,5 +486,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: langwatch/agentic-e2e-tests/test-results/
+          path: agentic-e2e-tests/test-results/
           retention-days: 7

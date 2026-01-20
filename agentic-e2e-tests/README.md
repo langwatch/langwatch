@@ -5,18 +5,21 @@ End-to-end tests for LangWatch using Playwright, designed to be authored and mai
 ## Quick Start
 
 ```bash
-# 1. Start infrastructure services
-docker compose -f compose.test.yml up -d
+# 1. Start infrastructure services (from this directory)
+cd agentic-e2e-tests
+docker compose up -d
 
 # 2. Run database migrations (first time only)
-cd langwatch
+cd ../langwatch
 pnpm prisma:migrate
 
 # 3. Start the app (in langwatch/ directory)
 PORT=5570 pnpm dev
 
-# 4. Run tests (from repo root)
-cd langwatch && pnpm playwright test --config=../playwright.config.ts
+# 4. Run tests (from agentic-e2e-tests/ directory)
+cd ../agentic-e2e-tests
+pnpm install   # First time only
+pnpm test
 ```
 
 ## Architecture
@@ -165,20 +168,20 @@ To reset authentication, delete `.auth/user.json` and re-run tests.
 ## Running Tests
 
 ```bash
-# Run all tests
-cd langwatch && pnpm playwright test --config=../playwright.config.ts
+# Run all tests (from agentic-e2e-tests/ directory)
+pnpm test
 
 # Run specific test file
-pnpm playwright test --config=../playwright.config.ts tests/scenarios/scenario-editor.spec.ts
+pnpm exec playwright test tests/scenarios/scenario-editor.spec.ts
 
 # Run with UI mode (interactive)
-pnpm playwright test --config=../playwright.config.ts --ui
+pnpm test:ui
 
 # Debug a specific test
-pnpm playwright test --config=../playwright.config.ts --debug
+pnpm exec playwright test --debug
 
 # View last test report
-pnpm playwright show-report agentic-e2e-tests/playwright-report
+pnpm exec playwright show-report playwright-report
 ```
 
 ## CI Integration
@@ -191,7 +194,7 @@ E2E tests are configured to run in CI with:
 
 See `.github/workflows/langwatch-app-ci.yml` for the full configuration.
 
-**To enable in CI:** Remove the `if: false` condition from the `test-e2e` job. No secrets are required - tests create their own user.
+The CI workflow installs dependencies for both `langwatch/` and `agentic-e2e-tests/` and runs tests using `pnpm test` from the e2e directory.
 
 **Global Setup (`global-setup.ts`):**
 - Validates environment configuration
@@ -210,16 +213,16 @@ await page.getByRole("button", { name: "Save" }).last().click();
 ```
 
 ### Tests timing out
-1. Ensure infrastructure is running: `docker compose -f compose.test.yml ps`
+1. Ensure infrastructure is running: `docker compose ps`
 2. Ensure app is running on port 5570: `curl http://localhost:5570`
 3. Check for console errors in the browser
 
 ### Database issues
 Reset the test database:
 ```bash
-docker compose -f compose.test.yml down -v
-docker compose -f compose.test.yml up -d
-cd langwatch && pnpm prisma:migrate
+docker compose down -v
+docker compose up -d
+cd ../langwatch && pnpm prisma:migrate
 ```
 
 ## For AI Agents
