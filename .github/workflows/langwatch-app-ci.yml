@@ -107,8 +107,11 @@ jobs:
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
-      REDIS_URL: "redis://localhost:6379"
+      # CLICKHOUSE_URL is used by clickhouse:migrate script
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
+      # CI-specific URLs for test containers (prefixed to avoid accidentally using production secrets)
+      CI_REDIS_URL: "redis://localhost:6379"
+      CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       BUILD_TIME: "true"
       CI: "true"
 

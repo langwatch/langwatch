@@ -7,10 +7,10 @@ import {
   RedisContainer,
   type StartedRedisContainer,
 } from "@testcontainers/redis";
-import * as fs from "fs";
 import IORedis, { type Redis } from "ioredis";
-import * as os from "os";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { migrateUp } from "~/server/clickhouse/goose";
 import { createLogger } from "~/utils/logger";
 
@@ -36,8 +36,8 @@ const CONTAINER_LABELS = {
  */
 function isUsingServiceContainers(): boolean {
   return !!(
-    process.env.CLICKHOUSE_URL &&
-    process.env.REDIS_URL &&
+    process.env.CI_CLICKHOUSE_URL &&
+    process.env.CI_REDIS_URL &&
     process.env.CI
   );
 }
@@ -62,8 +62,8 @@ export async function startTestContainers(): Promise<{
   // If using service containers (CI), connect to them directly
   // Note: CI service containers must have `local_primary` storage policy pre-configured
   if (isUsingServiceContainers()) {
-    const clickHouseUrl = process.env.CLICKHOUSE_URL!;
-    const redisUrl = process.env.REDIS_URL!;
+    const clickHouseUrl = process.env.CI_CLICKHOUSE_URL!;
+    const redisUrl = process.env.CI_REDIS_URL!;
 
     if (!redisConnection) {
       redisConnection = new IORedis(redisUrl, {
@@ -73,7 +73,7 @@ export async function startTestContainers(): Promise<{
     }
 
     // Run goose migrations to create database and tables
-    initializeClickHouseSchema(clickHouseUrl);
+    await initializeClickHouseSchema(clickHouseUrl);
 
     // Create client with the database in the URL path
     const urlWithDatabase = new URL(clickHouseUrl);
@@ -133,7 +133,7 @@ export async function startTestContainers(): Promise<{
   }
 
   // Run goose migrations to create database and tables
-  initializeClickHouseSchema(clickHouseUrl);
+  await initializeClickHouseSchema(clickHouseUrl);
 
   // Close the old client and create a new one with the database in the URL path
   await clickHouseClient.close();
@@ -277,9 +277,8 @@ function createStoragePolicyConfigFile(): string {
  *
  * @param connectionUrl - The ClickHouse connection URL (without database)
  */
-function initializeClickHouseSchema(connectionUrl: string): void {
-  migrateUp({
-    database: TEST_DATABASE,
+async function initializeClickHouseSchema(connectionUrl: string): Promise<void> {
+  await migrateUp({
     connectionUrl,
     verbose: true,
   });
