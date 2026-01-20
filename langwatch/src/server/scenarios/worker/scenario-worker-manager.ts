@@ -339,6 +339,13 @@ export class ScenarioWorkerManager {
               `[Worker] ${message.message}`,
             );
             break;
+          default: {
+            const _exhaustive: never = message;
+            logger.warn(
+              { message: _exhaustive, scenarioId: data.scenarioId },
+              "Unknown worker message type",
+            );
+          }
         }
       });
 
