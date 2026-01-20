@@ -433,7 +433,7 @@ jobs:
 
       - name: Install E2E test dependencies
         working-directory: agentic-e2e-tests
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Install Playwright browsers
         working-directory: agentic-e2e-tests
