@@ -63,12 +63,11 @@ export function AgentPickerModal({
             onSelect={onSelect}
           />
         </SearchablePickerDialog.ScrollableContent>
-        <SearchablePickerDialog.CreateButton
-          label="Create new agent"
-          onClick={onCreateNew}
-        />
       </SearchablePickerDialog.Body>
-      <SearchablePickerDialog.Footer />
+      <SearchablePickerDialog.Footer
+        actionLabel={hasAgents ? "Create new agent" : undefined}
+        onAction={hasAgents ? onCreateNew : undefined}
+      />
     </SearchablePickerDialog.Root>
   );
 }

@@ -348,17 +348,36 @@ function CreateButton({ label, onClick }: CreateButtonProps) {
 
 interface FooterProps {
   children?: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-function Footer({ children }: FooterProps) {
+function Footer({ children, actionLabel, onAction }: FooterProps) {
   const { onClose } = usePickerContext();
+
+  const handleAction = () => {
+    onAction?.();
+    onClose();
+  };
 
   return (
     <Dialog.Footer borderTopWidth="1px">
       {children ?? (
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
+        <HStack width="100%" justifyContent="space-between">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          {actionLabel && onAction && (
+            <Button
+              colorPalette="blue"
+              onClick={handleAction}
+              data-testid="picker-create-button"
+            >
+              <Plus size={14} />
+              {actionLabel}
+            </Button>
+          )}
+        </HStack>
       )}
     </Dialog.Footer>
   );

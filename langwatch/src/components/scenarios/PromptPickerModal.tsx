@@ -58,12 +58,11 @@ export function PromptPickerModal({
             onSelect={onSelect}
           />
         </SearchablePickerDialog.ScrollableContent>
-        <SearchablePickerDialog.CreateButton
-          label="Create new prompt"
-          onClick={onCreateNew}
-        />
       </SearchablePickerDialog.Body>
-      <SearchablePickerDialog.Footer />
+      <SearchablePickerDialog.Footer
+        actionLabel={hasPrompts ? "Create new prompt" : undefined}
+        onAction={hasPrompts ? onCreateNew : undefined}
+      />
     </SearchablePickerDialog.Root>
   );
 }
