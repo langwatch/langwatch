@@ -446,7 +446,8 @@ jobs:
 
       - name: Build app
         working-directory: langwatch
-        run: pnpm build
+        # Build with NODE_ENV=test to match main build job (avoids prerender issues)
+        run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
         working-directory: langwatch
