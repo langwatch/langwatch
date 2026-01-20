@@ -11,15 +11,15 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  *
  * Bootstrap & Migration Flow:
  * 1. Pre-flight: Validates config, checks connectivity, verifies goose binary
- * 2. Bootstrap: Creates Replicated database and goose_db_version table (if replicated)
+ * 2. Bootstrap: Creates Replicated database and goose_db_version table
  * 3. Migrations: Goose connects to the database and runs migrations
  *
- * This ensures goose_db_version is created with ReplicatedMergeTree engine
- * so migration state is consistent across all cluster nodes.
+ * The goose_db_version table is created in the target database (e.g., langwatch).
+ * For Replicated databases, DDL and data are automatically replicated across nodes.
  *
  * Configuration via environment variables:
- * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/dbname)
- * - CLICKHOUSE_CLUSTER: Cluster name for ReplicatedMergeTree (HA with Keeper). If set, enables replication.
+ * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/langwatch)
+ * - CLICKHOUSE_CLUSTER: Cluster name for Replicated database engine. If set, enables replication.
  * - TIERED_*_TABLE_HOT_DAYS: TTL configuration for tiered storage (optional, defaults to 2)
  *
  * @see https://github.com/pressly/goose
@@ -290,46 +290,27 @@ async function bootstrapDatabase(
       );
     }
 
-    // Create default.goose_db_version as ReplicatedMergeTree
-    // Goose uses the default database for its version table, and we need it replicated
-    // Since 'default' database is Atomic (not Replicated), we must specify explicit Keeper paths
+    // Create goose_db_version table in the target database
+    // Goose creates this table in the database specified in the connection string.
+    // We pre-create it to avoid race conditions when multiple workers start simultaneously.
     // Schema must match goose's ClickHouse table: https://github.com/pressly/goose
     //
-    // Note: We use CREATE TABLE IF NOT EXISTS ON CLUSTER which is idempotent - it will
-    // create the table on nodes where it doesn't exist and skip nodes where it does.
-    // The {replica} macro ensures each node gets a unique replica path in Keeper.
-    // We don't pre-check tableExists because that query goes through the NLB and might
-    // hit a node where the table exists, causing us to skip creation on other nodes.
-    if (config.clusterName) {
-      // Use ON CLUSTER to create the table on all nodes.
-      // The 'default' database is Atomic (not Replicated), so ReplicatedMergeTree tables
-      // must be explicitly created on each node via ON CLUSTER.
-      await executeBootstrapSQL(
-        client,
-        `CREATE TABLE IF NOT EXISTS default.goose_db_version ON CLUSTER ${config.clusterName} (
-          version_id Int64,
-          is_applied UInt8,
-          date Date DEFAULT now(),
-          tstamp DateTime DEFAULT now()
-        ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/default/goose_db_version', '{replica}')
-        ORDER BY date
-        SETTINGS index_granularity = 8192`,
-        verbose
-      );
-    } else {
-      await executeBootstrapSQL(
-        client,
-        `CREATE TABLE IF NOT EXISTS default.goose_db_version (
-          version_id Int64,
-          is_applied UInt8,
-          date Date DEFAULT now(),
-          tstamp DateTime DEFAULT now()
-        ) ENGINE = MergeTree()
-        ORDER BY date
-        SETTINGS index_granularity = 8192`,
-        verbose
-      );
-    }
+    // For Replicated databases (when clusterName is set):
+    // - DDL is automatically replicated to all nodes by the database engine
+    // - Data replication requires ReplicatedMergeTree (the database provides Keeper paths)
+    const engine = config.clusterName ? "ReplicatedMergeTree()" : "MergeTree()";
+    await executeBootstrapSQL(
+      client,
+      `CREATE TABLE IF NOT EXISTS ${config.database}.goose_db_version (
+        version_id Int64,
+        is_applied UInt8,
+        date Date DEFAULT now(),
+        tstamp DateTime DEFAULT now()
+      ) ENGINE = ${engine}
+      ORDER BY date
+      SETTINGS index_granularity = 8192`,
+      verbose
+    );
   });
 
   logger.info("Bootstrap completed");
@@ -398,6 +379,8 @@ function executeGoose(
   const args = [
     "-dir",
     migrationsDir,
+    "-table",
+    `${config.database}.goose_db_version`,
     "clickhouse",
     config.gooseConnectionString,
     command,
