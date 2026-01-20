@@ -364,8 +364,7 @@ jobs:
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       NODE_ENV: "development"
-      SKIP_ELASTIC_MIGRATE: "true"
-      SKIP_CLICKHOUSE_MIGRATE: "true"
+      # Note: Migrations run on app startup via start:prepare:db
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
@@ -434,7 +433,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: langwatch
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
 
       - name: Prepare files
         working-directory: langwatch
@@ -443,6 +442,10 @@ jobs:
       - name: Setup database
         working-directory: langwatch
         run: pnpm prisma:migrate
+
+      - name: Setup Elasticsearch
+        working-directory: langwatch
+        run: pnpm elastic:migrate
 
       - name: Build app
         working-directory: langwatch
