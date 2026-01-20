@@ -35,7 +35,7 @@ export function DatasetStep() {
   const {
     experimentId,
     setWizardState,
-    wizardState,
+    workbenchState,
     setDatasetId,
     getDatasetId,
     clearDatasetId,
@@ -44,14 +44,14 @@ export function DatasetStep() {
       ({
         experimentId,
         setWizardState,
-        wizardState,
+        workbenchState,
         setDatasetId,
         getDatasetId,
         clearDatasetId,
       }) => ({
         experimentId,
         setWizardState,
-        wizardState,
+        workbenchState,
         setDatasetId,
         getDatasetId,
         clearDatasetId,
@@ -61,7 +61,7 @@ export function DatasetStep() {
   const { project } = useOrganizationTeamProject();
 
   const [accordeonValue, setAccordeonValue] = useState(
-    wizardState.dataSource ? ["configuration"] : ["data-source"],
+    workbenchState.dataSource ? ["configuration"] : ["data-source"],
   );
 
   // Fetch datasets
@@ -128,7 +128,7 @@ export function DatasetStep() {
     }
 
     // If manual is already selected and there is a dataset id, then skip it
-    if (wizardState.dataSource === "manual" && getDatasetId()) {
+    if (workbenchState.dataSource === "manual" && getDatasetId()) {
       handleDataSourceSelect("manual");
       return;
     }
@@ -171,7 +171,7 @@ export function DatasetStep() {
     );
   }, [
     experimentId,
-    wizardState.dataSource,
+    workbenchState.dataSource,
     getDatasetId,
     upsertDataset,
     project?.id,
@@ -192,7 +192,7 @@ export function DatasetStep() {
           Datasets
         </Heading>
         <Text>
-          {wizardState.task === "real_time"
+          {workbenchState.task === "real_time"
             ? "Choose some sample data to test the evaluation before setting it up in production"
             : "Choose where your evaluation data will come from"}
         </Text>
@@ -213,16 +213,16 @@ export function DatasetStep() {
             width="full"
             borderColor="blue.400"
             title="Data Source"
-            showTrigger={!!wizardState.dataSource}
+            showTrigger={!!workbenchState.dataSource}
           >
             <RadioCard.Root
               variant="outline"
               colorPalette="blue"
-              value={wizardState.dataSource}
+              value={workbenchState.dataSource}
               onValueChange={(e) =>
                 handleDataSourceSelect(
                   e.value as Exclude<
-                    State["wizardState"]["dataSource"],
+                    State["workbenchState"]["dataSource"],
                     undefined
                   >,
                 )
@@ -285,22 +285,22 @@ export function DatasetStep() {
           </StepAccordion>
 
           {/* Second Accordion - Configuration Options */}
-          {wizardState.dataSource && (
+          {workbenchState.dataSource && (
             <StepAccordion
               value="configuration"
               width="full"
               borderColor="blue.400"
               title={
                 <Text>
-                  {wizardState.dataSource === "choose" && "Select Dataset"}
-                  {wizardState.dataSource === "from_production" &&
+                  {workbenchState.dataSource === "choose" && "Select Dataset"}
+                  {workbenchState.dataSource === "from_production" &&
                     "Import from Production"}
-                  {wizardState.dataSource === "manual" && "Create Dataset"}
-                  {wizardState.dataSource === "upload" && "Upload CSV"}
+                  {workbenchState.dataSource === "manual" && "Create Dataset"}
+                  {workbenchState.dataSource === "upload" && "Upload CSV"}
                 </Text>
               }
             >
-              {wizardState.dataSource === "choose" && (
+              {workbenchState.dataSource === "choose" && (
                 <VStack width="full" align="start" gap={3}>
                   {datasets.isLoading && <Text>Loading datasets...</Text>}
                   {datasets.error && (
@@ -331,13 +331,13 @@ export function DatasetStep() {
                 </VStack>
               )}
 
-              {wizardState.dataSource === "from_production" && (
+              {workbenchState.dataSource === "from_production" && (
                 <DatasetFromProductionConfiguration dataset={selectedDataset} />
               )}
 
-              {wizardState.dataSource === "manual" && <DatasetGeneration />}
+              {workbenchState.dataSource === "manual" && <DatasetGeneration />}
 
-              {wizardState.dataSource === "upload" && (
+              {workbenchState.dataSource === "upload" && (
                 <InlineUploadCSVForm
                   onSuccess={({ datasetId, columnTypes }) => {
                     handleCSVUploadSuccess(datasetId, columnTypes);

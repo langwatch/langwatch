@@ -1,14 +1,23 @@
 /**
  * @vitest-environment node
  */
-import { beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { generateText } from "ai";
+
 import ScenarioRunner from "@langwatch/scenario";
+import { generateText } from "ai";
+import {
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import { SimulationRunnerService } from "../simulation-runner.service";
-import { ScenarioService } from "../scenario.service";
 import { PromptService } from "../../prompt-config/prompt.service";
+import { ScenarioService } from "../scenario.service";
+import { SimulationRunnerService } from "../simulation-runner.service";
 
 // Mock the AI SDK to avoid real LLM calls
 vi.mock("ai", async () => {
@@ -32,18 +41,22 @@ vi.mock("@langwatch/scenario", async (importOriginal) => {
     ...actual,
     default: {
       ...actual.default,
-      run: vi.fn(async (config: { agents: Array<{ call?: (input: unknown) => Promise<string> }> }) => {
-        // Simulate SDK behavior: call the adapter agent if present
-        const adapter = config.agents.find(
-          (a) => a.call && typeof a.call === "function"
-        );
-        if (adapter?.call) {
-          await adapter.call({
-            messages: [{ role: "user", content: "Hello" }],
-          });
-        }
-        return { success: true, reasoning: "Mocked result" };
-      }),
+      run: vi.fn(
+        async (config: {
+          agents: Array<{ call?: (input: unknown) => Promise<string> }>;
+        }) => {
+          // Simulate SDK behavior: call the adapter agent if present
+          const adapter = config.agents.find(
+            (a) => a.call && typeof a.call === "function",
+          );
+          if (adapter?.call) {
+            await adapter.call({
+              messages: [{ role: "user", content: "Hello" }],
+            });
+          }
+          return { success: true, reasoning: "Mocked result" };
+        },
+      ),
       userSimulatorAgent: vi.fn(() => ({ name: "UserSimulator" })),
       judgeAgent: vi.fn(() => ({ name: "JudgeAgent" })),
     },
@@ -124,10 +137,9 @@ describe("SimulationRunnerService Integration", () => {
         role: string;
         content: string;
       }>;
-      return (
-        messages?.some(
-          (m) => m.role === "system" && m.content === "You are a helpful assistant.",
-        )
+      return messages?.some(
+        (m) =>
+          m.role === "system" && m.content === "You are a helpful assistant.",
       );
     });
 
@@ -240,8 +252,7 @@ describe("SimulationRunnerService Integration", () => {
       }),
       expect.objectContaining({
         batchRunId: "scenariobatch_test123",
-      })
+      }),
     );
   });
 });
-

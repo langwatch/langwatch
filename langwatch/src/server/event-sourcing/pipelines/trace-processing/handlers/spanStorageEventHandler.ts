@@ -3,8 +3,8 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
 import { spanRepository } from "../repositories";
-import type { SpanReceivedEvent } from "../schemas/events";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
+import type { SpanReceivedEvent } from "../schemas/events";
 import { SpanNormalizationPipelineService } from "../services/spanNormalizationPipelineService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 

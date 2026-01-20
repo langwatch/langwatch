@@ -1,5 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { TenantId } from "../../domain/tenantId";
@@ -8,9 +9,7 @@ import type {
   EventOrderingStrategy,
   Projection,
 } from "../../domain/types";
-import type {
-  ProjectionDefinition,
-} from "../../projection.types";
+import type { ProjectionDefinition } from "../../projection.types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type {
   EventStore,
@@ -31,7 +30,6 @@ import {
 import type { UpdateProjectionOptions } from "../eventSourcingService.types";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 
 /**
  * Manages projection updates for event sourcing.

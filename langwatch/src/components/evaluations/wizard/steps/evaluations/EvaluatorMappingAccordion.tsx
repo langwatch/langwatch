@@ -36,7 +36,7 @@ export const EvaluatorMappingAccordion = ({
   } = useEvaluationWizardStore(
     useShallow(
       ({
-        wizardState,
+        workbenchState,
         getFirstEvaluatorNode,
         setWizardState,
         getFirstEvaluatorEdges,
@@ -44,12 +44,12 @@ export const EvaluatorMappingAccordion = ({
         getDSL,
         getFirstExecutorNode,
       }) => ({
-        realTimeTraceMappings: wizardState.realTimeTraceMappings,
-        realTimeThreadMappings: wizardState.realTimeThreadMappings,
-        isThreadMapping: wizardState.isThreadMapping ?? false,
-        task: wizardState.task,
-        dataSource: wizardState.dataSource,
-        evaluatorCategory: wizardState.evaluatorCategory,
+        realTimeTraceMappings: workbenchState.realTimeTraceMappings,
+        realTimeThreadMappings: workbenchState.realTimeThreadMappings,
+        isThreadMapping: workbenchState.isThreadMapping ?? false,
+        task: workbenchState.task,
+        dataSource: workbenchState.dataSource,
+        evaluatorCategory: workbenchState.evaluatorCategory,
         getFirstEvaluatorNode,
         setWizardState,
         getFirstEvaluatorEdges,

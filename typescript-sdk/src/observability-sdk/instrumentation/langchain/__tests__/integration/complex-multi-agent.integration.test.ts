@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
@@ -536,7 +536,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     );
     expect(llmSpans.length).toBeGreaterThan(1);
 
-    llmSpans.forEach((span, index) => {
+    llmSpans.forEach((span) => {
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
       expect(span.attributes["langwatch.input"]).toBeDefined();
       expect(span.attributes["langwatch.output"]).toBeDefined();

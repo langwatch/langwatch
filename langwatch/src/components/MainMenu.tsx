@@ -1,6 +1,7 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import React, { useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
@@ -8,6 +9,7 @@ import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
+import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -24,6 +26,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const { project, hasOrganizationPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
@@ -32,6 +35,9 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+
+  // Feature flag: show collapsible navigation for @langwatch.ai users
+  const showCollapsibleNav = session?.user?.email?.endsWith("@langwatch.ai");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -96,14 +102,61 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
-            <PageMenuLink
-              path={projectRoutes.simulations.path}
-              icon={featureIcons.simulations.icon}
-              label={projectRoutes.simulations.title}
-              project={project}
-              isActive={router.pathname.includes("/simulations")}
-              showLabel={showExpanded}
-            />
+            {showCollapsibleNav ? (
+              <CollapsibleMenuGroup
+                icon={featureIcons.simulations.icon}
+                label={projectRoutes.simulations.title}
+                project={project}
+                showLabel={showExpanded}
+                children={[
+                  {
+                    icon: featureIcons.scenarios.icon,
+                    label: projectRoutes.scenarios.title,
+                    href: project
+                      ? projectRoutes.scenarios.path.replace(
+                          "[project]",
+                          project.slug,
+                        )
+                      : "/auth/signin",
+                    isActive: router.pathname.includes(
+                      "/simulations/scenarios",
+                    ),
+                  },
+                  {
+                    icon: featureIcons.simulation_runs.icon,
+                    label: projectRoutes.simulation_runs.title,
+                    href: project
+                      ? projectRoutes.simulation_runs.path.replace(
+                          "[project]",
+                          project.slug,
+                        )
+                      : "/auth/signin",
+                    isActive:
+                      router.pathname.includes("/simulations") &&
+                      !router.pathname.includes("/simulations/scenarios"),
+                  },
+                ]}
+              />
+            ) : (
+              <PageMenuLink
+                path={projectRoutes.simulations.path}
+                icon={featureIcons.simulations.icon}
+                label={projectRoutes.simulations.title}
+                project={project}
+                isActive={router.pathname.includes("/simulations")}
+                showLabel={showExpanded}
+              />
+            )}
+            {showCollapsibleNav && (
+              <PageMenuLink
+                path={projectRoutes.agents.path}
+                icon={featureIcons.agents.icon}
+                label={projectRoutes.agents.title}
+                project={project}
+                isActive={router.pathname.includes("/agents")}
+                showLabel={showExpanded}
+              />
+            )}
             <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={featureIcons.evaluations.icon}

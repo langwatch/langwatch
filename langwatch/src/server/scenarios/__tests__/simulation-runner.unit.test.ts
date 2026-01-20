@@ -1,10 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+
 import ScenarioRunner from "@langwatch/scenario";
-import { SimulationRunnerService } from "../simulation-runner.service";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioService } from "../scenario.service";
+import { SimulationRunnerService } from "../simulation-runner.service";
 
 // Mock external dependencies
 vi.mock("@langwatch/scenario", async (importOriginal) => {
@@ -61,7 +62,7 @@ describe("SimulationRunnerService", () => {
 
     // Replace internal ScenarioService with mock
     vi.spyOn(ScenarioService, "create").mockReturnValue(
-      mockScenarioService as unknown as ScenarioService
+      mockScenarioService as unknown as ScenarioService,
     );
 
     // Re-create service to use mocked ScenarioService
@@ -121,7 +122,7 @@ describe("SimulationRunnerService", () => {
         }),
         expect.objectContaining({
           batchRunId: "scenariobatch_test123",
-        })
+        }),
       );
     });
 
@@ -146,7 +147,7 @@ describe("SimulationRunnerService", () => {
       expect(mockJudgeAgent).toHaveBeenCalledWith(
         expect.objectContaining({
           criteria,
-        })
+        }),
       );
     });
   });
@@ -167,4 +168,3 @@ describe("SimulationRunnerService", () => {
     });
   });
 });
-

@@ -297,7 +297,9 @@ describe("QueueProcessorManager", () => {
       );
       const dedupId = createCall?.deduplication?.makeId?.(event);
       // Default format: ${tenantId}:${aggregateType}:${aggregateId}
-      expect(dedupId).toBe(`${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`);
+      expect(dedupId).toBe(
+        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+      );
     });
 
     it("uses custom deduplication config when provided", () => {
@@ -320,9 +322,14 @@ describe("QueueProcessorManager", () => {
       );
 
       const projections = {
-        projection1: createMockProjectionDefinition("projection1", void 0, void 0, {
-          deduplication: { makeId: customDeduplicationId },
-        }),
+        projection1: createMockProjectionDefinition(
+          "projection1",
+          void 0,
+          void 0,
+          {
+            deduplication: { makeId: customDeduplicationId },
+          },
+        ),
       };
       const processProjectionEventCallback = vi.fn();
 
@@ -384,7 +391,9 @@ describe("QueueProcessorManager", () => {
       );
       const dedupId = createCall?.deduplication?.makeId?.(event);
       // Default format: ${tenantId}:${aggregateType}:${aggregateId}
-      expect(dedupId).toBe(`${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`);
+      expect(dedupId).toBe(
+        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+      );
     });
   });
 

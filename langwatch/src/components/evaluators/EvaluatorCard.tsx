@@ -1,9 +1,9 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { Evaluator } from "@prisma/client";
 import { CheckSquare, MoreVertical, Workflow } from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
-import type { Evaluator } from "@prisma/client";
-import { Menu } from "../ui/menu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { Menu } from "../ui/menu";
 
 const evaluatorTypeIcons: Record<string, typeof CheckSquare> = {
   evaluator: CheckSquare,

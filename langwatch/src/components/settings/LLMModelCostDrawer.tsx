@@ -72,10 +72,11 @@ function LLMModelCostForm({
   const currentLLMModelCost = id
     ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
     : cloneModel
-    ? llmModelCosts.find(
-        (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel,
-      )
-    : undefined;
+      ? llmModelCosts.find(
+          (llmModelCost) =>
+            !llmModelCost.id && llmModelCost.model === cloneModel,
+        )
+      : undefined;
 
   type LLMModelCostForm = {
     model: string;

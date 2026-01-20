@@ -46,5 +46,3 @@ export function useLabelFilter(scenarios: Scenario[] | undefined) {
     handleLabelToggle,
   };
 }
-
-

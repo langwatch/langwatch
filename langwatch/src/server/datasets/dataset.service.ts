@@ -7,7 +7,11 @@ import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { DatasetConflictError, DatasetNotFoundError } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
-import type { DatasetColumns, DatasetRecordEntry } from "./types";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+  DatasetRecordInput,
+} from "./types";
 
 /**
  * Service input types for business operations
@@ -18,7 +22,8 @@ export type UpsertDatasetParams = {
   experimentId?: string;
   columnTypes: DatasetColumns;
   datasetId?: string;
-  datasetRecords?: DatasetRecordEntry[];
+  // Input records - IDs are optional (backend generates them with nanoid)
+  datasetRecords?: DatasetRecordInput[];
 };
 
 export type ValidateDatasetNameParams = {
@@ -191,7 +196,7 @@ export class DatasetService {
     projectId: string;
     name: string;
     columnTypes: DatasetColumns;
-    datasetRecords?: DatasetRecordEntry[];
+    datasetRecords?: DatasetRecordInput[];
   }) {
     const { projectId, name, columnTypes, datasetRecords } = params;
 

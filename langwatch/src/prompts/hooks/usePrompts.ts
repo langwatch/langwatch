@@ -18,7 +18,7 @@ export const usePrompts = () => {
 
   const invalidateAll = useCallback(
     async () => Promise.all([await trpc.prompts.invalidate()]),
-    [trpc.prompts]
+    [trpc.prompts],
   );
 
   const wrappedCreatePrompt: typeof createPrompt.mutateAsync = useCallback(
@@ -27,7 +27,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [createPrompt, invalidateAll]
+    [createPrompt, invalidateAll],
   );
 
   const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = useCallback(
@@ -36,7 +36,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [updatePrompt, invalidateAll]
+    [updatePrompt, invalidateAll],
   );
 
   const wrappedUpdateHandle: typeof updateHandle.mutateAsync = useCallback(
@@ -45,7 +45,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [updateHandle, invalidateAll]
+    [updateHandle, invalidateAll],
   );
 
   const wrappedGetPromptById = useCallback(
@@ -57,7 +57,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [trpc.prompts.getByIdOrHandle, projectId, invalidateAll]
+    [trpc.prompts.getByIdOrHandle, projectId, invalidateAll],
   );
 
   const wrappedRestoreVersion: typeof restoreVersion.mutateAsync = useCallback(
@@ -66,7 +66,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [restoreVersion, invalidateAll]
+    [restoreVersion, invalidateAll],
   );
 
   const wrappedDeletePrompt: typeof deletePrompt.mutateAsync = useCallback(
@@ -75,7 +75,7 @@ export const usePrompts = () => {
       await invalidateAll();
       return prompt;
     },
-    [deletePrompt, invalidateAll]
+    [deletePrompt, invalidateAll],
   );
 
   return {

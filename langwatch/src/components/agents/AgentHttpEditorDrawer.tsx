@@ -6,43 +6,42 @@ import {
   HStack,
   Input,
   Spinner,
+  Tabs,
   Text,
   VStack,
-  Tabs,
 } from "@chakra-ui/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-import { useState, useCallback, useEffect } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import type { AvailableSource, FieldMapping } from "~/components/variables";
 import {
-  useDrawer,
   getComplexProps,
-  useDrawerParams,
   getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import type { AvailableSource, FieldMapping } from "~/components/variables";
 import type {
-  TypedAgent,
-  AgentComponentConfig,
-} from "~/server/agents/agent.repository";
-import type {
-  HttpComponentConfig,
-  HttpMethod,
   HttpAuth,
+  HttpComponentConfig,
   HttpHeader,
+  HttpMethod,
 } from "~/optimization_studio/types/dsl";
-
+import type {
+  AgentComponentConfig,
+  TypedAgent,
+} from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
 import {
-  HttpMethodSelector,
-  BodyTemplateEditor,
-  OutputPathInput,
   AuthConfigSection,
+  BodyTemplateEditor,
   HeadersConfigSection,
+  HttpMethodSelector,
   HttpTestPanel,
+  OutputPathInput,
 } from "./http";
-import { toaster } from "~/components/ui/toaster";
 
 // ============================================================================
 // Constants
@@ -76,7 +75,7 @@ function buildHttpConfig(
   bodyTemplate: string,
   outputPath: string,
   headers: HttpHeader[],
-  auth: HttpAuth | undefined
+  auth: HttpAuth | undefined,
 ): HttpComponentConfig {
   return {
     name: "HTTP",
@@ -107,7 +106,7 @@ export type AgentHttpEditorDrawerProps = {
   /** Callback when input mappings change (for Evaluations V3) */
   onInputMappingsChange?: (
     identifier: string,
-    mapping: FieldMapping | undefined
+    mapping: FieldMapping | undefined,
   ) => void;
 };
 
@@ -124,7 +123,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const flowCallbacks = getFlowCallbacks("agentHttpEditor");
+  const _flowCallbacks = getFlowCallbacks("agentHttpEditor");
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
@@ -138,7 +137,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Props from drawer params or direct props (for Evaluations V3)
-  const availableSources =
+  const _availableSources =
     props.availableSources ??
     (complexProps.availableSources as AvailableSource[] | undefined);
 
@@ -156,11 +155,26 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!agentId && !!project?.id && isOpen }
+    { enabled: !!agentId && !!project?.id && isOpen },
   );
 
-  // Initialize form with agent data
+  // Track whether form has been initialized for this drawer session
+  const formInitializedRef = useRef(false);
+  const lastAgentIdRef = useRef<string | undefined>(undefined);
+
+  // Initialize form with agent data - only on first open or when agentId changes
   useEffect(() => {
+    // Reset initialization flag when agentId changes
+    if (lastAgentIdRef.current !== agentId) {
+      formInitializedRef.current = false;
+      lastAgentIdRef.current = agentId;
+    }
+
+    // Only initialize once per drawer session
+    if (formInitializedRef.current) {
+      return;
+    }
+
     if (agentQuery.data) {
       const config = getHttpConfig(agentQuery.data.config);
       setName(agentQuery.data.name ?? "");
@@ -172,8 +186,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
       setHasUnsavedChanges(false);
-    } else if (!agentId) {
-      // Reset form for new agent
+      formInitializedRef.current = true;
+    } else if (!agentId && isOpen) {
+      // Reset form for new agent only when drawer opens
       setName("");
       setUrl(DEFAULT_URL);
       setMethod(DEFAULT_METHOD);
@@ -182,8 +197,16 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setHeaders([]);
       setAuth({ type: "none" });
       setHasUnsavedChanges(false);
+      formInitializedRef.current = true;
     }
   }, [agentQuery.data, agentId, isOpen]);
+
+  // Reset initialization flag when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      formInitializedRef.current = false;
+    }
+  }, [isOpen]);
 
   // Mutations
   const createMutation = api.agents.create.useMutation({
@@ -223,7 +246,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = (name?.trim().length ?? 0) > 0 && (url?.trim().length ?? 0) > 0;
+  const isValid =
+    (name?.trim().length ?? 0) > 0 && (url?.trim().length ?? 0) > 0;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -234,7 +258,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       bodyTemplate,
       outputPath,
       headers,
-      auth
+      auth,
     );
 
     if (agentId) {
@@ -273,7 +297,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     if (hasUnsavedChanges) {
       if (
         !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?"
+          "You have unsaved changes. Are you sure you want to close?",
         )
       ) {
         return;
@@ -328,7 +352,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         };
       }
     },
-    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation]
+    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation],
   );
 
   return (
@@ -359,7 +383,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             <Heading>{agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           {agentId && agentQuery.isLoading ? (
             <HStack justify="center" paddingY={8}>
               <Spinner size="md" />
@@ -415,7 +444,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 overflow="hidden"
                 colorPalette="blue"
               >
-                <Tabs.List paddingX={6} borderBottomWidth="1px" borderColor="gray.200">
+                <Tabs.List
+                  paddingX={6}
+                  borderBottomWidth="1px"
+                  borderColor="gray.200"
+                >
                   <Tabs.Trigger value="body">Body</Tabs.Trigger>
                   <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
                   <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
@@ -434,7 +467,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                     <Field.Root>
                       <Field.Label>Request Body Template</Field.Label>
                       <Text fontSize="sm" color="gray.500" marginBottom={2}>
-                        JSON body with mustache variables. Variables are replaced at runtime.
+                        JSON body with mustache variables. Variables are
+                        replaced at runtime.
                       </Text>
                       <BodyTemplateEditor
                         value={bodyTemplate}

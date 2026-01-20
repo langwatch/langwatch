@@ -122,10 +122,10 @@ useEffect(() => {
 
 1. User configures thread mappings in wizard
 2. `useEffect` automatically merges thread mappings into `realTimeTraceMappings`
-3. Wizard saves experiment with `wizardState` containing merged mappings
+3. Wizard saves experiment with `workbenchState` containing merged mappings
 4. When saving as monitor (`experiments.saveAsMonitor`):
    ```typescript
-   monitor.mappings = wizardState.realTimeTraceMappings;
+   monitor.mappings = workbenchState.realTimeTraceMappings;
    ```
 5. Monitor table stores unified mapping format with both trace and thread types
 

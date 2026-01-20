@@ -37,9 +37,9 @@ import {
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
     useEvaluationWizardStore(
-      useShallow(({ wizardState, setWizardState }) => ({
-        executionMethod: wizardState.executionMethod,
-        realTimeExecution: wizardState.realTimeExecution,
+      useShallow(({ workbenchState, setWizardState }) => ({
+        executionMethod: workbenchState.executionMethod,
+        realTimeExecution: workbenchState.realTimeExecution,
         setWizardState,
       })),
     );

@@ -2,7 +2,7 @@
  * DSL Adapter for Evaluations V3
  *
  * Converts V3 UI state to the workflow DSL for execution.
- * This is a one-way conversion - state is persisted via wizardState, not DSL.
+ * This is a one-way conversion - state is persisted via workbenchState, not DSL.
  *
  * Key concepts:
  * - Evaluators are global/shared in state - targets reference them by ID
@@ -14,20 +14,20 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type {
-  Workflow,
-  Entry,
-  Signature,
   Code,
+  Entry,
   Evaluator,
   Field,
+  Signature,
+  Workflow,
 } from "~/optimization_studio/types/dsl";
 import type {
-  TargetConfig,
   DatasetColumn,
   DatasetReference,
   EvaluationsV3State,
   EvaluatorConfig,
   InlineDataset,
+  TargetConfig,
 } from "../types";
 
 // ============================================================================
@@ -45,7 +45,7 @@ import type {
  */
 export const stateToWorkflow = (
   state: EvaluationsV3State,
-  datasetIdOverride?: string
+  datasetIdOverride?: string,
 ): Workflow => {
   const datasetId = datasetIdOverride ?? state.activeDatasetId;
   const activeDataset = state.datasets.find((d) => d.id === datasetId);
@@ -79,7 +79,7 @@ export const stateToWorkflow = (
         datasetId,
         target.id,
         targetIndex,
-        evalIndex
+        evalIndex,
       );
       evaluatorNodes.push(evaluatorNode);
     });
@@ -89,7 +89,7 @@ export const stateToWorkflow = (
   const evaluatorEdges = buildEvaluatorEdges(
     state.targets,
     state.evaluators,
-    datasetId
+    datasetId,
   );
 
   return {
@@ -139,7 +139,7 @@ const createEntryNode = (dataset: DatasetReference): Node<Entry> => {
  * Convert dataset column type to DSL field type.
  */
 const columnTypeToFieldType = (
-  colType: DatasetColumn["type"]
+  colType: DatasetColumn["type"],
 ): Field["type"] => {
   switch (colType) {
     case "string":
@@ -156,7 +156,11 @@ const columnTypeToFieldType = (
  * Uses the `parameters` array structure expected by the DSL.
  * Sets default values on inputs that have value mappings.
  */
-const createCodeNode = (target: TargetConfig, activeDatasetId: string, index: number): Node<Code> => {
+const createCodeNode = (
+  target: TargetConfig,
+  activeDatasetId: string,
+  index: number,
+): Node<Code> => {
   const parameters: Field[] = [];
 
   // Get mappings for the active dataset
@@ -194,7 +198,7 @@ const createEvaluatorNode = (
   activeDatasetId: string,
   targetId: string,
   targetIndex: number,
-  evalIndex: number
+  evalIndex: number,
 ): Node<Evaluator> => {
   // Get the mappings for this dataset and target
   const datasetMappings = evaluator.mappings[activeDatasetId];
@@ -218,7 +222,7 @@ const createEvaluatorNode = (
       inputs,
       outputs: [{ identifier: "passed", type: "bool" }],
       evaluator: evaluator.evaluatorType,
-      ...evaluator.settings,
+      // Note: settings are fetched from DB at execution time, not stored in workbench state
     },
     position: { x: 600, y: targetIndex * 200 + evalIndex * 100 },
   };
@@ -231,7 +235,7 @@ const createEvaluatorNode = (
  */
 const buildTargetEdges = (
   targets: TargetConfig[],
-  activeDatasetId: string
+  activeDatasetId: string,
 ): Edge[] => {
   const edges: Edge[] = [];
 
@@ -279,7 +283,7 @@ const buildTargetEdges = (
 const buildEvaluatorEdges = (
   targets: TargetConfig[],
   evaluators: EvaluatorConfig[],
-  activeDatasetId: string
+  activeDatasetId: string,
 ): Edge[] => {
   const edges: Edge[] = [];
 
@@ -336,10 +340,10 @@ const buildEvaluatorEdges = (
  * For saved datasets, this would need to be fetched from the database separately.
  */
 export const getActiveDatasetData = (
-  state: EvaluationsV3State
+  state: EvaluationsV3State,
 ): InlineDataset | undefined => {
   const activeDataset = state.datasets.find(
-    (d) => d.id === state.activeDatasetId
+    (d) => d.id === state.activeDatasetId,
   );
   if (!activeDataset || activeDataset.type !== "inline") {
     return undefined;

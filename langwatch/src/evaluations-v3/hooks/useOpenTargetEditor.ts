@@ -6,28 +6,77 @@
  * 2. Converting mappings to UI format
  * 3. Setting up flow callbacks (onLocalConfigChange, onSave, onInputMappingsChange)
  * 4. Opening the drawer
+ * 5. Auto-scrolling to make the target column visible next to the drawer
  *
  * Used by both EvaluationsV3Table (header click) and RunEvaluationButton (validation).
  */
 
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
-
+import {
+  type AvailableSource,
+  datasetColumnTypeToFieldType,
+  type FieldMapping as UIFieldMapping,
+} from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+import type { TargetConfig } from "../types";
 import {
-  convertToUIMapping,
   convertFromUIMapping,
+  convertToUIMapping,
 } from "../utils/fieldMappingConverters";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
-import {
-  datasetColumnTypeToFieldType,
-  type AvailableSource,
-  type FieldMapping as UIFieldMapping,
-} from "~/components/variables";
-import type { TargetConfig } from "../types";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+
+// Drawer width constant - must match the one in EvaluationsV3Table
+const DRAWER_WIDTH = 456;
+
+/**
+ * Scroll the table container to position the target column right next to the drawer edge.
+ * Uses smooth scrolling animation for a polished UX.
+ */
+export const scrollToTargetColumn = (targetId: string) => {
+  // Find the target column header by data attribute
+  const targetHeader = document.querySelector(
+    `[data-target-column="${targetId}"]`,
+  );
+  if (!targetHeader) return;
+
+  // Find the scrollable container by traversing up to find scrollable element
+  let container = targetHeader.parentElement;
+  while (container && container !== document.body) {
+    const style = window.getComputedStyle(container);
+    if (style.overflow === "auto" || style.overflowX === "auto") {
+      break;
+    }
+    container = container.parentElement;
+  }
+
+  if (!container || container === document.body) return;
+
+  // Get positions
+  const headerRect = targetHeader.getBoundingClientRect();
+
+  // Calculate where the right edge of the column should be
+  // We want: column right edge = viewport width - drawer width
+  const viewportWidth = window.innerWidth;
+  const targetRightEdge = viewportWidth - DRAWER_WIDTH;
+
+  // Current position of column's right edge relative to viewport
+  const currentRightEdge = headerRect.right;
+
+  // How much we need to scroll
+  // If column is to the right of target position, scroll right (positive)
+  // If column is to the left of target position, scroll left (negative)
+  const scrollDelta = currentRightEdge - targetRightEdge;
+
+  // Apply the scroll with smooth animation
+  container.scrollBy({
+    left: scrollDelta,
+    behavior: "smooth",
+  });
+};
 
 export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
@@ -47,7 +96,7 @@ export const useOpenTargetEditor = () => {
       updateTarget: state.updateTarget,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
-    }))
+    })),
   );
 
   /**
@@ -55,7 +104,7 @@ export const useOpenTargetEditor = () => {
    */
   const isDatasetSource = useCallback(
     (sourceId: string) => datasets.some((d) => d.id === sourceId),
-    [datasets]
+    [datasets],
   );
 
   /**
@@ -103,9 +152,10 @@ export const useOpenTargetEditor = () => {
             updateTarget,
             setTargetMapping,
             removeTargetMapping,
-            getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
+            getActiveDatasetId: () =>
+              useEvaluationsV3Store.getState().activeDatasetId,
             getDatasets: () => useEvaluationsV3Store.getState().datasets,
-          })
+          }),
         );
 
         // Open the drawer with initial config and available sources
@@ -125,6 +175,12 @@ export const useOpenTargetEditor = () => {
           // Reset stack to prevent back button when switching between targets
           { resetStack: true },
         );
+
+        // Scroll to position the target column next to the drawer
+        // Use requestAnimationFrame to ensure the drawer has started opening
+        requestAnimationFrame(() => {
+          scrollToTargetColumn(target.id);
+        });
       } else if (target.type === "agent" && target.dbAgentId) {
         // Fetch the agent to determine its type
         try {
@@ -157,11 +213,12 @@ export const useOpenTargetEditor = () => {
             setFlowCallbacks("agentCodeEditor", {
               onInputMappingsChange: (
                 identifier: string,
-                mapping: UIFieldMapping | undefined
+                mapping: UIFieldMapping | undefined,
               ) => {
                 const currentActiveDatasetId =
                   useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets = useEvaluationsV3Store.getState().datasets;
+                const currentDatasets =
+                  useEvaluationsV3Store.getState().datasets;
                 const checkIsDatasetSource = (sourceId: string) =>
                   currentDatasets.some((d) => d.id === sourceId);
 
@@ -170,10 +227,14 @@ export const useOpenTargetEditor = () => {
                     target.id,
                     currentActiveDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource)
+                    convertFromUIMapping(mapping, checkIsDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(target.id, currentActiveDatasetId, identifier);
+                  removeTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                  );
                 }
               },
             });
@@ -185,6 +246,11 @@ export const useOpenTargetEditor = () => {
                 targetId: target.id,
                 agentId: target.dbAgentId ?? "",
               },
+            });
+
+            // Scroll to position the target column next to the drawer
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
             });
           }
         } catch (error) {
@@ -202,7 +268,7 @@ export const useOpenTargetEditor = () => {
       trpcUtils.agents.getById,
       project?.id,
       project?.slug,
-    ]
+    ],
   );
 
   return { openTargetEditor, buildAvailableSources, isDatasetSource };

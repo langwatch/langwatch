@@ -1,10 +1,17 @@
 /**
  * @vitest-environment jsdom
  */
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { InlineTagsInput } from "../InlineTagsInput";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { InlineTagsInput } from "../InlineTagsInput";
 
 afterEach(() => {
   cleanup();
@@ -15,17 +22,17 @@ function renderWithChakra(ui: React.ReactElement) {
 }
 
 describe("InlineTagsInput", () => {
-  it("adds tag on button click", async () => {
+  it("adds tag on Enter key", async () => {
     const onChange = vi.fn();
     renderWithChakra(<InlineTagsInput value={[]} onChange={onChange} />);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Label name...")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
     });
 
-    const input = screen.getByPlaceholderText("Label name...");
+    const input = screen.getByPlaceholderText("Add label...");
     fireEvent.change(input, { target: { value: "newlabel" } });
-    fireEvent.click(screen.getByText("Add"));
+    fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(["newlabel"]);
@@ -37,27 +44,28 @@ describe("InlineTagsInput", () => {
     renderWithChakra(<InlineTagsInput value={[]} onChange={onChange} />);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Label name...")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
     });
 
-    const input = screen.getByPlaceholderText("Label name...");
+    const input = screen.getByPlaceholderText("Add label...");
     fireEvent.change(input, { target: { value: "  spaced  " } });
-    fireEvent.click(screen.getByText("Add"));
+    fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(["spaced"]);
     });
   });
 
-  it("ignores empty input", async () => {
+  it("ignores empty input on Enter", async () => {
     const onChange = vi.fn();
     renderWithChakra(<InlineTagsInput value={[]} onChange={onChange} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Add")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Add"));
+    const input = screen.getByPlaceholderText("Add label...");
+    fireEvent.keyDown(input, { key: "Enter" });
 
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -65,7 +73,10 @@ describe("InlineTagsInput", () => {
   it("removes tag on close click", async () => {
     const onChange = vi.fn();
     renderWithChakra(
-      <InlineTagsInput value={["first", "second", "third"]} onChange={onChange} />
+      <InlineTagsInput
+        value={["first", "second", "third"]}
+        onChange={onChange}
+      />,
     );
 
     await waitFor(() => {
@@ -81,5 +92,3 @@ describe("InlineTagsInput", () => {
     });
   });
 });
-
-

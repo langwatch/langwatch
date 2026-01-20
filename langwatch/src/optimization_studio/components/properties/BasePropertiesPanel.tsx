@@ -13,18 +13,11 @@ import {
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ChevronDown,
-  Columns,
-  Info,
-  Plus,
-  Trash2,
-  X,
-} from "react-feather";
+import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
-
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
@@ -45,7 +38,6 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
@@ -310,13 +302,12 @@ export function FieldsForm({
   node: Node<Component>;
   field: "parameters" | "inputs" | "outputs";
 }) {
-  const parameters = node.data.parameters;
-  const { default_llm, setNode, setNodeParameter } = useWorkflowStore(
+  const _parameters = node.data.parameters;
+  const { default_llm, setNode } = useWorkflowStore(
     useShallow((state) => ({
       parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
       setNode: state.setNode,
       default_llm: state.default_llm,
-      setNodeParameter: state.setNodeParameter,
     })),
   );
 
@@ -389,12 +380,12 @@ export function FieldsForm({
     <VStack as="form" align="start" gap={3} width="full">
       {fields.map((field, index) => {
         if (field.type === "llm") {
+          // Use form state value (field.value) instead of node.data to ensure
+          // immediate UI updates when setValue is called
           return (
             <OptimizationStudioLLMConfigField
               key={field.id}
-              allowDefault={true}
-              defaultLLMConfig={default_llm}
-              llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
+              llmConfig={(field.value as LLMConfig) ?? default_llm}
               onChange={(llmConfig) => {
                 // Update form state instead of directly calling setNode
                 // This ensures form state stays in sync and prevents resets
@@ -461,7 +452,10 @@ export function FieldsForm({
 }
 
 // Re-export PropertySectionTitle for backwards compatibility
-export { PropertySectionTitle, type PropertySectionTitleProps } from "~/components/ui/PropertySectionTitle";
+export {
+  PropertySectionTitle,
+  type PropertySectionTitleProps,
+} from "~/components/ui/PropertySectionTitle";
 
 export function BasePropertiesPanel({
   node,

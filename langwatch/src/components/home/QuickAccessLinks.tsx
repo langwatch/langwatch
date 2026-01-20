@@ -43,7 +43,14 @@ export const buildQuickAccessCards = (
       description: isIntegrated
         ? "View your traces and monitor performance"
         : "Set up tracing for your AI application",
-      icon: <Icon as={tracesConfig.icon} width="16px" height="16px" display="block" />,
+      icon: (
+        <Icon
+          as={tracesConfig.icon}
+          width="16px"
+          height="16px"
+          display="block"
+        />
+      ),
       color: tracesConfig.color.split(".")[0] ?? "blue",
       href: isIntegrated
         ? `/${projectSlug}/messages`
@@ -53,7 +60,14 @@ export const buildQuickAccessCards = (
     {
       title: "Agent Simulations",
       description: "Test your AI agents with simulated conversations",
-      icon: <Icon as={simulationsConfig.icon} width="16px" height="16px" display="block" />,
+      icon: (
+        <Icon
+          as={simulationsConfig.icon}
+          width="16px"
+          height="16px"
+          display="block"
+        />
+      ),
       color: simulationsConfig.color.split(".")[0] ?? "pink",
       href: `/${projectSlug}/simulations`,
       docsHref: "https://langwatch.ai/docs/agent-simulations/getting-started",
@@ -61,7 +75,14 @@ export const buildQuickAccessCards = (
     {
       title: "Prompt Management",
       description: "Version and manage your prompts",
-      icon: <Icon as={promptsConfig.icon} width="16px" height="16px" display="block" />,
+      icon: (
+        <Icon
+          as={promptsConfig.icon}
+          width="16px"
+          height="16px"
+          display="block"
+        />
+      ),
       color: promptsConfig.color.split(".")[0] ?? "purple",
       href: `/${projectSlug}/prompts`,
       docsHref: "https://langwatch.ai/docs/prompt-management/overview",
@@ -69,7 +90,14 @@ export const buildQuickAccessCards = (
     {
       title: "Evaluations",
       description: "Evaluate your agent or set up real-time evaluations",
-      icon: <Icon as={evaluationsConfig.icon} width="16px" height="16px" display="block" />,
+      icon: (
+        <Icon
+          as={evaluationsConfig.icon}
+          width="16px"
+          height="16px"
+          display="block"
+        />
+      ),
       color: evaluationsConfig.color.split(".")[0] ?? "orange",
       href: `/${projectSlug}/evaluations`,
       docsHref: "https://langwatch.ai/docs/llm-evaluation",

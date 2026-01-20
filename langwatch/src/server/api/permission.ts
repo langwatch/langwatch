@@ -79,7 +79,7 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
 
 // Exported flat mapping maintains backward compatibility with exact old key names
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
+export const teamRolePermissionMapping = {
   // Project permissions
   SETUP_PROJECT: teamPermissions.project!.setup!,
   ARCHIVE_PROJECT: teamPermissions.project!.archive!,
@@ -240,113 +240,6 @@ export const checkPermissionOrPubliclyShared =
     ctx.permissionChecked = true;
     return next();
   };
-
-export const checkUserPermissionForProject =
-  (roleGroup: keyof typeof TeamRoleGroup) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    if (!(await backendHasTeamProjectPermission(ctx, input, roleGroup))) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    ctx.permissionChecked = true;
-    return next();
-  };
-
-export const backendHasTeamProjectPermission = async (
-  ctx: { prisma: PrismaClient; session: Session | null },
-  input: { projectId: string },
-  roleGroup: keyof typeof TeamRoleGroup,
-): Promise<boolean> => {
-  if (!ctx.session?.user) {
-    return false;
-  }
-
-  if (isDemoProject(input.projectId, roleGroup)) {
-    return true;
-  }
-
-  const projectTeam = await ctx.prisma.project.findUnique({
-    where: { id: input.projectId },
-    select: {
-      team: {
-        select: { members: { where: { userId: ctx.session.user.id } } },
-      },
-    },
-  });
-
-  const teamMember = projectTeam?.team?.members?.find(
-    (member) => member.userId === ctx.session?.user.id,
-  );
-
-  if (!projectTeam?.team || !teamMember) {
-    return false;
-  }
-
-  return teamRolePermissionMapping[roleGroup]!.includes(teamMember.role);
-};
-
-export const checkUserPermissionForTeam =
-  (roleGroup: keyof typeof TeamRoleGroup) =>
-  async ({
-    ctx,
-    input,
-    next,
-  }: PermissionMiddlewareParams<{ teamId: string }>) => {
-    if (!(await backendHasTeamPermission(ctx, input, roleGroup))) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-
-    ctx.permissionChecked = true;
-    return next();
-  };
-
-export const backendHasTeamPermission = async (
-  ctx: { prisma: PrismaClient; session: Session },
-  input: { teamId: string },
-  roleGroup: keyof typeof TeamRoleGroup,
-) => {
-  if (!ctx.session?.user) {
-    return false;
-  }
-
-  const team = await ctx.prisma.team.findUnique({
-    where: { id: input.teamId },
-  });
-  const organizationId = team?.organizationId;
-  if (!organizationId) {
-    throw "Organization not found for team";
-  }
-
-  const organizationUser = await ctx.prisma.organizationUser.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      organizationId,
-    },
-  });
-
-  // Organization ADMINs can do anything on all teams
-  if (organizationUser?.role === OrganizationUserRole.ADMIN) {
-    return true;
-  }
-
-  const teamUser = await ctx.prisma.teamUser.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      teamId: input.teamId,
-    },
-  });
-
-  if (!teamUser) {
-    return false;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return teamRolePermissionMapping[roleGroup]!.includes(teamUser.role);
-};
 
 export const checkUserPermissionForOrganization =
   (roleGroup: keyof typeof OrganizationRoleGroup) =>

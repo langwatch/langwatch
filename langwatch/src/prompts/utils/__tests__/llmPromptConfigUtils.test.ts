@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-
+import type { VersionedPrompt } from "~/server/prompt-config";
 import {
+  promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-  promptConfigFormValuesToOptimizationStudioNodeData,
 } from "../llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {
@@ -292,7 +291,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     versionCreatedAt: new Date(),
     model: "gpt-4",
     temperature: 0.7,
-    maxTokens: 1000,
+    maxTokens: 4096,
     prompt: "You are a helpful assistant.",
     projectId: "test-project",
     organizationId: "org-1",
@@ -306,12 +305,16 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
   describe("when prompt handle has no prefix", () => {
     it("keeps simple handle unchanged", () => {
-      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("gato"));
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("gato"),
+      );
       expect(result.handle).toBe("gato");
     });
 
     it("keeps folder handle unchanged", () => {
-      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("folder/gato"));
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("folder/gato"),
+      );
       expect(result.handle).toBe("folder/gato");
     });
   });
@@ -319,24 +322,23 @@ describe("versionedPromptToPromptConfigFormValues", () => {
   describe("when prompt handle has project_ prefix", () => {
     it("strips project prefix from simple handle", () => {
       const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/gato")
+        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/gato"),
       );
       expect(result.handle).toBe("gato");
     });
 
     it("strips project prefix but keeps folder structure", () => {
       const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/folder/gato")
+        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/folder/gato"),
       );
       expect(result.handle).toBe("folder/gato");
     });
   });
 
-
   describe("when prompt handle has organization_ prefix", () => {
     it("strips organization prefix from simple handle", () => {
       const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("organization_ABC123/gato")
+        createMockPrompt("organization_ABC123/gato"),
       );
       expect(result.handle).toBe("gato");
     });
@@ -345,14 +347,14 @@ describe("versionedPromptToPromptConfigFormValues", () => {
   describe("when prompt handle has 21-char nanoid prefix", () => {
     it("strips nanoid prefix from simple handle", () => {
       const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("iuc4aYIoL5YcI7imutYvl/gato")
+        createMockPrompt("iuc4aYIoL5YcI7imutYvl/gato"),
       );
       expect(result.handle).toBe("gato");
     });
 
     it("strips nanoid prefix but keeps folder structure", () => {
       const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("KAXYxPR8MUgTcP8CF193y/folder/gato")
+        createMockPrompt("KAXYxPR8MUgTcP8CF193y/folder/gato"),
       );
       expect(result.handle).toBe("folder/gato");
     });
@@ -360,7 +362,9 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
   describe("when prompt handle is null", () => {
     it("keeps handle as null", () => {
-      const result = versionedPromptToPromptConfigFormValues(createMockPrompt(null));
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt(null),
+      );
       expect(result.handle).toBeNull();
     });
   });
@@ -370,7 +374,9 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
   /**
    * Creates a mock VersionedPrompt for testing
    */
-  const createMockVersionedPrompt = (overrides: Partial<VersionedPrompt> = {}): VersionedPrompt => ({
+  const createMockVersionedPrompt = (
+    overrides: Partial<VersionedPrompt> = {},
+  ): VersionedPrompt => ({
     id: "prompt-1",
     name: "test-prompt",
     handle: "test-prompt",
@@ -380,7 +386,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     versionCreatedAt: new Date(),
     model: "gpt-4",
     temperature: 0.7,
-    maxTokens: 1000,
+    maxTokens: 4096,
     prompt: "You are a helpful assistant.", // System message stored here
     projectId: "test-project",
     organizationId: "org-1",
@@ -399,7 +405,8 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       messages: [{ role: "user", content: "Say meow" }],
     });
 
-    const result = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+    const result =
+      versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
 
     // System message should be first in the array
     expect(result.version.configData.messages[0]).toEqual({
@@ -446,7 +453,8 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
 
       // Simulate what happens in PromptSourceHeader.onSuccess after saving:
       // 1. Convert saved prompt to form values (MUST use WithSystemMessage)
-      const formValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(savedPrompt);
+      const formValues =
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(savedPrompt);
 
       // Verify form values have the system message
       expect(formValues.version.configData.messages).toHaveLength(1);
@@ -456,14 +464,19 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       });
 
       // 2. Simulate what syncNodeDataWithFormValues does - convert form to node data
-      const nodeData = promptConfigFormValuesToOptimizationStudioNodeData(formValues);
+      const nodeData =
+        promptConfigFormValuesToOptimizationStudioNodeData(formValues);
 
       // Verify node data has the instructions (system prompt)
-      const instructionsParam = nodeData.parameters?.find(p => p.identifier === "instructions");
+      const instructionsParam = nodeData.parameters?.find(
+        (p) => p.identifier === "instructions",
+      );
       expect(instructionsParam?.value).toBe("You are a helpful cat assistant.");
 
       // Verify messages param does NOT have the system message (it's stored separately in instructions)
-      const messagesParam = nodeData.parameters?.find(p => p.identifier === "messages");
+      const messagesParam = nodeData.parameters?.find(
+        (p) => p.identifier === "messages",
+      );
       expect(messagesParam?.value).toEqual([]);
     });
 
@@ -474,14 +487,18 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
       });
 
       // BUG: Using versionedPromptToPromptConfigFormValues (WITHOUT system message)
-      const formValuesWRONG = versionedPromptToPromptConfigFormValues(savedPrompt);
+      const formValuesWRONG =
+        versionedPromptToPromptConfigFormValues(savedPrompt);
 
       // Form values are MISSING the system message!
       expect(formValuesWRONG.version.configData.messages).toHaveLength(0);
 
       // When converted to node data, instructions will be empty
-      const nodeDataWRONG = promptConfigFormValuesToOptimizationStudioNodeData(formValuesWRONG);
-      const instructionsParam = nodeDataWRONG.parameters?.find(p => p.identifier === "instructions");
+      const nodeDataWRONG =
+        promptConfigFormValuesToOptimizationStudioNodeData(formValuesWRONG);
+      const instructionsParam = nodeDataWRONG.parameters?.find(
+        (p) => p.identifier === "instructions",
+      );
 
       // BUG: The system prompt is LOST
       expect(instructionsParam?.value).toBe("");

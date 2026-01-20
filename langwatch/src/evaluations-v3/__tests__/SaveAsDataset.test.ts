@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { DatasetColumn } from "../types";
-import { filterEmptyRows, convertInlineToRowRecords } from "../utils/datasetConversion";
+import {
+  convertInlineToRowRecords,
+  filterEmptyRows,
+} from "../utils/datasetConversion";
 
 describe("Save as dataset utilities", () => {
   describe("filterEmptyRows", () => {
@@ -58,7 +61,7 @@ describe("Save as dataset utilities", () => {
   });
 
   describe("convertInlineToRowRecords", () => {
-    it("converts column-based to row-based records", () => {
+    it("converts column-based to row-based records without IDs", () => {
       const columns: DatasetColumn[] = [
         { id: "input", name: "input", type: "string" },
         { id: "expected_output", name: "expected_output", type: "string" },
@@ -71,8 +74,9 @@ describe("Save as dataset utilities", () => {
       const result = convertInlineToRowRecords(columns, records);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ id: "row_0", input: "hello", expected_output: "hi" });
-      expect(result[1]).toEqual({ id: "row_1", input: "world", expected_output: "earth" });
+      // IDs are not included - backend generates them with nanoid()
+      expect(result[0]).toEqual({ input: "hello", expected_output: "hi" });
+      expect(result[1]).toEqual({ input: "world", expected_output: "earth" });
     });
 
     it("filters out empty rows after conversion", () => {
@@ -88,7 +92,7 @@ describe("Save as dataset utilities", () => {
       const result = convertInlineToRowRecords(columns, records);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ id: "row_0", input: "hello", expected_output: "world" });
+      expect(result[0]).toEqual({ input: "hello", expected_output: "world" });
     });
 
     it("handles default 3 empty rows scenario", () => {
@@ -105,7 +109,10 @@ describe("Save as dataset utilities", () => {
       const result = convertInlineToRowRecords(columns, records);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ id: "row_0", input: "my input", expected_output: "my output" });
+      expect(result[0]).toEqual({
+        input: "my input",
+        expected_output: "my output",
+      });
     });
 
     it("keeps partially filled rows", () => {
@@ -121,8 +128,8 @@ describe("Save as dataset utilities", () => {
       const result = convertInlineToRowRecords(columns, records);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ id: "row_0", input: "hello", expected_output: "world" });
-      expect(result[1]).toEqual({ id: "row_1", input: "partial", expected_output: "" });
+      expect(result[0]).toEqual({ input: "hello", expected_output: "world" });
+      expect(result[1]).toEqual({ input: "partial", expected_output: "" });
     });
 
     it("returns empty array if all rows are empty", () => {

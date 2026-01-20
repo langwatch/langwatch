@@ -42,10 +42,30 @@ const mockGoBack = vi.fn();
 let mockUseAllPromptsForProject = vi.fn();
 
 const mockPrompts = [
-  { id: "prompt-1", handle: "my-assistant", model: "openai/gpt-4o", version: 3 },
-  { id: "prompt-2", handle: "code-reviewer", model: "anthropic/claude-3", version: 1 },
-  { id: "prompt-3", handle: "shared/ts-guidelines", model: "openai/gpt-4o", version: 2 },
-  { id: "prompt-4", handle: "shared/go-guidelines", model: "openai/gpt-4o", version: 1 },
+  {
+    id: "prompt-1",
+    handle: "my-assistant",
+    model: "openai/gpt-4o",
+    version: 3,
+  },
+  {
+    id: "prompt-2",
+    handle: "code-reviewer",
+    model: "anthropic/claude-3",
+    version: 1,
+  },
+  {
+    id: "prompt-3",
+    handle: "shared/ts-guidelines",
+    model: "openai/gpt-4o",
+    version: 2,
+  },
+  {
+    id: "prompt-4",
+    handle: "shared/go-guidelines",
+    model: "openai/gpt-4o",
+    version: 1,
+  },
 ];
 
 // Wrapper with Chakra provider
@@ -66,8 +86,12 @@ describe("PromptListDrawer", () => {
     cleanup();
   });
 
-  const renderDrawer = (props: Partial<React.ComponentProps<typeof PromptListDrawer>> = {}) => {
-    return render(<PromptListDrawer open={true} {...props} />, { wrapper: Wrapper });
+  const renderDrawer = (
+    props: Partial<React.ComponentProps<typeof PromptListDrawer>> = {},
+  ) => {
+    return render(<PromptListDrawer open={true} {...props} />, {
+      wrapper: Wrapper,
+    });
   };
 
   describe("Basic rendering", () => {
@@ -107,7 +131,9 @@ describe("PromptListDrawer", () => {
       renderDrawer();
       await waitFor(() => {
         expect(screen.getByText("No prompts yet")).toBeInTheDocument();
-        expect(screen.getByText("Create your first prompt to get started")).toBeInTheDocument();
+        expect(
+          screen.getByText("Create your first prompt to get started"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -118,7 +144,9 @@ describe("PromptListDrawer", () => {
       });
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByTestId("create-first-prompt-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("create-first-prompt-button"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -166,7 +194,7 @@ describe("PromptListDrawer", () => {
         expect.objectContaining({
           id: "prompt-1",
           name: "my-assistant",
-        })
+        }),
       );
     });
 
@@ -250,7 +278,9 @@ describe("PromptListDrawer", () => {
       await waitFor(() => {
         expect(screen.getByText("No prompts yet")).toBeInTheDocument();
       });
-      expect(screen.queryByTestId("prompt-search-input")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("prompt-search-input"),
+      ).not.toBeInTheDocument();
     });
 
     it("filters prompts by name", async () => {

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  isPrivateOrLocalhostIP,
-  isBlockedCloudDomain,
-  validateUrlForSSRF,
   createSSRFValidator,
+  isBlockedCloudDomain,
+  isPrivateOrLocalhostIP,
+  validateUrlForSSRF,
 } from "../ssrfProtection";
 
 describe("isPrivateOrLocalhostIP", () => {
@@ -111,7 +111,10 @@ describe("validateUrlForSSRF", () => {
   const blockedCases: [string, string][] = [
     ["not-a-url", "Invalid URL format"],
     ["http://169.254.169.254/latest/meta-data/", "cloud metadata endpoints"],
-    ["http://metadata.google.internal/computeMetadata/v1/", "cloud provider internal domains"],
+    [
+      "http://metadata.google.internal/computeMetadata/v1/",
+      "cloud provider internal domains",
+    ],
     ["http://s3.amazonaws.com/bucket", "cloud provider internal domains"],
     ["http://127.0.0.1:8080/api", "private or localhost IP addresses"],
     ["http://10.0.0.1/internal", "private or localhost IP addresses"],
@@ -139,7 +142,9 @@ describe("validateUrlForSSRF", () => {
   });
 
   it("allows googleapis.com (not blocked in AWS-only config)", async () => {
-    const result = await validateUrlForSSRF("http://storage.googleapis.com/bucket");
+    const result = await validateUrlForSSRF(
+      "http://storage.googleapis.com/bucket",
+    );
     expect(result.hostname).toBe("storage.googleapis.com");
   });
 
@@ -150,7 +155,9 @@ describe("validateUrlForSSRF", () => {
       allowedDevHosts: [],
     });
     // In development mode without allowlist, unresolvable hostnames return development-bypass
-    const result = await devValidator("http://nonexistent-host-12345.invalid/path");
+    const result = await devValidator(
+      "http://nonexistent-host-12345.invalid/path",
+    );
     expect(result.type).toBe("development-bypass");
     if (result.type === "development-bypass") {
       expect(["dns-failed", "no-records"]).toContain(result.reason);
@@ -167,7 +174,7 @@ describe("createSSRFValidator (dependency injection)", () => {
 
     // Should block private IPs in production config
     await expect(validator("http://127.0.0.1/api")).rejects.toThrow(
-      "private or localhost IP addresses"
+      "private or localhost IP addresses",
     );
   });
 
@@ -180,7 +187,7 @@ describe("createSSRFValidator (dependency injection)", () => {
     // myhost.local is in the allowlist, but it's also a cloud domain pattern
     // Cloud domains are always blocked regardless of allowlist
     await expect(validator("http://myhost.local/api")).rejects.toThrow(
-      "cloud provider internal domains"
+      "cloud provider internal domains",
     );
   });
 
@@ -205,8 +212,8 @@ describe("createSSRFValidator (dependency injection)", () => {
     });
 
     // Metadata endpoints are always blocked, even if allowlisted
-    await expect(validator("http://169.254.169.254/latest/meta-data/")).rejects.toThrow(
-      "cloud metadata endpoints"
-    );
+    await expect(
+      validator("http://169.254.169.254/latest/meta-data/"),
+    ).rejects.toThrow("cloud metadata endpoints");
   });
 });

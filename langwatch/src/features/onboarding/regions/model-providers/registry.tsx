@@ -241,8 +241,9 @@ export function getModelProvider(
 }
 
 /** Default base URLs keyed by backendModelProviderKey for API validation */
-export const providerDefaultBaseUrls: Record<string, string> = Object.fromEntries(
-  modelProviderRegistry
-    .filter((p) => p.defaultBaseUrl)
-    .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!])
-);
+export const providerDefaultBaseUrls: Record<string, string> =
+  Object.fromEntries(
+    modelProviderRegistry
+      .filter((p) => p.defaultBaseUrl)
+      .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
+  );

@@ -15,7 +15,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
-import React, { useMemo, useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
 import {
   Area,
@@ -183,8 +183,8 @@ const CustomGraph_ = React.memo(
       const timeScale_ = shouldUseFull
         ? "full"
         : input.timeScale === "full"
-        ? input.timeScale
-        : parseInt(input.timeScale.toString(), 10);
+          ? input.timeScale
+          : parseInt(input.timeScale.toString(), 10);
 
       // Show 1 hour granularity for full period when days difference is 2 days or less
       if (
@@ -329,12 +329,12 @@ const CustomGraph_ = React.memo(
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
-          ? uppercaseFirstLetter(groupName)
-              .replace("Evaluation passed passed", "Evaluation Passed")
-              .replace("Evaluation passed failed", "Evaluation Failed")
-              .replace("Contains error", "Traces")
-              .replace(/^Evaluation label /i, "")
-          : series?.name ?? aggKey;
+            ? uppercaseFirstLetter(groupName)
+                .replace("Evaluation passed passed", "Evaluation Passed")
+                .replace("Evaluation passed failed", "Evaluation Failed")
+                .replace("Contains error", "Traces")
+                .replace(/^Evaluation label /i, "")
+            : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
     );
@@ -1099,10 +1099,10 @@ function MonitorGraph({
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
     : average > 0.8 || !hasLoaded
-    ? "greenTones"
-    : average < 0.4
-    ? "redTones"
-    : "orangeTones";
+      ? "greenTones"
+      : average < 0.4
+        ? "redTones"
+        : "orangeTones";
 
   const maxValue = isPassRate
     ? 1

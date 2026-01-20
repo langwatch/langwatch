@@ -6,9 +6,9 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { Listbox } from "../ui/listbox";
 import { Popover } from "../ui/popover";
-import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 
 interface PromptSelectorProps {
   value: string | null;
@@ -33,7 +33,7 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
 
     const filteredItems = inputValue
       ? allItems.filter((item) =>
-          item.label.toLowerCase().includes(inputValue.toLowerCase())
+          item.label.toLowerCase().includes(inputValue.toLowerCase()),
         )
       : allItems;
 

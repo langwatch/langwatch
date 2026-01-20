@@ -136,7 +136,7 @@ export const WelcomeScreen: React.FC = () => {
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
       <OnboardingContainer
-        title={currentScreen?.heading ?? "Welcome Aboard 👋"}
+        title={currentScreen?.heading ?? "Welcome aboard 👋"}
         subTitle={currentScreen?.subHeading}
       >
         <VStack gap={4} align="stretch" position="relative" minH="400px">

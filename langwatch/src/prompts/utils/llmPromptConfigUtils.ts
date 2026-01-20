@@ -338,6 +338,18 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
           model: prompt.model,
           temperature: prompt.temperature,
           max_tokens: prompt.maxTokens,
+          // Traditional sampling parameters
+          top_p: prompt.topP,
+          frequency_penalty: prompt.frequencyPenalty,
+          presence_penalty: prompt.presencePenalty,
+          // Other sampling parameters
+          seed: prompt.seed,
+          top_k: prompt.topK,
+          min_p: prompt.minP,
+          repetition_penalty: prompt.repetitionPenalty,
+          // Reasoning parameter (canonical/unified field)
+          reasoning: prompt.reasoning,
+          verbosity: prompt.verbosity,
         },
       },
       {
@@ -381,14 +393,28 @@ export function formValuesToTriggerSaveVersionParams(
     (msg) => msg.role !== "system",
   );
 
+  const llm = formValues.version.configData.llm;
+
   return {
     prompt: systemPrompt,
     messages: messages,
     inputs: formValues.version.configData.inputs,
     outputs: formValues.version.configData.outputs,
-    model: formValues.version.configData.llm.model,
-    temperature: formValues.version.configData.llm.temperature,
-    maxTokens: formValues.version.configData.llm.maxTokens,
+    model: llm.model,
+    temperature: llm.temperature,
+    maxTokens: llm.maxTokens,
+    // Traditional sampling parameters
+    topP: llm.topP,
+    frequencyPenalty: llm.frequencyPenalty,
+    presencePenalty: llm.presencePenalty,
+    // Other sampling parameters
+    seed: llm.seed,
+    topK: llm.topK,
+    minP: llm.minP,
+    repetitionPenalty: llm.repetitionPenalty,
+    // Reasoning parameter (canonical/unified field)
+    reasoning: llm.reasoning,
+    verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,
     responseFormat: formValues.version.configData.responseFormat,
@@ -411,7 +437,9 @@ export function formValuesToTriggerSaveVersionParams(
  * - "gato" -> "gato" (no change if no prefix)
  * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
  */
-const extractShortHandle = (handle: string | null | undefined): string | null => {
+const extractShortHandle = (
+  handle: string | null | undefined,
+): string | null => {
   if (!handle) return null;
 
   // Check for known prefixes: project_, org_, organization_
@@ -477,6 +505,18 @@ export function versionedPromptToPromptConfigFormValues(
           model: prompt.model,
           temperature: prompt.temperature,
           maxTokens: prompt.maxTokens,
+          // Traditional sampling parameters
+          topP: prompt.topP,
+          frequencyPenalty: prompt.frequencyPenalty,
+          presencePenalty: prompt.presencePenalty,
+          // Other sampling parameters
+          seed: prompt.seed,
+          topK: prompt.topK,
+          minP: prompt.minP,
+          repetitionPenalty: prompt.repetitionPenalty,
+          // Reasoning parameter (canonical/unified field)
+          reasoning: prompt.reasoning,
+          verbosity: prompt.verbosity,
         },
       },
     },
@@ -535,6 +575,18 @@ export function versionedPromptToOptimizationStudioNodeData(
           model: prompt.model,
           temperature: prompt.temperature,
           max_tokens: prompt.maxTokens,
+          // Traditional sampling parameters
+          top_p: prompt.topP,
+          frequency_penalty: prompt.frequencyPenalty,
+          presence_penalty: prompt.presencePenalty,
+          // Other sampling parameters
+          seed: prompt.seed,
+          top_k: prompt.topK,
+          min_p: prompt.minP,
+          repetition_penalty: prompt.repetitionPenalty,
+          // Reasoning parameter (canonical/unified field)
+          reasoning: prompt.reasoning,
+          verbosity: prompt.verbosity,
         },
       },
       {

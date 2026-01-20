@@ -13,7 +13,7 @@ export const useModelProviderKeys = ({
 
   const modelProvidersWithoutCustomKeys = Object.values(
     modelProviders ?? {},
-  ).filter((modelProvider) => !modelProvider.customKeys);
+  ).filter((modelProvider) => !modelProvider.enabled && !modelProvider.customKeys);
 
   const defaultModelProvider = workflow.default_llm.model.split("/")[0];
 

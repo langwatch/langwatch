@@ -1,5 +1,5 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { Event } from "../lib/types";
 import { JsonViewer } from "./JsonViewer";
 
@@ -26,7 +26,13 @@ export const EventDetail: React.FC<EventDetailProps> = ({
   maxJsonLines = 10,
 }) => {
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="blue" paddingX={1} flexShrink={0}>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="blue"
+      paddingX={1}
+      flexShrink={0}
+    >
       {/* Event summary header */}
       <Box justifyContent="space-between">
         <Text bold color="yellow">
@@ -71,11 +77,3 @@ export const EventDetail: React.FC<EventDetailProps> = ({
     </Box>
   );
 };
-
-
-
-
-
-
-
-

@@ -1,3 +1,4 @@
+// biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
 import { Anthropic } from "../../components/icons/Anthropic";
 import { AWS } from "../../components/icons/AWS";

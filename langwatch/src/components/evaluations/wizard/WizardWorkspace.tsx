@@ -36,20 +36,20 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     handleDatasetUpdate,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
-      dataSource: state.wizardState.dataSource,
+      dataSource: state.workbenchState.dataSource,
       getDatasetId: state.getDatasetId,
-      workspaceTab: state.wizardState.workspaceTab,
+      workspaceTab: state.workbenchState.workspaceTab,
       setWizardState: state.setWizardState,
       workflowId: state.workflowStore.workflow_id,
       experimentId: state.workflowStore.experiment_id,
       evaluationState: state.workflowStore.state.evaluation,
       nodes: state.workflowStore.nodes,
-      task: state.wizardState.task,
+      task: state.workbenchState.task,
       hasWorkflow: state.workflowStore.nodes.length > 0,
       hasCodeImplementation:
         !!state.getFirstEvaluatorNode() &&
-        (state.wizardState.executionMethod === "realtime_guardrail" ||
-          state.wizardState.executionMethod === "realtime_manually"),
+        (state.workbenchState.executionMethod === "realtime_guardrail" ||
+          state.workbenchState.executionMethod === "realtime_manually"),
       setDatasetGridRef: state.setDatasetGridRef,
       handleDatasetUpdate: state.handleDatasetUpdate,
     })),
@@ -116,7 +116,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
           value={workspaceTab}
           onValueChange={(e) => {
             setWizardState({
-              workspaceTab: e.value as State["wizardState"]["workspaceTab"],
+              workspaceTab: e.value as State["workbenchState"]["workspaceTab"],
             });
           }}
         >
@@ -199,13 +199,25 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             <Tabs.Content
               value="results"
               width="full"
-              height="fit-content"
-              minHeight="calc(100vh - 150px)"
+              height="calc(100vh - 150px)"
+              maxHeight="calc(100vh - 150px)"
               position="sticky"
               top="58px"
+              overflow="hidden"
             >
-              <Card.Root width="full" height="full" position="sticky" top={6}>
-                <Card.Body width="full" height="full" padding={0}>
+              <Card.Root
+                width="full"
+                height="full"
+                position="sticky"
+                top={6}
+                overflow="hidden"
+              >
+                <Card.Body
+                  width="full"
+                  height="full"
+                  padding={0}
+                  overflow="hidden"
+                >
                   <EvaluationResults
                     workflowId={workflowId}
                     experimentId={experimentId}
@@ -299,9 +311,9 @@ function CodeImplementation() {
   const { name, checkType, executionMethod, settings } =
     useEvaluationWizardStore(
       useShallow((state) => ({
-        name: state.wizardState.name,
+        name: state.workbenchState.name,
         checkType: state.getFirstEvaluatorNode()?.data.evaluator,
-        executionMethod: state.wizardState.executionMethod,
+        executionMethod: state.workbenchState.executionMethod,
         settings: Object.fromEntries(
           state
             .getFirstEvaluatorNode()

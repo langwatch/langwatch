@@ -1,7 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { PromptSelector } from "./PromptSelector";
 import { HttpAgentSelector } from "./HttpAgentSelector";
-import { TargetTypeSelector, type TargetType } from "./TargetTypeSelector";
+import { PromptSelector } from "./PromptSelector";
+import { type TargetType, TargetTypeSelector } from "./TargetTypeSelector";
 
 interface QuickTestBarProps {
   targetType: TargetType;
@@ -33,7 +33,10 @@ export function QuickTestBar({
       <HStack gap={2}>
         <TargetTypeSelector value={targetType} onChange={onTargetTypeChange} />
         {targetType === "prompt" ? (
-          <PromptSelector value={selectedTargetId} onChange={onTargetIdChange} />
+          <PromptSelector
+            value={selectedTargetId}
+            onChange={onTargetIdChange}
+          />
         ) : (
           <HttpAgentSelector
             value={selectedTargetId}

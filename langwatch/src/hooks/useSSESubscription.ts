@@ -1,5 +1,5 @@
+import type { TRPCClientError } from "@trpc/client";
 import { useEffect, useRef, useState } from "react";
-import { TRPCClientError } from "@trpc/client";
 import type { AppRouter } from "~/server/api/root";
 import { createLogger } from "~/utils/logger";
 
@@ -21,7 +21,10 @@ export type ConnectionState =
   | "disconnected"
   | "error";
 
-export function useSSESubscription<TData = unknown, TInput = Record<string, unknown>>(
+export function useSSESubscription<
+  TData = unknown,
+  TInput = Record<string, unknown>,
+>(
   subscription: {
     useSubscription: (
       input: TInput,
@@ -31,11 +34,11 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
         onError?: (error: TRPCClientError<AppRouter>) => void;
         onStarted?: () => void;
         onStopped?: () => void;
-      }
+      },
     ) => void;
   },
   input: TInput,
-  options: SSESubscriptionOptions<TData, TRPCClientError<AppRouter>> = {}
+  options: SSESubscriptionOptions<TData, TRPCClientError<AppRouter>> = {},
 ) {
   const {
     enabled = true,
@@ -48,7 +51,7 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
   } = options;
 
   const [connectionState, setConnectionState] = useState<ConnectionState>(
-    enabled ? "connecting" : "disconnected"
+    enabled ? "connecting" : "disconnected",
   );
 
   const lastDataRef = useRef<TData | undefined>(void 0);

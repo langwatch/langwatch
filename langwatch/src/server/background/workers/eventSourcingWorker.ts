@@ -21,8 +21,13 @@ export type EventSourcingJob = {
   timestamp: number;
 };
 
-export async function runEventSourcingJob(job: Job<EventSourcingJob, void, string>) {
-  logger.info({ jobId: job.id, data: job.data }, "processing event sourcing job");
+export async function runEventSourcingJob(
+  job: Job<EventSourcingJob, void, string>,
+) {
+  logger.info(
+    { jobId: job.id, data: job.data },
+    "processing event sourcing job",
+  );
   getJobProcessingCounter("event_sourcing", "processing").inc();
   const start = Date.now();
 
@@ -40,7 +45,10 @@ export async function runEventSourcingJob(job: Job<EventSourcingJob, void, strin
         logger.debug("event sourcing health check passed");
         break;
       default:
-        logger.warn({ action: job.data.action }, "unknown event sourcing action");
+        logger.warn(
+          { action: job.data.action },
+          "unknown event sourcing action",
+        );
     }
 
     getJobProcessingCounter("event_sourcing", "completed").inc();
@@ -48,7 +56,10 @@ export async function runEventSourcingJob(job: Job<EventSourcingJob, void, strin
     getJobProcessingDurationHistogram("event_sourcing").observe(duration);
   } catch (error) {
     getJobProcessingCounter("event_sourcing", "failed").inc();
-    logger.error({ jobId: job.id, error }, "failed to process event sourcing job");
+    logger.error(
+      { jobId: job.id, error },
+      "failed to process event sourcing job",
+    );
     await withScope(async (scope) => {
       scope.setTag?.("worker", "eventSourcing");
       scope.setExtra?.("job", job.data);
@@ -73,11 +84,16 @@ export const startEventSourcingWorker = () => {
   );
 
   eventSourcingWorker.on("ready", () => {
-    logger.info("event sourcing worker active, event sourcing system initialized");
+    logger.info(
+      "event sourcing worker active, event sourcing system initialized",
+    );
   });
 
   eventSourcingWorker.on("failed", async (job, err) => {
-    logger.error({ jobId: job?.id, error: err.message }, "event sourcing job failed");
+    logger.error(
+      { jobId: job?.id, error: err.message },
+      "event sourcing job failed",
+    );
     getJobProcessingCounter("event_sourcing", "failed").inc();
     await withScope((scope) => {
       scope.setTag?.("worker", "eventSourcing");

@@ -19,15 +19,19 @@ export type EffectiveDefaults = {
 
 /** Returns project defaults with fallbacks to DEFAULT_* constants */
 export function getEffectiveDefaults(
-  project: {
-    defaultModel?: string | null;
-    topicClusteringModel?: string | null;
-    embeddingsModel?: string | null;
-  } | null | undefined
+  project:
+    | {
+        defaultModel?: string | null;
+        topicClusteringModel?: string | null;
+        embeddingsModel?: string | null;
+      }
+    | null
+    | undefined,
 ): EffectiveDefaults {
   return {
     defaultModel: project?.defaultModel ?? DEFAULT_MODEL,
-    topicClusteringModel: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+    topicClusteringModel:
+      project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
     embeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
   };
 }
@@ -35,27 +39,33 @@ export function getEffectiveDefaults(
 /** Checks if provider is used for ANY effective default (used for delete prevention) */
 export function isProviderEffectiveDefault(
   providerKey: string,
-  project: {
-    defaultModel?: string | null;
-    topicClusteringModel?: string | null;
-    embeddingsModel?: string | null;
-  } | null | undefined
+  project:
+    | {
+        defaultModel?: string | null;
+        topicClusteringModel?: string | null;
+        embeddingsModel?: string | null;
+      }
+    | null
+    | undefined,
 ): boolean {
   const effectiveDefaults = getEffectiveDefaults(project);
   return isProviderUsedForDefaultModels(
     providerKey,
     effectiveDefaults.defaultModel,
     effectiveDefaults.topicClusteringModel,
-    effectiveDefaults.embeddingsModel
+    effectiveDefaults.embeddingsModel,
   );
 }
 
 /** Checks if provider is used for the Default Model only (used for badge and toggle logic) */
 export function isProviderDefaultModel(
   providerKey: string,
-  project: {
-    defaultModel?: string | null;
-  } | null | undefined
+  project:
+    | {
+        defaultModel?: string | null;
+      }
+    | null
+    | undefined,
 ): boolean {
   const effectiveDefault = project?.defaultModel ?? DEFAULT_MODEL;
   return getProviderFromModel(effectiveDefault) === providerKey;
@@ -66,9 +76,11 @@ export function isProviderUsedForDefaultModels(
   providerKey: string,
   defaultModel: string | null,
   topicClusteringModel: string | null,
-  embeddingsModel: string | null
+  embeddingsModel: string | null,
 ): boolean {
-  const defaultProvider = defaultModel ? getProviderFromModel(defaultModel) : null;
+  const defaultProvider = defaultModel
+    ? getProviderFromModel(defaultModel)
+    : null;
   const topicClusteringProvider = topicClusteringModel
     ? getProviderFromModel(topicClusteringModel)
     : null;
@@ -85,7 +97,10 @@ export function isProviderUsedForDefaultModels(
 
 /** Extracts shape from Zod schema for credential keys */
 export function getSchemaShape(schema: unknown): Record<string, unknown> {
-  const s = schema as { shape?: Record<string, unknown>; _def?: { schema?: { shape?: Record<string, unknown> } } };
+  const s = schema as {
+    shape?: Record<string, unknown>;
+    _def?: { schema?: { shape?: Record<string, unknown> } };
+  };
   if (s?.shape) return s.shape;
   if (s?._def?.schema) return s._def.schema.shape ?? {};
   return {};
@@ -164,14 +179,14 @@ export function buildCustomKeyState(
  * @returns true if user entered a real API key value (not masked, not empty)
  */
 export function hasUserEnteredNewApiKey(
-  customKeys: Record<string, string>
+  customKeys: Record<string, string>,
 ): boolean {
   return Object.entries(customKeys).some(
     ([key, value]) =>
       KEY_CHECK.some((k) => key.includes(k)) &&
       value &&
       value.trim() !== "" &&
-      value !== MASKED_KEY_PLACEHOLDER
+      value !== MASKED_KEY_PLACEHOLDER,
   );
 }
 
@@ -185,7 +200,7 @@ export function hasUserEnteredNewApiKey(
  */
 export function hasUserModifiedNonApiKeyFields(
   customKeys: Record<string, string>,
-  initialKeys: Record<string, unknown>
+  initialKeys: Record<string, unknown>,
 ): boolean {
   return Object.entries(customKeys).some(([key, value]) => {
     // Skip API key fields
@@ -195,7 +210,8 @@ export function hasUserModifiedNonApiKeyFields(
     // Check if value is non-empty and different from initial
     const initialValue = initialKeys[key];
     const currentValue = value?.trim() ?? "";
-    const storedValue = typeof initialValue === "string" ? initialValue.trim() : "";
+    const storedValue =
+      typeof initialValue === "string" ? initialValue.trim() : "";
     return currentValue !== "" && currentValue !== storedValue;
   });
 }
@@ -208,11 +224,11 @@ export function hasUserModifiedNonApiKeyFields(
  * @returns Object with masked API keys removed
  */
 export function filterMaskedApiKeys(
-  customKeys: Record<string, string>
+  customKeys: Record<string, string>,
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(customKeys).filter(
-      ([_, value]) => value !== MASKED_KEY_PLACEHOLDER
-    )
+      ([_, value]) => value !== MASKED_KEY_PLACEHOLDER,
+    ),
   );
 }

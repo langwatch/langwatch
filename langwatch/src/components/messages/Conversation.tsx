@@ -111,14 +111,15 @@ export function Conversation({
                 </Box>
               ) : null
             ) : null}
-            {trace.data && (!threadTraces.data || threadTraces.data.length === 0) && (
-              <TraceMessages
-                trace={trace.data}
-                highlighted={!!modalTraceId}
-                index="only"
-                loadingMore={threadTraces.isFetching}
-              />
-            )}
+            {trace.data &&
+              (!threadTraces.data || threadTraces.data.length === 0) && (
+                <TraceMessages
+                  trace={trace.data}
+                  highlighted={!!modalTraceId}
+                  index="only"
+                  loadingMore={threadTraces.isFetching}
+                />
+              )}
             {trace.data && !trace.data.metadata.thread_id && (
               <Box width="full" maxWidth="1000px" paddingY={8}>
                 <Text

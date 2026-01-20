@@ -1,10 +1,17 @@
 /**
  * @vitest-environment jsdom
  */
-import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { CriteriaInput } from "../CriteriaInput";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CriteriaInput } from "../CriteriaInput";
 
 afterEach(() => {
   cleanup();
@@ -20,7 +27,9 @@ describe("CriteriaInput", () => {
     renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Add a criterion...")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Add a criterion..."),
+      ).toBeInTheDocument();
     });
 
     const input = screen.getByPlaceholderText("Add a criterion...");
@@ -48,7 +57,10 @@ describe("CriteriaInput", () => {
   it("removes criterion on close click", async () => {
     const onChange = vi.fn();
     renderWithChakra(
-      <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />
+      <CriteriaInput
+        value={["first", "second", "third"]}
+        onChange={onChange}
+      />,
     );
 
     await waitFor(() => {

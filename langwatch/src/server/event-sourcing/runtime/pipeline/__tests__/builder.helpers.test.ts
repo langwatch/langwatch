@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 import { PipelineBuilder } from "../builder";
 import {
   BASE_COMMAND_HANDLER_SCHEMA,
@@ -8,7 +9,6 @@ import {
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";
-import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("Pipeline Builder Helper Functions", () => {
   beforeEach(() => {

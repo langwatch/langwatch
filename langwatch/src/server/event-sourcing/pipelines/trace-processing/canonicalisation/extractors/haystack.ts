@@ -14,9 +14,9 @@
  * - langwatch.rag.contexts (from retrieval.documents)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { safeJsonParse, isRecord, inferSpanTypeIfAbsent } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
+import { inferSpanTypeIfAbsent, isRecord, safeJsonParse } from "./_helpers";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class HaystackExtractor implements CanonicalAttributesExtractor {
   readonly id = "haystack";

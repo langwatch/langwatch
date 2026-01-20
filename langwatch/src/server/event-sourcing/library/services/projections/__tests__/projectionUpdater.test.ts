@@ -916,7 +916,7 @@ describe("ProjectionUpdater", () => {
       expect(event1CheckpointsDuringEvent3.length).toBe(0);
 
       // But event2 and event3 should be checkpointed during event3 processing
-      const event2CheckpointsDuringEvent3 = callsDuringEvent3.filter(
+      const _event2CheckpointsDuringEvent3 = callsDuringEvent3.filter(
         (call: unknown[]) => call[3] === event2 && call[4] === "processed",
       );
       const event3CheckpointsDuringEvent3 = callsDuringEvent3.filter(

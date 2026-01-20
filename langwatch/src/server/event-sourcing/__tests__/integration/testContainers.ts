@@ -7,12 +7,12 @@ import {
   RedisContainer,
   type StartedRedisContainer,
 } from "@testcontainers/redis";
-import IORedis, { type Redis } from "ioredis";
 import * as fs from "fs";
-import * as path from "path";
+import IORedis, { type Redis } from "ioredis";
 import * as os from "os";
-import { createLogger } from "~/utils/logger";
+import * as path from "path";
 import { migrateUp } from "~/server/clickhouse/goose";
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:event-sourcing:test-containers");
 

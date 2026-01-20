@@ -106,6 +106,21 @@ class LLMConfig(BaseModel):
     model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    # Sampling parameters
+    top_p: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    seed: Optional[int] = None
+    top_k: Optional[int] = None
+    min_p: Optional[float] = None
+    repetition_penalty: Optional[float] = None
+    # Reasoning parameter (canonical/unified field)
+    # Provider-specific mapping happens at runtime in utils.py
+    reasoning: Optional[str] = None
+    # Provider-specific fields - kept for backward compatibility reading old data
+    reasoning_effort: Optional[str] = None  # OpenAI (legacy)
+    thinkingLevel: Optional[str] = None  # Gemini (legacy)
+    effort: Optional[str] = None  # Anthropic (legacy)
     litellm_params: Optional[Dict[str, str]] = None
 
 

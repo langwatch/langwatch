@@ -1,16 +1,17 @@
-import type { AggregateType } from "../domain/aggregateType";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type {
   CommandHandlerClass,
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass";
+import type { AggregateType } from "../domain/aggregateType";
 import type { EventHandlerClass } from "../domain/handlers/eventHandlerClass";
 import type {
   ExtractProjectionHandlerProjection,
   ProjectionHandlerClass,
 } from "../domain/handlers/projectionHandlerClass";
-import type { Event, ParentLink, } from "../domain/types";
+import type { Event, ParentLink } from "../domain/types";
 import type { EventHandlerOptions } from "../eventHandler.types";
-import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { ProjectionOptions, ProjectionTypeMap } from "../projection.types";
 import { ConfigurationError } from "../services/errorHandling";
 import type {
@@ -19,7 +20,6 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "./types";
-import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.

@@ -23,8 +23,3 @@ export function ScenarioEmptyState({ onCreateClick }: ScenarioEmptyStateProps) {
     </VStack>
   );
 }
-
-
-
-
-

@@ -9,6 +9,7 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
+  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
@@ -19,7 +20,6 @@ import {
   createTestProjection,
   setupTestEnvironment,
   TEST_CONSTANTS,
-  createMockDistributedLock,
 } from "./testHelpers";
 
 describe("EventSourcingService - Recovery Flows", () => {

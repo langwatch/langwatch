@@ -2,9 +2,9 @@ import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
-import { useEffect, useState, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
+import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppRouter } from "../server/api/root";
 
 // Constants

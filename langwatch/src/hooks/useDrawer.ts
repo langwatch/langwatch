@@ -1,12 +1,12 @@
 import { useRouter } from "next/router";
 import qs from "qs";
-import { createLogger } from "../utils/logger";
 import {
-  drawers,
-  type DrawerType,
-  type DrawerProps,
   type DrawerCallbacks,
+  type DrawerProps,
+  type DrawerType,
+  drawers,
 } from "../components/drawerRegistry";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("useDrawer");
 
@@ -328,7 +328,7 @@ export const useDrawer = () => {
 
 // Re-export types for convenience
 export type {
-  DrawerType,
-  DrawerProps,
   DrawerCallbacks,
+  DrawerProps,
+  DrawerType,
 } from "../components/drawerRegistry";

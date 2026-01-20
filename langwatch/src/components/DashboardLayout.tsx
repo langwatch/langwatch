@@ -13,32 +13,35 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
+import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
+import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { FullLogo } from "./icons/FullLogo";
+import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { ProjectAvatar } from "./ProjectAvatar";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
-import { FullLogo } from "./icons/FullLogo";
-import { LogoIcon } from "./icons/LogoIcon";
-import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -74,23 +77,6 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
-const ProjectAvatar = ({
-  name,
-  size = "2xs",
-}: {
-  name: string;
-  size?: "2xs" | "xs" | "sm";
-}) => {
-  return (
-    <RandomColorAvatar
-      size={size}
-      name={name.slice(0, 1)}
-      width={size === "2xs" ? "20px" : undefined}
-      height={size === "2xs" ? "20px" : undefined}
-    />
-  );
-};
-
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
   project,
@@ -107,8 +93,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-      ? 1
-      : 0;
+        ? 1
+        : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -181,6 +167,24 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               );
 
                               if (hasProjectInRoute) {
+                                // Check if route has other dynamic segments beyond [project]
+                                // If so, redirect to parent route to avoid 404
+                                const hasOtherDynamicSegments =
+                                  currentRoute?.path
+                                    .replace("[project]", "")
+                                    .includes("[");
+
+                                if (
+                                  hasOtherDynamicSegments &&
+                                  currentRoute?.parent
+                                ) {
+                                  const parentRoute =
+                                    projectRoutes[currentRoute.parent];
+                                  return parentRoute.path
+                                    .replace("[project]", project_.slug)
+                                    .replace(/\/\/+/g, "/");
+                                }
+
                                 return currentRoute?.path
                                   .replace("[project]", project_.slug)
                                   .replace(/\/\/+/g, "/");
@@ -241,6 +245,7 @@ export const AddProjectButton = ({
   organization: Organization;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -250,19 +255,20 @@ export const AddProjectButton = ({
     },
   );
 
-  return !usage.data ||
-    usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
-    <Link
-      href={`/onboarding/${team.slug}/project`}
-      _hover={{
-        textDecoration: "none",
-      }}
+  return canAddProjects(usage.data) ? (
+    <Menu.Item
+      value={`new-project-${team.slug}`}
+      fontSize="14px"
+      onClick={() =>
+        openDrawer("createProject", {
+          navigateOnCreate: true,
+          defaultTeamId: team.id,
+        })
+      }
     >
-      <Menu.Item value={`new-project-${team.slug}`} fontSize="14px">
-        <Plus />
-        New Project
-      </Menu.Item>
-    </Link>
+      <Plus />
+      New Project
+    </Menu.Item>
   ) : (
     <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
@@ -301,7 +307,7 @@ export type DashboardLayoutProps = {
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  compactMenu : compactMenuProp = false,
+  compactMenu: compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
   const isSmallScreen = useBreakpointValue({ base: true, lg: false });

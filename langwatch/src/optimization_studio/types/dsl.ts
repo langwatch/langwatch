@@ -93,6 +93,23 @@ export const llmConfigSchema = z.object({
   model: z.string(),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
+  // Traditional sampling parameters
+  top_p: z.number().optional(),
+  frequency_penalty: z.number().optional(),
+  presence_penalty: z.number().optional(),
+  // Other sampling parameters
+  seed: z.number().optional(),
+  top_k: z.number().optional(),
+  min_p: z.number().optional(),
+  repetition_penalty: z.number().optional(),
+  // Reasoning parameter (canonical/unified field)
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+  reasoning: z.string().optional(),
+  // Provider-specific fields - kept for backward compatibility
+  reasoning_effort: z.string().optional(), // OpenAI (legacy)
+  thinkingLevel: z.string().optional(), // Gemini (legacy)
+  effort: z.string().optional(), // Anthropic (legacy)
+  verbosity: z.string().optional(),
   litellm_params: z.record(z.string()).optional(),
 });
 
@@ -408,8 +425,11 @@ export const codeComponentSchema = baseComponentSchema.extend({
   parameters: z
     .array(z.union([codeParameterSchema, fieldSchema]))
     .refine(
-      (params) => params?.some((p) => p.identifier === "code" && p.type === "code"),
-      { message: "Code component must have a 'code' parameter with type 'code'" },
+      (params) =>
+        params?.some((p) => p.identifier === "code" && p.type === "code"),
+      {
+        message: "Code component must have a 'code' parameter with type 'code'",
+      },
     ),
 });
 
@@ -440,8 +460,16 @@ export const httpHeaderSchema = z.object({
 export const httpAuthSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("none") }),
   z.object({ type: z.literal("bearer"), token: z.string() }),
-  z.object({ type: z.literal("api_key"), header: z.string(), value: z.string() }),
-  z.object({ type: z.literal("basic"), username: z.string(), password: z.string() }),
+  z.object({
+    type: z.literal("api_key"),
+    header: z.string(),
+    value: z.string(),
+  }),
+  z.object({
+    type: z.literal("basic"),
+    username: z.string(),
+    password: z.string(),
+  }),
 ]);
 
 /**

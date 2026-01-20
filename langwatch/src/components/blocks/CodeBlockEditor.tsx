@@ -1,8 +1,8 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
-import { RenderCode } from "../code/RenderCode";
 import { CodeEditorModal } from "../../optimization_studio/components/code/CodeEditorModal";
+import { RenderCode } from "../code/RenderCode";
 
 export type CodeBlockEditorProps = {
   /** The code to display/edit */

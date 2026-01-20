@@ -48,10 +48,12 @@ export const Toaster = () => {
               {toast.description && (
                 <Toast.Description>{toast.description}</Toast.Description>
               )}
+              {toast.action && (
+                <Toast.ActionTrigger marginTop="2">
+                  {toast.action.label}
+                </Toast.ActionTrigger>
+              )}
             </Stack>
-            {toast.action && (
-              <Toast.ActionTrigger>{toast.action.label}</Toast.ActionTrigger>
-            )}
             {toast.meta?.closable && <Toast.CloseTrigger />}
           </Toast.Root>
         )}

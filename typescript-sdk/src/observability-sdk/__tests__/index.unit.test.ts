@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setupTestEnvironment, testScenarios, MockTracerProvider } from "./test-utils";
 import { createLangWatchSpan, type LangWatchSpan } from "../span";
 import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
@@ -432,7 +432,7 @@ describe("index.ts", () => {
 
           throw new Error("Test error");
         });
-      } catch (_error) {
+      } catch {
         // Error expected
       }
 

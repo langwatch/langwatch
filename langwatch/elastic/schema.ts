@@ -1,18 +1,18 @@
-import {
-  type MappingDenseVectorProperty,
-  type MappingProperty,
-  type MappingTextProperty,
+import type {
+  MappingDenseVectorProperty,
+  MappingProperty,
+  MappingTextProperty,
 } from "@elastic/elasticsearch/lib/api/types";
 import { FLATENNED_TYPE } from "../src/server/elasticsearch";
 import type {
   DSPyStep,
   ESBatchEvaluation,
 } from "../src/server/experiments/types";
-import {
-  type ElasticSearchEvent,
-  type ElasticSearchSpan,
-  type ElasticSearchTrace,
-  type ElasticSearchEvaluation,
+import type {
+  ElasticSearchEvaluation,
+  ElasticSearchEvent,
+  ElasticSearchSpan,
+  ElasticSearchTrace,
 } from "../src/server/tracer/types";
 
 export type NonNestedMappingProperty =
@@ -32,27 +32,29 @@ type RemoveLeadingUnderscore<S extends string> = S extends `_${infer U}`
   : S;
 
 // Final snake_case conversion - preserve existing underscores
+// biome-ignore lint/correctness/noUnusedVariables: Start and End are used for pattern matching to detect underscores
 type ToSnakeCase<S extends string> = S extends `${infer Start}_${infer End}`
   ? S // Already snake_case, keep as is
   : RemoveLeadingUnderscore<CamelToSnakeCase<S>>;
 
-export type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
-  ? {
-      type?: "nested";
-      include_in_parent?: boolean;
-      properties: ElasticSearchMappingFrom<U>;
-    }
-  : {
-      [K in keyof Required<T> as ToSnakeCase<string & K>]: NonNullable<
-        T[K]
-      > extends string[] | number[]
-        ? NonNestedMappingProperty
-        : NonNullable<T[K]> extends object[]
-        ? ElasticSearchMappingFrom<T[K]>
-        : NonNullable<T[K]> extends object
-        ? { properties: ElasticSearchMappingFrom<T[K]> }
-        : NonNestedMappingProperty;
-    };
+export type ElasticSearchMappingFrom<T> =
+  NonNullable<T> extends (infer U)[]
+    ? {
+        type?: "nested";
+        include_in_parent?: boolean;
+        properties: ElasticSearchMappingFrom<U>;
+      }
+    : {
+        [K in keyof Required<T> as ToSnakeCase<string & K>]: NonNullable<
+          T[K]
+        > extends string[] | number[]
+          ? NonNestedMappingProperty
+          : NonNullable<T[K]> extends object[]
+            ? ElasticSearchMappingFrom<T[K]>
+            : NonNullable<T[K]> extends object
+              ? { properties: ElasticSearchMappingFrom<T[K]> }
+              : NonNestedMappingProperty;
+      };
 
 export type ElasticSearchMigration = {
   migration_name: string;
@@ -344,9 +346,23 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     workflow_version_id: { type: "keyword" },
     progress: { type: "integer" },
     total: { type: "integer" },
+    targets: {
+      type: "nested",
+      properties: {
+        id: { type: "keyword" },
+        name: { type: "keyword" },
+        type: { type: "keyword" },
+        prompt_id: { type: "keyword" },
+        prompt_version: { type: "integer" },
+        agent_id: { type: "keyword" },
+        model: { type: "keyword" },
+        metadata: { type: FLATENNED_TYPE } as any,
+      },
+    },
     dataset: {
       properties: {
         index: { type: "integer" },
+        target_id: { type: "keyword" },
         trace_id: { type: "keyword" },
         entry: { type: FLATENNED_TYPE } as any,
         predicted: { type: FLATENNED_TYPE } as any,
@@ -360,6 +376,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
       properties: {
         evaluator: { type: "keyword" },
         name: { type: "keyword" },
+        target_id: { type: "keyword" },
         status: { type: "keyword" },
         index: { type: "integer" },
         score: { type: "float" },

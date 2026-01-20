@@ -71,7 +71,7 @@ export const loginCommand = async (): Promise<void> => {
       const open = (await import("open")).default;
       await open(authUrl);
       spinner.succeed("Browser opened");
-    } catch (error) {
+    } catch {
       spinner.fail("Failed to open browser");
       console.log(chalk.yellow(`Please manually open: ${chalk.cyan(authUrl)}`));
     }

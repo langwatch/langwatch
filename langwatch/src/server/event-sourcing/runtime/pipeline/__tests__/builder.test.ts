@@ -4,7 +4,7 @@ import { PipelineBuilder } from "../builder";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: vi.fn(() => ({
-    withActiveSpan: vi.fn((_name,_optionss, fn) => {
+    withActiveSpan: vi.fn((_name, _optionss, fn) => {
       const mockSpan = {
         addEvent: vi.fn(),
         setAttributes: vi.fn(),
@@ -21,6 +21,7 @@ import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
 import { createTenantId } from "../../../library/domain/tenantId";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 import {
   createMockEventPublisher,
   createMockEventStore,
@@ -36,7 +37,6 @@ import {
   type TestEvent,
   testCommandPayloadSchema,
 } from "./testHelpers";
-import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("PipelineBuilder", () => {
   beforeEach(() => {

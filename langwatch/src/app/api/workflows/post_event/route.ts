@@ -13,7 +13,7 @@ import {
   type StudioServerEvent,
   studioClientEventSchema,
 } from "../../../../optimization_studio/types/events";
-import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { hasProjectPermission } from "../../../../server/api/rbac";
 import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { createLogger } from "../../../../utils/logger";
@@ -48,10 +48,10 @@ app.post(
       );
     }
 
-    const hasPermission = await backendHasTeamProjectPermission(
+    const hasPermission = await hasProjectPermission(
       { prisma, session },
-      { projectId },
-      "WORKFLOWS_MANAGE",
+      projectId,
+      "workflows:manage",
     );
     if (!hasPermission) {
       return c.json(

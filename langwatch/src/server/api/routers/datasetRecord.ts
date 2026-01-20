@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
-  type DatasetRecordEntry,
+  type DatasetRecordInput,
   newDatasetEntriesSchema,
 } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -339,7 +339,7 @@ const updateDatasetRecord = async ({
 };
 
 const createDatasetRecords = (
-  entries: DatasetRecordEntry[],
+  entries: DatasetRecordInput[],
   { datasetId, projectId }: { datasetId: string; projectId: string },
   useS3 = false,
 ) => {
@@ -376,7 +376,8 @@ export const createManyDatasetRecords = async ({
 }: {
   datasetId: string;
   projectId: string;
-  datasetRecords: DatasetRecordEntry[];
+  // Input records - IDs are optional (backend generates with nanoid)
+  datasetRecords: DatasetRecordInput[];
 }) => {
   const dataset = await prisma.dataset.findFirst({
     where: { id: datasetId, projectId },

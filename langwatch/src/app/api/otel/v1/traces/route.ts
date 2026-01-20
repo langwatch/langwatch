@@ -1,9 +1,7 @@
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import type {
-  IExportTraceServiceRequest,
-} from "@opentelemetry/otlp-transformer";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import * as crypto from "node:crypto";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -15,8 +13,8 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
-import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
+import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
 import { createLogger } from "../../../../../utils/logger";
 

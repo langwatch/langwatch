@@ -187,7 +187,6 @@ describe("Tracer Integration Tests", () => {
 
       // Verify parent-child relationships using trace and span context
       const parentTraceId = parentSpan.spanContext().traceId;
-      const parentSpanId = parentSpan.spanContext().spanId;
 
       expect(child1Span.spanContext().traceId).toBe(parentTraceId);
       expect(child2Span.spanContext().traceId).toBe(parentTraceId);
@@ -477,7 +476,7 @@ describe("Tracer Integration Tests", () => {
           span.setAttribute("object.value", { key: "value" } as any); // Not valid AttributeValue
           span.setAttribute("date.value", new Date() as any); // Not valid AttributeValue
           span.setAttribute("null.value", null as any); // Not valid AttributeValue
-        } catch (error) {
+        } catch {
           // Some invalid attribute types may throw - this is expected behavior
         }
 
@@ -523,7 +522,7 @@ describe("Tracer Integration Tests", () => {
 
           // This may fail or be handled gracefully depending on implementation
           span.setOutput(circularData);
-        } catch (error) {
+        } catch {
           // If it throws, set a fallback output
           span.setOutput("Fallback output due to serialization error");
         }

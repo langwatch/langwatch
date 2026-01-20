@@ -24,11 +24,3 @@ export type EventHandlerTimelineTypes = {
     handlers: DiscoveredEventHandler[];
   };
 };
-
-
-
-
-
-
-
-

@@ -1,18 +1,18 @@
 import {
-  VStack,
   Box,
   Combobox,
+  Field,
   TagsInput,
   useCombobox,
   useFilter,
   useListCollection,
   useTagsInput,
-  Field,
+  VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import type {
-  UseModelProviderFormState,
   UseModelProviderFormActions,
+  UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import {
   getProviderModelOptions,
@@ -54,7 +54,7 @@ const ModelTagsInput = ({
     (details: { value: string[] }) => {
       onValuesChange(details.value);
     },
-    [onValuesChange]
+    [onValuesChange],
   );
 
   const tags = useTagsInput({
@@ -76,7 +76,7 @@ const ModelTagsInput = ({
     (event: { inputValue: string }) => {
       filter(event.inputValue);
     },
-    [filter]
+    [filter],
   );
 
   const handleComboboxValueChange = useCallback(
@@ -87,7 +87,7 @@ const ModelTagsInput = ({
         tags.addValue(nextValue);
       }
     },
-    [values, tags]
+    [values, tags],
   );
 
   const combobox = useCombobox({
@@ -109,7 +109,11 @@ const ModelTagsInput = ({
       <Field.Root>
         <Combobox.RootProvider value={combobox}>
           <TagsInput.RootProvider value={tags} size="sm">
-            <TagsInput.Control ref={controlRef} maxHeight="120px" overflowY="auto">
+            <TagsInput.Control
+              ref={controlRef}
+              maxHeight="120px"
+              overflowY="auto"
+            >
               {tags.value.map((tag, index) => (
                 <TagsInput.Item key={index} index={index} value={tag}>
                   <TagsInput.ItemPreview borderRadius="md">
@@ -125,7 +129,11 @@ const ModelTagsInput = ({
             </TagsInput.Control>
             <TagsInput.HiddenInput />
             <Combobox.Positioner>
-              <Combobox.Content borderRadius="md" maxHeight="200px" overflowY="auto">
+              <Combobox.Content
+                borderRadius="md"
+                maxHeight="200px"
+                overflowY="auto"
+              >
                 {collection.items.length > 0 ? (
                   collection.items.map((item) => (
                     <Combobox.Item key={item} item={item}>
@@ -162,38 +170,38 @@ export const CustomModelInputSection = ({
 }) => {
   const modelOptions = useMemo(
     () => getProviderModelOptions(provider.provider, "chat"),
-    [provider.provider]
+    [provider.provider],
   );
 
   const embeddingsOptions = useMemo(
     () => getProviderModelOptions(provider.provider, "embedding"),
-    [provider.provider]
+    [provider.provider],
   );
 
   const modelValues = useMemo(
     () => state.customModels.map((m) => m.value),
-    [state.customModels]
+    [state.customModels],
   );
 
   const embeddingsValues = useMemo(
     () => state.customEmbeddingsModels.map((m) => m.value),
-    [state.customEmbeddingsModels]
+    [state.customEmbeddingsModels],
   );
 
   const handleModelsChange = useCallback(
     (values: string[]) => {
       actions.setCustomModels(values.map((v) => ({ label: v, value: v })));
     },
-    [actions]
+    [actions],
   );
 
   const handleEmbeddingsChange = useCallback(
     (values: string[]) => {
       actions.setCustomEmbeddingsModels(
-        values.map((v) => ({ label: v, value: v }))
+        values.map((v) => ({ label: v, value: v })),
       );
     },
-    [actions]
+    [actions],
   );
 
   return (

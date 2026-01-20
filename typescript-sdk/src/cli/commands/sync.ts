@@ -129,8 +129,7 @@ export const syncCommand = async (): Promise<void> => {
           if (prompt) {
             // Check if we need to update (new version or not materialized)
             const needsUpdate =
-              !lockEntry ||
-              lockEntry.version !== prompt.version ||
+              lockEntry?.version !== prompt.version ||
               !lockEntry.materialized ||
               !fs.existsSync(path.resolve(lockEntry.materialized));
 

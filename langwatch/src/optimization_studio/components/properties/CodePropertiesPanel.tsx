@@ -3,18 +3,14 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
-
+import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
-  VariablesSection,
-  type Variable,
-} from "~/components/variables";
-import {
-  OutputsSection,
   CODE_OUTPUT_TYPES,
   type Output,
+  OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
-import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
+import { type Variable, VariablesSection } from "~/components/variables";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, Field } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
@@ -28,13 +24,13 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
     useShallow((state) => ({
       setNode: state.setNode,
       setNodeParameter: state.setNodeParameter,
-    }))
+    })),
   );
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Get code from parameters
   const codeParam = node.data.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code"
+    (p) => p.identifier === "code" && p.type === "code",
   );
   const code = (codeParam?.value as string) ?? "";
 
@@ -59,7 +55,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
         value: newCode,
       });
     },
-    [node.id, setNodeParameter]
+    [node.id, setNodeParameter],
   );
 
   // Handle inputs change
@@ -76,7 +72,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
       });
       updateNodeInternals(node.id);
     },
-    [node.id, setNode, updateNodeInternals]
+    [node.id, setNode, updateNodeInternals],
   );
 
   // Handle outputs change
@@ -93,16 +89,11 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
       });
       updateNodeInternals(node.id);
     },
-    [node.id, setNode, updateNodeInternals]
+    [node.id, setNode, updateNodeInternals],
   );
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-    >
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
       {/* Code Editor */}
       <CodeBlockEditor
         code={code}

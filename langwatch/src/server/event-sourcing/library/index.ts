@@ -7,13 +7,6 @@
  */
 
 export type {
-  CommandHandlerOptions as StaticCommandHandlerOptions,
-  NoCommands,
-  RegisteredCommand,
-  StaticPipelineDefinition,
-} from "./pipeline/types";
-export { definePipeline } from "./pipeline/staticBuilder";
-export type {
   Command,
   CommandHandler,
   CommandHandlerResult,
@@ -83,6 +76,13 @@ export {
   ProjectionMetadataSchema,
   ProjectionSchema,
 } from "./domain/types";
+export { definePipeline } from "./pipeline/staticBuilder";
+export type {
+  CommandHandlerOptions as StaticCommandHandlerOptions,
+  NoCommands,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "./pipeline/types";
 export type {
   ProjectionDefinition,
   ProjectionDefinitions,

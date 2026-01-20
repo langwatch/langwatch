@@ -1,18 +1,18 @@
-'use client'
+"use client";
 // Internal pages don't need to be server rendering
 
-import { HStack, Spinner, Spacer, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
-import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
@@ -25,7 +25,7 @@ function ScenarioLibraryPage() {
     error,
   } = api.scenarios.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const {
@@ -68,7 +68,7 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {error && (
+        {error && !scenarios?.length && (
           <VStack gap={4} align="center" py={8}>
             <Text color="red.500">Error loading scenarios</Text>
             <Text fontSize="sm" color="gray.600">

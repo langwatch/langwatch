@@ -3,16 +3,16 @@
  * When adding a new migration file, make sure to add it here as well.
  */
 
-// Import all migrations
-import * as add_retention_policy from "./202503020034_add_retention_policy";
+import * as flatten_span_params from "./202408041216_flatten_span_params";
+import * as add_evaluation_labels from "./202408112226_add_evaluation_labels";
+import * as add_span_id_to_evaluations from "./202408232024_add_span_id_to_evaluations";
+import * as add_evaluation_id_migrate_check_id_evaluations from "./202408240457_add_evaluation_id_migrate_check_id_evaluations";
 import * as create_batch_evaluation_index from "./202409231217_create_batch_evaluation_index";
 import * as add_workflow_version_id_to_dspy_steps from "./202409231347_add_workflow_version_id_to_dspy_steps";
 import * as remove_embeddings from "./202501111740_remove_embeddings";
 import * as add_predicted_to_batch_evaluations from "./202502190833_add_predicted_to_batch_evaluations";
-import * as add_evaluation_labels from "./202408112226_add_evaluation_labels";
-import * as add_span_id_to_evaluations from "./202408232024_add_span_id_to_evaluations";
-import * as add_evaluation_id_migrate_check_id_evaluations from "./202408240457_add_evaluation_id_migrate_check_id_evaluations";
-import * as flatten_span_params from "./202408041216_flatten_span_params";
+// Import all migrations
+import * as add_retention_policy from "./202503020034_add_retention_policy";
 import * as flatten_examples_trace from "./202504241534_flatten_examples_trace";
 import * as add_trace_id_to_batch_evaluations from "./202505212051_add_trace_id_to_batch_evaluations";
 import * as set_type_for_prompt_metadata from "./202505220000_set_type_for_prompt_metadata";
@@ -20,6 +20,7 @@ import * as simulations_mappings from "./202506280000_simulations_mappings";
 import * as add_simulations_trace_id from "./202508311847_add_simulations_trace_id";
 import * as add_evaluation_thread_id_and_inputs from "./202510031800_add_evaluation_thread_id_and_inputs";
 import * as add_scenario_name_keyword from "./202512171410_add_scenario_name_keyword";
+import * as migrate_batch_evals_index from "./202601161600_migrate_batch_evals_index";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -44,6 +45,7 @@ export const migrations = {
   "202510031800_add_evaluation_thread_id_and_inputs":
     add_evaluation_thread_id_and_inputs,
   "202512171410_add_scenario_name_keyword": add_scenario_name_keyword,
+  "202601161600_migrate_batch_evals_index": migrate_batch_evals_index,
 };
 
 // Export the migrations object for use in other modules

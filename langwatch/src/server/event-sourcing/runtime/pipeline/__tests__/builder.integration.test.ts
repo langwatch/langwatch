@@ -4,6 +4,7 @@ import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
 import { createTenantId } from "../../../library/domain/tenantId";
 import type { Projection } from "../../../library/domain/types";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 import { ProcessorCheckpointStoreMemory } from "../../stores/processorCheckpointStoreMemory";
@@ -25,7 +26,6 @@ import {
   type TestEvent,
   testCommandPayloadSchema,
 } from "./testHelpers";
-import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("PipelineBuilder Integration Tests", () => {
   beforeEach(() => {
@@ -1003,24 +1003,33 @@ describe("PipelineBuilder Integration Tests", () => {
       // Verify handlers were called in order
       // Use objectContaining to allow for optional metadata field that may be added during processing
       expect(handleSpy).toHaveBeenCalledTimes(3);
-      expect(handleSpy).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        id: event1.id,
-        aggregateId: event1.aggregateId,
-        type: event1.type,
-        timestamp: event1.timestamp,
-      }));
-      expect(handleSpy).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        id: event2.id,
-        aggregateId: event2.aggregateId,
-        type: event2.type,
-        timestamp: event2.timestamp,
-      }));
-      expect(handleSpy).toHaveBeenNthCalledWith(3, expect.objectContaining({
-        id: event3.id,
-        aggregateId: event3.aggregateId,
-        type: event3.type,
-        timestamp: event3.timestamp,
-      }));
+      expect(handleSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          id: event1.id,
+          aggregateId: event1.aggregateId,
+          type: event1.type,
+          timestamp: event1.timestamp,
+        }),
+      );
+      expect(handleSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          id: event2.id,
+          aggregateId: event2.aggregateId,
+          type: event2.type,
+          timestamp: event2.timestamp,
+        }),
+      );
+      expect(handleSpy).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({
+          id: event3.id,
+          aggregateId: event3.aggregateId,
+          type: event3.type,
+          timestamp: event3.timestamp,
+        }),
+      );
 
       // Verify final checkpoint reflects the last processed event
       // Note: Checkpoint is per-aggregate, not per-event, so there's only one checkpoint
@@ -1081,12 +1090,14 @@ describe("PipelineBuilder Integration Tests", () => {
       // Verify event1 was processed
       // Use objectContaining to allow for optional metadata field that may be added during processing
       expect(handleSpy).toHaveBeenCalledTimes(1);
-      expect(handleSpy).toHaveBeenCalledWith(expect.objectContaining({
-        id: event1.id,
-        aggregateId: event1.aggregateId,
-        type: event1.type,
-        timestamp: event1.timestamp,
-      }));
+      expect(handleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: event1.id,
+          aggregateId: event1.aggregateId,
+          type: event1.type,
+          timestamp: event1.timestamp,
+        }),
+      );
 
       // Try to process event2 before event1 checkpoint is saved - should still work
       // because we're using the same service instance and checkpoint store
@@ -1094,12 +1105,14 @@ describe("PipelineBuilder Integration Tests", () => {
 
       // Verify event2 was processed after event1
       expect(handleSpy).toHaveBeenCalledTimes(2);
-      expect(handleSpy).toHaveBeenLastCalledWith(expect.objectContaining({
-        id: event2.id,
-        aggregateId: event2.aggregateId,
-        type: event2.type,
-        timestamp: event2.timestamp,
-      }));
+      expect(handleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          id: event2.id,
+          aggregateId: event2.aggregateId,
+          type: event2.type,
+          timestamp: event2.timestamp,
+        }),
+      );
 
       // Verify sequence numbers are correct
       const checkpointKey2 = buildCheckpointKey(

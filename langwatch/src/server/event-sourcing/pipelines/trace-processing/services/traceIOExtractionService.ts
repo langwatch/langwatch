@@ -1,8 +1,8 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
-import type { NormalizedSpan } from "../schemas/spans";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
+import type { NormalizedSpan } from "../schemas/spans";
 
 // ============================================================================
 // Types
@@ -150,7 +150,7 @@ const extractMessageContent = (message: unknown): string | null => {
 /**
  * Checks if a value is empty or null-like.
  */
-const isEmptyValue = (value: unknown): boolean => {
+const _isEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
   if (typeof value === "string" && value.trim() === "") return true;
   if (Array.isArray(value) && value.length === 0) return true;

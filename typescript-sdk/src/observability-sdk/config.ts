@@ -1,7 +1,6 @@
 import { type Logger, NoOpLogger } from "../logger/index.js";
 import {
   type DataCaptureMode,
-  type DataCaptureContext,
   type DataCaptureOptions,
 } from "./features/data-capture/types.js";
 import { validateDataCaptureMode } from "./features/data-capture/utils.js";

@@ -60,4 +60,3 @@ export type PromptTextAreaWithVariablesProps = {
   /** Role identifier for focusing (e.g., "system" for system prompt) */
   role?: string;
 } & Omit<BoxProps, "onChange">;
-

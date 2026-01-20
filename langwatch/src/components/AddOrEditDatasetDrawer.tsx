@@ -21,12 +21,11 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
 import type {
   DatasetColumns,
-  DatasetRecordEntry,
   DatasetRecordForm,
+  DatasetRecordInput,
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
-import { DatasetPreview } from "./datasets/DatasetPreview";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
@@ -35,7 +34,8 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
-    datasetRecords?: InMemoryDataset["datasetRecords"];
+    // IDs are optional for new records - backend generates them with nanoid()
+    datasetRecords?: Array<{ id?: string } & Record<string, unknown>>;
   };
   open?: boolean;
   onClose?: () => void;
@@ -139,7 +139,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   });
 
   const name = watch("name");
-  const columnTypes = watch("columnTypes");
 
   // Use custom hook for slug validation against a name + datasetId
   const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } =
@@ -297,7 +296,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 <VStack align="start" width="full">
                   {fields.map((field, index) => {
                     const columnName = watch(`columnTypes.${index}.name`);
-                    const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
+                    const isHidden =
+                      props.columnVisibility?.hiddenColumns.has(columnName);
                     return (
                       <HStack key={field.id} width="full" gap={2}>
                         <Input
@@ -328,12 +328,22 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                           <IconButton
                             size="sm"
                             variant="ghost"
-                            onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
+                            onClick={() =>
+                              props.columnVisibility?.onToggleVisibility(
+                                columnName,
+                              )
+                            }
                             color={isHidden ? "gray.400" : "gray.600"}
-                            aria-label={isHidden ? "Show column" : "Hide column"}
+                            aria-label={
+                              isHidden ? "Show column" : "Hide column"
+                            }
                             title={isHidden ? "Show column" : "Hide column"}
                           >
-                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {isHidden ? (
+                              <EyeOff size={16} />
+                            ) : (
+                              <Eye size={16} />
+                            )}
                           </IconButton>
                         )}
                         <Button size="sm" onClick={() => remove(index)}>
@@ -351,32 +361,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 </VStack>
               </VStack>
             </HorizontalFormControl>
-            {props.datasetToSave?.datasetRecords && !props.localOnly && (
-              <VStack align="start" gap={4} paddingY={6}>
-                <HStack gap={2}>
-                  <Heading size="md">Preview</Heading>
-                  <Text fontSize="13px" color="gray.500">
-                    {props.datasetToSave.datasetRecords.length} rows,{" "}
-                    {columnTypes.length} columns
-                  </Text>
-                </HStack>
-                <Box width="100%" overflowX="auto">
-                  <Box width={`${Math.max(20 * columnTypes.length, 100)}%`}>
-                    <DatasetPreview
-                      rows={tryToConvertRowsToAppropriateType(
-                        tryToMapPreviousColumnsToNewColumns(
-                          props.datasetToSave.datasetRecords.slice(0, 5),
-                          props.datasetToSave.columnTypes,
-                          columnTypes,
-                        ),
-                        columnTypes,
-                      )}
-                      columns={columnTypes.slice(0, 50)}
-                    />
-                  </Box>
-                </Box>
-              </VStack>
-            )}
             <Button
               colorPalette="blue"
               type="submit"
@@ -397,9 +381,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 }
 
 export const tryToConvertRowsToAppropriateType = (
-  datasetRecords: DatasetRecordEntry[],
+  datasetRecords: DatasetRecordInput[],
   columnTypes: DatasetColumns,
-) => {
+): DatasetRecordInput[] => {
   const typeForColumn = Object.fromEntries(
     columnTypes.map((col) => [col.name, col.type]),
   );

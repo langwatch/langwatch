@@ -112,16 +112,26 @@ export const useBatchEvaluationResults = ({
     };
   }
 
+  // Group evaluations by evaluator (and target if present for V3)
+  // Key format: "evaluator" or "target:evaluator"
   let resultsByEvaluator = run.data?.evaluations.reduce(
     (acc, evaluation) => {
-      if (!acc[evaluation.evaluator]) {
-        acc[evaluation.evaluator] = [];
+      // For V3 evaluations, group by target + evaluator
+      // For V2, just use evaluator
+      const key = evaluation.target_id
+        ? `${evaluation.target_id}:${evaluation.evaluator}`
+        : evaluation.evaluator;
+      if (!acc[key]) {
+        acc[key] = [];
       }
-      acc[evaluation.evaluator]!.push(evaluation);
+      acc[key]!.push(evaluation);
       return acc;
     },
     {} as Record<string, ESBatchEvaluation["evaluations"]>,
   );
+
+  // Get target metadata for display names
+  const targetsMap = new Map((run.data?.targets ?? []).map((t) => [t.id, t]));
 
   resultsByEvaluator = Object.fromEntries(
     Object.entries(resultsByEvaluator ?? {}).sort((a, b) =>
@@ -147,6 +157,7 @@ export const useBatchEvaluationResults = ({
     datasetColumns,
     predictedColumns,
     resultsByEvaluator,
+    targetsMap,
   };
 };
 
@@ -167,6 +178,7 @@ export const useBatchEvaluationDownloadCSV = ({
     datasetColumns,
     predictedColumns,
     resultsByEvaluator,
+    targetsMap: _targetsMap,
   } = useBatchEvaluationResults({
     project,
     experiment,
@@ -342,12 +354,30 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       datasetColumns,
       predictedColumns,
       resultsByEvaluator,
+      targetsMap,
     } = useBatchEvaluationResults({
       project,
       experiment,
       runId,
       isFinished,
     });
+
+    // Helper to format tab label for V3 (target + evaluator)
+    const getTabLabel = (
+      key: string,
+      results: ESBatchEvaluation["evaluations"],
+    ) => {
+      // Check if this is a V3 target:evaluator key
+      if (key.includes(":")) {
+        const [targetId, evaluator] = key.split(":");
+        const target = targetId ? targetsMap.get(targetId) : undefined;
+        const targetName = target?.name ?? targetId;
+        const evaluatorName = results.find((r) => r.name)?.name ?? evaluator;
+        return `${targetName} - ${evaluatorName}`;
+      }
+      // V2 style: just evaluator name
+      return results.find((r) => r.name)?.name ?? key;
+    };
 
     const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV(
       {
@@ -479,10 +509,10 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           borderColor="gray.200"
         >
           <Tabs.List minWidth={0}>
-            {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
+            {Object.entries(resultsByEvaluator).map(([key, results]) => (
               <Tabs.Trigger
-                key={evaluator}
-                value={evaluator}
+                key={key}
+                value={key}
                 css={{
                   "& span": {
                     textOverflow: "ellipsis",
@@ -492,7 +522,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                   },
                 }}
               >
-                {results.find((r) => r.name)?.name ?? evaluator}
+                {getTabLabel(key, results)}
               </Tabs.Trigger>
             ))}
           </Tabs.List>

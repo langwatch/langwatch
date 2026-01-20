@@ -2,11 +2,11 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { List, Table } from "react-feather";
+import { LuTrendingUp } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { LuTrendingUp } from "react-icons/lu";
 
 export function useTableView() {
   const router = useRouter();

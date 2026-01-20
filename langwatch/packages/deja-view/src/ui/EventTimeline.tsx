@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
 import { Box, Text, useStdout } from "ink";
+import React, { useMemo } from "react";
 import type { Event } from "../lib/types";
 
 /** Color mapping for different event types */
@@ -16,7 +16,9 @@ function getEventColor(eventType: string): string {
   }
   // For unknown types, derive a color from the event type hash
   const fallbackColors = ["blue", "yellow", "red", "magenta", "green", "cyan"];
-  const hash = eventType.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const hash = eventType
+    .split("")
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return fallbackColors[hash % fallbackColors.length] ?? "white";
 }
 
@@ -77,7 +79,13 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({
   };
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0}>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="gray"
+      paddingX={1}
+      flexShrink={0}
+    >
       <Box>
         {startIndex > 0 && <Text dimColor>{"< "}</Text>}
         {visibleEvents.map((event, i) => {
@@ -88,11 +96,7 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({
 
           return (
             <React.Fragment key={event.id}>
-              <Text
-                color={eventColor}
-                bold={isCurrent}
-                inverse={isCurrent}
-              >
+              <Text color={eventColor} bold={isCurrent} inverse={isCurrent}>
                 [{num}]
               </Text>
               {i < visibleEvents.length - 1 && <Text> </Text>}
@@ -103,7 +107,9 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({
       </Box>
 
       <Box justifyContent="space-between">
-        <Text color={currentEvent ? getEventColor(currentEvent.type) : "yellow"}>
+        <Text
+          color={currentEvent ? getEventColor(currentEvent.type) : "yellow"}
+        >
           {currentEvent?.type ?? "No event"}
         </Text>
         <Text dimColor>← h/l →</Text>

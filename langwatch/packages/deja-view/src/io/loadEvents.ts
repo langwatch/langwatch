@@ -31,7 +31,7 @@ const ClickHouseJsonSchema = z.object({
     z.object({
       name: z.string(),
       type: z.string(),
-    })
+    }),
   ),
   data: z.array(ClickHouseEventRowSchema),
   rows: z.number(),

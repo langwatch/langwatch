@@ -390,7 +390,7 @@ describe("span.ts", () => {
 
   describe("edge cases", () => {
     it("should handle empty/null inputs gracefully", () => {
-      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+      const { langwatchSpan } = testScenarios.createSpanTest();
       expect(() => langwatchSpan.setInput(null)).not.toThrow();
       expect(() => langwatchSpan.setInput(undefined)).not.toThrow();
       expect(() => langwatchSpan.setOutput(null)).not.toThrow();
@@ -398,7 +398,7 @@ describe("span.ts", () => {
     });
 
     it("should handle empty metrics", () => {
-      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+      const { langwatchSpan } = testScenarios.createSpanTest();
       expect(() => langwatchSpan.setMetrics({})).not.toThrow();
     });
 

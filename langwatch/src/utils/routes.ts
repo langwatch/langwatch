@@ -39,6 +39,16 @@ export const projectRoutes = {
     title: "Editing Evaluation",
     parent: "evaluations",
   },
+  evaluations_v3: {
+    path: "/[project]/evaluations/v3/[slug]",
+    title: "Evaluation Workbench",
+    parent: "evaluations",
+  },
+  evaluations_wizard: {
+    path: "/[project]/evaluations/wizard/[slug]",
+    title: "Evaluation Wizard",
+    parent: "evaluations",
+  },
   experiments: {
     path: "/[project]/experiments",
     title: "Experiments",
@@ -112,9 +122,23 @@ export const projectRoutes = {
     path: "/[project]/simulations",
     title: "Simulations",
   },
+  agents: {
+    path: "/[project]/agents",
+    title: "Agents",
+  },
+  simulation_runs: {
+    path: "/[project]/simulations",
+    title: "Runs",
+    parent: "simulations",
+  },
+  scenarios: {
+    path: "/[project]/simulations/scenarios",
+    title: "Scenarios",
+    parent: "simulations",
+  },
   simulations_batch: {
     path: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
-    title: "Simulations",
+    title: "Runs",
     parent: "simulations",
   },
   simulations_run: {
@@ -155,7 +179,7 @@ export function getRoutePath(params: {
  */
 export function buildRoutePath(
   route: keyof typeof projectRoutes,
-  params: Record<string, string>
+  params: Record<string, string>,
 ): string {
   let path: string = projectRoutes[route].path;
 

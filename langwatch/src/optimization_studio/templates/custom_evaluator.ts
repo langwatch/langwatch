@@ -132,8 +132,7 @@ export const customEvaluatorTemplate: Workflow = {
   spec_version: "1.4",
   name: "Custom Evaluator",
   icon: "✅",
-  description:
-    "Create a custom evaluator to be used in other workflows",
+  description: "Create a custom evaluator to be used in other workflows",
   version: "1.0",
   default_llm: {
     model: "openai/gpt-5",
