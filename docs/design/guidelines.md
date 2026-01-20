@@ -122,7 +122,7 @@ function ParentDrawer() {
         <HStack gap={2}>
           {canGoBack && (
             <Button variant="ghost" size="sm" onClick={goBack}>
-              <LuArrowLeft />
+              <ArrowLeft />
             </Button>
           )}
           <Heading>Select Type</Heading>
@@ -162,7 +162,7 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
     <Spacer />
     <HStack gap={2}>
       <PageLayout.HeaderButton onClick={handleAction}>
-        <LuPlus /> Add Item
+        <Plus /> Add Item
       </PageLayout.HeaderButton>
     </HStack>
   </PageLayout.Header>

@@ -305,10 +305,10 @@ import { Checkbox } from "../../components/ui/checkbox";
 Use lucide-react for all icons:
 
 ```tsx
-import { LuPlus, LuTrash, LuPencil, LuCheck, LuX } from "react-icons/lu";
+import { Plus, Trash, Pencil, Check, X } from "lucide-react";
 
 <Button>
-  <LuPlus /> Add Item
+  <Plus /> Add Item
 </Button>
 ```
 
