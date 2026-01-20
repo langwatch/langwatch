@@ -346,9 +346,8 @@ jobs:
   # E2E Tests (Playwright)
   # =============================================================================
   # Tests are self-contained: they create their own test user via API.
-  # No secrets required - just remove `if: false` to enable.
+  # No secrets required.
   test-e2e:
-    if: false  # Disabled - remove this line to enable E2E tests
     needs: build
     runs-on: ubuntu-latest
     env:
