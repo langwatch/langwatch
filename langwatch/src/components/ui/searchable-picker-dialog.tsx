@@ -69,7 +69,7 @@ function Root({
     <PickerContext.Provider value={{ searchValue, setSearchValue, onClose }}>
       <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
         <Dialog.Content maxWidth={maxWidth}>
-          <Dialog.Header>
+          <Dialog.Header paddingInline={4}>
             <Dialog.Title>{title}</Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
@@ -361,7 +361,7 @@ function Footer({ children, actionLabel, onAction }: FooterProps) {
   };
 
   return (
-    <Dialog.Footer borderTopWidth="1px">
+    <Dialog.Footer borderTopWidth="1px" paddingInline={4}>
       {children ?? (
         <HStack width="100%" justifyContent="space-between">
           <Button variant="outline" onClick={onClose}>
