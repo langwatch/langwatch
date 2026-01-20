@@ -7,7 +7,7 @@ import {
   applyAuthentication,
   AUTH_STRATEGIES,
   type AuthConfig,
-} from "../auth-strategies";
+} from "../auth.strategies";
 
 describe("AUTH_STRATEGIES", () => {
   describe("none", () => {

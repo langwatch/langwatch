@@ -6,9 +6,9 @@ import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAgentData, LiteLLMParams, PromptConfigData } from "../types";
 import {
-  StandaloneHttpAgentAdapter,
-  StandalonePromptConfigAdapter,
-} from "../standalone-adapters";
+  SerializedHttpAgentAdapter,
+  SerializedPromptConfigAdapter,
+} from "../serialized.adapters";
 
 // Mock dependencies
 vi.mock("ai", () => ({
@@ -19,7 +19,7 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("../model-factory", () => ({
+vi.mock("../model.factory", () => ({
   createModelFromParams: vi.fn(() => ({ modelId: "test-model" })),
 }));
 
@@ -29,7 +29,7 @@ import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 const mockGenerateText = vi.mocked(generateText);
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);
 
-describe("StandalonePromptConfigAdapter", () => {
+describe("SerializedPromptConfigAdapter", () => {
   const defaultConfig: PromptConfigData = {
     type: "prompt",
     promptId: "prompt_123",
@@ -63,7 +63,7 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 
   it("has AGENT role", () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,
       defaultLitellmParams,
       "http://localhost:8080",
@@ -72,16 +72,16 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 
   it("has correct name", () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,
       defaultLitellmParams,
       "http://localhost:8080",
     );
-    expect(adapter.name).toBe("StandalonePromptConfigAdapter");
+    expect(adapter.name).toBe("SerializedPromptConfigAdapter");
   });
 
   it("builds messages with system prompt first", async () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,
       defaultLitellmParams,
       "http://localhost:8080",
@@ -99,7 +99,7 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 
   it("includes prompt messages before conversation history", async () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,
       defaultLitellmParams,
       "http://localhost:8080",
@@ -119,7 +119,7 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 
   it("passes temperature to generateText", async () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       { ...defaultConfig, temperature: 0.5 },
       defaultLitellmParams,
       "http://localhost:8080",
@@ -135,7 +135,7 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 
   it("passes maxTokens to generateText", async () => {
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       { ...defaultConfig, maxTokens: 500 },
       defaultLitellmParams,
       "http://localhost:8080",
@@ -155,7 +155,7 @@ describe("StandalonePromptConfigAdapter", () => {
       text: "Generated response",
     } as Awaited<ReturnType<typeof generateText>>);
 
-    const adapter = new StandalonePromptConfigAdapter(
+    const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,
       defaultLitellmParams,
       "http://localhost:8080",
@@ -167,7 +167,7 @@ describe("StandalonePromptConfigAdapter", () => {
   });
 });
 
-describe("StandaloneHttpAgentAdapter", () => {
+describe("SerializedHttpAgentAdapter", () => {
   const defaultConfig: HttpAgentData = {
     type: "http",
     agentId: "agent_123",
@@ -199,17 +199,17 @@ describe("StandaloneHttpAgentAdapter", () => {
   });
 
   it("has AGENT role", () => {
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
     expect(adapter.role).toBe(AgentRole.AGENT);
   });
 
   it("has correct name", () => {
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
-    expect(adapter.name).toBe("StandaloneHttpAgentAdapter");
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+    expect(adapter.name).toBe("SerializedHttpAgentAdapter");
   });
 
   it("makes HTTP request with correct URL and method", async () => {
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
 
     await adapter.call(defaultInput);
 
@@ -222,7 +222,7 @@ describe("StandaloneHttpAgentAdapter", () => {
   });
 
   it("includes Content-Type header", async () => {
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
 
     await adapter.call(defaultInput);
 
@@ -244,7 +244,7 @@ describe("StandaloneHttpAgentAdapter", () => {
         { key: "X-Another", value: "another-value" },
       ],
     };
-    const adapter = new StandaloneHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter(config);
 
     await adapter.call(defaultInput);
 
@@ -264,7 +264,7 @@ describe("StandaloneHttpAgentAdapter", () => {
       ...defaultConfig,
       auth: { type: "bearer", token: "secret-token" },
     };
-    const adapter = new StandaloneHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter(config);
 
     await adapter.call(defaultInput);
 
@@ -283,7 +283,7 @@ describe("StandaloneHttpAgentAdapter", () => {
       ...defaultConfig,
       auth: { type: "api_key", header: "X-API-Key", value: "my-key" },
     };
-    const adapter = new StandaloneHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter(config);
 
     await adapter.call(defaultInput);
 
@@ -298,7 +298,7 @@ describe("StandaloneHttpAgentAdapter", () => {
   });
 
   it("extracts response using JSONPath", async () => {
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
 
     const result = await adapter.call(defaultInput);
 
@@ -317,7 +317,7 @@ describe("StandaloneHttpAgentAdapter", () => {
       json: vi.fn().mockResolvedValue({ data: "value" }),
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-    const adapter = new StandaloneHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter(config);
     const result = await adapter.call(defaultInput);
 
     expect(result).toBe('{"data":"value"}');
@@ -330,7 +330,7 @@ describe("StandaloneHttpAgentAdapter", () => {
       statusText: "Internal Server Error",
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-    const adapter = new StandaloneHttpAgentAdapter(defaultConfig);
+    const adapter = new SerializedHttpAgentAdapter(defaultConfig);
 
     await expect(adapter.call(defaultInput)).rejects.toThrow(
       "HTTP 500: Internal Server Error",
@@ -339,7 +339,7 @@ describe("StandaloneHttpAgentAdapter", () => {
 
   it("does not send body for GET requests", async () => {
     const config: HttpAgentData = { ...defaultConfig, method: "GET" };
-    const adapter = new StandaloneHttpAgentAdapter(config);
+    const adapter = new SerializedHttpAgentAdapter(config);
 
     await adapter.call(defaultInput);
 
@@ -357,7 +357,7 @@ describe("StandaloneHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"messages": {{messages}}}',
       };
-      const adapter = new StandaloneHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter(config);
 
       await adapter.call(defaultInput);
 
@@ -371,7 +371,7 @@ describe("StandaloneHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"thread": "{{threadId}}"}',
       };
-      const adapter = new StandaloneHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter(config);
 
       await adapter.call(defaultInput);
 
@@ -385,7 +385,7 @@ describe("StandaloneHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"input": "{{input}}"}',
       };
-      const adapter = new StandaloneHttpAgentAdapter(config);
+      const adapter = new SerializedHttpAgentAdapter(config);
 
       await adapter.call(defaultInput);
 
