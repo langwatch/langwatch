@@ -51,7 +51,7 @@ export class EvaluationFacade {
    *
    * @example
    * ```typescript
-   * const evaluation = await langwatch.evaluation.init('my-experiment');
+   * const evaluation = await langwatch.experiments.init('my-experiment');
    *
    * await evaluation.run(dataset, async ({ item, index }) => {
    *   const response = await myAgent(item.question);
@@ -70,15 +70,15 @@ export class EvaluationFacade {
   }
 
   /**
-   * Run a platform-configured evaluation (Evaluations V3)
+   * Run a platform-configured experiment (Experiments Workbench)
    *
-   * This runs an evaluation that was configured in the LangWatch platform.
+   * This runs an experiment that was configured in the LangWatch platform.
    * The method automatically prints a summary and exits with code 1 on failure
    * (unless `exitOnFailure: false` is passed).
    *
-   * @param slug - The slug of the evaluation (found in the evaluation URL)
+   * @param slug - The slug of the experiment (found in the experiment URL)
    * @param options - Optional configuration
-   * @returns The evaluation results including pass rate and summary
+   * @returns The experiment results including pass rate and summary
    *
    * @example
    * ```typescript
@@ -86,7 +86,7 @@ export class EvaluationFacade {
    *
    * const langwatch = new LangWatch();
    *
-   * const result = await langwatch.evaluation.run("my-evaluation-slug");
+   * const result = await langwatch.experiments.run("my-experiment-slug");
    * result.printSummary();
    * ```
    */

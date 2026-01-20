@@ -53,7 +53,7 @@ const main = async () => {
   });
 
   // Initialize evaluation with experiment name
-  const evaluation = await langwatch.evaluation.init("basic-typescript-eval");
+  const evaluation = await langwatch.experiments.init("basic-typescript-eval");
 
   // Run evaluation over dataset
   await evaluation.run(

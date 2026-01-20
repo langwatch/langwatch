@@ -79,7 +79,7 @@ const simulateClaude = async (question: string): Promise<string> => {
 const main = async () => {
   console.log("🚀 Starting multi-target comparison...\n");
 
-  const evaluation = await langwatch.evaluation.init("typescript-model-comparison");
+  const evaluation = await langwatch.experiments.init("typescript-model-comparison");
 
   await evaluation.run(
     dataset,

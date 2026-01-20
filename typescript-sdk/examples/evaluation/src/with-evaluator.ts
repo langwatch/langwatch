@@ -59,7 +59,7 @@ const main = async () => {
     endpoint: process.env.LANGWATCH_ENDPOINT,
   });
 
-  const evaluation = await langwatch.evaluation.init("typescript-with-evaluators");
+  const evaluation = await langwatch.experiments.init("typescript-with-evaluators");
 
   await evaluation.run(
     dataset,

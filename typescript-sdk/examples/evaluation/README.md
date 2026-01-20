@@ -95,7 +95,7 @@ const langwatch = new LangWatch({
   endpoint: process.env.LANGWATCH_ENDPOINT,
 });
 
-const evaluation = await langwatch.evaluation.init("my-experiment-name");
+const evaluation = await langwatch.experiments.init("my-experiment-name");
 ```
 
 ### Running Over a Dataset

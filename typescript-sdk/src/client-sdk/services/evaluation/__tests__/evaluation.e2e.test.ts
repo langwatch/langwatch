@@ -25,7 +25,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
   describe("init()", () => {
     it("creates experiment and returns evaluation instance", async () => {
       const experimentName = `test-init-${Date.now()}`;
-      const evaluation = await langwatch.evaluation.init(experimentName);
+      const evaluation = await langwatch.experiments.init(experimentName);
 
       expect(evaluation).toBeInstanceOf(Evaluation);
       expect(evaluation.name).toBe(experimentName);
@@ -35,7 +35,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
     it("accepts custom runId", async () => {
       const customRunId = "my-custom-run-123";
-      const evaluation = await langwatch.evaluation.init(`test-custom-run-${Date.now()}`, {
+      const evaluation = await langwatch.experiments.init(`test-custom-run-${Date.now()}`, {
         runId: customRunId,
       });
 
@@ -49,14 +49,14 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       });
 
       await expect(
-        badLangwatch.evaluation.init("test-bad-key")
+        badLangwatch.experiments.init("test-bad-key")
       ).rejects.toThrow(EvaluationInitError);
     });
   });
 
   describe("run()", () => {
     it("executes callback for each dataset item", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-run-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-run-${Date.now()}`);
       const dataset = [
         { question: "What is 2+2?", expected: "4" },
         { question: "What is 3+3?", expected: "6" },
@@ -74,7 +74,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("respects concurrency limit", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-concurrency-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-concurrency-${Date.now()}`);
       const dataset = Array.from({ length: 10 }, (_, i) => ({ id: i }));
 
       let maxConcurrent = 0;
@@ -98,7 +98,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("handles errors in callback gracefully", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-errors-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-errors-${Date.now()}`);
       const dataset = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const processed: number[] = [];
@@ -117,7 +117,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
   describe("log()", () => {
     it("logs metrics to the API", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-log-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-log-${Date.now()}`);
       const dataset = [{ question: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -130,7 +130,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("logs with target and metadata", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-targets-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-targets-${Date.now()}`);
       const dataset = [{ question: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -156,7 +156,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
   describe("target registration", () => {
     it("throws on conflicting metadata for same target", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-conflict-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);
 
       // Register target first
       evaluation.log("m1", {
@@ -178,7 +178,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("allows same target without metadata after registration", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-no-conflict-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-no-conflict-${Date.now()}`);
       const dataset = [{ q: "test" }];
 
       await evaluation.run(dataset, async ({ index }) => {
@@ -204,7 +204,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
   describe("withTarget()", () => {
     it("creates separate span for each target", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-${Date.now()}`);
       const dataset = [{ question: "What is AI?" }];
 
       const results: Array<{ target: string; duration: number; spanId: string }> = [];
@@ -253,7 +253,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("auto-infers target in log() calls inside withTarget()", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-infer-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-infer-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       // Track logged targets (via internal inspection or API verification)
@@ -280,7 +280,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("captures duration automatically in dataset entry", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-latency-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-latency-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
@@ -301,7 +301,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("runs targets in parallel with Promise.all", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-parallel-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-parallel-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       let parallelStartTime = 0;
@@ -337,7 +337,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("isolates context between concurrent withTarget blocks", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-isolation-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-isolation-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       // Track that both withTarget blocks executed successfully
@@ -368,7 +368,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("works with overloaded signature (no metadata)", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-overload-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-overload-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
@@ -383,7 +383,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("propagates errors from callback", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-error-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-error-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
       await evaluation.run(dataset, async () => {
@@ -396,7 +396,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     });
 
     it("captures correct item data for each target in concurrent execution", async () => {
-      const evaluation = await langwatch.evaluation.init(`test-withTarget-race-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(`test-withTarget-race-${Date.now()}`);
 
       // Use distinct questions to verify correct association
       const dataset = [
@@ -508,7 +508,7 @@ describe("Evaluation Unit", () => {
           { question: "Question C" },
         ];
 
-        const evaluation = await langwatch.evaluation.init("test-entry-capture");
+        const evaluation = await langwatch.experiments.init("test-entry-capture");
 
         await evaluation.run(
           dataset,

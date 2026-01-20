@@ -170,13 +170,13 @@ def run(
     api_key: Optional[str] = None,
 ) -> EvaluationRunResult:
     """
-    Run a platform-configured evaluation and wait for completion.
+    Run a platform-configured experiment and wait for completion.
 
-    This runs an Evaluation that you have configured in the LangWatch platform.
-    The evaluation will execute all targets and evaluators defined in the configuration.
+    This runs an Experiment that you have configured in the LangWatch platform.
+    The experiment will execute all targets and evaluators defined in the configuration.
 
     Args:
-        slug: The slug of the evaluation to run (found in the evaluation URL)
+        slug: The slug of the experiment to run (found in the experiment URL)
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)
@@ -187,16 +187,16 @@ def run(
         to display results and exit with code 1 on failure.
 
     Raises:
-        EvaluationNotFoundError: If the evaluation slug doesn't exist
-        EvaluationTimeoutError: If the evaluation doesn't complete within timeout
-        EvaluationRunFailedError: If the evaluation fails
+        EvaluationNotFoundError: If the experiment slug doesn't exist
+        EvaluationTimeoutError: If the experiment doesn't complete within timeout
+        EvaluationRunFailedError: If the experiment fails
         EvaluationsApiError: For other API errors
 
     Example:
         ```python
         import langwatch
 
-        result = langwatch.evaluation.run("my-evaluation-slug")
+        result = langwatch.experiment.run("my-experiment-slug")
         result.print_summary()
         ```
     """

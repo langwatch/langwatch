@@ -32,8 +32,24 @@ export class LangWatch {
 
   readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;
-  readonly evaluation: EvaluationFacade;
   readonly datasets: DatasetsFacade;
+
+  /**
+   * Run experiments on LangWatch platform or via SDK.
+   *
+   * Platform experiments (CI/CD):
+   * ```typescript
+   * const result = await langwatch.experiments.run("my-experiment-slug");
+   * result.printSummary();
+   * ```
+   *
+   * SDK-defined experiments:
+   * ```typescript
+   * const evaluation = await langwatch.experiments.init("my-experiment");
+   * // ... run evaluators using evaluation.evaluate()
+   * ```
+   */
+  readonly experiments: EvaluationFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -51,12 +67,14 @@ export class LangWatch {
       ...this.config,
     });
     this.traces = new TracesFacade(this.config);
-    this.evaluation = new EvaluationFacade({
+
+    this.experiments = new EvaluationFacade({
       langwatchApiClient: this.config.langwatchApiClient,
       endpoint: this.config.endpoint,
       apiKey: this.config.apiKey,
       logger: this.config.logger,
     });
+
     this.datasets = new DatasetsFacade({
       langwatchApiClient: this.config.langwatchApiClient,
       logger: this.config.logger,

@@ -33,7 +33,7 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
   describe("error handling", () => {
     it("throws EvaluationNotFoundError for non-existent slug", async () => {
       await expect(
-        langwatch.evaluation.run("non-existent-evaluation-slug-12345")
+        langwatch.experiments.run("non-existent-evaluation-slug-12345")
       ).rejects.toThrow(EvaluationNotFoundError);
     });
 
@@ -44,7 +44,7 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
       });
 
       await expect(
-        invalidClient.evaluation.run(testSlug)
+        invalidClient.experiments.run(testSlug)
       ).rejects.toThrow(EvaluationsApiError);
     });
   });
@@ -58,7 +58,7 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
         return;
       }
 
-      const result = await langwatch.evaluation.run(testSlug, {
+      const result = await langwatch.experiments.run(testSlug, {
         timeout: 300000, // 5 minutes
         onProgress: (completed, total) => {
           console.log(`Progress: ${completed}/${total}`);
@@ -84,7 +84,7 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
 
       const progressUpdates: Array<{ completed: number; total: number }> = [];
 
-      await langwatch.evaluation.run(testSlug, {
+      await langwatch.experiments.run(testSlug, {
         timeout: 300000,
         onProgress: (completed, total) => {
           progressUpdates.push({ completed, total });

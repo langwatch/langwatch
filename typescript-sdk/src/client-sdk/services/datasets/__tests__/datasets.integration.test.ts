@@ -80,7 +80,7 @@ describe.skipIf(SKIP_INTEGRATION)("Dataset Integration", () => {
       const dataset = await langwatch.datasets.get(datasetSlug);
 
       // Use in evaluation
-      const evaluation = await langwatch.evaluation.init(
+      const evaluation = await langwatch.experiments.init(
         `test-dataset-eval-${Date.now()}`
       );
 

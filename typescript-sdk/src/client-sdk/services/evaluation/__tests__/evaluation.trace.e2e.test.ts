@@ -73,7 +73,7 @@ describe("Target Trace Isolation", () => {
       endpoint: "http://localhost:5560",
     });
 
-    const evaluation = await langwatch.evaluation.init("test-trace-isolation");
+    const evaluation = await langwatch.experiments.init("test-trace-isolation");
 
     // Use a SINGLE dataset item to test that targets within the SAME row get different traces
     await evaluation.run(
@@ -151,7 +151,7 @@ describe("Target Trace Isolation", () => {
       endpoint: "http://localhost:5560",
     });
 
-    const evaluation = await langwatch.evaluation.init("test-all-unique");
+    const evaluation = await langwatch.experiments.init("test-all-unique");
 
     await evaluation.run(
       [{ question: "Question A" }, { question: "Question B" }, { question: "Question C" }],
@@ -208,7 +208,7 @@ describe("Target Trace Isolation", () => {
       endpoint: "http://localhost:5560",
     });
 
-    const evaluation = await langwatch.evaluation.init("test-noop-tracer");
+    const evaluation = await langwatch.experiments.init("test-noop-tracer");
 
     await evaluation.run(
       [{ q: "test" }],
@@ -247,7 +247,7 @@ describe("Target Trace Isolation", () => {
       endpoint: "http://localhost:5560",
     });
 
-    const evaluation = await langwatch.evaluation.init("test-flag");
+    const evaluation = await langwatch.experiments.init("test-flag");
 
     // Before first withTarget, flag should be false (but we can't access it directly)
     // This test verifies the behavior: after withTarget, subsequent iterations
@@ -297,7 +297,7 @@ describe("Target Trace Isolation", () => {
       endpoint: "http://localhost:5560",
     });
 
-    const evaluation = await langwatch.evaluation.init("test-skip-iteration");
+    const evaluation = await langwatch.experiments.init("test-skip-iteration");
 
     await evaluation.run(
       [{ q: "A" }, { q: "B" }, { q: "C" }],

@@ -1,13 +1,13 @@
 /**
- * Evaluation API
+ * Experiments API
  *
- * Run batch evaluations over datasets with automatic tracing,
+ * Run batch experiments over datasets with automatic tracing,
  * parallel execution, and built-in evaluator support.
  *
- * @example SDK-defined evaluation
+ * @example SDK-defined experiment
  * ```typescript
  * const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
- * const evaluation = await langwatch.evaluation.init('my-experiment');
+ * const evaluation = await langwatch.experiments.init('my-experiment');
  *
  * await evaluation.run(dataset, async ({ item, index, span }) => {
  *   const response = await myAgent(item.question);
@@ -15,10 +15,10 @@
  * });
  * ```
  *
- * @example Platform-configured evaluation (Evaluations V3)
+ * @example Platform-configured experiment (Experiments Workbench)
  * ```typescript
  * const langwatch = new LangWatch();
- * const result = await langwatch.evaluation.run("my-evaluation-slug");
+ * const result = await langwatch.experiments.run("my-experiment-slug");
  * result.printSummary();
  * ```
  */

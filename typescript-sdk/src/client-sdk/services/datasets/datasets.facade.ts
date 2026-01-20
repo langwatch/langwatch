@@ -21,7 +21,7 @@ type DatasetsFacadeConfig = {
  * const dataset = await langwatch.datasets.get("my-dataset");
  *
  * // Use with evaluation
- * const evaluation = langwatch.evaluation.init("my-experiment");
+ * const evaluation = langwatch.experiments.init("my-experiment");
  * await evaluation.run(dataset.entries.map(e => e.entry), async ({ item, index }) => {
  *   const output = await myLLM(item.input);
  *   await evaluation.evaluate("my-evaluator", {
