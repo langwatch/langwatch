@@ -2,89 +2,33 @@
  * @vitest-environment node
  */
 
-import ScenarioRunner from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { ScenarioService } from "../scenario.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationRunnerService } from "../simulation-runner.service";
 
-// Mock external dependencies
-vi.mock("@langwatch/scenario", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/scenario")>();
-  return {
-    ...actual,
-    default: {
-      ...actual.default,
-      run: vi.fn(),
-      userSimulatorAgent: vi.fn(() => ({ name: "UserSimulator" })),
-      judgeAgent: vi.fn(() => ({ name: "JudgeAgent" })),
-    },
-  };
-});
-
-vi.mock("../../modelProviders/utils", () => ({
-  getVercelAIModel: vi.fn(() => Promise.resolve({ modelId: "test-model" })),
+// Mock the scenario queue
+vi.mock("../scenario.queue", () => ({
+  scheduleScenarioRun: vi.fn().mockResolvedValue({
+    id: "job_123",
+    data: {},
+  }),
+  generateBatchRunId: () => "scenariobatch_test123",
 }));
 
-vi.mock("~/env.mjs", () => ({
-  env: { BASE_HOST: "http://localhost:3000" },
-}));
+import { scheduleScenarioRun } from "../scenario.queue";
 
-const mockScenarioRun = ScenarioRunner.run as Mock;
-const mockJudgeAgent = ScenarioRunner.judgeAgent as Mock;
+const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
 describe("SimulationRunnerService", () => {
   let service: SimulationRunnerService;
-  let mockPrisma: {
-    project: { findUnique: Mock };
-  };
-  let mockScenarioService: {
-    getById: Mock;
-  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockPrisma = {
-      project: {
-        findUnique: vi.fn().mockResolvedValue({
-          apiKey: "test-api-key",
-          defaultModel: "openai/gpt-4o-mini",
-        }),
-      },
-    };
-
-    mockScenarioService = {
-      getById: vi.fn(),
-    };
-
-    // Create service with mocked prisma
-    service = SimulationRunnerService.create(mockPrisma as never);
-
-    // Replace internal ScenarioService with mock
-    vi.spyOn(ScenarioService, "create").mockReturnValue(
-      mockScenarioService as unknown as ScenarioService,
-    );
-
-    // Re-create service to use mocked ScenarioService
-    service = SimulationRunnerService.create(mockPrisma as never);
-
-    // Mock SDK run to succeed
-    mockScenarioRun.mockResolvedValue({
-      success: true,
-      reasoning: "Test passed",
-    });
+    service = SimulationRunnerService.create();
   });
 
-  describe("when executing a scenario", () => {
-    it("loads scenario from ScenarioService", async () => {
-      mockScenarioService.getById.mockResolvedValue({
-        id: "scen_123",
-        name: "Test Scenario",
-        situation: "User wants help",
-        criteria: [],
-      });
-
-      await service.execute({
+  describe("execute", () => {
+    it("schedules a scenario job on the queue", async () => {
+      const result = await service.execute({
         projectId: "proj_123",
         scenarioId: "scen_123",
         target: { type: "prompt", referenceId: "prompt_123" },
@@ -92,23 +36,7 @@ describe("SimulationRunnerService", () => {
         batchRunId: "scenariobatch_test123",
       });
 
-      expect(mockScenarioService.getById).toHaveBeenCalledWith({
-        projectId: "proj_123",
-        id: "scen_123",
-      });
-    });
-
-    it("passes situation as SDK description", async () => {
-      const situation = "User is angry about billing";
-
-      mockScenarioService.getById.mockResolvedValue({
-        id: "scen_123",
-        name: "Billing Complaint",
-        situation,
-        criteria: [],
-      });
-
-      await service.execute({
+      expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
         projectId: "proj_123",
         scenarioId: "scen_123",
         target: { type: "prompt", referenceId: "prompt_123" },
@@ -116,55 +44,38 @@ describe("SimulationRunnerService", () => {
         batchRunId: "scenariobatch_test123",
       });
 
-      expect(mockScenarioRun).toHaveBeenCalledWith(
-        expect.objectContaining({
-          description: situation,
-        }),
-        expect.objectContaining({
-          batchRunId: "scenariobatch_test123",
-        }),
-      );
+      expect(result.success).toBe(true);
+      expect(result.runId).toBe("job_123");
     });
 
-    it("passes criteria to judge agent", async () => {
-      const criteria = ["Must apologize", "Must offer refund"];
-
-      mockScenarioService.getById.mockResolvedValue({
-        id: "scen_123",
-        name: "Refund Test",
-        situation: "User wants refund",
-        criteria,
-      });
-
+    it("schedules http target jobs", async () => {
       await service.execute({
-        projectId: "proj_123",
-        scenarioId: "scen_123",
-        target: { type: "prompt", referenceId: "prompt_123" },
-        setId: "set_123",
-        batchRunId: "scenariobatch_test123",
+        projectId: "proj_456",
+        scenarioId: "scen_456",
+        target: { type: "http", referenceId: "agent_456" },
+        setId: "set_456",
+        batchRunId: "scenariobatch_http123",
       });
 
-      expect(mockJudgeAgent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          criteria,
-        }),
-      );
+      expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
+        projectId: "proj_456",
+        scenarioId: "scen_456",
+        target: { type: "http", referenceId: "agent_456" },
+        setId: "set_456",
+        batchRunId: "scenariobatch_http123",
+      });
     });
-  });
 
-  describe("when scenario is not found", () => {
-    it("does not invoke SDK", async () => {
-      mockScenarioService.getById.mockResolvedValue(null);
-
-      await service.execute({
-        projectId: "proj_123",
-        scenarioId: "scen_nonexistent",
-        target: { type: "prompt", referenceId: "prompt_123" },
-        setId: "set_123",
-        batchRunId: "scenariobatch_test123",
-      });
-
-      expect(mockScenarioRun).not.toHaveBeenCalled();
+    it("throws error for invalid batchRunId", async () => {
+      await expect(
+        service.execute({
+          projectId: "proj_123",
+          scenarioId: "scen_123",
+          target: { type: "prompt", referenceId: "prompt_123" },
+          setId: "set_123",
+          batchRunId: "",
+        }),
+      ).rejects.toThrow("Invalid batchRunId");
     });
   });
 });

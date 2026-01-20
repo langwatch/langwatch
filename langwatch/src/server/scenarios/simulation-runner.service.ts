@@ -1,19 +1,15 @@
-import type { PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import {
-  ScenarioWorkerManager,
-  type ScenarioWorkerManagerDeps,
-} from "./worker/scenario-worker-manager";
-import type { ScenarioWorkerResult } from "./worker/types";
-
-/** Generates a unique batch run ID for grouping scenario executions */
-export function generateBatchRunId(): string {
-  return `scenariobatch_${nanoid()}`;
-}
+  generateBatchRunId,
+  scheduleScenarioRun,
+  type ScenarioJobResult,
+} from "./scenario.queue";
 
 const logger = createLogger("SimulationRunnerService");
+
+// Re-export for backwards compatibility
+export { generateBatchRunId };
 
 interface ExecuteParams {
   projectId: string;
@@ -26,22 +22,21 @@ interface ExecuteParams {
 /**
  * Service for running scenarios against targets.
  *
- * Scenarios are executed in isolated worker threads to ensure proper
- * OpenTelemetry trace capture. Each worker has its own OTEL context
- * that exports traces to LangWatch, independent of the server's
- * global OTEL configuration.
+ * Scenarios are executed via BullMQ queue with OTEL trace isolation.
+ * When Redis is not available, execution falls back to direct processing.
  *
  * @see https://github.com/langwatch/langwatch/issues/1088
  */
 export class SimulationRunnerService {
-  constructor(private readonly workerManager: ScenarioWorkerManager) {}
-
   /**
-   * Execute a scenario against a target in an isolated worker thread.
+   * Schedule a scenario for execution.
    *
-   * Returns the execution result, allowing callers to handle success/failure.
+   * This schedules the scenario on the queue and returns immediately.
+   * The actual execution happens asynchronously in the scenario worker.
+   *
+   * When Redis is unavailable, QueueWithFallback processes the job directly.
    */
-  async execute(params: ExecuteParams): Promise<ScenarioWorkerResult> {
+  async execute(params: ExecuteParams): Promise<ScenarioJobResult> {
     const { projectId, scenarioId, target, setId, batchRunId } = params;
 
     if (!batchRunId) {
@@ -50,43 +45,34 @@ export class SimulationRunnerService {
 
     logger.info(
       { scenarioId, setId, batchRunId, targetType: target.type },
-      "Starting scenario execution in isolated worker",
+      "Scheduling scenario execution",
     );
 
-    const result = await this.workerManager.execute({
+    const job = await scheduleScenarioRun({
       projectId,
       scenarioId,
-      target,
+      target: {
+        type: target.type,
+        referenceId: target.referenceId,
+      },
       setId,
       batchRunId,
     });
 
     logger.info(
-      {
-        scenarioId,
-        setId,
-        runId: result.runId,
-        success: result.success,
-        reasoning: result.reasoning,
-      },
-      "Scenario execution completed",
+      { scenarioId, setId, batchRunId, jobId: job.id },
+      "Scenario scheduled",
     );
 
-    if (!result.success && result.error) {
-      logger.error(
-        { error: result.error, scenarioId, projectId },
-        "Scenario execution failed with error",
-      );
-    }
-
-    return result;
+    // For backwards compatibility, return a pending result
+    // The actual result is processed asynchronously by the worker
+    return {
+      success: true,
+      runId: job.id,
+    };
   }
 
-  static create(
-    prisma: PrismaClient,
-    deps?: Partial<ScenarioWorkerManagerDeps>,
-  ): SimulationRunnerService {
-    const workerManager = ScenarioWorkerManager.create(prisma, deps);
-    return new SimulationRunnerService(workerManager);
+  static create(): SimulationRunnerService {
+    return new SimulationRunnerService();
   }
 }
