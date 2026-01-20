@@ -56,7 +56,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         "Generated batchRunId for scenario run",
       );
 
-      const runnerService = SimulationRunnerService.create(ctx.prisma);
+      const runnerService = SimulationRunnerService.create();
 
       // Fire and forget - execution happens async
       void runnerService.execute({
