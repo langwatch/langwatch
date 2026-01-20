@@ -5,8 +5,6 @@
  * and the results returned from scenario execution.
  */
 
-import type { SimulationTarget } from "~/server/api/routers/scenarios";
-
 /**
  * Pre-fetched prompt configuration data for standalone execution.
  * Contains all data needed to execute prompt-based scenarios without DB access.

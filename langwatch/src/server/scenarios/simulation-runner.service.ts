@@ -44,7 +44,7 @@ export class SimulationRunnerService {
   async execute(params: ExecuteParams): Promise<ScenarioWorkerResult> {
     const { projectId, scenarioId, target, setId, batchRunId } = params;
 
-    if (!batchRunId || typeof batchRunId !== "string") {
+    if (!batchRunId) {
       throw new Error(`Invalid batchRunId: ${batchRunId}`);
     }
 
