@@ -243,8 +243,8 @@ describe("AgentPickerModal", () => {
     });
   });
 
-  describe("Empty state", () => {
-    it("shows empty state when no HTTP agents exist", async () => {
+  describe("when no HTTP agents exist", () => {
+    it("shows empty state", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
         data: [{ id: "code-only", name: "Code Agent", type: "code" }],
         isLoading: false,
@@ -262,7 +262,7 @@ describe("AgentPickerModal", () => {
       });
     });
 
-    it("shows empty state when no agents at all", async () => {
+    it("shows empty state when agent list is empty", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
         data: [],
         isLoading: false,
@@ -276,8 +276,8 @@ describe("AgentPickerModal", () => {
     });
   });
 
-  describe("Loading state", () => {
-    it("shows spinner when loading", async () => {
+  describe("when loading", () => {
+    it("shows spinner", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
         data: undefined,
         isLoading: true,

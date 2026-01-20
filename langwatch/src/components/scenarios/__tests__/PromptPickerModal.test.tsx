@@ -251,8 +251,8 @@ describe("PromptPickerModal", () => {
     });
   });
 
-  describe("Empty state", () => {
-    it("shows empty state when no prompts exist", async () => {
+  describe("when no prompts exist", () => {
+    it("shows empty state", async () => {
       const { useAllPromptsForProject } = await import(
         "~/prompts/hooks/useAllPromptsForProject"
       );
@@ -274,8 +274,8 @@ describe("PromptPickerModal", () => {
     });
   });
 
-  describe("Loading state", () => {
-    it("shows spinner when loading", async () => {
+  describe("when loading", () => {
+    it("shows spinner", async () => {
       const { useAllPromptsForProject } = await import(
         "~/prompts/hooks/useAllPromptsForProject"
       );

@@ -1,4 +1,5 @@
 import { useLocalStorage } from "usehooks-ts";
+import { localStorageKeys } from "../utils/localStorageKeys";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 const MAX_RECENT_ITEMS = 5;
@@ -26,13 +27,8 @@ function createAddRecent(
 export function useRecentTargets() {
   const { project } = useOrganizationTeamProject();
 
-  const promptStorageKey = project?.id
-    ? `langwatch:recent-prompts:${project.id}`
-    : "langwatch:recent-prompts:temp";
-
-  const agentStorageKey = project?.id
-    ? `langwatch:recent-agents:${project.id}`
-    : "langwatch:recent-agents:temp";
+  const promptStorageKey = localStorageKeys.recentPrompts(project?.id ?? "");
+  const agentStorageKey = localStorageKeys.recentAgents(project?.id ?? "");
 
   const [recentPromptIds, setRecentPromptIds] = useLocalStorage<string[]>(
     promptStorageKey,

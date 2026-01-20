@@ -186,7 +186,8 @@ describe("SearchablePickerDialog", () => {
   });
 
   describe("EmptyState component", () => {
-    it("renders empty state when isEmpty is true", async () => {
+    describe("when isEmpty is true", () => {
+      it("renders empty state content", async () => {
       render(
         <SearchablePickerDialog.Root
           open={true}
@@ -220,9 +221,9 @@ describe("SearchablePickerDialog", () => {
       });
 
       expect(screen.queryByText("Should not render")).not.toBeInTheDocument();
-    });
+      });
 
-    it("calls onAction when clicking empty state button", async () => {
+      it("calls onAction when clicking the action button", async () => {
       const user = userEvent.setup();
       render(
         <SearchablePickerDialog.Root
@@ -259,11 +260,12 @@ describe("SearchablePickerDialog", () => {
 
       expect(mockOnCreate).toHaveBeenCalled();
       expect(mockOnClose).toHaveBeenCalled();
+      });
     });
   });
 
-  describe("Loading state", () => {
-    it("shows spinner when loading", async () => {
+  describe("when loading", () => {
+    it("shows spinner", async () => {
       render(
         <SearchablePickerDialog.Root
           open={true}
@@ -287,7 +289,7 @@ describe("SearchablePickerDialog", () => {
     });
   });
 
-  describe("NoResults component", () => {
+  describe("when no results match search", () => {
     it("renders no results message", async () => {
       render(
         <SearchablePickerDialog.Root
