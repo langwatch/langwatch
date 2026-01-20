@@ -8,7 +8,15 @@
  * @see https://github.com/langwatch/langwatch/issues/1088
  */
 
-export { ScenarioWorkerManager } from "./scenario-worker-manager";
+export {
+  ScenarioWorkerManager,
+  type ScenarioWorkerManagerDeps,
+} from "./scenario-worker-manager";
+export { createModelFromParams } from "./model-factory";
+export {
+  StandalonePromptConfigAdapter,
+  StandaloneHttpAgentAdapter,
+} from "./standalone-adapters";
 export type {
   HttpAgentData,
   LiteLLMParams,
