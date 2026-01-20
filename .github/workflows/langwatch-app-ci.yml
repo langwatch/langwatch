@@ -364,7 +364,7 @@ jobs:
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       NODE_ENV: "development"
-      # Note: Migrations run on app startup via start:prepare:db
+      SKIP_CLICKHOUSE_MIGRATE: "true"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
