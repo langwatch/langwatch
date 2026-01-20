@@ -9,7 +9,7 @@ import {
   AgentRepository,
   type AgentRepository as AgentRepositoryType,
 } from "../../agents/agent.repository";
-import { applyAuthentication } from "./auth-strategies";
+import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
 

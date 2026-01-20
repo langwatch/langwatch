@@ -1,5 +1,5 @@
 /**
- * Standalone adapters for scenario worker execution.
+ * Serialized adapters for scenario worker execution.
  *
  * These adapters operate with pre-fetched configuration data and don't require
  * database access. They're designed to run in isolated worker threads.
@@ -10,17 +10,17 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { applyAuthentication } from "../adapters/auth-strategies";
-import { createModelFromParams } from "./model-factory";
+import { applyAuthentication } from "../adapters/auth.strategies";
+import { createModelFromParams } from "./model.factory";
 import type { HttpAgentData, LiteLLMParams, PromptConfigData } from "./types";
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
 /**
- * Standalone prompt config adapter that uses pre-fetched configuration.
+ * Serialized prompt config adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class StandalonePromptConfigAdapter extends AgentAdapter {
+export class SerializedPromptConfigAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   constructor(
@@ -29,7 +29,7 @@ export class StandalonePromptConfigAdapter extends AgentAdapter {
     private readonly nlpServiceUrl: string,
   ) {
     super();
-    this.name = "StandalonePromptConfigAdapter";
+    this.name = "SerializedPromptConfigAdapter";
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -53,15 +53,15 @@ export class StandalonePromptConfigAdapter extends AgentAdapter {
 }
 
 /**
- * Standalone HTTP agent adapter that uses pre-fetched configuration.
+ * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class StandaloneHttpAgentAdapter extends AgentAdapter {
+export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   constructor(private readonly config: HttpAgentData) {
     super();
-    this.name = "StandaloneHttpAgentAdapter";
+    this.name = "SerializedHttpAgentAdapter";
   }
 
   async call(input: AgentInput): Promise<string> {
