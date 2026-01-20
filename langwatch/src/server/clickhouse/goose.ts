@@ -295,48 +295,40 @@ async function bootstrapDatabase(
     // Since 'default' database is Atomic (not Replicated), we must specify explicit Keeper paths
     // Schema must match goose's ClickHouse table: https://github.com/pressly/goose
     //
-    // Note: We check if the table exists first because CREATE TABLE IF NOT EXISTS
-    // can still fail with REPLICA_ALREADY_EXISTS on replicated tables when the
-    // ZooKeeper path exists but the local table doesn't (e.g., after node recovery)
-    const tableExistsResult = await client.query({
-      query: `SELECT 1 FROM system.tables WHERE database = 'default' AND name = 'goose_db_version'`,
-      format: "JSONEachRow",
-    });
-    const tableExists = (await tableExistsResult.json()).length > 0;
-
-    if (!tableExists) {
-      if (config.clusterName) {
-        // Don't use ON CLUSTER here - create table locally only.
-        // Each node creates its own replica when it runs migrations.
-        // The {replica} macro ensures unique replica paths in ZooKeeper.
-        await executeBootstrapSQL(
-          client,
-          `CREATE TABLE IF NOT EXISTS default.goose_db_version (
-            version_id Int64,
-            is_applied UInt8,
-            date Date DEFAULT now(),
-            tstamp DateTime DEFAULT now()
-          ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/default/goose_db_version', '{replica}')
-          ORDER BY date
-          SETTINGS index_granularity = 8192`,
-          verbose
-        );
-      } else {
-        await executeBootstrapSQL(
-          client,
-          `CREATE TABLE IF NOT EXISTS default.goose_db_version (
-            version_id Int64,
-            is_applied UInt8,
-            date Date DEFAULT now(),
-            tstamp DateTime DEFAULT now()
-          ) ENGINE = MergeTree()
-          ORDER BY date
-          SETTINGS index_granularity = 8192`,
-          verbose
-        );
-      }
+    // Note: We use CREATE TABLE IF NOT EXISTS ON CLUSTER which is idempotent - it will
+    // create the table on nodes where it doesn't exist and skip nodes where it does.
+    // The {replica} macro ensures each node gets a unique replica path in Keeper.
+    // We don't pre-check tableExists because that query goes through the NLB and might
+    // hit a node where the table exists, causing us to skip creation on other nodes.
+    if (config.clusterName) {
+      // Use ON CLUSTER to create the table on all nodes.
+      // The 'default' database is Atomic (not Replicated), so ReplicatedMergeTree tables
+      // must be explicitly created on each node via ON CLUSTER.
+      await executeBootstrapSQL(
+        client,
+        `CREATE TABLE IF NOT EXISTS default.goose_db_version ON CLUSTER ${config.clusterName} (
+          version_id Int64,
+          is_applied UInt8,
+          date Date DEFAULT now(),
+          tstamp DateTime DEFAULT now()
+        ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/default/goose_db_version', '{replica}')
+        ORDER BY date
+        SETTINGS index_granularity = 8192`,
+        verbose
+      );
     } else {
-      logger.debug("goose_db_version table already exists, skipping creation");
+      await executeBootstrapSQL(
+        client,
+        `CREATE TABLE IF NOT EXISTS default.goose_db_version (
+          version_id Int64,
+          is_applied UInt8,
+          date Date DEFAULT now(),
+          tstamp DateTime DEFAULT now()
+        ) ENGINE = MergeTree()
+        ORDER BY date
+        SETTINGS index_granularity = 8192`,
+        verbose
+      );
     }
   });
 
