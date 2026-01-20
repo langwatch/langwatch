@@ -131,8 +131,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           <SectionHeader>Situation</SectionHeader>
           <Text fontSize="13px" color="gray.500">
             Describe the user, their context, and what they're trying to
-            accomplish. Don't describe the "happy path" — describe the scenario
-            that keeps you up at night.
+            accomplish. Think about a critical path or a complex edge case.
           </Text>
         </VStack>
         <Field.Root invalid={!!errors.situation}>
@@ -151,7 +150,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         <VStack align="stretch" gap={1}>
           <SectionHeader>Criteria</SectionHeader>
           <Text fontSize="13px" color="gray.500">
-            What must the agent do or NOT do? e.g. "Must remain empathetic",
+            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
             "Must NOT offer refund without manager approval"
           </Text>
         </VStack>
