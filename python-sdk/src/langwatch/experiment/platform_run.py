@@ -1,5 +1,5 @@
 """
-Runner for platform-configured evaluations (Evaluations V3).
+Runner for platform-configured experiments (Experiments Workbench).
 
 This module provides the `run()` function to execute evaluations that are
 configured in the LangWatch platform from CI/CD pipelines or scripts.
@@ -35,16 +35,16 @@ def _replace_url_domain(url: str, new_base: str) -> str:
     ))
 
 
-class EvaluationNotFoundError(Exception):
-    """Raised when evaluation slug doesn't exist."""
+class ExperimentNotFoundError(Exception):
+    """Raised when experiment slug doesn't exist."""
 
     def __init__(self, slug: str):
         self.slug = slug
         super().__init__(f"Evaluation not found: {slug}")
 
 
-class EvaluationTimeoutError(Exception):
-    """Raised when evaluation run times out."""
+class ExperimentTimeoutError(Exception):
+    """Raised when experiment run times out."""
 
     def __init__(self, run_id: str, progress: int, total: int):
         self.run_id = run_id
@@ -55,8 +55,8 @@ class EvaluationTimeoutError(Exception):
         )
 
 
-class EvaluationRunFailedError(Exception):
-    """Raised when evaluation run fails."""
+class ExperimentRunFailedError(Exception):
+    """Raised when experiment run fails."""
 
     def __init__(self, run_id: str, error: str):
         self.run_id = run_id
@@ -64,7 +64,7 @@ class EvaluationRunFailedError(Exception):
         super().__init__(f"Evaluation run failed: {error}")
 
 
-class EvaluationsApiError(Exception):
+class ExperimentsApiError(Exception):
     """Raised for other API errors."""
 
     def __init__(self, message: str, status_code: int):
@@ -97,8 +97,8 @@ class EvaluatorStats:
 
 
 @dataclass
-class EvaluationRunSummary:
-    """Summary of a completed evaluation run."""
+class ExperimentRunSummary:
+    """Summary of a completed experiment run."""
 
     run_id: str
     total_cells: int
@@ -115,7 +115,7 @@ class EvaluationRunSummary:
 
 
 @dataclass
-class EvaluationRunResult:
+class ExperimentRunResult:
     """Result of running a platform evaluation."""
 
     run_id: str
@@ -125,7 +125,7 @@ class EvaluationRunResult:
     pass_rate: float
     duration: int
     run_url: str
-    summary: EvaluationRunSummary
+    summary: ExperimentRunSummary
 
     def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
         """
@@ -168,7 +168,7 @@ def run(
     timeout: float = 600.0,
     on_progress: Optional[Callable[[int, int], None]] = None,
     api_key: Optional[str] = None,
-) -> EvaluationRunResult:
+) -> ExperimentRunResult:
     """
     Run a platform-configured experiment and wait for completion.
 
@@ -183,14 +183,14 @@ def run(
         api_key: Optional API key override (uses LANGWATCH_API_KEY env var by default)
 
     Returns:
-        EvaluationRunResult with pass rate and summary. Call result.print_summary()
+        ExperimentRunResult with pass rate and summary. Call result.print_summary()
         to display results and exit with code 1 on failure.
 
     Raises:
-        EvaluationNotFoundError: If the experiment slug doesn't exist
-        EvaluationTimeoutError: If the experiment doesn't complete within timeout
-        EvaluationRunFailedError: If the experiment fails
-        EvaluationsApiError: For other API errors
+        ExperimentNotFoundError: If the experiment slug doesn't exist
+        ExperimentTimeoutError: If the experiment doesn't complete within timeout
+        ExperimentRunFailedError: If the experiment fails
+        ExperimentsApiError: For other API errors
 
     Example:
         ```python
@@ -219,7 +219,7 @@ def run(
     api_run_url = start_response.get("runUrl", "")
     run_url = _replace_url_domain(api_run_url, endpoint) if api_run_url else ""
 
-    print(f"Started evaluation run: {run_id}")
+    print(f"Started experiment run: {run_id}")
     if run_url:
         print(f"Follow live: {run_url}")
 
@@ -238,7 +238,7 @@ def run(
         if time.time() - start_time > timeout:
             print()  # Newline after progress
             status = _get_run_status(run_id, endpoint, effective_api_key)
-            raise EvaluationTimeoutError(
+            raise ExperimentTimeoutError(
                 run_id, status.get("progress", 0), status.get("total", 0)
             )
 
@@ -267,7 +267,7 @@ def run(
 
         if run_status == "failed":
             print()  # Newline after progress
-            raise EvaluationRunFailedError(
+            raise ExperimentRunFailedError(
                 run_id, status.get("error", "Unknown error")
             )
 
@@ -278,7 +278,7 @@ def run(
 
 
 def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
-    """Start an evaluation run."""
+    """Start an experiment run."""
     with httpx.Client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/evaluations/v3/{slug}/run",
@@ -286,12 +286,12 @@ def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
         )
 
     if response.status_code == 404:
-        raise EvaluationNotFoundError(slug)
+        raise ExperimentNotFoundError(slug)
     if response.status_code == 401:
-        raise EvaluationsApiError("Unauthorized - check your API key", 401)
+        raise ExperimentsApiError("Unauthorized - check your API key", 401)
     if not response.is_success:
         error_body = response.json() if response.content else {}
-        raise EvaluationsApiError(
+        raise ExperimentsApiError(
             error_body.get("error", f"Failed to start evaluation: {response.status_code}"),
             response.status_code,
         )
@@ -308,12 +308,12 @@ def _get_run_status(run_id: str, endpoint: str, api_key: str) -> dict:
         )
 
     if response.status_code == 404:
-        raise EvaluationsApiError(f"Run not found: {run_id}", 404)
+        raise ExperimentsApiError(f"Run not found: {run_id}", 404)
     if response.status_code == 401:
-        raise EvaluationsApiError("Unauthorized - check your API key", 401)
+        raise ExperimentsApiError("Unauthorized - check your API key", 401)
     if not response.is_success:
         error_body = response.json() if response.content else {}
-        raise EvaluationsApiError(
+        raise ExperimentsApiError(
             error_body.get("error", f"Failed to get run status: {response.status_code}"),
             response.status_code,
         )
@@ -326,7 +326,7 @@ def _build_result(
     status: Literal["completed", "failed", "stopped"],
     summary_data: dict,
     run_url: str,
-) -> EvaluationRunResult:
+) -> ExperimentRunResult:
     """Build the result object from API response."""
     total_cells = summary_data.get("totalCells", 0)
     completed_cells = summary_data.get("completedCells", 0)
@@ -368,7 +368,7 @@ def _build_result(
             )
         )
 
-    summary = EvaluationRunSummary(
+    summary = ExperimentRunSummary(
         run_id=run_id,
         total_cells=total_cells,
         completed_cells=completed_cells,
@@ -383,7 +383,7 @@ def _build_result(
         total_cost=summary_data.get("totalCost", 0),
     )
 
-    return EvaluationRunResult(
+    return ExperimentRunResult(
         run_id=run_id,
         status=status,
         passed=total_passed,
@@ -395,12 +395,12 @@ def _build_result(
     )
 
 
-def _print_summary(result: EvaluationRunResult) -> None:
-    """Print a CI-friendly summary of the evaluation results."""
+def _print_summary(result: ExperimentRunResult) -> None:
+    """Print a CI-friendly summary of the experiment results."""
     summary = result.summary
 
     print("\n" + "═" * 60)
-    print("  EVALUATION RESULTS")
+    print("  EXPERIMENT RESULTS")
     print("═" * 60)
     print(f"  Run ID:     {result.run_id}")
     print(f"  Status:     {result.status.upper()}")

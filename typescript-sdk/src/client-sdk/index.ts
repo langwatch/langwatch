@@ -2,16 +2,16 @@ import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 export type { Dataset, DatasetEntry, GetDatasetOptions } from "./services/datasets";
 export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./services/datasets";
-export type { EvaluationRunResult, RunEvaluationOptions } from "./services/evaluation";
+export type { ExperimentRunResult, RunExperimentOptions } from "./services/experiments";
 export {
-  EvaluationsError,
-  EvaluationNotFoundError,
-  EvaluationTimeoutError,
-  EvaluationRunFailedError,
-  EvaluationsApiError,
-} from "./services/evaluation";
+  ExperimentsError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+} from "./services/experiments";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
-import { EvaluationFacade } from "./services/evaluation";
+import { ExperimentsFacade } from "./services/experiments";
 import { DatasetsFacade } from "./services/datasets";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
@@ -45,11 +45,11 @@ export class LangWatch {
    *
    * SDK-defined experiments:
    * ```typescript
-   * const evaluation = await langwatch.experiments.init("my-experiment");
-   * // ... run evaluators using evaluation.evaluate()
+   * const experiment = await langwatch.experiments.init("my-experiment");
+   * // ... run evaluators using experiment.evaluate()
    * ```
    */
-  readonly experiments: EvaluationFacade;
+  readonly experiments: ExperimentsFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -68,7 +68,7 @@ export class LangWatch {
     });
     this.traces = new TracesFacade(this.config);
 
-    this.experiments = new EvaluationFacade({
+    this.experiments = new ExperimentsFacade({
       langwatchApiClient: this.config.langwatchApiClient,
       endpoint: this.config.endpoint,
       apiKey: this.config.apiKey,

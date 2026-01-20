@@ -14,8 +14,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from unittest.mock import patch, MagicMock
 
 import langwatch
-from langwatch.evaluation.evaluation import (
-    Evaluation,
+from langwatch.experiment.experiment import (
+    Experiment,
     _iteration_context,
     IterationContext,
 )
@@ -45,7 +45,7 @@ def setup_langwatch():
 @pytest.fixture
 def evaluation():
     """Create an evaluation instance with auto-send disabled."""
-    ev = Evaluation("test-trace-isolation")
+    ev = Experiment("test-trace-isolation")
     ev.initialized = True
     # Disable auto-sending during tests
     ev.last_sent = time.time() + 100000
@@ -126,7 +126,7 @@ class TestTraceIdInHttpPayload:
             response.raise_for_status = MagicMock()
             return response
 
-        evaluation = Evaluation("test-trace-payload")
+        evaluation = Experiment("test-trace-payload")
         evaluation.initialized = True
 
         df = pd.DataFrame([
@@ -224,7 +224,7 @@ class TestConcurrentTargetTraceIsolation:
 
     def test_concurrent_targets_have_unique_traces(self):
         """Parallel target() calls should each get unique trace_ids."""
-        evaluation = Evaluation("test-concurrent-traces")
+        evaluation = Experiment("test-concurrent-traces")
         evaluation.initialized = True
         evaluation.last_sent = time.time() + 100000
 

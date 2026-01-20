@@ -1,7 +1,7 @@
 /**
- * Evaluation - Main class for running batch evaluations
+ * Experiment - Main class for running batch experiments
  *
- * Provides a clean API for running evaluations over datasets with:
+ * Provides a clean API for running experiments over datasets with:
  * - Automatic tracing per iteration
  * - Parallel execution with concurrency control
  * - Batched result sending
@@ -17,7 +17,7 @@ import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { generateHumanReadableId } from "./humanReadableId";
 import {
-  EvaluationInitError,
+  ExperimentInitError,
   TargetMetadataConflictError,
   EvaluatorError,
 } from "./errors";
@@ -27,7 +27,7 @@ import type {
   EvaluationResult,
   TargetInfo,
   TargetMetadata,
-  EvaluationInitOptions,
+  ExperimentInitOptions,
   LogOptions,
   EvaluateOptions,
   RunOptions,
@@ -64,9 +64,9 @@ const iterationContextStorage = new AsyncLocalStorage<IterationContext>();
 const targetContextStorage = new AsyncLocalStorage<TargetExecutionContext>();
 
 /**
- * Evaluation session for running batch evaluations
+ * Experiment session for running batch experiments
  */
-export class Evaluation {
+export class Experiment {
   readonly name: string;
   readonly runId: string;
   readonly experimentSlug: string;
@@ -136,11 +136,11 @@ export class Evaluation {
       endpoint: string;
       apiKey: string;
       logger: Logger;
-    } & EvaluationInitOptions
-  ): Promise<Evaluation> {
-    const evaluation = new Evaluation(name, options);
-    await evaluation.initialize();
-    return evaluation;
+    } & ExperimentInitOptions
+  ): Promise<Experiment> {
+    const experiment = new Experiment(name, options);
+    await experiment.initialize();
+    return experiment;
   }
 
   /**
@@ -148,7 +148,7 @@ export class Evaluation {
    */
   private async initialize(): Promise<void> {
     if (!this.apiKey) {
-      throw new EvaluationInitError(
+      throw new ExperimentInitError(
         "API key is required. Set LANGWATCH_API_KEY or pass apiKey to LangWatch constructor."
       );
     }
@@ -168,12 +168,12 @@ export class Evaluation {
       });
 
       if (response.status === 401) {
-        throw new EvaluationInitError("Invalid API key");
+        throw new ExperimentInitError("Invalid API key");
       }
 
       if (!response.ok) {
         const text = await response.text();
-        throw new EvaluationInitError(`Failed to initialize experiment: ${text}`);
+        throw new ExperimentInitError(`Failed to initialize experiment: ${text}`);
       }
 
       const data = (await response.json()) as ExperimentInitResponse;
@@ -184,10 +184,10 @@ export class Evaluation {
 
       this.initialized = true;
     } catch (error) {
-      if (error instanceof EvaluationInitError) {
+      if (error instanceof ExperimentInitError) {
         throw error;
       }
-      throw new EvaluationInitError(
+      throw new ExperimentInitError(
         `Failed to initialize evaluation: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error : undefined
       );

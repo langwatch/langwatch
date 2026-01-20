@@ -3,7 +3,7 @@ Unit tests for target registration in Evaluation class.
 """
 
 import pytest
-from langwatch.evaluation.evaluation import Evaluation, TargetInfo
+from langwatch.experiment.experiment import Experiment, TargetInfo
 
 
 class TestTargetRegistration:
@@ -11,7 +11,7 @@ class TestTargetRegistration:
 
     def test_register_target_with_metadata(self):
         """Registers a target with metadata on first log call."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         # Register target via _register_target
         target_id = evaluation._register_target(
@@ -29,7 +29,7 @@ class TestTargetRegistration:
 
     def test_register_target_without_metadata(self):
         """Registers a target without metadata."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         target_id = evaluation._register_target("my-target")
 
@@ -39,7 +39,7 @@ class TestTargetRegistration:
 
     def test_subsequent_log_reuses_registered_target(self):
         """Subsequent calls with same target reuse the registration."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         # First call registers
         target_id1 = evaluation._register_target(
@@ -55,7 +55,7 @@ class TestTargetRegistration:
 
     def test_subsequent_log_with_same_metadata_works(self):
         """Subsequent calls with same metadata are allowed."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         # First call
         evaluation._register_target("gpt4", metadata={"model": "gpt-4"})
@@ -68,7 +68,7 @@ class TestTargetRegistration:
 
     def test_conflicting_metadata_raises_error(self):
         """Raises error when providing different metadata for same target."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         # First call registers with model=gpt-4
         evaluation._register_target("my-target", metadata={"model": "gpt-4"})
@@ -85,7 +85,7 @@ class TestTargetRegistration:
 
     def test_multiple_targets_can_be_registered(self):
         """Multiple different targets can be registered."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         evaluation._register_target("gpt4", metadata={"model": "openai/gpt-4"})
         evaluation._register_target("claude", metadata={"model": "anthropic/claude-3"})
@@ -98,7 +98,7 @@ class TestTargetRegistration:
 
     def test_targets_added_to_batch(self):
         """Registered targets are added to batch for sending."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
 
         evaluation._register_target("target-1", metadata={"v": 1})
         evaluation._register_target("target-2", metadata={"v": 2})
@@ -114,7 +114,7 @@ class TestLogWithTarget:
 
     def test_log_with_target_registers_it(self):
         """Calling log with target registers the target."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
         evaluation.initialized = True  # Skip init for unit test
 
         evaluation.log(
@@ -130,7 +130,7 @@ class TestLogWithTarget:
 
     def test_log_without_target_works(self):
         """Calling log without target is backwards compatible."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
         evaluation.initialized = True
 
         evaluation.log(
@@ -147,7 +147,7 @@ class TestLogWithTarget:
 
     def test_log_with_target_sets_target_id(self):
         """Log with target sets target_id on the evaluation result."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
         evaluation.initialized = True
 
         evaluation.log(
@@ -162,7 +162,7 @@ class TestLogWithTarget:
 
     def test_log_multiple_metrics_for_same_target(self):
         """Multiple metrics can be logged for the same target."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
         evaluation.initialized = True
 
         evaluation.log(

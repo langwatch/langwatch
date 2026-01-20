@@ -1,7 +1,7 @@
 /**
- * Types for the Evaluation API
+ * Types for the Experiments API
  *
- * These types define the structure for batch evaluations, including
+ * These types define the structure for batch experiments, including
  * logging metrics, running evaluators, and managing targets.
  */
 
@@ -188,9 +188,9 @@ export type RunEvaluatorResponse = {
 // ============================================================================
 
 /**
- * Options for initializing an evaluation
+ * Options for initializing an experiment
  */
-export type EvaluationInitOptions = {
+export type ExperimentInitOptions = {
   /** Custom run ID (auto-generated if not provided) */
   runId?: string;
   /** Number of parallel threads for submit() */

@@ -10,15 +10,15 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import {
-  EvaluationNotFoundError,
-  EvaluationsApiError,
+  ExperimentNotFoundError,
+  ExperimentsApiError,
 } from "../platformErrors";
 
 // Skip if not configured for integration testing
 const shouldRun =
   process.env.LANGWATCH_ENDPOINT && process.env.LANGWATCH_API_KEY;
 
-describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
+describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
   let langwatch: LangWatch;
   const testSlug =
     process.env.TEST_EVALUATION_SLUG ?? "test-evaluation";
@@ -31,13 +31,13 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
   });
 
   describe("error handling", () => {
-    it("throws EvaluationNotFoundError for non-existent slug", async () => {
+    it("throws ExperimentNotFoundError for non-existent slug", async () => {
       await expect(
         langwatch.experiments.run("non-existent-evaluation-slug-12345")
-      ).rejects.toThrow(EvaluationNotFoundError);
+      ).rejects.toThrow(ExperimentNotFoundError);
     });
 
-    it("throws EvaluationsApiError with invalid API key", async () => {
+    it("throws ExperimentsApiError with invalid API key", async () => {
       const invalidClient = new LangWatch({
         apiKey: "invalid-api-key",
         endpoint: process.env.LANGWATCH_ENDPOINT,
@@ -45,7 +45,7 @@ describe.skipIf(!shouldRun)("Platform Evaluations Integration", () => {
 
       await expect(
         invalidClient.experiments.run(testSlug)
-      ).rejects.toThrow(EvaluationsApiError);
+      ).rejects.toThrow(ExperimentsApiError);
     });
   });
 

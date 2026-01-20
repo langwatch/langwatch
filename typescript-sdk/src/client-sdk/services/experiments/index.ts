@@ -7,11 +7,11 @@
  * @example SDK-defined experiment
  * ```typescript
  * const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
- * const evaluation = await langwatch.experiments.init('my-experiment');
+ * const experiment = await langwatch.experiments.init('my-experiment');
  *
- * await evaluation.run(dataset, async ({ item, index, span }) => {
+ * await experiment.run(dataset, async ({ item, index, span }) => {
  *   const response = await myAgent(item.question);
- *   evaluation.log('accuracy', { index, score: 0.95 });
+ *   experiment.log('accuracy', { index, score: 0.95 });
  * });
  * ```
  *
@@ -23,10 +23,10 @@
  * ```
  */
 
-export { Evaluation } from "./evaluation";
-export { EvaluationFacade } from "./evaluation.facade";
+export { Experiment } from "./experiment";
+export { ExperimentsFacade } from "./experiments.facade";
 
-// SDK-defined evaluation types
+// SDK-defined experiment types
 export type {
   EvaluationStatus,
   TargetType,
@@ -35,7 +35,7 @@ export type {
   EvaluationResult,
   BatchEntry,
   Batch,
-  EvaluationInitOptions,
+  ExperimentInitOptions,
   LogOptions,
   EvaluateOptions,
   RunOptions,
@@ -48,24 +48,24 @@ export type {
 } from "./types";
 
 export {
-  EvaluationError,
-  EvaluationInitError,
-  EvaluationApiError,
+  ExperimentError,
+  ExperimentInitError,
+  ExperimentApiError,
   TargetMetadataConflictError,
   EvaluatorError,
 } from "./errors";
 
-// Platform evaluation types (Evaluations V3)
+// Platform experiment types (Experiments Workbench)
 export type {
-  EvaluationRunSummary,
-  RunEvaluationOptions,
-  EvaluationRunResult,
+  ExperimentRunSummary,
+  RunExperimentOptions,
+  ExperimentRunResult,
 } from "./platformTypes";
 
 export {
-  EvaluationsError,
-  EvaluationNotFoundError,
-  EvaluationTimeoutError,
-  EvaluationRunFailedError,
-  EvaluationsApiError,
+  ExperimentsError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
 } from "./platformErrors";

@@ -1,18 +1,18 @@
 /**
- * Integration tests for Evaluation API
+ * Integration tests for Experiment API
  *
  * These tests run against a real LangWatch backend.
  * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";
-import { Evaluation } from "../evaluation";
-import { EvaluationInitError, TargetMetadataConflictError } from "../errors";
+import { Experiment } from "../experiment";
+import { ExperimentInitError, TargetMetadataConflictError } from "../errors";
 
 // Skip if no API key (CI environments without backend)
 const SKIP_INTEGRATION = !process.env.LANGWATCH_API_KEY;
 
-describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
+describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   let langwatch: LangWatch;
 
   beforeAll(() => {
@@ -27,7 +27,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       const experimentName = `test-init-${Date.now()}`;
       const evaluation = await langwatch.experiments.init(experimentName);
 
-      expect(evaluation).toBeInstanceOf(Evaluation);
+      expect(evaluation).toBeInstanceOf(Experiment);
       expect(evaluation.name).toBe(experimentName);
       expect(evaluation.runId).toBeDefined();
       expect(evaluation.runId).toMatch(/^[a-z]+-[a-z]+-[a-z]+$/); // Human readable ID
@@ -42,7 +42,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       expect(evaluation.runId).toBe(customRunId);
     });
 
-    it("throws EvaluationInitError with invalid API key", async () => {
+    it("throws ExperimentInitError with invalid API key", async () => {
       const badLangwatch = new LangWatch({
         apiKey: "invalid-key",
         endpoint: process.env.LANGWATCH_ENDPOINT,
@@ -50,7 +50,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       await expect(
         badLangwatch.experiments.init("test-bad-key")
-      ).rejects.toThrow(EvaluationInitError);
+      ).rejects.toThrow(ExperimentInitError);
     });
   });
 

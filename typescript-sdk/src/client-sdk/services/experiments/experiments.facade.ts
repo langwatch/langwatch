@@ -1,31 +1,31 @@
 /**
- * EvaluationFacade - Entry point for the evaluation API
+ * ExperimentsFacade - Entry point for the experiments API
  *
  * Provides:
- * - `init()` method to create evaluation sessions (SDK-defined evaluations)
- * - `run()` method to execute platform-configured evaluations (Evaluations V3)
+ * - `init()` method to create experiment sessions (SDK-defined experiments)
+ * - `run()` method to execute platform-configured experiments (Experiments Workbench)
  */
 
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
-import { Evaluation } from "./evaluation";
-import type { EvaluationInitOptions } from "./types";
+import { Experiment } from "./experiment";
+import type { ExperimentInitOptions } from "./types";
 import type {
-  EvaluationRunResult,
-  RunEvaluationOptions,
-  EvaluationRunSummary,
+  ExperimentRunResult,
+  RunExperimentOptions,
+  ExperimentRunSummary,
 } from "./platformTypes";
 import {
-  EvaluationsApiError,
-  EvaluationNotFoundError,
-  EvaluationTimeoutError,
-  EvaluationRunFailedError,
+  ExperimentsApiError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
 } from "./platformErrors";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes
 
-type EvaluationFacadeConfig = {
+type ExperimentsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
   endpoint: string;
   apiKey: string;
@@ -33,34 +33,34 @@ type EvaluationFacadeConfig = {
 };
 
 /**
- * Facade for creating evaluation sessions and running platform-configured evaluations
+ * Facade for creating experiment sessions and running platform-configured experiments
  */
-export class EvaluationFacade {
-  private readonly config: EvaluationFacadeConfig;
+export class ExperimentsFacade {
+  private readonly config: ExperimentsFacadeConfig;
 
-  constructor(config: EvaluationFacadeConfig) {
+  constructor(config: ExperimentsFacadeConfig) {
     this.config = config;
   }
 
   /**
-   * Initialize a new evaluation session (SDK-defined)
+   * Initialize a new experiment session (SDK-defined)
    *
    * @param name - Name of the experiment (used as slug)
    * @param options - Optional configuration
-   * @returns An initialized Evaluation instance
+   * @returns An initialized Experiment instance
    *
    * @example
    * ```typescript
-   * const evaluation = await langwatch.experiments.init('my-experiment');
+   * const experiment = await langwatch.experiments.init('my-experiment');
    *
-   * await evaluation.run(dataset, async ({ item, index }) => {
+   * await experiment.run(dataset, async ({ item, index }) => {
    *   const response = await myAgent(item.question);
-   *   evaluation.log('accuracy', { index, score: 0.95 });
+   *   experiment.log('accuracy', { index, score: 0.95 });
    * });
    * ```
    */
-  async init(name: string, options?: EvaluationInitOptions): Promise<Evaluation> {
-    return Evaluation.init(name, {
+  async init(name: string, options?: ExperimentInitOptions): Promise<Experiment> {
+    return Experiment.init(name, {
       apiClient: this.config.langwatchApiClient,
       endpoint: this.config.endpoint,
       apiKey: this.config.apiKey,
@@ -90,19 +90,19 @@ export class EvaluationFacade {
    * result.printSummary();
    * ```
    */
-  async run(slug: string, options?: RunEvaluationOptions): Promise<EvaluationRunResult> {
-    this.config.logger.info(`Running platform evaluation: ${slug}`);
+  async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
+    this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
   }
 
   /**
-   * Run an evaluation and wait for completion using polling
+   * Run an experiment and wait for completion using polling
    */
   private async runWithPolling(
     slug: string,
-    options: RunEvaluationOptions = {}
-  ): Promise<EvaluationRunResult> {
+    options: RunExperimentOptions = {}
+  ): Promise<ExperimentRunResult> {
     const pollInterval = options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
@@ -114,7 +114,7 @@ export class EvaluationFacade {
     const apiRunUrl = startResponse.runUrl ?? "";
     const runUrl = apiRunUrl ? this.replaceUrlDomain(apiRunUrl, this.config.endpoint) : "";
 
-    console.log(`Started evaluation run: ${runId}`);
+    console.log(`Started experiment run: ${runId}`);
     if (runUrl) {
       console.log(`Follow live: ${runUrl}`);
     }
@@ -135,7 +135,7 @@ export class EvaluationFacade {
       if (Date.now() - startTime > timeout) {
         console.log(); // Newline after progress
         const finalStatus = await this.getRunStatus(runId);
-        throw new EvaluationTimeoutError(runId, finalStatus.progress, finalStatus.total);
+        throw new ExperimentTimeoutError(runId, finalStatus.progress, finalStatus.total);
       }
 
       await this.sleep(pollInterval);
@@ -160,7 +160,7 @@ export class EvaluationFacade {
 
       if (status.status === "failed") {
         console.log(); // Newline after progress
-        throw new EvaluationRunFailedError(runId, status.error ?? "Unknown error");
+        throw new ExperimentRunFailedError(runId, status.error ?? "Unknown error");
       }
 
       if (status.status === "stopped") {
@@ -177,7 +177,7 @@ export class EvaluationFacade {
   }
 
   /**
-   * Start an evaluation run
+   * Start an experiment run
    */
   private async startRun(slug: string): Promise<{ runId: string; total: number; runUrl?: string }> {
     const response = await this.config.langwatchApiClient.POST(
@@ -193,16 +193,16 @@ export class EvaluationFacade {
       const status = response.response.status;
 
       if (status === 404) {
-        throw new EvaluationNotFoundError(slug);
+        throw new ExperimentNotFoundError(slug);
       }
 
       if (status === 401) {
-        throw new EvaluationsApiError("Unauthorized - check your API key", 401);
+        throw new ExperimentsApiError("Unauthorized - check your API key", 401);
       }
 
       const errorMessage =
-        "error" in response.error ? response.error.error : `Failed to start evaluation: ${slug}`;
-      throw new EvaluationsApiError(errorMessage ?? `HTTP ${status}`, status);
+        "error" in response.error ? response.error.error : `Failed to start experiment: ${slug}`;
+      throw new ExperimentsApiError(errorMessage ?? `HTTP ${status}`, status);
     }
 
     return response.data as { runId: string; total: number; runUrl?: string };
@@ -215,7 +215,7 @@ export class EvaluationFacade {
     status: string;
     progress: number;
     total: number;
-    summary?: EvaluationRunSummary;
+    summary?: ExperimentRunSummary;
     error?: string;
   }> {
     const response = await this.config.langwatchApiClient.GET(
@@ -231,23 +231,23 @@ export class EvaluationFacade {
       const status = response.response.status;
 
       if (status === 404) {
-        throw new EvaluationsApiError(`Run not found: ${runId}`, 404);
+        throw new ExperimentsApiError(`Run not found: ${runId}`, 404);
       }
 
       if (status === 401) {
-        throw new EvaluationsApiError("Unauthorized - check your API key", 401);
+        throw new ExperimentsApiError("Unauthorized - check your API key", 401);
       }
 
       const errorMessage =
         "error" in response.error ? response.error.error : `Failed to get run status: ${runId}`;
-      throw new EvaluationsApiError(errorMessage ?? `HTTP ${status}`, status);
+      throw new ExperimentsApiError(errorMessage ?? `HTTP ${status}`, status);
     }
 
     return response.data as {
       status: string;
       progress: number;
       total: number;
-      summary?: EvaluationRunSummary;
+      summary?: ExperimentRunSummary;
       error?: string;
     };
   }
@@ -258,9 +258,9 @@ export class EvaluationFacade {
   private buildResult(
     runId: string,
     status: "completed" | "failed" | "stopped",
-    summary: EvaluationRunSummary,
+    summary: ExperimentRunSummary,
     runUrl: string
-  ): EvaluationRunResult {
+  ): ExperimentRunResult {
     const totalCells = summary.totalCells ?? 0;
     const completedCells = summary.completedCells ?? 0;
     const failedCells = summary.failedCells ?? 0;
@@ -300,13 +300,13 @@ export class EvaluationFacade {
   }
 
   /**
-   * Print a CI-friendly summary of the evaluation results
+   * Print a CI-friendly summary of the experiment results
    */
-  private printSummary(result: Omit<EvaluationRunResult, "printSummary">): void {
+  private printSummary(result: Omit<ExperimentRunResult, "printSummary">): void {
     const { runId, status, passed, failed, passRate, duration, runUrl, summary } = result;
 
     console.log("\n" + "═".repeat(60));
-    console.log("  EVALUATION RESULTS");
+    console.log("  EXPERIMENT RESULTS");
     console.log("═".repeat(60));
     console.log(`  Run ID:     ${runId}`);
     console.log(`  Status:     ${status.toUpperCase()}`);

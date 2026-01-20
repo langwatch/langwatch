@@ -1,11 +1,11 @@
 /**
- * Types for platform-configured evaluations (Evaluations V3)
+ * Types for platform-configured experiments (Experiments Workbench)
  */
 
 /**
- * Summary of a completed evaluation run
+ * Summary of a completed experiment run
  */
-export type EvaluationRunSummary = {
+export type ExperimentRunSummary = {
   runId?: string;
   totalCells?: number;
   completedCells?: number;
@@ -40,9 +40,9 @@ export type EvaluationRunSummary = {
 };
 
 /**
- * Options for running a platform evaluation
+ * Options for running a platform experiment
  */
-export type RunEvaluationOptions = {
+export type RunExperimentOptions = {
   /**
    * Polling interval in milliseconds (default: 2000)
    */
@@ -58,9 +58,9 @@ export type RunEvaluationOptions = {
 };
 
 /**
- * Final result of a platform evaluation run
+ * Final result of a platform experiment run
  */
-export type EvaluationRunResult = {
+export type ExperimentRunResult = {
   runId: string;
   status: "completed" | "failed" | "stopped";
   passed: number;
@@ -68,7 +68,7 @@ export type EvaluationRunResult = {
   passRate: number;
   duration: number;
   runUrl: string;
-  summary: EvaluationRunSummary;
+  summary: ExperimentRunSummary;
   /**
    * Print a CI-friendly summary of the results
    * @param exitOnFailure - If true (default), calls process.exit(1) when there are failures

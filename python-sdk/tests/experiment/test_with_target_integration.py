@@ -7,8 +7,8 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from unittest.mock import patch, MagicMock
-from langwatch.evaluation.evaluation import (
-    Evaluation,
+from langwatch.experiment.experiment import (
+    Experiment,
     _target_context,
 )
 
@@ -16,7 +16,7 @@ from langwatch.evaluation.evaluation import (
 @pytest.fixture
 def evaluation():
     """Create an evaluation that won't send batches during tests."""
-    ev = Evaluation("test-experiment")
+    ev = Experiment("test-experiment")
     ev.initialized = True
     # Set last_sent to far future to prevent automatic sending
     ev.last_sent = time.time() + 100000
@@ -175,7 +175,7 @@ class TestTargetInSubmit:
 
     def test_target_in_submit_creates_entries(self):
         """target inside submit() creates proper dataset entries."""
-        evaluation = Evaluation("test-experiment")
+        evaluation = Experiment("test-experiment")
         evaluation.initialized = True
         evaluation.last_sent = time.time() + 100000
 
@@ -355,7 +355,7 @@ class TestRaceConditionPrevention:
         langwatch._endpoint = "http://localhost:5560"
 
         # Create evaluation
-        evaluation = Evaluation("test-multi-target")
+        evaluation = Experiment("test-multi-target")
         evaluation.initialized = True
 
         # Create test dataset

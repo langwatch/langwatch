@@ -135,7 +135,7 @@ class IterationInfo(TypedDict):
     error: Optional[Exception]
 
 
-class Evaluation:
+class Experiment:
     _executor: ThreadPoolExecutor
     _futures: List[Future[Any]]
     _current_index: int
@@ -255,7 +255,7 @@ class Evaluation:
                 progress_bar.close()
 
         except Exception as e:
-            Evaluation._log_results(
+            Experiment._log_results(
                 langwatch.get_api_key() or "",
                 {
                     "experiment_slug": self.experiment_slug,
@@ -456,7 +456,7 @@ class Evaluation:
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=Evaluation._log_results,
+                target=Experiment._log_results,
                 args=(langwatch.get_api_key(), body),
             )
             thread.start()
@@ -485,7 +485,7 @@ class Evaluation:
         better_raise_for_status(response)
 
     def _wait_for_completion(self):
-        async def wait_for_completion(self: Evaluation):
+        async def wait_for_completion(self: Experiment):
             # Send any remaining batch
             self._send_batch(finished=True)
 

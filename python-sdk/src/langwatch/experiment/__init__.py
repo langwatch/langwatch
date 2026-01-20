@@ -19,44 +19,44 @@ This module provides two ways to run experiments:
    ```python
    import langwatch
 
-   evaluation = langwatch.experiment.init("my-experiment")
+   experiment = langwatch.experiment.init("my-experiment")
 
-   for index, row in evaluation.loop(df.iterrows(), threads=4):
+   for index, row in experiment.loop(df.iterrows(), threads=4):
        async def task(index, row):
            result = await my_agent(row["input"])
-           evaluation.evaluate(
+           experiment.evaluate(
                "langevals/exact_match",
                index=index,
                data={"output": result, "expected_output": row["expected"]},
                settings={},
            )
-       evaluation.submit(task, index, row)
+       experiment.submit(task, index, row)
    ```
 """
 from typing import Optional
 
-# Re-export the Evaluation class for SDK-defined experiments
-from langwatch.evaluation.evaluation import Evaluation
+# Re-export the Experiment class for SDK-defined experiments
+from langwatch.experiment.experiment import Experiment
 
 # Re-export the platform run function and related types
-from langwatch.evaluation.platform_run import (
+from langwatch.experiment.platform_run import (
     run,
-    EvaluationRunResult as ExperimentRunResult,
-    EvaluationRunSummary as ExperimentRunSummary,
-    EvaluationNotFoundError as ExperimentNotFoundError,
-    EvaluationTimeoutError as ExperimentTimeoutError,
-    EvaluationRunFailedError as ExperimentRunFailedError,
-    EvaluationsApiError as ExperimentsApiError,
+    ExperimentRunResult,
+    ExperimentRunSummary,
+    ExperimentNotFoundError,
+    ExperimentTimeoutError,
+    ExperimentRunFailedError,
+    ExperimentsApiError,
     TargetStats,
     EvaluatorStats,
 )
 
 
-def init(name: str, *, run_id: Optional[str] = None) -> Evaluation:
+def init(name: str, *, run_id: Optional[str] = None) -> Experiment:
     """
     Initialize an SDK-defined experiment.
 
-    This creates an Evaluation instance that you can use to run evaluators
+    This creates an Experiment instance that you can use to run evaluators
     programmatically using datasets and custom logic.
 
     Args:
@@ -64,7 +64,7 @@ def init(name: str, *, run_id: Optional[str] = None) -> Evaluation:
         run_id: Optional custom run ID (auto-generated if not provided)
 
     Returns:
-        Evaluation instance with methods:
+        Experiment instance with methods:
         - loop(): Iterate over dataset rows with parallel execution
         - evaluate(): Run an evaluator on the current row
         - log(): Log custom metrics
@@ -74,29 +74,29 @@ def init(name: str, *, run_id: Optional[str] = None) -> Evaluation:
         ```python
         import langwatch
 
-        evaluation = langwatch.experiment.init("my-experiment")
+        experiment = langwatch.experiment.init("my-experiment")
 
-        for index, row in evaluation.loop(df.iterrows(), threads=4):
+        for index, row in experiment.loop(df.iterrows(), threads=4):
             async def task(index, row):
                 result = await my_agent(row["input"])
-                evaluation.evaluate(
+                experiment.evaluate(
                     "langevals/exact_match",
                     index=index,
                     data={"output": result, "expected_output": row["expected"]},
                     settings={},
                 )
-            evaluation.submit(task, index, row)
+            experiment.submit(task, index, row)
         ```
     """
-    evaluation = Evaluation(name, run_id=run_id)
-    evaluation.init()
-    return evaluation
+    experiment = Experiment(name, run_id=run_id)
+    experiment.init()
+    return experiment
 
 
 __all__ = [
     "init",
     "run",
-    "Evaluation",
+    "Experiment",
     "ExperimentRunResult",
     "ExperimentRunSummary",
     "ExperimentNotFoundError",

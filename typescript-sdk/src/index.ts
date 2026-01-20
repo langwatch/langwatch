@@ -13,27 +13,27 @@ export {
 export { LangWatchExporter } from "./observability-sdk/exporters";
 export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
 
-// Evaluation API exports
+// Experiments API exports
 export {
-  Evaluation,
-  EvaluationFacade,
+  Experiment,
+  ExperimentsFacade,
   type EvaluationStatus,
   type TargetType,
   type TargetMetadata,
   type TargetInfo,
   type EvaluationResult,
-  type EvaluationInitOptions,
+  type ExperimentInitOptions,
   type LogOptions,
   type EvaluateOptions,
   type RunOptions,
   type RunCallback,
   type RunContext,
-  EvaluationError,
-  EvaluationInitError,
-  EvaluationApiError,
+  ExperimentError,
+  ExperimentInitError,
+  ExperimentApiError,
   TargetMetadataConflictError,
   EvaluatorError,
-} from "./client-sdk/services/evaluation";
+} from "./client-sdk/services/experiments";
 
 export const logger = {
   ConsoleLogger,

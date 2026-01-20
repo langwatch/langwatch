@@ -1,45 +1,45 @@
 /**
- * Errors for the Evaluation API
+ * Errors for the Experiments API
  */
 
 /**
- * Base error for evaluation-related issues
+ * Base error for experiment-related issues
  */
-export class EvaluationError extends Error {
+export class ExperimentError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "EvaluationError";
+    this.name = "ExperimentError";
   }
 }
 
 /**
  * Thrown when initialization fails
  */
-export class EvaluationInitError extends EvaluationError {
+export class ExperimentInitError extends ExperimentError {
   constructor(message: string, public readonly cause?: Error) {
     super(message);
-    this.name = "EvaluationInitError";
+    this.name = "ExperimentInitError";
   }
 }
 
 /**
  * Thrown when API calls fail
  */
-export class EvaluationApiError extends EvaluationError {
+export class ExperimentApiError extends ExperimentError {
   constructor(
     message: string,
     public readonly statusCode?: number,
     public readonly cause?: Error
   ) {
     super(message);
-    this.name = "EvaluationApiError";
+    this.name = "ExperimentApiError";
   }
 }
 
 /**
  * Thrown when target metadata conflicts
  */
-export class TargetMetadataConflictError extends EvaluationError {
+export class TargetMetadataConflictError extends ExperimentError {
   constructor(
     public readonly targetName: string,
     public readonly existingMetadata: Record<string, unknown>,
@@ -58,7 +58,7 @@ export class TargetMetadataConflictError extends EvaluationError {
 /**
  * Thrown when an evaluator call fails
  */
-export class EvaluatorError extends EvaluationError {
+export class EvaluatorError extends ExperimentError {
   constructor(
     public readonly evaluatorSlug: string,
     message: string,

@@ -5,8 +5,8 @@ Unit tests for target() context manager in Evaluation class.
 import pytest
 import time
 from unittest.mock import patch, MagicMock
-from langwatch.evaluation.evaluation import (
-    Evaluation,
+from langwatch.experiment.experiment import (
+    Experiment,
     _target_context,
 )
 
@@ -14,7 +14,7 @@ from langwatch.evaluation.evaluation import (
 @pytest.fixture
 def evaluation():
     """Create an evaluation that won't send batches during tests."""
-    ev = Evaluation("test-experiment")
+    ev = Experiment("test-experiment")
     ev.initialized = True
     ev._current_index = 0
     ev._current_item = {"question": "test"}
