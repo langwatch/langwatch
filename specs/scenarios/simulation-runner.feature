@@ -90,3 +90,87 @@ Feature: Simulation Runner Service
     When a scenario run completes
     Then a "run_finished" event is emitted
     And the event includes pass/fail for each criterion
+
+  # ============================================================================
+  # Worker-Based Execution with OTEL Isolation (Issue #1088)
+  # ============================================================================
+
+  @integration
+  Scenario: Execute scenario in isolated worker thread
+    Given scenario "Test" exists with criteria
+    And prompt "Test Prompt" is configured as target
+    When SimulationRunnerService.execute is called
+    Then a worker thread is spawned
+    And the worker receives serialized scenario data
+    And the worker receives serialized LiteLLM params
+
+  @integration
+  Scenario: Worker thread has isolated OTEL context
+    Given a scenario run is started via worker
+    When the worker thread initializes
+    Then it creates its own OTEL TracerProvider
+    And the provider exports to LangWatch endpoint
+    And traces are not mixed with server global telemetry
+
+  @integration
+  Scenario: Worker traces include scenario metadata
+    Given scenario "Refund Test" with labels ["support", "billing"]
+    When the scenario executes in a worker
+    Then exported traces include scenarioId as resource attribute
+    And exported traces include batchRunId as resource attribute
+
+  @integration
+  Scenario: OTEL context is cleaned up after worker execution
+    Given a scenario run completes in a worker
+    When the worker finishes execution
+    Then the TracerProvider is shut down
+    And pending spans are flushed before termination
+
+  @integration
+  Scenario: Worker returns execution result to manager
+    Given a scenario run completes successfully
+    When the worker sends results back
+    Then SimulationRunnerService receives success status
+    And the result includes the runId
+
+  @integration
+  Scenario: Worker reports errors to manager
+    Given scenario execution fails in worker
+    When the worker encounters an error
+    Then SimulationRunnerService receives failure status
+    And the result includes the error message
+
+  # ============================================================================
+  # Error Handling
+  # ============================================================================
+
+  @integration
+  Scenario: Return error when scenario not found
+    Given scenario "nonexistent" does not exist
+    When SimulationRunnerService.execute is called
+    Then it returns an error result
+    And the error message contains "not found"
+
+  @integration
+  Scenario: Return error when prompt not found
+    Given scenario "Test" exists
+    And prompt "nonexistent" does not exist
+    When SimulationRunnerService.execute is called with prompt target
+    Then it returns an error result
+    And the error message contains "Prompt" and "not found"
+
+  @integration
+  Scenario: Return error when HTTP agent not found
+    Given scenario "Test" exists
+    And HTTP agent "nonexistent" does not exist
+    When SimulationRunnerService.execute is called with HTTP target
+    Then it returns an error result
+    And the error message contains "HTTP agent" and "not found"
+
+  @integration
+  Scenario: Return error when model provider disabled
+    Given scenario "Test" exists
+    And the project's model provider is disabled
+    When SimulationRunnerService.execute is called
+    Then it returns an error result
+    And the error message contains "not configured or disabled"
