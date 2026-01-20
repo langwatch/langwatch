@@ -5,41 +5,16 @@
  * database access. They're designed to run in isolated worker threads.
  */
 
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
 import { JSONPath } from "jsonpath-plus";
-import type {
-  HttpAgentData,
-  LiteLLMParams,
-  PromptConfigData,
-} from "./types";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { applyAuthentication } from "../adapters/auth-strategies";
+import { createModelFromParams } from "./model-factory";
+import type { HttpAgentData, LiteLLMParams, PromptConfigData } from "./types";
 
-/**
- * Creates a Vercel AI model using pre-fetched LiteLLM params.
- */
-function createModelFromParams(
-  litellmParams: LiteLLMParams,
-  nlpServiceUrl: string,
-) {
-  const providerKey = litellmParams.model.split("/")[0];
-  const headers = Object.fromEntries(
-    Object.entries(litellmParams).map(([key, value]) => [
-      `x-litellm-${key}`,
-      value,
-    ]),
-  );
-
-  const vercelProvider = createOpenAICompatible({
-    name: providerKey ?? "unknown",
-    apiKey: litellmParams.api_key,
-    baseURL: `${nlpServiceUrl}/proxy/v1`,
-    headers,
-  });
-
-  return vercelProvider(litellmParams.model);
-}
+const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
 /**
  * Standalone prompt config adapter that uses pre-fetched configuration.
@@ -58,17 +33,14 @@ export class StandalonePromptConfigAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
-    // Build messages: system prompt + prompt messages + conversation history
     const messages = [
       { role: "system" as const, content: this.config.systemPrompt },
       ...this.config.messages,
       ...input.messages,
     ];
 
-    // Create model from pre-fetched params
     const model = createModelFromParams(this.litellmParams, this.nlpServiceUrl);
 
-    // Generate response using Vercel AI SDK
     const result = await generateText({
       model,
       messages,
@@ -79,32 +51,6 @@ export class StandalonePromptConfigAdapter extends AgentAdapter {
     return result.text;
   }
 }
-
-const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
-
-type AuthStrategy = (auth: HttpAgentData["auth"]) => Record<string, string>;
-
-const emptyHeaders: Record<string, string> = {};
-
-const AUTH_STRATEGIES: Record<string, AuthStrategy> = {
-  none: () => emptyHeaders,
-  bearer: (auth) => {
-    if (auth?.type !== "bearer" || !auth.token) return emptyHeaders;
-    return { Authorization: `Bearer ${auth.token}` };
-  },
-  api_key: (auth) => {
-    if (auth?.type !== "api_key" || !auth.header || !auth.value)
-      return emptyHeaders;
-    return { [auth.header]: auth.value };
-  },
-  basic: (auth) => {
-    if (auth?.type !== "basic" || !auth.username) return emptyHeaders;
-    const credentials = Buffer.from(
-      `${auth.username}:${auth.password ?? ""}`,
-    ).toString("base64");
-    return { Authorization: `Basic ${credentials}` };
-  },
-};
 
 /**
  * Standalone HTTP agent adapter that uses pre-fetched configuration.
@@ -130,7 +76,6 @@ export class StandaloneHttpAgentAdapter extends AgentAdapter {
       "Content-Type": "application/json",
     };
 
-    // Apply custom headers
     for (const header of this.config.headers) {
       const key = header.key.trim();
       if (key) {
@@ -138,13 +83,7 @@ export class StandaloneHttpAgentAdapter extends AgentAdapter {
       }
     }
 
-    // Apply authentication
-    if (this.config.auth) {
-      const strategy = AUTH_STRATEGIES[this.config.auth.type];
-      if (strategy) {
-        Object.assign(headers, strategy(this.config.auth));
-      }
-    }
+    Object.assign(headers, applyAuthentication(this.config.auth));
 
     return headers;
   }
@@ -153,7 +92,7 @@ export class StandaloneHttpAgentAdapter extends AgentAdapter {
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
-    const response = await fetch(this.config.url, {
+    const response = await ssrfSafeFetch(this.config.url, {
       method: this.config.method,
       headers,
       body: this.config.method !== "GET" ? body : undefined,

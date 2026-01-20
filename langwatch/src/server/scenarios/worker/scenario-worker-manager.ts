@@ -34,12 +34,40 @@ import type {
 
 const logger = createLogger("ScenarioWorkerManager");
 
+const DEFAULT_NLP_SERVICE_URL = "http://localhost:8080";
+
 interface ExecuteInWorkerParams {
   projectId: string;
   scenarioId: string;
   target: SimulationTarget;
   setId: string;
   batchRunId: string;
+}
+
+/**
+ * Dependencies for ScenarioWorkerManager.
+ * Allows injection for testing.
+ */
+export interface ScenarioWorkerManagerDeps {
+  scenarioService: ScenarioService;
+  promptService: PromptService;
+  agentRepository: AgentRepository;
+  prisma: PrismaClient;
+}
+
+/**
+ * Type guard for LiteLLMParams.
+ * Validates the shape of params returned from prepareLitellmParams.
+ */
+function isLiteLLMParams(params: unknown): params is LiteLLMParams {
+  return (
+    typeof params === "object" &&
+    params !== null &&
+    "api_key" in params &&
+    "model" in params &&
+    typeof (params as LiteLLMParams).api_key === "string" &&
+    typeof (params as LiteLLMParams).model === "string"
+  );
 }
 
 /**
@@ -53,23 +81,17 @@ export class ScenarioWorkerManager {
   private readonly scenarioService: ScenarioService;
   private readonly promptService: PromptService;
   private readonly agentRepository: AgentRepository;
+  private readonly prisma: PrismaClient;
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.scenarioService = ScenarioService.create(prisma);
-    this.promptService = new PromptService(prisma);
-    this.agentRepository = new AgentRepository(prisma);
+  constructor(deps: ScenarioWorkerManagerDeps) {
+    this.scenarioService = deps.scenarioService;
+    this.promptService = deps.promptService;
+    this.agentRepository = deps.agentRepository;
+    this.prisma = deps.prisma;
   }
 
-  /**
-   * Execute a scenario in an isolated worker thread with its own OTEL context.
-   *
-   * This method:
-   * 1. Pre-fetches all required data from the database
-   * 2. Spawns a worker thread with serialized configuration
-   * 3. Waits for the worker to complete and returns the result
-   */
   async execute(params: ExecuteInWorkerParams): Promise<ScenarioWorkerResult> {
-    const { projectId, scenarioId, target, setId, batchRunId } = params;
+    const { projectId, scenarioId, batchRunId } = params;
 
     logger.info(
       { scenarioId, projectId, batchRunId },
@@ -77,16 +99,7 @@ export class ScenarioWorkerManager {
     );
 
     try {
-      // 1. Pre-fetch all required data
-      const workerData = await this.prepareWorkerData({
-        projectId,
-        scenarioId,
-        target,
-        setId,
-        batchRunId,
-      });
-
-      // 2. Spawn worker and wait for result
+      const workerData = await this.prepareWorkerData(params);
       const result = await this.spawnWorker(workerData);
 
       logger.info(
@@ -110,16 +123,11 @@ export class ScenarioWorkerManager {
     }
   }
 
-  /**
-   * Pre-fetches all data required for scenario execution and prepares
-   * the serializable worker data structure.
-   */
   private async prepareWorkerData(
     params: ExecuteInWorkerParams,
   ): Promise<ScenarioWorkerData> {
     const { projectId, scenarioId, target, setId, batchRunId } = params;
 
-    // Fetch scenario
     const scenario = await this.scenarioService.getById({
       projectId,
       id: scenarioId,
@@ -129,7 +137,6 @@ export class ScenarioWorkerManager {
       throw new Error(`Scenario ${scenarioId} not found`);
     }
 
-    // Fetch project config
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { apiKey: true, defaultModel: true },
@@ -139,16 +146,12 @@ export class ScenarioWorkerManager {
       throw new Error(`Project ${projectId} not found or has no API key`);
     }
 
-    // Get default model for simulator/judge
     const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
-
-    // Prepare LiteLLM params for the default model
     const defaultModelLiteLLMParams = await this.prepareLiteLLMParams(
       projectId,
       defaultModel,
     );
 
-    // Prepare target adapter data
     const { targetAdapter, targetModelLiteLLMParams } =
       await this.prepareTargetAdapterData(target, projectId);
 
@@ -167,13 +170,10 @@ export class ScenarioWorkerManager {
         endpoint: this.getLangWatchEndpoint(),
         apiKey: project.apiKey,
       },
-      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? DEFAULT_NLP_SERVICE_URL,
     };
   }
 
-  /**
-   * Prepares LiteLLM parameters for a given model.
-   */
   private async prepareLiteLLMParams(
     projectId: string,
     model: string,
@@ -194,12 +194,13 @@ export class ScenarioWorkerManager {
       projectId,
     });
 
-    return litellmParams as LiteLLMParams;
+    if (!isLiteLLMParams(litellmParams)) {
+      throw new Error("Invalid LiteLLM params returned from prepareLitellmParams");
+    }
+
+    return litellmParams;
   }
 
-  /**
-   * Prepares the target adapter data based on target type.
-   */
   private async prepareTargetAdapterData(
     target: SimulationTarget,
     projectId: string,
@@ -219,9 +220,6 @@ export class ScenarioWorkerManager {
     }
   }
 
-  /**
-   * Prepares data for prompt-based target adapter.
-   */
   private async preparePromptAdapterData(
     promptId: string,
     projectId: string,
@@ -238,13 +236,11 @@ export class ScenarioWorkerManager {
       throw new Error(`Prompt ${promptId} not found`);
     }
 
-    // Prepare LiteLLM params for the prompt's model
     const targetModelLiteLLMParams = await this.prepareLiteLLMParams(
       projectId,
       prompt.model,
     );
 
-    // Build adapter data
     const promptMessages = prompt.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({
@@ -265,9 +261,6 @@ export class ScenarioWorkerManager {
     return { targetAdapter, targetModelLiteLLMParams };
   }
 
-  /**
-   * Prepares data for HTTP-based target adapter.
-   */
   private async prepareHttpAdapterData(
     agentId: string,
     projectId: string,
@@ -306,43 +299,41 @@ export class ScenarioWorkerManager {
     return { targetAdapter };
   }
 
-  /**
-   * Spawns a worker thread and returns a promise that resolves with the result.
-   */
   private spawnWorker(data: ScenarioWorkerData): Promise<ScenarioWorkerResult> {
-    return new Promise((resolve, reject) => {
-      // Resolve the worker script path
-      // In development, we use the TypeScript file via ts-node/tsx
-      // In production, we use the compiled JavaScript file
+    return new Promise((resolve) => {
       const workerPath = this.getWorkerPath();
 
-      logger.debug({ workerPath, scenarioId: data.scenarioId }, "Spawning worker");
+      logger.debug(
+        { workerPath, scenarioId: data.scenarioId },
+        "Spawning worker",
+      );
 
       const worker = new Worker(workerPath, {
         workerData: data,
-        // Enable TypeScript support in development
-        execArgv: process.env.NODE_ENV !== "production"
-          ? ["--import", "tsx"]
-          : undefined,
+        execArgv:
+          process.env.NODE_ENV !== "production"
+            ? ["--import", "tsx"]
+            : undefined,
       });
 
       let hasResolved = false;
 
+      const resolveOnce = (result: ScenarioWorkerResult) => {
+        if (!hasResolved) {
+          hasResolved = true;
+          resolve(result);
+        }
+      };
+
       worker.on("message", (message: WorkerMessage) => {
         switch (message.type) {
           case "result":
-            hasResolved = true;
-            resolve(message.data);
+            resolveOnce(message.data);
             break;
           case "error":
-            hasResolved = true;
-            resolve({
-              success: false,
-              error: message.error,
-            });
+            resolveOnce({ success: false, error: message.error });
             break;
           case "log":
-            // Forward worker logs
             logger[message.level](
               { workerId: worker.threadId, scenarioId: data.scenarioId },
               `[Worker] ${message.message}`,
@@ -352,53 +343,31 @@ export class ScenarioWorkerManager {
       });
 
       worker.on("error", (error) => {
-        if (!hasResolved) {
-          hasResolved = true;
-          logger.error(
-            { error, scenarioId: data.scenarioId },
-            "Worker thread error",
-          );
-          resolve({
-            success: false,
-            error: error.message,
-          });
-        }
+        logger.error(
+          { error, scenarioId: data.scenarioId },
+          "Worker thread error",
+        );
+        resolveOnce({ success: false, error: error.message });
       });
 
       worker.on("exit", (code) => {
-        if (!hasResolved) {
-          hasResolved = true;
-          if (code !== 0) {
-            logger.error(
-              { exitCode: code, scenarioId: data.scenarioId },
-              "Worker exited with non-zero code",
-            );
-            resolve({
-              success: false,
-              error: `Worker exited with code ${code}`,
-            });
-          } else {
-            // Worker exited cleanly but never sent a result
-            resolve({
-              success: false,
-              error: "Worker exited without sending result",
-            });
-          }
+        if (code !== 0) {
+          logger.error(
+            { exitCode: code, scenarioId: data.scenarioId },
+            "Worker exited with non-zero code",
+          );
+          resolveOnce({ success: false, error: `Worker exited with code ${code}` });
+        } else {
+          resolveOnce({ success: false, error: "Worker exited without sending result" });
         }
       });
     });
   }
 
-  /**
-   * Gets the path to the worker script.
-   */
   private getWorkerPath(): string {
-    // In production, use the compiled JS file
     if (process.env.NODE_ENV === "production") {
       return path.join(__dirname, "scenario-worker.js");
     }
-
-    // In development, use the TypeScript file
     return path.join(__dirname, "scenario-worker.ts");
   }
 
@@ -406,7 +375,15 @@ export class ScenarioWorkerManager {
     return env.BASE_HOST ?? "https://app.langwatch.ai";
   }
 
-  static create(prisma: PrismaClient): ScenarioWorkerManager {
-    return new ScenarioWorkerManager(prisma);
+  static create(
+    prisma: PrismaClient,
+    deps?: Partial<ScenarioWorkerManagerDeps>,
+  ): ScenarioWorkerManager {
+    return new ScenarioWorkerManager({
+      scenarioService: deps?.scenarioService ?? ScenarioService.create(prisma),
+      promptService: deps?.promptService ?? new PromptService(prisma),
+      agentRepository: deps?.agentRepository ?? new AgentRepository(prisma),
+      prisma,
+    });
   }
 }
