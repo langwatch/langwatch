@@ -63,7 +63,7 @@ agentic-e2e-tests/
 
 Tests map directly to Gherkin scenarios in `specs/`:
 
-```
+```text
 specs/scenarios/scenario-editor.feature  →  tests/scenarios/scenario-editor.spec.ts
 specs/scenarios/scenario-library.feature →  tests/scenarios/scenario-library.spec.ts
 ```
