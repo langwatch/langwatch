@@ -21,16 +21,25 @@ Worktrees should be created in the **workspace root** (parent of `langwatch-saas
 2. **Check if branch exists remotely:**
    ```bash
    git fetch origin
-   git branch -r | grep $ARGUMENTS
+   # Use exact match with word boundaries to avoid partial matches
+   if git branch -r | grep -qw "origin/$ARGUMENTS"; then
+     echo "Branch exists remotely"
+   else
+     echo "Branch does not exist, will create new branch"
+   fi
    ```
 
 3. **Create the worktree:**
-   - If branch exists: `git worktree add ../worktree-$ARGUMENTS $ARGUMENTS`
-   - If new branch: `git worktree add -b $ARGUMENTS ../worktree-$ARGUMENTS main`
+   - If branch exists: `git worktree add "../worktree-$ARGUMENTS" "$ARGUMENTS"`
+   - If new branch: `git worktree add -b "$ARGUMENTS" "../worktree-$ARGUMENTS" main`
 
 4. **Copy the .env file for local testing:**
    ```bash
-   cp langwatch/.env ../worktree-$ARGUMENTS/langwatch/.env
+   if [ -f langwatch/.env ]; then
+     cp langwatch/.env "../worktree-$ARGUMENTS/langwatch/.env" || echo "Warning: Failed to copy .env file"
+   else
+     echo "Warning: langwatch/.env not found, skipping copy"
+   fi
    ```
 
 5. **Verify setup:**
@@ -49,5 +58,5 @@ After completing, tell the user:
 
 To remove a worktree later:
 ```bash
-git worktree remove ../worktree-$ARGUMENTS
+git worktree remove "../worktree-$ARGUMENTS"
 ```

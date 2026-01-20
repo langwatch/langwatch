@@ -24,14 +24,25 @@ If PR number provided, use that: `$ARGUMENTS`
 
 ## Step 2: Fetch All Unresolved Comments
 
-Get all review comments and PR comments:
+Get all review comments and PR comments. First, extract repo info and set PR_NUMBER:
+
+```bash
+# Extract owner/repo from git remote (assumes origin)
+OWNER=$(gh repo view --json owner --jq '.owner.login')
+REPO=$(gh repo view --json name --jq '.name')
+
+# Set PR_NUMBER from arguments or detected PR
+PR_NUMBER="${ARGUMENTS:-$(gh pr list --head "$(git branch --show-current)" --json number --jq '.[0].number')}"
+```
+
+Then fetch comments:
 
 ```bash
 # Get PR review comments (code comments)
-gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.in_reply_to_id == null) | {id: .id, path: .path, line: .line, body: .body, user: .user.login, url: .html_url}'
+gh api "repos/$OWNER/$REPO/pulls/$PR_NUMBER/comments" --jq '.[] | select(.in_reply_to_id == null) | {id: .id, path: .path, line: .line, body: .body, user: .user.login, url: .html_url}'
 
 # Get PR conversation comments
-gh api repos/{owner}/{repo}/issues/{pr_number}/comments --jq '.[] | {id: .id, body: .body, user: .user.login, url: .html_url}'
+gh api "repos/$OWNER/$REPO/issues/$PR_NUMBER/comments" --jq '.[] | {id: .id, body: .body, user: .user.login, url: .html_url}'
 
 # Get pending review threads (unresolved)
 gh api graphql -f query='
@@ -54,7 +65,7 @@ gh api graphql -f query='
       }
     }
   }
-' -f owner=langwatch -f repo=langwatch -F pr=$PR_NUMBER
+' -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER"
 ```
 
 ## Step 3: Triage Comments
