@@ -215,12 +215,14 @@ interface MenuButtonProps {
 function MenuButton({ icon, title, description, onClick }: MenuButtonProps) {
   return (
     <HStack
+      as="button"
       padding={3}
       cursor="pointer"
       borderRadius="md"
       borderWidth="1px"
       borderColor="gray.200"
       bg="white"
+      width="100%"
       _hover={{ bg: "gray.50", borderColor: "gray.300" }}
       onClick={onClick}
       gap={3}
