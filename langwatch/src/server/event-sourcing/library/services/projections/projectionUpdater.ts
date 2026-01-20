@@ -23,6 +23,7 @@ import {
   ConfigurationError,
   categorizeError,
   handleError,
+  isNoEventsFoundError,
   isSequentialOrderingError,
   LockError,
   NoEventsFoundError,
@@ -575,25 +576,28 @@ export class ProjectionUpdater<
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          const isLockError =
-            error instanceof LockError ||
-            (typeof error === "object" &&
-              error !== null &&
-              (error as { name?: string }).name === "LockError");
+          const isLock = error instanceof LockError;
           const isOrderingError = isSequentialOrderingError(error);
+          const isNoEvents = isNoEventsFoundError(error);
 
-          if (isLockError || isOrderingError) {
+          if (isLock || isOrderingError || isNoEvents) {
             this.logger.debug(
               {
                 projectionName,
                 eventId: event.id,
                 aggregateId: String(event.aggregateId),
                 tenantId: event.tenantId,
-                errorType: isLockError ? "lock" : "ordering",
+                errorType: isLock
+                  ? "lock"
+                  : isOrderingError
+                    ? "ordering"
+                    : "no_events",
               },
-              isLockError
+              isLock
                 ? "Projection processing blocked by lock, will retry (expected behavior)"
-                : "Projection processing blocked by ordering, will retry (expected behavior)",
+                : isOrderingError
+                  ? "Projection processing blocked by ordering, will retry (expected behavior)"
+                  : "Projection processing delayed; events not yet visible, will retry",
             );
           } else {
             await this.checkpointManager.saveCheckpointSafely(

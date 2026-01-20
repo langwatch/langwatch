@@ -309,17 +309,29 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       }
 
       // For "no events found" errors (ClickHouse replication lag), use exponential backoff
+      // Note: BullMQ doesn't increment attemptsMade for DelayedError, so we track retries in job.data
       if (isNoEventsFoundError(error)) {
-        const exponentialDelayMs = this.calculateExponentialBackoff(
-          job.attemptsMade,
-        );
+        const jobData = job.data as Payload & {
+          _noEventsFoundRetryCount?: number;
+        };
+        const currentRetryCount = jobData._noEventsFoundRetryCount ?? 0;
+        const nextRetryCount = currentRetryCount + 1;
+
+        // Update job data with incremented retry count
+        await job.updateData({
+          ...jobData,
+          _noEventsFoundRetryCount: nextRetryCount,
+        });
+
+        const exponentialDelayMs =
+          this.calculateExponentialBackoff(currentRetryCount);
 
         this.logger.debug(
           {
             queueName: this.queueName,
             jobId: job.id,
             delayMs: exponentialDelayMs,
-            attemptsMade: job.attemptsMade,
+            noEventsFoundRetryCount: nextRetryCount,
           },
           "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
         );
@@ -408,7 +420,9 @@ export class EventSourcedQueueProcessorBullMq<Payload>
    * - Attempt 4: 32000ms
    * - Attempt 5+: 60000ms (capped)
    */
-  private calculateExponentialBackoff(attemptsMade: number | undefined): number {
+  private calculateExponentialBackoff(
+    attemptsMade: number | undefined,
+  ): number {
     const attempts = attemptsMade ?? 0;
     const delay =
       NO_EVENTS_FOUND_DELAY_CONFIG.baseDelayMs *
