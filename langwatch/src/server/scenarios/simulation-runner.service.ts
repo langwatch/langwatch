@@ -1,15 +1,8 @@
-import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { env } from "~/env.mjs";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger";
 import type { SimulationTarget } from "../api/routers/scenarios";
-import { getVercelAIModel } from "../modelProviders/utils";
-import { PromptService } from "../prompt-config/prompt.service";
-import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
-import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
-import { ScenarioService } from "./scenario.service";
+import { ScenarioWorkerManager } from "./worker/scenario-worker-manager";
 
 /** Default scenario set for local/quick runs */
 const _DEFAULT_SIMULATION_SET_ID = "local-scenarios";
@@ -31,111 +24,64 @@ interface ExecuteParams {
 
 /**
  * Service for running scenarios against targets.
+ *
+ * Scenarios are executed in isolated worker threads to ensure proper
+ * OpenTelemetry trace capture. Each worker has its own OTEL context
+ * that exports traces to LangWatch, independent of the server's
+ * global OTEL configuration.
+ *
+ * Architecture:
+ * - SimulationRunnerService (main process): Coordinates execution, validates inputs
+ * - ScenarioWorkerManager (main process): Pre-fetches data, spawns workers
+ * - scenario-worker.ts (worker thread): Isolated OTEL setup, runs scenario
+ *
+ * @see https://github.com/langwatch/langwatch/issues/1088
  */
 export class SimulationRunnerService {
-  private readonly scenarioService: ScenarioService;
-  private readonly promptService: PromptService;
+  private readonly workerManager: ScenarioWorkerManager;
 
   constructor(private readonly prisma: PrismaClient) {
-    this.scenarioService = ScenarioService.create(prisma);
-    this.promptService = new PromptService(prisma);
+    this.workerManager = ScenarioWorkerManager.create(prisma);
   }
 
   /**
-   * Execute a scenario against a target.
-   * Fire and forget - returns immediately, execution happens async.
+   * Execute a scenario against a target in an isolated worker thread.
+   *
+   * The scenario runs in a separate worker thread with its own OpenTelemetry
+   * context, ensuring traces are properly captured and sent to LangWatch
+   * without interfering with the server's global OTEL setup.
    */
   async execute(params: ExecuteParams): Promise<void> {
     const { projectId, scenarioId, target, setId, batchRunId } = params;
 
+    // Validate batchRunId
+    if (!batchRunId || typeof batchRunId !== "string") {
+      logger.error(
+        { batchRunId, type: typeof batchRunId },
+        "Invalid batchRunId",
+      );
+      throw new Error(`Invalid batchRunId: ${batchRunId}`);
+    }
+
+    logger.info(
+      {
+        scenarioId,
+        setId,
+        batchRunId,
+        targetType: target.type,
+      },
+      "Starting scenario execution in isolated worker",
+    );
+
     try {
-      // 1. Fetch scenario
-      const scenario = await this.scenarioService.getById({
+      // Execute scenario in isolated worker thread
+      const result = await this.workerManager.execute({
         projectId,
-        id: scenarioId,
+        scenarioId,
+        target,
+        setId,
+        batchRunId,
       });
-
-      if (!scenario) {
-        logger.error({ scenarioId, projectId }, "Scenario not found");
-        return;
-      }
-
-      // 2. Fetch project config
-      // TODO: We should use the project service or repository instead of prisma directly
-      const project = await this.prisma.project.findUnique({
-        where: { id: projectId },
-        select: { apiKey: true, defaultModel: true },
-      });
-
-      if (!project?.apiKey) {
-        throw new Error(`Project ${projectId} not found or has no API key`);
-      }
-
-      // 3. Get project's default model for simulator and judge agents
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
-      const simulatorModel = await getVercelAIModel(projectId, defaultModel);
-      const judgeModel = await getVercelAIModel(projectId, defaultModel);
-
-      // 4. Resolve target to adapter
-      logger.debug(
-        { targetType: target.type, referenceId: target.referenceId, projectId },
-        "Resolving target to adapter",
-      );
-      const adapter = this.resolveAdapter(target, projectId);
-      logger.debug(
-        { adapterName: adapter.name, adapterRole: adapter.role },
-        "Adapter resolved",
-      );
-
-      // 5. Run scenario with SDK
-      // Validate batchRunId is defined before passing to SDK
-      if (!batchRunId || typeof batchRunId !== "string") {
-        logger.error(
-          { batchRunId, type: typeof batchRunId },
-          "Invalid batchRunId",
-        );
-        throw new Error(`Invalid batchRunId: ${batchRunId}`);
-      }
-
-      logger.info(
-        {
-          scenarioId,
-          setId,
-          batchRunId,
-          batchRunIdLength: batchRunId.length,
-          targetType: target.type,
-          model: defaultModel,
-        },
-        "Starting scenario execution with batchRunId",
-      );
-
-      // Run in headless mode on server (don't open browser tabs)
-      process.env.SCENARIO_HEADLESS = "true";
-
-      const result = await ScenarioRunner.run(
-        {
-          id: scenarioId,
-          name: scenario.name,
-          description: scenario.situation,
-          setId,
-          agents: [
-            adapter,
-            ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-            ScenarioRunner.judgeAgent({
-              model: judgeModel,
-              criteria: scenario.criteria,
-            }),
-          ],
-          verbose: true,
-        },
-        {
-          batchRunId,
-          langwatch: {
-            endpoint: this.getLangWatchEndpoint(),
-            apiKey: project.apiKey,
-          },
-        },
-      );
 
       logger.info(
         {
@@ -147,40 +93,18 @@ export class SimulationRunnerService {
         },
         "Scenario execution completed",
       );
+
+      if (!result.success && result.error) {
+        logger.error(
+          { error: result.error, scenarioId, projectId },
+          "Scenario execution failed with error",
+        );
+      }
     } catch (error) {
       logger.error(
         { error, scenarioId, projectId, setId },
-        "Scenario execution failed",
+        "Scenario worker execution failed",
       );
-    }
-  }
-
-  private getLangWatchEndpoint(): string {
-    // Use BASE_HOST if available (self-referencing), otherwise default
-    return env.BASE_HOST ?? "https://app.langwatch.ai";
-  }
-
-  private resolveAdapter(
-    target: SimulationTarget,
-    projectId: string,
-  ): AgentAdapter {
-    switch (target.type) {
-      case "prompt":
-        return new PromptConfigAdapter(
-          target.referenceId,
-          this.promptService,
-          projectId,
-        );
-      case "http":
-        return HttpAgentAdapter.create({
-          agentId: target.referenceId,
-          projectId,
-          prisma: this.prisma,
-        });
-      default: {
-        const _exhaustive: never = target.type;
-        throw new Error(`Unknown target type: ${_exhaustive}`);
-      }
     }
   }
 
