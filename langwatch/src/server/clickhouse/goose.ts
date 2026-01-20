@@ -37,6 +37,7 @@ const TTL_ENV_VARS = [
 
 export interface GooseOptions {
   connectionUrl?: string;
+  database?: string; // Optional database override (takes precedence over URL path)
   migrationsDir?: string;
   verbose?: boolean;
 }
@@ -97,7 +98,7 @@ function validateNumericEnvVar(name: string, defaultVal: number): number {
   return num;
 }
 
-function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
+function parseConnectionUrl(connectionUrl?: string, databaseOverride?: string): ClickHouseConfig {
   const url = connectionUrl ?? process.env.CLICKHOUSE_URL;
 
   if (!url) {
@@ -117,10 +118,11 @@ function parseConnectionUrl(connectionUrl?: string): ClickHouseConfig {
     );
   }
 
-  const database = parsed.pathname.replace(/^\//, "");
+  // Use database override if provided, otherwise extract from URL path
+  const database = databaseOverride ?? parsed.pathname.replace(/^\//, "");
   if (!database) {
     throw new MigrationError(
-      "Database name must be specified in CLICKHOUSE_URL path (e.g., http://host:8123/langwatch)",
+      "Database name must be specified in CLICKHOUSE_URL path (e.g., http://host:8123/langwatch) or via database option",
       "preflight"
     );
   }
@@ -452,7 +454,7 @@ function executeGoose(
 }
 
 export async function migrateUp(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl);
+  const config = parseConnectionUrl(options.connectionUrl, options.database);
 
   logger.info("Running ClickHouse migrations...");
 
@@ -469,7 +471,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
 }
 
 export async function migrateDown(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl);
+  const config = parseConnectionUrl(options.connectionUrl, options.database);
 
   logger.info("Rolling back last ClickHouse migration...");
 
@@ -482,7 +484,7 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
 }
 
 export async function migrateReset(options: GooseOptions = {}): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl);
+  const config = parseConnectionUrl(options.connectionUrl, options.database);
 
   logger.info("Resetting all ClickHouse migrations...");
 
@@ -497,14 +499,14 @@ export async function migrateReset(options: GooseOptions = {}): Promise<string> 
 export async function getMigrateVersion(
   options: GooseOptions = {}
 ): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl);
+  const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("version", config, options);
 }
 
 export async function getMigrateStatus(
   options: GooseOptions = {}
 ): Promise<string> {
-  const config = parseConnectionUrl(options.connectionUrl);
+  const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("status", config, options);
 }
 
