@@ -456,12 +456,13 @@ jobs:
           PORT=5570 pnpm start &
           APP_PID=$!
 
-          # Global setup in playwright.config.ts waits for app readiness
-          # Run tests
-          pnpm exec playwright test --config=../playwright.config.ts
+          # Run tests (config is now in langwatch/playwright.config.ts)
+          pnpm exec playwright test
+          TEST_EXIT=$?
 
           # Cleanup
           kill $APP_PID || true
+          exit $TEST_EXIT
 
       - name: Upload test results
         if: always()
