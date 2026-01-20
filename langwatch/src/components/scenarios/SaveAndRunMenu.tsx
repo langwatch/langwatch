@@ -9,11 +9,10 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { setFlowCallbacks, useDrawer } from "../../hooks/useDrawer";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
-import { AgentPickerModal } from "./AgentPickerModal";
-import { PromptPickerModal } from "./PromptPickerModal";
 import type { TargetValue } from "./TargetSelector";
 
 interface SaveAndRunMenuProps {
@@ -28,7 +27,7 @@ interface SaveAndRunMenuProps {
 
 /**
  * Combined "Save and Run" dropdown menu with target selection.
- * Button-style menu items that open picker modals for prompts and agents.
+ * Button-style menu items that open drawer pickers for prompts and agents.
  */
 export function SaveAndRunMenu({
   selectedTarget,
@@ -45,10 +44,9 @@ export function SaveAndRunMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+  const { openDrawer, closeDrawer } = useDrawer();
 
   const [open, setOpen] = useState(false);
-  const [promptModalOpen, setPromptModalOpen] = useState(false);
-  const [agentModalOpen, setAgentModalOpen] = useState(false);
 
   // Get the name of the previous target for display
   const previousTargetInfo = useMemo(() => {
@@ -76,26 +74,42 @@ export function SaveAndRunMenu({
     }
   };
 
-  const handleOpenPromptModal = () => {
+  const handleOpenPromptDrawer = () => {
     setOpen(false);
-    setPromptModalOpen(true);
+    // Set up callback for when a prompt is selected
+    setFlowCallbacks("promptList", {
+      onSelect: (prompt) => {
+        const target: TargetValue = { type: "prompt", id: prompt.id };
+        onTargetChange(target);
+        onSaveAndRun(target);
+        closeDrawer();
+      },
+      onCreateNew: onCreatePrompt
+        ? () => {
+            closeDrawer();
+            onCreatePrompt();
+          }
+        : undefined,
+    });
+    openDrawer("promptList");
   };
 
-  const handleOpenAgentModal = () => {
+  const handleOpenAgentDrawer = () => {
     setOpen(false);
-    setAgentModalOpen(true);
-  };
-
-  const handleSelectPrompt = (promptId: string) => {
-    const target: TargetValue = { type: "prompt", id: promptId };
-    onTargetChange(target);
-    onSaveAndRun(target);
-  };
-
-  const handleSelectAgent = (agentId: string) => {
-    const target: TargetValue = { type: "http", id: agentId };
-    onTargetChange(target);
-    onSaveAndRun(target);
+    // Set up callback for when an agent is selected
+    setFlowCallbacks("agentList", {
+      onSelect: (agent) => {
+        const target: TargetValue = { type: "http", id: agent.id };
+        onTargetChange(target);
+        onSaveAndRun(target);
+        closeDrawer();
+      },
+      onCreateNew: () => {
+        closeDrawer();
+        onCreateAgent();
+      },
+    });
+    openDrawer("agentList");
   };
 
   const handleSaveWithoutRunning = () => {
@@ -103,105 +117,77 @@ export function SaveAndRunMenu({
     onSaveWithoutRunning();
   };
 
-  const handleCreateAgent = () => {
-    setAgentModalOpen(false);
-    onCreateAgent();
-  };
-
-  const handleCreatePrompt = () => {
-    setPromptModalOpen(false);
-    onCreatePrompt?.();
-  };
-
   return (
-    <>
-      <Popover.Root
-        open={open}
-        onOpenChange={(e) => setOpen(e.open)}
-        positioning={{ placement: "top-end" }}
-      >
-        <Popover.Trigger asChild>
-          <Button colorPalette="blue" size="sm" loading={isLoading}>
-            <Play size={14} />
-            Save and Run
-            <ChevronDown size={14} />
-          </Button>
-        </Popover.Trigger>
+    <Popover.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      positioning={{ placement: "top-end" }}
+    >
+      <Popover.Trigger asChild>
+        <Button colorPalette="blue" size="sm" loading={isLoading}>
+          <Play size={14} />
+          Save and Run
+          <ChevronDown size={14} />
+        </Button>
+      </Popover.Trigger>
 
-        <Portal>
-          <Popover.Content width="320px" padding={3}>
-            <VStack gap={2} align="stretch">
-              {/* Run Previous - only shown if there's a previous target */}
-              {previousTargetInfo && (
-                <>
-                  <MenuButton
-                    icon={<RotateCcw size={16} />}
-                    title="Run previous"
-                    description={`${previousTargetInfo.name} (${previousTargetInfo.type})`}
-                    onClick={handleRunPrevious}
-                  />
-                  <Box
-                    borderBottomWidth="1px"
-                    borderColor="gray.200"
-                    marginY={1}
-                  />
-                </>
-              )}
+      <Portal>
+        <Popover.Content width="320px" padding={3}>
+          <VStack gap={2} align="stretch">
+            {/* Run Previous - only shown if there's a previous target */}
+            {previousTargetInfo && (
+              <>
+                <MenuButton
+                  icon={<RotateCcw size={16} />}
+                  title="Run previous"
+                  description={`${previousTargetInfo.name} (${previousTargetInfo.type})`}
+                  onClick={handleRunPrevious}
+                />
+                <Box
+                  borderBottomWidth="1px"
+                  borderColor="gray.200"
+                  marginY={1}
+                />
+              </>
+            )}
 
-              {/* Run against prompt */}
-              <MenuButton
-                icon={<BookText size={16} />}
-                title="Run against prompt"
-                description="Test with a prompt config"
-                onClick={handleOpenPromptModal}
-              />
+            {/* Run against prompt */}
+            <MenuButton
+              icon={<BookText size={16} />}
+              title="Run against prompt"
+              description="Test with a prompt config"
+              onClick={handleOpenPromptDrawer}
+            />
 
-              {/* Run against agent */}
-              <MenuButton
-                icon={<Globe size={16} />}
-                title="Run against agent"
-                description="Test with an HTTP endpoint"
-                onClick={handleOpenAgentModal}
-              />
+            {/* Run against agent */}
+            <MenuButton
+              icon={<Globe size={16} />}
+              title="Run against agent"
+              description="Test with an HTTP endpoint"
+              onClick={handleOpenAgentDrawer}
+            />
 
-              {/* Save only */}
-              <Box borderBottomWidth="1px" borderColor="gray.200" marginY={1} />
-              <HStack
-                as="button"
-                paddingX={2}
-                paddingY={2}
-                cursor="pointer"
-                borderRadius="md"
-                width="100%"
-                _hover={{ bg: "gray.50" }}
-                onClick={handleSaveWithoutRunning}
-              >
-                <Save size={14} color="var(--chakra-colors-gray-500)" />
-                <Text fontSize="sm" color="gray.600">
-                  Save only
-                </Text>
-              </HStack>
-            </VStack>
-          </Popover.Content>
-        </Portal>
-      </Popover.Root>
-
-      {/* Prompt Picker Modal */}
-      <PromptPickerModal
-        open={promptModalOpen}
-        onClose={() => setPromptModalOpen(false)}
-        onSelect={handleSelectPrompt}
-        onCreateNew={handleCreatePrompt}
-      />
-
-      {/* Agent Picker Modal */}
-      <AgentPickerModal
-        open={agentModalOpen}
-        onClose={() => setAgentModalOpen(false)}
-        onSelect={handleSelectAgent}
-        onCreateNew={handleCreateAgent}
-      />
-    </>
+            {/* Save only */}
+            <Box borderBottomWidth="1px" borderColor="gray.200" marginY={1} />
+            <HStack
+              as="button"
+              paddingX={2}
+              paddingY={2}
+              cursor="pointer"
+              borderRadius="md"
+              width="100%"
+              _hover={{ bg: "gray.50" }}
+              onClick={handleSaveWithoutRunning}
+            >
+              <Save size={14} color="var(--chakra-colors-gray-500)" />
+              <Text fontSize="sm" color="gray.600">
+                Save only
+              </Text>
+            </HStack>
+          </VStack>
+        </Popover.Content>
+      </Portal>
+    </Popover.Root>
   );
 }
 
