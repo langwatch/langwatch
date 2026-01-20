@@ -21,7 +21,7 @@ If the request spans multiple capabilities, create separate feature files.
 
 - Draft a `.feature` file in the `specs/` directory
 - Use **only** these tags: `@e2e`, `@component`, `@integration`, `@unit`
-- Scenarios must be user/domain focused
+- Scenarios must be user/domain-focused
 - **One invariant per scenario**
 - Present for approval. **Do NOT write code yet.**
 

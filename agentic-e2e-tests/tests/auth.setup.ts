@@ -1,7 +1,14 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "path";
+import fs from "fs";
 
-const AUTH_FILE = path.join(__dirname, "..", ".auth", "user.json");
+const AUTH_DIR = path.join(__dirname, "..", ".auth");
+const AUTH_FILE = path.join(AUTH_DIR, "user.json");
+
+// Ensure .auth directory exists
+if (!fs.existsSync(AUTH_DIR)) {
+  fs.mkdirSync(AUTH_DIR, { recursive: true });
+}
 
 /**
  * Auth Setup for E2E Tests

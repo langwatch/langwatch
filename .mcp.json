@@ -7,9 +7,8 @@
         "playwright",
         "run-test-mcp-server",
         "--config",
-        "langwatch/playwright.config.ts"
-      ],
-      "cwd": "/Users/hope/workspace/langwatch/langwatch-saas"
+        "agentic-e2e-tests/playwright.config.ts"
+      ]
     }
   }
 }

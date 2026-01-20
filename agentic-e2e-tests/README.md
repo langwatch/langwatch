@@ -44,7 +44,7 @@ Tests run against a **locally-running Next.js dev server** with Docker providing
 
 ### Directory Structure
 
-```
+```text
 agentic-e2e-tests/
 ├── tests/
 │   └── scenarios/

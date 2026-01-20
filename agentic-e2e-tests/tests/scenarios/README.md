@@ -53,7 +53,7 @@ await page.getByRole("button", { name: /save/i }).last().click();
 
 The `scenario lifecycle` test combines multiple feature scenarios:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  Workflow: scenario lifecycle                                   │
 ├─────────────────────────────────────────────────────────────────┤

@@ -11,7 +11,7 @@ LangWatch is an observability and testing platform for LLM-powered applications.
 
 ## Value Proposition
 
-**"Transform 'maybe it works' into 'I know it behaves.'"**
+### "Transform 'maybe it works' into 'I know it behaves.'"
 
 LangWatch ensures agents:
 - **Succeed** - Complete user intent (booking, refund, etc.)
