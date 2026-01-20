@@ -837,7 +837,7 @@ class Evaluation:
         with self.lock:
             self.batch["evaluations"].append(eval)
 
-    def run(
+    def evaluate(
         self,
         evaluator_id: str,
         index: Union[int, Hashable],
@@ -846,6 +846,17 @@ class Evaluation:
         name: Optional[str] = None,
         as_guardrail: bool = False,
     ):
+        """
+        Run an evaluator on the current row.
+
+        Args:
+            evaluator_id: The evaluator type/slug (e.g., "langevals/exact_match", "ragas/faithfulness")
+            index: The row index for this evaluation
+            data: Data to pass to the evaluator (e.g., {"input": ..., "output": ..., "expected_output": ...})
+            settings: Evaluator-specific settings
+            name: Optional display name for the evaluation (defaults to evaluator_id)
+            as_guardrail: Whether to run as a guardrail (stricter pass/fail)
+        """
         duration: Optional[int] = None
 
         start_time = time.time()
@@ -870,4 +881,32 @@ class Evaluation:
             label=result.label,
             duration=duration,
             cost=result.cost,
+        )
+
+    def run(
+        self,
+        evaluator_id: str,
+        index: Union[int, Hashable],
+        data: Dict[str, Any],
+        settings: Dict[str, Any],
+        name: Optional[str] = None,
+        as_guardrail: bool = False,
+    ):
+        """
+        Deprecated: Use `evaluate()` instead.
+        """
+        import warnings
+
+        warnings.warn(
+            "evaluation.run() is deprecated, use evaluation.evaluate() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.evaluate(
+            evaluator_id=evaluator_id,
+            index=index,
+            data=data,
+            settings=settings,
+            name=name,
+            as_guardrail=as_guardrail,
         )

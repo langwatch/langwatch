@@ -491,7 +491,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
 const generatePythonSnippet = (slug: string): string => {
   return `import langwatch
 
-result = langwatch.evaluation.evaluate("${slug}")
+result = langwatch.evaluation.run("${slug}")
 result.print_summary()`;
 };
 

@@ -1,8 +1,7 @@
 from typing import Optional
 from langwatch.evaluation.evaluation import Evaluation
 from langwatch.evaluation.platform_run import (
-    evaluate,
-    run,  # Deprecated, kept for backwards compatibility
+    run,
     EvaluationRunResult,
     EvaluationRunSummary,
     EvaluationNotFoundError,
@@ -22,8 +21,7 @@ def init(name: str, *, run_id: Optional[str] = None) -> Evaluation:
 
 __all__ = [
     "init",
-    "evaluate",
-    "run",  # Deprecated
+    "run",
     "Evaluation",
     "EvaluationRunResult",
     "EvaluationRunSummary",

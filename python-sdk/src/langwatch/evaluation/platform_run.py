@@ -161,7 +161,7 @@ def _is_notebook() -> bool:
         return False
 
 
-def evaluate(
+def run(
     slug: str,
     *,
     poll_interval: float = 2.0,
@@ -196,7 +196,7 @@ def evaluate(
         ```python
         import langwatch
 
-        result = langwatch.evaluation.evaluate("my-evaluation-slug")
+        result = langwatch.evaluation.run("my-evaluation-slug")
         result.print_summary()
         ```
     """
@@ -433,30 +433,3 @@ def _print_summary(result: EvaluationRunResult) -> None:
     print("═" * 60 + "\n")
 
 
-def run(
-    slug: str,
-    *,
-    poll_interval: float = 2.0,
-    timeout: float = 600.0,
-    on_progress: Optional[Callable[[int, int], None]] = None,
-    api_key: Optional[str] = None,
-) -> EvaluationRunResult:
-    """
-    Deprecated: Use `evaluate()` instead.
-
-    Run a platform-configured evaluation and wait for completion.
-    """
-    import warnings
-
-    warnings.warn(
-        "langwatch.evaluation.run() is deprecated, use langwatch.evaluation.evaluate() instead",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return evaluate(
-        slug,
-        poll_interval=poll_interval,
-        timeout=timeout,
-        on_progress=on_progress,
-        api_key=api_key,
-    )

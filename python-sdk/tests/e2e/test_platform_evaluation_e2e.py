@@ -15,7 +15,7 @@ load_dotenv()
 import pytest
 
 import langwatch
-from langwatch.evaluation import evaluate, EvaluationRunResult
+from langwatch.evaluation import run, EvaluationRunResult
 from langwatch.evaluation.platform_run import (
     EvaluationNotFoundError,
     EvaluationsApiError,
@@ -26,12 +26,12 @@ from langwatch.evaluation.platform_run import (
 class TestErrorHandling:
     def test_raises_evaluation_not_found_for_non_existent_slug(self):
         with pytest.raises(EvaluationNotFoundError) as exc_info:
-            evaluate("non-existent-evaluation-slug-12345")
+            run("non-existent-evaluation-slug-12345")
         assert "non-existent-evaluation-slug-12345" in str(exc_info.value)
 
     def test_raises_api_error_with_invalid_api_key(self):
         with pytest.raises(EvaluationsApiError) as exc_info:
-            evaluate(
+            run(
                 os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation"),
                 api_key="invalid-api-key",
             )
@@ -46,7 +46,7 @@ class TestRunEvaluation:
     )
     def test_runs_evaluation_and_returns_results(self):
         slug = os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation")
-        result = evaluate(
+        result = run(
             slug,
             timeout=300,  # 5 minutes
             on_progress=lambda completed, total: print(f"Progress: {completed}/{total}"),
@@ -72,7 +72,7 @@ class TestRunEvaluation:
         slug = os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation")
         progress_updates: list[tuple[int, int]] = []
 
-        result = evaluate(
+        result = run(
             slug,
             timeout=300,
             on_progress=lambda completed, total: progress_updates.append(
