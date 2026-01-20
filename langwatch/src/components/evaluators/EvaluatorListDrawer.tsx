@@ -13,7 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Plus, Workflow } from "lucide-react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Menu } from "../ui/menu";
@@ -35,13 +35,17 @@ export type EvaluatorListDrawerProps = {
  */
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, goBack, canGoBack } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
+
+  // Get flow callbacks for this drawer (set by parent drawer like OnlineEvaluationDrawer)
+  const flowCallbacks = getFlowCallbacks("evaluatorList");
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
     props.onSelect ??
+    flowCallbacks?.onSelect ??
     (complexProps.onSelect as EvaluatorListDrawerProps["onSelect"]);
   const onCreateNew =
     props.onCreateNew ?? (() => openDrawer("evaluatorCategorySelector"));
@@ -60,7 +64,13 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 
   const handleSelectEvaluator = (evaluator: Evaluator) => {
     onSelect?.(evaluator);
-    onClose();
+    // Use goBack to return to the parent drawer if there is one,
+    // otherwise close the drawer completely
+    if (canGoBack) {
+      goBack();
+    } else {
+      onClose();
+    }
   };
 
   const handleEditEvaluator = (evaluator: Evaluator) => {

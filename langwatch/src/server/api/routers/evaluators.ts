@@ -44,6 +44,20 @@ export const evaluatorsRouter = createTRPCRouter({
     }),
 
   /**
+   * Gets a single evaluator by slug
+   */
+  getBySlug: protectedProcedure
+    .input(z.object({ slug: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const evaluatorService = EvaluatorService.create(ctx.prisma);
+      return await evaluatorService.getBySlug({
+        slug: input.slug,
+        projectId: input.projectId,
+      });
+    }),
+
+  /**
    * Creates a new evaluator
    */
   create: protectedProcedure

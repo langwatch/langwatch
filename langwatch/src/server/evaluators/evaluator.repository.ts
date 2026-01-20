@@ -1,4 +1,5 @@
 import type { Evaluator, Prisma, PrismaClient } from "@prisma/client";
+import { generateEvaluatorSlug } from "../../utils/evaluatorSlug";
 
 /**
  * Input type for creating an evaluator
@@ -7,6 +8,7 @@ export type CreateEvaluatorInput = {
   id: string;
   projectId: string;
   name: string;
+  slug?: string; // Auto-generated from name if not provided
   type: string; // "evaluator" (built-in) | "workflow" (custom)
   config: Prisma.InputJsonValue;
   workflowId?: string;
@@ -67,12 +69,57 @@ export class EvaluatorRepository {
   }
 
   /**
+   * Finds a single evaluator by slug within a project.
+   * Excludes archived evaluators by default.
+   */
+  async findBySlug(input: {
+    slug: string;
+    projectId: string;
+  }): Promise<Evaluator | null> {
+    return await this.prisma.evaluator.findFirst({
+      where: {
+        slug: input.slug,
+        projectId: input.projectId,
+        archivedAt: null,
+      },
+    });
+  }
+
+  /**
    * Creates a new evaluator.
+   * Auto-generates a slug from the name if not provided.
+   * Retries with a new nanoid suffix on unique constraint violation.
    */
   async create(input: CreateEvaluatorInput): Promise<Evaluator> {
-    return await this.prisma.evaluator.create({
-      data: input,
-    });
+    const MAX_RETRIES = 3;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const slug = input.slug ?? generateEvaluatorSlug(input.name);
+      try {
+        return await this.prisma.evaluator.create({
+          data: {
+            ...input,
+            slug,
+          },
+        });
+      } catch (error) {
+        // Check if it's a unique constraint violation on slug
+        if (
+          error instanceof Error &&
+          error.message.includes("Unique constraint") &&
+          error.message.includes("slug")
+        ) {
+          lastError = error;
+          // Retry with a new slug (don't use input.slug on retry)
+          input = { ...input, slug: undefined };
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError;
   }
 
   /**

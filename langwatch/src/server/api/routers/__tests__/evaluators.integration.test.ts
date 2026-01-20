@@ -54,6 +54,39 @@ describe("Evaluators Endpoints", () => {
       expect(result.archivedAt).toBeNull();
     });
 
+    it("auto-generates slug from evaluator name", async () => {
+      const result = await caller.evaluators.create({
+        projectId,
+        name: "My Custom Evaluator",
+        type: "evaluator",
+        config: { evaluatorType: "test" },
+      });
+
+      // Slug should be in format: slugified-name-XXXXX
+      expect(result.slug).toMatch(/^my-custom-evaluator-[a-zA-Z0-9_-]{5}$/);
+    });
+
+    it("generates unique slugs for evaluators with same name", async () => {
+      const result1 = await caller.evaluators.create({
+        projectId,
+        name: "Duplicate Name Test",
+        type: "evaluator",
+        config: { evaluatorType: "test" },
+      });
+
+      const result2 = await caller.evaluators.create({
+        projectId,
+        name: "Duplicate Name Test",
+        type: "evaluator",
+        config: { evaluatorType: "test" },
+      });
+
+      // Both should have slugs but they should be different
+      expect(result1.slug).toMatch(/^duplicate-name-test-[a-zA-Z0-9_-]{5}$/);
+      expect(result2.slug).toMatch(/^duplicate-name-test-[a-zA-Z0-9_-]{5}$/);
+      expect(result1.slug).not.toBe(result2.slug);
+    });
+
     it("creates an LLM Judge evaluator", async () => {
       const result = await caller.evaluators.create({
         projectId,
@@ -131,6 +164,58 @@ describe("Evaluators Endpoints", () => {
     it("returns null for non-existent evaluator", async () => {
       const found = await caller.evaluators.getById({
         id: "evaluator_nonexistent",
+        projectId,
+      });
+
+      expect(found).toBeNull();
+    });
+  });
+
+  describe("getBySlug", () => {
+    it("returns evaluator by slug", async () => {
+      const created = await caller.evaluators.create({
+        projectId,
+        name: "Slug Lookup Test",
+        type: "evaluator",
+        config: { evaluatorType: "test" },
+      });
+
+      const found = await caller.evaluators.getBySlug({
+        slug: created.slug!,
+        projectId,
+      });
+
+      expect(found?.id).toBe(created.id);
+      expect(found?.name).toBe("Slug Lookup Test");
+      expect(found?.slug).toBe(created.slug);
+    });
+
+    it("returns null for non-existent slug", async () => {
+      const found = await caller.evaluators.getBySlug({
+        slug: "non-existent-slug-12345",
+        projectId,
+      });
+
+      expect(found).toBeNull();
+    });
+
+    it("excludes archived evaluators from slug lookup", async () => {
+      const created = await caller.evaluators.create({
+        projectId,
+        name: "Archived Slug Test",
+        type: "evaluator",
+        config: {},
+      });
+
+      // Archive the evaluator
+      await caller.evaluators.delete({
+        id: created.id,
+        projectId,
+      });
+
+      // Should not find by slug anymore
+      const found = await caller.evaluators.getBySlug({
+        slug: created.slug!,
         projectId,
       });
 

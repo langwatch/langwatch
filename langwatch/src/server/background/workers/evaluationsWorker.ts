@@ -65,6 +65,7 @@ export async function runEvaluationJob(
       id: job.data.check.evaluator_id,
       projectId: job.data.trace.project_id,
     },
+    include: { evaluator: true },
   });
   if (!check) {
     throw `check config ${job.data.check.evaluator_id} not found`;
@@ -74,11 +75,19 @@ export async function runEvaluationJob(
     projectId: job.data.trace.project_id,
   });
 
+  // Use evaluator settings if available, otherwise fall back to monitor parameters
+  // This supports both new monitors (with evaluatorId) and legacy monitors (with inline parameters)
+  const settings =
+    check.evaluator && check.evaluator.config
+      ? (check.evaluator.config as Record<string, any>).settings ??
+        check.parameters
+      : check.parameters;
+
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
-    settings: check.parameters,
+    settings,
     mappings: check.mappings as MappingState | null,
     protections,
   });

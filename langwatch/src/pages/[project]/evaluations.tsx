@@ -25,7 +25,7 @@ import {
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
-import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
+import { NewEvaluationMenu } from "~/components/evaluations/NewEvaluationMenu";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
@@ -147,7 +147,7 @@ function EvaluationsV2() {
         <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
-          <NewEvaluationButton />
+          <NewEvaluationMenu />
         </HStack>
       </PageLayout.Header>
       <Container

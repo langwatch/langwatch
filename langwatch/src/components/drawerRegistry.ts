@@ -38,6 +38,9 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
+// Online Evaluations (Monitors) drawers
+import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
+import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 
 /**
  * Map of drawer names to their React components.
@@ -77,6 +80,9 @@ export const drawers = {
   scenarioEditor: ScenarioFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  // Online Evaluations (Monitors)
+  onlineEvaluation: OnlineEvaluationDrawer,
+  guardrails: GuardrailsDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

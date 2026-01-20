@@ -32,6 +32,13 @@ export class EvaluatorService {
   }
 
   /**
+   * Gets an evaluator by slug.
+   */
+  get getBySlug() {
+    return this.repository.findBySlug.bind(this.repository);
+  }
+
+  /**
    * Gets all evaluators for a project.
    */
   get getAll() {

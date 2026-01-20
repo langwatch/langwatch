@@ -24,6 +24,7 @@ export const monitorsRouter = createTRPCRouter({
       const checks = await prisma.monitor.findMany({
         where: { projectId },
         orderBy: { createdAt: "asc" },
+        include: { evaluator: true },
       });
 
       return checks;
@@ -52,12 +53,14 @@ export const monitorsRouter = createTRPCRouter({
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
         settings: z.object({}).passthrough(),
+        mappings: z.object({}).passthrough().optional(),
         sample: z.number().min(0).max(1),
         executionMode: z.enum([
           EvaluationExecutionMode.ON_MESSAGE,
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
+        evaluatorId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("evaluations:create"))
@@ -68,11 +71,26 @@ export const monitorsRouter = createTRPCRouter({
         checkType,
         preconditions,
         settings: parameters,
+        mappings,
         sample,
         executionMode,
+        evaluatorId,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
+
+      // Validate evaluator exists and belongs to project if provided
+      if (evaluatorId) {
+        const evaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId, archivedAt: null },
+        });
+        if (!evaluator) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Evaluator not found or does not belong to this project",
+          });
+        }
+      }
 
       validateCheckSettings(checkType, parameters);
 
@@ -85,9 +103,11 @@ export const monitorsRouter = createTRPCRouter({
           slug,
           preconditions,
           parameters,
+          mappings: mappings ?? {},
           sample,
           enabled: true,
           executionMode,
+          evaluatorId,
         },
       });
 
@@ -110,6 +130,7 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
+        evaluatorId: z.string().nullable().optional(),
       }),
     )
     .use(checkProjectPermission("evaluations:update"))
@@ -125,9 +146,23 @@ export const monitorsRouter = createTRPCRouter({
         enabled,
         executionMode,
         mappings,
+        evaluatorId,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
+
+      // Validate evaluator exists and belongs to project if provided
+      if (evaluatorId) {
+        const evaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId, archivedAt: null },
+        });
+        if (!evaluator) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Evaluator not found or does not belong to this project",
+          });
+        }
+      }
 
       validateCheckSettings(checkType, parameters);
 
@@ -143,6 +178,7 @@ export const monitorsRouter = createTRPCRouter({
           ...(enabled !== undefined && { enabled }),
           executionMode,
           mappings,
+          ...(evaluatorId !== undefined && { evaluatorId }),
         },
       });
 
@@ -157,6 +193,7 @@ export const monitorsRouter = createTRPCRouter({
 
       const check = await prisma.monitor.findUnique({
         where: { id, projectId },
+        include: { evaluator: true },
       });
 
       if (!check) {
