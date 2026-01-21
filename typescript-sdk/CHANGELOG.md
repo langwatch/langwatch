@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.12.0...typescript-sdk@v0.13.0) (2026-01-21)
+
+
+### Features
+
+* **llm-config:** upgrade model registry with dynamic parameters and OpenRouter sync ([#1115](https://github.com/langwatch/langwatch/issues/1115)) ([f03a283](https://github.com/langwatch/langwatch/commit/f03a283c1e49fa4127bbc82d01f301c6cc3fcf49))
+* **sdk:** add online evaluations API and ensureSetup for TypeScript ([2209258](https://github.com/langwatch/langwatch/commit/22092580433b9a3014123e62f39cf8c44543d8cc))
+
+
+### Miscellaneous
+
+* add pnpm-workspace to typescript-sdk to avoid issues with nested pnpm installation ([671b025](https://github.com/langwatch/langwatch/commit/671b025e42402bbd5eda84c89fa4a3224d1ed235))
+
+
+### Code Refactoring
+
+* **sdk:** rename evaluation API to experiment for new terminology ([f10326c](https://github.com/langwatch/langwatch/commit/f10326c0f2ee5818fbcf51507a95933bfe83caeb))
+* **sdk:** rename internal evaluation classes to experiment ([ff70cab](https://github.com/langwatch/langwatch/commit/ff70cab904905b85a77a68e7b1eb60e9c364a18d))
+
 ## [0.12.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.11.0...typescript-sdk@v0.12.0) (2026-01-18)
 
 
