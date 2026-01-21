@@ -269,7 +269,7 @@ export const updateEvaluationStatusInES = async ({
             label,
             details,
             error: error
-              ? JSON.stringify(captureError(error))
+              ? (error instanceof Error ? error.message : String(error))
               : undefined,
           });
         }
