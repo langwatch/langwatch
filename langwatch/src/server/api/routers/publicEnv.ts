@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
+import { getSelfHostedPlan } from "@langwatch/ee/license";
 import { skipPermissionCheck } from "../permission";
 import { publicProcedure } from "../trpc";
 
@@ -24,6 +25,7 @@ export const publicEnvRouter = publicProcedure
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
+      SELF_HOSTED_PLAN: getSelfHostedPlan(),
     };
 
     return publicEnvVars;

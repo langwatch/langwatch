@@ -103,6 +103,9 @@ export const env = createEnv({
 
     // ClickHouse Migration Configuration
     CLICKHOUSE_CLUSTER: z.string().optional(),
+
+    // Enterprise Edition License
+    LICENSE_KEY: z.string().optional(),
   },
 
   /**
@@ -203,6 +206,7 @@ export const env = createEnv({
       process.env.ENABLE_CLICKHOUSE === "true" ||
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
     CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
+    LICENSE_KEY: process.env.LICENSE_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
