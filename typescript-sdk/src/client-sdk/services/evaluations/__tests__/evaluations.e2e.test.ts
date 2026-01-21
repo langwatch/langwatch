@@ -10,7 +10,7 @@ import { EvaluatorNotFoundError, EvaluationsApiError } from "../errors";
 
 describe("Evaluations E2E", () => {
   let langwatch: LangWatch;
-  const endpoint = process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560";
+  const endpoint = process.env.LANGWATCH_ENDPOINT;
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
 
   beforeAll(() => {
