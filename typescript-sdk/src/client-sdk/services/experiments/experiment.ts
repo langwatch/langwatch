@@ -15,6 +15,7 @@ import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
 import type { LangWatchSpan } from "@/observability-sdk/span/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
+import { ensureSetup } from "@/observability-sdk/setup/node";
 import { generateHumanReadableId } from "./humanReadableId";
 import {
   ExperimentInitError,
@@ -138,6 +139,9 @@ export class Experiment {
       logger: Logger;
     } & ExperimentInitOptions
   ): Promise<Experiment> {
+    // Ensure observability is set up for proper tracing
+    ensureSetup();
+
     const experiment = new Experiment(name, options);
     await experiment.initialize();
     return experiment;
@@ -803,7 +807,10 @@ export class Experiment {
         trace_id: entry.trace_id,
         target_id: entry.target_id ?? null,
         cost: entry.cost ?? null,
-        predicted: entry.predicted ?? null,
+        // Only include predicted if it's defined (omit entirely when null/undefined)
+        ...(entry.predicted !== undefined && entry.predicted !== null
+          ? { predicted: entry.predicted }
+          : {}),
       })),
       evaluations: this.batch.evaluations.map((e) => ({
         name: e.name,

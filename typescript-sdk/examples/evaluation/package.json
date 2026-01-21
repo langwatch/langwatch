@@ -6,7 +6,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "start:with-evaluator": "tsx src/with-evaluator.ts",
-    "start:multi-target": "tsx src/multi-target.ts"
+    "start:multi-target": "tsx src/multi-target.ts",
+    "start:guardrail": "tsx src/guardrail.ts"
   },
   "keywords": [],
   "author": "LangWatch",

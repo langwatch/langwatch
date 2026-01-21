@@ -22,5 +22,4 @@
 | Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
 | Putting method-specific options interfaces in `types.ts` | Options interfaces belong in the file that uses them (e.g., `GetPromptOptions` in `prompts.facade.ts`) |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
-
-
+| Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |

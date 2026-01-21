@@ -291,3 +291,51 @@ export function createAndStartNodeSdk(
 
   return sdk;
 }
+
+/**
+ * Ensure observability is set up, but only if not already configured.
+ * 
+ * This is an idempotent function that:
+ * - Does nothing if OpenTelemetry is already configured (by you or another library)
+ * - Sets up LangWatch observability if no tracer provider exists
+ * - Does nothing if LANGWATCH_API_KEY is not set
+ * 
+ * This is useful for libraries/SDKs that want to ensure tracing is available
+ * without conflicting with user's existing observability setup.
+ * 
+ * @example
+ * ```typescript
+ * import { ensureSetup } from "langwatch/observability/node";
+ * 
+ * // Safe to call - won't conflict with existing setup
+ * ensureSetup();
+ * 
+ * // Now you can use tracing
+ * const tracer = trace.getTracer("my-app");
+ * ```
+ */
+export const ensureSetup = (): ObservabilityHandle => {
+  const globalProvider = trace.getTracerProvider();
+  const alreadySetup = isConcreteProvider(globalProvider);
+  
+  // If already set up, return no-op handle (don't log error, just silently skip)
+  if (alreadySetup) {
+    return {
+      shutdown: async () => {
+        // No-op - we didn't set up anything
+      },
+    };
+  }
+  
+  // If no API key, return no-op handle (can't set up without it)
+  if (!process.env.LANGWATCH_API_KEY) {
+    return {
+      shutdown: async () => {
+        // No-op - no API key available
+      },
+    };
+  }
+  
+  // Set up observability with defaults
+  return setupObservability();
+};

@@ -10,9 +10,17 @@ export {
   ExperimentRunFailedError,
   ExperimentsApiError,
 } from "./services/experiments";
+export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./services/evaluations";
+export {
+  EvaluationError,
+  EvaluatorCallError,
+  EvaluatorNotFoundError,
+  EvaluationsApiError,
+} from "./services/evaluations";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { ExperimentsFacade } from "./services/experiments";
 import { DatasetsFacade } from "./services/datasets";
+import { EvaluationsFacade } from "./services/evaluations";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -51,6 +59,25 @@ export class LangWatch {
    */
   readonly experiments: ExperimentsFacade;
 
+  /**
+   * Run evaluators and guardrails in real-time (Online Evaluations).
+   *
+   * @example
+   * ```typescript
+   * // Run a guardrail
+   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+   *   data: { input: userInput, output: generatedResponse },
+   *   name: "PII Detection",
+   *   asGuardrail: true,
+   * });
+   *
+   * if (!guardrail.passed) {
+   *   return "I'm sorry, I can't do that.";
+   * }
+   * ```
+   */
+  readonly evaluations: EvaluationsFacade;
+
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = options.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
@@ -77,6 +104,12 @@ export class LangWatch {
 
     this.datasets = new DatasetsFacade({
       langwatchApiClient: this.config.langwatchApiClient,
+      logger: this.config.logger,
+    });
+
+    this.evaluations = new EvaluationsFacade({
+      endpoint: this.config.endpoint,
+      apiKey: this.config.apiKey,
       logger: this.config.logger,
     });
   }
