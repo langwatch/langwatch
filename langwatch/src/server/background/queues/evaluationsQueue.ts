@@ -54,12 +54,14 @@ export const scheduleEvaluation = async ({
   });
 
   // Emit evaluation scheduled event to event sourcing pipeline
-  const project = await prisma.project.findUnique({
-    where: { id: trace.project_id },
-    select: { featureEventSourcingEvaluationIngestion: true },
-  });
-  if (project?.featureEventSourcingEvaluationIngestion) {
-    try {
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: trace.project_id },
+      select: { featureEventSourcingEvaluationIngestion: true },
+    });
+    if (project?.featureEventSourcingEvaluationIngestion) {
       await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
         tenantId: trace.project_id,
         evaluationId: getEvaluationId(check),
@@ -69,17 +71,15 @@ export const scheduleEvaluation = async ({
         traceId: trace.trace_id,
         isGuardrail: false,
       });
-    } catch (error) {
-      // Note: Event sourcing errors are logged but not re-thrown because the evaluation
-      // should proceed even if event tracking fails. Errors are captured for monitoring.
-      captureException(error, {
-        extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: "scheduled" },
-      });
-      logger.error(
-        { error, check, trace },
-        "Failed to emit evaluation scheduled event",
-      );
     }
+  } catch (error) {
+    captureException(error, {
+      extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: "scheduled" },
+    });
+    logger.warn(
+      { error, check, trace },
+      "Failed to check feature flag or emit evaluation scheduled event",
+    );
   }
 
   const jobId = traceCheckIndexId({
@@ -235,13 +235,15 @@ export const updateEvaluationStatusInES = async ({
 
   // Emit evaluation events to event sourcing pipeline based on status
   // Skip "scheduled" status here since it's handled in scheduleEvaluation()
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
   if (status !== "scheduled") {
-    const project = await prisma.project.findUnique({
-      where: { id: trace.project_id },
-      select: { featureEventSourcingEvaluationIngestion: true },
-    });
-    if (project?.featureEventSourcingEvaluationIngestion) {
-      try {
+    try {
+      const project = await prisma.project.findUnique({
+        where: { id: trace.project_id },
+        select: { featureEventSourcingEvaluationIngestion: true },
+      });
+      if (project?.featureEventSourcingEvaluationIngestion) {
         const evaluationId = getEvaluationId(check);
         if (status === "in_progress") {
           // Emit started event
@@ -273,17 +275,15 @@ export const updateEvaluationStatusInES = async ({
               : undefined,
           });
         }
-      } catch (eventError) {
-        // Note: Event sourcing errors are logged but not re-thrown because the evaluation
-        // should proceed even if event tracking fails. Errors are captured for monitoring.
-        captureException(eventError, {
-          extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: status },
-        });
-        logger.error(
-          { error: eventError, check, trace, status },
-          "Failed to emit evaluation event",
-        );
       }
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: status },
+      });
+      logger.warn(
+        { error: eventError, check, trace, status },
+        "Failed to check feature flag or emit evaluation event",
+      );
     }
   }
 };
