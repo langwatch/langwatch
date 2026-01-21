@@ -2,6 +2,7 @@ packages:
   - .
   - "saas-src/*"
   - "packages/*"
+  - "ee"
 
 onlyBuiltDependencies:
   - '@prisma/client'
