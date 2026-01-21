@@ -270,7 +270,7 @@ export const VariableInsertMenu = ({
         ref={menuRef}
         width={`${MENU_WIDTH}px`}
         maxHeight={`${MENU_MAX_HEIGHT}px`}
-        background="white"
+        background="bg.panel"
         borderRadius="8px"
         boxShadow="lg"
         border="1px solid"
@@ -319,7 +319,7 @@ export const VariableInsertMenu = ({
               padding={2}
               borderBottom="1px solid"
               borderColor="border.muted"
-              background="gray.50"
+              background="bg.subtle"
             >
               <Text fontSize="sm" color="fg.muted" fontFamily="mono">
                 {`{{${query}`}
@@ -350,7 +350,7 @@ export const VariableInsertMenu = ({
                     paddingX={2}
                     paddingY={1}
                     gap={2}
-                    background="gray.50"
+                    background="bg.subtle"
                     borderRadius="4px"
                     marginBottom={1}
                     marginTop={sourceIndex > 0 ? 2 : 0}

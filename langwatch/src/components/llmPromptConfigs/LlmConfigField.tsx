@@ -47,7 +47,7 @@ export function LLMConfigField({
             border="1px solid"
             borderColor="border"
             cursor="pointer"
-            _hover={{ bg: "gray.50" }}
+            _hover={{ bg: "bg.subtle" }}
             transition="background 0.15s"
             justify="space-between"
             opacity={modelOption?.isDisabled ? 0.5 : 1}

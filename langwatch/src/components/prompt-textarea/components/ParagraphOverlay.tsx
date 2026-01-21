@@ -144,7 +144,7 @@ export function GripHandles({
             left={0}
             right={0}
             height="2px"
-            background="blue.500"
+            background="blue.solid"
             pointerEvents="none"
             zIndex={10}
             borderRadius="full"

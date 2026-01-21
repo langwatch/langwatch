@@ -366,7 +366,7 @@ export const PromptTextAreaWithVariables = ({
               : `1px solid ${
                   hasError
                     ? "var(--chakra-colors-red-500)"
-                    : "var(--chakra-colors-gray-200)"
+                    : "var(--chakra-colors-border)"
                 }`,
             borderRadius: borderless ? "0" : "12px",
             outline: "none",
@@ -385,7 +385,7 @@ export const PromptTextAreaWithVariables = ({
             if (borderless) return;
             e.currentTarget.style.borderColor = hasError
               ? "var(--chakra-colors-red-500)"
-              : "var(--chakra-colors-gray-200)";
+              : "var(--chakra-colors-border)";
             e.currentTarget.style.borderWidth = "1px";
             e.currentTarget.style.padding = "8px 10px";
           }}
@@ -411,8 +411,8 @@ export const PromptTextAreaWithVariables = ({
           {invalidVariables.length > 0 && (
             <Text
               fontSize="xs"
-              color="red.800"
-              backgroundColor="red.50"
+              color="red.fg"
+              backgroundColor="red.subtle"
               borderRadius="lg"
               padding={1}
               marginBottom={1}

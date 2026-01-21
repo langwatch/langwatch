@@ -214,7 +214,7 @@ export function PromptsList({
                         <Badge
                           colorPalette="green"
                           border="1px solid"
-                          borderColor="green.200"
+                          borderColor="green.muted"
                         >
                           v{config.version}
                         </Badge>
@@ -376,7 +376,7 @@ export function PromptsList({
                       >
                         <Menu.Item
                           value="delete"
-                          color="red.600"
+                          color="red.fg"
                           onClick={(_event) => {
                             if (hasPromptsDeletePermission) {
                               void onDelete(config);

@@ -98,7 +98,7 @@ export function ParameterRow({
           borderColor="border"
           cursor={disabled ? "not-allowed" : "pointer"}
           opacity={disabled ? 0.5 : 1}
-          _hover={disabled ? {} : { bg: "gray.50" }}
+          _hover={disabled ? {} : { bg: "bg.subtle" }}
           transition="background 0.15s"
           data-testid={`parameter-row-${name}`}
         >

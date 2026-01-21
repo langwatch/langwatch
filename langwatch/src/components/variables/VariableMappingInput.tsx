@@ -420,7 +420,7 @@ export const VariableMappingInput = ({
             width={`${Math.max(dropdownPosition.width, 280)}px`}
             maxHeight="300px"
             overflowY="auto"
-            background="white"
+            background="bg.panel"
             borderRadius="8px"
             boxShadow="lg"
             border="1px solid"
@@ -442,7 +442,7 @@ export const VariableMappingInput = ({
                       paddingX={2}
                       paddingY={1}
                       gap={2}
-                      background="gray.50"
+                      background="bg.subtle"
                       borderRadius="4px"
                       marginBottom={1}
                     >
@@ -507,7 +507,7 @@ export const VariableMappingInput = ({
                 {searchQuery.trim() && (
                   <div data-testid="use-as-value-option">
                     {filteredSources.length > 0 && (
-                      <Box height="1px" background="gray.200" marginY={1} />
+                      <Box height="1px" background="border" marginY={1} />
                     )}
                     <HStack
                       paddingX={3}
