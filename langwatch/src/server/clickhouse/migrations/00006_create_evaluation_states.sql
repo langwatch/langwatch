@@ -3,9 +3,13 @@
 -- +goose StatementBegin
 
 -- ============================================================================
--- LangWatch ClickHouse Schema - Create Evaluation States
+-- Table: evaluation_states
 -- ============================================================================
 -- Tracks current state of each evaluation for stuck detection.
+--
+-- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_CLUSTER)
+-- - DDL replication handled by Replicated database engine
+-- - Data replication handled by ReplicatedReplacingMergeTree when enabled
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_states
@@ -42,8 +46,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_states
     INDEX idx_started_at StartedAt TYPE minmax GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
+PARTITION BY toYearWeek(UpdatedAt)
 ORDER BY (TenantId, EvaluationId)
-SETTINGS index_granularity = 8192;
+TTL toDateTime(UpdatedAt) + INTERVAL ${TIERED_EVALUATION_STATES_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
