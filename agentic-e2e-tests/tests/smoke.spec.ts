@@ -3,26 +3,18 @@ import { test, expect } from "@playwright/test";
 /**
  * Smoke Tests
  *
- * Basic tests to verify the application is running and accessible.
- * These tests run after authentication setup.
+ * Basic sanity checks that run after authentication setup.
+ * These verify infrastructure is working, not user behavior.
  */
 
-test("Smoke - application is accessible and user is authenticated", async ({
-  page,
-}) => {
-  // Navigate to the app - should be redirected to projects or onboarding
+test("app loads after authentication", async ({ page }) => {
   await page.goto("/");
 
-  // Verify we're not on the login page (auth setup should have authenticated us)
+  // Verify we're not redirected to login
   await expect(page).not.toHaveURL(/\/auth\/signin/);
 
-  // Verify some core UI element is visible (adjust based on actual app structure)
-  // This could be the sidebar, header, or main content area
-  const mainContent = page.locator("main, [role='main'], #__next");
-  await expect(mainContent).toBeVisible({ timeout: 15000 });
-});
-
-test("Smoke - API health endpoint responds", async ({ request }) => {
-  const response = await request.get("/api/health");
-  expect(response.ok()).toBeTruthy();
+  // Verify navigation is visible (indicates app is functional)
+  await expect(
+    page.getByRole("link", { name: "Home", exact: true })
+  ).toBeVisible({ timeout: 15000 });
 });

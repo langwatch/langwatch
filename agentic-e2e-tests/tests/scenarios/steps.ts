@@ -4,6 +4,7 @@
  * These functions are named to match Gherkin language from feature files:
  * - specs/scenarios/scenario-editor.feature
  * - specs/scenarios/scenario-library.feature
+ * - specs/scenarios/scenario-execution.feature
  *
  * Usage: Import and compose these steps in test files to create
  * readable tests that map directly to feature specifications.
@@ -31,11 +32,9 @@ export async function givenIAmLoggedIntoProject(page: Page) {
  * When I am on the scenarios list page
  */
 export async function givenIAmOnTheScenariosListPage(page: Page) {
-  // Navigate to root and wait for app to be ready
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/");
 
   // Wait for the sidebar Home link to appear (indicates app is loaded)
-  // The Home link is in the sidebar with an href like "/project-slug"
   const homeLink = page.getByRole("link", { name: "Home", exact: true });
   await expect(homeLink).toBeVisible({ timeout: 30000 });
 
@@ -48,6 +47,30 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
 
   await page.goto(`/${projectSlug}/simulations/scenarios`);
   await expect(page).toHaveURL(/simulations\/scenarios/);
+}
+
+/**
+ * Given I am on the simulations page (Runs)
+ */
+export async function givenIAmOnTheSimulationsPage(page: Page) {
+  await page.goto("/");
+
+  // Wait for dashboard to load
+  await expect(
+    page.getByRole("heading", { name: /hello/i })
+  ).toBeVisible({ timeout: 15000 });
+
+  // Expand simulations submenu
+  const simulationsButton = page.getByRole("button", { name: /expand simulations/i });
+  await expect(simulationsButton).toBeVisible({ timeout: 5000 });
+  await simulationsButton.click();
+
+  // Click "Runs" link
+  const runsLink = page.getByRole("link", { name: "Runs", exact: true });
+  await expect(runsLink).toBeVisible({ timeout: 5000 });
+  await runsLink.click();
+
+  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
 
 /**
@@ -100,12 +123,12 @@ export async function thenISeeScenarioFormFields(page: Page) {
     page.getByRole("textbox", { name: "Name", exact: true }).first()
   ).toBeVisible();
 
-  // Situation field
+  // Situation field (using placeholder as fallback - no label available)
   await expect(
     page.getByPlaceholder(/a frustrated premium subscriber/i).first()
   ).toBeVisible();
 
-  // Criteria field
+  // Criteria field (using placeholder as fallback - no label available)
   await expect(
     page.getByPlaceholder(/must apologize for the inconvenience/i).first()
   ).toBeVisible();
@@ -147,7 +170,6 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
   // Criteria appear as textbox inputs with the criterion as their value
-  // Use web-first assertion with getByRole for user-facing locators
   const criterionInput = page
     .getByRole("textbox")
     .filter({ hasText: criterion })
@@ -170,16 +192,21 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete
-  await page.waitForTimeout(1000);
+  // Wait for save to complete by checking dialog closes or list updates
+  await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
 /**
  * When I close the scenario editor
  */
 export async function whenICloseTheEditor(page: Page) {
-  await page.getByRole("button", { name: "Close" }).last().click();
-  await page.waitForTimeout(500);
+  const closeButton = page.getByRole("button", { name: "Close" }).last();
+  await closeButton.click();
+
+  // Wait for dialog to close
+  await expect(
+    page.getByRole("heading", { name: /create scenario|edit scenario/i }).last()
+  ).not.toBeVisible({ timeout: 5000 });
 }
 
 // =============================================================================
@@ -222,21 +249,71 @@ export async function whenIChangeNameTo(page: Page, name: string) {
  * Then "<name>" appears in the list
  */
 export async function thenScenarioAppearsInList(page: Page, name: string) {
-  // Use .first() in case the name appears multiple times (e.g., in table and elsewhere)
   await expect(page.getByText(name).first()).toBeVisible({ timeout: 10000 });
 }
 
 /**
- * Then I see an empty state message
- * And I see a call to action to create a scenario
+ * Then I see the empty state
  */
-export async function thenISeeEmptyStateOrScenarioList(page: Page) {
-  const emptyStateText = page.getByText("No scenarios yet");
-  const createButton = page.getByRole("button", { name: "Create Scenario" });
-  const table = page.getByRole("table");
+export async function thenISeeEmptyState(page: Page) {
+  await expect(page.getByText("No scenarios yet")).toBeVisible({ timeout: 10000 });
+}
 
-  // Wait for any of these to be visible
-  await expect(
-    emptyStateText.or(createButton).or(table).first()
-  ).toBeVisible({ timeout: 10000 });
+/**
+ * Then I see the scenarios table
+ */
+export async function thenISeeScenarioTable(page: Page) {
+  await expect(page.getByRole("table")).toBeVisible({ timeout: 10000 });
+}
+
+// =============================================================================
+// Scenario Execution Steps
+// =============================================================================
+
+/**
+ * Then I see the simulations page content
+ */
+export async function thenISeeSimulationsPageContent(page: Page) {
+  // Either empty state or simulation results
+  const emptyStateHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
+  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+
+  await expect(emptyStateHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * When I click "Run" on a scenario
+ */
+export async function whenIClickRunOnScenario(page: Page) {
+  await page.getByRole("button", { name: /^run$/i }).last().click();
+}
+
+/**
+ * Then the run starts
+ */
+export async function thenTheRunStarts(page: Page) {
+  // Look for running indicator or navigation to run page
+  const runningIndicator = page.getByText(/running|in progress/i);
+  const runPage = page.locator("[data-testid='run-visualization']");
+
+  await expect(runningIndicator.or(runPage).first()).toBeVisible({ timeout: 30000 });
+}
+
+/**
+ * Then I see the conversation
+ */
+export async function thenISeeTheConversation(page: Page) {
+  // Conversation messages appear in the run visualization
+  const messageContainer = page.getByRole("log").or(page.locator("[data-testid='conversation']"));
+  await expect(messageContainer).toBeVisible({ timeout: 30000 });
+}
+
+/**
+ * Then I see pass/fail status
+ */
+export async function thenISeePassFailStatus(page: Page) {
+  const passStatus = page.getByText(/pass|passed/i);
+  const failStatus = page.getByText(/fail|failed/i);
+
+  await expect(passStatus.or(failStatus).first()).toBeVisible({ timeout: 30000 });
 }

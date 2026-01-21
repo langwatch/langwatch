@@ -4,7 +4,8 @@ import {
   givenIAmOnTheScenariosListPage,
   thenISeeTheScenariosListPage,
   thenISeeNewScenarioButton,
-  thenISeeEmptyStateOrScenarioList,
+  thenISeeEmptyState,
+  thenISeeScenarioTable,
 } from "./steps";
 
 /**
@@ -19,52 +20,28 @@ import {
  * filter by label) are covered by the workflow test in scenario-editor.spec.ts
  */
 test.describe("Scenario Library", () => {
-  // Background: Given I am logged into project
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);
   });
 
-  // ===========================================================================
-  // Navigation
-  // ===========================================================================
-
   /**
-   * Scenario: Navigate to scenarios list
-   * Source: scenario-library.feature lines 13-17
-   */
-  test("navigate to scenarios list", async ({ page }) => {
-    // When I navigate to the scenarios list page
-    await givenIAmOnTheScenariosListPage(page);
-
-    // Then I see the scenarios list page
-    await thenISeeTheScenariosListPage(page);
-
-    // And I see a "New Scenario" button
-    await thenISeeNewScenarioButton(page);
-  });
-
-  // ===========================================================================
-  // List View
-  // ===========================================================================
-
-  /**
-   * Scenario: Empty state when no scenarios
-   * Source: scenario-library.feature lines 41-45
+   * Scenario: View scenarios list page
+   * Source: scenario-library.feature lines 13-17, 41-45
    *
-   * Note: "View scenarios in list" and "Click scenario row to edit" are
-   * covered by the workflow test in scenario-editor.spec.ts
+   * Verifies the scenarios page displays correctly with either
+   * empty state or existing scenarios table.
    */
-  test("empty state or list when on scenarios page", async ({ page }) => {
-    // Given I am on the scenarios list page
+  test("displays scenario library with new scenario button", async ({ page }) => {
     await givenIAmOnTheScenariosListPage(page);
 
-    // Then I see the Scenario Library heading
     await thenISeeTheScenariosListPage(page);
-
-    // And I see the "New Scenario" button
     await thenISeeNewScenarioButton(page);
 
-    // Then I see an empty state message OR a list of scenarios
-    await thenISeeEmptyStateOrScenarioList(page);
+    // Verify either empty state or table is shown
+    const emptyState = page.getByText("No scenarios yet");
+    const table = page.getByRole("table");
+
+    // One of these should be visible
+    await emptyState.or(table).first().waitFor({ state: "visible", timeout: 10000 });
   });
 });

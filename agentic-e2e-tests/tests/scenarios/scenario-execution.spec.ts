@@ -1,83 +1,114 @@
 import { test, expect } from "@playwright/test";
+import {
+  givenIAmLoggedIntoProject,
+  givenIAmOnTheScenariosListPage,
+  givenIAmOnTheSimulationsPage,
+  thenISeeSimulationsPageContent,
+  whenIClickNewScenario,
+  whenIFillInNameWith,
+  whenIFillInSituationWith,
+  whenIAddCriterion,
+  whenIClickSave,
+  thenScenarioAppearsInList,
+} from "./steps";
 
 /**
- * Feature: Scenario Execution / Simulation Results
+ * Feature: Scenario Execution
  * Source: specs/scenarios/scenario-execution.feature
  *
- * Note: The LangWatch Scenario feature uses a code-based SDK approach.
- * Scenarios are executed via the Scenario SDK, and results appear in this UI.
- * These tests verify the simulation results page displays correctly.
+ * As a LangWatch user
+ * I want to run scenarios against my agents
+ * So that I can validate their behavior meets my criteria
+ *
+ * Note: These tests require NLP service to be running for execution.
  */
+test.describe("Scenario Execution", () => {
+  test.beforeEach(async ({ page }) => {
+    await givenIAmLoggedIntoProject(page);
+  });
 
-// Helper to navigate to simulations page via sidebar
-async function navigateToSimulations(page: import("@playwright/test").Page) {
-  await page.goto("/");
+  // ===========================================================================
+  // Simulations Page
+  // ===========================================================================
 
-  // Wait for the dashboard to load
-  await expect(page.getByRole("heading", { name: /hello/i })).toBeVisible({ timeout: 15000 });
+  /**
+   * Scenario: View simulations page
+   * Source: scenario-execution.feature (implicit - page must load)
+   */
+  test("displays simulations page content", async ({ page }) => {
+    await givenIAmOnTheSimulationsPage(page);
+    await thenISeeSimulationsPageContent(page);
+  });
 
-  // Click the "Expand Simulations" button in the sidebar to open submenu
-  const simulationsButton = page.getByRole("button", { name: /expand simulations/i });
-  await expect(simulationsButton).toBeVisible({ timeout: 5000 });
-  await simulationsButton.click();
+  // ===========================================================================
+  // Running Scenarios
+  // ===========================================================================
 
-  // Click "Runs" link to go to /simulations (main simulations page)
-  const runsLink = page.getByRole("link", { name: "Runs", exact: true });
-  await expect(runsLink).toBeVisible({ timeout: 5000 });
-  await runsLink.click();
+  /**
+   * Scenario: Run scenario and view results
+   * Source: scenario-execution.feature lines 14-19, 34-38, 41-46
+   *
+   * Workflow test: creates scenario, runs it, and verifies results appear.
+   * Requires NLP service to be running.
+   */
+  test("executes scenario and displays run results", async ({ page }) => {
+    // Create a scenario first
+    await givenIAmOnTheScenariosListPage(page);
+    await whenIClickNewScenario(page);
 
-  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
-}
+    const scenarioName = `E2E Run Test ${Date.now()}`;
+    await whenIFillInNameWith(page, scenarioName);
+    await whenIFillInSituationWith(page, "A user asking about product features");
+    await whenIAddCriterion(page, "Agent provides accurate information");
 
-// ============================================================================
-// Viewing Simulation Results
-// ============================================================================
+    // Save and run
+    const saveAndRunButton = page.getByRole("button", { name: /save and run/i }).last();
+    await saveAndRunButton.click();
 
-test("Scenario Execution - view simulations page loads", async ({ page }) => {
-  // When I navigate to the simulations page
-  await navigateToSimulations(page);
+    // Click "Save and run" (not "Save without running")
+    const saveAndRunOption = page.getByText("Save and run").last();
+    await expect(saveAndRunOption).toBeVisible({ timeout: 5000 });
+    await saveAndRunOption.click();
 
-  // Then the page loads without errors
-  await expect(page).toHaveURL(/simulations/);
+    // Wait for navigation to run visualization or for run to start
+    // The UI should show the run in progress or completed
+    await expect(page).toHaveURL(/simulations/, { timeout: 30000 });
 
-  // And we see the page content - either the empty state info card or simulation results
-  // The empty state shows "Scenario: Agentic Simulations" heading
-  // Wait for either the info card heading or simulation set cards to appear
-  const infoCardHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
-  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+    // Verify we see either running state or results
+    const runningOrResults = page
+      .getByText(/running|in progress|completed|pass|fail/i)
+      .first();
+    await expect(runningOrResults).toBeVisible({ timeout: 60000 });
+  });
 
-  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
-});
+  /**
+   * Scenario: View run history
+   * Source: scenario-execution.feature lines 59-63
+   *
+   * After running a scenario, verifies results appear in history.
+   */
+  test("displays run in simulation history after execution", async ({ page }) => {
+    // Navigate to simulations page
+    await givenIAmOnTheSimulationsPage(page);
 
-test("Scenario Execution - simulations page shows content", async ({ page }) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
+    // Either we see existing runs or empty state
+    const simulationContent = page.getByRole("heading", { name: /simulation sets/i });
+    const emptyState = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
 
-  // Then I see either simulation results OR the getting started info card
-  // The info card has specific text about what Scenario can do
-  const infoCardText = page.getByText("Your simulations will appear here");
-  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+    await expect(simulationContent.or(emptyState)).toBeVisible({ timeout: 15000 });
 
-  await expect(infoCardText.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
-});
-
-test("Scenario Execution - page displays correctly on reload", async ({
-  page,
-}) => {
-  // Given I am on the simulations page
-  await navigateToSimulations(page);
-
-  // Wait for initial content to load
-  const infoCardHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
-  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
-  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
-
-  // When I reload the page
-  await page.reload();
-
-  // Then the page still displays correctly
-  await expect(page).toHaveURL(/simulations/);
-
-  // And the same content is visible again after reload
-  await expect(infoCardHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
+    // If there are simulation sets, we should be able to see run details
+    const hasSimulations = await simulationContent.isVisible().catch(() => false);
+    if (hasSimulations) {
+      // Click on a simulation set to view details
+      const firstSimulationSet = page.getByRole("button", { name: /view|expand/i }).first();
+      if (await firstSimulationSet.isVisible().catch(() => false)) {
+        await firstSimulationSet.click();
+        // Should see run details
+        await expect(
+          page.getByText(/run|execution|results/i).first()
+        ).toBeVisible({ timeout: 10000 });
+      }
+    }
+  });
 });

@@ -62,15 +62,12 @@ setup("authenticate", async ({ page, request }) => {
   // Wait for the sign in form to be ready
   await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
 
-  // Fill in credentials using input type selectors (custom Chakra form layout)
-  await page.locator('input[type="email"]').fill(TEST_USER.email);
-  await page.locator('input[type="password"]').fill(TEST_USER.password);
+  // Fill in credentials - use label-based locators with fallback
+  await page.getByLabel(/email/i).fill(TEST_USER.email);
+  await page.getByLabel(/password/i).fill(TEST_USER.password);
 
   // Submit the form
   await page.getByRole("button", { name: /sign in/i }).click();
-
-  // Wait a moment for the form submission to process
-  await page.waitForTimeout(2000);
 
   // Wait for successful authentication - should redirect away from signin
   await expect(page).not.toHaveURL(/\/auth\/signin/);
