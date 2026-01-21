@@ -13,7 +13,7 @@ Read these files before reviewing:
 - `CLAUDE.md` - common mistakes to avoid
 - `TESTING.md` - testing hierarchy and BDD workflow
 - `docs/best_practices/` - project conventions
-- `docs/architecture/` - architectural rules (RBAC, event sourcing, logging)
+- `docs/adr/` - Architecture Decision Records with enforcement rules
 
 ## Scope
 

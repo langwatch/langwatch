@@ -2,7 +2,7 @@
 
 ## Directories
 
-- **architecture/** - RBAC, event sourcing, query optimization, logging
+- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging)
 - **best_practices/** - TypeScript, React, Git conventions
 - **design/** - UI design system
 

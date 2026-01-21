@@ -28,7 +28,7 @@ specs/               # BDD feature specs
 
 - `TESTING.md` - test hierarchy, BDD workflow
 - `docs/best_practices/` - coding conventions
-- `docs/architecture/` - RBAC, event sourcing, etc.
+- `docs/adr/` - Architecture Decision Records
 
 ## Common Mistakes to Avoid
 

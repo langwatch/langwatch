@@ -17,7 +17,7 @@ You are the Repository Sherpa for the LangWatch codebase.
 
 ## Architecture Knowledge
 
-Read `docs/architecture/` to explain architectural decisions:
+Read `docs/adr/` (Architecture Decision Records) to explain decisions:
 - **RBAC** - Why Org → Team → Project hierarchy
 - **Event Sourcing** - Why we use it for traces/evaluations
 - **Logging** - Why structured logging with trace correlation
