@@ -9,6 +9,10 @@ Specialized Claude personas with defined workflows. Agents run in isolated conte
 | `coder` | TDD implementation, self-verification | `/code` skill |
 | `repo-sherpa` | Documentation, DX, meta-layer ownership | `/sherpa` skill |
 | `uncle-bob-reviewer` | SOLID/Clean Code review | `/review` skill |
+| `playwright-test-planner` | Creates test plans by exploring the live app | Task tool |
+| `playwright-test-generator` | Generates Playwright tests from plans | Task tool |
+| `playwright-test-healer` | Debugs and fixes failing tests | Task tool |
+| `e2e-test-final-reviewer` | Reviews e2e tests for quality and maintainability | Task tool |
 
 ## How Agents Are Invoked
 
