@@ -1,16 +1,37 @@
 # Architecture Decision Records (ADRs)
 
-Documenting **why** we made architectural choices. Code documents _how_.
+Document **important technical and architectural decisions** — context, trade-offs, and consequences.
 
-| Decision | Rationale | Rules |
-|----------|-----------|-------|
-| [RBAC](./rbac.md) | Multi-tenant isolation | Always use new system, never raw queries |
-| [Event Sourcing](./event-sourcing.md) | Audit trail + rebuild capability | TenantId required, events immutable |
-| [Logging](./logging.md) | Debugging + compliance | Never log PII/secrets |
+## Decisions
 
-## Adding an ADR
+| # | Decision | Status |
+|---|----------|--------|
+| [001](./001-rbac.md) | RBAC with Org → Team → Project hierarchy | Accepted |
+| [002](./002-event-sourcing.md) | Event sourcing for traces/evaluations | Accepted |
+| [003](./003-logging.md) | Structured logging with trace correlation | Accepted |
 
-Create a new file when making a significant architectural decision:
-- Focus on **context** and **why**, not implementation details
-- Include "Rules (Reviewer: Enforce These)" section
-- Keep it brief - link to code for specifics
+## When to Write an ADR
+
+- Long-lasting or hard to reverse
+- Affects multiple teams/services
+- Tools, frameworks, data models, protocols, patterns
+- Impacts costs, performance, or maintainability
+
+Skip for small implementation details or experiments.
+
+## How to Write
+
+1. **One decision per ADR** — keep it focused
+2. **Keep it short** — 1-2 pages max
+3. **Write for the future** — assume someone reads this in 2 years
+4. **Be honest about trade-offs** — no decision is perfect
+5. **Use narrative** — explain reasoning, not just bullet points
+
+Use [`TEMPLATE.md`](./TEMPLATE.md) for new ADRs. Name: `NNN-short-title.md`
+
+## Status
+
+- **Proposed** → under discussion
+- **Accepted** → in effect
+- **Superseded** → replaced by later ADR
+- **Deprecated** → no longer relevant
