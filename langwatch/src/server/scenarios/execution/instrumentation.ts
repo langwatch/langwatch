@@ -9,12 +9,12 @@
  */
 
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { Resource } from "@opentelemetry/resources";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import {
   BatchSpanProcessor,
   SimpleSpanProcessor,
+  NodeTracerProvider,
 } from "@opentelemetry/sdk-trace-node";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:scenarios:instrumentation");
@@ -64,15 +64,12 @@ export function createScenarioTracer(
   });
 
   // Create resource with scenario metadata
-  const resource = new Resource({
+  const resource = resourceFromAttributes({
     "service.name": "langwatch-scenario",
     "langwatch.scenario.id": scenarioId,
     "langwatch.scenario.batch_run_id": batchRunId,
     "langwatch.project.id": projectId,
   });
-
-  // Create provider with scenario-specific resource
-  const provider = new NodeTracerProvider({ resource });
 
   // Use simple processor for scenarios (lower latency, immediate export)
   // Could use BatchSpanProcessor for production if needed
@@ -81,7 +78,11 @@ export function createScenarioTracer(
     ? new BatchSpanProcessor(exporter)
     : new SimpleSpanProcessor(exporter);
 
-  provider.addSpanProcessor(processor);
+  // Create provider with scenario-specific resource and span processor
+  const provider = new NodeTracerProvider({
+    resource,
+    spanProcessors: [processor],
+  });
   provider.register();
 
   logger.info(

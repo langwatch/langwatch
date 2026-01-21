@@ -19,7 +19,7 @@ export interface AgentData {
     method: string;
     headers?: Array<{ key: string; value: string }>;
     auth?: {
-      type: string;
+      type: "none" | "bearer" | "api_key" | "basic";
       token?: string;
       header?: string;
       value?: string;

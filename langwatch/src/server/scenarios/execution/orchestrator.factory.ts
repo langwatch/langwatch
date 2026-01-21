@@ -9,8 +9,9 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders";
-import { AgentRepository } from "../../agents/agent.repository";
+import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import { prisma } from "../../db";
+import type { AgentData, AgentLookup } from "../adapters/http.adapter.factory";
 import { PromptService } from "../../prompt-config/prompt.service";
 import { HttpAdapterFactory } from "../adapters/http.adapter.factory";
 import { PromptAdapterFactory } from "../adapters/prompt.adapter.factory";
@@ -87,6 +88,43 @@ function createModelParamsProvider(): ModelParamsProvider {
   };
 }
 
+/** Adapts AgentRepository to AgentLookup interface */
+function createAgentLookup(repo: AgentRepository): AgentLookup {
+  return {
+    async findById(params): Promise<AgentData | null> {
+      const agent = await repo.findById(params);
+      if (!agent) return null;
+
+      // Only HTTP agents have the required config shape
+      if (agent.type !== "http") {
+        return { id: agent.id, type: agent.type, config: {} as AgentData["config"] };
+      }
+
+      // TypedAgent with type=http has HttpComponentConfig
+      const config = agent.config as {
+        url: string;
+        method: string;
+        headers?: Array<{ key: string; value: string }>;
+        auth?: { type: "none" | "bearer" | "api_key" | "basic"; token?: string; header?: string; value?: string };
+        bodyTemplate?: string;
+        outputPath?: string;
+      };
+      return {
+        id: agent.id,
+        type: agent.type,
+        config: {
+          url: config.url,
+          method: config.method,
+          headers: config.headers,
+          auth: config.auth,
+          bodyTemplate: config.bodyTemplate,
+          outputPath: config.outputPath,
+        },
+      };
+    },
+  };
+}
+
 /** Creates adapter factory using the registry pattern */
 function createAdapterFactory(): AdapterFactory {
   const modelParamsProvider = createModelParamsProvider();
@@ -96,7 +134,8 @@ function createAdapterFactory(): AdapterFactory {
     modelParamsProvider,
   );
 
-  const httpFactory = new HttpAdapterFactory(new AgentRepository(prisma));
+  const agentLookup = createAgentLookup(new AgentRepository(prisma));
+  const httpFactory = new HttpAdapterFactory(agentLookup);
 
   return new TargetAdapterRegistry([promptFactory, httpFactory]);
 }
