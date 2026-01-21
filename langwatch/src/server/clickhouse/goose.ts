@@ -311,6 +311,17 @@ async function bootstrapDatabase(
       SETTINGS index_granularity = 8192`,
       verbose
     );
+
+    // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
+    // Goose requires at least one row to determine the starting version.
+    // Without this, goose reports "no next version found" on an empty table.
+    await executeBootstrapSQL(
+      client,
+      `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
+       SELECT 0, 1
+       WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
+      verbose
+    );
   });
 
   logger.info("Bootstrap completed");
