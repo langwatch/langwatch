@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { ShieldUser } from "lucide-react";
+import { Lock, ShieldUser } from "lucide-react";
 
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
@@ -24,6 +24,7 @@ import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useHasEntitlement } from "../../features/entitlements";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
@@ -37,6 +38,7 @@ import { api } from "../../utils/api";
  */
 function RolesSettings() {
   const { organization, hasPermission } = useOrganizationTeamProject();
+  const hasCustomRbac = useHasEntitlement("custom-rbac");
 
   if (!organization) {
     return (
@@ -53,6 +55,7 @@ function RolesSettings() {
       <RolesManagement
         organizationId={organization.id}
         hasPermission={hasPermission}
+        hasCustomRbac={hasCustomRbac}
       />
     </SettingsLayout>
   );
@@ -71,9 +74,11 @@ type RoleFormData = {
 function RolesManagement({
   organizationId,
   hasPermission,
+  hasCustomRbac,
 }: {
   organizationId: string;
   hasPermission: (permission: Permission) => boolean;
+  hasCustomRbac: boolean;
 }) {
   const { open, onOpen, onClose } = useDisclosure();
   const {
@@ -258,12 +263,16 @@ function RolesManagement({
           </Text>
         </VStack>
         <Tooltip
-          content="You need organization:manage permissions to create roles."
-          disabled={hasPermission("organization:manage")}
+          content={
+            !hasCustomRbac
+              ? "Custom roles require an Enterprise license. Please upgrade your plan."
+              : "You need organization:manage permissions to create roles."
+          }
+          disabled={hasCustomRbac && hasPermission("organization:manage")}
         >
           <PageLayout.HeaderButton
             onClick={onOpen}
-            disabled={!hasPermission("organization:manage")}
+            disabled={!hasCustomRbac || !hasPermission("organization:manage")}
           >
             <Plus size={16} /> Create Role
           </PageLayout.HeaderButton>
@@ -335,6 +344,29 @@ function RolesManagement({
           </Text>
         </Box>
 
+        {!hasCustomRbac && (
+          <Card.Root
+            width="full"
+            borderColor="orange.200"
+            backgroundColor="orange.50"
+            _dark={{ borderColor: "orange.700", backgroundColor: "orange.900" }}
+          >
+            <Card.Body padding={4}>
+              <HStack gap={3}>
+                <Lock size={20} />
+                <VStack align="start" gap={1}>
+                  <Text fontWeight="semibold">Enterprise Feature</Text>
+                  <Text fontSize="sm" color="fg.muted">
+                    Custom roles require an Enterprise license. Upgrade your
+                    plan to create and manage custom roles with granular
+                    permissions.
+                  </Text>
+                </VStack>
+              </HStack>
+            </Card.Body>
+          </Card.Root>
+        )}
+
         {roles.isLoading && (
           <VStack align="center" width="full" padding={8}>
             <Spinner />
@@ -368,6 +400,7 @@ function RolesManagement({
               description={role.description ?? ""}
               permissionCount={`${role.permissions.length} permissions`}
               hasPermission={hasPermission}
+              hasEntitlement={hasCustomRbac}
               onDelete={() => {
                 if (
                   confirm(

@@ -16,6 +16,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import { env } from "~/env.mjs";
+import { requireEntitlementForCurrentPlan } from "~/features/entitlements";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -580,6 +581,17 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
+      // Check if any invites include custom roles
+      const hasCustomRoleInvite = input.invites.some(
+        (invite) =>
+          invite.teams?.some((t) =>
+            typeof t.role === "string" && t.role.startsWith("custom:")
+          )
+      );
+      if (hasCustomRoleInvite) {
+        requireEntitlementForCurrentPlan("custom-rbac");
+      }
+
       const organization = await prisma.organization.findFirst({
         where: {
           id: input.organizationId,
@@ -995,6 +1007,11 @@ export const organizationRouter = createTRPCRouter({
 
       // Check if this is a custom role
       const isCustomRole = input.role.startsWith("custom:");
+
+      // Check entitlement before allowing custom role assignment
+      if (isCustomRole) {
+        requireEntitlementForCurrentPlan("custom-rbac");
+      }
 
       if (isCustomRole && input.customRoleId) {
         const customRoleId = input.customRoleId; // Store in a const for TypeScript

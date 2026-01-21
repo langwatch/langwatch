@@ -2,6 +2,7 @@ import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { requireEntitlementForCurrentPlan } from "~/features/entitlements";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { slugify } from "~/utils/slugify";
 import {
@@ -149,6 +150,14 @@ export const teamRouter = createTRPCRouter({
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      // Check if any members are being assigned custom roles
+      const hasCustomRoleAssignment = input.members.some((m) =>
+        m.role.startsWith("custom:")
+      );
+      if (hasCustomRoleAssignment) {
+        requireEntitlementForCurrentPlan("custom-rbac");
+      }
 
       return await prisma.$transaction(async (tx) => {
         const updateData: any = {
@@ -368,6 +377,15 @@ export const teamRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      // Check if any members are being assigned custom roles
+      const hasCustomRoleAssignment = input.members.some((m) =>
+        m.role.startsWith("custom:")
+      );
+      if (hasCustomRoleAssignment) {
+        requireEntitlementForCurrentPlan("custom-rbac");
+      }
+
       const teamNanoId = nanoid();
       const teamId = `team_${teamNanoId}`;
       const teamSlug =

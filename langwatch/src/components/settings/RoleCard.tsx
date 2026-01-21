@@ -17,6 +17,7 @@ export function RoleCard({
   onEdit,
   onViewPermissions,
   hasPermission,
+  hasEntitlement = true,
 }: {
   name: string;
   description: string;
@@ -27,6 +28,7 @@ export function RoleCard({
   onEdit?: () => void;
   onViewPermissions?: () => void;
   hasPermission: (permission: Permission) => boolean;
+  hasEntitlement?: boolean;
 }) {
   return (
     <Card.Root
@@ -81,7 +83,9 @@ export function RoleCard({
                     e.stopPropagation();
                     onEdit();
                   }}
-                  disabled={!hasPermission("organization:manage")}
+                  disabled={
+                    !hasEntitlement || !hasPermission("organization:manage")
+                  }
                 >
                   <Edit size={14} />
                 </Button>
@@ -95,7 +99,9 @@ export function RoleCard({
                     e.stopPropagation();
                     onDelete();
                   }}
-                  disabled={!hasPermission("organization:manage")}
+                  disabled={
+                    !hasEntitlement || !hasPermission("organization:manage")
+                  }
                 >
                   <Trash2 size={14} />
                 </Button>

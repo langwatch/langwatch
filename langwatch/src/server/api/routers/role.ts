@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoleService } from "../../role";
+import { checkEntitlement } from "../../../features/entitlements";
 import {
   checkOrganizationPermission,
   checkTeamPermission,
@@ -54,6 +55,7 @@ export const roleRouter = createTRPCRouter({
         permissions: z.array(permissionSchema),
       }),
     )
+    .use(checkEntitlement("custom-rbac"))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
@@ -74,6 +76,7 @@ export const roleRouter = createTRPCRouter({
         permissions: z.array(permissionSchema).optional(),
       }),
     )
+    .use(checkEntitlement("custom-rbac"))
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId for permission check
       const roleService = new RoleService(ctx.prisma);
@@ -104,6 +107,7 @@ export const roleRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ roleId: z.string() }))
+    .use(checkEntitlement("custom-rbac"))
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId for permission check
       const roleService = new RoleService(ctx.prisma);
@@ -136,6 +140,7 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
+    .use(checkEntitlement("custom-rbac"))
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
@@ -154,6 +159,7 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
+    .use(checkEntitlement("custom-rbac"))
     .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);

@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  determinePlanFromLicenseKey,
   getSelfHostedPlan,
   isEeEnabled,
   hasPaidLicense,
@@ -19,6 +20,38 @@ describe("License Validation", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+  });
+
+  describe("determinePlanFromLicenseKey (pure function)", () => {
+    it("returns self-hosted:oss when license key is undefined", () => {
+      const plan = determinePlanFromLicenseKey(undefined);
+      expect(plan).toBe("self-hosted:oss");
+    });
+
+    it("returns self-hosted:oss when license key is empty string", () => {
+      const plan = determinePlanFromLicenseKey("");
+      expect(plan).toBe("self-hosted:oss");
+    });
+
+    it("returns self-hosted:enterprise for LW-ENT- prefixed key", () => {
+      const plan = determinePlanFromLicenseKey("LW-ENT-abc123");
+      expect(plan).toBe("self-hosted:enterprise");
+    });
+
+    it("returns self-hosted:pro for LW-PRO- prefixed key", () => {
+      const plan = determinePlanFromLicenseKey("LW-PRO-xyz789");
+      expect(plan).toBe("self-hosted:pro");
+    });
+
+    it("returns self-hosted:oss for invalid license key format", () => {
+      const plan = determinePlanFromLicenseKey("invalid-key-format");
+      expect(plan).toBe("self-hosted:oss");
+    });
+
+    it("is case-sensitive (LW-ent- does not match)", () => {
+      const plan = determinePlanFromLicenseKey("LW-ent-abc123");
+      expect(plan).toBe("self-hosted:oss");
+    });
   });
 
   describe("getSelfHostedPlan", () => {

@@ -47,9 +47,8 @@ describe("checkEntitlement middleware", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(TRPCError);
       expect((error as TRPCError).code).toBe("FORBIDDEN");
-      expect((error as TRPCError).message).toContain(
-        "Please upgrade to LangWatch Enterprise"
-      );
+      expect((error as TRPCError).message).toContain("custom-rbac");
+      expect((error as TRPCError).message).toContain("Please upgrade your plan");
     }
   });
 

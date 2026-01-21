@@ -16,4 +16,5 @@ Feature: Entitlement tRPC Middleware
     Given no LICENSE_KEY is set
     And I call an endpoint protected by checkEntitlement("custom-rbac")
     Then the request should fail with FORBIDDEN
-    And the error should mention "Please upgrade to LangWatch Enterprise"
+    And the error should mention "custom-rbac" entitlement
+    And the error should mention "Please upgrade your plan"
