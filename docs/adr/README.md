@@ -31,6 +31,7 @@ Use [`TEMPLATE.md`](./TEMPLATE.md) for new ADRs. Name: `NNN-short-title.md`
 
 ## Status
 
+- **Draft** → initial write-up
 - **Proposed** → under discussion
 - **Accepted** → in effect
 - **Superseded** → replaced by later ADR

@@ -1,23 +1,31 @@
-# ADR-NNN: Title
+# ADR-NNN: [Short Decision Title]
 
-**Status:** Proposed | Accepted | Superseded | Deprecated
+**Date:** YYYY-MM-DD
+
+**Status:** Draft | Proposed | Accepted | Superseded | Deprecated
 
 ## Context
 
-What is the issue? What forces are at play? Why is a decision needed now?
+Describe the situation, constraints, and trade-offs that motivate a decision. Use neutral language. Explain what's driving the need.
 
 ## Decision
 
-What is the change being proposed or made?
+State your decision in clear, active sentences (e.g., "We will..."). Explain how this choice responds to the context and challenges.
 
-## Rationale
+## Rationale / Trade-offs (optional)
 
-Why this approach over alternatives? What trade-offs were considered?
+Discuss why this decision was chosen over alternatives:
+- Which needs are addressed
+- Which needs are compromised
+- What trade-offs were accepted and why
+
+Use narrative form, not just bullet points.
 
 ## Consequences
 
-What becomes easier or harder? What are the risks? What rules must be followed?
+What changes once this decision is applied? Capture positive, negative, and neutral consequences. Explain how this alters the context for future decisions.
 
 ## References (optional)
 
-Links to related ADRs, docs, or discussions.
+- Related ADRs:
+- External links, tickets, discussions:
