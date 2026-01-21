@@ -90,7 +90,7 @@ function NodeInputs({
             }}
           />
           <Text>{input.identifier}</Text>
-          <Text color="gray.400">:</Text>
+          <Text color="fg.subtle">:</Text>
           <TypeLabel type={input.type} />
           <Spacer />
           {input.optional &&
@@ -98,7 +98,7 @@ function NodeInputs({
               node.type !== "end" ||
               (input.identifier !== "score" &&
                 input.identifier !== "passed")) && (
-              <Text color="gray.400">(optional)</Text>
+              <Text color="fg.subtle">(optional)</Text>
             )}
         </HStack>
       ))}
@@ -147,7 +147,7 @@ function NodeOutputs({
             />
           )}
           <Text>{output.identifier}</Text>
-          <Text color="gray.400">:</Text>
+          <Text color="fg.subtle">:</Text>
           <TypeLabel type={output.type} />
         </HStack>
       ))}
@@ -174,7 +174,7 @@ export function NodeSectionTitle({
     <Text
       fontSize={fontSize ?? "9px"}
       textTransform="uppercase"
-      color="gray.500"
+      color="fg.muted"
       fontWeight="bold"
       paddingTop={1}
     >
@@ -269,7 +269,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       padding="10px"
       gap={2}
       align="start"
-      color="gray.600"
+      color="fg.muted"
       fontSize="11px"
       minWidth={
         120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"

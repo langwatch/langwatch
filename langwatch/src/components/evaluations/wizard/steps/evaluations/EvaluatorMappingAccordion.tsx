@@ -192,7 +192,7 @@ export const EvaluatorMappingAccordion = ({
     <StepAccordion
       value="mappings"
       width="full"
-      borderColor="green.400"
+      borderColor="green.fg"
       title="Data Mapping"
       showTrigger={!!evaluatorCategory}
     >

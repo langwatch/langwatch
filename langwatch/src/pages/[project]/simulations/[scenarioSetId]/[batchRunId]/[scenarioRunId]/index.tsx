@@ -110,7 +110,7 @@ export default function IndividualScenarioRunPage() {
       >
         <VStack height="full" w="full">
           {/* Header with Back Button and Title */}
-          <Box borderBottom="1px" borderColor="gray.200" w="100%" mb={2}>
+          <Box borderBottom="1px" borderColor="border" w="100%" mb={2}>
             <HStack justify="space-between" align="center">
               {scenarioSetId && batchRunId && (
                 <VStack>
@@ -171,7 +171,7 @@ export default function IndividualScenarioRunPage() {
             borderRadius="lg"
             boxShadow="sm"
             border="1px"
-            borderColor="gray.200"
+            borderColor="border"
             overflow="hidden"
             w="full"
           >
@@ -219,7 +219,7 @@ export default function IndividualScenarioRunPage() {
                         <Box
                           w="100%"
                           borderTop="1px"
-                          borderColor="gray.100"
+                          borderColor="border.muted"
                           flex="1"
                         >
                           <SimulationConsole
@@ -239,7 +239,7 @@ export default function IndividualScenarioRunPage() {
                       w="250px"
                       height="100%"
                       borderLeft="1px"
-                      borderColor="gray.200"
+                      borderColor="border"
                       borderStyle="solid"
                       borderTopRightRadius="lg"
                       borderBottomRightRadius="lg"
@@ -250,7 +250,7 @@ export default function IndividualScenarioRunPage() {
                       <Box
                         p={6}
                         borderBottom="1px"
-                        borderColor="gray.200"
+                        borderColor="border"
                         borderStyle="solid"
                       >
                         <Text fontSize="md" fontWeight="semibold">

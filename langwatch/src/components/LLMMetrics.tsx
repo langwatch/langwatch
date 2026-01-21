@@ -154,7 +154,7 @@ export function LLMMetrics() {
                         }}
                         titleProps={{
                           fontSize: 16,
-                          color: "black",
+                          color: "fg",
                         }}
                       />
                     </Tabs.Trigger>
@@ -169,7 +169,7 @@ export function LLMMetrics() {
                         input={{ ...totalCostGraph, graphType: "summary" }}
                         titleProps={{
                           fontSize: 16,
-                          color: "black",
+                          color: "fg",
                         }}
                       />
                     </Tabs.Trigger>
@@ -185,7 +185,7 @@ export function LLMMetrics() {
                           input={totalTokensSummary}
                           titleProps={{
                             fontSize: 16,
-                            color: "black",
+                            color: "fg",
                           }}
                         />
                       ) : isQuickwit ? (
@@ -193,7 +193,7 @@ export function LLMMetrics() {
                           input={promptAndCompletionTokensSummary}
                           titleProps={{
                             fontSize: 16,
-                            color: "black",
+                            color: "fg",
                           }}
                         />
                       ) : (

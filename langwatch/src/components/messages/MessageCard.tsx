@@ -170,7 +170,7 @@ export function MessageCard({
         <VStack alignItems="flex-start" gap={2}>
           <Box
             fontSize="11px"
-            color="gray.400"
+            color="fg.subtle"
             textTransform="uppercase"
             fontWeight="bold"
           >
@@ -197,19 +197,19 @@ export function MessageCard({
             <VStack alignItems="flex-start" gap={2}>
               <Box
                 fontSize="11px"
-                color="red.400"
+                color="red.fg"
                 textTransform="uppercase"
                 fontWeight="bold"
               >
                 Exception
               </Box>
-              <Text color="red.900">{trace.error.message}</Text>
+              <Text color="red.fg">{trace.error.message}</Text>
             </VStack>
           ) : (
             <VStack alignItems="flex-start" gap={2}>
               <Box
                 fontSize="11px"
-                color="gray.400"
+                color="fg.subtle"
                 textTransform="uppercase"
                 fontWeight="bold"
               >
@@ -230,7 +230,7 @@ export function MessageCard({
                   <HStack
                     align="start"
                     border="1px solid"
-                    borderColor="gray.300"
+                    borderColor="border.emphasized"
                     borderRadius={6}
                     padding={4}
                     gap={4}
@@ -316,7 +316,7 @@ export function MessageCard({
               </Badge>
             ))}
           </HStack>
-          <HStack fontSize="12px" color="gray.400">
+          <HStack fontSize="12px" color="fg.subtle">
             {!!trace.metadata.customer_id && (
               <>
                 <Box>
@@ -332,7 +332,7 @@ export function MessageCard({
             >
               <Text
                 borderBottomWidth="1px"
-                borderBottomColor="gray.400"
+                borderBottomColor="border.emphasized"
                 borderBottomStyle="dashed"
                 position="relative"
                 zIndex="popover"
@@ -396,13 +396,14 @@ export function MessageCard({
             <Popover.Trigger>
               <Tag.Root
                 variant="outline"
-                boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                borderWidth="1px"
+                borderColor="border"
                 color={
                   allGuardrailsSkipped
-                    ? "yellow.600"
+                    ? "yellow.fg"
                     : guardrailsPasses == totalGuardrails
-                      ? "green.600"
-                      : "blue.600"
+                      ? "green.fg"
+                      : "blue.fg"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -466,13 +467,14 @@ export function MessageCard({
             <Popover.Trigger>
               <Tag.Root
                 variant="outline"
-                boxShadow="#DEDEDE 0px 0px 0px 1px inset"
+                borderWidth="1px"
+                borderColor="border"
                 color={
                   !evaluationsDone || allEvaluationsSkipped
-                    ? "yellow.600"
+                    ? "yellow.fg"
                     : evaluationsPasses == totalEvaluations
-                      ? "green.600"
-                      : "red.600"
+                      ? "green.fg"
+                      : "red.fg"
                 }
                 paddingY={1}
                 paddingX={2}

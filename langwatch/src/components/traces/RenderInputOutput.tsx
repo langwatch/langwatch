@@ -7,6 +7,7 @@ import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
+import { useColorMode } from "../ui/color-mode";
 import { CopyIcon } from "../icons/Copy";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
@@ -18,6 +19,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   },
 ) {
   let { value } = props;
+  const { colorMode } = useColorMode();
   const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
     loading: () => <div />,
   });
@@ -111,7 +113,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
                 <Box>
                   <TinyButton
                     onClick={() => setRaw(!raw)}
-                    background={raw ? "gray.200" : "gray.100"}
+                    background={raw ? "bg.emphasized" : "bg.muted"}
                   >
                     {"{}"}
                   </TinyButton>
@@ -133,7 +135,11 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
             displayObjectSize={false}
             enableClipboard={false}
             collapseStringsAfterLength={1000}
-            style={{ fontSize: "13px" }}
+            style={{
+              fontSize: "13px",
+              backgroundColor: "transparent",
+            }}
+            theme={colorMode === "dark" ? "twilight" : "rjv-default"}
             //@ts-ignore
             displayArrayKey={false}
             {...propsWithoutValue}
@@ -185,7 +191,7 @@ function TinyButton(props: ButtonProps) {
       minWidth="0"
       borderRadius="0"
       border="1px solid"
-      borderColor="gray.300"
+      borderColor="border.emphasized"
       colorPalette="gray"
       {...props}
     />

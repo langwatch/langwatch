@@ -125,7 +125,7 @@ export function EvaluatorTypeSelectorDrawer(
           padding={0}
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an evaluator to configure and save.
             </Text>
 
@@ -154,7 +154,7 @@ export function EvaluatorTypeSelectorDrawer(
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -188,11 +188,11 @@ function EvaluatorCard({
       padding={4}
       borderRadius="lg"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "green.400", bg: "green.50" }}
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
       transition="all 0.15s"
       data-testid={`evaluator-type-${evaluatorType.replace("/", "-")}`}
     >
@@ -200,7 +200,7 @@ function EvaluatorCard({
         <Text fontWeight="500" fontSize="sm">
           {name}
         </Text>
-        <Text fontSize="xs" color="gray.600" lineClamp={2}>
+        <Text fontSize="xs" color="fg.muted" lineClamp={2}>
           {description}
         </Text>
       </VStack>

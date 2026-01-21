@@ -105,7 +105,7 @@ export function TestMessagesBuilder({
     <VStack align="stretch" gap={3} width="full">
       {/* Header with Add button */}
       <HStack width="full">
-        <Text fontSize="xs" color="gray.600" marginBottom={2}>
+        <Text fontSize="xs" color="fg.muted" marginBottom={2}>
           <Code fontSize="xs">{`{{messages}}`}</Code>
         </Text>
 
@@ -115,10 +115,10 @@ export function TestMessagesBuilder({
 
       <Box
         padding={4}
-        bg="gray.50"
+        bg="bg.subtle"
         borderRadius="md"
         borderWidth="1px"
-        borderColor="gray.200"
+        borderColor="border"
       >
         {/* Message rows */}
         {messages.map((message, index) => (

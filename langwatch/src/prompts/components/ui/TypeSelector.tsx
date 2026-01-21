@@ -52,7 +52,7 @@ export function TypeSelector({
     <>
       <HStack
         position="relative"
-        background="white"
+        background="bg.panel"
         borderRadius="8px"
         paddingX={2}
         paddingY={1}
@@ -64,7 +64,7 @@ export function TypeSelector({
         </Box>
         {!readOnly && (
           <>
-            <Box color="gray.600">
+            <Box color="fg.muted">
               <ChevronDown size={14} />
             </Box>
             <NativeSelect.Root
@@ -98,7 +98,7 @@ export function TypeSelector({
       {value === "json_schema" && (
         <Button
           size="xs"
-          background="white"
+          background="bg.muted"
           height="auto"
           paddingY="6px"
           paddingX={2}
@@ -200,7 +200,7 @@ function JsonSchemaDialog({
         <Dialog.Header>
           <Dialog.Title>JSON Schema</Dialog.Title>
         </Dialog.Header>
-        <Dialog.CloseTrigger color="white" _hover={{ color: "black" }} />
+        <Dialog.CloseTrigger color="white" _hover={{ opacity: 0.8 }} />
         <Dialog.Body>
           <Box height="400px">
             {open && (
@@ -229,7 +229,7 @@ function JsonSchemaDialog({
             colorPalette="white"
             size="lg"
             disabled={!!error}
-            _hover={{ color: "black" }}
+            _hover={{ opacity: 0.8 }}
           >
             Save
           </Button>

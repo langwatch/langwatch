@@ -36,7 +36,7 @@ export function LineHighlights({
             left={0}
             right={0}
             height={`${positions[gripHoveredParagraph]?.height ?? 0}px`}
-            background="gray.50"
+            background="bg.muted"
             pointerEvents="none"
             borderRadius="md"
           />
@@ -119,9 +119,9 @@ export function GripHandles({
             onDragStart={(e) => onDragStart(e as unknown as DragEvent, idx)}
             onDragEnd={onDragEnd}
             borderRadius="md"
-            _hover={{ background: "gray.100" }}
+            _hover={{ background: "bg.muted" }}
           >
-            <Box color="gray.400">
+            <Box color="fg.subtle">
               <GripVertical size={14} />
             </Box>
           </Box>

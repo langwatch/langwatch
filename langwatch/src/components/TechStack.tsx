@@ -272,7 +272,7 @@ export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
 
   if (language.label === "Other" && framework.label === "Other") {
     return (
-      <HStack gap={0} align="center" justify="center" color="gray.600">
+      <HStack gap={0} align="center" justify="center" color="fg.muted">
         <IconWrapper>
           <PuzzleIcon />
         </IconWrapper>

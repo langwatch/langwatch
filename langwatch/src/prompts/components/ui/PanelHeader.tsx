@@ -70,10 +70,10 @@ interface PanelActionsProps {
 function PanelActions({ onExpand, onClose }: PanelActionsProps) {
   return (
     <HStack gap={0}>
-      <Button variant="ghost" size="sm" color="gray.500" onClick={onExpand}>
+      <Button variant="ghost" size="sm" color="fg.muted" onClick={onExpand}>
         <Columns size={16} />
       </Button>
-      <Button variant="ghost" size="sm" color="gray.500" onClick={onClose}>
+      <Button variant="ghost" size="sm" color="fg.muted" onClick={onClose}>
         <X size={16} />
       </Button>
     </HStack>

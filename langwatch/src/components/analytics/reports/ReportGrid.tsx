@@ -123,7 +123,7 @@ export function ReportGrid({
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                color="gray.400"
+                color="fg.subtle"
                 height="calc(100% - 40px)"
               >
                 Chart preview

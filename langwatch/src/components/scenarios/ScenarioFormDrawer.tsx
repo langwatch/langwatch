@@ -198,7 +198,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               overflowY="auto"
               padding={6}
               borderRightWidth="1px"
-              borderColor="gray.200"
+              borderColor="border"
             >
               <ScenarioForm
                 key={scenarioId ?? "new"}
@@ -207,7 +207,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               />
             </GridItem>
             {/* Right: Help Sidebar */}
-            <GridItem overflowY="auto" padding={4} bg="gray.50">
+            <GridItem overflowY="auto" padding={4} bg="bg.subtle">
               <ScenarioEditorSidebar form={formInstance} />
             </GridItem>
           </Grid>

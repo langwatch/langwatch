@@ -262,7 +262,7 @@ export function CustomDashboardsSection({
                       transition="opacity 0.2s"
                       padding={1}
                       cursor="pointer"
-                      color="gray.500"
+                      color="fg.muted"
                       _hover={{ color: "gray.700" }}
                     >
                       <MoreVertical size={14} />

@@ -333,7 +333,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                                 columnName,
                               )
                             }
-                            color={isHidden ? "gray.400" : "gray.600"}
+                            color={isHidden ? "fg.subtle" : "fg.muted"}
                             aria-label={
                               isHidden ? "Show column" : "Hide column"
                             }

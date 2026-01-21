@@ -32,7 +32,7 @@ export const DialogContent = React.forwardRef<
       <ChakraDialog.Positioner>
         <ChakraDialog.Content
           borderRadius="lg"
-          background="white/75"
+          background="bg.surface/75"
           backdropFilter="blur(8px)"
           ref={ref}
           {...rest}

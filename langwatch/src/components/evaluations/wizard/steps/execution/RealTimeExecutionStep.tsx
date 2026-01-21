@@ -107,7 +107,7 @@ export function RealTimeExecutionStep() {
   const sample = form.watch("sample");
 
   const runOn = (
-    <Text color="gray.500" fontStyle="italic">
+    <Text color="fg.muted" fontStyle="italic">
       This evaluation will run on{" "}
       {sample >= 1
         ? "every message"
@@ -220,7 +220,7 @@ export function RealTimeExecutionStep() {
                       sample == 1 ? (
                         runOn
                       ) : (
-                        <Text color="gray.500" fontStyle="italic">
+                        <Text color="fg.muted" fontStyle="italic">
                           No preconditions defined
                         </Text>
                       )

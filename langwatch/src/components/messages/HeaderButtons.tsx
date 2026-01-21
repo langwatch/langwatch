@@ -72,7 +72,7 @@ export function ToggleTableView() {
 
   return (
     <HStack
-      background="gray.200"
+      background="bg.emphasized"
       padding="3px"
       paddingY={0}
       borderRadius="lg"
@@ -80,7 +80,7 @@ export function ToggleTableView() {
       position="relative"
     >
       <Box
-        background="white"
+        background="bg.panel"
         position="absolute"
         height="26px"
         borderRadius="6px"

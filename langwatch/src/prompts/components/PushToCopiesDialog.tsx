@@ -105,7 +105,7 @@ export const PushToCopiesDialog = ({
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
-            <Text fontSize="sm" color="gray.600">
+            <Text fontSize="sm" color="fg.muted">
               Select which replicas to push the latest version to:
             </Text>
             {isLoading ? (
@@ -115,7 +115,7 @@ export const PushToCopiesDialog = ({
                 Error loading replicas: {error.message}
               </Text>
             ) : availableCopies.length === 0 ? (
-              <Text color="gray.500">No replicas found.</Text>
+              <Text color="fg.muted">No replicas found.</Text>
             ) : (
               <VStack gap={2} align={"start"} width="full">
                 {availableCopies.map((copy) => (
@@ -126,7 +126,7 @@ export const PushToCopiesDialog = ({
                   >
                     <VStack align={"start"} gap={0}>
                       <Text fontWeight="medium">{copy.handle}</Text>
-                      <Text fontSize="sm" color="gray.500">
+                      <Text fontSize="sm" color="fg.muted">
                         {copy.fullPath}
                       </Text>
                     </VStack>

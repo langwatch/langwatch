@@ -8,10 +8,10 @@ export const getStatusColor = (
   value: number,
 ): Record<string, string> => {
   if (status === "error")
-    return { bg: "red.50", color: "red.800", borderColor: "red.200" };
+    return { bg: "red.subtle", color: "red.fg", borderColor: "red.emphasized" };
   if (status === "warning" || value < 0.8)
-    return { bg: "amber.50", color: "amber.800", borderColor: "amber.200" };
-  return { bg: "green.50", color: "green.800", borderColor: "green.200" };
+    return { bg: "yellow.subtle", color: "yellow.fg", borderColor: "yellow.emphasized" };
+  return { bg: "green.subtle", color: "green.fg", borderColor: "green.emphasized" };
 };
 
 export const getStatusIcon = (status: StatusType, value: number): ReactNode => {

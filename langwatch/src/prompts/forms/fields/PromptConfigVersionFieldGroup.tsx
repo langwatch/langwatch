@@ -213,7 +213,7 @@ function FieldRow({
     <Field.Root key={field.id} invalid={!!error}>
       <HStack width="full">
         <HStack
-          background="gray.100"
+          background="bg.muted"
           paddingRight={2}
           borderRadius="8px"
           width="full"

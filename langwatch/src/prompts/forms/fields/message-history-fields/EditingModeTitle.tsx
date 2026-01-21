@@ -71,13 +71,13 @@ export function EditingModeTitle({
           <Box
             opacity={isHovered ? 1 : 0}
             transition="opacity 0.15s"
-            color="gray.500"
+            color="fg.muted"
           >
             <LuChevronDown size={14} />
           </Box>
         </HStack>
       </Menu.Trigger>
-      <Menu.Content portalled={false} zIndex={10} backgroundColor="white">
+      <Menu.Content portalled={false} zIndex={10} backgroundColor="bg.panel">
         <Menu.Item
           value="prompt"
           onClick={() => onChange("prompt")}

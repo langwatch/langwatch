@@ -26,7 +26,7 @@ export function QuickTestBar({
         fontSize="xs"
         fontWeight="bold"
         textTransform="uppercase"
-        color="gray.500"
+        color="fg.muted"
       >
         Quick Test
       </Text>

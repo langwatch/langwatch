@@ -189,7 +189,7 @@ export const DefaultProviderSection = ({
         </Box>
       </Tooltip>
       {state.useAsDefaultProvider && (
-        <Text fontSize="xs" color="gray.500" marginTop={-2}>
+        <Text fontSize="xs" color="fg.muted" marginTop={-2}>
           Configure the default models used for workflows, evaluations and other
           LangWatch features.
         </Text>
@@ -200,7 +200,7 @@ export const DefaultProviderSection = ({
         <VStack width="full" align="start" gap={4}>
           <Field.Root width="full">
             <SmallLabel>Default Model</SmallLabel>
-            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+            <Text fontSize="xs" color="fg.muted" marginBottom={2}>
               For general tasks within LangWatch
             </Text>
             <ProviderModelSelector
@@ -216,7 +216,7 @@ export const DefaultProviderSection = ({
 
           <Field.Root width="full">
             <SmallLabel>Topic Clustering Model</SmallLabel>
-            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+            <Text fontSize="xs" color="fg.muted" marginBottom={2}>
               For generating topic names
             </Text>
             <ProviderModelSelector
@@ -236,7 +236,7 @@ export const DefaultProviderSection = ({
 
           <Field.Root width="full">
             <SmallLabel>Embeddings Model</SmallLabel>
-            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+            <Text fontSize="xs" color="fg.muted" marginBottom={2}>
               For embeddings to be used in topic clustering and evaluations
             </Text>
             <ProviderModelSelector

@@ -60,7 +60,7 @@ export function EvaluatorResultChip({
 
     // Show spinner when running
     if (status === "running") {
-      return <Spinner size="xs" color="gray.500" />;
+      return <Spinner size="xs" color="fg.muted" />;
     }
 
     // Show error icon for error status
@@ -119,7 +119,7 @@ export function EvaluatorResultChip({
         </HStack>
         {details && (
           <Box marginTop={1}>
-            <Text fontSize="12px" color="gray.400" marginBottom={0.5}>
+            <Text fontSize="12px" color="fg.subtle" marginBottom={0.5}>
               Details:
             </Text>
             <Text
@@ -145,7 +145,7 @@ export function EvaluatorResultChip({
       paddingY={1}
       borderRadius="md"
       borderWidth="1px"
-      borderColor="gray.200"
+      borderColor="border"
       bg="white"
       fontSize="11px"
       fontWeight="medium"
@@ -154,7 +154,7 @@ export function EvaluatorResultChip({
       {/* Status indicator - spinning for running, static for others */}
       {status === "running" ? (
         <Box flexShrink={0}>
-          <Spinner size="xs" color="gray.500" marginBottom="-2px" />
+          <Spinner size="xs" color="fg.muted" marginBottom="-2px" />
         </Box>
       ) : (
         <Circle size="10px" bg={statusColor} flexShrink={0} />

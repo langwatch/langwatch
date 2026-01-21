@@ -47,7 +47,7 @@ export function EvaluationStatusItem({
 
   return (
     <Box
-      backgroundColor={"gray.400/10"}
+      backgroundColor="bg.muted"
       width={"full"}
       padding={6}
       borderRadius={"lg"}
@@ -62,10 +62,10 @@ export function EvaluationStatusItem({
               <b>{check.name || evaluator?.name}</b>
             </Text>
             <Spacer />
-            <Text fontSize={"sm"} color="gray.400">
+            <Text fontSize={"sm"} color="fg.subtle">
               {check.evaluator_id}
             </Text>
-            <Text color="gray.400">·</Text>
+            <Text color="fg.subtle">·</Text>
             <Text fontSize={"sm"}>
               {check.timestamps.finished_at && (
                 <Tooltip
@@ -75,7 +75,7 @@ export function EvaluationStatusItem({
                 >
                   <Text
                     borderBottomWidth="1px"
-                    borderBottomColor="gray.400"
+                    borderBottomColor="border.emphasized"
                     borderBottomStyle="dashed"
                   >
                     {formatDistanceToNow(

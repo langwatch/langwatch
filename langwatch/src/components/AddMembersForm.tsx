@@ -293,7 +293,7 @@ function MemberRow({
           width="100%"
         >
           <HStack paddingLeft={4} justify="space-between" width="100%">
-            <Text fontSize="sm" fontWeight="medium" color="gray.700">
+            <Text fontSize="sm" fontWeight="medium" color="fg">
               Team Assignments
             </Text>
             <Button

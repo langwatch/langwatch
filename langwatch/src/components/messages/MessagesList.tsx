@@ -233,14 +233,14 @@ const ExpandableMessages = React.memo(
           {...(isExpanded
             ? {
                 className: "card-stack-content expanded",
-                background: "#ECEEF2",
+                background: "bg.muted",
                 borderRadius: "10px",
                 padding: "40px",
                 width: "calc(100% + 80px)",
                 cursor: "n-resize",
               }
             : {
-                background: "#ECEEF200",
+                background: "transparent",
                 className: "card-stack-content",
                 marginBottom:
                   traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
@@ -273,7 +273,7 @@ const ExpandableMessages = React.memo(
               marginTop="-22px"
               fontSize="13px"
               fontWeight={600}
-              color="gray.500"
+              color="fg.muted"
               cursor="default"
             >
               <HStack gap={1}>
@@ -292,7 +292,7 @@ const ExpandableMessages = React.memo(
                 marginTop="-22px"
                 fontSize="13px"
                 fontWeight={600}
-                color="gray.500"
+                color="fg.muted"
                 cursor="default"
               >
                 <HStack gap={1}>
@@ -307,7 +307,7 @@ const ExpandableMessages = React.memo(
                 marginTop="-22px"
                 fontSize="13px"
                 fontWeight={600}
-                color="gray.500"
+                color="fg.muted"
                 cursor="default"
               >
                 <HStack gap={1}>
@@ -474,7 +474,7 @@ function GroupingSelector() {
         </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content>
-        <Box paddingX={3} paddingY={2} fontWeight="medium" color="gray.500">
+        <Box paddingX={3} paddingY={2} fontWeight="medium" color="fg.muted">
           Group by
         </Box>
         <RadioGroup

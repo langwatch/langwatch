@@ -87,7 +87,7 @@ export function PropertiesPanel() {
         right={0}
         background="white"
         border="1px solid"
-        borderColor="gray.350"
+        borderColor="border.emphasized"
         borderTopWidth={0}
         borderBottomWidth={0}
         borderRightWidth={0}

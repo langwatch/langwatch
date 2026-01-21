@@ -213,7 +213,7 @@ export const OutputsSection = ({
         <Text
           fontSize="sm"
           fontWeight="medium"
-          color="gray.600"
+          color="fg.muted"
         >
           {title}
         </Text>
@@ -250,7 +250,7 @@ export const OutputsSection = ({
 
       {/* Outputs List */}
       {outputs.length === 0 ? (
-        <Text fontSize="13px" color="gray.400">
+        <Text fontSize="13px" color="fg.subtle">
           No outputs defined
         </Text>
       ) : (
@@ -385,7 +385,7 @@ const OutputRow = ({
             borderRadius="lg"
             padding={1}
             paddingRight={5}
-            _hover={{ borderColor: "gray.200" }}
+            _hover={{ borderColor: "border" }}
             css={{
               color: "transparent",
               "& option": { color: "black" },
@@ -438,7 +438,7 @@ const OutputRow = ({
           marginX={-2}
           marginY={-1}
           borderRadius="lg"
-          _hover={readOnly ? undefined : { borderColor: "gray.200" }}
+          _hover={readOnly ? undefined : { borderColor: "border" }}
           minWidth="60px"
           data-testid={`output-name-${output.identifier}`}
         >
@@ -477,7 +477,7 @@ const OutputRow = ({
             colorPalette="gray"
             onClick={onRemove}
             flexShrink={0}
-            color="gray.400"
+            color="fg.subtle"
             disabled={!canRemove}
             data-testid={`remove-output-${output.identifier}`}
           >

@@ -106,9 +106,9 @@ export function BaseProgressToast({
       padding={1}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       onClick={onClick}
-      color="gray.800"
+      color="fg"
     >
       <VStack align="start" gap={1}>
         <VStack align="start" gap={1} paddingY={2} paddingX={3}>

@@ -101,8 +101,8 @@ function RecentItemCard({ item }: RecentItemCardProps) {
             <Box
               padding={1.5}
               borderRadius="md"
-              background={`${color.split(".")[0]}.50`}
-              color={color}
+              background={`${color.split(".")[0]}.subtle`}
+              color={`${color.split(".")[0]}.solid`}
             >
               {icon}
             </Box>
@@ -111,15 +111,15 @@ function RecentItemCard({ item }: RecentItemCardProps) {
                 {item.name}
               </Text>
               <HStack gap={2}>
-                <Text fontSize="xs" color="gray.500">
+                <Text fontSize="xs" color="fg.muted">
                   {getLabelForType(item.type)}
                 </Text>
                 {timeAgo && (
                   <>
-                    <Text fontSize="xs" color="gray.400">
+                    <Text fontSize="xs" color="fg.subtle">
                       •
                     </Text>
-                    <Text fontSize="xs" color="gray.500">
+                    <Text fontSize="xs" color="fg.muted">
                       {timeAgo}
                     </Text>
                   </>
@@ -214,10 +214,10 @@ function GroupedItemsView({ items }: { items: RecentItem[] }) {
         <VStack key={type} align="stretch" gap={2}>
           <HStack>
             <Box color={getColorForType(type)}>{getIconForType(type)}</Box>
-            <Text fontSize="sm" color="gray.700">
+            <Text fontSize="sm" color="fg">
               {getLabelForType(type)}s
             </Text>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="fg.muted">
               ({typeItems.length})
             </Text>
           </HStack>
@@ -304,7 +304,7 @@ export function RecentItemsSection() {
               <Box color="red.500">
                 <LuCircleX size={24} />
               </Box>
-              <Text fontSize="sm" color="gray.600">
+              <Text fontSize="sm" color="fg.muted">
                 Failed to load recent items
               </Text>
               <Text

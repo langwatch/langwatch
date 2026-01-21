@@ -49,7 +49,7 @@ export function UndoRedo() {
   return (
     <>
       <Button
-        color="gray.500"
+        color="fg.muted"
         size="xs"
         variant="ghost"
         onClick={() => undo()}
@@ -58,7 +58,7 @@ export function UndoRedo() {
         <RotateCcw width="16px" />
       </Button>
       <Button
-        color="gray.500"
+        color="fg.muted"
         size="xs"
         variant="ghost"
         onClick={() => redo()}

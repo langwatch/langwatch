@@ -249,13 +249,13 @@ export const WizardSidebar = memo(function WizardSidebar({
             ref={stickyRef}
             width="full"
             position="sticky"
-            background="white"
+            background="bg.surface"
             paddingX={6}
             paddingY={4}
             borderTop={isSticky ? "1px solid" : "none"}
             boxShadow={isSticky ? "-5px 0 10px 0 rgba(0, 0, 0, 0.1)" : "none"}
             transition="all 0.3s ease-in-out"
-            borderTopColor="gray.200"
+            borderTopColor="border"
             bottom="-1px"
           >
             {step !== "task" && (
@@ -350,7 +350,7 @@ export const WizardSidebar = memo(function WizardSidebar({
                   color="white"
                   borderColor="black"
                   _hover={{
-                    background: "gray.700",
+                    background: "gray.800",
                   }}
                   onClick={() =>
                     setWizardState({

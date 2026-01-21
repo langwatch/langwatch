@@ -102,7 +102,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
@@ -123,7 +123,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
@@ -148,7 +148,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
@@ -169,7 +169,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
@@ -190,7 +190,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >
@@ -215,7 +215,7 @@ export const IntegrationChecks = () => {
             <Text
               display="inline"
               borderBottomWidth="1px"
-              borderColor="gray.350"
+              borderColor="border.emphasized"
               borderStyle="dashed"
               _groupHover={{ border: "none" }}
             >

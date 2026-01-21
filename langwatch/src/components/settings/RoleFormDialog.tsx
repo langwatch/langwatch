@@ -128,7 +128,7 @@ export function RoleFormDialog({
 
               <VStack align="start" width="full" gap={4}>
                 <Heading size="sm">Permissions</Heading>
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color="fg.muted">
                   Select the permissions this role should have
                 </Text>
 

@@ -285,7 +285,7 @@ export function MessagesTable({
                 : "0 0 0 rgba(0, 0, 0, 0)"
             }
             paddingX={4}
-            background="white"
+            background="bg.panel"
           >
             <HStack>
               <Checkbox
@@ -725,7 +725,7 @@ export function MessagesTable({
         height={4}
         cursor="pointer"
         onClick={() => sortBy(columnKey)}
-        color="gray.400"
+        color="fg.subtle"
       >
         <LuChevronsUpDown />
       </Icon>
@@ -1122,7 +1122,7 @@ export function MessagesTable({
                           key={index}
                           paddingX={4}
                           paddingY={4}
-                          background="white"
+                          background="bg.panel"
                           borderRadius="4px 0 0 0"
                           {...(columnKey === "checked"
                             ? {

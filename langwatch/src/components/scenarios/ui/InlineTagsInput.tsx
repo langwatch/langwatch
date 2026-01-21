@@ -75,7 +75,7 @@ export function InlineTagsInput({
       align="center"
       padding={2}
       borderWidth="1px"
-      borderColor="gray.200"
+      borderColor="border"
       borderRadius="md"
       minHeight="40px"
       cursor="text"

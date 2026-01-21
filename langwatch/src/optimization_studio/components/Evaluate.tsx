@@ -375,7 +375,7 @@ export function EvaluateModalContent({
             />
           </VStack>
           <VStack align="start" width="full" gap={2}>
-            <SmallLabel color="gray.600">Evaluate on</SmallLabel>
+            <SmallLabel>Evaluate on</SmallLabel>
             <Controller
               control={form.control}
               name="evaluateOn"
@@ -391,7 +391,7 @@ export function EvaluateModalContent({
           </VStack>
         </VStack>
       </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
         <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
@@ -464,7 +464,7 @@ const DatasetSplitSelect = ({
             <Select.Item item={option} key={option.value}>
               <VStack align="start" width="full">
                 <Text>{option.label}</Text>
-                <Text fontSize="13px" color="gray.500">
+                <Text fontSize="13px" color="fg.muted">
                   {option.description}
                 </Text>
               </VStack>

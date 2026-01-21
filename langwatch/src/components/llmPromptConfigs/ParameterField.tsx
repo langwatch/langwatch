@@ -65,7 +65,7 @@ function SliderField({
   return (
     <VStack gap={1} align="stretch" width="full">
       <HStack justify="space-between">
-        <Text fontSize="xs" color="gray.600">
+        <Text fontSize="xs" color="fg.muted">
           {config.label}
         </Text>
         <Input
@@ -123,7 +123,7 @@ function SelectField({ config, value, onChange, disabled }: SelectFieldProps) {
 
   return (
     <VStack gap={1} align="stretch" width="full">
-      <Text fontSize="xs" color="gray.600">
+      <Text fontSize="xs" color="fg.muted">
         {config.label}
       </Text>
       <NativeSelect.Root size="sm" disabled={disabled}>

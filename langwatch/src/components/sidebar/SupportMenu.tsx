@@ -12,7 +12,6 @@ import {
 } from "react-icons/lu";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "../icons/DiscordOutline";
-import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
 import { SideMenuItem } from "./SideMenuLink";
@@ -22,7 +21,6 @@ export type SupportMenuProps = {
 };
 
 export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
-  const gray600 = useColorRawValue("gray.600");
   const [isOpen, setIsOpen] = useState(false);
   const publicEnv = usePublicEnv();
 
@@ -78,7 +76,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
               showLabel={showLabel}
               rightElement={
                 showLabel ? (
-                  <LuChevronRight size={14} color={gray600} />
+                  <LuChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
                 ) : undefined
               }
             />

@@ -14,7 +14,7 @@ export function SectionHeader({ children, ...props }: SectionHeaderProps) {
       fontSize="11px"
       fontWeight="bold"
       textTransform="uppercase"
-      color="gray.500"
+      color="fg.muted"
       letterSpacing="0.5px"
       {...props}
     >

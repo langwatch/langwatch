@@ -170,13 +170,13 @@ function EvaluationsV2() {
 
               <VStack align="start" gap={1}>
                 <Heading as="h1">Evaluations</Heading>
-                <Text color="gray.600">
+                <Text color="fg.muted">
                   View and analyze your evaluation results
                 </Text>
               </VStack>
 
-              <Card.Root>
-                <Card.Body overflowX="auto">
+              <Card.Root overflow="hidden">
+                <Card.Body padding={0} overflowX="auto">
                   {experiments.data &&
                   experiments.data.experiments.length == 0 ? (
                     <EmptyState.Root>
@@ -321,7 +321,7 @@ function EvaluationsV2() {
                                           <Text
                                             as="span"
                                             fontSize="xs"
-                                            color="gray.600"
+                                            color="fg.muted"
                                           >
                                             {
                                               experiment.runsSummary
@@ -340,6 +340,55 @@ function EvaluationsV2() {
                                       ) : (
                                         "-"
                                       )}
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                      {experiment.runsSummary.count ?? "-"}
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                      <HStack gap={1}>
+                                        {experiment.runsSummary.latestRun
+                                          ?.timestamps?.finished_at ? (
+                                          <>
+                                            <LuCircleCheckBig
+                                              size={14}
+                                              color="var(--chakra-colors-green-500)"
+                                            />
+                                            <Text fontSize="sm">Completed</Text>
+                                          </>
+                                        ) : experiment.runsSummary.latestRun
+                                            ?.timestamps?.stopped_at ? (
+                                          <>
+                                            <LuCircleX
+                                              size={14}
+                                              color="var(--chakra-colors-red-500)"
+                                            />
+                                            <Text fontSize="sm">Stopped</Text>
+                                          </>
+                                        ) : experiment.runsSummary.latestRun &&
+                                          experiment.runsSummary.latestRun
+                                            .timestamps?.updated_at &&
+                                          Date.now() -
+                                            experiment.runsSummary.latestRun
+                                              .timestamps.updated_at <
+                                            5 * 60 * 1000 ? (
+                                          <>
+                                            <Spinner size="xs" />
+                                            <Text fontSize="sm">Running</Text>
+                                          </>
+                                        ) : experiment.runsSummary.count > 0 ? (
+                                          <>
+                                            <LuCircleCheckBig
+                                              size={14}
+                                              color="var(--chakra-colors-green-500)"
+                                            />
+                                            <Text fontSize="sm">Completed</Text>
+                                          </>
+                                        ) : (
+                                          <Text fontSize="sm" color="fg.muted">
+                                            -
+                                          </Text>
+                                        )}
+                                      </HStack>
                                     </Table.Cell>
                                     <Table.Cell whiteSpace="nowrap">
                                       {new Date(

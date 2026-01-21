@@ -44,7 +44,7 @@ export function LabelFilterDropdown({
       <PopoverContent width="200px">
         <PopoverBody>
           {allLabels.length === 0 ? (
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="fg.muted">
               No labels available
             </Text>
           ) : (

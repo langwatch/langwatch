@@ -92,7 +92,7 @@ export function EditableHeading({
         className="edit-icon"
         opacity={0}
         transition="opacity 0.2s"
-        color="gray.400"
+        color="fg.subtle"
       >
         <Edit2 size={14} />
       </Box>

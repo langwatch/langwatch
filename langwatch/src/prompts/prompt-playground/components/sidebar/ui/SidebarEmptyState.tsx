@@ -8,7 +8,7 @@ export function SidebarEmptyState() {
   return (
     <Text
       fontSize="sm"
-      color="gray.500"
+      color="fg.muted"
       textAlign="center"
       paddingY={6}
       paddingX={4}

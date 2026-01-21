@@ -1048,7 +1048,7 @@ function SeriesFieldItem({
       key={field.id}
       value={index.toString()}
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       marginBottom={4}
     >
       <Accordion.ItemTrigger

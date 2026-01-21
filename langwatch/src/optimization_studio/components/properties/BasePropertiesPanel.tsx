@@ -219,7 +219,7 @@ export function FieldsDefinition({
                   </Box>
                   {!readOnly ? (
                     <>
-                      <Box color="gray.600">
+                      <Box color="fg.muted">
                         <ChevronDown size={14} />
                       </Box>
                       <NativeSelect.Root
@@ -414,7 +414,7 @@ export function FieldsForm({
                   {camelCaseToTitleCase(field.identifier)}
                 </PropertySectionTitle>
                 {field.optional && (
-                  <Text color="gray.500" fontSize="12px">
+                  <Text color="fg.muted" fontSize="12px">
                     (optional)
                   </Text>
                 )}
@@ -621,7 +621,7 @@ export function BasePropertiesPanel({
                   <Button
                     variant="ghost"
                     size="sm"
-                    color="gray.500"
+                    color="fg.muted"
                     onClick={() => {
                       setPropertiesExpanded(!propertiesExpanded);
                     }}
@@ -633,7 +633,7 @@ export function BasePropertiesPanel({
               <Button
                 variant="ghost"
                 size="sm"
-                color="gray.500"
+                color="fg.muted"
                 onClick={() => {
                   if (propertiesExpanded) {
                     setPropertiesExpanded(false);
@@ -647,7 +647,7 @@ export function BasePropertiesPanel({
             </HStack>
           </HStack>
           {!hideDescription && node.data?.description && (
-            <Text fontSize="12px" color="gray.500" paddingX={2}>
+            <Text fontSize="12px" color="fg.muted" paddingX={2}>
               {node.data?.description}
             </Text>
           )}

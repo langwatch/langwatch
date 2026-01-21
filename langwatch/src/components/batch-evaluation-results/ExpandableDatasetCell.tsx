@@ -109,7 +109,7 @@ export function ExpandableDatasetCell({
   // Empty state
   if (!rawContent) {
     return (
-      <Text fontSize="13px" color="gray.400">
+      <Text fontSize="13px" color="fg.subtle">
         -
       </Text>
     );
@@ -123,7 +123,7 @@ export function ExpandableDatasetCell({
           <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
             {displayContent}
             {isTruncated && (
-              <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+              <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                 (truncated)
               </Box>
             )}
@@ -144,7 +144,7 @@ export function ExpandableDatasetCell({
           <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
             {displayContent}
             {isTruncated && (
-              <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+              <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                 (truncated)
               </Box>
             )}

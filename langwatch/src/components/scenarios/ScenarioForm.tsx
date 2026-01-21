@@ -129,7 +129,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <SectionHeader>Situation</SectionHeader>
-          <Text fontSize="13px" color="gray.500">
+          <Text fontSize="13px" color="fg.muted">
             Describe the user, their context, and what they're trying to
             accomplish. Think about a critical path or a complex edge case.
           </Text>
@@ -149,7 +149,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <SectionHeader>Criteria</SectionHeader>
-          <Text fontSize="13px" color="gray.500">
+          <Text fontSize="13px" color="fg.muted">
             What must the agent DO or NOT DO? e.g. "Must remain empathetic",
             "Must NOT offer refund without manager approval"
           </Text>

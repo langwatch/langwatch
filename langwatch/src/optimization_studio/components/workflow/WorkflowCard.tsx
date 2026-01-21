@@ -38,7 +38,7 @@ export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
       role="button"
       transition="all 0.2s ease-in-out"
       border="1px solid"
-      borderColor="gray.100"
+      borderColor="border.muted"
       _hover={{
         boxShadow: "xl",
         textDecoration: "none",
@@ -199,7 +199,7 @@ export function WorkflowCard({
         <HStack gap={4} paddingX={4} paddingBottom={2} width="full">
           <WorkflowIcon icon={icon} size={"lg"} />
           {description && (
-            <Text color="gray.600" fontSize="sm" fontWeight={500}>
+            <Text color="fg.muted" fontSize="sm" fontWeight={500}>
               {name}
             </Text>
           )}
@@ -315,13 +315,13 @@ export function WorkflowCard({
         {!description && <Spacer />}
         <Text
           paddingX={4}
-          color="gray.600"
+          color="fg.muted"
           fontSize="sm"
           fontWeight={!description ? 500 : undefined}
         >
           {description ?? name}
         </Text>
-        <Text paddingX={4} color="gray.400" fontSize="12px">
+        <Text paddingX={4} color="fg.subtle" fontSize="12px">
           {formatTimeAgo(workflow?.updatedAt?.getTime() ?? 0)}
         </Text>
       </WorkflowCardBase>

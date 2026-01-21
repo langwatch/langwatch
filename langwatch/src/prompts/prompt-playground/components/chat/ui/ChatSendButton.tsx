@@ -27,7 +27,7 @@ export function ChatSendButton({
       cursor={disabled ? "not-allowed" : "pointer"}
       onClick={() => onSend()}
       disabled={disabled}
-      bg={disabled ? "gray.300" : "orange.500"}
+      bg={disabled ? "bg.emphasized" : "orange.solid"}
       color="white"
       borderRadius="md"
       padding={2}
@@ -35,7 +35,7 @@ export function ChatSendButton({
       alignItems="center"
       justifyContent="center"
       opacity={disabled ? 0.5 : 1}
-      _hover={disabled ? undefined : { bg: "orange.600" }}
+      _hover={disabled ? undefined : { bg: "orange.emphasized" }}
       transition="all 0.2s"
       {...buttonProps}
     >

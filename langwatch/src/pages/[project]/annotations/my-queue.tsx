@@ -132,7 +132,7 @@ export default function TraceAnnotations() {
             width="full"
             backgroundColor="white"
             borderTop="1px solid"
-            borderColor="gray.200"
+            borderColor="border"
             zIndex={10}
           >
             <AnnotationQueuePicker

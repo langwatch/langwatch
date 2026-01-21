@@ -83,7 +83,7 @@ const SourceTypeIconComponent = ({ type }: { type: SourceType }) => {
   if (type === "dataset") {
     return (
       <ColorfulBlockIcon
-        color="blue.400"
+        color="blue.solid"
         size="xs"
         icon={<Database size={12} />}
       />
@@ -334,7 +334,7 @@ export const VariableMappingInput = ({
       {/* Container with full-width bottom border */}
       <Box
         borderBottom="1px solid"
-        borderColor={isMissing ? "yellow.500" : "gray.200"}
+        borderColor={isMissing ? "yellow.500" : "border"}
         background={isMissing ? "orange.50" : undefined}
         // borderRadius={isMissing ? "md" : undefined}
         paddingX={isMissing ? 1 : undefined}
@@ -424,12 +424,12 @@ export const VariableMappingInput = ({
             borderRadius="8px"
             boxShadow="lg"
             border="1px solid"
-            borderColor="gray.200"
+            borderColor="border"
             zIndex={2000}
           >
             {allOptions.length === 0 ? (
               <Box padding={3}>
-                <Text fontSize="sm" color="gray.500">
+                <Text fontSize="sm" color="fg.muted">
                   No available sources
                 </Text>
               </Box>
@@ -450,7 +450,7 @@ export const VariableMappingInput = ({
                       <Text
                         fontSize="xs"
                         fontWeight="semibold"
-                        color="gray.600"
+                        color="fg.muted"
                       >
                         {source.name}
                       </Text>
@@ -541,9 +541,9 @@ export const VariableMappingInput = ({
                       }
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />
-                      <Text fontSize="13px" color="gray.600">
+                      <Text fontSize="13px" color="fg.muted">
                         Use "
-                        <Text as="span" fontWeight="medium" color="gray.800">
+                        <Text as="span" fontWeight="medium" color="fg">
                           {searchQuery.trim()}
                         </Text>
                         " as value

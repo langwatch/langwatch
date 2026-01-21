@@ -21,7 +21,7 @@ import { useEffect, useState } from "react";
 import { AnalyticsProvider } from "react-contextual-analytics";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
-import { colorSystem } from "../components/ui/color-mode";
+import { colorSystem, ColorModeProvider } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
 import { dependencies } from "../injection/dependencies.client";
@@ -31,8 +31,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: "#E5E7EB",
+      background: { _light: "#E5E7EB", _dark: "{colors.gray.900}" },
       fontSize: "14px",
+      color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
     "*::selection": {
       // Chakra by default overrides browser selection color, I really don't like things overriding defaults
@@ -78,43 +79,126 @@ export const system = createSystem(defaultConfig, {
     },
     semanticTokens: {
       colors: {
+        // Palette-specific semantic tokens
         gray: {
-          solid: { value: "{colors.gray.200}" },
-          hover: { value: "{colors.gray.300}" },
-          contrast: { value: "{colors.gray.800}" },
-          subtle: { value: "{colors.gray.200}" },
+          solid: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          hover: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" } },
+          contrast: { value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" } },
+          subtle: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: "#ED8926" },
-          hover: { value: "{colors.orange.600}" },
+          hover: { value: { _light: "{colors.orange.600}", _dark: "{colors.orange.500}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
-          subtle: { value: "{colors.orange.50}" },
-          fg: { value: "{colors.orange.800}" },
+          subtle: { value: { _light: "{colors.orange.50}", _dark: "{colors.orange.900}" } },
+          fg: { value: { _light: "{colors.orange.800}", _dark: "{colors.orange.200}" } },
         },
         green: {
-          solid: { value: "{colors.green.500}" },
-          hover: { value: "{colors.green.600}" },
-          subtle: { value: "{colors.green.50}" },
+          solid: { value: { _light: "{colors.green.500}", _dark: "{colors.green.400}" } },
+          hover: { value: { _light: "{colors.green.600}", _dark: "{colors.green.500}" } },
+          subtle: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
-          solid: { value: "{colors.blue.500}" },
-          hover: { value: "{colors.blue.600}" },
-          subtle: { value: "{colors.blue.50}" },
+          solid: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" } },
+          hover: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.500}" } },
+          subtle: { value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
-          solid: { value: "{colors.yellow.500}" },
-          hover: { value: "{colors.yellow.600}" },
-          subtle: { value: "{colors.yellow.50}" },
+          solid: { value: { _light: "{colors.yellow.500}", _dark: "{colors.yellow.400}" } },
+          hover: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.500}" } },
+          subtle: { value: { _light: "{colors.yellow.50}", _dark: "{colors.yellow.900}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
-          solid: { value: "{colors.red.500}" },
-          hover: { value: "{colors.red.600}" },
-          subtle: { value: "{colors.red.50}" },
+          solid: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
+          hover: { value: { _light: "{colors.red.600}", _dark: "{colors.red.500}" } },
+          subtle: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
           focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        pink: {
+          solid: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.400}" } },
+          hover: { value: { _light: "{colors.pink.600}", _dark: "{colors.pink.500}" } },
+          subtle: { value: { _light: "{colors.pink.50}", _dark: "{colors.pink.900}" } },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        purple: {
+          solid: { value: { _light: "{colors.purple.500}", _dark: "{colors.purple.400}" } },
+          hover: { value: { _light: "{colors.purple.600}", _dark: "{colors.purple.500}" } },
+          subtle: { value: { _light: "{colors.purple.50}", _dark: "{colors.purple.900}" } },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        teal: {
+          solid: { value: { _light: "{colors.teal.500}", _dark: "{colors.teal.400}" } },
+          hover: { value: { _light: "{colors.teal.600}", _dark: "{colors.teal.500}" } },
+          subtle: { value: { _light: "{colors.teal.50}", _dark: "{colors.teal.900}" } },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        cyan: {
+          solid: { value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.400}" } },
+          hover: { value: { _light: "{colors.cyan.600}", _dark: "{colors.cyan.500}" } },
+          subtle: { value: { _light: "{colors.cyan.50}", _dark: "{colors.cyan.900}" } },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+
+        // Status semantic tokens - for evaluation results, pass/fail states, etc.
+        status: {
+          success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.400}" } },
+          error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.400}" } },
+          warning: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.400}" } },
+          pending: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.400}" } },
+          info: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" } },
+        },
+
+        // Navigation semantic tokens - for sidebar menu items
+        nav: {
+          fg: { value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" } },
+          fgMuted: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
+          bgActive: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          bgHover: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+        },
+
+        // Label semantic tokens - for form labels, section headers
+        label: {
+          fg: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
+          fgMuted: { value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" } },
+        },
+
+        // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
+        bg: {
+          // Page/sidebar background - lighter gray in dark mode
+          page: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
+          // Main content area - darkest in dark mode
+          surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Cards and panels - same as surface (darkest)
+          panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Muted background for hover states, selections
+          muted: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" } },
+          // Emphasized background for active states
+          emphasized: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          // Subtle background for table headers, etc.
+          subtle: { value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" } },
+          // Form inputs
+          input: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" } },
+          inputHover: { value: { _light: "white", _dark: "{colors.gray.700}" } },
+        },
+
+        // Foreground semantic tokens - proper contrast in dark mode
+        fg: {
+          DEFAULT: { value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" } },
+          muted: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
+          subtle: { value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" } },
+          inverted: { value: { _light: "white", _dark: "{colors.gray.900}" } },
+        },
+
+        // Border semantic tokens - subtle borders in dark mode
+        border: {
+          DEFAULT: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" } },
+          muted: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" } },
+          subtle: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
+          emphasized: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" } },
         },
       },
       shadows: {
@@ -136,6 +220,7 @@ export const system = createSystem(defaultConfig, {
       heading: defineRecipe({
         base: {
           fontWeight: "500",
+          color: "fg",
         },
         variants: {
           size: {
@@ -172,23 +257,23 @@ export const system = createSystem(defaultConfig, {
             },
             outline: {
               boxShadow: "2xs",
-              borderColor: "gray.300",
-              color: "gray.800",
+              borderColor: "border.emphasized",
+              color: "fg",
               _hover: {
-                backgroundColor: "gray.50",
+                backgroundColor: "bg.subtle",
                 boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
               },
               _expanded: {
-                backgroundColor: "gray.50",
+                backgroundColor: "bg.subtle",
               },
             },
             ghost: {
-              color: "gray.800",
+              color: "fg",
               _hover: {
-                backgroundColor: "gray.200",
+                backgroundColor: "bg.emphasized",
               },
               _expanded: {
-                backgroundColor: "gray.200",
+                backgroundColor: "bg.emphasized",
               },
             },
           },
@@ -254,7 +339,7 @@ export const system = createSystem(defaultConfig, {
         variants: {
           variant: {
             outline: {
-              bg: "white/65",
+              bg: "bg.surface/65",
             },
             flushed: {
               borderRadius: "none",
@@ -277,16 +362,16 @@ export const system = createSystem(defaultConfig, {
         variants: {
           variant: {
             outline: {
-              bg: "white/65",
+              bg: "bg.surface/65",
             },
           },
         },
       }),
       radio: defineRecipe({
         base: {
-          backgroundColor: "white/65",
+          backgroundColor: "bg.surface/65",
           "& .dot": {
-            backgroundColor: "white/65",
+            backgroundColor: "bg.surface/65",
           },
         },
       }),
@@ -303,6 +388,7 @@ export const system = createSystem(defaultConfig, {
           root: {
             borderRadius: "xl",
             transition: "all 0.2s ease-in-out",
+            background: "bg.panel",
           },
         },
         variants: {
@@ -315,7 +401,7 @@ export const system = createSystem(defaultConfig, {
             elevated: {
               root: {
                 border: "1px solid",
-                borderColor: "gray.100",
+                borderColor: "border.muted",
                 boxShadow: "md",
                 _hover: {
                   boxShadow: "lg",
@@ -341,7 +427,7 @@ export const system = createSystem(defaultConfig, {
           control: {
             borderWidth: "1px",
             cursor: "pointer",
-            backgroundColor: "white/65",
+            backgroundColor: "bg.surface/65",
           },
           label: {
             fontWeight: "normal",
@@ -352,7 +438,7 @@ export const system = createSystem(defaultConfig, {
           variant: {
             solid: {
               control: {
-                borderColor: "gray.350",
+                borderColor: "border.emphasized",
                 "&:is([data-state=checked], [data-state=indeterminate])": {
                   bg: "blue.500",
                   color: "white",
@@ -434,8 +520,11 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       menu: defineSlotRecipe({
-        slots: ["item"],
+        slots: ["item", "content"],
         base: {
+          content: {
+            background: "bg.panel",
+          },
           item: {
             cursor: "pointer",
           },
@@ -457,16 +546,22 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       table: defineSlotRecipe({
-        slots: ["root"],
+        slots: ["root", "row", "cell", "columnHeader"],
         base: {
           root: {
             borderRadius: "lg",
+            background: "bg.panel",
+          },
+          row: {
+            _hover: {
+              background: "bg.muted",
+            },
           },
           columnHeader: {
             fontWeight: "bold",
             textStyle: "xs",
             textTransform: "uppercase",
-            color: "gray.600",
+            color: "fg.muted",
             letterSpacing: "wider",
           },
         },
@@ -474,30 +569,44 @@ export const system = createSystem(defaultConfig, {
           variant: {
             // add grid variant following previous pattern
             grid: {
+              root: {
+                background: "bg.panel",
+              },
               columnHeader: {
                 border: "1px solid",
-                borderColor: "gray.200",
-                background: "gray.50",
+                borderColor: "border",
+                background: "bg.subtle",
               },
               cell: {
                 border: "1px solid",
-                borderColor: "gray.200",
+                borderColor: "border",
               },
             },
             line: {
+              root: {
+                background: "bg.panel",
+              },
               columnHeader: {
-                borderColor: "gray.100",
+                borderColor: "border",
+                background: "bg.subtle",
               },
               cell: {
-                borderColor: "gray.100",
+                borderColor: "border",
               },
             },
             outline: {
+              root: {
+                background: "bg.panel",
+              },
               header: {
                 background: "none",
               },
             },
-            ghost: {},
+            ghost: {
+              root: {
+                background: "transparent",
+              },
+            },
           },
           size: {
             xs: {
@@ -568,7 +677,7 @@ export const system = createSystem(defaultConfig, {
           itemTrigger: {
             cursor: "pointer",
             _hover: {
-              bg: "gray.50",
+              bg: "bg.subtle",
             },
           },
         },
@@ -584,6 +693,7 @@ export const system = createSystem(defaultConfig, {
             pt: "3",
           },
           content: {
+            background: "bg.surface",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },
@@ -604,12 +714,23 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       select: defineSlotRecipe({
-        slots: ["trigger"],
+        slots: ["trigger", "content"],
         base: {
           trigger: {
             cursor: "pointer",
             borderRadius: "lg",
-            background: "white/65",
+            background: "bg.surface/65",
+          },
+          content: {
+            background: "bg.panel",
+          },
+        },
+      }),
+      popover: defineSlotRecipe({
+        slots: ["content"],
+        base: {
+          content: {
+            background: "bg.panel",
           },
         },
       }),
@@ -620,7 +741,7 @@ export const system = createSystem(defaultConfig, {
             outline: {
               field: {
                 borderRadius: "lg",
-                background: "white/65",
+                background: "bg.surface/65",
               },
             },
           },
@@ -631,6 +752,7 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             maxWidth: "70%",
+            background: "bg.surface",
           },
           header: {
             paddingY: 4,
@@ -688,7 +810,7 @@ export const system = createSystem(defaultConfig, {
         slots: ["itemControl"],
         base: {
           itemControl: {
-            backgroundColor: "white/65",
+            backgroundColor: "bg.surface/65",
           },
         },
       }),
@@ -781,28 +903,30 @@ const LangWatch: AppType<{
       refetchOnWindowFocus={false}
     >
       <ChakraProvider value={system}>
-        <Head>
-          <title>LangWatch</title>
-        </Head>
-        <AnalyticsProvider
-          client={createAppAnalyticsClient({
-            isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-            posthogClient: postHog,
-          })}
-        >
-          {postHog ? (
-            <PostHogProvider client={postHog}>
+        <ColorModeProvider>
+          <Head>
+            <title>LangWatch</title>
+          </Head>
+          <AnalyticsProvider
+            client={createAppAnalyticsClient({
+              isSaaS: Boolean(publicEnv.data?.IS_SAAS),
+              posthogClient: postHog,
+            })}
+          >
+            {postHog ? (
+              <PostHogProvider client={postHog}>
+                <Component {...pageProps} />
+              </PostHogProvider>
+            ) : (
               <Component {...pageProps} />
-            </PostHogProvider>
-          ) : (
-            <Component {...pageProps} />
-          )}
-        </AnalyticsProvider>
-        <Toaster />
+            )}
+          </AnalyticsProvider>
+          <Toaster />
 
-        {dependencies.ExtraFooterComponents && (
-          <dependencies.ExtraFooterComponents />
-        )}
+          {dependencies.ExtraFooterComponents && (
+            <dependencies.ExtraFooterComponents />
+          )}
+        </ColorModeProvider>
       </ChakraProvider>
     </SessionProvider>
   );

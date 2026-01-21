@@ -81,7 +81,7 @@ const SimulationButton: React.FC<SimulationButtonProps> = ({
           {label}
         </Text>
         <Text
-          color="gray.500"
+          color="fg.muted"
           fontSize="xs"
           mt={0.25}
           textAlign="left"
@@ -93,7 +93,7 @@ const SimulationButton: React.FC<SimulationButtonProps> = ({
           {description}
         </Text>
       </Box>
-      <Box as="span" color="gray.400" ml={2} display="flex" alignItems="center">
+      <Box as="span" color="fg.subtle" ml={2} display="flex" alignItems="center">
         <LuExternalLink size={18} />
       </Box>
     </a>

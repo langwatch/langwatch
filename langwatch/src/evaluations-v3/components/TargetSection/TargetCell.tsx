@@ -258,9 +258,9 @@ export function TargetCellContent({
         <HStack
           gap={2}
           p={2}
-          bg="red.50"
+          bg="red.subtle"
           borderRadius="md"
-          color="red.700"
+          color="red.fg"
           fontSize="13px"
         >
           <Box flexShrink={0}>
@@ -279,7 +279,7 @@ export function TargetCellContent({
           <VStack flex={1} overflowY="auto" minHeight={0} align="start">
             <Text
               fontSize="11px"
-              color="gray.500"
+              color="fg.muted"
               fontWeight="700"
               textTransform="uppercase"
             >
@@ -288,7 +288,7 @@ export function TargetCellContent({
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
-                <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                   (truncated)
                 </Box>
               )}
@@ -311,7 +311,7 @@ export function TargetCellContent({
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
-                <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                   (truncated)
                 </Box>
               )}
@@ -330,15 +330,16 @@ export function TargetCellContent({
               onClick={handleExpandOutput}
               className="cell-fade-overlay"
               css={{
-                background: "linear-gradient(to bottom, transparent, white)",
+                background:
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
                 "tr:hover &": {
                   background:
-                    "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+                    "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
                 },
                 // Selected row takes priority over hover
                 "tr[data-selected='true'] &": {
                   background:
-                    "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-50))",
+                    "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
                 },
               }}
             />
@@ -349,7 +350,7 @@ export function TargetCellContent({
 
     // No output yet
     return (
-      <Text fontSize="13px" color="gray.400">
+      <Text fontSize="13px" color="fg.subtle">
         No output yet
       </Text>
     );
@@ -382,7 +383,7 @@ export function TargetCellContent({
       <Button
         size="xs"
         variant="outline"
-        color="gray.500"
+        color="fg.muted"
         fontWeight="500"
         onClick={(e) => {
           e.stopPropagation();
@@ -425,7 +426,7 @@ export function TargetCellContent({
       className={inExpandedView ? undefined : "cell-action-btn"}
       opacity={inExpandedView ? 1 : 0}
       transition="opacity 0.15s"
-      bg={inExpandedView ? "transparent" : "gray.50"}
+      bg={inExpandedView ? "transparent" : "bg.subtle"}
       borderRadius="md"
       paddingLeft={2}
       paddingRight={0.5}
@@ -439,7 +440,7 @@ export function TargetCellContent({
         >
           <Text
             fontSize="11px"
-            color="gray.500"
+            color="fg.muted"
             whiteSpace="nowrap"
             px={1}
             data-testid={`latency-${target.id}`}
@@ -458,7 +459,7 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            _hover={{ bg: "gray.200" }}
+            _hover={{ bg: "bg.emphasized" }}
             onClick={handleViewTrace}
             data-testid={`trace-link-${target.id}`}
           >
@@ -476,7 +477,7 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            _hover={{ bg: "gray.200" }}
+            _hover={{ bg: "bg.emphasized" }}
             onClick={(e) => {
               e.stopPropagation();
               handleCopyOutput();
@@ -497,7 +498,7 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            _hover={{ bg: "gray.200" }}
+            _hover={{ bg: "bg.emphasized" }}
             onClick={(e) => {
               e.stopPropagation();
               if (isLoading && onStopCell) {
@@ -552,10 +553,10 @@ export function TargetCellContent({
             left={`${expandedPosition.left - 8}px`}
             width={`${Math.max(expandedPosition.width + 16, 250)}px`}
             maxHeight="calc(100vh - 32px)"
-            bg="white/75"
+            bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-gray-300), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

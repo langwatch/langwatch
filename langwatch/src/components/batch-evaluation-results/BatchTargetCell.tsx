@@ -168,7 +168,7 @@ export function BatchTargetCell({
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
-                <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                   (truncated)
                 </Box>
               )}
@@ -189,7 +189,7 @@ export function BatchTargetCell({
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
-                <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
                   (truncated)
                 </Box>
               )}
@@ -222,7 +222,7 @@ export function BatchTargetCell({
 
     // No output
     return (
-      <Text fontSize="13px" color="gray.400">
+      <Text fontSize="13px" color="fg.subtle">
         No output
       </Text>
     );
@@ -280,7 +280,7 @@ export function BatchTargetCell({
         >
           <Text
             fontSize="11px"
-            color="gray.500"
+            color="fg.muted"
             whiteSpace="nowrap"
             px={1}
             data-testid={`latency-${targetOutput.targetId}`}

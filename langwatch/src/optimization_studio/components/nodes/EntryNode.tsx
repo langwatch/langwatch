@@ -28,7 +28,7 @@ export const EntryNode = forwardRef(function EntryNode(
       <NodeSectionTitle>
         Dataset{" "}
         {total && (
-          <Text as="span" color="gray.400">
+          <Text as="span" color="fg.subtle">
             ({total} rows)
           </Text>
         )}

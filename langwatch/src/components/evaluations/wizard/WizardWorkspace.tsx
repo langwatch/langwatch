@@ -98,9 +98,9 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       height="100%"
       minHeight="calc(100vh - 50px)"
       borderLeft="1px solid"
-      borderLeftColor="gray.200"
+      borderLeftColor="border"
       borderTop="1px solid"
-      borderTopColor="gray.200"
+      borderTopColor="border"
       minWidth="0"
       gap={0}
       borderRadius="8px 0 0 0"
@@ -124,7 +124,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             <HStack width="full" />
             <Tabs.List
               width="fit"
-              background="gray.200"
+              background="bg.emphasized"
               colorPalette="blue"
               alignSelf="center"
               position="sticky"
@@ -273,7 +273,7 @@ const WizardOptimizationStudioCanvas = memo(
         defaultZoom={1}
         yAdjust={560}
         style={{
-          border: "1px solid #DDD",
+          border: "1px solid var(--chakra-colors-border)",
           borderRadius: "8px",
         }}
         onNodesChange={onNodesChange}

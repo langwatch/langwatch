@@ -964,21 +964,21 @@ export function EvaluationsV3Table({
           position: "sticky",
           top: 0,
           zIndex: 11,
-          backgroundColor: "white",
+          backgroundColor: "var(--chakra-colors-bg-panel)",
         },
         // Column header row (second row in thead)
         "& thead tr:nth-of-type(2) th": {
           position: "sticky",
           top: `${SUPER_HEADER_HEIGHT}px`,
           zIndex: 10,
-          backgroundColor: "white",
+          backgroundColor: "var(--chakra-colors-bg-panel)",
         },
         "& th": {
-          borderBottom: "1px solid var(--chakra-colors-gray-200)",
-          borderRight: "1px solid var(--chakra-colors-gray-100)",
+          borderBottom: "1px solid var(--chakra-colors-border)",
+          borderRight: "1px solid var(--chakra-colors-border-muted)",
           padding: "8px 12px",
           textAlign: "left",
-          backgroundColor: "white",
+          backgroundColor: "var(--chakra-colors-bg-panel)",
           fontWeight: "medium",
           fontSize: "13px",
           position: "relative",
@@ -1002,7 +1002,7 @@ export function EvaluationsV3Table({
             top: 0,
             height: "100%",
             width: "4px",
-            background: "var(--chakra-colors-blue-400)",
+            background: "var(--chakra-colors-blue-solid)",
             opacity: 0,
             transition: "opacity 0.15s",
           },
@@ -1012,27 +1012,27 @@ export function EvaluationsV3Table({
           opacity: 1,
         },
         "& td": {
-          borderBottom: "1px solid var(--chakra-colors-gray-100)",
-          borderRight: "1px solid var(--chakra-colors-gray-100)",
+          borderBottom: "1px solid var(--chakra-colors-border-muted)",
+          borderRight: "1px solid var(--chakra-colors-border-muted)",
           padding: "8px 12px",
           fontSize: "13px",
           verticalAlign: "top",
           // CSS variable for fade overlay gradient
-          "--cell-bg": "white",
+          "--cell-bg": "var(--chakra-colors-bg-panel)",
         },
         "& tr:hover td": {
-          backgroundColor: "var(--chakra-colors-gray-50)",
+          backgroundColor: "var(--chakra-colors-bg-subtle)",
           // Update CSS variable for fade overlay on hover
-          "--cell-bg": "var(--chakra-colors-gray-50)",
+          "--cell-bg": "var(--chakra-colors-bg-subtle)",
         },
         // Selected row styling
         "& tr[data-selected='true'] td": {
-          backgroundColor: "var(--chakra-colors-blue-50)",
-          "--cell-bg": "var(--chakra-colors-blue-50)",
-          "border-color": "var(--chakra-colors-blue-100)",
+          backgroundColor: "var(--chakra-colors-blue-subtle)",
+          "--cell-bg": "var(--chakra-colors-blue-subtle)",
+          "border-color": "var(--chakra-colors-blue-muted)",
         },
         "& tr:has(+ tr[data-selected='true']) td": {
-          "border-bottom-color": "var(--chakra-colors-blue-100)",
+          "border-bottom-color": "var(--chakra-colors-blue-muted)",
         },
       }}
     >
@@ -1207,7 +1207,7 @@ export function EvaluationsV3Table({
                     minWidth: DRAWER_WIDTH + 280,
                   }}
                 >
-                  <Text fontSize="xs" color="gray.400" fontStyle="italic">
+                  <Text fontSize="xs" color="fg.subtle" fontStyle="italic">
                     Click "+ Add" above to get started
                   </Text>
                 </th>

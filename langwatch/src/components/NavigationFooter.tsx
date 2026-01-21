@@ -178,6 +178,9 @@ export const useMessagesNavigationFooter = () => {
 
   // Reset pagination when search query changes
   useEffect(() => {
+    // Only push if we have the required dynamic route params
+    if (!router.query.project) return;
+
     void router.push({
       pathname: router.pathname,
       query: {

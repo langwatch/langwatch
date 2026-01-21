@@ -506,7 +506,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           top={1}
           right={2}
           borderBottom="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
         >
           <Tabs.List minWidth={0}>
             {Object.entries(resultsByEvaluator).map(([key, results]) => (
@@ -527,7 +527,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
             ))}
           </Tabs.List>
           <Spacer />
-          <Text color="gray.400" fontSize="12px" flexShrink={0}>
+          <Text color="fg.subtle" fontSize="12px" flexShrink={0}>
             {runId}
           </Text>
           {size === "sm" && (

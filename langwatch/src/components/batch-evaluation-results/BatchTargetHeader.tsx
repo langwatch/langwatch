@@ -173,7 +173,7 @@ const SummaryTooltipContent = ({
     {/* Per-evaluator breakdown */}
     {aggregates.evaluators.length > 0 && (
       <>
-        <Box borderTopWidth="1px" borderColor="gray.500" />
+        <Box borderTopWidth="1px" borderColor="border.emphasized" />
         <VStack align="stretch" gap={2} padding={2}>
           <Text color="white/85" fontWeight="semibold">
             Evaluators
@@ -253,14 +253,14 @@ const SummaryBadge = memo(function SummaryBadge({
       <HStack
         gap={2}
         fontSize="11px"
-        color="gray.500"
+        color="fg.muted"
         paddingX={2}
         paddingY={0.5}
         borderRadius="lg"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         cursor="default"
-        _hover={{ borderColor: "gray.300", bg: "gray.50" }}
+        _hover={{ borderColor: "border.emphasized", bg: "bg.muted" }}
         data-testid="target-summary-badge"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -287,7 +287,7 @@ const SummaryBadge = memo(function SummaryBadge({
         {aggregates.overallAverageScore !== null && (
           <HStack gap={1}>
             <LuTriangleRight />
-            <Text color="gray.600">
+            <Text color="fg.muted">
               {formatScore(aggregates.overallAverageScore)}
             </Text>
           </HStack>
@@ -308,7 +308,7 @@ const SummaryBadge = memo(function SummaryBadge({
           aggregates.overallPassRate === null &&
           aggregates.overallAverageScore === null && (
             <HStack gap={1}>
-              <Text color="gray.500">{formatCost(aggregates.totalCost)}</Text>
+              <Text color="fg.muted">{formatCost(aggregates.totalCost)}</Text>
             </HStack>
           )}
 
@@ -345,9 +345,9 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
   };
 
   const getTargetColor = () => {
-    if (target.type === "prompt") return "green.400";
-    if (target.type === "agent") return "#3E5A60";
-    return "gray.400";
+    if (target.type === "prompt") return "green.solid";
+    if (target.type === "agent") return "cyan.solid";
+    return "gray.solid";
   };
 
   return (

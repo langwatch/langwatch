@@ -67,7 +67,7 @@ export function SelectionToolbar({
         boxShadow="lg"
         gap={3}
         zIndex={100}
-        bg="white"
+        bg="bg.panel"
       >
         <Text fontSize="sm" data-testid="selection-count">
           {selectedCount} selected

@@ -295,7 +295,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               >
                 {/* Description */}
                 {evaluatorDef?.description && (
-                  <Text fontSize="sm" color="gray.600">
+                  <Text fontSize="sm" color="fg.muted">
                     {evaluatorDef.description}
                   </Text>
                 )}
@@ -322,7 +322,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                 )}
 
                 {!hasSettings && !mappingsConfig && (
-                  <Text fontSize="sm" color="gray.500">
+                  <Text fontSize="sm" color="fg.muted">
                     This evaluator does not have any settings to configure.
                   </Text>
                 )}
@@ -343,7 +343,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
             </FormProvider>
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <HStack gap={3}>
             <Button variant="outline" onClick={handleClose}>
               Cancel
@@ -484,7 +484,7 @@ function EvaluatorMappingsSection({
 
   if (variables.length === 0) {
     return (
-      <Text fontSize="sm" color="gray.500">
+      <Text fontSize="sm" color="fg.muted">
         This evaluator does not require any input mappings.
       </Text>
     );

@@ -121,8 +121,8 @@ function QuickAccessCardItem({ card }: QuickAccessCardItemProps) {
             <Box
               padding={1.5}
               borderRadius="md"
-              background={`${card.color}.50`}
-              color={`${card.color}.500`}
+              background={`${card.color}.subtle`}
+              color={`${card.color}.solid`}
             >
               {card.icon}
             </Box>
@@ -131,7 +131,7 @@ function QuickAccessCardItem({ card }: QuickAccessCardItemProps) {
             <Text fontWeight="medium" fontSize="sm">
               {card.title}
             </Text>
-            <Text fontSize="xs" color="gray.500" lineClamp={2}>
+            <Text fontSize="xs" color="fg.muted" lineClamp={2}>
               {card.description}
             </Text>
           </VStack>
@@ -139,7 +139,7 @@ function QuickAccessCardItem({ card }: QuickAccessCardItemProps) {
             href={card.docsHref}
             isExternal
             fontSize="xs"
-            color="gray.400"
+            color="fg.subtle"
             _hover={{ color: `${card.color}.500` }}
             onClick={(e) => e.stopPropagation()}
           >

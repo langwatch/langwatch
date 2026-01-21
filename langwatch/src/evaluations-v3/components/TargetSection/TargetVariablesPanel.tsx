@@ -240,13 +240,13 @@ export const TargetVariablesPanel = ({
       {/* Warning for missing mappings */}
       {missingMappings.length > 0 && !readOnly && (
         <Box
-          background="orange.50"
+          background="orange.subtle"
           border="1px solid"
-          borderColor="orange.200"
+          borderColor="orange.muted"
           borderRadius="md"
           padding={3}
         >
-          <Text fontSize="sm" color="orange.800">
+          <Text fontSize="sm" color="orange.fg">
             ⚠️ {missingMappings.length} input
             {missingMappings.length === 1 ? "" : "s"} not mapped:{" "}
             {missingMappings.map((m) => m.identifier).join(", ")}
@@ -270,7 +270,7 @@ export const TargetVariablesPanel = ({
 
       {/* Helper text */}
       {!readOnly && (
-        <Text fontSize="xs" color="gray.500">
+        <Text fontSize="xs" color="fg.muted">
           Connect each input variable to a data source. Use the dropdown to map
           to dataset columns or outputs from other targets.
         </Text>

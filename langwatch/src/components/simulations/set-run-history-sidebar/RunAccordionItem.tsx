@@ -51,9 +51,9 @@ export const RunAccordionItem = ({
       value={run.scenarioRunId}
       border="none"
       borderBottom="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       borderLeft={isOpen ? "4px solid" : "none"}
-      borderLeftColor={isOpen ? "orange.400" : "transparent"}
+      borderLeftColor={isOpen ? "orange.fg" : "transparent"}
       w="full"
       p={0}
       h="full"
@@ -86,10 +86,10 @@ export const RunAccordionItem = ({
                 }
                 color={
                   passedCount > 0 && failedCount === 0
-                    ? "green.400"
+                    ? "green.fg"
                     : failedCount > 0
-                      ? "red.400"
-                      : "yellow.400"
+                      ? "red.fg"
+                      : "yellow.fg"
                 }
                 boxSize={3}
               />
@@ -97,13 +97,13 @@ export const RunAccordionItem = ({
                 {run.label}
               </Text>
             </HStack>
-            <HStack gap={1} color="gray.500" fontSize="2xs" align="center">
+            <HStack gap={1} color="fg.muted" fontSize="2xs" align="center">
               <Icon as={Calendar} boxSize={3} />
               <Text>{new Date(run.timestamp).toLocaleString()}</Text>
               <Icon as={Clock} boxSize={3} ml={2} />
               <Text>{run.duration}</Text>
             </HStack>
-            <HStack gap={1} color="gray.500" fontSize="2xs" align="center">
+            <HStack gap={1} color="fg.muted" fontSize="2xs" align="center">
               <Text fontWeight="semibold">
                 {passedCount} passed, {failedCount} failed
               </Text>

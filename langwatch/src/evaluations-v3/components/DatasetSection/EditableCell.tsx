@@ -376,7 +376,7 @@ export function EditableCell({
         >
           {displayValue.text}
           {displayValue.truncated && (
-            <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+            <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
               (truncated)
             </Box>
           )}
@@ -394,15 +394,16 @@ export function EditableCell({
             onClick={handleExpandClick}
             className="cell-fade-overlay"
             css={{
-              background: "linear-gradient(to bottom, transparent, white)",
+              background:
+                "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
               "tr:hover &": {
                 background:
-                  "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
               },
               // Selected row takes priority over hover
               "tr[data-selected='true'] &": {
                 background:
-                  "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-50))",
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
               },
             }}
           />
@@ -427,15 +428,15 @@ export function EditableCell({
               transition="opacity 0.15s"
               _hover={{ opacity: 1 }}
               css={{
-                background: "var(--cell-bg, white)",
+                background: "var(--cell-bg, var(--chakra-colors-bg-panel))",
               }}
             >
               <Box
                 width="40px"
                 height="4px"
                 borderRadius="full"
-                bg="gray.300"
-                _hover={{ bg: "gray.400" }}
+                bg="gray.muted"
+                _hover={{ bg: "gray.emphasized" }}
                 transition="background 0.15s"
               />
             </Box>
@@ -447,9 +448,9 @@ export function EditableCell({
         <Portal>
           <Box
             style={editorStyle}
-            bg="white"
+            bg="bg.panel"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-blue-500), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
             overflow="hidden"
           >
             <Textarea
@@ -470,10 +471,10 @@ export function EditableCell({
               paddingX={2}
               paddingY={1}
               fontSize="10px"
-              color="gray.500"
+              color="fg.muted"
               borderTop="1px solid"
-              borderColor="gray.100"
-              bg="gray.50"
+              borderColor="border.muted"
+              bg="bg.subtle"
             >
               Enter to save • Escape to cancel • Shift+Enter for newline
             </Box>

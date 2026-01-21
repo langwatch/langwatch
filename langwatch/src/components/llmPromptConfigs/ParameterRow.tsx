@@ -95,7 +95,7 @@ export function ParameterRow({
           paddingX={3}
           borderRadius="md"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           cursor={disabled ? "not-allowed" : "pointer"}
           opacity={disabled ? 0.5 : 1}
           _hover={disabled ? {} : { bg: "gray.50" }}
@@ -108,14 +108,14 @@ export function ParameterRow({
             justifyContent="center"
             width="16px"
             height="16px"
-            color="gray.600"
+            color="fg.muted"
           >
             <IconComponent size={16} />
           </Box>
           <Text fontSize="sm" fontWeight="medium" flex={1}>
             {config.label}
           </Text>
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="fg.muted">
             {displayValue}
           </Text>
         </HStack>

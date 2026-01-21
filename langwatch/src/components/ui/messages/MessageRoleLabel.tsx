@@ -23,8 +23,8 @@ export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
       fontSize="xs"
       textTransform="none"
       fontWeight="normal"
-      color="gray.500"
-      backgroundColor="gray.100"
+      color="fg.muted"
+      backgroundColor="bg.muted"
       paddingX={2}
       paddingY={0.5}
       borderRadius="lg"

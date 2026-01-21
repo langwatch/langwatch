@@ -194,7 +194,7 @@ export const TargetHeader = memo(function TargetHeader({
   };
 
   const getTargetColor = () => {
-    return target.type === "prompt" ? "green.400" : "#3E5A60";
+    return target.type === "prompt" ? "green.fg" : "cyan.fg";
   };
 
   const editLabel = target.type === "prompt" ? "Edit Prompt" : "Edit Agent";
@@ -210,7 +210,7 @@ export const TargetHeader = memo(function TargetHeader({
           <Button
             variant="ghost"
             size="xs"
-            _hover={{ bg: "gray.100" }}
+            _hover={{ bg: "bg.subtle" }}
             paddingX={2}
             paddingY={1}
             gap={2}
@@ -255,7 +255,7 @@ export const TargetHeader = memo(function TargetHeader({
                   _hover={{ transform: "scale(1.2)" }}
                   transition="transform 0.15s"
                 >
-                  <Icon as={LuCircleAlert} color="yellow.500" boxSize={4} />
+                  <Icon as={LuCircleAlert} color="yellow.fg" boxSize={4} />
                 </Box>
               </Tooltip>
             )}
@@ -268,7 +268,7 @@ export const TargetHeader = memo(function TargetHeader({
               >
                 <Circle
                   size="8px"
-                  bg="orange.400"
+                  bg="orange.solid"
                   flexShrink={0}
                   data-testid="unpublished-indicator"
                 />
@@ -296,9 +296,9 @@ export const TargetHeader = memo(function TargetHeader({
               <Text>Duplicate</Text>
             </HStack>
           </Menu.Item>
-          <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
+          <Box borderTopWidth="1px" borderColor="border" my={1} />
           <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
-            <HStack gap={2} color="red.600">
+            <HStack gap={2} color="red.fg">
               <LuTrash2 size={14} />
               <Text>Remove from Workbench</Text>
             </HStack>

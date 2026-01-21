@@ -112,7 +112,7 @@ export function DatasetTabs({
       <Text
         fontWeight="semibold"
         fontSize="sm"
-        color="gray.700"
+        color="fg"
         paddingRight={2}
       >
         Datasets
@@ -138,8 +138,8 @@ export function DatasetTabs({
             aria-label="Add dataset"
             size="xs"
             variant="ghost"
-            color="gray.500"
-            _hover={{ color: "gray.700", bg: "gray.100" }}
+            color="fg.muted"
+            _hover={{ color: "fg", bg: "bg.subtle" }}
           >
             <Plus size={14} />
           </IconButton>
@@ -173,8 +173,8 @@ export function DatasetTabs({
         aria-label="Edit dataset columns"
         size="xs"
         variant="ghost"
-        color="gray.500"
-        _hover={{ color: "gray.700", bg: "gray.100" }}
+        color="fg.muted"
+        _hover={{ color: "fg", bg: "bg.subtle" }}
         onClick={onEditDataset}
       >
         <Settings2 size={14} />
@@ -216,7 +216,7 @@ function DatasetTab({
         paddingX={2}
         paddingY={1}
         height="auto"
-        _hover={{ bg: "gray.100" }}
+        _hover={{ bg: "bg.subtle" }}
         data-testid={`dataset-tab-${dataset.id}`}
       >
         <HStack gap={1}>
@@ -239,12 +239,12 @@ function DatasetTab({
         <Button
           size="xs"
           variant="outline"
-          bg="gray.100"
-          borderColor="gray.300"
+          bg="bg.muted"
+          borderColor="border.emphasized"
           paddingX={2}
           paddingY={1}
           height="auto"
-          _hover={{ bg: "gray.200" }}
+          _hover={{ bg: "bg.emphasized" }}
           data-testid={`dataset-tab-${dataset.id}`}
         >
           <HStack gap={1}>
@@ -269,7 +269,7 @@ function DatasetTab({
           </Menu.Item>
         )}
         {dataset.type === "inline" && (
-          <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
+          <Box borderTopWidth="1px" borderColor="border" my={1} />
         )}
         <Menu.Item value="remove" onClick={onRemove} disabled={!canRemove}>
           <HStack gap={2}>

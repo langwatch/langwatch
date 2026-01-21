@@ -187,7 +187,7 @@ export const ExternalImage = ({
       >
         <Box
           border="1px solid"
-          borderColor="gray.300"
+          borderColor="border.emphasized"
           borderRadius="2px"
           {...props}
           display="inline-flex"

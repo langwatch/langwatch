@@ -160,7 +160,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                     }
                   >
                     <Checkbox
-                      borderColor="gray.400"
+                      borderColor="border.emphasized"
                       gap={3}
                       flexGrow={1}
                       checked={selectedTopics.includes(topic.id)}
@@ -177,7 +177,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                         {topic.name}
                       </OverflownTextWithTooltip>
                     </Checkbox>
-                    <Text color="gray.500" fontSize="12px" whiteSpace="nowrap">
+                    <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
                       {topic.count}
                     </Text>
                   </HStack>
@@ -196,7 +196,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           fontWeight="normal"
                         >
                           <Checkbox
-                            borderColor="gray.400"
+                            borderColor="border.emphasized"
                             gap={3}
                             flexGrow={1}
                             checked={selectedSubtopics.includes(subtopic.id)}
@@ -216,7 +216,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             </OverflownTextWithTooltip>
                           </Checkbox>
                           <Text
-                            color="gray.500"
+                            color="fg.muted"
                             fontSize="12px"
                             whiteSpace="nowrap"
                           >

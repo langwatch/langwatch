@@ -15,7 +15,7 @@ import { StepAccordion, type StepAccordionProps } from "./StepAccordion";
  */
 const ExecutionStepAccordionRoot = (props: StepAccordionProps) => {
   const {
-    borderColor = "orange.400",
+    borderColor = "orange.fg",
     width = "full",
     children,
     ...rest
@@ -90,7 +90,7 @@ const OutputField = ({ node, title = "Outputs", onChange }: FieldsProps) => {
 export const ExecutionStepAccordion = Object.assign(
   // For backward compatibility
   function ExecutionStepAccordion(props: StepAccordionProps) {
-    const { borderColor = "orange.400", width = "full", ...rest } = props;
+    const { borderColor = "orange.fg", width = "full", ...rest } = props;
     return <StepAccordion borderColor={borderColor} width={width} {...rest} />;
   },
   {

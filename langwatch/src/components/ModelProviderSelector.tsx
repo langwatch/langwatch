@@ -119,7 +119,7 @@ export const ModelProviderSelector = React.memo(function ModelProviderSelector({
         <Text
           fontSize={size === "sm" ? 12 : 14}
           fontFamily="mono"
-          color="gray.400"
+          color="fg.subtle"
         >
           (disabled)
         </Text>
@@ -192,7 +192,7 @@ export const ModelProviderSelector = React.memo(function ModelProviderSelector({
                       display="inline-block"
                       fontSize={size === "sm" ? 12 : 14}
                       fontFamily="mono"
-                      color="gray.400"
+                      color="fg.subtle"
                     >
                       (disabled)
                     </Text>

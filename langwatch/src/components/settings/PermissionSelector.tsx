@@ -216,7 +216,7 @@ export function PermissionSelector({
                               <Text fontSize="sm" textTransform="capitalize">
                                 {action}
                               </Text>
-                              <Box color="gray.500">
+                              <Box color="fg.muted">
                                 <Info size={14} />
                               </Box>
                             </HStack>

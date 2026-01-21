@@ -15,7 +15,7 @@ export function ScenarioRunHeader({
   scenarioId,
 }: ScenarioRunHeaderProps) {
   return (
-    <Box p={5} borderBottom="1px" borderColor="gray.200" w="100%">
+    <Box p={5} borderBottom="1px" borderColor="border" w="100%">
       <HStack justify="space-between" align="center">
         <VStack gap={4}>
           <VStack align="start" gap={0}>
@@ -25,7 +25,7 @@ export function ScenarioRunHeader({
                 {name}
               </Text>
             </HStack>
-            <Text fontSize="sm" color="gray.500" ml={5}>
+            <Text fontSize="sm" color="fg.muted" ml={5}>
               Scenario ID: {scenarioId}
             </Text>
           </VStack>

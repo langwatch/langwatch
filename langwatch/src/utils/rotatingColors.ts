@@ -1,89 +1,98 @@
 const tones = (color: string) => [
   {
-    background: `${color}.800`,
-    color: `${color}.400`,
+    background: `${color}.subtle`,
+    color: `${color}.fg`,
   },
   {
-    background: `${color}.100`,
-    color: `${color}.600`,
+    background: `${color}.muted`,
+    color: `${color}.fg`,
   },
   {
-    background: `${color}.200`,
-    color: `${color}.700`,
+    background: `${color}.emphasized`,
+    color: `${color}.fg`,
   },
   {
-    background: `${color}.300`,
-    color: `${color}.800`,
+    background: `${color}.subtle`,
+    color: `${color}.solid`,
   },
   {
-    background: `${color}.400`,
-    color: `${color}.900`,
+    background: `${color}.muted`,
+    color: `${color}.solid`,
   },
   {
-    background: `${color}.600`,
-    color: `${color}.200`,
+    background: `${color}.solid`,
+    color: `${color}.contrast`,
   },
+];
+
+// Chart-specific tones using numeric values for brightness adjustments
+// These are used by useGetRotatingColorForCharts which needs numeric color values
+const chartTones = (color: string) => [
+  { background: `${color}.100`, color: `${color}.500` },
+  { background: `${color}.200`, color: `${color}.600` },
+  { background: `${color}.300`, color: `${color}.700` },
 ];
 
 export const rotatingColors = {
   colors: [
     {
-      background: "orange.100",
-      color: "orange.400",
+      background: "orange.subtle",
+      color: "orange.fg",
     },
     {
-      background: "blue.50",
-      color: "blue.400",
+      background: "blue.subtle",
+      color: "blue.fg",
     },
     {
-      background: "green.50",
-      color: "green.400",
+      background: "green.subtle",
+      color: "green.fg",
     },
     {
-      background: "yellow.100",
-      color: "yellow.500",
+      background: "yellow.subtle",
+      color: "yellow.fg",
     },
     {
-      background: "purple.50",
-      color: "purple.400",
+      background: "purple.subtle",
+      color: "purple.fg",
     },
     {
-      background: "teal.50",
-      color: "teal.500",
+      background: "teal.subtle",
+      color: "teal.fg",
     },
     {
-      background: "cyan.50",
-      color: "cyan.500",
+      background: "cyan.subtle",
+      color: "cyan.fg",
     },
     {
-      background: "pink.50",
-      color: "pink.500",
+      background: "pink.subtle",
+      color: "pink.fg",
     },
   ],
   positiveNegativeNeutral: [
     {
-      background: "green.100",
-      color: "green.400",
+      background: "green.subtle",
+      color: "green.fg",
     },
     {
-      background: "red.100",
-      color: "red.400",
+      background: "red.subtle",
+      color: "red.fg",
     },
     {
-      background: "gray.100",
-      color: "gray.375",
+      background: "gray.subtle",
+      color: "gray.fg",
     },
   ],
-  orangeTones: tones("orange"),
-  blueTones: tones("blue"),
-  greenTones: tones("green"),
-  purpleTones: tones("purple"),
-  yellowTones: tones("yellow"),
-  tealTones: tones("teal"),
-  cyanTones: tones("cyan"),
-  pinkTones: tones("pink"),
-  grayTones: tones("gray"),
-  redTones: tones("red"),
+  // Chart tones use numeric color values for brightness adjustments
+  orangeTones: chartTones("orange"),
+  blueTones: chartTones("blue"),
+  greenTones: chartTones("green"),
+  purpleTones: chartTones("purple"),
+  yellowTones: chartTones("yellow"),
+  tealTones: chartTones("teal"),
+  cyanTones: chartTones("cyan"),
+  pinkTones: chartTones("pink"),
+  grayTones: chartTones("gray"),
+  redTones: chartTones("red"),
 } satisfies Record<string, { background: string; color: string }[]>;
 
 const colorMap: Record<string, { background: string; color: string }> = {};

@@ -14,25 +14,25 @@ export function ScenarioRunStatusIcon({
   ...iconProps
 }: ScenarioRunStatusIconProps) {
   let IconComponent = Clock;
-  let defaultColor = "green.400";
+  let defaultColor = "green.fg";
   let defaultBoxSize = "16px";
 
   if (status === ScenarioRunStatus.SUCCESS) {
     IconComponent = Check;
-    defaultColor = "green.400";
+    defaultColor = "green.fg";
   } else if (
     status === ScenarioRunStatus.FAILED ||
     status === ScenarioRunStatus.ERROR
   ) {
     IconComponent = XCircle;
-    defaultColor = "red.400";
+    defaultColor = "red.fg";
   } else if (
     status === ScenarioRunStatus.IN_PROGRESS ||
     status === ScenarioRunStatus.PENDING
   ) {
     IconComponent = Clock;
     defaultColor =
-      status === ScenarioRunStatus.IN_PROGRESS ? "orange.400" : "gray.400";
+      status === ScenarioRunStatus.IN_PROGRESS ? "orange.fg" : "fg.muted";
   }
 
   return (

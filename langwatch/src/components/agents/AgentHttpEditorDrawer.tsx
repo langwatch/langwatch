@@ -447,7 +447,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 <Tabs.List
                   paddingX={6}
                   borderBottomWidth="1px"
-                  borderColor="gray.200"
+                  borderColor="border"
                 >
                   <Tabs.Trigger value="body">Body</Tabs.Trigger>
                   <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
@@ -466,7 +466,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   <VStack gap={6} align="stretch">
                     <Field.Root>
                       <Field.Label>Request Body Template</Field.Label>
-                      <Text fontSize="sm" color="gray.500" marginBottom={2}>
+                      <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                         JSON body with mustache variables. Variables are
                         replaced at runtime.
                       </Text>
@@ -546,7 +546,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             </VStack>
           )}
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <HStack gap={3}>
             <Button variant="outline" onClick={handleClose}>
               Cancel

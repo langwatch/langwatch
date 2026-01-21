@@ -141,7 +141,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           size="sm"
                           aria-label="More options"
                           _hover={{
-                            backgroundColor: "white",
+                            backgroundColor: "bg.panel",
                           }}
                         >
                           <LuEllipsis size={16} />
@@ -256,7 +256,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                         </Menu.Item>
                         <Menu.Item
                           value="delete"
-                          color="red.500"
+                          color="red.fg"
                           onClick={() => {
                             if (!project) return;
 
@@ -307,7 +307,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
               })}
             </SimpleGrid>
             {monitors.data?.length === 0 && (
-              <Text color="gray.600">
+              <Text color="fg.muted">
                 No real-time monitors or guardrails set up yet.
                 {project && hasPermission("evaluations:manage") && (
                   <>

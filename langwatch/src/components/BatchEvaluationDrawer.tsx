@@ -216,11 +216,11 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                     <Table.Root
                       variant="line"
                       borderWidth={1}
-                      borderColor={"gray.200"}
+                      borderColor="border"
                       width="full"
                     >
                       <Table.Header>
-                        <Table.Row backgroundColor={"gray.200"}>
+                        <Table.Row backgroundColor="bg.muted">
                           <Table.ColumnHeader></Table.ColumnHeader>
                           <Table.ColumnHeader>NAME</Table.ColumnHeader>
                           <Table.ColumnHeader>DESCRIPTION</Table.ColumnHeader>
@@ -333,10 +333,10 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                     <Table.Root
                       variant="line"
                       borderWidth={1}
-                      borderColor={"gray.200"}
+                      borderColor="border"
                     >
-                      <Table.Header backgroundColor={"gray.200"}>
-                        <Table.Row backgroundColor={"gray.200"}>
+                      <Table.Header backgroundColor="bg.muted">
+                        <Table.Row backgroundColor="bg.muted">
                           <Table.ColumnHeader></Table.ColumnHeader>
                           <Table.ColumnHeader>NAME</Table.ColumnHeader>
                           <Table.ColumnHeader>DESCRIPTION</Table.ColumnHeader>

@@ -124,7 +124,7 @@ export default function EditTraceCheck() {
               <Menu.Content>
                 <Menu.Item
                   value="delete"
-                  color="red.600"
+                  color="red.fg"
                   onClick={handleDeleteCheck}
                 >
                   Delete Check

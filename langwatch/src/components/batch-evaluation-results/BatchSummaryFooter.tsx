@@ -115,13 +115,13 @@ export function BatchSummaryFooter({
   return (
     <VStack
       width="full"
-      background="white"
+      background="bg.surface"
       gap={0}
       position="sticky"
       left={0}
       bottom={0}
       borderTop="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       overflowX="auto"
       overflowY="hidden"
       flexShrink={0}
@@ -197,7 +197,7 @@ export function BatchSummaryFooter({
           width="full"
           padding={3}
           borderTop="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           gap={2}
         >
           <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
@@ -210,7 +210,7 @@ export function BatchSummaryFooter({
               </Progress.Track>
             </Progress.Root>
           </Box>
-          <Text fontSize="12px" color="gray.500" whiteSpace="nowrap">
+          <Text fontSize="12px" color="fg.muted" whiteSpace="nowrap">
             {progress}/{total}
           </Text>
           {onStop && (

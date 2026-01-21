@@ -358,7 +358,7 @@ export const AddAnnotationQueueDrawer = ({
                               bottom={0}
                               bg="white"
                               borderTop="1px solid"
-                              borderColor="gray.100"
+                              borderColor="border.muted"
                             >
                               <Button
                                 width="100%"

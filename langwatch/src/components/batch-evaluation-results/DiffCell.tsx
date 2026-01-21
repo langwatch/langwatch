@@ -25,7 +25,7 @@ type DiffCellProps = {
 export const DiffCell = ({ values, inline = false }: DiffCellProps) => {
   if (values.length === 0) {
     return (
-      <Text fontSize="13px" color="gray.400">
+      <Text fontSize="13px" color="fg.subtle">
         -
       </Text>
     );
@@ -52,7 +52,7 @@ export const DiffCell = ({ values, inline = false }: DiffCellProps) => {
           align="start"
           paddingY={idx > 0 ? 2 : 0}
           borderTop={!inline && idx > 0 ? "1px dashed" : undefined}
-          borderColor="gray.200"
+          borderColor="border"
         >
           <Circle size="8px" bg={item.color} flexShrink={0} marginTop="6px" />
           <Box flex={1} minWidth={0}>

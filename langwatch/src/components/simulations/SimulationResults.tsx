@@ -5,13 +5,13 @@ import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/sch
 function VerdictSection({ verdict }: { verdict: string }) {
   return (
     <HStack align="center" w="100%">
-      <Text fontWeight="semibold" color="gray.700" fontSize="md">
+      <Text fontWeight="semibold" color="fg" fontSize="md">
         Verdict:
       </Text>
       <Text
         fontWeight="bold"
         fontSize="md"
-        color={verdict === "success" ? "green.600" : "red.600"}
+        color={verdict === "success" ? "green.fg" : "red.fg"}
         textTransform="uppercase"
       >
         {verdict}
@@ -26,10 +26,10 @@ function ReasoningSection({ reasoning }: { reasoning?: string }) {
 
   return (
     <Box w="100%">
-      <Text fontWeight="semibold" color="gray.700" fontSize="md" mb={2}>
+      <Text fontWeight="semibold" color="fg" fontSize="md" mb={2}>
         Reasoning:
       </Text>
-      <Text color="gray.800" fontSize="sm" lineHeight="tall">
+      <Text color="fg" fontSize="sm" lineHeight="tall">
         {reasoning}
       </Text>
     </Box>
@@ -46,12 +46,12 @@ function CriteriaSection({
   criteria: string[];
   color: "green" | "red";
 }) {
-  const bulletColor = color === "green" ? "green.500" : "red.500";
-  const textColor = color === "green" ? "green.700" : "red.700";
+  const bulletColor = color === "green" ? "green.solid" : "red.solid";
+  const textColor = color === "green" ? "green.fg" : "red.fg";
 
   return (
     <Box w="100%">
-      <Text fontWeight="semibold" color="gray.700" fontSize="md" mb={3}>
+      <Text fontWeight="semibold" color="fg" fontSize="md" mb={3}>
         {title}:
       </Text>
       {criteria.length > 0 ? (
@@ -73,7 +73,7 @@ function CriteriaSection({
           ))}
         </VStack>
       ) : (
-        <Text color="gray.400" fontSize="sm" pl={2}>
+        <Text color="fg.subtle" fontSize="sm" pl={2}>
           None
         </Text>
       )}
@@ -85,7 +85,7 @@ function CriteriaSection({
 export function SimulationResults({ results }: { results: ScenarioResults }) {
   return (
     <Box p={6} width="100%" height="100%">
-      <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.900">
+      <Text fontSize="xl" fontWeight="bold" mb={6} color="fg">
         Results
       </Text>
       <VStack alignItems="flex-start" gap={6} height="100%">

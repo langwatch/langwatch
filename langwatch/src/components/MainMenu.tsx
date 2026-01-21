@@ -12,6 +12,7 @@ import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
+import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
 
 export const MENU_WIDTH_EXPANDED = "200px";
@@ -45,7 +46,7 @@ export const MainMenu = React.memo(function MainMenu({
 
   return (
     <Box
-      background="gray.100"
+      background="bg.page"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       height="calc(100vh - 60px)"
@@ -60,7 +61,7 @@ export const MainMenu = React.memo(function MainMenu({
         left={0}
         width={currentWidth}
         height="calc(100vh - 60px)"
-        background="gray.100"
+        background="bg.page"
         transition="width 0.15s ease-in-out"
         overflow="hidden"
       >
@@ -223,6 +224,7 @@ export const MainMenu = React.memo(function MainMenu({
           <VStack width="full" gap={0.5} align="start">
             <UsageIndicator showLabel={showExpanded} />
             <SupportMenu showLabel={showExpanded} />
+            <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
       </Box>

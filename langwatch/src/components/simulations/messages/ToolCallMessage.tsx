@@ -11,27 +11,29 @@ export const ToolCallMessage = ({
   return (
     <VStack w="full" gap={2} mb={2} align="start">
       <HStack gap={2}>
-        <Settings size={12} color="#ea580c" />
-        <Text fontSize="xs" color="orange.600" fontWeight="medium">
+        <Box color="orange.fg">
+          <Settings size={12} />
+        </Box>
+        <Text fontSize="xs" color="orange.fg" fontWeight="medium">
           {message.name}
         </Text>
       </HStack>
       <Box
         w="full"
         maxW="80%"
-        bg="gray.50"
+        bg="bg.subtle"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         borderRadius="lg"
         p={3}
       >
-        <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={2}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
           Tool arguments
         </Text>
         <Box
-          bg="white"
+          bg="bg.panel"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           borderRadius="md"
           p={2}
         >

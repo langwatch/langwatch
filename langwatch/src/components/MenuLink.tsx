@@ -35,8 +35,8 @@ export const MenuLink = ({
       width="full"
       position="relative"
       borderRadius="lg"
-      background={selected ? "gray.100" : "transparent"}
-      _hover={{ background: "gray.100" }}
+      background={selected ? "bg.muted" : "transparent"}
+      _hover={{ background: "bg.muted" }}
     >
       <NextLink href={href}>
         <HStack width="full" gap={2}>

@@ -57,7 +57,7 @@ export function LLMModelDisplay({
           {modelOption?.label ?? model}
         </OverflownTextWithTooltip>
         {subtitle && (
-          <Text fontSize="xs" color="gray.500" lineClamp={1}>
+          <Text fontSize="xs" color="fg.muted" lineClamp={1}>
             {subtitle}
           </Text>
         )}
