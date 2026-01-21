@@ -1058,7 +1058,6 @@ export const system = createSystem(defaultConfig, {
       progress: defineSlotRecipe({
         slots: ["root", "track", "range"],
         variants: {
-          // @ts-expect-error
           striped: {
             true: {
               range: {
