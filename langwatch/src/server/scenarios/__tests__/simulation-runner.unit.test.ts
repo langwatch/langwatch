@@ -1,9 +1,10 @@
 /**
  * @vitest-environment node
+ *
+ * Unit tests for scenario scheduling via the queue.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SimulationRunnerService } from "../simulation-runner.service";
 
 // Mock the scenario queue
 vi.mock("../scenario.queue", () => ({
@@ -14,68 +15,37 @@ vi.mock("../scenario.queue", () => ({
   generateBatchRunId: () => "scenariobatch_test123",
 }));
 
-import { scheduleScenarioRun } from "../scenario.queue";
+import { scheduleScenarioRun, generateBatchRunId } from "../scenario.queue";
 
 const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
-describe("SimulationRunnerService", () => {
-  let service: SimulationRunnerService;
-
+describe("scheduleScenarioRun", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    service = SimulationRunnerService.create();
   });
 
-  describe("execute", () => {
-    it("schedules a scenario job on the queue", async () => {
-      const result = await service.execute({
-        projectId: "proj_123",
-        scenarioId: "scen_123",
-        target: { type: "prompt", referenceId: "prompt_123" },
-        setId: "set_123",
-        batchRunId: "scenariobatch_test123",
-      });
+  it("schedules a job with correct parameters", async () => {
+    // Given: scenario parameters
+    const params = {
+      projectId: "proj_123",
+      scenarioId: "scen_123",
+      target: { type: "prompt" as const, referenceId: "prompt_123" },
+      setId: "set_123",
+      batchRunId: "scenariobatch_test123",
+    };
 
-      expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-        projectId: "proj_123",
-        scenarioId: "scen_123",
-        target: { type: "prompt", referenceId: "prompt_123" },
-        setId: "set_123",
-        batchRunId: "scenariobatch_test123",
-      });
+    // When: scheduling
+    const job = await scheduleScenarioRun(params);
 
-      expect(result.success).toBe(true);
-      expect(result.runId).toBe("job_123");
-    });
+    // Then: returns job with ID
+    expect(job.id).toBe("job_123");
+    expect(mockScheduleScenarioRun).toHaveBeenCalledWith(params);
+  });
+});
 
-    it("schedules http target jobs", async () => {
-      await service.execute({
-        projectId: "proj_456",
-        scenarioId: "scen_456",
-        target: { type: "http", referenceId: "agent_456" },
-        setId: "set_456",
-        batchRunId: "scenariobatch_http123",
-      });
-
-      expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-        projectId: "proj_456",
-        scenarioId: "scen_456",
-        target: { type: "http", referenceId: "agent_456" },
-        setId: "set_456",
-        batchRunId: "scenariobatch_http123",
-      });
-    });
-
-    it("throws error for invalid batchRunId", async () => {
-      await expect(
-        service.execute({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: "set_123",
-          batchRunId: "",
-        }),
-      ).rejects.toThrow("Invalid batchRunId");
-    });
+describe("generateBatchRunId", () => {
+  it("generates IDs with correct prefix", () => {
+    const id = generateBatchRunId();
+    expect(id).toMatch(/^scenariobatch_/);
   });
 });

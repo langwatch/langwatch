@@ -104,6 +104,8 @@ export function createScenarioTracer(
           { error, scenarioId, batchRunId },
           "Error shutting down scenario tracer",
         );
+        // Propagate error - caller decides how to handle
+        throw error;
       }
     },
   };
