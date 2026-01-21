@@ -31,14 +31,17 @@ export async function givenIAmLoggedIntoProject(page: Page) {
  * When I am on the scenarios list page
  */
 export async function givenIAmOnTheScenariosListPage(page: Page) {
-  // Navigate to root first, then find the project slug from Home link
-  await page.goto("/");
+  // Navigate to root and wait for app to be ready
+  await page.goto("/", { waitUntil: "networkidle" });
 
-  // Get project slug from Home link
-  // The Home link contains a paragraph with text "Home"
-  // Use filter to find the link that has exactly "Home" as accessible name
-  const homeLink = page.getByRole("link").filter({ hasText: "Home" }).first();
-  await expect(homeLink).toBeVisible({ timeout: 15000 });
+  // Wait for the navigation sidebar to appear (indicates app is loaded)
+  const nav = page.getByRole("navigation");
+  await expect(nav).toBeVisible({ timeout: 30000 });
+
+  // Get project slug from Home link in the sidebar
+  // The Home link has an href like "/project-slug"
+  const homeLink = nav.getByRole("link", { name: /home/i }).first();
+  await expect(homeLink).toBeVisible({ timeout: 10000 });
   const href = await homeLink.getAttribute("href");
   const projectSlug = href?.replace(/^\//, "") || "";
 

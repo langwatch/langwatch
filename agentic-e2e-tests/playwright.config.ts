@@ -78,19 +78,8 @@ export default defineConfig({
       dependencies: ["setup"],
     },
 
-    /* Firefox for cross-browser coverage (CI only) */
-    ...(IS_CI
-      ? [
-          {
-            name: "firefox",
-            use: {
-              ...devices["Desktop Firefox"],
-              storageState: AUTH_FILE,
-            },
-            dependencies: ["setup"],
-          },
-        ]
-      : []),
+    /* Note: Firefox removed due to flakiness (NS_BINDING_ABORTED errors)
+     * Chromium provides sufficient coverage for our use case */
   ],
 
   /* Global timeout */
