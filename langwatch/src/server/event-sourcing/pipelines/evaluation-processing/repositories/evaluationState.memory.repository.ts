@@ -4,7 +4,7 @@ import type {
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../library";
-import type { EvaluationStateRepository } from "./evaluationStateRepository";
+import type { EvaluationStateRepository } from "./evaluationState.repository";
 
 /**
  * Base class for in-memory projection stores.

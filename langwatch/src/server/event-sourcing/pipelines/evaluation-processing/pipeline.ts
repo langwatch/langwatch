@@ -1,7 +1,7 @@
 import { definePipeline } from "../../library";
-import { ScheduleEvaluationCommand } from "./commands/scheduleEvaluationCommand";
-import { StartEvaluationCommand } from "./commands/startEvaluationCommand";
-import { CompleteEvaluationCommand } from "./commands/completeEvaluationCommand";
+import { ScheduleEvaluationCommand } from "./commands/scheduleEvaluation.command";
+import { StartEvaluationCommand } from "./commands/startEvaluation.command";
+import { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
 import { EvaluationStateProjectionHandler } from "./projections";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 

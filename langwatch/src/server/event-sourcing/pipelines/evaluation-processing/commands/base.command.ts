@@ -18,8 +18,6 @@ export interface EvaluationCommandConfig<TCommandData, TEventData> {
   handleLogMessage: string;
   /** Log message for when event is emitted */
   emitLogMessage: string;
-  /** Job ID suffix (e.g., "schedule", "start", "complete") */
-  jobIdSuffix: string;
   /** Maps command data to event data */
   mapToEventData: (commandData: TCommandData) => TEventData;
   /** Extracts additional log context from command data */
@@ -27,31 +25,26 @@ export interface EvaluationCommandConfig<TCommandData, TEventData> {
 }
 
 /**
- * Abstract base class for evaluation command handlers.
- * Eliminates duplication by providing common handle() logic while allowing
- * subclasses to specify event-specific configuration.
+ * Creates a command handler function for evaluation commands.
+ * Uses composition to share common logic across different command types.
+ *
+ * @param config - Configuration for this command handler
+ * @returns A command handler that processes commands and emits events
  */
-export abstract class BaseEvaluationCommand<
+export function createEvaluationCommandHandler<
   TCommandData extends { tenantId: string; evaluationId: string },
   TEvent extends EvaluationProcessingEvent,
   TEventData,
-> implements CommandHandler<Command<TCommandData>, EvaluationProcessingEvent>
-{
-  protected abstract readonly config: EvaluationCommandConfig<
-    TCommandData,
-    TEventData
-  >;
+>(
+  config: EvaluationCommandConfig<TCommandData, TEventData>
+): CommandHandler<Command<TCommandData>, EvaluationProcessingEvent>["handle"] {
+  const logger = createLogger(
+    `langwatch:evaluation-processing:${config.loggerName}`
+  );
 
-  protected getLogger(): ReturnType<typeof createLogger> {
-    return createLogger(
-      `langwatch:evaluation-processing:${this.config.loggerName}`
-    );
-  }
-
-  async handle(
+  return async (
     command: Command<TCommandData>
-  ): Promise<EvaluationProcessingEvent[]> {
-    const logger = this.getLogger();
+  ): Promise<EvaluationProcessingEvent[]> => {
     const { tenantId: tenantIdStr, data: commandData } = command;
     const tenantId = createTenantId(tenantIdStr);
     const { evaluationId } = commandData;
@@ -60,18 +53,18 @@ export abstract class BaseEvaluationCommand<
       {
         tenantId,
         evaluationId,
-        ...this.config.getLogContext(commandData),
+        ...config.getLogContext(commandData),
       },
-      this.config.handleLogMessage
+      config.handleLogMessage
     );
 
     const event = EventUtils.createEvent<TEvent>(
       "evaluation",
       evaluationId,
       tenantId,
-      this.config.eventType as TEvent["type"],
-      this.config.eventVersion as TEvent["version"],
-      this.config.mapToEventData(commandData) as TEvent["data"]
+      config.eventType as TEvent["type"],
+      config.eventVersion as TEvent["version"],
+      config.mapToEventData(commandData) as TEvent["data"]
     );
 
     logger.debug(
@@ -81,19 +74,19 @@ export abstract class BaseEvaluationCommand<
         eventId: event.id,
         eventType: event.type,
       },
-      this.config.emitLogMessage
+      config.emitLogMessage
     );
 
     return [event];
-  }
+  };
+}
 
-  /**
-   * Create a unique job ID for deduplication.
-   * Format: {tenantId}:{evaluationId}:{suffix}
-   */
-  static makeJobIdWithSuffix<
-    T extends { tenantId: string; evaluationId: string },
-  >(payload: T, suffix: string): string {
-    return `${payload.tenantId}:${payload.evaluationId}:${suffix}`;
-  }
+/**
+ * Create a unique job ID for deduplication.
+ * Format: {tenantId}:{evaluationId}:{suffix}
+ */
+export function makeJobIdWithSuffix<
+  T extends { tenantId: string; evaluationId: string },
+>(payload: T, suffix: string): string {
+  return `${payload.tenantId}:${payload.evaluationId}:${suffix}`;
 }

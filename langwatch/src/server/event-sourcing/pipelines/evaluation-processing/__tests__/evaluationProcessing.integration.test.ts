@@ -23,9 +23,9 @@ import {
 } from "../../../__tests__/integration/testHelpers";
 import type { EvaluationState } from "../projections";
 import { EvaluationStateProjectionHandler } from "../projections";
-import { ScheduleEvaluationCommand } from "../commands/scheduleEvaluationCommand";
-import { StartEvaluationCommand } from "../commands/startEvaluationCommand";
-import { CompleteEvaluationCommand } from "../commands/completeEvaluationCommand";
+import { ScheduleEvaluationCommand } from "../commands/scheduleEvaluation.command";
+import { StartEvaluationCommand } from "../commands/startEvaluation.command";
+import { CompleteEvaluationCommand } from "../commands/completeEvaluation.command";
 import type {
   CompleteEvaluationCommandData,
   ScheduleEvaluationCommandData,

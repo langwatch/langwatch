@@ -1,3 +1,4 @@
+import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { ScheduleEvaluationCommandData } from "../schemas/commands";
 import { scheduleEvaluationCommandDataSchema } from "../schemas/commands";
@@ -7,13 +8,15 @@ import {
   EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
+  EvaluationProcessingEvent,
   EvaluationScheduledEvent,
   EvaluationScheduledEventData,
 } from "../schemas/events";
 import {
-  BaseEvaluationCommand,
+  createEvaluationCommandHandler,
+  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
-} from "./baseEvaluationCommand";
+} from "./base.command";
 
 const config: EvaluationCommandConfig<
   ScheduleEvaluationCommandData,
@@ -24,7 +27,6 @@ const config: EvaluationCommandConfig<
   loggerName: "schedule-evaluation",
   handleLogMessage: "Handling schedule evaluation command",
   emitLogMessage: "Emitting evaluation scheduled event",
-  jobIdSuffix: "schedule",
   mapToEventData: (commandData) => ({
     evaluationId: commandData.evaluationId,
     evaluatorId: commandData.evaluatorId,
@@ -42,18 +44,30 @@ const config: EvaluationCommandConfig<
  * Command handler for scheduling an evaluation.
  * Emits EvaluationScheduledEvent when an evaluation job is added to the queue.
  */
-export class ScheduleEvaluationCommand extends BaseEvaluationCommand<
-  ScheduleEvaluationCommandData,
-  EvaluationScheduledEvent,
-  EvaluationScheduledEventData
-> {
+export class ScheduleEvaluationCommand
+  implements
+    CommandHandler<
+      Command<ScheduleEvaluationCommandData>,
+      EvaluationProcessingEvent
+    >
+{
   static readonly schema = defineCommandSchema(
     SCHEDULE_EVALUATION_COMMAND_TYPE,
     scheduleEvaluationCommandDataSchema,
     "Command to schedule an evaluation"
   );
 
-  protected readonly config = config;
+  private readonly handleCommand = createEvaluationCommandHandler<
+    ScheduleEvaluationCommandData,
+    EvaluationScheduledEvent,
+    EvaluationScheduledEventData
+  >(config);
+
+  handle(
+    command: Command<ScheduleEvaluationCommandData>
+  ): CommandHandlerResult<EvaluationProcessingEvent> {
+    return this.handleCommand(command);
+  }
 
   static getAggregateId(payload: ScheduleEvaluationCommandData): string {
     return payload.evaluationId;
@@ -71,6 +85,6 @@ export class ScheduleEvaluationCommand extends BaseEvaluationCommand<
   }
 
   static makeJobId(payload: ScheduleEvaluationCommandData): string {
-    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "schedule");
+    return makeJobIdWithSuffix(payload, "schedule");
   }
 }

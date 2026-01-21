@@ -1,3 +1,4 @@
+import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { StartEvaluationCommandData } from "../schemas/commands";
 import { startEvaluationCommandDataSchema } from "../schemas/commands";
@@ -7,13 +8,15 @@ import {
   EVALUATION_STARTED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
+  EvaluationProcessingEvent,
   EvaluationStartedEvent,
   EvaluationStartedEventData,
 } from "../schemas/events";
 import {
-  BaseEvaluationCommand,
+  createEvaluationCommandHandler,
+  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
-} from "./baseEvaluationCommand";
+} from "./base.command";
 
 const config: EvaluationCommandConfig<
   StartEvaluationCommandData,
@@ -24,7 +27,6 @@ const config: EvaluationCommandConfig<
   loggerName: "start-evaluation",
   handleLogMessage: "Handling start evaluation command",
   emitLogMessage: "Emitting evaluation started event",
-  jobIdSuffix: "start",
   mapToEventData: (commandData) => ({
     evaluationId: commandData.evaluationId,
     evaluatorId: commandData.evaluatorId,
@@ -42,18 +44,30 @@ const config: EvaluationCommandConfig<
  * Command handler for starting an evaluation.
  * Emits EvaluationStartedEvent when evaluation execution begins.
  */
-export class StartEvaluationCommand extends BaseEvaluationCommand<
-  StartEvaluationCommandData,
-  EvaluationStartedEvent,
-  EvaluationStartedEventData
-> {
+export class StartEvaluationCommand
+  implements
+    CommandHandler<
+      Command<StartEvaluationCommandData>,
+      EvaluationProcessingEvent
+    >
+{
   static readonly schema = defineCommandSchema(
     START_EVALUATION_COMMAND_TYPE,
     startEvaluationCommandDataSchema,
     "Command to start an evaluation"
   );
 
-  protected readonly config = config;
+  private readonly handleCommand = createEvaluationCommandHandler<
+    StartEvaluationCommandData,
+    EvaluationStartedEvent,
+    EvaluationStartedEventData
+  >(config);
+
+  handle(
+    command: Command<StartEvaluationCommandData>
+  ): CommandHandlerResult<EvaluationProcessingEvent> {
+    return this.handleCommand(command);
+  }
 
   static getAggregateId(payload: StartEvaluationCommandData): string {
     return payload.evaluationId;
@@ -71,6 +85,6 @@ export class StartEvaluationCommand extends BaseEvaluationCommand<
   }
 
   static makeJobId(payload: StartEvaluationCommandData): string {
-    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "start");
+    return makeJobIdWithSuffix(payload, "start");
   }
 }

@@ -92,30 +92,16 @@ export type EvaluationCompletedEvent = z.infer<
 >;
 
 /**
- * Type guards for evaluation events.
- */
-export function isEvaluationScheduledEvent(
-  event: EvaluationProcessingEvent
-): event is EvaluationScheduledEvent {
-  return event.type === EVALUATION_SCHEDULED_EVENT_TYPE;
-}
-
-export function isEvaluationStartedEvent(
-  event: EvaluationProcessingEvent
-): event is EvaluationStartedEvent {
-  return event.type === EVALUATION_STARTED_EVENT_TYPE;
-}
-
-export function isEvaluationCompletedEvent(
-  event: EvaluationProcessingEvent
-): event is EvaluationCompletedEvent {
-  return event.type === EVALUATION_COMPLETED_EVENT_TYPE;
-}
-
-/**
  * Union of all evaluation processing event types.
  */
 export type EvaluationProcessingEvent =
   | EvaluationScheduledEvent
   | EvaluationStartedEvent
   | EvaluationCompletedEvent;
+
+// Re-export type guards for backwards compatibility
+export {
+  isEvaluationScheduledEvent,
+  isEvaluationStartedEvent,
+  isEvaluationCompletedEvent,
+} from "./typeGuards";

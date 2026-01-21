@@ -1,3 +1,4 @@
+import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { CompleteEvaluationCommandData } from "../schemas/commands";
 import { completeEvaluationCommandDataSchema } from "../schemas/commands";
@@ -7,13 +8,15 @@ import {
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
+  EvaluationProcessingEvent,
   EvaluationCompletedEvent,
   EvaluationCompletedEventData,
 } from "../schemas/events";
 import {
-  BaseEvaluationCommand,
+  createEvaluationCommandHandler,
+  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
-} from "./baseEvaluationCommand";
+} from "./base.command";
 
 const config: EvaluationCommandConfig<
   CompleteEvaluationCommandData,
@@ -24,7 +27,6 @@ const config: EvaluationCommandConfig<
   loggerName: "complete-evaluation",
   handleLogMessage: "Handling complete evaluation command",
   emitLogMessage: "Emitting evaluation completed event",
-  jobIdSuffix: "complete",
   mapToEventData: (commandData) => ({
     evaluationId: commandData.evaluationId,
     status: commandData.status,
@@ -43,18 +45,30 @@ const config: EvaluationCommandConfig<
  * Command handler for completing an evaluation.
  * Emits EvaluationCompletedEvent when evaluation execution finishes.
  */
-export class CompleteEvaluationCommand extends BaseEvaluationCommand<
-  CompleteEvaluationCommandData,
-  EvaluationCompletedEvent,
-  EvaluationCompletedEventData
-> {
+export class CompleteEvaluationCommand
+  implements
+    CommandHandler<
+      Command<CompleteEvaluationCommandData>,
+      EvaluationProcessingEvent
+    >
+{
   static readonly schema = defineCommandSchema(
     COMPLETE_EVALUATION_COMMAND_TYPE,
     completeEvaluationCommandDataSchema,
     "Command to complete an evaluation"
   );
 
-  protected readonly config = config;
+  private readonly handleCommand = createEvaluationCommandHandler<
+    CompleteEvaluationCommandData,
+    EvaluationCompletedEvent,
+    EvaluationCompletedEventData
+  >(config);
+
+  handle(
+    command: Command<CompleteEvaluationCommandData>
+  ): CommandHandlerResult<EvaluationProcessingEvent> {
+    return this.handleCommand(command);
+  }
 
   static getAggregateId(payload: CompleteEvaluationCommandData): string {
     return payload.evaluationId;
@@ -72,6 +86,6 @@ export class CompleteEvaluationCommand extends BaseEvaluationCommand<
   }
 
   static makeJobId(payload: CompleteEvaluationCommandData): string {
-    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "complete");
+    return makeJobIdWithSuffix(payload, "complete");
   }
 }

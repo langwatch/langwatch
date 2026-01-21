@@ -7,9 +7,9 @@ export * from "./schemas/events";
 export * from "./schemas/commands";
 
 // Command handlers
-export { ScheduleEvaluationCommand } from "./commands/scheduleEvaluationCommand";
-export { StartEvaluationCommand } from "./commands/startEvaluationCommand";
-export { CompleteEvaluationCommand } from "./commands/completeEvaluationCommand";
+export { ScheduleEvaluationCommand } from "./commands/scheduleEvaluation.command";
+export { StartEvaluationCommand } from "./commands/startEvaluation.command";
+export { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
 
 // Projections
 export * from "./projections";
