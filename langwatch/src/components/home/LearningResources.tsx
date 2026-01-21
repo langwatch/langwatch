@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { LuBookOpen, LuCirclePlay, LuExternalLink } from "react-icons/lu";
 import { Link } from "../ui/link";
+import { HomeCard } from "./HomeCard";
 
 type ResourceCard = {
   title: string;
@@ -99,7 +100,7 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
  */
 export function LearningResources() {
   return (
-    <VStack align="stretch" gap={3} width="full">
+    <VStack data-tour-target="learning-resources" align="stretch" gap={3} width="full">
       <Heading>Learning resources</Heading>
       <Grid
         templateColumns={{

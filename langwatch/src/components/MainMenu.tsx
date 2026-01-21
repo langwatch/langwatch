@@ -45,6 +45,7 @@ export const MainMenu = React.memo(function MainMenu({
 
   return (
     <Box
+      data-tour-target="main-menu"
       background="gray.100"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}

@@ -8,6 +8,7 @@ import {
   LuGithub,
   LuLifeBuoy,
   LuLightbulb,
+  LuMap,
   LuMessageCircle,
 } from "react-icons/lu";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
@@ -16,6 +17,7 @@ import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
 import { SideMenuItem } from "./SideMenuLink";
+import { useHomeTour } from "../home/coachmarks/HomeTourContext";
 
 export type SupportMenuProps = {
   showLabel?: boolean;
@@ -25,6 +27,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
   const gray600 = useColorRawValue("gray.600");
   const [isOpen, setIsOpen] = useState(false);
   const publicEnv = usePublicEnv();
+  const homeTour = useHomeTour();
 
   return (
     <VStack width="full" align="start" gap={0.5}>
@@ -100,6 +103,20 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
                 <DiscordOutlineIcon /> Discord
               </Link>
             </Menu.Item>
+            {homeTour && (
+              <Menu.Item value="home-tour">
+                <Box
+                  as="button"
+                  width="full"
+                  onClick={() => {
+                    setIsOpen(false);
+                    homeTour.startTour();
+                  }}
+                >
+                  <LuMap /> Take Home Tour
+                </Box>
+              </Menu.Item>
+            )}
             <MenuSeparator />
             <Menu.Item value="documentation">
               <Link isExternal href="https://docs.langwatch.ai">

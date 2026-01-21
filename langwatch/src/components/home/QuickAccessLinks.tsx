@@ -174,7 +174,7 @@ export function QuickAccessLinks() {
   const cards = buildQuickAccessCards(project.slug, isIntegrated);
 
   return (
-    <VStack align="stretch" gap={3} width="full">
+    <VStack data-tour-target="quick-access" align="stretch" gap={3} width="full">
       <Heading>What would you like to work on today?</Heading>
       <Grid
         templateColumns={{

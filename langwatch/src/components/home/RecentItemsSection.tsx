@@ -261,7 +261,7 @@ export function RecentItemsSection() {
   }
 
   return (
-    <VStack align="stretch" gap={3} width="full">
+    <VStack data-tour-target="recent-items" align="stretch" gap={3} width="full">
       <Tabs.Root
         defaultValue="recents"
         variant="enclosed"
