@@ -31,7 +31,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: { _light: "#E5E7EB", _dark: "{colors.gray.900}" },
+      background: { _light: "#F2F4F8", _dark: "{colors.gray.900}" },
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
