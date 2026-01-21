@@ -109,13 +109,22 @@ export class EvaluationStateProjectionHandler
           "Processing EvaluationScheduledEvent"
         );
       } else if (isEvaluationStartedEvent(event)) {
-        // Update evaluator info if not set (for direct API calls without scheduling)
+        // Merge metadata fields individually to allow backfilling from start event
+        // when schedule event had partial or missing data
         if (!evaluatorId) {
           evaluatorId = event.data.evaluatorId;
+        }
+        if (!evaluatorType) {
           evaluatorType = event.data.evaluatorType;
+        }
+        if (evaluatorName == null) {
           evaluatorName = event.data.evaluatorName ?? null;
+        }
+        if (traceId == null) {
           traceId = event.data.traceId ?? null;
-          isGuardrail = event.data.isGuardrail ?? false;
+        }
+        if (event.data.isGuardrail != null) {
+          isGuardrail = event.data.isGuardrail;
         }
         status = "in_progress";
         startedAt = event.timestamp;

@@ -30,19 +30,33 @@ export type EvaluationJob = {
 };
 
 /**
- * Safely extracts the evaluation ID from a check object.
+ * Extracts the evaluation ID from a check object.
  * Handles both new format (evaluation_id) and legacy format (id).
+ * @throws Error if no valid ID is found (surfaces data quality issues)
  */
 export function getEvaluationId(check: EvaluationJobCheck): string {
-  return check.evaluation_id ?? check.id ?? "";
+  const id = check.evaluation_id ?? check.id;
+  if (!id) {
+    throw new Error(
+      `Missing evaluation ID in check object: ${JSON.stringify(check)}`
+    );
+  }
+  return id;
 }
 
 /**
- * Safely extracts the evaluator ID from a check object.
+ * Extracts the evaluator ID from a check object.
  * Handles both new format (evaluator_id) and legacy format (id).
+ * @throws Error if no valid ID is found (surfaces data quality issues)
  */
 export function getEvaluatorId(check: EvaluationJobCheck): string {
-  return check.evaluator_id ?? check.id ?? "";
+  const id = check.evaluator_id ?? check.id;
+  if (!id) {
+    throw new Error(
+      `Missing evaluator ID in check object: ${JSON.stringify(check)}`
+    );
+  }
+  return id;
 }
 
 export type TopicClusteringJob = {

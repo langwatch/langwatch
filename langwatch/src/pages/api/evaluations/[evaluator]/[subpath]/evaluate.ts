@@ -200,8 +200,11 @@ export async function handleEvaluatorCall(
   let result: SingleEvaluationResult;
 
   // Generate evaluationId for event sourcing tracking
+  // evaluationId must be unique per execution (not per evaluator definition)
+  // to avoid collapsing all executions into one aggregate stream
   const evaluationId =
-    storedEvaluator?.id ?? params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
+    params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
+  // evaluatorId identifies which evaluator definition is being used
   const evaluatorId =
     storedEvaluator?.id ??
     params.evaluator_id ??

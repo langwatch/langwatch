@@ -62,8 +62,8 @@ export const scheduleEvaluation = async ({
     try {
       await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
         tenantId: trace.project_id,
-        evaluationId: check.evaluation_id,
-        evaluatorId: check.evaluator_id,
+        evaluationId: getEvaluationId(check),
+        evaluatorId: getEvaluatorId(check),
         evaluatorType: check.type,
         evaluatorName: check.name,
         traceId: trace.trace_id,
@@ -73,7 +73,7 @@ export const scheduleEvaluation = async ({
       // Note: Event sourcing errors are logged but not re-thrown because the evaluation
       // should proceed even if event tracking fails. Errors are captured for monitoring.
       captureException(error, {
-        extra: { projectId: trace.project_id, evaluationId: check.evaluation_id, event: "scheduled" },
+        extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: "scheduled" },
       });
       logger.error(
         { error, check, trace },
