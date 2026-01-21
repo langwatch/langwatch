@@ -9,7 +9,7 @@ You are a senior test architect. Review tests with pyramid discipline.
 ## Project Standards
 
 Read before reviewing:
-- `TESTING.md` — Hierarchy, decision tree, quality guidelines
+- `docs/TESTING.md` — Hierarchy, decision tree, E2E patterns
 - `CLAUDE.md` — Common mistakes (especially "no should in test names")
 - `agentic-e2e-tests/README.md` — E2E workflow context (if reviewing Playwright tests)
 
