@@ -193,22 +193,38 @@ export function useColorMode(): UseColorModeReturn {
   };
 }
 
+// Mapping for semantic token names to numeric color values
+// Used to resolve tokens like "blue.fg" to actual hex colors
+const semanticToNumeric: Record<string, number> = {
+  fg: 600,
+  solid: 500,
+  subtle: 100,
+  muted: 200,
+  emphasized: 300,
+  contrast: 900,
+  hover: 600,
+};
+
 export function getRawColorValue(color: string): string {
   if (color === "white") {
     return "white";
   }
 
-  const [colorName, number] = color.split(".");
+  const [colorName, numberOrToken] = color.split(".");
 
-  if (!colorName || !number) {
+  if (!colorName || !numberOrToken) {
     return "pink";
   }
 
+  // Try parsing as number first, then check semantic token mapping
+  let numericValue = parseInt(numberOrToken, 10);
+  if (isNaN(numericValue)) {
+    numericValue = semanticToNumeric[numberOrToken] ?? 500;
+  }
+
   return (
-    colorSystem[colorName as keyof typeof colorSystem][
-      (parseInt(
-        number, 10
-      ) as keyof (typeof colorSystem)[keyof typeof colorSystem]) ?? 0
+    colorSystem[colorName as keyof typeof colorSystem]?.[
+      numericValue as keyof (typeof colorSystem)[keyof typeof colorSystem]
     ]?.value ?? "pink"
   );
 }
