@@ -147,11 +147,10 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
   // Criteria appear as textbox inputs with the criterion as their value
-  // Use getByRole with filtering to avoid CSS selector injection
+  // Use web-first assertion with getByRole for user-facing locators
   const criterionInput = page
     .getByRole("textbox")
-    .filter({ has: page.locator(`[value="${criterion.replace(/"/g, '\\"')}"]`) })
-    .or(page.getByRole("textbox").filter({ hasText: criterion }))
+    .filter({ hasText: criterion })
     .last();
   await expect(criterionInput).toBeVisible({ timeout: 5000 });
 }
