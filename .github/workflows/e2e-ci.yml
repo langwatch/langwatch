@@ -104,11 +104,11 @@ jobs:
 
       - name: Install E2E test dependencies
         working-directory: agentic-e2e-tests
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
         working-directory: agentic-e2e-tests
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Prepare files
         working-directory: langwatch

@@ -188,11 +188,11 @@ pnpm exec playwright show-report playwright-report
 
 E2E tests are configured to run in CI with:
 - Infrastructure services via GitHub Actions service containers
-- Chromium + Firefox browsers
+- Chromium browser (Firefox removed due to flakiness)
 - Retries on failure (2 retries in CI)
 - Global setup that validates environment and waits for app readiness
 
-See `.github/workflows/langwatch-app-ci.yml` for the full configuration.
+See `.github/workflows/e2e-ci.yml` for the full configuration.
 
 The CI workflow installs dependencies for both `langwatch/` and `agentic-e2e-tests/` and runs tests using `pnpm test` from the e2e directory.
 
