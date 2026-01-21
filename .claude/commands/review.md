@@ -2,4 +2,6 @@
 
 Invoke **uncle-bob-reviewer** on recent changes.
 
-At the end, check if the PR description is still accurate and update if needed.
+After the review:
+1. Check if any ADRs in `docs/adr/` need updating based on the changes
+2. Verify PR description is still accurate and update if needed
