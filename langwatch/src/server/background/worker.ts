@@ -146,6 +146,8 @@ const incrementWorkerRestartCount = () => {
 };
 
 const startMetricsServer = () => {
+  const port = parseInt(process.env.WORKER_METRICS_PORT ?? "2999");
+
   const server = http.createServer((req, res) => {
     if (req.url === "/metrics") {
       res.setHeader("Content-Type", register.contentType);
@@ -168,7 +170,7 @@ const startMetricsServer = () => {
     }
   });
 
-  server.listen(2999, () => {
-    logger.info("metrics server listening on port 2999");
+  server.listen(port, () => {
+    logger.info(`metrics server listening on port ${port}`);
   });
 };

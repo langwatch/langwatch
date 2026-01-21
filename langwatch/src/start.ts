@@ -108,7 +108,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
-          const workersMetricsRes = await fetch("http://0.0.0.0:2999/metrics");
+          const workerMetricsPort = process.env.WORKER_METRICS_PORT ?? "2999";
+          const workersMetricsRes = await fetch(
+            `http://0.0.0.0:${workerMetricsPort}/metrics`
+          );
           const workersMetrics = await workersMetricsRes.text();
           res.setHeader("Content-Type", register.contentType);
           res.end(workersMetrics);

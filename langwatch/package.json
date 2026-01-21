@@ -46,7 +46,8 @@
 		"test:e2e": "playwright test --config=e2e/playwright.config.ts",
 		"test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
 		"test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
-		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
+		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
+		"bullboard": "tsx src/bullboard.ts"
 	},
 	"dependencies": {
 		"@ag-grid-community/client-side-row-model": "^32.3.3",
@@ -65,6 +66,9 @@
 		"@aws-sdk/client-lambda": "^3.744.0",
 		"@aws-sdk/client-s3": "^3.750.0",
 		"@aws-sdk/client-ses": "^3.645.0",
+		"@bull-board/api": "^6.16.2",
+		"@bull-board/hono": "^6.16.2",
+		"@bull-board/ui": "^6.16.2",
 		"@chakra-ui/next-js": "^2.4.2",
 		"@chakra-ui/react": "^3.28.1",
 		"@clickhouse/client": "^1.13.0",
@@ -79,6 +83,7 @@
 		"@elastic/elasticsearch": "~8.15.0",
 		"@emotion/react": "^11.14.0",
 		"@google-cloud/dlp": "^5.12.0",
+		"@hono/node-server": "^1.19.9",
 		"@hono/zod-validator": "^0.4.3",
 		"@hookform/resolvers": "^3.3.2",
 		"@langwatch/ksuid": "^2.0.2",
