@@ -25,7 +25,7 @@ export const AddVariableButton = forwardRef<
       onClick={onClick}
       onMouseDown={(e) => e.stopPropagation()}
       opacity={0.7}
-      _hover={{ opacity: 1, background: "gray.100" }}
+      _hover={{ opacity: 1, background: "bg.muted" }}
       {...props}
     >
       <Text fontSize="xs" marginRight={1} fontWeight="500">

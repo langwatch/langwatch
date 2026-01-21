@@ -70,14 +70,14 @@ export function TracesOverview() {
   return (
     <HomeCard width="full" padding={4} _hover={{ boxShadow: "2xs" }}>
       <HStack width="full" gap={2} marginBottom={2}>
-        <Heading size="sm" color="gray.700">
+        <Heading size="sm" color="fg">
           Traces Overview
         </Heading>
         <Spacer />
         <Link
           href={`/${project.slug}/analytics`}
           fontSize="xs"
-          color="gray.500"
+          color="fg.muted"
           _hover={{ color: "orange.500" }}
         >
           View dashboards <LuArrowRight size={12} />

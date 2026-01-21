@@ -93,7 +93,7 @@ function ProjectsList({
                   <Button
                     background="gray.50"
                     _hover={{ background: "gray.50" }}
-                    color="gray.400"
+                    color="fg.subtle"
                   >
                     <HStack gap={2}>
                       <Plus size={20} />

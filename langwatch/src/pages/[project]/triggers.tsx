@@ -196,7 +196,7 @@ function Triggers() {
       paddingX={2}
       paddingY={1}
     >
-      <Box color="gray.500">
+      <Box color="fg.muted">
         <Filter width={16} style={{ minWidth: 16 }} />
       </Box>
       {children}
@@ -216,7 +216,7 @@ function Triggers() {
         padding={1}
         fontWeight="500"
         textTransform="capitalize"
-        color="gray.500"
+        color="fg.muted"
       >
         {text.replace("_", " ")}
       </Box>

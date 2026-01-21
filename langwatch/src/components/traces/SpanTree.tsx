@@ -83,14 +83,14 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         marginLeft={level == 0 ? "21px" : "37px"}
         bottom={lineHeight}
         width="1px"
-        bgColor="gray.400"
+        bgColor="border.emphasized"
         _before={
           level > 0
             ? {
                 content: "''",
                 width: "18px",
                 height: "12px",
-                borderColor: "gray.400",
+                borderColor: "border.emphasized",
                 borderStyle: "solid",
                 borderTopWidth: 0,
                 borderRightWidth: 0,
@@ -112,9 +112,9 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         paddingX={level > 0 ? 8 : 4}
         paddingRight={4}
         borderRadius={6}
-        background={span.span_id === currentSpanId ? "gray.100" : undefined}
+        background={span.span_id === currentSpanId ? "bg.muted" : undefined}
         _hover={{
-          background: "gray.100",
+          background: "bg.muted",
         }}
         cursor="pointer"
         role="button"
@@ -133,8 +133,8 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
       >
         <HStack gap={4}>
           <Box
-            background="white"
-            borderColor={span.error ? "red.400" : "gray.400"}
+            background="bg.panel"
+            borderColor={span.error ? "red.400" : "border.emphasized"}
             borderWidth="3px"
             borderRadius="100%"
             width="12px"
@@ -164,7 +164,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               </IconWrapper>
             )}
           </HStack>
-          <HStack fontSize="13px" color="gray.500">
+          <HStack fontSize="13px" color="fg.muted">
             <SpanDuration span={span} />
             {(span.metrics?.prompt_tokens !== undefined ||
               span.metrics?.completion_tokens !== undefined) && (
@@ -181,7 +181,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               span.metrics?.cost !== null && (
                 <>
                   <Text>·</Text>
-                  <Text fontSize="13px" color="gray.500">
+                  <Text fontSize="13px" color="fg.muted">
                     <SpanCost span={span} />
                   </Text>
                 </>

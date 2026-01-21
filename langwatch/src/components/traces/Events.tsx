@@ -32,7 +32,7 @@ export function Events({ traceId }: { traceId: string }) {
       {trace.data?.events?.map((event) => (
         <VStack
           key={event.event_id}
-          backgroundColor="gray.100"
+          backgroundColor="bg.muted"
           width="full"
           padding={6}
           borderRadius="lg"
@@ -46,7 +46,7 @@ export function Events({ traceId }: { traceId: string }) {
               <Tooltip
                 content={new Date(event.timestamps.started_at).toLocaleString()}
               >
-                <Text color="gray.400" borderBottom="1px dashed">
+                <Text color="fg.subtle" borderBottom="1px dashed">
                   {formatTimeAgo(event.timestamps.started_at)}
                 </Text>
               </Tooltip>
@@ -55,12 +55,12 @@ export function Events({ traceId }: { traceId: string }) {
           <Box
             borderRadius="6px"
             borderWidth="1px"
-            borderColor="gray.400"
+            borderColor="border.emphasized"
             width="full"
           >
             <Table.Root
               size="sm"
-              background="white"
+              background="bg.panel"
               borderRadius="6px"
               variant="line"
               border="none"

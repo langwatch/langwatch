@@ -110,7 +110,7 @@ export const EvaluatorSettingsAccordion = () => {
     <StepAccordion
       value="settings"
       width="full"
-      borderColor="green.400"
+      borderColor="green.fg"
       title="Evaluator Settings"
       showTrigger={!!workbenchState.evaluatorCategory && !!hasEvaluatorFields}
       indicatorProps={{

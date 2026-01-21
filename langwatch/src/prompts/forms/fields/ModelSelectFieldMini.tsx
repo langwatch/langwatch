@@ -85,14 +85,14 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 paddingX={3}
                 borderRadius="md"
                 border="1px solid"
-                borderColor="gray.200"
+                borderColor="border"
                 cursor="pointer"
-                _hover={{ bg: "gray.50" }}
+                _hover={{ bg: "bg.subtle" }}
                 transition="background 0.15s"
                 justify="space-between"
               >
                 <LLMModelDisplay model={field.value?.model ?? ""} />
-                <Box color="gray.500">
+                <Box color="fg.muted">
                   <ChevronDown size={16} />
                 </Box>
               </HStack>

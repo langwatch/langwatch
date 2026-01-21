@@ -54,7 +54,7 @@ export default function NewEvaluationV3() {
   }, [project, router, createExperiment]);
 
   return (
-    <DashboardLayout backgroundColor="white" compactMenu={true}>
+    <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
       <Center height="calc(100vh - 100px)">
         {createExperiment.isError ? (
           <Box padding={6} maxWidth="500px">

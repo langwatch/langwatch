@@ -25,7 +25,7 @@ const FilterContainer = ({
     border={hasBorder ? "1px solid lightgray" : "none"}
     borderRadius="md"
   >
-    <Box color="gray.400">
+    <Box color="fg.subtle">
       <Filter width={16} style={{ minWidth: 16 }} />
     </Box>
     {children}
@@ -45,7 +45,7 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
       padding={1}
       fontWeight="500"
       textTransform="capitalize"
-      color="gray.400"
+      color="fg.subtle"
     >
       {text.replace("_", " ")}
     </Box>

@@ -60,7 +60,7 @@ function Header({
       paddingX={6}
       width="full"
       borderBottom={withBorder ? "1px solid" : undefined}
-      borderBottomColor={withBorder ? "gray.100" : undefined}
+      borderBottomColor={withBorder ? "border" : undefined}
       gap={2}
       {...props}
     >

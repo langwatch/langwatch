@@ -186,14 +186,14 @@ function RequestPreview({
         </HStack>
         {headers && headers.length > 0 && (
           <Box>
-            <Text fontWeight="medium" fontSize="xs" color="gray.600">
+            <Text fontWeight="medium" fontSize="xs" color="fg.muted">
               Headers:
             </Text>
             <Box
               as="pre"
               fontSize="xs"
               fontFamily="mono"
-              bg="gray.50"
+              bg="bg.subtle"
               padding={2}
               borderRadius="md"
               overflow="auto"
@@ -204,7 +204,7 @@ function RequestPreview({
         )}
         <Box>
           <HStack justify="space-between">
-            <Text fontWeight="medium" fontSize="xs" color="gray.600">
+            <Text fontWeight="medium" fontSize="xs" color="fg.muted">
               Body (rendered):
             </Text>
             <CopyButton text={body} label="Copy body" />
@@ -213,7 +213,7 @@ function RequestPreview({
             as="pre"
             fontSize="xs"
             fontFamily="mono"
-            bg="gray.50"
+            bg="bg.subtle"
             padding={2}
             borderRadius="md"
             overflow="auto"
@@ -258,7 +258,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
               </Badge>
             )}
             {result.duration !== undefined && (
-              <HStack gap={1} color="gray.600" fontSize="sm">
+              <HStack gap={1} color="fg.muted" fontSize="sm">
                 <Clock size={14} />
                 <Text>{formatDuration(result.duration)}</Text>
               </HStack>
@@ -293,7 +293,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
               as="pre"
               fontSize="xs"
               fontFamily="mono"
-              bg="gray.50"
+              bg="bg.subtle"
               padding={2}
               borderRadius="md"
               overflow="auto"
@@ -312,7 +312,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
             as="pre"
             fontSize="xs"
             fontFamily="mono"
-            bg="gray.50"
+            bg="bg.subtle"
             padding={3}
             borderRadius="md"
             overflow="auto"
@@ -523,7 +523,7 @@ export function HttpTestPanel({
 
       {/* Output Path Info */}
       {outputPath && (
-        <Box fontSize="sm" color="gray.600">
+        <Box fontSize="sm" color="fg.muted">
           <Text>
             Output will be extracted using JSONPath:{" "}
             <Code fontSize="sm">{outputPath}</Code>

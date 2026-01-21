@@ -52,7 +52,7 @@ function JsonTreeView({ data }: { data: object }) {
       borderRadius="6px"
       padding={4}
       borderWidth="1px"
-      borderColor="gray.300"
+      borderColor="border.emphasized"
       width="full"
       whiteSpace="pre-wrap"
     >

@@ -17,8 +17,8 @@ export function PromptHandleInfo() {
       padding={2}
       borderRadius="md"
       borderWidth="1px"
-      borderColor="gray.200"
-      backgroundColor="gray.50"
+      borderColor="border"
+      backgroundColor="bg.subtle"
       width="full"
     >
       <HStack justifyContent="space-between" width="full">

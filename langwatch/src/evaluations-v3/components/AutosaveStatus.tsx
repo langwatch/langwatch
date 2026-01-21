@@ -32,27 +32,27 @@ export function AutosaveStatus({
       return {
         icon: <AlertCircle size={14} />,
         text: "Failed to save",
-        color: "red.500",
+        color: "red.fg",
       };
     }
     if (isSaving) {
       return {
         icon: <RefreshCw size={12} />,
         text: "Saving...",
-        color: "gray.500",
+        color: "fg.muted",
       };
     }
     if (isSaved) {
       return {
         icon: <Check size={14} />,
         text: "Saved",
-        color: "gray.400",
+        color: "fg.subtle",
       };
     }
     return {
       icon: <Cloud size={14} />,
       text: "",
-      color: "gray.400",
+      color: "fg.subtle",
     };
   };
 
@@ -91,7 +91,7 @@ export function AutosaveStatus({
         paddingX={2}
         paddingY={1}
         borderRadius="md"
-        _hover={{ bg: "gray.50" }}
+        _hover={{ bg: "bg.subtle" }}
       >
         <Box>{status.icon}</Box>
         {status.text && <Text>{status.text}</Text>}

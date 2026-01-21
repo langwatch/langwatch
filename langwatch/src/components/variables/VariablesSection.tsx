@@ -180,7 +180,7 @@ export const VariablesSection = ({
           fontSize="xs"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.500"
+          color="fg.muted"
         >
           {title}
         </Text>
@@ -200,7 +200,7 @@ export const VariablesSection = ({
 
       {/* Variables List */}
       {variables.length === 0 ? (
-        <Text fontSize="13px" color="gray.400">
+        <Text fontSize="13px" color="fg.subtle">
           No variables defined
         </Text>
       ) : (
@@ -354,7 +354,7 @@ const VariableRow = ({
             borderRadius="lg"
             padding={1}
             paddingRight={5}
-            _hover={{ borderColor: "gray.200" }}
+            _hover={{ borderColor: "border" }}
             css={{
               // Hide the default text, show only icon
               color: "transparent",
@@ -411,7 +411,7 @@ const VariableRow = ({
             marginX={-2}
             marginY={-1}
             borderRadius="lg"
-            _hover={readOnly ? undefined : { borderColor: "gray.200" }}
+            _hover={readOnly ? undefined : { borderColor: "border" }}
             minWidth="60px"
             data-testid={`variable-name-${variable.identifier}`}
           >
@@ -420,7 +420,7 @@ const VariableRow = ({
           {infoTooltip && (
             <Tooltip content={infoTooltip} positioning={{ placement: "top" }}>
               <Box
-                color="gray.400"
+                color="fg.subtle"
                 cursor="help"
                 data-testid={`variable-info-${variable.identifier}`}
               >
@@ -434,7 +434,7 @@ const VariableRow = ({
       {!isMappingDisabled && (
         <>
           {/* = sign and value/mapping input */}
-          <Text color="gray.400" fontSize="sm" flexShrink={0}>
+          <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
             =
           </Text>
 
@@ -461,7 +461,7 @@ const VariableRow = ({
               fontFamily="mono"
               fontSize="13px"
               variant="flushed"
-              borderColor="gray.200"
+              borderColor="border"
             />
           )}
         </>
@@ -476,7 +476,7 @@ const VariableRow = ({
             colorPalette="gray"
             onClick={onRemove}
             flexShrink={0}
-            color="gray.400"
+            color="fg.subtle"
             data-testid={`remove-variable-${variable.identifier}`}
           >
             <X size={14} />

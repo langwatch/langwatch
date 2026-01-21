@@ -132,13 +132,12 @@ export function SyncedChatInput({
         position="relative"
         borderRadius="xl"
         border="1px solid"
-        borderColor="gray.300"
+        borderColor="border.emphasized"
         transition="box-shadow 0.2s"
-        bg="white"
+        bg="bg.panel"
         width="full"
         maxWidth="768px"
         margin="0 auto"
-        background="white"
       >
         <ChatTextArea
           borderRadius="xl"

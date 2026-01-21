@@ -170,7 +170,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <VStack gap={2} align="stretch" paddingX={6} paddingTop={4}>
-              <Text color="gray.600" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 Select an existing prompt or create a new one.
               </Text>
 
@@ -178,13 +178,13 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
               {hasPrompts && (
                 <HStack
                   border="1px solid"
-                  borderColor="gray.200"
+                  borderColor="border"
                   borderRadius="md"
                   paddingX={3}
                   paddingY={2}
-                  bg="white"
+                  bg="bg.panel"
                 >
-                  <Search size={16} color="gray" />
+                  <Search size={16} color="currentColor" />
                   <Input
                     placeholder="Search prompts..."
                     value={searchQuery}
@@ -216,7 +216,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
                 <EmptyState onCreateNew={onCreateNew} />
               ) : filteredCount === 0 ? (
                 <VStack paddingY={8} gap={2} textAlign="center">
-                  <Text color="gray.500" data-testid="no-search-results">
+                  <Text color="fg.muted" data-testid="no-search-results">
                     No prompts match "{searchQuery}"
                   </Text>
                   <Button
@@ -240,7 +240,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -257,14 +257,14 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
   return (
     <VStack paddingY={12} gap={4} textAlign="center">
-      <Box padding={4} borderRadius="full" bg="gray.100" color="gray.500">
+      <Box padding={4} borderRadius="full" bg="bg.muted" color="fg.muted">
         <FileText size={32} />
       </Box>
       <VStack gap={1}>
-        <Text fontWeight="medium" color="gray.700">
+        <Text fontWeight="medium" color="fg">
           No prompts yet
         </Text>
-        <Text fontSize="sm" color="gray.500">
+        <Text fontSize="sm" color="fg.muted">
           Create your first prompt to get started
         </Text>
       </VStack>
@@ -339,7 +339,7 @@ function PromptFolder({ folder, prompts, onSelect }: PromptFolderProps) {
             <Text flex={1} textAlign="left" fontWeight="medium">
               {folder}
             </Text>
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="fg.muted">
               ({prompts.length})
             </Text>
           </HStack>
@@ -396,21 +396,21 @@ function PromptCard({ prompt, onClick }: PromptCardProps) {
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
+      _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
       transition="all 0.15s"
       data-testid={`prompt-card-${prompt.id}`}
     >
       <HStack gap={3}>
-        <Box color="green.500">{renderIcon()}</Box>
+        <Box color="green.fg">{renderIcon()}</Box>
         <VStack align="start" gap={0} flex={1}>
           <Text fontWeight="medium" fontSize="sm">
             {displayName}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
+          <HStack gap={2} fontSize="xs" color="fg.muted">
             <Text>v{prompt.version}</Text>
             {prompt.model && (
               <>

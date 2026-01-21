@@ -68,7 +68,7 @@ const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
   if (type === "dataset") {
     return (
       <ColorfulBlockIcon
-        color="blue.400"
+        color="blue.solid"
         size="xs"
         icon={<Database size={12} />}
       />
@@ -274,7 +274,7 @@ export const VariableInsertMenu = ({
         borderRadius="8px"
         boxShadow="lg"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         overflow="hidden"
         padding={0}
         // Prevent focus on container in readonly mode
@@ -284,7 +284,7 @@ export const VariableInsertMenu = ({
       >
         {/* Search input (editable) or Query display (readonly) */}
         {onQueryChange ? (
-          <Box padding={2} borderBottom="1px solid" borderColor="gray.100">
+          <Box padding={2} borderBottom="1px solid" borderColor="border.muted">
             <Input
               ref={searchInputRef}
               value={query}
@@ -318,10 +318,10 @@ export const VariableInsertMenu = ({
             <Box
               padding={2}
               borderBottom="1px solid"
-              borderColor="gray.100"
+              borderColor="border.muted"
               background="gray.50"
             >
-              <Text fontSize="sm" color="gray.600" fontFamily="mono">
+              <Text fontSize="sm" color="fg.muted" fontFamily="mono">
                 {`{{${query}`}
               </Text>
             </Box>
@@ -332,11 +332,11 @@ export const VariableInsertMenu = ({
         <Box maxHeight="280px" overflowY="auto">
           {flattenedOptions.length === 0 ? (
             <Box padding={3}>
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 No matching fields found
               </Text>
               {onCreateVariable && !query && (
-                <Text fontSize="xs" color="gray.400" marginTop={1}>
+                <Text fontSize="xs" color="fg.subtle" marginTop={1}>
                   Type a name to create a new variable
                 </Text>
               )}
@@ -356,7 +356,7 @@ export const VariableInsertMenu = ({
                     marginTop={sourceIndex > 0 ? 2 : 0}
                   >
                     <SourceTypeIconSmall type={source.type} />
-                    <Text fontSize="xs" fontWeight="semibold" color="gray.600">
+                    <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                       {source.name}
                     </Text>
                   </HStack>
@@ -420,7 +420,7 @@ export const VariableInsertMenu = ({
                     }
                   }}
                   borderTop="1px solid"
-                  borderColor="gray.100"
+                  borderColor="border.muted"
                   marginTop={filteredSources.length > 0 ? 2 : 0}
                   onClick={() => onCreateVariable?.(normalizedQuery)}
                 >

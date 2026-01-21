@@ -40,7 +40,7 @@ export const StepsItem = React.forwardRef<
               !isCompleted
                 ? {
                     background: "transparent",
-                    borderColor: "gray.200",
+                    borderColor: "border",
                     borderWidth: "2px",
                     color: "fg",
                   }

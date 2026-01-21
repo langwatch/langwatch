@@ -71,7 +71,7 @@ export default function EvaluationsV3Page() {
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
-      <DashboardLayout backgroundColor="white" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
         <Box padding={6}>
           <Alert.Root status="warning">
             <Alert.Indicator />
@@ -89,7 +89,7 @@ export default function EvaluationsV3Page() {
   // Show error for other failures (permissions, network, etc.)
   if (isError) {
     return (
-      <DashboardLayout backgroundColor="white" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
         <Box padding={6}>
           <Alert.Root status="error">
             <Alert.Indicator />
@@ -105,7 +105,7 @@ export default function EvaluationsV3Page() {
   }
 
   return (
-    <DashboardLayout backgroundColor="white" compactMenu={true}>
+    <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
       <VStack
         width="full"
         height="calc(100vh - 50px)"
@@ -147,8 +147,8 @@ export default function EvaluationsV3Page() {
           borderTopLeftRadius="xl"
           borderLeft="1px solid"
           borderTop="1px solid"
-          borderColor="gray.350"
-          bg="white"
+          borderColor="border.emphasized"
+          bg="bg.panel"
         >
           <Box position="absolute" inset={0} overflow="auto">
             <EvaluationsV3Table

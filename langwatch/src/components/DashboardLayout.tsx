@@ -37,7 +37,6 @@ import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { RandomColorAvatar } from "./RandomColorAvatar";
-import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
@@ -49,7 +48,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   if (!currentRoute) return null;
 
   return (
-    <HStack gap={2} fontSize="13px" color="gray.500" alignItems="center">
+    <HStack gap={2} fontSize="13px" color="fg.muted" alignItems="center">
       <ChevronRight width="12" style={{ minWidth: "12px" }} />
       <Link href={`/${project?.slug ?? ""}`}>Dashboard</Link>
       {currentRoute.parent && (
@@ -68,7 +67,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
       {currentRoute.title !== "Home" && (
         <>
           <ChevronRight width="12" style={{ minWidth: "12px" }} />
-          <Text color="gray.500" whiteSpace="nowrap">
+          <Text color="fg.muted" whiteSpace="nowrap">
             {currentRoute.title}
           </Text>
         </>
@@ -115,9 +114,9 @@ export const ProjectSelector = React.memo(function ProjectSelector({
           height="auto"
           fontWeight="normal"
           minWidth="fit-content"
-          color="gray.700"
+          color="fg"
           _hover={{
-            backgroundColor: "gray.200",
+            backgroundColor: "bg.muted",
           }}
         >
           <HStack gap={2}>
@@ -286,7 +285,7 @@ export const AddProjectButton = ({
         <Menu.Item
           value={`new-project-${team.slug}`}
           fontSize="14px"
-          color="gray.400"
+          color="fg.subtle"
           _hover={{
             backgroundColor: "transparent",
           }}
@@ -313,7 +312,6 @@ export const DashboardLayout = ({
   const isSmallScreen = useBreakpointValue({ base: true, lg: false });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
-  const gray400 = useColorRawValue("gray.400");
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
@@ -361,7 +359,7 @@ export const DashboardLayout = ({
     <Box
       width="full"
       minHeight="100vh"
-      background="gray.100"
+      background="bg.page"
       overflowX={["auto", "auto", "clip"]}
     >
       <Head>
@@ -378,7 +376,7 @@ export const DashboardLayout = ({
         width="full"
         paddingX={4}
         paddingY={3}
-        background="gray.100"
+        background="bg.page"
         justifyContent="space-between"
         gap={4}
       >
@@ -445,25 +443,25 @@ export const DashboardLayout = ({
                 }
               }}
             >
-              <InputGroup startElement={<Search color={gray400} size={14} />}>
+              <InputGroup startElement={<Search color="var(--chakra-colors-fg-muted)" size={14} />}>
                 <Input
                   name="query"
                   type="search"
                   placeholder="Search"
-                  _placeholder={{ color: "gray.500" }}
+                  _placeholder={{ color: "fg.muted" }}
                   fontSize="13px"
                   paddingY={1}
                   paddingLeft={8}
                   paddingRight={3}
                   width="120px"
                   height="32px"
-                  backgroundColor="gray.200"
+                  backgroundColor="bg.input"
                   border="none"
                   borderRadius="full"
                   transition="all 0.2s ease-in-out"
                   _focus={{
                     width: "240px",
-                    backgroundColor: "white",
+                    backgroundColor: "bg.inputHover",
                     boxShadow: "sm",
                     outline: "none",
                   }}
@@ -546,7 +544,7 @@ export const DashboardLayout = ({
         <Box
           width="full"
           height="full"
-          background="white"
+          background="bg.surface"
           borderTopLeftRadius="xl"
           overflow="auto"
           display="flex"

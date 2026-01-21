@@ -212,7 +212,7 @@ export function BatchRunsSidebar({
         justify="space-between"
         align="center"
       >
-        <Text fontSize="sm" fontWeight="semibold" color="gray.700">
+        <Text fontSize="sm" fontWeight="semibold" color="fg">
           Experiment Runs
         </Text>
         {onToggleCompareMode && (
@@ -283,7 +283,7 @@ export function BatchRunsSidebar({
 
       {/* Empty state */}
       {!isLoading && !error && runs.length === 0 && (
-        <Text paddingX={3} paddingY={4} color="gray.500" fontSize="sm">
+        <Text paddingX={3} paddingY={4} color="fg.muted" fontSize="sm">
           No runs yet
         </Text>
       )}
@@ -407,7 +407,7 @@ export function BatchRunsSidebar({
                       <Text
                         fontSize="10px"
                         fontWeight="600"
-                        color="gray.500"
+                        color="fg.muted"
                         flexShrink={0}
                       >
                         v{run.workflowVersion.version}
@@ -419,7 +419,7 @@ export function BatchRunsSidebar({
                   </HStack>
 
                   {/* Line 2: Time ago + status */}
-                  <Text color="gray.500" fontSize="12px">
+                  <Text color="fg.muted" fontSize="12px">
                     {run.timestamps.created_at
                       ? formatTimeAgo(run.timestamps.created_at)
                       : "..."}

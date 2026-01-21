@@ -31,13 +31,13 @@ export function DatasetSuperHeader({
   return (
     <SuperHeader
       colSpan={colSpan}
-      color="blue.400"
+      color="blue.solid"
       icon={<Database size={14} />}
       paddingLeft="52px"
     >
       {isLoading ? (
         <>
-          <Text fontWeight="semibold" fontSize="sm" color="gray.700">
+          <Text fontWeight="semibold" fontSize="sm" color="fg">
             Dataset
           </Text>
           <Skeleton height="20px" width="150px" />
@@ -50,7 +50,7 @@ export function DatasetSuperHeader({
           onSaveAsDataset={datasetHandlers.onSaveAsDataset}
         />
       ) : (
-        <Text fontWeight="semibold" fontSize="sm" color="gray.700">
+        <Text fontWeight="semibold" fontSize="sm" color="fg">
           Dataset
         </Text>
       )}

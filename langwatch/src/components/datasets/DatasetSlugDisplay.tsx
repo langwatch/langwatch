@@ -71,7 +71,7 @@ export function DatasetSlugDisplay({
             <Text
               className="slug-text"
               fontSize="2xs"
-              color="gray.600"
+              color="fg.muted"
               textAlign="left"
               transition="opacity 0.2s"
               minWidth={0}

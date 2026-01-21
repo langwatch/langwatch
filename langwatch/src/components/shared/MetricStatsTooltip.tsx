@@ -68,7 +68,7 @@ export const MetricStatsTooltip = ({
       <Text color="white/60">Max</Text>
       <Text>{formatValue(stats.max)}</Text>
     </HStack>
-    <Box borderTopWidth="1px" borderColor="gray.500" marginY={1} />
+    <Box borderTopWidth="1px" borderColor="border.emphasized" marginY={1} />
     <HStack justify="space-between">
       <Text color="white/60">Total</Text>
       <Text fontWeight="medium">{formatValue(stats.total)}</Text>

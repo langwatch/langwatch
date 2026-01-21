@@ -41,7 +41,7 @@ function SimulationCardHeader({
         <Text
           fontSize="sm"
           fontWeight="semibold"
-          color={isComplete ? "white" : "gray.800"}
+          color={isComplete ? "white" : "fg"}
           lineClamp={2}
           textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
         >
@@ -86,25 +86,12 @@ export function SimulationCard({
     <Card.Root
       height="100%"
       borderWidth={1}
-      borderColor="whiteAlpha.600"
+      borderColor="border"
       borderRadius="xl"
       overflow="hidden"
       position="relative"
-      boxShadow="0 4px 24px -1px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset"
-      _before={{
-        content: '""',
-        position: "absolute",
-        inset: 0,
-        borderRadius: "xl",
-        padding: "1px",
-        background:
-          "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.3) 100%)",
-        WebkitMask:
-          "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-        WebkitMaskComposite: "xor",
-        maskComposite: "exclude",
-        pointerEvents: "none",
-      }}
+      boxShadow="lg"
+      bg="bg.panel"
     >
       <VStack height="100%" gap={0}>
         <SimulationCardHeader title={title} status={status} />

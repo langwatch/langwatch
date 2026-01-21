@@ -156,7 +156,7 @@ export function PromptTabbedSection({
         flexShrink={0}
         minHeight="32px"
         borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
-        borderColor={layoutMode === "horizontal" ? "gray.100" : undefined}
+        borderColor={layoutMode === "horizontal" ? "border" : undefined}
         paddingBottom={2}
       >
         <HStack

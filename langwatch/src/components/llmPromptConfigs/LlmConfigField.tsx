@@ -45,7 +45,7 @@ export function LLMConfigField({
             paddingX={3}
             borderRadius="md"
             border="1px solid"
-            borderColor="gray.200"
+            borderColor="border"
             cursor="pointer"
             _hover={{ bg: "gray.50" }}
             transition="background 0.15s"
@@ -53,7 +53,7 @@ export function LLMConfigField({
             opacity={modelOption?.isDisabled ? 0.5 : 1}
           >
             <LLMModelDisplay model={model ?? ""} />
-            <Box color="gray.500">
+            <Box color="fg.muted">
               <ChevronDown size={16} />
             </Box>
           </HStack>

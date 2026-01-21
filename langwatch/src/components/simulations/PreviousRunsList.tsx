@@ -106,9 +106,9 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
           p={4}
           borderRadius="md"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           cursor="pointer"
-          _hover={{ bg: "gray.100" }}
+          _hover={{ bg: "bg.muted" }}
           onClick={() => {
             if (scenarioSetId && batchRunId) {
               goToSimulationRun({
@@ -150,13 +150,13 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
 
             {/* Metrics Row */}
             <VStack align="start" gap={1} w="100%">
-              <Box fontSize="xs" color="gray.600">
+              <Box fontSize="xs" color="fg.muted">
                 <Text>Duration: {Math.round(run.durationInMs / 1000)}s</Text>
                 <Text>
                   Accuracy: {calculateAccuracyPercentage(run.results)}%
                 </Text>
               </Box>
-              <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+              <Text fontSize="xs" color="fg.subtle" whiteSpace="nowrap">
                 {new Date(run.timestamp).toLocaleDateString()},{" "}
                 {new Date(run.timestamp).toLocaleTimeString()}
               </Text>

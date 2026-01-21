@@ -111,13 +111,13 @@ export function AutoSave() {
           <Text fontSize="13px">Saving...</Text>
         </HStack>
       ) : autosave.isError ? (
-        <HStack color="red.600">
+        <HStack color="status.error">
           <X size={16} />
           <Text fontSize="13px">Failed to autosave</Text>
         </HStack>
       ) : recentlySaved ? (
         <HStack>
-          <Box color="green.600">
+          <Box color="status.success">
             <Check width="16px" height="16px" />
           </Box>
           <Text fontSize="13px">Saved</Text>

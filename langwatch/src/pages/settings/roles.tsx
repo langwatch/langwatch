@@ -252,7 +252,7 @@ function RolesManagement({
       <HStack justify="space-between" width="full">
         <VStack align="start" gap={1}>
           <Heading as="h2">Roles & Permissions</Heading>
-          <Text color="gray.600" fontSize="sm">
+          <Text color="fg.muted" fontSize="sm">
             Create custom roles and assign specific permissions to control
             access
           </Text>
@@ -276,7 +276,7 @@ function RolesManagement({
       <VStack align="start" width="full" gap={4}>
         <Box>
           <Heading as="h3">Default Roles</Heading>
-          <Text color="gray.600" fontSize="sm">
+          <Text color="fg.muted" fontSize="sm">
             These are the built-in roles that cannot be modified or deleted.
           </Text>
         </Box>
@@ -329,7 +329,7 @@ function RolesManagement({
       <VStack align="start" width="full" gap={4}>
         <Box>
           <Heading as="h3">Custom Roles</Heading>
-          <Text color="gray.600" fontSize="sm">
+          <Text color="fg.muted" fontSize="sm">
             Custom roles created for your organization with specific permission
             sets.
           </Text>
@@ -346,7 +346,7 @@ function RolesManagement({
             <Card.Body textAlign="center" padding={8}>
               <VStack gap={2}>
                 <Shield size={48} color="gray" />
-                <Text color="gray.600">
+                <Text color="fg.muted">
                   No custom roles yet. Create your first custom role to get
                   started.
                 </Text>
@@ -434,7 +434,7 @@ function RolesManagement({
               <VStack gap={4} align="start">
                 <VStack align="start" gap={2} width="full">
                   <Text fontWeight="semibold">Description:</Text>
-                  <Text color="gray.600">
+                  <Text color="fg.muted">
                     {viewingRole.description || "No description provided"}
                   </Text>
                 </VStack>
@@ -475,7 +475,7 @@ function RolesManagement({
               <VStack gap={4} align="start">
                 <VStack align="start" gap={2} width="full">
                   <Text fontWeight="semibold">Description:</Text>
-                  <Text color="gray.600">{viewingDefaultRole.description}</Text>
+                  <Text color="fg.muted">{viewingDefaultRole.description}</Text>
                 </VStack>
 
                 <Separator />

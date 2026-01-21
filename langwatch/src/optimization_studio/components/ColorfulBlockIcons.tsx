@@ -117,19 +117,19 @@ export const ComponentIcon = ({
   };
 
   const componentColorMap: Record<ComponentType, string> = {
-    signature: "green.400",
-    entry: "blue.400",
-    code: "#3E5A60",
-    retriever: "purple.400",
-    prompting_technique: "teal.400",
-    evaluator: "#5FD15D",
-    end: "orange.400",
-    custom: "gray.400",
+    signature: "green.solid",
+    entry: "blue.solid",
+    code: "cyan.solid",
+    retriever: "purple.solid",
+    prompting_technique: "teal.solid",
+    evaluator: "green.solid",
+    end: "orange.solid",
+    custom: "gray.solid",
   };
 
   let color = componentColorMap[type];
   if (behave_as === "evaluator") {
-    color = "#5FD15D";
+    color = "green.solid";
   }
 
   return (
@@ -161,7 +161,7 @@ export function WorkflowIcon({
       )}')`}
       borderRadius="4px"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       width={sizeMap[size]}
       minWidth={sizeMap[size]}
       height={sizeMap[size]}

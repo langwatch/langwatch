@@ -79,8 +79,8 @@ export function UndoRedo() {
         size="sm"
         onClick={handleUndo}
         disabled={!canUndo}
-        color={canUndo ? "gray.600" : "gray.300"}
-        _hover={canUndo ? { bg: "gray.100" } : {}}
+        color={canUndo ? "fg.muted" : "fg.subtle"}
+        _hover={canUndo ? { bg: "bg.subtle" } : {}}
       >
         <Undo2 size={18} />
       </IconButton>
@@ -91,8 +91,8 @@ export function UndoRedo() {
         size="sm"
         onClick={handleRedo}
         disabled={!canRedo}
-        color={canRedo ? "gray.600" : "gray.300"}
-        _hover={canRedo ? { bg: "gray.100" } : {}}
+        color={canRedo ? "fg.muted" : "fg.subtle"}
+        _hover={canRedo ? { bg: "bg.subtle" } : {}}
       >
         <Redo2 size={18} />
       </IconButton>

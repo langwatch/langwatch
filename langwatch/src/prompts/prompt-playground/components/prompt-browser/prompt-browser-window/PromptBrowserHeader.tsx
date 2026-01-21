@@ -32,7 +32,7 @@ export function PromptBrowserHeader() {
   };
 
   return (
-    <Box width="full" bg="white">
+    <Box width="full">
       <PromptEditorHeader
         onSave={handleSaveVersion}
         hasUnsavedChanges={hasUnsavedChanges}

@@ -257,7 +257,7 @@ function PromptBrowserWindowInner(props: {
               minWidth="300px"
               maxWidth="600px"
               borderRight="1px solid"
-              borderColor="gray.100"
+              borderColor="border.muted"
               overflow="hidden"
               boxShadow="md"
             >
@@ -362,7 +362,7 @@ function PromptBrowserWindowInner(props: {
                 left={0}
                 right={0}
                 height="12px"
-                background="linear-gradient(to bottom, transparent, white)"
+                background="linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))"
                 pointerEvents="none"
               />
             )}

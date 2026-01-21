@@ -118,7 +118,7 @@ export function SaveAndRunMenu({
           <Box
             padding={2}
             borderBottomWidth="1px"
-            borderColor="gray.200"
+            borderColor="border"
             position="sticky"
             top={0}
             bg="white"
@@ -141,10 +141,10 @@ export function SaveAndRunMenu({
                 fontSize="xs"
                 fontWeight="bold"
                 textTransform="uppercase"
-                color="gray.500"
+                color="fg.muted"
                 paddingX={3}
                 paddingY={2}
-                bg="gray.50"
+                bg="bg.subtle"
                 position="sticky"
                 top={0}
                 zIndex={5}
@@ -152,7 +152,7 @@ export function SaveAndRunMenu({
                 Run against HTTP Agent
               </Text>
               {filteredAgents.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
+                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
                   {searchValue ? "No agents found" : "No agents available"}
                 </Text>
               ) : (
@@ -188,7 +188,7 @@ export function SaveAndRunMenu({
                 cursor="pointer"
                 _hover={{ bg: "gray.100" }}
                 borderTopWidth="1px"
-                borderColor="gray.100"
+                borderColor="border.muted"
                 color="blue.500"
                 onClick={handleCreateAgent}
               >
@@ -198,15 +198,15 @@ export function SaveAndRunMenu({
             </Box>
 
             {/* Prompts Section */}
-            <Box borderTopWidth="1px" borderColor="gray.200">
+            <Box borderTopWidth="1px" borderColor="border">
               <Text
                 fontSize="xs"
                 fontWeight="bold"
                 textTransform="uppercase"
-                color="gray.500"
+                color="fg.muted"
                 paddingX={3}
                 paddingY={2}
-                bg="gray.50"
+                bg="bg.subtle"
                 position="sticky"
                 top={0}
                 zIndex={5}
@@ -214,7 +214,7 @@ export function SaveAndRunMenu({
                 Run against Prompt
               </Text>
               {filteredPrompts.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
+                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
                   {searchValue ? "No prompts found" : "No prompts available"}
                 </Text>
               ) : (
@@ -250,7 +250,7 @@ export function SaveAndRunMenu({
                 cursor="pointer"
                 _hover={{ bg: "gray.100" }}
                 borderTopWidth="1px"
-                borderColor="gray.100"
+                borderColor="border.muted"
                 color="blue.500"
                 onClick={handleCreatePrompt}
               >
@@ -261,7 +261,7 @@ export function SaveAndRunMenu({
           </Box>
 
           {/* Save without running option */}
-          <Box borderTopWidth="1px" borderColor="gray.200">
+          <Box borderTopWidth="1px" borderColor="border">
             <HStack
               paddingX={3}
               paddingY={3}

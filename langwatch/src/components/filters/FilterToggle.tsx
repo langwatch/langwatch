@@ -128,7 +128,7 @@ export function FilterToggleButton({
       <Button
         size="sm"
         variant="outline"
-        backgroundColor={toggled ? "gray.200" : undefined}
+        backgroundColor={toggled ? "bg.muted" : undefined}
         onClick={onClick}
         minWidth="fit-content"
         paddingRight={hasAnyFilters ? 1 : undefined}
@@ -163,7 +163,7 @@ export function FilterToggleButton({
             variant="plain"
             width="fit-content"
             minWidth={0}
-            backgroundColor={negateFiltersToggled ? "gray.200" : undefined}
+            backgroundColor={negateFiltersToggled ? "bg.muted" : undefined}
             onClick={(e) => {
               e.stopPropagation();
               setNegateFilters(!negateFiltersToggled);

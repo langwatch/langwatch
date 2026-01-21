@@ -175,7 +175,7 @@ export function ParameterPopoverContent({
         </Text>
 
         {/* Description */}
-        <Text fontSize="xs" color="gray.500" lineHeight="tall">
+        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           {config.helper}
         </Text>
       </VStack>

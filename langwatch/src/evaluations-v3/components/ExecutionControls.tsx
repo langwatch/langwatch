@@ -75,21 +75,21 @@ export function ExecutionControls({
       {/* Progress indicator */}
       {isRunning && hasProgress && (
         <HStack gap={2} minWidth="120px">
-          <Spinner size="sm" color="blue.500" />
-          <Text fontSize="sm" color="gray.600" whiteSpace="nowrap">
+          <Spinner size="sm" color="blue.fg" />
+          <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
             {progress.completed}/{progress.total}
           </Text>
           {!compact && (
             <Box
               width="80px"
               height="4px"
-              bg="gray.200"
+              bg="gray.muted"
               borderRadius="full"
               overflow="hidden"
             >
               <Box
                 height="100%"
-                bg="blue.500"
+                bg="blue.solid"
                 width={`${progressPercent}%`}
                 transition="width 0.3s ease"
               />
@@ -100,21 +100,21 @@ export function ExecutionControls({
 
       {/* Completion indicator */}
       {!isRunning && status === "completed" && hasProgress && (
-        <Text fontSize="sm" color="green.600" fontWeight="medium">
+        <Text fontSize="sm" color="green.fg" fontWeight="medium">
           ✓ {progress.completed}/{progress.total} completed
         </Text>
       )}
 
       {/* Error indicator */}
       {!isRunning && status === "error" && (
-        <Text fontSize="sm" color="red.600" fontWeight="medium">
+        <Text fontSize="sm" color="red.fg" fontWeight="medium">
           ⚠ Execution failed
         </Text>
       )}
 
       {/* Stopped indicator */}
       {!isRunning && status === "stopped" && hasProgress && (
-        <Text fontSize="sm" color="orange.600" fontWeight="medium">
+        <Text fontSize="sm" color="orange.fg" fontWeight="medium">
           ⏹ Stopped at {progress.completed}/{progress.total}
         </Text>
       )}

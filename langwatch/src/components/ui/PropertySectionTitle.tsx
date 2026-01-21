@@ -18,7 +18,7 @@ export function PropertySectionTitle({
         fontSize="12px"
         fontWeight="bold"
         textTransform="uppercase"
-        color="gray.500"
+        color="fg.muted"
       >
         {children}
       </Text>

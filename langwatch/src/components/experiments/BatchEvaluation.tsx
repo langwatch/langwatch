@@ -196,7 +196,7 @@ export default function BatchEvaluation({
   );
 
   return (
-    <Box background="white" width="full" height="full" paddingTop={14}>
+    <Box background="bg.surface" width="full" height="full" paddingTop={14}>
       <Container maxW={"calc(100vw - 200px)"}>
         <HStack width="full" verticalAlign={"middle"} paddingBottom={6}>
           <VStack align="start">
@@ -233,7 +233,7 @@ export default function BatchEvaluation({
             <Card.Root key={evaluation}>
               <Card.Body>
                 <VStack align="start" justify="center" height="full" gap={2}>
-                  <Text color="gray.700" fontSize="15px" fontWeight="500">
+                  <Text color="fg" fontSize="15px" fontWeight="500">
                     {evaluation}
                   </Text>
                   <HStack
@@ -264,7 +264,7 @@ export default function BatchEvaluation({
                     fontSize="11px"
                     textTransform="uppercase"
                     fontWeight="600"
-                    color="gray.500"
+                    color="fg.muted"
                   >
                     {groupedByEvaluation?.[evaluation]?.skipped.length && (
                       <Text>
@@ -302,7 +302,7 @@ export default function BatchEvaluation({
         <Card.Root>
           <Card.Body>
             <VStack align="start" justify="center" height="full" gap={2}>
-              <Text color="gray.700" fontSize="15px" fontWeight="500">
+              <Text color="fg" fontSize="15px" fontWeight="500">
                 Evaluations Cost
               </Text>
               <Text fontSize="26px" fontWeight="300">
@@ -316,7 +316,7 @@ export default function BatchEvaluation({
         <Card.Root>
           <Card.Body>
             <VStack align="start" justify="center" height="full" gap={2}>
-              <Text color="gray.700" fontSize="15px" fontWeight="500">
+              <Text color="fg" fontSize="15px" fontWeight="500">
                 Runtime
               </Text>
               <Text fontSize="26px" fontWeight="300">
@@ -340,7 +340,7 @@ export default function BatchEvaluation({
               <Table.Root
                 variant="line"
                 borderWidth="1px"
-                borderColor="gray.200"
+                borderColor="border"
               >
                 <Table.Body>
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -382,7 +382,7 @@ export default function BatchEvaluation({
                       <Table.Root
                         variant="line"
                         borderWidth="1px"
-                        borderColor="gray.200"
+                        borderColor="border"
                       >
                         <Table.Header>
                           <Table.Row>

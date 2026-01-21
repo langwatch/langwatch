@@ -39,17 +39,17 @@ function Controls({ showScale = true }: ControlsProps) {
 
   return (
     <HStack gap={2}>
-      <Button bgColor="white" size="sm" variant="outline" onClick={zoomOut}>
+      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomOut}>
         Zoom Out <ZoomOut size={16} />
       </Button>
-      <Button bgColor="white" size="sm" variant="outline" onClick={zoomIn}>
+      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomIn}>
         Zoom In <ZoomIn size={16} />
       </Button>
       {showScale && (
         <Box
           px={2}
           py={1}
-          bg="gray.200"
+          bg="bg.muted"
           borderRadius="full"
           fontSize="xs"
           fontFamily="mono"

@@ -200,7 +200,7 @@ export default function OptimizationStudio() {
                   background="white"
                   padding={2}
                   borderBottom="1px solid"
-                  borderColor="gray.350"
+                  borderColor="border.emphasized"
                 >
                   <HStack width="full">
                     <Link href={`/${project?.slug}/workflows`}>
@@ -274,7 +274,7 @@ export default function OptimizationStudio() {
                             display={isResultsPanelCollapsed ? "block" : "none"}
                             background="white"
                             borderRadius={4}
-                            borderColor="gray.350"
+                            borderColor="border.emphasized"
                             variant="outline"
                             onClick={() => {
                               panelRef.current?.expand(70);

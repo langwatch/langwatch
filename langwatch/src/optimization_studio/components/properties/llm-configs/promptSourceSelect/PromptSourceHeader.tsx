@@ -111,7 +111,7 @@ export function PromptSourceHeader({
         <HStack
           justifyContent="space-between"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           borderRadius="md"
           padding={2}
           background="gray.50"

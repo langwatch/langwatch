@@ -65,7 +65,7 @@ export default function AnnotationsLayout({
           align="start"
           paddingY={5}
           borderRightWidth="1px"
-          borderColor="gray.300"
+          borderColor="border.emphasized"
           fontSize="14px"
           minWidth="240px"
           height="full"

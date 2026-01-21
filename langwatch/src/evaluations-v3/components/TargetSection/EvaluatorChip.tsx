@@ -70,7 +70,7 @@ export function EvaluatorChip({
 
     // Show spinner when running
     if (status === "running") {
-      return <Spinner size="xs" color="gray.500" />;
+      return <Spinner size="xs" color="fg.muted" />;
     }
 
     // Show error icon for error status
@@ -103,7 +103,7 @@ export function EvaluatorChip({
           size="xs"
           fontSize="11px"
           fontWeight="medium"
-          borderColor={hasMissingMappings ? "orange.400" : undefined}
+          borderColor={hasMissingMappings ? "orange.solid" : undefined}
           css={{
             "& .chevron-icon": {
               display: "none",
@@ -117,7 +117,7 @@ export function EvaluatorChip({
             {/* Status indicator - spinning for running, static for others */}
             {status === "running" ? (
               <Box flexShrink={0}>
-                <Spinner size="xs" color="gray.500" marginBottom="-2px" />
+                <Spinner size="xs" color="fg.muted" marginBottom="-2px" />
               </Box>
             ) : (
               <Circle size="10px" bg={statusColor} flexShrink={0} />
@@ -129,7 +129,7 @@ export function EvaluatorChip({
             {hasMissingMappings && (
               <Icon
                 as={LuCircleAlert}
-                color="yellow.500"
+                color="yellow.fg"
                 boxSize="14px"
                 css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
                 onClick={(e) => {
@@ -153,7 +153,7 @@ export function EvaluatorChip({
               <Text
                 fontSize="11px"
                 fontWeight="semibold"
-                color="gray.500"
+                color="fg.muted"
                 marginBottom={1}
               >
                 Result
@@ -161,7 +161,7 @@ export function EvaluatorChip({
               <VStack align="stretch" gap={1}>
                 {score !== undefined && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">
+                    <Text fontSize="12px" color="fg.muted">
                       Score:
                     </Text>
                     <Text fontSize="12px" fontWeight="semibold">
@@ -171,7 +171,7 @@ export function EvaluatorChip({
                 )}
                 {label && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">
+                    <Text fontSize="12px" color="fg.muted">
                       Label:
                     </Text>
                     <Text fontSize="12px" fontWeight="semibold">
@@ -180,7 +180,7 @@ export function EvaluatorChip({
                   </HStack>
                 )}
                 <HStack justify="space-between">
-                  <Text fontSize="12px" color="gray.600">
+                  <Text fontSize="12px" color="fg.muted">
                     Status:
                   </Text>
                   <Text
@@ -193,12 +193,12 @@ export function EvaluatorChip({
                 </HStack>
                 {details && (
                   <Box marginTop={1}>
-                    <Text fontSize="11px" color="gray.500" marginBottom={0.5}>
+                    <Text fontSize="11px" color="fg.muted" marginBottom={0.5}>
                       Details:
                     </Text>
                     <Text
                       fontSize="11px"
-                      color="gray.600"
+                      color="fg.muted"
                       whiteSpace="pre-wrap"
                       maxHeight="200px"
                       overflow="auto"
@@ -209,7 +209,7 @@ export function EvaluatorChip({
                 )}
               </VStack>
             </Box>
-            <Box borderTopWidth="1px" borderColor="gray.200" />
+            <Box borderTopWidth="1px" borderColor="border" />
           </>
         )}
         {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
@@ -227,9 +227,9 @@ export function EvaluatorChip({
             <Text>Edit Configuration</Text>
           </HStack>
         </Menu.Item>
-        <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
+        <Box borderTopWidth="1px" borderColor="border" my={1} />
         <Menu.Item value="remove" onClick={onRemove}>
-          <HStack gap={2} color="red.600">
+          <HStack gap={2} color="red.fg">
             <LuTrash2 size={14} />
             <Text>Remove from Workbench</Text>
           </HStack>

@@ -58,7 +58,7 @@ export const EvaluatorSelectionAccordion = ({
     <StepAccordion
       value="selection"
       width="full"
-      borderColor="green.400"
+      borderColor="green.fg"
       title="Evaluator Selection"
       showTrigger={!!workbenchState.evaluatorCategory}
     >

@@ -54,7 +54,7 @@ export function EditablePromptHandleField(
           {handle}
         </Text>
       ) : (
-        <Text color="gray.500">Draft</Text>
+        <Text color="fg.muted">Draft</Text>
       )}
       {handle && (
         <HStack
@@ -64,7 +64,7 @@ export function EditablePromptHandleField(
           opacity={0}
           transition="opacity 0.2s"
           gap={1}
-          background="gray.50"
+          background="bg.subtle"
           paddingX={1}
           borderRadius="lg"
         >

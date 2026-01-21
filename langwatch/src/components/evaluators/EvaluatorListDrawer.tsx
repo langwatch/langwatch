@@ -140,7 +140,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -157,14 +157,14 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
   return (
     <VStack paddingY={24} gap={4} textAlign="center">
-      <Box padding={4} borderRadius="full" bg="green.100" color="green.600">
+      <Box padding={4} borderRadius="full" bg="green.subtle" color="green.fg">
         <CheckCircle size={32} />
       </Box>
       <VStack gap={1}>
-        <Text fontWeight="medium" color="gray.700">
+        <Text fontWeight="medium" color="fg">
           No evaluators yet
         </Text>
-        <Text fontSize="sm" color="gray.500">
+        <Text fontSize="sm" color="fg.muted">
           Create your first evaluator to get started
         </Text>
       </VStack>
@@ -213,17 +213,17 @@ function EvaluatorCard({
       padding={4}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "green.400", bg: "green.50" }}
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
       transition="all 0.15s"
       data-testid={`evaluator-card-${evaluator.id}`}
       position="relative"
     >
       <HStack gap={3} align="start">
-        <Box color="green.500" paddingTop={1}>
+        <Box color="green.fg" paddingTop={1}>
           {evaluator.type === "workflow" ? (
             <Workflow size={16} />
           ) : (
@@ -234,7 +234,7 @@ function EvaluatorCard({
           <Text fontWeight="medium" fontSize="13px">
             {evaluator.name}
           </Text>
-          <Text fontSize="xs" color="gray.500" lineClamp={1}>
+          <Text fontSize="xs" color="fg.muted" lineClamp={1}>
             <span>{typeLabel}</span>
             {evaluatorType && (
               <>

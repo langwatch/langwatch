@@ -33,7 +33,7 @@ export function RoleCard({
       width="100%"
       height="100%"
       borderWidth="1px"
-      borderColor="gray.200"
+      borderColor="border"
       _hover={
         onViewPermissions ? { borderColor: "orange.400", shadow: "md" } : {}
       }
@@ -51,7 +51,7 @@ export function RoleCard({
               <Text fontWeight="semibold">{name}</Text>
             </HStack>
             {isDefault && (
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="fg.muted">
                 Built-in Role
               </Text>
             )}
@@ -106,7 +106,7 @@ export function RoleCard({
       </Card.Header>
       <Card.Body paddingTop={0} flex={1} display="flex" flexDirection="column">
         <VStack align="start" gap={2} flex={1} width="full">
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="fg.muted">
             {description}
           </Text>
           {isDefault ? (

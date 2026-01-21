@@ -79,7 +79,7 @@ export function PermissionViewer({
                   return (
                     <HStack key={permission} gap={2} align="center">
                       <Check size={14} color="var(--chakra-colors-green-500)" />
-                      <Text fontSize="sm" color="gray.700">
+                      <Text fontSize="sm" color="fg">
                         {actionText}
                       </Text>
                     </HStack>

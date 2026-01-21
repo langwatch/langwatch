@@ -50,7 +50,7 @@ function ChatContent() {
 
   return (
     <Box height="100vh">
-      <Box height="full" bg="gray.100" p={16} pt={4}>
+      <Box height="full" bg="bg.muted" p={16} pt={4}>
         <FullLogo />
         <ChakraCard.Root height="90%" bg="white" p={5} mt={4}>
           <ChatBox

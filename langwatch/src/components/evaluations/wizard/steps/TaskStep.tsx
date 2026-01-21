@@ -54,7 +54,7 @@ export function TaskStep() {
             onClick={() => handleTaskSelection("llm_app")}
             icon={
               <ColorfulBlockIcon
-                color="blue.400"
+                color="blue.solid"
                 size="md"
                 icon={<LuListChecks />}
                 marginTop="-2px"
@@ -69,7 +69,7 @@ export function TaskStep() {
             onClick={() => handleTaskSelection("real_time")}
             icon={
               <ColorfulBlockIcon
-                color="green.400"
+                color="green.solid"
                 size="md"
                 icon={<Activity />}
                 marginTop="-2px"
@@ -86,7 +86,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="purple.400"
+                color="purple.solid"
                 size="md"
                 icon={<Edit3 />}
                 marginTop="-2px"
@@ -103,7 +103,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="orange.400"
+                color="orange.solid"
                 size="md"
                 icon={<LuBadgeCheck />}
                 marginTop="-2px"
@@ -120,7 +120,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="teal.400"
+                color="teal.solid"
                 size="md"
                 icon={<LuShield />}
                 marginTop="-2px"

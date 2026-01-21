@@ -98,7 +98,7 @@ export const EvaluationsCount = (
       <Text
         borderRadius={"md"}
         paddingX={2}
-        backgroundColor={"red.500"}
+        backgroundColor={"red.solid"}
         color={"white"}
         fontSize={"sm"}
       >
@@ -117,7 +117,7 @@ export const EvaluationsCount = (
     <Text
       borderRadius={"md"}
       paddingX={2}
-      backgroundColor={totalProcessed > 0 ? "green.500" : "yellow.500"}
+      backgroundColor={totalProcessed > 0 ? "green.solid" : "yellow.solid"}
       color={"white"}
       fontSize={"sm"}
     >
@@ -139,7 +139,8 @@ export const Blocked = (trace: TraceEval) => {
     <Text
       borderRadius={"md"}
       paddingX={2}
-      backgroundColor={"blue.100"}
+      backgroundColor={"blue.subtle"}
+      color={"blue.fg"}
       fontSize={"sm"}
     >
       {totalBlocked} blocked

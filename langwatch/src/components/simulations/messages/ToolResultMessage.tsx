@@ -8,19 +8,19 @@ export const ToolResultMessage = ({ message }: { message: ResultMessage }) => {
       <Box
         w="full"
         maxW="80%"
-        bg="gray.50"
+        bg="bg.subtle"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         borderRadius="lg"
         p={3}
       >
-        <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={2}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
           Tool result
         </Text>
         <Box
-          bg="white"
+          bg="bg.panel"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           borderRadius="md"
           p={2}
         >

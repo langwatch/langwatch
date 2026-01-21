@@ -529,10 +529,10 @@ export function DatasetTable({
               <Edit2 />
             </Button>
           )}
-          <Text fontSize={"14px"} color="gray.400">
+          <Text fontSize={"14px"} color="fg.subtle">
             {databaseDataset.data?.count ?? parentRowData?.length} records
           </Text>
-          <Text fontSize={"14px"} color="gray.400">
+          <Text fontSize={"14px"} color="fg.subtle">
             {savingStatus === "saving"
               ? "Saving..."
               : savingStatus === "saved"

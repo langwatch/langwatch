@@ -116,9 +116,9 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
           fontSize="13px"
           fontWeight="normal"
           width="100%"
-          _hover={{ bg: "gray.100" }}
+          _hover={{ bg: "bg.subtle" }}
         >
-          <HStack gap={2} color="gray.500" fontWeight="600">
+          <HStack gap={2} color="fg.muted" fontWeight="600">
             <LuGauge />
             <Text>Concurrency</Text>
           </HStack>
@@ -152,7 +152,7 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
               flex={1}
             />
           </HStack>
-          <Text fontSize="11px" color="gray.500">
+          <Text fontSize="11px" color="fg.muted">
             Higher values run more cells in parallel but may cause rate limiting
           </Text>
         </VStack>
@@ -218,8 +218,8 @@ export function TableSettingsMenu({
               <IconButton
                 variant="ghost"
                 size="sm"
-                color="gray.500"
-                _hover={{ color: "gray.700", bg: "gray.100" }}
+                color="fg.muted"
+                _hover={{ color: "fg", bg: "bg.subtle" }}
                 disabled={disabled}
                 aria-label="Workbench settings"
               >
@@ -232,7 +232,7 @@ export function TableSettingsMenu({
           <VStack align="stretch" gap={3}>
             {/* Row Height Section */}
             <VStack align="stretch" gap={2}>
-              <Text fontSize="xs" fontWeight="medium" color="gray.500">
+              <Text fontSize="xs" fontWeight="medium" color="fg.muted">
                 Row height
               </Text>
               <HStack gap={2}>
@@ -262,8 +262,8 @@ export function TableSettingsMenu({
             </VStack>
 
             {/* Concurrency Section */}
-            <Box borderTopWidth="1px" borderColor="gray.200" />
-            <Text fontSize="xs" fontWeight="medium" color="gray.500">
+            <Box borderTopWidth="1px" borderColor="border" />
+            <Text fontSize="xs" fontWeight="medium" color="fg.muted">
               Concurrency
             </Text>
             <VStack align="stretch" gap={1}>
@@ -276,9 +276,9 @@ export function TableSettingsMenu({
             {/* CI/CD Section */}
             {showCICDOption && (
               <>
-                <Box borderTopWidth="1px" borderColor="gray.200" />
+                <Box borderTopWidth="1px" borderColor="border" />
                 <VStack align="stretch" gap={1}>
-                  <Text fontSize="xs" fontWeight="medium" color="gray.500">
+                  <Text fontSize="xs" fontWeight="medium" color="fg.muted">
                     Automation
                   </Text>
                   <Button
@@ -290,13 +290,13 @@ export function TableSettingsMenu({
                     fontSize="13px"
                     fontWeight="normal"
                     onClick={handleOpenCICDDialog}
-                    _hover={{ bg: "gray.100" }}
+                    _hover={{ bg: "bg.subtle" }}
                   >
                     <HStack gap={2}>
                       <Terminal size={16} />
                       <VStack align="flex-start" gap={0}>
                         <Text>Run in CI/CD</Text>
-                        <Text fontSize="11px" color="gray.500">
+                        <Text fontSize="11px" color="fg.muted">
                           Execute from your pipeline
                         </Text>
                       </VStack>
@@ -404,10 +404,10 @@ const CICDDialog = React.memo(function CICDDialog({
               }}
             />
             <VStack align="flex-start" gap={2}>
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 Set the <code>LANGWATCH_API_KEY</code> environment variable with
                 your API key.{" "}
-                <Link asChild color="blue.500">
+                <Link asChild color="blue.fg">
                   <NextLink href={`/${projectSlug}/setup`}>
                     Find your API key{" "}
                     <ExternalLink
@@ -417,13 +417,13 @@ const CICDDialog = React.memo(function CICDDialog({
                   </NextLink>
                 </Link>
               </Text>
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 Learn more about running evaluations from CI/CD in our{" "}
                 <Link
                   href="https://docs.langwatch.ai/llm-evaluation/offline/platform/ci-cd-execution"
                   target="_blank"
                   rel="noopener noreferrer"
-                  color="blue.500"
+                  color="blue.fg"
                 >
                   documentation{" "}
                   <ExternalLink

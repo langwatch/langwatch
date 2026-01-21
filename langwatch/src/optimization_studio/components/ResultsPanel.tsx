@@ -75,7 +75,7 @@ export function ResultsPanel({
       display={isCollapsed ? "none" : undefined}
       background="white"
       borderTop="2px solid"
-      borderColor="gray.200"
+      borderColor="border"
       width="full"
       fontSize="14px"
       height="full"
@@ -600,7 +600,7 @@ export function LoadedOptimizationResults({
                   width="full"
                   height="full"
                   borderTop="1px solid"
-                  borderColor="gray.200"
+                  borderColor="border"
                 >
                   {stepToDisplay &&
                     (!highlightedRun ||
@@ -649,7 +649,7 @@ export function LoadedOptimizationResults({
               width="full"
               padding={3}
               borderTop="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
             >
               <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
                 Running
@@ -685,7 +685,7 @@ export function LoadedOptimizationResults({
           <VStack
             width="full"
             borderTop="1px solid"
-            borderColor="gray.200"
+            borderColor="border"
             height="100%"
             position="relative"
             minHeight="0"

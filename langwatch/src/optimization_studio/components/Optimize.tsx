@@ -358,7 +358,7 @@ export function OptimizeModalContent({
             />
           </VStack>
           <VStack align="start" width="full" gap={2}>
-            <SmallLabel color="gray.600">Optimizer</SmallLabel>
+            <SmallLabel>Optimizer</SmallLabel>
             <Controller
               control={form.control}
               name="optimizer"
@@ -371,7 +371,7 @@ export function OptimizeModalContent({
           {"llm" in optimizer.params && (
             <VStack align="start" width="full" gap={2}>
               <HStack>
-                <SmallLabel color="gray.600">Teacher LLM</SmallLabel>
+                <SmallLabel>Teacher LLM</SmallLabel>
                 <Tooltip content="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
                   <Info size={16} />
                 </Tooltip>
@@ -397,7 +397,7 @@ export function OptimizeModalContent({
             <GridItem>
               <VStack align="start" gap={2}>
                 <HStack>
-                  <SmallLabel color="gray.600">
+                  <SmallLabel>
                     Number of Candidate Prompts
                   </SmallLabel>
                   <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
@@ -417,7 +417,7 @@ export function OptimizeModalContent({
             <GridItem>
               <VStack align="start" width="full" gap={2}>
                 <HStack>
-                  <SmallLabel color="gray.600">
+                  <SmallLabel>
                     Max Bootstrapped Demos
                   </SmallLabel>
                   <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
@@ -437,7 +437,7 @@ export function OptimizeModalContent({
             <GridItem>
               <VStack align="start" width="full" gap={2}>
                 <HStack>
-                  <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
+                  <SmallLabel>Max Labeled Demos</SmallLabel>
                   <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
                     <Info size={16} />
                   </Tooltip>
@@ -454,7 +454,7 @@ export function OptimizeModalContent({
         </Grid>
         {/* {"max_rounds" in optimizer.params && (
           <VStack align="start" width="full" gap={2}>
-            <SmallLabel color="gray.600">Max Rounds</SmallLabel>
+            <SmallLabel>Max Rounds</SmallLabel>
             <Input
               {...form.register("params.max_rounds")}
               type="number"
@@ -480,7 +480,7 @@ export function OptimizeModalContent({
           </Alert.Root>
         ) : null}
       </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
         <VStack align="start" width="full" gap={3}>
           <HStack width="full">
             <VStack align="start" gap={0}>
@@ -548,7 +548,7 @@ const OptimizerSelect = ({
           <Select.Item item={option} key={option.value}>
             <VStack align="start" width="full">
               <Text>{option.label}</Text>
-              <Text fontSize="13px" color="gray.500">
+              <Text fontSize="13px" color="fg.muted">
                 {option.description}
               </Text>
             </VStack>

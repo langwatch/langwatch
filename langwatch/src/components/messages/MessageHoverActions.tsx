@@ -59,8 +59,8 @@ const ActionButton = ({
         paddingX={2}
         borderRadius={"50%"}
         border="1px solid"
-        borderColor="gray.200"
-        backgroundColor="white"
+        borderColor="border"
+        backgroundColor="bg.panel"
         onClick={(e) => {
           e.stopPropagation();
           onClick(e);

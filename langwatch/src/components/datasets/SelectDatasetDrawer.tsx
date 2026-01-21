@@ -97,7 +97,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
           padding={0}
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an existing dataset to use for this evaluation.
             </Text>
 
@@ -108,7 +108,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
                 left={9}
                 top="50%"
                 transform="translateY(-50%)"
-                color="gray.400"
+                color="fg.subtle"
                 zIndex={1}
               >
                 <Search size={16} />
@@ -135,7 +135,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
                   <Spinner size="md" />
                 </HStack>
               ) : filteredDatasets.length === 0 ? (
-                <Box paddingY={8} textAlign="center" color="gray.500">
+                <Box paddingY={8} textAlign="center" color="fg.muted">
                   {searchQuery
                     ? "No datasets match your search"
                     : "No datasets found in this project"}
@@ -155,7 +155,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -191,23 +191,23 @@ function DatasetCard({
       padding={4}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
+      _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
       transition="all 0.15s"
       data-testid={`dataset-card-${name}`}
     >
       <HStack gap={3}>
-        <Box color="blue.500">
+        <Box color="blue.fg">
           <Database size={20} />
         </Box>
         <VStack align="start" gap={0} flex={1}>
           <Text fontWeight="medium" fontSize="sm">
             {name}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
+          <HStack gap={2} fontSize="xs" color="fg.muted">
             <Text>{entryCount} entries</Text>
             <Text>•</Text>
             <Text>{columnCount} columns</Text>

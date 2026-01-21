@@ -96,7 +96,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
           padding={0}
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Choose what you want to evaluate - a prompt from your library or a
               custom agent.
             </Text>
@@ -113,7 +113,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -143,7 +143,7 @@ function TargetTypeCard({
   onClick,
 }: TargetTypeCardProps) {
   const iconColor = type === "prompt" ? "green" : "blue";
-  const iconBg = type === "prompt" ? "green.50" : "blue.50";
+  const iconBg = type === "prompt" ? "green.subtle" : "blue.subtle";
 
   return (
     <Box
@@ -152,11 +152,11 @@ function TargetTypeCard({
       padding={5}
       borderRadius="lg"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: `${iconColor}.400`, bg: `${iconColor}.50` }}
+      _hover={{ borderColor: `${iconColor}.muted`, bg: `${iconColor}.subtle` }}
       transition="all 0.15s"
       data-testid={`target-type-${type}`}
     >
@@ -165,13 +165,13 @@ function TargetTypeCard({
           padding={1}
           borderRadius="md"
           bg={iconBg}
-          color={`${iconColor}.600`}
+          color={`${iconColor}.fg`}
         >
           <Icon size={16} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
           <Text fontWeight="medium">{title}</Text>
-          <Text fontSize="13px" color="gray.600">
+          <Text fontSize="13px" color="fg.muted">
             {description}
           </Text>
         </VStack>

@@ -429,7 +429,7 @@ function CSVReaderBox({
       {...getRootProps()}
       borderRadius={"lg"}
       borderWidth={2}
-      borderColor={zoneHover ? "gray.400" : "gray.200"}
+      borderColor={zoneHover ? "border.emphasized" : "border"}
       borderStyle="dashed"
       padding={10}
       textAlign="center"
@@ -439,7 +439,7 @@ function CSVReaderBox({
       {acceptedFile ? (
         <>
           <Box
-            bg="gray.100"
+            bg="bg.muted"
             padding={4}
             borderRadius={"lg"}
             position="relative"

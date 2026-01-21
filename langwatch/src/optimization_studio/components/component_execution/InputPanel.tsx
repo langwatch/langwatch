@@ -104,7 +104,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
       height="full"
       padding={6}
       border="1px solid"
-      borderColor="gray.350"
+      borderColor="border.emphasized"
       borderRadius="8px 0 0 8px"
       borderRightWidth={0}
       boxShadow="0 0 10px rgba(0,0,0,0.05)"

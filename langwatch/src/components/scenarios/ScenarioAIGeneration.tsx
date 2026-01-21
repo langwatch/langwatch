@@ -225,7 +225,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               </Text>
             </HStack>
 
-            <Text fontSize="xs" color="gray.600">
+            <Text fontSize="xs" color="fg.muted">
               Let AI help you create a scenario. Describe your agent and the
               situation you want to test.
             </Text>
@@ -268,7 +268,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             </Button>
           </HStack>
 
-          <Text fontSize="xs" color="gray.600">
+          <Text fontSize="xs" color="fg.muted">
             Describe what your agent does and the scenario you want to test.
           </Text>
 
@@ -295,7 +295,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
           {/* Prompt History - no truncation */}
           {hasHistory && (
-            <VStack align="stretch" gap={1} fontSize="xs" color="gray.500">
+            <VStack align="stretch" gap={1} fontSize="xs" color="fg.muted">
               {history.map((prompt, index) => (
                 <HStack key={index} align="start">
                   <Text flexShrink={0}>{">"}</Text>

@@ -211,7 +211,7 @@ export function DatasetSelectionItem({
       width="300px"
       border="1px solid"
       borderRadius="8px"
-      borderColor="gray.350"
+      borderColor="border.emphasized"
       background="#F5F7F7"
       className="ag-borderless"
       position="relative"
@@ -227,7 +227,7 @@ export function DatasetSelectionItem({
                 minHeight="0"
                 height="auto"
                 minWidth="0"
-                color="gray.400"
+                color="fg.subtle"
                 colorPalette="gray"
                 rounded="md"
                 onClick={(event) => {

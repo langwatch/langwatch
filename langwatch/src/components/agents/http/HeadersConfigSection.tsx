@@ -55,7 +55,7 @@ export function HeadersConfigSection({
           fontSize="xs"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.500"
+          color="fg.muted"
         >
           Custom Headers
         </Text>
@@ -75,7 +75,7 @@ export function HeadersConfigSection({
 
       {/* Headers List */}
       {value.length === 0 ? (
-        <Text fontSize="13px" color="gray.400" textAlign="center" paddingY={4}>
+        <Text fontSize="13px" color="fg.subtle" textAlign="center" paddingY={4}>
           No custom headers defined
         </Text>
       ) : (
@@ -114,7 +114,7 @@ export function HeadersConfigSection({
                     variant="ghost"
                     colorPalette="gray"
                     onClick={() => handleRemoveHeader(index)}
-                    color="gray.400"
+                    color="fg.subtle"
                     data-testid={`remove-header-${index}`}
                   >
                     <X size={14} />

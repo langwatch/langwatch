@@ -87,7 +87,7 @@ export function AnalyticsHeader({
               className="edit-icon"
               opacity={0}
               transition="opacity 0.2s"
-              color="gray.400"
+              color="fg.subtle"
               paddingTop={1}
             >
               <Edit2 size={16} />

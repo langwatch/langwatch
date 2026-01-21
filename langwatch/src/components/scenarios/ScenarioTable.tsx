@@ -62,7 +62,7 @@ export function ScenarioTable({
               <Text
                 key={label}
                 fontSize="xs"
-                bg="gray.100"
+                bg="bg.muted"
                 px={2}
                 py={0.5}
                 borderRadius="md"
@@ -76,7 +76,7 @@ export function ScenarioTable({
       columnHelper.accessor("updatedAt", {
         header: "Updated",
         cell: (info) => (
-          <Text color="gray.500">
+          <Text color="fg.muted">
             {formatTimeAgo(info.getValue().getTime())}
           </Text>
         ),

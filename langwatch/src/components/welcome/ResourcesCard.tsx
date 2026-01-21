@@ -102,7 +102,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({
           {resource.buttonText}
         </Text>
         <Text
-          color="gray.500"
+          color="fg.muted"
           fontSize="xs"
           mt={0.25}
           textAlign="left"
@@ -114,7 +114,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({
           {resource.description}
         </Text>
       </Box>
-      <Box as="span" color="gray.400" ml={2} display="flex" alignItems="center">
+      <Box as="span" color="fg.subtle" ml={2} display="flex" alignItems="center">
         <LuExternalLink size={18} />
       </Box>
     </a>
@@ -130,7 +130,7 @@ const ResourcesCard: React.FC = () => {
           <Heading size="md" textAlign="left">
             Resources
           </Heading>
-          <Text fontSize="xs" color="gray.500" textAlign="left">
+          <Text fontSize="xs" color="fg.muted" textAlign="left">
             Explore examples and learn from our demo implementations
           </Text>
         </VStack>

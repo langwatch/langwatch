@@ -350,7 +350,7 @@ function PublishMenu({
           <Menu.Item
             {...props}
             disabled={false}
-            color="gray.400"
+            color="fg.subtle"
             onClick={() => {
               trackEvent("subscription_hook_click", {
                 projectId: project?.id,
@@ -381,7 +381,7 @@ function PublishMenu({
       {publishedWorkflow.data?.version && (
         <>
           <HStack px={3}>
-            <SmallLabel color="gray.600">Published Version</SmallLabel>
+            <SmallLabel>Published Version</SmallLabel>
             <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
           </HStack>
           <Separator />
@@ -666,7 +666,7 @@ function PublishModalContent({
           )}
         </VStack>
       </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
         <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey

@@ -124,7 +124,7 @@ export function Conversation({
               <Box width="full" maxWidth="1000px" paddingY={8}>
                 <Text
                   fontStyle="italic"
-                  color="gray.500"
+                  color="fg.muted"
                   textAlign="center"
                   width="full"
                 >
@@ -150,12 +150,12 @@ export function Conversation({
                 <Box
                   position="relative"
                   border="1px solid"
-                  borderColor="gray.200"
+                  borderColor="border"
                   marginRight={5}
                   paddingLeft={10}
                   paddingRight={10}
                   paddingY={4}
-                  background="white"
+                  background="bg.panel"
                   borderRadius="lg"
                   minHeight="524px"
                 >

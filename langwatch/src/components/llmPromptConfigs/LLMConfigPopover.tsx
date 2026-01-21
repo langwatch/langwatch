@@ -165,7 +165,7 @@ export function LLMConfigPopover({
       <VStack paddingY={3} paddingX={4} width="full" align="start" gap={3}>
         {/* Model Selector */}
         <Box width="full">
-          <Text fontSize="sm" fontWeight="medium" color="gray.600" marginBottom={1}>
+          <Text fontSize="sm" fontWeight="medium" color="fg.muted" marginBottom={1}>
             Model
           </Text>
           <ModelSelector
@@ -213,7 +213,7 @@ export function LLMConfigPopover({
 
           {/* Show model info if no supported params */}
           {displayParameters.length === 0 && (
-            <Text fontSize="xs" color="gray.500">
+            <Text fontSize="xs" color="fg.muted">
               No configurable parameters for this model
             </Text>
           )}
@@ -236,10 +236,10 @@ export function LLMConfigPopover({
           <>
             <HStack width="full" justify="space-between" paddingTop={2}>
               <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
                   Structured Outputs
                 </Text>
-                <Text fontSize="xs" color="gray.500">
+                <Text fontSize="xs" color="fg.muted">
                   Define custom output fields and types
                 </Text>
               </VStack>

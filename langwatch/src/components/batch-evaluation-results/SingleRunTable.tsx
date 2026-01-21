@@ -75,7 +75,7 @@ const buildColumns = (
       cell: ({ row }) => (
         <Text
           fontSize="12px"
-          color="gray.500"
+          color="fg.muted"
           textAlign="right"
           paddingRight={1}
         >
@@ -160,7 +160,7 @@ const buildColumns = (
           const targetOutput = getValue();
           if (!targetOutput) {
             return (
-              <Text fontSize="13px" color="gray.400">
+              <Text fontSize="13px" color="fg.subtle">
                 -
               </Text>
             );
@@ -257,7 +257,7 @@ export function SingleRunTable({
   if (!data || data.rows.length === 0) {
     return (
       <Box padding={6} textAlign="center">
-        <Text color="gray.500">No results to display</Text>
+        <Text color="fg.muted">No results to display</Text>
       </Box>
     );
   }

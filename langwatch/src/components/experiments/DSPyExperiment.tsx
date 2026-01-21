@@ -344,10 +344,10 @@ export function DSPyExperimentRunList({
   return (
     <VStack
       align="start"
-      background="white"
+      background="bg.surface"
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
-      borderColor="gray.300"
+      borderColor="border.emphasized"
       fontSize="14px"
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
@@ -489,7 +489,7 @@ export function DSPyExperimentRunList({
                     </HStack>
 
                     <HStack
-                      color="gray.400"
+                      color="fg.subtle"
                       fontSize={size === "sm" ? "12px" : "13px"}
                     >
                       <Text>
@@ -635,7 +635,7 @@ export const RunDetails = React.memo(
                 marginBottom="-2px"
                 paddingX={4}
                 fontWeight={500}
-                color="gray.500"
+                color="fg.muted"
                 background="gray.100"
               >
                 <Text>Step {dspyStepSummary.index}</Text>
@@ -670,7 +670,7 @@ export const RunDetails = React.memo(
                 <Spacer />
                 <HStack
                   paddingX={4}
-                  color="gray.500"
+                  color="fg.muted"
                   fontSize="12px"
                   textTransform="uppercase"
                 >
@@ -1035,7 +1035,7 @@ export const RunDetails = React.memo(
                           ) : llmCall.response.cached ? (
                             <HStack align="start">
                               <Text>$0.00</Text>
-                              <Text color="gray.400">(cached)</Text>
+                              <Text color="fg.subtle">(cached)</Text>
                             </HStack>
                           ) : (
                             "-"
@@ -1427,9 +1427,9 @@ export function DSPyExperimentSummary({
       left={0}
       bottom={0}
       width="100%"
-      background="white"
+      background="bg.surface"
       borderTop="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       paddingY={4}
       paddingX={6}
       gap={5}

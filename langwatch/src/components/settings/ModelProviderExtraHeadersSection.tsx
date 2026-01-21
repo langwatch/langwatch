@@ -46,7 +46,7 @@ export const ExtraHeadersSection = ({
           rowGap={2}
           width="full"
         >
-          <GridItem color="gray.500" colSpan={4}>
+          <GridItem color="fg.muted" colSpan={4}>
             <SmallLabel>Extra Headers</SmallLabel>
           </GridItem>
           {state.extraHeaders.map((h: ExtraHeader, index: number) => (

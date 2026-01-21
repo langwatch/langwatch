@@ -135,14 +135,14 @@ const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           paddingX={3}
           borderRadius="md"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           cursor="pointer"
           _hover={{ bg: "gray.50" }}
           transition="background 0.15s"
           justify="space-between"
         >
           <LLMModelDisplay model={model ?? ""} />
-          <Box color="gray.500">
+          <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>
         </HStack>
@@ -219,7 +219,7 @@ const ArrayField = <T extends EvaluatorTypes>({
           borderLeft={
             arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined
           }
-          borderLeftColor={variant === "studio" ? "gray.200" : "orange.400"}
+          borderLeftColor={variant === "studio" ? "border" : "orange.400"}
           width="full"
         >
           <HStack
@@ -238,7 +238,7 @@ const ArrayField = <T extends EvaluatorTypes>({
               size="sm"
               variant="ghost"
               onClick={() => remove(index)}
-              color="gray.400"
+              color="fg.subtle"
             >
               {variant === "studio" ? <Trash2 size={14} /> : <X size={18} />}
             </Button>
@@ -545,7 +545,7 @@ const DynamicZodForm = ({
                     {camelCaseToTitleCase(key)}
                   </PropertySectionTitle>
                   {isOptional && (
-                    <Text color="gray.500" fontSize="12px">
+                    <Text color="fg.muted" fontSize="12px">
                       (optional)
                     </Text>
                   )}

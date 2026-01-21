@@ -48,7 +48,7 @@ export default function GraphsLayout({
               paddingX={4}
               paddingTop={4}
               paddingBottom={2}
-              color="gray.700"
+              color="fg"
               fontSize="12px"
             >
               Engagement
@@ -65,7 +65,7 @@ export default function GraphsLayout({
               paddingX={4}
               paddingTop={4}
               paddingBottom={2}
-              color="gray.700"
+              color="fg"
               fontSize="12px"
             >
               Observability
@@ -82,7 +82,7 @@ export default function GraphsLayout({
               paddingX={4}
               paddingTop={4}
               paddingBottom={2}
-              color="gray.700"
+              color="fg"
               fontSize="12px"
             >
               Custom

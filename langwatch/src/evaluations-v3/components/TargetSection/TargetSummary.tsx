@@ -120,7 +120,7 @@ export const TargetSummary = memo(function TargetSummary({
             >
               <Text color="white/75">Avg Latency</Text>
               <HStack gap={1}>
-                <Icon as={LuClock} color="gray.300" boxSize={3} />
+                <Icon as={LuClock} color="white/60" boxSize={3} />
                 <Text fontWeight="medium">
                   {formatLatency(aggregates.averageLatency)}
                 </Text>
@@ -172,7 +172,7 @@ export const TargetSummary = memo(function TargetSummary({
       {/* Per-evaluator breakdown */}
       {aggregates.evaluators.length > 0 && (
         <>
-          <Box borderTopWidth="1px" borderColor="gray.500" />
+          <Box borderTopWidth="1px" borderColor="border.emphasized" />
           <VStack align="stretch" gap={2} padding={2}>
             <Text color="white/85" fontWeight="semibold">
               Evaluators
@@ -198,7 +198,7 @@ export const TargetSummary = memo(function TargetSummary({
                     </HStack>
                   )}
                   {evaluator.averageScore !== null && (
-                    <Text fontSize="11px" color="gray.200">
+                    <Text fontSize="11px" color="white/75">
                       {formatScore(evaluator.averageScore)}
                     </Text>
                   )}
@@ -237,14 +237,14 @@ export const TargetSummary = memo(function TargetSummary({
       <HStack
         gap={2}
         fontSize="12px"
-        color="gray.500"
+        color="fg.muted"
         paddingX={2}
         paddingY={1}
         borderRadius="lg"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         cursor="default"
-        _hover={{ borderColor: "gray.300", bg: "gray.50" }}
+        _hover={{ borderColor: "border.emphasized", bg: "bg.muted" }}
         data-testid="target-summary"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -252,8 +252,8 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Running progress */}
         {isRunning && aggregates.completedRows < aggregates.totalRows && (
           <HStack gap={1}>
-            <Icon as={LuZap} boxSize={3} color="blue.500" />
-            <Text color="blue.600" fontWeight="medium">
+            <Icon as={LuZap} boxSize={3} color="blue.fg" />
+            <Text color="blue.fg" fontWeight="medium">
               {aggregates.completedRows}/{aggregates.totalRows}
             </Text>
           </HStack>
@@ -281,7 +281,7 @@ export const TargetSummary = memo(function TargetSummary({
         {aggregates.overallAverageScore !== null && (
           <HStack gap={1}>
             <LuTriangleRight />
-            <Text color="gray.600">
+            <Text color="fg.muted">
               {formatScore(aggregates.overallAverageScore)}
             </Text>
           </HStack>
@@ -303,13 +303,13 @@ export const TargetSummary = memo(function TargetSummary({
           aggregates.overallAverageScore === null &&
           !isRunning && (
             <HStack gap={1}>
-              <Text color="gray.500">{formatCost(aggregates.totalCost)}</Text>
+              <Text color="fg.muted">{formatCost(aggregates.totalCost)}</Text>
             </HStack>
           )}
 
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
-          <Text color="red.500" fontWeight="medium">
+          <Text color="red.fg" fontWeight="medium">
             {aggregates.errorRows}{" "}
             {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>

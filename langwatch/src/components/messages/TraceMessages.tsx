@@ -102,7 +102,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           maxWidth="1000px"
           width="100%"
           position="relative"
-          background={highlighted ? "blue.50" : hover ? "gray.50" : "white"}
+          background={highlighted ? "blue.subtle" : hover ? "bg.muted" : "bg.panel"}
           paddingLeft={10}
           paddingRight={10}
           paddingY={4}
@@ -127,7 +127,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ? "1px solid"
               : "none"
           }
-          borderColor={highlighted ? "blue.200" : "gray.300"}
+          borderColor={highlighted ? "blue.200" : "border"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}
           onMouseLeave={() => setShowTools(false)}
@@ -143,7 +143,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               <MessageHoverActions trace={trace} {...translationState} />
             )}
             {trace.metadata.thread_id && (
-              <Text color="gray.400" fontSize="xs">
+              <Text color="fg.subtle" fontSize="xs">
                 Thread ID: {trace.metadata.thread_id}
               </Text>
             )}
@@ -253,7 +253,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   </Alert.Content>
                 </Alert.Root>
               )}
-              <HStack fontSize="13px" color="gray.400">
+              <HStack fontSize="13px" color="fg.subtle">
                 <EventsCounter trace={trace} addDot={false} />
               </HStack>
             </Message>
@@ -320,7 +320,7 @@ export function Message({
           <Spacer />
           {timestampDate && timeAgo && (
             <Tooltip content={timestampDate?.toLocaleString()}>
-              <Text color="gray.400">{timeAgo}</Text>
+              <Text color="fg.subtle">{timeAgo}</Text>
             </Tooltip>
           )}
         </HStack>

@@ -358,7 +358,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
           <Heading>Configure Alert</Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <Text color="gray.600" fontSize="sm" marginBottom={6}>
+          <Text color="fg.muted" fontSize="sm" marginBottom={6}>
             Set up an alert to be notified when a metric crosses a threshold.
           </Text>
 
@@ -389,7 +389,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 <Text
                   padding={2}
                   borderWidth={1}
-                  borderColor="gray.200"
+                  borderColor="border"
                   borderRadius="md"
                   backgroundColor="gray.50"
                 >

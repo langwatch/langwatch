@@ -23,11 +23,12 @@ export const evaluationStatusColor = (
   check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">,
 ) => {
   const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
-    scheduled: "yellow.600",
-    in_progress: "yellow.600",
-    error: "red.600",
-    skipped: "yellow.600",
-    processed: evaluationPassed(check) === false ? "red.600" : "green.600",
+    scheduled: "status.pending",
+    in_progress: "status.pending",
+    error: "status.error",
+    skipped: "status.warning",
+    processed:
+      evaluationPassed(check) === false ? "status.error" : "status.success",
   };
 
   return colorMap[check.status];

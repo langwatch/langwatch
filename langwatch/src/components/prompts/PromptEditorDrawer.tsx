@@ -939,7 +939,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                     className="edit-icon"
                     display="none"
                     transition="opacity 0.2s"
-                    color="gray.500"
+                    color="fg.muted"
                   >
                     <LuPencil size={16} />
                   </Box>
@@ -989,13 +989,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 {/* Header bar - shared with prompt playground */}
                 <Box
                   borderBottomWidth="1px"
-                  borderColor="gray.200"
+                  borderColor="border"
                   paddingX={4}
                   paddingY={3}
                   position="sticky"
                   top={0}
                   zIndex={1}
-                  background="white"
+                  background="bg.panel"
                 >
                   <PromptEditorHeader
                     onSave={() => void handleSave()}
@@ -1069,7 +1069,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         {targetId && (
           <Drawer.Footer
             borderTopWidth="1px"
-            borderColor="gray.200"
+            borderColor="border"
             paddingX={4}
             paddingY={3}
           >

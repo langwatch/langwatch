@@ -60,7 +60,7 @@ export function ConfigModal({
             paddingY={2}
             paddingRight={1}
             borderBottomWidth="1px"
-            borderColor="gray.200"
+            borderColor="border"
           >
             <Text fontSize="14px" fontWeight={500}>
               {title}

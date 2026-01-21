@@ -18,7 +18,7 @@ export function DatasetRadioCard({
       width="full"
       minWidth={0}
       onClick={() => handleDatasetSelect?.(dataset.id)}
-      _active={{ background: "blue.50" }}
+      _active={{ background: "blue.subtle" }}
     >
       <RadioCard.ItemHiddenInput />
       <RadioCard.ItemControl cursor="pointer" width="full">
@@ -26,7 +26,7 @@ export function DatasetRadioCard({
           <VStack
             align="start"
             gap={3}
-            _icon={{ color: "blue.300" }}
+            _icon={{ color: "blue.fg" }}
             width="full"
           >
             <Folder size={18} />
@@ -34,7 +34,7 @@ export function DatasetRadioCard({
               <OverflownTextWithTooltip wordBreak="break-all">
                 {dataset.name}
               </OverflownTextWithTooltip>
-              <Text fontSize="xs" color="gray.500" fontWeight="normal">
+              <Text fontSize="xs" color="fg.muted" fontWeight="normal">
                 {dataset._count.datasetRecords} entries
               </Text>
             </VStack>

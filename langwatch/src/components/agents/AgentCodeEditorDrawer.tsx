@@ -377,7 +377,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 <Box>
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
-                    <Text fontSize="sm" color="gray.500" marginBottom={2}>
+                    <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                       Write a DSPy module that takes inputs and returns outputs.
                     </Text>
                     <CodeBlockEditor
@@ -419,7 +419,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
               </VStack>
             )}
           </Drawer.Body>
-          <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
             <HStack gap={3}>
               <Button variant="outline" onClick={handleClose}>
                 Cancel

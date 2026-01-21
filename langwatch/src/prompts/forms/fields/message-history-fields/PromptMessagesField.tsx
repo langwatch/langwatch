@@ -437,7 +437,7 @@ export function PromptMessagesField({
                 marginTop={2}
                 paddingBottom={borderless ? 3 : 0}
                 borderBottomWidth={borderless ? "1px" : 0}
-                borderColor="gray.200"
+                borderColor="border"
               >
                 <HStack
                   width="full"
@@ -479,7 +479,7 @@ export function PromptMessagesField({
                   key={`message-box-${idx}`}
                   paddingBottom={borderless && !isLast ? 3 : 0}
                   borderBottomWidth={borderless && !isLast ? "1px" : 0}
-                  borderColor="gray.200"
+                  borderColor="border"
                   flex={borderless && isLast ? 1 : undefined}
                   paddingX={borderless ? 1 : 0}
                   height={borderless && isLast ? "100%" : undefined}

@@ -166,7 +166,7 @@ function FieldsFilter({
         <Popover.Trigger asChild>
           <Button variant="subtle" size="sm" width="100%" fontWeight="normal">
             <HStack width="full" gap={1}>
-              <Text color="gray.500" fontWeight="500" paddingRight={4}>
+              <Text color="fg.muted" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
               {currentStringList.length > 0 ? (
@@ -202,7 +202,7 @@ function FieldsFilter({
                 </>
               ) : (
                 <>
-                  <Text color="gray.400">Any</Text>
+                  <Text color="fg.subtle">Any</Text>
                   <Spacer />
                 </>
               )}
@@ -509,7 +509,7 @@ function ListSelection({
                     {details && (
                       <OverflownTextWithTooltip
                         fontSize="sm"
-                        color="gray.500"
+                        color="fg.muted"
                         lineClamp={1}
                         wordBreak="break-all"
                       >
@@ -526,7 +526,7 @@ function ListSelection({
                 </Checkbox>
                 <Spacer />
                 {typeof count !== "undefined" && (
-                  <Text fontSize="13px" color="gray.400">
+                  <Text fontSize="13px" color="fg.subtle">
                     {count}
                   </Text>
                 )}

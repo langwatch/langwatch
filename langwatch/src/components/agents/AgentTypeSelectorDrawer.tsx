@@ -112,7 +112,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
           padding={0}
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select the type of agent you want to create.
             </Text>
 
@@ -128,7 +128,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -164,24 +164,24 @@ function AgentTypeCard({
       padding={5}
       borderRadius="lg"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
+      _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
       transition="all 0.15s"
       data-testid={`agent-type-${type}`}
       cursor="pointer"
     >
       <HStack gap={4} align="start">
-        <Box padding={3} borderRadius="md" bg="blue.50" color="blue.600">
+        <Box padding={3} borderRadius="md" bg="blue.subtle" color="blue.fg">
           <Icon size={24} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
           <Text fontWeight="semibold" fontSize="md">
             {title}
           </Text>
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="fg.muted">
             {description}
           </Text>
         </VStack>

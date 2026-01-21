@@ -85,7 +85,7 @@ export function PromptingTechniqueWrapper({
       padding="2px"
       backgroundColor="#F7FAFC"
       borderRadius="12px"
-      color="gray.600"
+      color="fg.muted"
       fontSize="10px"
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, 0.1)`}
       outline={!!node.selected || hovered ? "1.5px solid" : "none"}

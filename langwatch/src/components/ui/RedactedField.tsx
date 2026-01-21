@@ -25,7 +25,7 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
     return (
       <Tooltip content="This field is redacted based on your permissions and project settings.">
         <HStack
-          color="gray.500"
+          color="fg.muted"
           fontStyle="italic"
           fontSize="sm"
           gap={1}

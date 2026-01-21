@@ -203,9 +203,9 @@ function DragOverlayContent({
   return (
     <div
       style={{
-        background: "white",
+        background: "var(--chakra-colors-bg-panel)",
         padding: 8,
-        border: "1px solid #DDD",
+        border: "1px solid var(--chakra-colors-border)",
         borderRadius: 6,
         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
         pointerEvents: "none",

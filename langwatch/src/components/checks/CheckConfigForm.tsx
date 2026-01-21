@@ -225,7 +225,7 @@ export default function CheckConfigForm({
   );
 
   const runOn = (
-    <Text color="gray.500" fontStyle="italic">
+    <Text color="fg.muted" fontStyle="italic">
       This check will run on{" "}
       {sample >= 1
         ? "every message"
@@ -284,12 +284,12 @@ export default function CheckConfigForm({
                           }}
                           marginLeft={4}
                           fontWeight="normal"
-                          color="gray.600"
+                          color="fg.muted"
                         >
                           <Edit2 size={14} />
                         </Button>
                       </HStack>
-                      <Text fontSize="12px" color="gray.500">
+                      <Text fontSize="12px" color="fg.muted">
                         {availableEvaluators[checkType].description}
                       </Text>
                       {checkType.startsWith("legacy/") && (
@@ -433,7 +433,7 @@ export default function CheckConfigForm({
                               sample == 1 ? (
                                 runOn
                               ) : (
-                                <Text color="gray.500" fontStyle="italic">
+                                <Text color="fg.muted" fontStyle="italic">
                                   No preconditions defined
                                 </Text>
                               )

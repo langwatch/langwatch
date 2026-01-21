@@ -48,7 +48,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Define Success Clearly
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     What does &apos;good&apos; look like? Be specific about
                     expected outcomes.
                   </Text>
@@ -63,7 +63,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Consider Edge Cases
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     What unusual situations should your agent handle?
                   </Text>
                 </VStack>
@@ -77,7 +77,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Think About Personas
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     Who are your users? Different users have different needs.
                   </Text>
                 </VStack>
@@ -91,7 +91,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                   <Text fontSize="sm" fontWeight="medium">
                     Conversation Flow
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     How should the conversation progress?
                   </Text>
                 </VStack>
@@ -110,25 +110,25 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
             </Text>
 
             <List.Root gap={2} listStyleType="none">
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Start with small simulations to validate quickly
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Use specific prompts for better results
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Include edge cases in your testing
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>

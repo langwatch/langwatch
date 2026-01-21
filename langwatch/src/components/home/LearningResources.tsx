@@ -26,7 +26,7 @@ const resources: ResourceCard[] = [
     description: "Learn how to integrate and use LangWatch effectively",
     icon: <LuBookOpen size={18} />,
     color: "blue",
-    background: "blue.50",
+    background: "blue.subtle",
     href: "https://docs.langwatch.ai",
     cta: "View documentation",
   },
@@ -35,7 +35,7 @@ const resources: ResourceCard[] = [
     description: "Watch step-by-step guides and feature walkthroughs",
     icon: <LuCirclePlay size={22} />,
     color: "red",
-    background: "red.50",
+    background: "red.subtle",
     href: "https://www.youtube.com/@LangWatch/videos",
     cta: "Watch videos",
   },
@@ -79,7 +79,7 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
             <Text fontWeight="medium" fontSize="sm">
               {resource.title}
             </Text>
-            <Text fontSize="xs" color="gray.600">
+            <Text fontSize="xs" color="fg.muted">
               {resource.description}
             </Text>
             <HStack color={`${resource.color}.600`} fontSize="xs">
@@ -113,12 +113,12 @@ export function LearningResources() {
           <ResourceCardItem key={resource.title} resource={resource} />
         ))}
       </Grid>
-      <Text fontSize="13px" color="gray.500" paddingTop={2}>
+      <Text fontSize="13px" color="fg.muted" paddingTop={2}>
         Considering LangWatch for your team?{" "}
         <Link
           href="https://langwatch.ai/get-a-demo"
           isExternal
-          color="gray.600"
+          color="fg.muted"
           textDecoration="underline"
           _hover={{ color: "orange.500" }}
         >

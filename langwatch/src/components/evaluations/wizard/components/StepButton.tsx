@@ -26,7 +26,7 @@ export function StepButton({
             {icon}
             <VStack align="start" gap={1} width="full">
               <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
-              <Text fontSize="sm" color="gray.500" fontWeight="normal">
+              <Text fontSize="sm" color="fg.muted" fontWeight="normal">
                 {description}
               </Text>
             </VStack>
@@ -79,7 +79,7 @@ export function StepRadio({
                 {icon}
                 <VStack align="start" gap={1} width="full">
                   <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
-                  <Text fontSize="sm" color="gray.500" fontWeight="normal">
+                  <Text fontSize="sm" color="fg.muted" fontWeight="normal">
                     {description}
                   </Text>
                 </VStack>

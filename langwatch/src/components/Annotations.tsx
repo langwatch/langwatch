@@ -67,7 +67,7 @@ export const Annotations = ({
 
         return (
           <Card.Root
-            backgroundColor="gray.200"
+            backgroundColor="bg.muted"
             border="none"
             width={"full"}
             onClick={
@@ -93,7 +93,7 @@ export const Annotations = ({
             <Card.Body>
               <VStack align="start" gap={3}>
                 <HStack width="full" align={"top"}>
-                  <Avatar.Root size="sm" background="gray.400" color="white">
+                  <Avatar.Root size="sm" background="gray.solid" color="white">
                     <Avatar.Fallback
                       name={annotation.user?.name ?? undefined}
                     />
@@ -107,12 +107,12 @@ export const Annotations = ({
                             paddingY={0.5}
                             paddingX={2}
                             border="1px solid"
-                            borderColor="gray.500"
+                            borderColor="border.emphasized"
                             fontSize="xs"
                           >
                             API
                           </Box>
-                          <Text color="gray.500" fontSize="sm">
+                          <Text color="fg.muted" fontSize="sm">
                             -{" "}
                             {annotation.email ? annotation.email : "anonymous"}
                           </Text>

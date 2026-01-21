@@ -42,15 +42,15 @@ export function BodyTemplateEditor({
       />
       <Box
         padding={3}
-        bg="gray.50"
+        bg="bg.subtle"
         borderRadius="md"
         borderWidth="1px"
-        borderColor="gray.200"
+        borderColor="border"
       >
         <Text
           fontSize="xs"
           fontWeight="medium"
-          color="gray.600"
+          color="fg.muted"
           marginBottom={2}
         >
           Available Variables

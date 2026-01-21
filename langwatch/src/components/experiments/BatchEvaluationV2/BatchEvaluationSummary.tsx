@@ -68,7 +68,7 @@ export function BatchEvaluationV2EvaluationSummary({
       left={0}
       bottom={0}
       borderTop="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       overflowX="auto"
       overflowY="hidden"
       flexShrink={0}
@@ -243,7 +243,7 @@ export function BatchEvaluationV2EvaluationSummary({
           width="full"
           padding={3}
           borderTop="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           gap={2}
         >
           <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>

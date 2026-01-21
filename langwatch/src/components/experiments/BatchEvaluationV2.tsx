@@ -274,10 +274,10 @@ export function BatchEvaluationV2RunList({
   return (
     <VStack
       align="start"
-      background="white"
+      background="bg.surface"
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
-      borderColor="gray.300"
+      borderColor="border.emphasized"
       fontSize="14px"
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
@@ -397,7 +397,7 @@ export function BatchEvaluationV2RunList({
                     )}
                   </OverflownTextWithTooltip>
                   <HStack
-                    color="gray.400"
+                    color="fg.subtle"
                     fontSize={size === "sm" ? "12px" : "13px"}
                     gap={1}
                   >
@@ -432,7 +432,7 @@ export function BatchEvaluationV2RunList({
                     )}
                   </HStack>
                   <HStack
-                    color="gray.400"
+                    color="fg.subtle"
                     fontSize={size === "sm" ? "12px" : "13px"}
                   >
                     <Text whiteSpace="nowrap" lineClamp={1}>

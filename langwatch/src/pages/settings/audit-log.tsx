@@ -289,7 +289,7 @@ function AuditLogPage() {
         <HStack width="full" marginTop={2}>
           <VStack align="start" gap={1}>
             <Heading as="h2">Audit Log</Heading>
-            <Text color="gray.600">
+            <Text color="fg.muted">
               View all audit logs for your organization. Filter by project,
               user, action type, or date range.
             </Text>
@@ -416,7 +416,7 @@ function AuditLogPage() {
           </VStack>
         ) : auditLogs.length === 0 ? (
           <VStack padding={8}>
-            <Text color="gray.500">No audit logs found</Text>
+            <Text color="fg.muted">No audit logs found</Text>
           </VStack>
         ) : (
           <>
@@ -439,7 +439,7 @@ function AuditLogPage() {
                         <Text fontSize="sm">
                           {new Date(log.createdAt).toLocaleString()}
                         </Text>
-                        <Text fontSize="xs" color="gray.500">
+                        <Text fontSize="xs" color="fg.muted">
                           {formatDistanceToNow(new Date(log.createdAt), {
                             addSuffix: true,
                           })}
@@ -452,12 +452,12 @@ function AuditLogPage() {
                           <Text fontSize="sm" fontWeight="medium">
                             {log.user.name ?? "Unknown"}
                           </Text>
-                          <Text fontSize="xs" color="gray.500">
+                          <Text fontSize="xs" color="fg.muted">
                             {log.user.email}
                           </Text>
                         </VStack>
                       ) : (
-                        <Text fontSize="sm" color="gray.400">
+                        <Text fontSize="sm" color="fg.subtle">
                           User not found
                         </Text>
                       )}
@@ -480,7 +480,7 @@ function AuditLogPage() {
                           );
                         })()
                       ) : (
-                        <Text fontSize="sm" color="gray.400">
+                        <Text fontSize="sm" color="fg.subtle">
                           —
                         </Text>
                       )}
@@ -491,7 +491,7 @@ function AuditLogPage() {
                           {log.ipAddress}
                         </Text>
                       ) : (
-                        <Text fontSize="sm" color="gray.400">
+                        <Text fontSize="sm" color="fg.subtle">
                           —
                         </Text>
                       )}
@@ -502,7 +502,7 @@ function AuditLogPage() {
                           {log.error}
                         </Text>
                       ) : (
-                        <Text fontSize="sm" color="gray.400">
+                        <Text fontSize="sm" color="fg.subtle">
                           —
                         </Text>
                       )}

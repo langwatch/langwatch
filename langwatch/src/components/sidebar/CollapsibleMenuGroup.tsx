@@ -11,7 +11,6 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { trackEvent } from "../../utils/tracking";
-import { useColorRawValue } from "../ui/color-mode";
 import { ICON_SIZE, MENU_ITEM_HEIGHT, SideMenuLink } from "./SideMenuLink";
 
 export type CollapsibleMenuChild = {
@@ -38,7 +37,6 @@ export const CollapsibleMenuGroup = ({
   showLabel = true,
   defaultExpanded = false,
 }: CollapsibleMenuGroupProps) => {
-  const gray600 = useColorRawValue("gray.600");
   const isAnyChildActive = children.some((child) => child.isActive);
   const [isExpanded, setIsExpanded] = useState(
     defaultExpanded || isAnyChildActive,
@@ -75,7 +73,7 @@ export const CollapsibleMenuGroup = ({
               borderRadius="lg"
               backgroundColor="transparent"
               _hover={{
-                backgroundColor: "gray.200",
+                backgroundColor: "nav.bgHover",
               }}
               transition="background-color 0.15s ease-in-out"
             >
@@ -87,23 +85,23 @@ export const CollapsibleMenuGroup = ({
                 width={`${ICON_SIZE}px`}
                 height={`${ICON_SIZE}px`}
               >
-                <Icon size={ICON_SIZE} color={gray600} />
+                <Icon size={ICON_SIZE} color="var(--chakra-colors-nav-fg-muted)" />
               </Box>
               {showLabel && (
                 <>
                   <Text
                     fontSize="14px"
                     fontWeight="normal"
-                    color="gray.700"
+                    color="nav.fg"
                     whiteSpace="nowrap"
                   >
                     {label}
                   </Text>
                   <Spacer />
                   {isExpanded ? (
-                    <ChevronDown size={14} color={gray600} />
+                    <ChevronDown size={14} color="var(--chakra-colors-nav-fg-muted)" />
                   ) : (
-                    <ChevronRight size={14} color={gray600} />
+                    <ChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
                   )}
                 </>
               )}
