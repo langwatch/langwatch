@@ -312,21 +312,16 @@ async function bootstrapDatabase(
       verbose
     );
 
-    // Insert initial version 0 row if table is empty
+    // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
     // Goose requires at least one row to determine the starting version.
     // Without this, goose reports "no next version found" on an empty table.
-    const countResult = await client.query({
-      query: `SELECT count() as cnt FROM ${config.database}.goose_db_version`,
-      format: "JSONEachRow",
-    });
-    const countRows = (await countResult.json()) as { cnt: string }[];
-    if (countRows[0] && countRows[0].cnt === "0") {
-      await executeBootstrapSQL(
-        client,
-        `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied) VALUES (0, 1)`,
-        verbose
-      );
-    }
+    await executeBootstrapSQL(
+      client,
+      `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
+       SELECT 0, 1
+       WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
+      verbose
+    );
   });
 
   logger.info("Bootstrap completed");
