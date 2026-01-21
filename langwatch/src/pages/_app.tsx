@@ -200,7 +200,7 @@ export const system = createSystem(defaultConfig, {
           // Page/sidebar background - lighter gray in dark mode
           page: { value: { _light: "#F2F4F8", _dark: "{colors.gray.900}" } },
           // Main content area - darkest in dark mode
-          surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          surface: { value: { _light: "#F2F4F8", _dark: "{colors.gray.950}" } },
           // Cards and panels - same as surface (darkest)
           panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Muted background for hover states, selections
