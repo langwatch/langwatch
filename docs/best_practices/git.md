@@ -5,7 +5,16 @@
 
 ## Issues
 
-When creating issues via `gh issue create`:
-- Target repo: `langwatch/langwatch`
-- Always set project field (e.g., `--project "Agents"`)
-- Fill milestone and labels when applicable
+When creating issues, add them to the **LangWatch Kanban** project and fill in:
+- **Project** - category (e.g., "📖 Documentation", "🎭 Agent Simulations")
+- **Priority** - P0/P1/P2/P3
+- **Size** - XS/S/M/L/XL
+- **Epic** - if applicable
+- **Labels** and **Milestone** when relevant
+
+```bash
+# Create issue and add to project
+gh issue create --repo langwatch/langwatch --title "..." --body "..."
+gh project item-add 5 --owner langwatch --url <issue-url>
+# Then set fields in the GitHub Projects UI
+```
