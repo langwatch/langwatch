@@ -41,7 +41,7 @@ from pydantic import BaseModel
 
 from langwatch.types import (
     Conversation,
-    Evaluation,
+    Evaluation as _EvaluationTypedDict,
     EvaluationResult,
     EvaluationTimestamps,
     Money,
@@ -431,7 +431,7 @@ def _add_evaluation(  # type: ignore
         if span_ctx and span_ctx.is_valid:
             span_id = format(span_ctx.span_id, "x")
 
-        evaluation = Evaluation(
+        evaluation = _EvaluationTypedDict(
             evaluation_id=evaluation_id or str(PKSUID("eval")),
             span_id=span_id,
             name=name,
