@@ -1,6 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
-import type { Command, CommandHandler } from "../../../library";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../library";
+import { defineCommandSchema } from "../../../library";
 import type { ScheduleEvaluationCommandData } from "../schemas/commands";
 import { scheduleEvaluationCommandDataSchema } from "../schemas/commands";
 import {
@@ -9,80 +7,60 @@ import {
   EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
-  EvaluationProcessingEvent,
   EvaluationScheduledEvent,
+  EvaluationScheduledEventData,
 } from "../schemas/events";
+import {
+  BaseEvaluationCommand,
+  type EvaluationCommandConfig,
+} from "./baseEvaluationCommand";
 
-const logger = createLogger("langwatch:evaluation-processing:schedule-evaluation");
+const config: EvaluationCommandConfig<
+  ScheduleEvaluationCommandData,
+  EvaluationScheduledEventData
+> = {
+  eventType: EVALUATION_SCHEDULED_EVENT_TYPE,
+  eventVersion: EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
+  loggerName: "schedule-evaluation",
+  handleLogMessage: "Handling schedule evaluation command",
+  emitLogMessage: "Emitting evaluation scheduled event",
+  jobIdSuffix: "schedule",
+  mapToEventData: (commandData) => ({
+    evaluationId: commandData.evaluationId,
+    evaluatorId: commandData.evaluatorId,
+    evaluatorType: commandData.evaluatorType,
+    evaluatorName: commandData.evaluatorName,
+    traceId: commandData.traceId,
+    isGuardrail: commandData.isGuardrail,
+  }),
+  getLogContext: (commandData) => ({
+    evaluatorId: commandData.evaluatorId,
+  }),
+};
 
 /**
  * Command handler for scheduling an evaluation.
  * Emits EvaluationScheduledEvent when an evaluation job is added to the queue.
  */
-export class ScheduleEvaluationCommand
-  implements
-    CommandHandler<
-      Command<ScheduleEvaluationCommandData>,
-      EvaluationProcessingEvent
-    >
-{
+export class ScheduleEvaluationCommand extends BaseEvaluationCommand<
+  ScheduleEvaluationCommandData,
+  EvaluationScheduledEvent,
+  EvaluationScheduledEventData
+> {
   static readonly schema = defineCommandSchema(
     SCHEDULE_EVALUATION_COMMAND_TYPE,
     scheduleEvaluationCommandDataSchema,
-    "Command to schedule an evaluation",
+    "Command to schedule an evaluation"
   );
 
-  async handle(
-    command: Command<ScheduleEvaluationCommandData>,
-  ): Promise<EvaluationProcessingEvent[]> {
-    const { tenantId: tenantIdStr, data: commandData } = command;
-    const tenantId = createTenantId(tenantIdStr);
-    const { evaluationId } = commandData;
-
-    logger.info(
-      {
-        tenantId,
-        evaluationId,
-        evaluatorId: commandData.evaluatorId,
-      },
-      "Handling schedule evaluation command",
-    );
-
-    const event = EventUtils.createEvent<EvaluationScheduledEvent>(
-      "evaluation",
-      evaluationId,
-      tenantId,
-      EVALUATION_SCHEDULED_EVENT_TYPE,
-      EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
-      {
-        evaluationId,
-        evaluatorId: commandData.evaluatorId,
-        evaluatorType: commandData.evaluatorType,
-        evaluatorName: commandData.evaluatorName,
-        traceId: commandData.traceId,
-        isGuardrail: commandData.isGuardrail,
-      },
-    );
-
-    logger.debug(
-      {
-        tenantId,
-        evaluationId,
-        eventId: event.id,
-        eventType: event.type,
-      },
-      "Emitting evaluation scheduled event",
-    );
-
-    return [event];
-  }
+  protected readonly config = config;
 
   static getAggregateId(payload: ScheduleEvaluationCommandData): string {
     return payload.evaluationId;
   }
 
   static getSpanAttributes(
-    payload: ScheduleEvaluationCommandData,
+    payload: ScheduleEvaluationCommandData
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,
@@ -93,6 +71,6 @@ export class ScheduleEvaluationCommand
   }
 
   static makeJobId(payload: ScheduleEvaluationCommandData): string {
-    return `${payload.tenantId}:${payload.evaluationId}:schedule`;
+    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "schedule");
   }
 }

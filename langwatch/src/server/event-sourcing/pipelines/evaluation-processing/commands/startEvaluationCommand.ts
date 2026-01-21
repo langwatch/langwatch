@@ -1,6 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
-import type { Command, CommandHandler } from "../../../library";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../library";
+import { defineCommandSchema } from "../../../library";
 import type { StartEvaluationCommandData } from "../schemas/commands";
 import { startEvaluationCommandDataSchema } from "../schemas/commands";
 import {
@@ -9,80 +7,60 @@ import {
   EVALUATION_STARTED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
-  EvaluationProcessingEvent,
   EvaluationStartedEvent,
+  EvaluationStartedEventData,
 } from "../schemas/events";
+import {
+  BaseEvaluationCommand,
+  type EvaluationCommandConfig,
+} from "./baseEvaluationCommand";
 
-const logger = createLogger("langwatch:evaluation-processing:start-evaluation");
+const config: EvaluationCommandConfig<
+  StartEvaluationCommandData,
+  EvaluationStartedEventData
+> = {
+  eventType: EVALUATION_STARTED_EVENT_TYPE,
+  eventVersion: EVALUATION_STARTED_EVENT_VERSION_LATEST,
+  loggerName: "start-evaluation",
+  handleLogMessage: "Handling start evaluation command",
+  emitLogMessage: "Emitting evaluation started event",
+  jobIdSuffix: "start",
+  mapToEventData: (commandData) => ({
+    evaluationId: commandData.evaluationId,
+    evaluatorId: commandData.evaluatorId,
+    evaluatorType: commandData.evaluatorType,
+    evaluatorName: commandData.evaluatorName,
+    traceId: commandData.traceId,
+    isGuardrail: commandData.isGuardrail,
+  }),
+  getLogContext: (commandData) => ({
+    evaluatorId: commandData.evaluatorId,
+  }),
+};
 
 /**
  * Command handler for starting an evaluation.
  * Emits EvaluationStartedEvent when evaluation execution begins.
  */
-export class StartEvaluationCommand
-  implements
-    CommandHandler<
-      Command<StartEvaluationCommandData>,
-      EvaluationProcessingEvent
-    >
-{
+export class StartEvaluationCommand extends BaseEvaluationCommand<
+  StartEvaluationCommandData,
+  EvaluationStartedEvent,
+  EvaluationStartedEventData
+> {
   static readonly schema = defineCommandSchema(
     START_EVALUATION_COMMAND_TYPE,
     startEvaluationCommandDataSchema,
-    "Command to start an evaluation",
+    "Command to start an evaluation"
   );
 
-  async handle(
-    command: Command<StartEvaluationCommandData>,
-  ): Promise<EvaluationProcessingEvent[]> {
-    const { tenantId: tenantIdStr, data: commandData } = command;
-    const tenantId = createTenantId(tenantIdStr);
-    const { evaluationId } = commandData;
-
-    logger.info(
-      {
-        tenantId,
-        evaluationId,
-        evaluatorId: commandData.evaluatorId,
-      },
-      "Handling start evaluation command",
-    );
-
-    const event = EventUtils.createEvent<EvaluationStartedEvent>(
-      "evaluation",
-      evaluationId,
-      tenantId,
-      EVALUATION_STARTED_EVENT_TYPE,
-      EVALUATION_STARTED_EVENT_VERSION_LATEST,
-      {
-        evaluationId,
-        evaluatorId: commandData.evaluatorId,
-        evaluatorType: commandData.evaluatorType,
-        evaluatorName: commandData.evaluatorName,
-        traceId: commandData.traceId,
-        isGuardrail: commandData.isGuardrail,
-      },
-    );
-
-    logger.debug(
-      {
-        tenantId,
-        evaluationId,
-        eventId: event.id,
-        eventType: event.type,
-      },
-      "Emitting evaluation started event",
-    );
-
-    return [event];
-  }
+  protected readonly config = config;
 
   static getAggregateId(payload: StartEvaluationCommandData): string {
     return payload.evaluationId;
   }
 
   static getSpanAttributes(
-    payload: StartEvaluationCommandData,
+    payload: StartEvaluationCommandData
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,
@@ -93,6 +71,6 @@ export class StartEvaluationCommand
   }
 
   static makeJobId(payload: StartEvaluationCommandData): string {
-    return `${payload.tenantId}:${payload.evaluationId}:start`;
+    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "start");
   }
 }

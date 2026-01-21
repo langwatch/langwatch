@@ -8,13 +8,17 @@ import type {
   TrackEventRESTParamsValidator,
 } from "../tracer/types";
 
+export type EvaluationJobCheck = {
+  evaluation_id: string;
+  evaluator_id: string;
+  type: EvaluatorTypes;
+  name: string;
+  /** @deprecated Legacy field - use evaluation_id/evaluator_id instead. Kept for backwards compatibility with old queue jobs. */
+  id?: string;
+};
+
 export type EvaluationJob = {
-  check: {
-    evaluation_id: string;
-    evaluator_id: string;
-    type: EvaluatorTypes;
-    name: string;
-  };
+  check: EvaluationJobCheck;
   trace: {
     trace_id: string;
     project_id: string;
@@ -24,6 +28,22 @@ export type EvaluationJob = {
     labels?: string[] | undefined;
   };
 };
+
+/**
+ * Safely extracts the evaluation ID from a check object.
+ * Handles both new format (evaluation_id) and legacy format (id).
+ */
+export function getEvaluationId(check: EvaluationJobCheck): string {
+  return check.evaluation_id ?? check.id ?? "";
+}
+
+/**
+ * Safely extracts the evaluator ID from a check object.
+ * Handles both new format (evaluator_id) and legacy format (id).
+ */
+export function getEvaluatorId(check: EvaluationJobCheck): string {
+  return check.evaluator_id ?? check.id ?? "";
+}
 
 export type TopicClusteringJob = {
   project_id: string;

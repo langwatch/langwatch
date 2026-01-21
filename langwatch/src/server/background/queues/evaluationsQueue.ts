@@ -1,8 +1,9 @@
 import type { ConnectionOptions } from "bullmq";
-import type { EvaluationJob } from "~/server/background/types";
+import { type EvaluationJob, getEvaluationId, getEvaluatorId } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
+import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { prisma } from "../../db";
@@ -69,6 +70,11 @@ export const scheduleEvaluation = async ({
         isGuardrail: false,
       });
     } catch (error) {
+      // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+      // should proceed even if event tracking fails. Errors are captured for monitoring.
+      captureException(error, {
+        extra: { projectId: trace.project_id, evaluationId: check.evaluation_id, event: "scheduled" },
+      });
       logger.error(
         { error, check, trace },
         "Failed to emit evaluation scheduled event",
@@ -147,8 +153,8 @@ export const updateEvaluationStatusInES = async ({
   inputs?: Record<string, any>;
 }) => {
   const evaluation: ElasticSearchEvaluation = {
-    evaluation_id: check.evaluation_id ?? (check as any).id,
-    evaluator_id: check.evaluator_id ?? (check as any).id,
+    evaluation_id: getEvaluationId(check),
+    evaluator_id: getEvaluatorId(check),
     thread_id: trace.thread_id,
     user_id: trace.user_id,
     customer_id: trace.customer_id,
@@ -236,13 +242,13 @@ export const updateEvaluationStatusInES = async ({
     });
     if (project?.featureEventSourcingEvaluationIngestion) {
       try {
-        const evaluationId = check.evaluation_id ?? (check as any).id;
+        const evaluationId = getEvaluationId(check);
         if (status === "in_progress") {
           // Emit started event
           await evaluationProcessingPipeline.commands.startEvaluation.send({
             tenantId: trace.project_id,
             evaluationId,
-            evaluatorId: check.evaluator_id ?? (check as any).id,
+            evaluatorId: getEvaluatorId(check),
             evaluatorType: check.type,
             evaluatorName: check.name,
             traceId: trace.trace_id,
@@ -268,6 +274,11 @@ export const updateEvaluationStatusInES = async ({
           });
         }
       } catch (eventError) {
+        // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+        // should proceed even if event tracking fails. Errors are captured for monitoring.
+        captureException(eventError, {
+          extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: status },
+        });
         logger.error(
           { error: eventError, check, trace, status },
           "Failed to emit evaluation event",

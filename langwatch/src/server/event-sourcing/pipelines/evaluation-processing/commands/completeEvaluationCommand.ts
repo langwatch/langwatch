@@ -1,6 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
-import type { Command, CommandHandler } from "../../../library";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../library";
+import { defineCommandSchema } from "../../../library";
 import type { CompleteEvaluationCommandData } from "../schemas/commands";
 import { completeEvaluationCommandDataSchema } from "../schemas/commands";
 import {
@@ -9,82 +7,61 @@ import {
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
-  EvaluationProcessingEvent,
   EvaluationCompletedEvent,
+  EvaluationCompletedEventData,
 } from "../schemas/events";
+import {
+  BaseEvaluationCommand,
+  type EvaluationCommandConfig,
+} from "./baseEvaluationCommand";
 
-const logger = createLogger("langwatch:evaluation-processing:complete-evaluation");
+const config: EvaluationCommandConfig<
+  CompleteEvaluationCommandData,
+  EvaluationCompletedEventData
+> = {
+  eventType: EVALUATION_COMPLETED_EVENT_TYPE,
+  eventVersion: EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+  loggerName: "complete-evaluation",
+  handleLogMessage: "Handling complete evaluation command",
+  emitLogMessage: "Emitting evaluation completed event",
+  jobIdSuffix: "complete",
+  mapToEventData: (commandData) => ({
+    evaluationId: commandData.evaluationId,
+    status: commandData.status,
+    score: commandData.score,
+    passed: commandData.passed,
+    label: commandData.label,
+    details: commandData.details,
+    error: commandData.error,
+  }),
+  getLogContext: (commandData) => ({
+    status: commandData.status,
+  }),
+};
 
 /**
  * Command handler for completing an evaluation.
  * Emits EvaluationCompletedEvent when evaluation execution finishes.
  */
-export class CompleteEvaluationCommand
-  implements
-    CommandHandler<
-      Command<CompleteEvaluationCommandData>,
-      EvaluationProcessingEvent
-    >
-{
+export class CompleteEvaluationCommand extends BaseEvaluationCommand<
+  CompleteEvaluationCommandData,
+  EvaluationCompletedEvent,
+  EvaluationCompletedEventData
+> {
   static readonly schema = defineCommandSchema(
     COMPLETE_EVALUATION_COMMAND_TYPE,
     completeEvaluationCommandDataSchema,
-    "Command to complete an evaluation",
+    "Command to complete an evaluation"
   );
 
-  async handle(
-    command: Command<CompleteEvaluationCommandData>,
-  ): Promise<EvaluationProcessingEvent[]> {
-    const { tenantId: tenantIdStr, data: commandData } = command;
-    const tenantId = createTenantId(tenantIdStr);
-    const { evaluationId, status } = commandData;
-
-    logger.info(
-      {
-        tenantId,
-        evaluationId,
-        status,
-      },
-      "Handling complete evaluation command",
-    );
-
-    const event = EventUtils.createEvent<EvaluationCompletedEvent>(
-      "evaluation",
-      evaluationId,
-      tenantId,
-      EVALUATION_COMPLETED_EVENT_TYPE,
-      EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
-      {
-        evaluationId,
-        status,
-        score: commandData.score,
-        passed: commandData.passed,
-        label: commandData.label,
-        details: commandData.details,
-        error: commandData.error,
-      },
-    );
-
-    logger.debug(
-      {
-        tenantId,
-        evaluationId,
-        status,
-        eventId: event.id,
-        eventType: event.type,
-      },
-      "Emitting evaluation completed event",
-    );
-
-    return [event];
-  }
+  protected readonly config = config;
 
   static getAggregateId(payload: CompleteEvaluationCommandData): string {
     return payload.evaluationId;
   }
 
   static getSpanAttributes(
-    payload: CompleteEvaluationCommandData,
+    payload: CompleteEvaluationCommandData
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,
@@ -95,6 +72,6 @@ export class CompleteEvaluationCommand
   }
 
   static makeJobId(payload: CompleteEvaluationCommandData): string {
-    return `${payload.tenantId}:${payload.evaluationId}:complete`;
+    return BaseEvaluationCommand.makeJobIdWithSuffix(payload, "complete");
   }
 }

@@ -216,6 +216,8 @@ export async function handleEvaluatorCall(
     });
 
   // Emit evaluation started event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // should proceed even if event tracking fails. Errors are captured for monitoring.
   if (project.featureEventSourcingEvaluationIngestion) {
     try {
       await evaluationProcessingPipeline.commands.startEvaluation.send({
@@ -228,6 +230,9 @@ export async function handleEvaluatorCall(
         isGuardrail: isGuardrail ?? undefined,
       });
     } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "started" },
+      });
       logger.error(
         { error: eventError, projectId: project.id, evaluationId },
         "Failed to emit evaluation started event",
@@ -265,6 +270,8 @@ export async function handleEvaluatorCall(
   }
 
   // Emit evaluation completed event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // result should be returned even if event tracking fails. Errors are captured for monitoring.
   if (project.featureEventSourcingEvaluationIngestion) {
     try {
       await evaluationProcessingPipeline.commands.completeEvaluation.send({
@@ -281,6 +288,9 @@ export async function handleEvaluatorCall(
             : undefined,
       });
     } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "completed" },
+      });
       logger.error(
         { error: eventError, projectId: project.id, evaluationId },
         "Failed to emit evaluation completed event",
