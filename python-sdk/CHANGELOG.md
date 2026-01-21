@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.9.0...python-sdk@v0.10.0) (2026-01-21)
+
+
+### Features
+
+* **sdk:** add online evaluations API and ensureSetup for TypeScript ([2209258](https://github.com/langwatch/langwatch/commit/22092580433b9a3014123e62f39cf8c44543d8cc))
+
+
+### Bug Fixes
+
+* **python-sdk:** resolve name collision between Evaluation TypedDict and class alias ([873909a](https://github.com/langwatch/langwatch/commit/873909a09414bb309fa955b68e4a19bddc93e21f))
+
+
+### Code Refactoring
+
+* **sdk:** fix evaluation API naming consistency ([3aef2a3](https://github.com/langwatch/langwatch/commit/3aef2a353cc4939c8087b53044f441e7501530ae))
+* **sdk:** rename evaluation API to experiment for new terminology ([f10326c](https://github.com/langwatch/langwatch/commit/f10326c0f2ee5818fbcf51507a95933bfe83caeb))
+* **sdk:** rename internal evaluation classes to experiment ([ff70cab](https://github.com/langwatch/langwatch/commit/ff70cab904905b85a77a68e7b1eb60e9c364a18d))
+
 ## [0.9.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.8.1...python-sdk@v0.9.0) (2026-01-18)
 
 
