@@ -12,7 +12,7 @@ import type {
   OrchestratorDependencies,
   TracerHandle,
 } from "./orchestrator.types";
-import type { ScenarioConfig, ScenarioExecutionResult } from "./types";
+import type { LiteLLMParams, ScenarioConfig, ScenarioExecutionResult } from "./types";
 
 const logger = createLogger("langwatch:scenarios:orchestrator");
 
@@ -104,8 +104,8 @@ export class ScenarioExecutionOrchestrator {
 
   private async runScenario(
     scenario: ScenarioConfig,
-    adapter: Awaited<ReturnType<typeof this.createAdapter>> extends { success: true; adapter: infer A } ? A : never,
-    modelParams: NonNullable<Awaited<ReturnType<typeof this.prepareModelParams>>>,
+    adapter: Parameters<typeof this.deps.scenarioExecutor.run>[1],
+    modelParams: LiteLLMParams,
     batchRunId: string,
   ) {
     return this.deps.scenarioExecutor.run(
