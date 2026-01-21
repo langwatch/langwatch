@@ -198,7 +198,7 @@ export const system = createSystem(defaultConfig, {
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
           // Page/sidebar background - lighter gray in dark mode
-          page: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
+          page: { value: { _light: "#F2F4F8", _dark: "{colors.gray.900}" } },
           // Main content area - darkest in dark mode
           surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Cards and panels - same as surface (darkest)
