@@ -18,7 +18,7 @@ export const FALLBACK_MAX_TOKENS = 64_000;
 
 export const KSUID_RESOURCES = {
   COST: "cost",
-  EVALUATION: "evaluation",
+  EVALUATION: "eval",
   EVENT: "event",
   EXPERIMENT: "experiment",
   MONITOR: "monitor",

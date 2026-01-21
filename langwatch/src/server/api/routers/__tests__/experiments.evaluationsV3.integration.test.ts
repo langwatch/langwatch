@@ -70,8 +70,8 @@ describe("Evaluations V3 Endpoints", () => {
 
       createdExperimentIds.push(result.id);
 
-      // ID should start with evaluation_ (ksuid format)
-      expect(result.id).toMatch(/^evaluation_/);
+      // ID should start with eval_ (ksuid format)
+      expect(result.id).toMatch(/^eval_/);
       // Slug should be the last 8 characters of the ID (shorter URL)
       expect(result.slug).toBe(result.id.slice(-8));
       expect(result.slug).toHaveLength(8);
