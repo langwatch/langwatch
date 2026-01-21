@@ -39,4 +39,3 @@ When implementing a new feature or page:
 
 - [PR #1025](https://github.com/langwatch/langwatch/pull/1025) - Original design implementation
 - [Chakra UI v3 Documentation](https://chakra-ui.com/docs) - Component library reference
-- [Cursor Rules](../../.cursor/rules/frontend.mdc) - Additional frontend coding guidelines
