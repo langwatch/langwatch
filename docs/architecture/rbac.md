@@ -1,43 +1,26 @@
 # RBAC System
 
-## Overview
+## Decision
 
-Three-level permission hierarchy: Organization → Team → Project
+Multi-tenant SaaS requires strict data isolation. We chose Organization → Team → Project hierarchy because:
+- Organizations own billing and external integrations
+- Teams scope access within organizations (departments, projects)
+- Projects are the primary workspace unit
 
-## Key Files
+## Rules (Reviewer: Enforce These)
 
-- `src/server/api/rbac.ts` - New RBAC system (preferred)
-- `src/server/api/permission.ts` - Legacy system (backward compatible)
-- `src/hooks/useOrganizationTeamProject.ts` - Client-side hooks
+1. **Always use `checkPermissionOrThrow`** from `src/server/api/rbac.ts` - never write raw permission checks
+2. **Never bypass with direct DB queries** - all data access must flow through RBAC
+3. **Use the new system** (`rbac.ts`), not legacy `permission.ts` - backward compat only
+4. **Client-side is advisory** - `hasPermission()` hides UI but server must re-check
 
-## Roles
+## Quick Reference
 
-**Team roles** (`TeamUserRole` in Prisma):
-- `ADMIN` - Full control, manage members, create/delete projects
-- `MEMBER` - Create/modify resources, view costs, no member management
-- `VIEWER` - Read-only, no costs
+| Role | Scope | Creates | Manages Members |
+|------|-------|---------|-----------------|
+| Org Admin | Organization | Teams | Yes (all) |
+| Team Admin | Team | Projects | Yes (team) |
+| Team Member | Team | Resources | No |
+| Team Viewer | Team | Nothing | No |
 
-**Organization roles** (`OrganizationUserRole`):
-- `ADMIN` - Full control, implicit admin on all teams
-- `MEMBER` - View org details
-- `EXTERNAL` - Limited external collaborator access
-
-## Permission Format
-
-New system uses `resource:action` format:
-```typescript
-type Permission = `${Resource}:${Action}`;
-// "analytics:view", "datasets:manage", "project:create"
-```
-
-## Usage
-
-```typescript
-// Server-side
-import { checkPermissionOrThrow } from "~/server/api/rbac";
-await checkPermissionOrThrow({ permission: "analytics:view", projectId });
-
-// Client-side
-const { hasPermission } = useOrganizationTeamProject();
-if (hasPermission("analytics:view")) { ... }
-```
+Permission format: `resource:action` (e.g., `analytics:view`, `datasets:manage`)

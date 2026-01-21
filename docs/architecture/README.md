@@ -1,14 +1,11 @@
-# Architecture Documentation
+# Architecture Decisions
 
-Project-specific architectural decisions and patterns.
+Why we built things the way we did. Code is self-documenting for _how_.
 
-## Files
+| Decision | Rationale | Rules |
+|----------|-----------|-------|
+| [RBAC](./rbac.md) | Multi-tenant isolation | Always use new system, never raw queries |
+| [Event Sourcing](./event-sourcing.md) | Audit trail + rebuild capability | TenantId required, events immutable |
+| [Logging](./logging.md) | Debugging + compliance | Never log PII/secrets |
 
-- **rbac.md** - Role-based access control system
-- **event-sourcing.md** - Event sourcing patterns
-- **n-plus-one.md** - Query optimization patterns
-- **logging.md** - Logging conventions
-
-## Principles
-
-These docs focus on the "why" and navigation, not implementation details. Read the code for specifics.
+N+1 optimization removed - it's a standard pattern, not a project decision.

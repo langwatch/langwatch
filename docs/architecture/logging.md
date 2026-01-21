@@ -1,31 +1,15 @@
-# Logging Best Practices
+# Logging
 
-## Structured Logging
+## Decision
 
-Use structured logging with context:
-```typescript
-logger.info("Processing trace", { traceId, projectId, spanCount });
-```
+Structured logging with trace correlation because:
+- **Debugging** - Trace requests across services
+- **Compliance** - Audit trail for sensitive operations
+- **Alerting** - Structured data enables automated monitoring
 
-## Log Levels
+## Rules (Reviewer: Enforce These)
 
-| Level | Use For |
-|-------|---------|
-| `error` | Failures requiring attention |
-| `warn` | Recoverable issues, deprecations |
-| `info` | Key business events, request lifecycle |
-| `debug` | Detailed debugging (off in prod) |
-
-## Sensitive Data
-
-Never log:
-- API keys, tokens, passwords
-- PII (emails, names) unless required
-- Full request/response bodies
-
-## Correlation
-
-Include trace IDs for request correlation:
-```typescript
-logger.info("Operation complete", { traceId: ctx.traceId });
-```
+1. **Never log secrets** - API keys, tokens, passwords
+2. **Never log PII** - Emails, names (unless explicit business requirement)
+3. **Always include traceId** - For request correlation
+4. **Use structured format** - `logger.info("msg", { key: value })`, not string interpolation

@@ -1,31 +1,20 @@
 # Event Sourcing
 
-## Overview
+## Decision
 
-Event-driven system for traces, evaluations, and other aggregates.
+We use event sourcing for traces and evaluations because:
+- **Audit trail** - Complete history of all changes for compliance
+- **Rebuild capability** - Can recompute projections when logic changes
+- **Tenant isolation** - Branded TenantId enforces data boundaries at type level
 
-## Key Directories
+## Rules (Reviewer: Enforce These)
 
-- `src/server/event-sourcing/library/` - Core abstractions (domain-agnostic)
+1. **Events are immutable** - Never modify or delete events, only append
+2. **TenantId is required** - Use the branded type, never plain strings
+3. **Partition by tenant** - All queries must include tenantId
+4. **Projections are derived** - Don't store authoritative data in projections
+
+## Where to Look
+
+- `src/server/event-sourcing/library/` - Core abstractions
 - `src/server/event-sourcing/runtime/` - Runtime implementation
-
-## Core Concepts
-
-| Concept | Description | Key File |
-|---------|-------------|----------|
-| Event | Immutable fact with `tenantId`, `aggregateId`, `type`, `data` | `library/event.ts` |
-| Projection | Computed view built from events | `library/projection.ts` |
-| EventStore | Persists/queries events (partitioned by tenant) | `library/store.ts` |
-| EventSourcingService | Orchestrates rebuild pipeline | `library/service.ts` |
-
-## Security
-
-- **TenantId is branded type** - not plain string, enforces isolation
-- Always partition by `tenantId + aggregateType`
-- Use context-aware read/write operations
-
-## Patterns
-
-- Events are immutable facts, projections are derived
-- Rebuild projections from events when logic changes
-- Use EventStream for automatic ordering
