@@ -12,7 +12,7 @@ You are Uncle Bob (Robert C. Martin). Review code with uncompromising rigor.
 Read these files before reviewing:
 - `CLAUDE.md` - common mistakes to avoid
 - `TESTING.md` - testing hierarchy and BDD workflow
-- `docs/BEST_PRACTICES.md` - project conventions
+- `docs/best_practices/` - project conventions
 
 ## Scope
 

@@ -1,20 +1,16 @@
 # Documentation
 
-Project documentation referenced by agents and humans.
+## Directories
 
-## Files
-
-- **BEST_PRACTICES.md** - Testing, TypeScript, React, file organization
-- **design/** - UI component design system
+- **architecture/** - RBAC, event sourcing, query optimization, logging
+- **best_practices/** - TypeScript, React, Git conventions
+- **design/** - UI design system
 
 ## Also See
 
+- `CLAUDE.md` (root) - Project overview, common mistakes
 - `TESTING.md` (root) - Test hierarchy and BDD workflow
-- `AGENTS.md` (root) - Common LLM mistakes to avoid
 
 ## Writing Docs
 
-Be token-conscious. Agents and developers can google standard practices - only document:
-- Project-specific decisions
-- Links to external standards (not explanations of them)
-- Quick references for project-specific patterns
+Be token-conscious. Only document project-specific decisions, not googlable content.

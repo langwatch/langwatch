@@ -27,7 +27,8 @@ specs/               # BDD feature specs
 ## Key References
 
 - `TESTING.md` - test hierarchy, BDD workflow
-- `docs/BEST_PRACTICES.md` - coding conventions
+- `docs/best_practices/` - coding conventions
+- `docs/architecture/` - RBAC, event sourcing, etc.
 
 ## Common Mistakes to Avoid
 
