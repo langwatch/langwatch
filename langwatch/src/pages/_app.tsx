@@ -5,10 +5,9 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
-import type { AppType } from "next/app";
 import type { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
-import { api } from "~/utils/api";
+import type { AppType } from "next/app";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
@@ -21,7 +20,8 @@ import { useEffect, useState } from "react";
 import { AnalyticsProvider } from "react-contextual-analytics";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
-import { colorSystem, ColorModeProvider } from "../components/ui/color-mode";
+import { api } from "~/utils/api";
+import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
 import { dependencies } from "../injection/dependencies.client";
@@ -31,13 +31,13 @@ const inter = Inter({ subsets: ["latin"] });
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: { _light: "#E5E7EB", _dark: "{colors.gray.900}" },
+      background: { _light: "#F2F4F8", _dark: "{colors.gray.900}" },
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
     "*::selection": {
       // Chakra by default overrides browser selection color, I really don't like things overriding defaults
-      // @ts-ignore
+      // @ts-expect-error
       bg: null,
     },
   },
@@ -81,124 +81,394 @@ export const system = createSystem(defaultConfig, {
       colors: {
         // Palette-specific semantic tokens
         gray: {
-          solid: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
-          hover: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" } },
-          contrast: { value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" } },
-          subtle: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          solid: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+          },
+          hover: {
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
+          },
+          contrast: {
+            value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" },
+          },
+          subtle: {
+            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
+          },
+          muted: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
+          },
+          fg: {
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: "#ED8926" },
-          hover: { value: { _light: "{colors.orange.600}", _dark: "{colors.orange.500}" } },
+          hover: {
+            value: {
+              _light: "{colors.orange.600}",
+              _dark: "{colors.orange.500}",
+            },
+          },
+          subtle: {
+            value: {
+              _light: "{colors.orange.50}",
+              _dark: "{colors.orange.900}",
+            },
+          },
+          muted: {
+            value: {
+              _light: "{colors.orange.100}",
+              _dark: "{colors.orange.800}",
+            },
+          },
+          emphasized: {
+            value: {
+              _light: "{colors.orange.200}",
+              _dark: "{colors.orange.700}",
+            },
+          },
+          fg: {
+            value: {
+              _light: "{colors.orange.800}",
+              _dark: "{colors.orange.200}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
-          subtle: { value: { _light: "{colors.orange.50}", _dark: "{colors.orange.900}" } },
-          fg: { value: { _light: "{colors.orange.800}", _dark: "{colors.orange.200}" } },
         },
         green: {
-          solid: { value: { _light: "{colors.green.500}", _dark: "{colors.green.400}" } },
-          hover: { value: { _light: "{colors.green.600}", _dark: "{colors.green.500}" } },
-          subtle: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
+          solid: {
+            value: {
+              _light: "{colors.green.500}",
+              _dark: "{colors.green.400}",
+            },
+          },
+          hover: {
+            value: {
+              _light: "{colors.green.600}",
+              _dark: "{colors.green.500}",
+            },
+          },
+          subtle: {
+            value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" },
+          },
+          muted: {
+            value: {
+              _light: "{colors.green.100}",
+              _dark: "{colors.green.800}",
+            },
+          },
+          emphasized: {
+            value: {
+              _light: "{colors.green.200}",
+              _dark: "{colors.green.700}",
+            },
+          },
+          fg: {
+            value: {
+              _light: "{colors.green.700}",
+              _dark: "{colors.green.200}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
-          solid: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" } },
-          hover: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.500}" } },
-          subtle: { value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" } },
+          solid: {
+            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" },
+          },
+          hover: {
+            value: { _light: "{colors.blue.600}", _dark: "{colors.blue.500}" },
+          },
+          subtle: {
+            value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" },
+          },
+          muted: {
+            value: { _light: "{colors.blue.100}", _dark: "{colors.blue.800}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.blue.200}", _dark: "{colors.blue.700}" },
+          },
+          fg: {
+            value: { _light: "{colors.blue.700}", _dark: "{colors.blue.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
-          solid: { value: { _light: "{colors.yellow.500}", _dark: "{colors.yellow.400}" } },
-          hover: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.500}" } },
-          subtle: { value: { _light: "{colors.yellow.50}", _dark: "{colors.yellow.900}" } },
+          solid: {
+            value: {
+              _light: "{colors.yellow.500}",
+              _dark: "{colors.yellow.400}",
+            },
+          },
+          hover: {
+            value: {
+              _light: "{colors.yellow.600}",
+              _dark: "{colors.yellow.500}",
+            },
+          },
+          subtle: {
+            value: {
+              _light: "{colors.yellow.50}",
+              _dark: "{colors.yellow.900}",
+            },
+          },
+          muted: {
+            value: {
+              _light: "{colors.yellow.100}",
+              _dark: "{colors.yellow.800}",
+            },
+          },
+          emphasized: {
+            value: {
+              _light: "{colors.yellow.200}",
+              _dark: "{colors.yellow.700}",
+            },
+          },
+          fg: {
+            value: {
+              _light: "{colors.yellow.700}",
+              _dark: "{colors.yellow.200}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
-          solid: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
-          hover: { value: { _light: "{colors.red.600}", _dark: "{colors.red.500}" } },
-          subtle: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
+          solid: {
+            value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" },
+          },
+          hover: {
+            value: { _light: "{colors.red.600}", _dark: "{colors.red.500}" },
+          },
+          subtle: {
+            value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" },
+          },
+          muted: {
+            value: { _light: "{colors.red.100}", _dark: "{colors.red.800}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.red.200}", _dark: "{colors.red.700}" },
+          },
+          fg: {
+            value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         pink: {
-          solid: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.400}" } },
-          hover: { value: { _light: "{colors.pink.600}", _dark: "{colors.pink.500}" } },
-          subtle: { value: { _light: "{colors.pink.50}", _dark: "{colors.pink.900}" } },
+          solid: {
+            value: { _light: "{colors.pink.500}", _dark: "{colors.pink.400}" },
+          },
+          hover: {
+            value: { _light: "{colors.pink.600}", _dark: "{colors.pink.500}" },
+          },
+          subtle: {
+            value: { _light: "{colors.pink.50}", _dark: "{colors.pink.900}" },
+          },
+          muted: {
+            value: { _light: "{colors.pink.100}", _dark: "{colors.pink.800}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.pink.200}", _dark: "{colors.pink.700}" },
+          },
+          fg: {
+            value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         purple: {
-          solid: { value: { _light: "{colors.purple.500}", _dark: "{colors.purple.400}" } },
-          hover: { value: { _light: "{colors.purple.600}", _dark: "{colors.purple.500}" } },
-          subtle: { value: { _light: "{colors.purple.50}", _dark: "{colors.purple.900}" } },
+          solid: {
+            value: {
+              _light: "{colors.purple.500}",
+              _dark: "{colors.purple.400}",
+            },
+          },
+          hover: {
+            value: {
+              _light: "{colors.purple.600}",
+              _dark: "{colors.purple.500}",
+            },
+          },
+          subtle: {
+            value: {
+              _light: "{colors.purple.50}",
+              _dark: "{colors.purple.900}",
+            },
+          },
+          muted: {
+            value: {
+              _light: "{colors.purple.100}",
+              _dark: "{colors.purple.800}",
+            },
+          },
+          emphasized: {
+            value: {
+              _light: "{colors.purple.200}",
+              _dark: "{colors.purple.700}",
+            },
+          },
+          fg: {
+            value: {
+              _light: "{colors.purple.700}",
+              _dark: "{colors.purple.200}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         teal: {
-          solid: { value: { _light: "{colors.teal.500}", _dark: "{colors.teal.400}" } },
-          hover: { value: { _light: "{colors.teal.600}", _dark: "{colors.teal.500}" } },
-          subtle: { value: { _light: "{colors.teal.50}", _dark: "{colors.teal.900}" } },
+          solid: {
+            value: { _light: "{colors.teal.500}", _dark: "{colors.teal.400}" },
+          },
+          hover: {
+            value: { _light: "{colors.teal.600}", _dark: "{colors.teal.500}" },
+          },
+          subtle: {
+            value: { _light: "{colors.teal.50}", _dark: "{colors.teal.900}" },
+          },
+          muted: {
+            value: { _light: "{colors.teal.100}", _dark: "{colors.teal.800}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.teal.200}", _dark: "{colors.teal.700}" },
+          },
+          fg: {
+            value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         cyan: {
-          solid: { value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.400}" } },
-          hover: { value: { _light: "{colors.cyan.600}", _dark: "{colors.cyan.500}" } },
-          subtle: { value: { _light: "{colors.cyan.50}", _dark: "{colors.cyan.900}" } },
+          solid: {
+            value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.400}" },
+          },
+          hover: {
+            value: { _light: "{colors.cyan.600}", _dark: "{colors.cyan.500}" },
+          },
+          subtle: {
+            value: { _light: "{colors.cyan.50}", _dark: "{colors.cyan.900}" },
+          },
+          muted: {
+            value: { _light: "{colors.cyan.100}", _dark: "{colors.cyan.800}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.cyan.200}", _dark: "{colors.cyan.700}" },
+          },
+          fg: {
+            value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
 
         // Status semantic tokens - for evaluation results, pass/fail states, etc.
         status: {
-          success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.400}" } },
-          error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.400}" } },
-          warning: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.400}" } },
-          pending: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.400}" } },
-          info: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" } },
+          success: {
+            value: {
+              _light: "{colors.green.600}",
+              _dark: "{colors.green.400}",
+            },
+          },
+          error: {
+            value: { _light: "{colors.red.600}", _dark: "{colors.red.400}" },
+          },
+          warning: {
+            value: {
+              _light: "{colors.yellow.600}",
+              _dark: "{colors.yellow.400}",
+            },
+          },
+          pending: {
+            value: {
+              _light: "{colors.yellow.600}",
+              _dark: "{colors.yellow.400}",
+            },
+          },
+          info: {
+            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" },
+          },
         },
 
         // Navigation semantic tokens - for sidebar menu items
         nav: {
-          fg: { value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" } },
-          fgMuted: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
-          bgActive: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
-          bgHover: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          fg: {
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
+          },
+          fgMuted: {
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+          },
+          bgActive: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+          },
+          bgHover: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+          },
         },
 
         // Label semantic tokens - for form labels, section headers
         label: {
-          fg: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
-          fgMuted: { value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" } },
+          fg: {
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+          },
+          fgMuted: {
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+          },
         },
 
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
           // Page/sidebar background - lighter gray in dark mode
-          page: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
+          page: { value: { _light: "#F2F4F8", _dark: "{colors.gray.900}" } },
           // Main content area - darkest in dark mode
           surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Cards and panels - same as surface (darkest)
           panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Muted background for hover states, selections
-          muted: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" } },
+          muted: {
+            value: { _light: "#F2F4F8", _dark: "{colors.gray.800}" },
+          },
           // Emphasized background for active states
-          emphasized: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" } },
+          emphasized: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+          },
           // Subtle background for table headers, etc.
-          subtle: { value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" } },
+          subtle: {
+            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
+          },
           // Form inputs
-          input: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" } },
-          inputHover: { value: { _light: "white", _dark: "{colors.gray.700}" } },
+          input: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+          },
+          inputHover: {
+            value: { _light: "white", _dark: "{colors.gray.700}" },
+          },
         },
 
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
-          DEFAULT: { value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" } },
-          muted: { value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" } },
-          subtle: { value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" } },
+          DEFAULT: {
+            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
+          },
+          muted: {
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+          },
+          subtle: {
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+          },
           inverted: { value: { _light: "white", _dark: "{colors.gray.900}" } },
         },
 
         // Border semantic tokens - subtle borders in dark mode
         border: {
-          DEFAULT: { value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" } },
-          muted: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" } },
-          subtle: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
-          emphasized: { value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" } },
+          DEFAULT: {
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+          },
+          muted: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+          },
+          subtle: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+          },
+          emphasized: {
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" },
+          },
         },
       },
       shadows: {
@@ -449,7 +719,7 @@ export const system = createSystem(defaultConfig, {
           },
         },
         defaultVariants: {
-          // @ts-ignore
+          // @ts-expect-error
           size: "sm",
         },
       }),
@@ -788,7 +1058,6 @@ export const system = createSystem(defaultConfig, {
       progress: defineSlotRecipe({
         slots: ["root", "track", "range"],
         variants: {
-          // @ts-ignore
           striped: {
             true: {
               range: {
@@ -894,7 +1163,7 @@ const LangWatch: AppType<{
       router.events.off("routeChangeError", handleChangeDone);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, keepSameFeatureFlags]);
 
   return (
     <SessionProvider

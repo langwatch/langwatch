@@ -111,7 +111,7 @@ export const PushToCopiesDialog = ({
             {isLoading ? (
               <Text>Loading replicas...</Text>
             ) : error ? (
-              <Text color="red.500">
+              <Text color="red.fg">
                 Error loading replicas: {error.message}
               </Text>
             ) : availableCopies.length === 0 ? (

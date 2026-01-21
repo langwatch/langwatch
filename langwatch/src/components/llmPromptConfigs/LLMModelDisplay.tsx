@@ -51,7 +51,7 @@ export function LLMModelDisplay({
           fontFamily="mono"
           lineClamp={1}
           wordBreak="break-all"
-          color={isDisabled ? "gray.500" : undefined}
+          color={isDisabled ? "fg.muted" : undefined}
           textDecoration={isDisabled ? "line-through" : undefined}
         >
           {modelOption?.label ?? model}

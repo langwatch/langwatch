@@ -32,7 +32,7 @@ function renderAction(type: ParsedLLMError["type"]) {
           {" "}
           <Link
             href="/settings/model-providers"
-            color="red.700"
+            color="red.fg"
             fontWeight="medium"
             textDecoration="underline"
           >

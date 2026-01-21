@@ -146,7 +146,7 @@ export function ChangeHandleDialog({
             <VStack width="full" gap={4}>
               {currentHandle && (
                 <Text
-                  color="red.500"
+                  color="red.fg"
                   fontSize="12px"
                   fontWeight="medium"
                   mb={2}
