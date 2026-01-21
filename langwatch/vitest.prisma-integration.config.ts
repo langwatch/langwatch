@@ -1,12 +1,13 @@
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+/**
+ * Integration test config for tests that only need Prisma/Postgres.
+ * Does NOT include testcontainers setup (ClickHouse, Redis).
+ */
 export default defineConfig({
   test: {
-    setupFiles: [
-      "./test-setup.ts",
-      "./src/server/event-sourcing/__tests__/integration/setup.ts",
-    ],
+    setupFiles: ["./test-setup.ts"],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [
       ...configDefaults.exclude,
@@ -14,9 +15,9 @@ export default defineConfig({
       ".next-saas/**/*",
       "saas-src/**/*",
     ],
-    testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
-    hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
-    teardownTimeout: 30_000, // 30 seconds for cleanup
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+    teardownTimeout: 30_000,
   },
   esbuild: {
     jsx: "automatic",
