@@ -22,20 +22,30 @@ const baseEntitlements: Entitlement[] = [
 const enterpriseEntitlements: Entitlement[] = ["custom-rbac"];
 
 /**
- * Mapping of plans to their entitled features.
+ * Exhaustive type check helper.
+ * If this function is called at runtime, it means a case was not handled.
+ * TypeScript will error at compile time if any plan is not handled in a switch.
  */
-const planEntitlements: Record<Plan, Entitlement[]> = {
-  "self-hosted:oss": [...baseEntitlements],
-  "self-hosted:pro": [...baseEntitlements],
-  "self-hosted:enterprise": [...baseEntitlements, ...enterpriseEntitlements],
-};
+function assertUnreachable(x: never): never {
+  throw new Error(`Unhandled plan type: ${x}`);
+}
 
 /**
  * Gets all entitlements for a given plan.
+ * Uses exhaustive switch to ensure all plans are handled at compile time.
  *
  * @param plan - The plan to get entitlements for
  * @returns Array of entitlements the plan has access to
  */
 export function getEntitlementsForPlan(plan: Plan): Entitlement[] {
-  return planEntitlements[plan];
+  switch (plan) {
+    case "self-hosted:oss":
+      return [...baseEntitlements];
+    case "self-hosted:pro":
+      return [...baseEntitlements];
+    case "self-hosted:enterprise":
+      return [...baseEntitlements, ...enterpriseEntitlements];
+    default:
+      return assertUnreachable(plan);
+  }
 }

@@ -41,7 +41,7 @@ export function requireEntitlement(
   entitlement: Entitlement
 ): void {
   if (!hasEntitlement(plan, entitlement)) {
-    throw createEntitlementError(entitlement);
+    throw createEntitlementError(entitlement, plan);
   }
 }
 

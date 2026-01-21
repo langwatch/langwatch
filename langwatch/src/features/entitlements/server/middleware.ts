@@ -21,7 +21,7 @@ export function checkEntitlement(entitlement: Entitlement) {
     const plan = getSelfHostedPlan();
 
     if (!hasEntitlement(plan, entitlement)) {
-      throw createEntitlementError(entitlement);
+      throw createEntitlementError(entitlement, plan);
     }
 
     return next();
