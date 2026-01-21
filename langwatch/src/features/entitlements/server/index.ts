@@ -1,3 +1,5 @@
+export { createEntitlementError } from "./errors";
+
 export {
   hasEntitlement,
   hasEntitlementForCurrentPlan,

@@ -1,6 +1,6 @@
-import { TRPCError } from "@trpc/server";
 import { getSelfHostedPlan } from "@langwatch/ee/license";
 import type { Entitlement } from "../constants";
+import { createEntitlementError } from "./errors";
 import { hasEntitlement } from "./hasEntitlement";
 
 /**
@@ -21,10 +21,7 @@ export function checkEntitlement(entitlement: Entitlement) {
     const plan = getSelfHostedPlan();
 
     if (!hasEntitlement(plan, entitlement)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `This feature requires the "${entitlement}" entitlement. Please upgrade to LangWatch Enterprise.`,
-      });
+      throw createEntitlementError(entitlement);
     }
 
     return next();

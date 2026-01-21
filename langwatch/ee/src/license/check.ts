@@ -1,20 +1,21 @@
-import type { SelfHostedPlan } from "./types";
+import { DEFAULT_PLAN, type SelfHostedPlan } from "./types";
 
 /**
- * Determines the self-hosted plan based on the LICENSE_KEY environment variable.
+ * Pure function to determine plan from a license key.
  *
  * License key format:
  * - LW-ENT-xxx → self-hosted:enterprise
  * - LW-PRO-xxx → self-hosted:pro
  * - No key or invalid → self-hosted:oss
  *
- * @returns The current self-hosted plan
+ * @param licenseKey - The license key to evaluate
+ * @returns The corresponding plan
  */
-export function getSelfHostedPlan(): SelfHostedPlan {
-  const licenseKey = process.env.LICENSE_KEY;
-
+export function determinePlanFromLicenseKey(
+  licenseKey: string | undefined
+): SelfHostedPlan {
   if (!licenseKey) {
-    return "self-hosted:oss";
+    return DEFAULT_PLAN;
   }
 
   if (licenseKey.startsWith("LW-ENT-")) {
@@ -26,7 +27,16 @@ export function getSelfHostedPlan(): SelfHostedPlan {
   }
 
   // Invalid or unrecognized license key format
-  return "self-hosted:oss";
+  return DEFAULT_PLAN;
+}
+
+/**
+ * Gets the self-hosted plan based on the LICENSE_KEY environment variable.
+ *
+ * @returns The current self-hosted plan
+ */
+export function getSelfHostedPlan(): SelfHostedPlan {
+  return determinePlanFromLicenseKey(process.env.LICENSE_KEY);
 }
 
 /**

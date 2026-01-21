@@ -1,6 +1,24 @@
+import { DEFAULT_PLAN, isValidPlan } from "@langwatch/ee/license";
 import type { Entitlement } from "../constants";
 import { getEntitlementsForPlan, type Plan } from "../plans";
 import { api } from "../../../utils/api";
+
+/**
+ * Safely extracts and validates the plan from publicEnv data.
+ *
+ * @param publicEnv - The public env data or undefined
+ * @returns The validated plan or DEFAULT_PLAN
+ */
+function getPlanFromPublicEnv(
+  publicEnv: { SELF_HOSTED_PLAN?: unknown } | undefined
+): Plan {
+  if (!publicEnv) {
+    return DEFAULT_PLAN;
+  }
+
+  const rawPlan = publicEnv.SELF_HOSTED_PLAN;
+  return isValidPlan(rawPlan) ? rawPlan : DEFAULT_PLAN;
+}
 
 /**
  * React hook that checks if the current deployment has a specific entitlement.
@@ -18,7 +36,7 @@ export function useHasEntitlement(entitlement: Entitlement): boolean {
     return true;
   }
 
-  const plan = (publicEnv.SELF_HOSTED_PLAN ?? "self-hosted:oss") as Plan;
+  const plan = getPlanFromPublicEnv(publicEnv);
   const planEntitlements = getEntitlementsForPlan(plan);
 
   return planEntitlements.includes(entitlement);
@@ -36,5 +54,5 @@ export function useCurrentPlan(): Plan | undefined {
     return undefined;
   }
 
-  return (publicEnv.SELF_HOSTED_PLAN ?? "self-hosted:oss") as Plan;
+  return getPlanFromPublicEnv(publicEnv);
 }

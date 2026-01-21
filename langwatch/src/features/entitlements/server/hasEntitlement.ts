@@ -1,7 +1,7 @@
-import { TRPCError } from "@trpc/server";
 import { getSelfHostedPlan } from "@langwatch/ee/license";
 import type { Entitlement } from "../constants";
 import { getEntitlementsForPlan, type Plan } from "../plans";
+import { createEntitlementError } from "./errors";
 
 /**
  * Checks if a plan has access to a specific entitlement.
@@ -41,10 +41,7 @@ export function requireEntitlement(
   entitlement: Entitlement
 ): void {
   if (!hasEntitlement(plan, entitlement)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `This feature requires the "${entitlement}" entitlement. Please upgrade your plan.`,
-    });
+    throw createEntitlementError(entitlement);
   }
 }
 

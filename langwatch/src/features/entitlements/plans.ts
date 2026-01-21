@@ -37,5 +37,5 @@ const planEntitlements: Record<Plan, Entitlement[]> = {
  * @returns Array of entitlements the plan has access to
  */
 export function getEntitlementsForPlan(plan: Plan): Entitlement[] {
-  return planEntitlements[plan] ?? baseEntitlements;
+  return planEntitlements[plan];
 }
