@@ -39,15 +39,15 @@ export function NewEvaluationMenu() {
         <Menu.Content minWidth="320px">
           <Menu.Item value="experiment" onClick={openExperimentDialog}>
             <Box width="100%">
-              <Text fontWeight="medium">New Experiment</Text>
+              <Text fontWeight="medium">Create Experiment</Text>
               <Text fontSize="xs" color="gray.500">
-                Compare prompts and model performance side by side
+                Compare prompts and agents performance side by side
               </Text>
             </Box>
           </Menu.Item>
           <Menu.Item value="onlineEvaluation" onClick={handleNewOnlineEvaluation}>
             <Box width="100%">
-              <Text fontWeight="medium">New Online Evaluation</Text>
+              <Text fontWeight="medium">Add Online Evaluation</Text>
               <Text fontSize="xs" color="gray.500">
                 Monitor live traces and capture performance signals
               </Text>
@@ -55,7 +55,7 @@ export function NewEvaluationMenu() {
           </Menu.Item>
           <Menu.Item value="guardrail" onClick={handleNewGuardrail}>
             <Box width="100%">
-              <Text fontWeight="medium">New Guardrail</Text>
+              <Text fontWeight="medium">Setup Guardrail</Text>
               <Text fontSize="xs" color="gray.500">
                 Block dangerous requests and harmful outputs
               </Text>

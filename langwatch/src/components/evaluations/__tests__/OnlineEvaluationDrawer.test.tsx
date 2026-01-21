@@ -261,8 +261,6 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
       // Name should be auto-filled
       const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
       expect(nameInput.value).toBe("PII Check");
-      // Should NOT show the empty state
-      expect(screen.queryByText("Choose an evaluator to run on incoming traces")).not.toBeInTheDocument();
     });
   });
 });
@@ -412,7 +410,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("clears evaluator when clicking X button", async () => {
+    it("shows selected evaluator in clickable selection box", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -426,19 +424,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
-      });
-
-      // Find and click the X button to clear
-      const clearButton = screen.getByRole("button", { name: "" }); // X button has no aria-label
-      // Use getAllByRole and filter to find the right button
-      const buttons = screen.getAllByRole("button");
-      const xButton = buttons.find(btn => btn.querySelector("svg[class*='lucide-x']"));
-      if (xButton) {
-        await user.click(xButton);
-      }
-
-      await waitFor(() => {
-        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+        // Selection box should be clickable (has caret indicator for re-selection)
+        const selectionBox = screen.getByText("PII Check").closest("button");
+        expect(selectionBox).toBeInTheDocument();
       });
     });
   });
@@ -751,8 +739,9 @@ describe("OnlineEvaluationDrawer", () => {
         expect(nameInput.value).toBe("My Custom Monitor Name");
       });
 
-      // Now click "Change" to navigate to evaluator list again
-      await user.click(screen.getByText("Change"));
+      // Now click on the selection box to navigate to evaluator list again (caret indicates clickable)
+      const selectionBox = screen.getByText("PII Check").closest("button");
+      await user.click(selectionBox!);
 
       // Clear the flow callbacks to simulate navigation
       clearFlowCallbacks();
@@ -783,8 +772,9 @@ describe("OnlineEvaluationDrawer", () => {
       const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
       await user.clear(nameInput);
 
-      // Click "Change" to select a different evaluator
-      await user.click(screen.getByText("Change"));
+      // Click selection box to select a different evaluator (caret indicates clickable)
+      const selectionBox = screen.getByText("PII Check").closest("button");
+      await user.click(selectionBox!);
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
 
       // Select the second evaluator
@@ -828,25 +818,25 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Evaluation Level selector", () => {
-    it("shows Trace and Thread options", async () => {
+    it("shows Trace Level and Thread Level options", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText("Trace")).toBeInTheDocument();
-        expect(screen.getByText("Thread")).toBeInTheDocument();
+        expect(screen.getByText("Trace Level")).toBeInTheDocument();
+        expect(screen.getByText("Thread Level")).toBeInTheDocument();
       });
     });
 
-    it("Trace is selected by default", async () => {
+    it("Trace Level is selected by default", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        const traceRadio = screen.getByRole("radio", { name: /trace/i });
+        const traceRadio = screen.getByRole("radio", { name: /trace level/i });
         expect(traceRadio).toBeChecked();
       });
     });
 
-    it("shows trace level description when Trace selected", async () => {
+    it("shows trace level description", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
@@ -854,36 +844,32 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("shows thread level description when Thread selected", async () => {
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    it("shows thread level description", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
-
-      const threadRadio = screen.getByRole("radio", { name: /thread/i });
-      await user.click(threadRadio);
 
       await waitFor(() => {
         expect(screen.getByText(/evaluate all traces in a conversation thread/i)).toBeInTheDocument();
       });
     });
 
-    it("allows switching between Trace and Thread levels", async () => {
+    it("allows switching between Trace Level and Thread Level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
-      // Initially Trace
-      const traceRadio = screen.getByRole("radio", { name: /trace/i });
-      const threadRadio = screen.getByRole("radio", { name: /thread/i });
+      // Initially Trace Level
+      const traceRadio = screen.getByRole("radio", { name: /trace level/i });
+      const threadRadio = screen.getByRole("radio", { name: /thread level/i });
       expect(traceRadio).toBeChecked();
       expect(threadRadio).not.toBeChecked();
 
-      // Switch to Thread
+      // Switch to Thread Level
       await user.click(threadRadio);
       await waitFor(() => {
         expect(threadRadio).toBeChecked();
         expect(traceRadio).not.toBeChecked();
       });
 
-      // Switch back to Trace
+      // Switch back to Trace Level
       await user.click(traceRadio);
       await waitFor(() => {
         expect(traceRadio).toBeChecked();
@@ -966,7 +952,6 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
-        expect(screen.getByText(/choose an evaluator/i)).toBeInTheDocument();
       });
     });
   });

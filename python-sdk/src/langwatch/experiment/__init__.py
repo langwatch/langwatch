@@ -19,27 +19,17 @@ This module provides two ways to run experiments:
    ```python
    import langwatch
 
-<<<<<<< HEAD
    experiment = langwatch.experiment.init("my-experiment")
 
    for index, row in experiment.loop(df.iterrows(), threads=4):
        async def task(index, row):
            result = await my_agent(row["input"])
            experiment.evaluate(
-=======
-   evaluation = langwatch.experiment.init("my-experiment")
-
-   for index, row in evaluation.loop(df.iterrows(), threads=4):
-       async def task(index, row):
-           result = await my_agent(row["input"])
-           evaluation.evaluate(
->>>>>>> 131e50b78 (wip)
                "langevals/exact_match",
                index=index,
                data={"output": result, "expected_output": row["expected"]},
                settings={},
            )
-<<<<<<< HEAD
        experiment.submit(task, index, row)
    ```
 """
@@ -57,31 +47,10 @@ from langwatch.experiment.platform_run import (
     ExperimentTimeoutError,
     ExperimentRunFailedError,
     ExperimentsApiError,
-=======
-       evaluation.submit(task, index, row)
-   ```
-"""
-
-from typing import Optional
-
-# Re-export the Evaluation class (the instance is still called "evaluation" in examples)
-from langwatch.evaluation.evaluation import Evaluation
-
-# Re-export platform run functionality
-from langwatch.evaluation.platform_run import (
-    run,
-    EvaluationRunResult as ExperimentRunResult,
-    EvaluationRunSummary as ExperimentRunSummary,
-    EvaluationNotFoundError as ExperimentNotFoundError,
-    EvaluationTimeoutError as ExperimentTimeoutError,
-    EvaluationRunFailedError as ExperimentRunFailedError,
-    EvaluationsApiError as ExperimentsApiError,
->>>>>>> 131e50b78 (wip)
     TargetStats,
     EvaluatorStats,
 )
 
-<<<<<<< HEAD
 
 def init(name: str, *, run_id: Optional[str] = None) -> Experiment:
     """
@@ -100,35 +69,11 @@ def init(name: str, *, run_id: Optional[str] = None) -> Experiment:
         - evaluate(): Run an evaluator on the current row
         - log(): Log custom metrics
         - submit(): Submit async tasks
-=======
-# Also export with original names for backwards compatibility
-from langwatch.evaluation.platform_run import (
-    EvaluationRunResult,
-    EvaluationRunSummary,
-    EvaluationNotFoundError,
-    EvaluationTimeoutError,
-    EvaluationRunFailedError,
-    EvaluationsApiError,
-)
-
-
-def init(name: str, *, run_id: Optional[str] = None) -> Evaluation:
-    """
-    Initialize a new SDK-defined experiment.
-
-    Args:
-        name: Name for the experiment (shown in LangWatch UI)
-        run_id: Optional custom run ID (auto-generated if not provided)
-
-    Returns:
-        An Evaluation instance to use for running the experiment.
->>>>>>> 131e50b78 (wip)
 
     Example:
         ```python
         import langwatch
 
-<<<<<<< HEAD
         experiment = langwatch.experiment.init("my-experiment")
 
         for index, row in experiment.loop(df.iterrows(), threads=4):
@@ -152,47 +97,12 @@ __all__ = [
     "init",
     "run",
     "Experiment",
-=======
-        evaluation = langwatch.experiment.init("my-experiment")
-
-        for index, row in evaluation.loop(df.iterrows()):
-            async def task(index, row):
-                result = await my_agent(row["input"])
-                evaluation.log("result", index=index, data={"output": result}, score=0.9)
-            evaluation.submit(task, index, row)
-        ```
-    """
-    evaluation = Evaluation(name, run_id=run_id)
-    evaluation.init()
-    return evaluation
-
-
-__all__ = [
-    # Core functionality
-    "init",
-    "run",
-    "Evaluation",
-    # New names (preferred)
->>>>>>> 131e50b78 (wip)
     "ExperimentRunResult",
     "ExperimentRunSummary",
     "ExperimentNotFoundError",
     "ExperimentTimeoutError",
     "ExperimentRunFailedError",
     "ExperimentsApiError",
-<<<<<<< HEAD
     "TargetStats",
     "EvaluatorStats",
-=======
-    # Stats
-    "TargetStats",
-    "EvaluatorStats",
-    # Legacy names (backwards compatibility)
-    "EvaluationRunResult",
-    "EvaluationRunSummary",
-    "EvaluationNotFoundError",
-    "EvaluationTimeoutError",
-    "EvaluationRunFailedError",
-    "EvaluationsApiError",
->>>>>>> 131e50b78 (wip)
 ]

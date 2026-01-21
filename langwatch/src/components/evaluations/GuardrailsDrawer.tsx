@@ -1,22 +1,24 @@
 import {
   Box,
   Button,
-  Code,
-  Field,
   Heading,
   HStack,
-  Tabs,
+  Link,
+  NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
-import { Check, Copy } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import {
   setFlowCallbacks,
   useDrawer,
 } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { RenderCode } from "../code/RenderCode";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
 
 export type GuardrailsDrawerProps = {
@@ -31,7 +33,7 @@ export type GuardrailsDrawerProps = {
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let guardrailsDrawerState: {
   selectedEvaluator: Evaluator | null;
-  activeTab: string;
+  activeLanguage: string;
 } | null = null;
 
 /** Clear persisted drawer state (for testing) */
@@ -41,6 +43,7 @@ export const clearGuardrailsDrawerState = () => {
 
 export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   const { closeDrawer, openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
 
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open !== false && props.open !== undefined;
@@ -49,9 +52,8 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
     () => guardrailsDrawerState?.selectedEvaluator ?? null
   );
-  const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState(
-    () => guardrailsDrawerState?.activeTab ?? "python"
+  const [activeLanguage, setActiveLanguage] = useState(
+    () => guardrailsDrawerState?.activeLanguage ?? "python-async"
   );
 
   // Track previous open state to reset form when drawer opens fresh (no persisted state)
@@ -61,8 +63,7 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
     // If drawer is opening (was closed, now open) and there's no persisted state, reset form
     if (!prevIsOpenRef.current && isOpen && !guardrailsDrawerState) {
       setSelectedEvaluator(null);
-      setActiveTab("python");
-      setCopied(false);
+      setActiveLanguage("python-async");
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen]);
@@ -70,9 +71,9 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   // Persist state changes to module-level storage
   useEffect(() => {
     if (isOpen) {
-      guardrailsDrawerState = { selectedEvaluator, activeTab };
+      guardrailsDrawerState = { selectedEvaluator, activeLanguage };
     }
-  }, [isOpen, selectedEvaluator, activeTab]);
+  }, [isOpen, selectedEvaluator, activeLanguage]);
 
   // Clear persisted state when drawer truly closes (via close button, not navigation)
   const handleClose = useCallback(() => {
@@ -86,118 +87,143 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
       onSelect: (evaluator: Evaluator) => {
         setSelectedEvaluator(evaluator);
         // Also update persisted state immediately
-        guardrailsDrawerState = { selectedEvaluator: evaluator, activeTab };
+        guardrailsDrawerState = { selectedEvaluator: evaluator, activeLanguage };
       },
     });
     openDrawer("evaluatorList", {});
-  }, [openDrawer, activeTab]);
-
-  const handleClearEvaluator = useCallback(() => {
-    setSelectedEvaluator(null);
-  }, []);
-
-  const handleCopy = (code: string) => {
-    void navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  }, [openDrawer, activeLanguage]);
 
   const evaluatorSlug = selectedEvaluator?.slug ?? "your-evaluator-slug";
-  const apiKey = "<YOUR_LANGWATCH_API_KEY>";
+  const evaluatorName = selectedEvaluator?.name ?? "My Guardrail";
 
-  // Code snippets
-  const pythonCode = `import langwatch
+  // Code snippets using environment variable
+  const pythonAsyncCode = `import langwatch
 
-# Initialize LangWatch client
-langwatch.api_key = "${apiKey}"
+# Uses LANGWATCH_API_KEY environment variable
 
-async def check_guardrail(input_text: str) -> dict:
-    """
-    Check if input passes the guardrail.
-    Returns the evaluation result with pass/fail status.
-    """
-    result = await langwatch.guardrails.evaluate(
-        evaluator="evaluators/${evaluatorSlug}",
-        data={"input": input_text}
+async def llm_step(user_input: str):
+    # ... your existing code
+
+    guardrail = await langwatch.evaluation.async_evaluate(
+        "${evaluatorSlug}",
+        data={
+            "input": user_input
+        },
+        name="${evaluatorName}",
+        as_guardrail=True,
     )
 
-    if not result.passed:
-        # Handle failed guardrail (e.g., block request)
-        raise ValueError(f"Guardrail failed: {result.details}")
+    if not guardrail.passed:
+        # handle the guardrail here
+        return "I'm sorry, I can't do that."
 
-    return result
+    # ... continue with your LLM call`;
 
-# Example usage
-async def handle_user_message(message: str):
-    # Check guardrail before processing
-    await check_guardrail(message)
+  const pythonSyncCode = `import langwatch
 
-    # Process the message...
-    return generate_response(message)`;
+# Uses LANGWATCH_API_KEY environment variable
+
+def llm_step(user_input: str):
+    # ... your existing code
+
+    guardrail = langwatch.evaluation.evaluate(
+        "${evaluatorSlug}",
+        data={
+            "input": user_input
+        },
+        name="${evaluatorName}",
+        as_guardrail=True,
+    )
+
+    if not guardrail.passed:
+        # handle the guardrail here
+        return "I'm sorry, I can't do that."
+
+    # ... continue with your LLM call`;
 
   const typescriptCode = `import { LangWatch } from "langwatch";
 
-// Initialize LangWatch client
-const langwatch = new LangWatch({
-  apiKey: "${apiKey}",
-});
+// Uses LANGWATCH_API_KEY environment variable
+const langwatch = new LangWatch();
 
-async function checkGuardrail(inputText: string) {
-  /**
-   * Check if input passes the guardrail.
-   * Returns the evaluation result with pass/fail status.
-   */
-  const result = await langwatch.guardrails.evaluate({
-    evaluator: "evaluators/${evaluatorSlug}",
-    data: { input: inputText },
-  });
+async function llmStep(message: string): Promise<string> {
+    // ... your existing code
 
-  if (!result.passed) {
-    // Handle failed guardrail (e.g., block request)
-    throw new Error(\`Guardrail failed: \${result.details}\`);
-  }
+    // call the guardrail
+    const guardrail = await langwatch.evaluations.evaluate(
+      "${evaluatorSlug}",
+      {
+        data: {
+          input: message
+        },
+        name: "${evaluatorName}",
+        asGuardrail: true,
+      }
+    );
 
-  return result;
-}
+    if (!guardrail.passed) {
+        // handle the guardrail here
+        return "I'm sorry, I can't do that.";
+    }
 
-// Example usage
-async function handleUserMessage(message: string) {
-  // Check guardrail before processing
-  await checkGuardrail(message);
-
-  // Process the message...
-  return generateResponse(message);
+    // ... continue with your LLM call
 }`;
 
-  const curlCode = `curl -X POST "https://api.langwatch.ai/api/evaluations/evaluators/${evaluatorSlug}/evaluate" \\
-  -H "X-Auth-Token: ${apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "data": {
-      "input": "Your input text here"
-    }
-  }'
+  const curlCode = `# Set your API key
+API_KEY="$LANGWATCH_API_KEY"
 
-# Response format:
+# Use curl to send the POST request
+curl -X POST "https://app.langwatch.ai/api/evaluations/${evaluatorSlug}/evaluate" \\
+     -H "X-Auth-Token: $API_KEY" \\
+     -H "Content-Type: application/json" \\
+     -d @- <<EOF
+{
+  "name": "${evaluatorName}",
+  "data": {
+    "input": "input content"
+  },
+  "as_guardrail": true
+}
+EOF
+
+# Response:
 # {
+#   "status": "processed",
 #   "passed": true,
-#   "score": 1.0,
-#   "details": "Evaluation details...",
-#   "cost": { "amount": 0.001, "currency": "USD" }
+#   "score": 1,
+#   "details": "possible explanation"
 # }`;
 
   const getCode = () => {
-    switch (activeTab) {
+    switch (activeLanguage) {
+      case "python-async":
+        return pythonAsyncCode;
       case "python":
-        return pythonCode;
+        return pythonSyncCode;
       case "typescript":
         return typescriptCode;
-      case "curl":
+      case "bash":
         return curlCode;
       default:
-        return pythonCode;
+        return pythonAsyncCode;
     }
   };
+
+  const getLanguageForHighlight = () => {
+    switch (activeLanguage) {
+      case "python-async":
+      case "python":
+        return "python";
+      case "typescript":
+        return "typescript";
+      case "bash":
+        return "bash";
+      default:
+        return "python";
+    }
+  };
+
+  const apiKeyLink = project ? `/${project.slug}/settings` : "/settings";
 
   return (
     <Drawer.Root
@@ -211,121 +237,80 @@ async function handleUserMessage(message: string) {
           <Heading size="md">New Guardrail</Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <VStack gap={6} align="stretch">
+          <VStack gap={0} align="stretch">
             {/* Evaluator Selection */}
-            <Field.Root>
-              <Field.Label>Evaluator</Field.Label>
+            <HorizontalFormControl
+              label="Evaluator"
+              helper="Select an evaluator to use as a guardrail"
+            >
               <EvaluatorSelectionBox
                 selectedEvaluator={selectedEvaluator}
                 onSelectClick={handleSelectEvaluator}
-                onClear={handleClearEvaluator}
                 placeholder="Select Evaluator"
-                placeholderDescription="Choose an evaluator to use as a guardrail"
                 showSlug={true}
               />
-            </Field.Root>
+            </HorizontalFormControl>
 
             {/* Code Integration - only shown when evaluator is selected */}
             {selectedEvaluator && (
-              <>
-                {/* Instructions */}
-                <VStack align="start" gap={2}>
-                  <Text fontWeight="medium">Integration Code</Text>
+              <HorizontalFormControl
+                label="Integration Code"
+                helper="Use the code below to integrate this guardrail into your application"
+                direction="vertical"
+                align="start"
+                labelProps={{
+                  paddingLeft: 0,
+                }}
+              >
+                <VStack align="stretch" gap={4} width="full">
+                  <NativeSelect.Root width="170px">
+                    <NativeSelect.Field
+                      value={activeLanguage}
+                      onChange={(e) => setActiveLanguage(e.target.value)}
+                    >
+                      <option value="python-async">Python (async)</option>
+                      <option value="python">Python</option>
+                      <option value="typescript">TypeScript</option>
+                      <option value="bash">cURL</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+
+                  <Box borderRadius="md" overflow="hidden" width="full">
+                    <RenderCode
+                      code={getCode()}
+                      language={getLanguageForHighlight()}
+                      style={{ padding: "16px", width: "100%" }}
+                    />
+                  </Box>
+
                   <Text fontSize="sm" color="gray.600">
-                    Use the code below to integrate this guardrail into your application.
-                    The guardrail will evaluate inputs before processing and can block
-                    requests that fail the evaluation.
+                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
+                    <Link
+                      href={apiKeyLink}
+                      color="blue.500"
+                      display="inline-flex"
+                      alignItems="center"
+                      gap={1}
+                    >
+                      Find your API key <ExternalLink size={12} />
+                    </Link>
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    Learn more about running guardrails in our{" "}
+                    <Link
+                      href="https://langwatch.ai/docs/evaluations/guardrails/overview"
+                      color="blue.500"
+                      display="inline-flex"
+                      alignItems="center"
+                      gap={1}
+                      target="_blank"
+                    >
+                      documentation <ExternalLink size={12} />
+                    </Link>
                   </Text>
                 </VStack>
-
-                {/* Code Block with Tabs */}
-                <Box>
-                  <Tabs.Root
-                    value={activeTab}
-                    onValueChange={({ value }) => setActiveTab(value)}
-                  >
-                    <HStack justify="space-between" marginBottom={2}>
-                      <Tabs.List>
-                        <Tabs.Trigger value="python">Python</Tabs.Trigger>
-                        <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
-                        <Tabs.Trigger value="curl">cURL</Tabs.Trigger>
-                      </Tabs.List>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleCopy(getCode())}
-                      >
-                        {copied ? (
-                          <>
-                            <Check size={14} />
-                            Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={14} />
-                            Copy
-                          </>
-                        )}
-                      </Button>
-                    </HStack>
-                    <Box
-                      backgroundColor="gray.900"
-                      borderRadius="md"
-                      padding={4}
-                      overflowX="auto"
-                    >
-                      <Tabs.Content value="python">
-                        <Code
-                          display="block"
-                          whiteSpace="pre"
-                          fontSize="sm"
-                          color="gray.100"
-                          backgroundColor="transparent"
-                        >
-                          {pythonCode}
-                        </Code>
-                      </Tabs.Content>
-                      <Tabs.Content value="typescript">
-                        <Code
-                          display="block"
-                          whiteSpace="pre"
-                          fontSize="sm"
-                          color="gray.100"
-                          backgroundColor="transparent"
-                        >
-                          {typescriptCode}
-                        </Code>
-                      </Tabs.Content>
-                      <Tabs.Content value="curl">
-                        <Code
-                          display="block"
-                          whiteSpace="pre"
-                          fontSize="sm"
-                          color="gray.100"
-                          backgroundColor="transparent"
-                        >
-                          {curlCode}
-                        </Code>
-                      </Tabs.Content>
-                    </Box>
-                  </Tabs.Root>
-                </Box>
-
-                {/* API Key Note */}
-                <Box
-                  padding={4}
-                  borderWidth={1}
-                  borderRadius="md"
-                  borderColor="orange.200"
-                  backgroundColor="orange.50"
-                >
-                  <Text fontSize="sm" color="orange.800">
-                    <strong>Note:</strong> Replace <Code size="sm">{apiKey}</Code> with
-                    your actual LangWatch API key. You can find it in your project
-                    settings.
-                  </Text>
-                </Box>
-              </>
+              </HorizontalFormControl>
             )}
           </VStack>
         </Drawer.Body>

@@ -6,13 +6,13 @@ import {
   HStack,
   Input,
   NativeSelect,
-  RadioGroup,
+  RadioCard,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode, type Evaluator } from "@prisma/client";
-import { AlertTriangle, HelpCircle, X } from "lucide-react";
+import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvailableSource, FieldMapping as UIFieldMapping } from "~/components/variables";
 import { Drawer } from "~/components/ui/drawer";
@@ -35,6 +35,8 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
+import { StepRadio } from "./wizard/components/StepButton";
+import { LuListTree } from "react-icons/lu";
 
 export type EvaluationLevel = "trace" | "thread";
 
@@ -247,7 +249,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Get evaluator type info for display
   const evaluatorType = selectedEvaluator
     ? ((selectedEvaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined)
+      ?.evaluatorType as EvaluatorTypes | undefined)
     : undefined;
 
   // Compute required fields and pending mappings
@@ -369,11 +371,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // Set flow callback for evaluator selection
     setFlowCallbacks("evaluatorList", {
       onSelect: (evaluator: Evaluator) => {
+        const newName = name || evaluator.name;
         setSelectedEvaluator(evaluator);
 
         // Default name to evaluator name if not set
         if (!name) {
-          setName(evaluator.name);
+          setName(newName);
         }
 
         // Get evaluator type and required fields
@@ -384,6 +387,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         // Auto-infer mappings for trace level
         const autoMappings = autoInferMappings(fields, level);
         setMappings(autoMappings);
+
+        // Immediately persist state (useEffect may not run before navigation)
+        onlineEvaluationDrawerState = {
+          level,
+          name: newName,
+          selectedEvaluator: evaluator,
+          sample,
+          mappings: autoMappings,
+          preconditions,
+        };
 
         // Check for pending mappings
         const pending = getPendingFields(fields, autoMappings);
@@ -415,12 +428,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       },
     });
     openDrawer("evaluatorList", {});
-  }, [name, level, openDrawer]);
-
-  const handleClearEvaluator = useCallback(() => {
-    setSelectedEvaluator(null);
-    setMappings({});
-  }, []);
+  }, [name, level, sample, preconditions, openDrawer]);
 
   const handleLevelChange = useCallback((details: { value: string | null }) => {
     if (!details.value) return;
@@ -554,29 +562,34 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
             {/* Evaluation Level */}
             <HorizontalFormControl
               label="Evaluation Level"
-              helper={
-                level === "trace"
-                  ? "Evaluate each trace individually as it arrives"
-                  : "Evaluate all traces in a conversation thread together"
-              }
+              helper="Select the level at which to evaluate incoming data"
+              align="start"
+              labelProps={{ paddingLeft: 0 }}
             >
-              <RadioGroup.Root
+              <RadioCard.Root
+                variant="outline"
+                colorPalette="orange"
                 value={level}
                 onValueChange={handleLevelChange}
+                width="full"
               >
-                <HStack gap={4}>
-                  <RadioGroup.Item value="trace">
-                    <RadioGroup.ItemHiddenInput />
-                    <RadioGroup.ItemIndicator />
-                    <RadioGroup.ItemText>Trace</RadioGroup.ItemText>
-                  </RadioGroup.Item>
-                  <RadioGroup.Item value="thread">
-                    <RadioGroup.ItemHiddenInput />
-                    <RadioGroup.ItemIndicator />
-                    <RadioGroup.ItemText>Thread</RadioGroup.ItemText>
-                  </RadioGroup.Item>
-                </HStack>
-              </RadioGroup.Root>
+                <VStack gap={2} width="full" align="stretch">
+                  <StepRadio
+                    value="trace"
+                    title="Trace Level"
+                    description="Evaluate each trace individually as it arrives"
+                    icon={<LuListTree />}
+                    width="full"
+                  />
+                  <StepRadio
+                    value="thread"
+                    title="Thread Level"
+                    description="Evaluate all traces in a conversation thread together"
+                    icon={<Spool />}
+                    width="full"
+                  />
+                </VStack>
+              </RadioCard.Root>
             </HorizontalFormControl>
 
             {/* Evaluator Selection */}
@@ -588,9 +601,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 <EvaluatorSelectionBox
                   selectedEvaluator={selectedEvaluator}
                   onSelectClick={handleSelectEvaluator}
-                  onClear={handleClearEvaluator}
                   placeholder="Select Evaluator"
-                  placeholderDescription="Choose an evaluator to run on incoming traces"
                 />
 
                 {/* Pending Mappings Warning */}

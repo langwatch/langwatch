@@ -15,7 +15,12 @@ import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
+import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";
 
 export type EvaluatorListDrawerProps = {
@@ -194,16 +199,21 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 // Evaluator Card Component
 // ============================================================================
 
-const evaluatorTypeLabels: Record<string, string> = {
-  evaluator: "Built-in",
-  workflow: "Workflow",
-};
-
 type EvaluatorCardProps = {
   evaluator: Evaluator;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
+};
+
+const getEvaluatorDisplayName = (evaluatorType: string): string => {
+  if (!evaluatorType) return "";
+
+  const evaluatorDefinition =
+    AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  if (!evaluatorDefinition) return evaluatorType;
+
+  return evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name;
 };
 
 function EvaluatorCard({
@@ -212,9 +222,12 @@ function EvaluatorCard({
   onEdit,
   onDelete,
 }: EvaluatorCardProps) {
-  const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType ?? "";
+  const displayName =
+    evaluator.type === "workflow"
+      ? "Workflow"
+      : getEvaluatorDisplayName(evaluatorType);
 
   return (
     <Box
@@ -245,14 +258,12 @@ function EvaluatorCard({
             {evaluator.name}
           </Text>
           <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-            <span>{typeLabel}</span>
-            {evaluatorType && (
+            {displayName && (
               <>
+                <span>{displayName}</span>
                 <span style={{ margin: "0 4px" }}>{" • "}</span>
-                <span>{evaluatorType}</span>
               </>
             )}
-            <span style={{ margin: "0 4px" }}>{" • "}</span>
             <span>
               Updated{" "}
               {formatDistanceToNow(new Date(evaluator.updatedAt), {
