@@ -7,7 +7,7 @@ import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
   ExperimentType,
-  type Prisma,
+  Prisma,
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -39,13 +39,20 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
+import { DatasetService } from "../../datasets/dataset.service";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  createInnerTRPCContext,
+  createTRPCRouter,
+  protectedProcedure,
+} from "../trpc";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
+type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -474,13 +481,29 @@ export const experimentsRouter = createTRPCRouter({
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
 
-      // Get total count for pagination
-      const totalHits = await prisma.experiment.count({
-        where: { projectId: input.projectId },
-      });
+      const baseWhereClause: Prisma.ExperimentWhereInput = {
+        projectId: input.projectId,
+      };
 
-      const experiments = await prisma.experiment.findMany({
-        where: { projectId: input.projectId },
+      // Helper to check if an experiment is a real_time evaluation (old wizard)
+      const isRealTimeEvaluation = (workbenchState: JsonValue | null) => {
+        if (!workbenchState || typeof workbenchState !== "object") return false;
+        return (workbenchState as Record<string, unknown>).task === "real_time";
+      };
+
+      // Get total count for pagination (excluding real_time evaluations)
+      const allExperimentsCount = await prisma.experiment.findMany({
+        where: baseWhereClause,
+        select: { workbenchState: true },
+      });
+      const totalHits = allExperimentsCount.filter(
+        (e) => !isRealTimeEvaluation(e.workbenchState),
+      ).length;
+
+      // Fetch all experiments and filter/paginate in JS
+      // (Prisma JSON path filtering is unreliable for nested fields)
+      const allExperiments = await prisma.experiment.findMany({
+        where: baseWhereClause,
         include: {
           workflow: {
             include: {
@@ -491,9 +514,12 @@ export const experimentsRouter = createTRPCRouter({
         orderBy: {
           updatedAt: "desc",
         },
-        skip: pageOffset,
-        take: pageSize,
       });
+
+      // Filter out real_time evaluations and apply pagination
+      const experiments = allExperiments
+        .filter((e) => !isRealTimeEvaluation(e.workbenchState))
+        .slice(pageOffset, pageOffset + pageSize);
 
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (
@@ -969,6 +995,18 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
+      // Handle V3 experiments (no workflow, state stored in workbenchState)
+      if (experiment.type === ExperimentType.EVALUATIONS_V3) {
+        return await copyEvaluationsV3Experiment({
+          ctx,
+          experiment,
+          targetProjectId: input.projectId,
+          sourceProjectId: input.sourceProjectId,
+          copyDatasets: input.copyDatasets,
+        });
+      }
+
+      // V2 experiments require a workflow
       if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -1391,4 +1429,124 @@ const getExperimentBatchEvaluationRuns = async (
   );
 
   return runsByExperimentId;
+};
+
+/**
+ * Copies an EVALUATIONS_V3 experiment to another project.
+ * V3 experiments store their state in workbenchState (no workflow).
+ * Optionally copies saved datasets and updates references.
+ */
+const copyEvaluationsV3Experiment = async ({
+  ctx,
+  experiment,
+  targetProjectId,
+  sourceProjectId,
+  copyDatasets,
+}: {
+  ctx: TRPCContext;
+  experiment: {
+    id: string;
+    name: string | null;
+    slug: string;
+    type: ExperimentType;
+    workbenchState: JsonValue;
+  };
+  targetProjectId: string;
+  sourceProjectId: string;
+  copyDatasets?: boolean;
+}) => {
+  // Deep clone the workbenchState
+  const workbenchState = JSON.parse(
+    JSON.stringify(experiment.workbenchState ?? {}),
+  ) as Record<string, unknown>;
+
+  // Clear execution results (don't copy them to new project)
+  delete workbenchState.results;
+
+  // Process datasets if copyDatasets is enabled
+  if (copyDatasets && Array.isArray(workbenchState.datasets)) {
+    const datasetService = DatasetService.create(ctx.prisma);
+    const datasetIdMap: Record<string, string> = {};
+
+    // Copy saved datasets and build ID mapping
+    for (const dataset of workbenchState.datasets as Array<{
+      id: string;
+      type: string;
+      datasetId?: string;
+    }>) {
+      if (dataset.type === "saved" && dataset.datasetId) {
+        try {
+          const newDataset = await datasetService.copyDataset({
+            sourceDatasetId: dataset.datasetId,
+            sourceProjectId,
+            targetProjectId,
+          });
+          datasetIdMap[dataset.datasetId] = newDataset.id;
+        } catch {
+          // If dataset copy fails (e.g., not found), keep original reference
+          continue;
+        }
+      }
+    }
+
+    // Update dataset references in workbenchState
+    for (const dataset of workbenchState.datasets as Array<{
+      id: string;
+      type: string;
+      datasetId?: string;
+    }>) {
+      if (
+        dataset.type === "saved" &&
+        dataset.datasetId &&
+        datasetIdMap[dataset.datasetId]
+      ) {
+        dataset.datasetId = datasetIdMap[dataset.datasetId];
+      }
+    }
+  }
+
+  // Generate unique slug for the new experiment
+  const experimentName = experiment.name ?? experiment.slug;
+  const baseSlug = slugify(experimentName);
+
+  const MAX_ATTEMPTS = 100;
+  let newSlug = baseSlug;
+  let index = 2;
+  let attempts = 0;
+
+  while (attempts < MAX_ATTEMPTS) {
+    const existingExperiment = await ctx.prisma.experiment.findFirst({
+      where: {
+        projectId: targetProjectId,
+        slug: newSlug,
+      },
+    });
+
+    if (!existingExperiment) {
+      break;
+    }
+
+    newSlug = `${baseSlug}-${index}`;
+    index++;
+    attempts++;
+  }
+
+  // Fallback to random suffix if we hit the limit
+  if (attempts >= MAX_ATTEMPTS) {
+    newSlug = `${baseSlug}-${nanoid(8)}`;
+  }
+
+  // Create the new experiment
+  const newExperiment = await ctx.prisma.experiment.create({
+    data: {
+      id: generate("eval").toString(),
+      name: experimentName,
+      slug: newSlug,
+      projectId: targetProjectId,
+      type: ExperimentType.EVALUATIONS_V3,
+      workbenchState: workbenchState as Prisma.InputJsonValue,
+    },
+  });
+
+  return { experiment: newExperiment, workflow: null };
 };

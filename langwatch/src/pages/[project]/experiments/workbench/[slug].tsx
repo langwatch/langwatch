@@ -19,11 +19,11 @@ import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoa
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
- * Evaluations V3 Page
+ * Experiments Workbench Page
  *
- * Main page for the new spreadsheet-like evaluation experience.
+ * Main page for the spreadsheet-like experiment experience.
  */
-export default function EvaluationsV3Page() {
+export default function ExperimentsWorkbenchPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
@@ -75,9 +75,9 @@ export default function EvaluationsV3Page() {
         <Box padding={6}>
           <Alert.Root status="warning">
             <Alert.Indicator />
-            <Alert.Title>Evaluation not found</Alert.Title>
+            <Alert.Title>Experiment not found</Alert.Title>
             <Alert.Description>
-              The evaluation you&apos;re looking for doesn&apos;t exist or you
+              The experiment you&apos;re looking for doesn&apos;t exist or you
               don&apos;t have access to it.
             </Alert.Description>
           </Alert.Root>
@@ -93,10 +93,10 @@ export default function EvaluationsV3Page() {
         <Box padding={6}>
           <Alert.Root status="error">
             <Alert.Indicator />
-            <Alert.Title>Failed to load evaluation</Alert.Title>
+            <Alert.Title>Failed to load experiment</Alert.Title>
             <Alert.Description>
               {error?.message ??
-                "An unexpected error occurred while loading the evaluation."}
+                "An unexpected error occurred while loading the experiment."}
             </Alert.Description>
           </Alert.Root>
         </Box>

@@ -514,11 +514,11 @@ export function BatchEvaluationResults({
           )}
           {experiment.type === ExperimentType.EVALUATIONS_V3 && (
             <Link
-              href={`/${project.slug}/evaluations/v3/${experiment.slug}`}
+              href={`/${project.slug}/experiments/workbench/${experiment.slug}`}
               asChild
             >
               <Button size="sm" variant="outline" textDecoration="none">
-                <ExternalLink size={16} /> Open Evaluation
+                <ExternalLink size={16} /> Open Experiment
               </Button>
             </Link>
           )}

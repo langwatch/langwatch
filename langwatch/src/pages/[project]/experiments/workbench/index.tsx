@@ -9,12 +9,12 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 /**
- * New Evaluation V3 Page
+ * New Experiment Workbench Page
  *
- * Creates a new evaluation on the server and redirects to the slug page.
- * This ensures the experiment exists before navigating to /v3/[slug].
+ * Creates a new experiment on the server and redirects to the slug page.
+ * This ensures the experiment exists before navigating to /experiments/workbench/[slug].
  */
-export default function NewEvaluationV3() {
+export default function NewExperimentWorkbench() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const hasCreatedRef = useRef(false);
@@ -43,10 +43,10 @@ export default function NewEvaluationV3() {
 
         // Redirect to the new experiment
         void router.replace(
-          `/${project.slug}/evaluations/v3/${experiment.slug}`,
+          `/${project.slug}/experiments/workbench/${experiment.slug}`,
         );
       } catch (error) {
-        console.error("Failed to create new evaluation:", error);
+        console.error("Failed to create new experiment:", error);
         // hasCreatedRef stays true to prevent retry loops
         // Error will be shown in the UI via createExperiment.isError
       }
@@ -61,7 +61,7 @@ export default function NewEvaluationV3() {
             <Alert.Root status="error">
               <Alert.Indicator />
               <VStack align="start" gap={1}>
-                <Alert.Title>Failed to create evaluation</Alert.Title>
+                <Alert.Title>Failed to create experiment</Alert.Title>
                 <Alert.Description>
                   {createExperiment.error?.message ??
                     "An unexpected error occurred."}

@@ -266,12 +266,12 @@ function EvaluationsV2() {
                                   <Table.Row
                                     cursor="pointer"
                                     onClick={() => {
-                                      // EVALUATIONS_V3 type goes to the V3 workbench page
+                                      // EVALUATIONS_V3 type goes to the experiments workbench page
                                       if (
                                         experiment.type === "EVALUATIONS_V3"
                                       ) {
                                         void router.push({
-                                          pathname: `/${project?.slug}/evaluations/v3/${experiment.slug}`,
+                                          pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
                                         });
                                       } else if (experiment.workbenchState) {
                                         void router.push({

@@ -49,23 +49,39 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 // Mock tRPC API for experiment creation
-const mockCreateMutate = vi.fn();
+let mockMutateCallback: ((data: unknown) => void) | null = null;
+let mockOnSuccess: ((data: { slug: string }) => void) | null = null;
+let mockIsPending = false;
+const mockInvalidate = vi.fn(() => Promise.resolve());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: vi.fn(() => ({
+      experiments: {
+        getAllForEvaluationsList: {
+          invalidate: mockInvalidate,
+        },
+      },
+    })),
     experiments: {
       saveEvaluationsV3: {
-        useMutation: vi.fn((options: { onSuccess?: (data: { slug: string }) => void }) => ({
-          mutate: (data: unknown) => {
-            mockCreateMutate(data);
-            // Simulate successful creation
-            options?.onSuccess?.({ slug: "test-experiment-abc12" });
-          },
-          isPending: false,
-        })),
+        useMutation: vi.fn((options: { onSuccess?: (data: { slug: string }) => void; onError?: () => void }) => {
+          mockOnSuccess = options?.onSuccess ?? null;
+          return {
+            mutate: (data: unknown) => {
+              mockMutateCallback?.(data);
+            },
+            isPending: mockIsPending,
+          };
+        }),
       },
     },
   },
+}));
+
+// Mock humanReadableId to return predictable values
+vi.mock("~/utils/humanReadableId", () => ({
+  generateHumanReadableId: vi.fn(() => "swift-bright-fox"),
 }));
 
 // Wrapper with ChakraProvider
@@ -78,7 +94,10 @@ describe("NewEvaluationMenu", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockQuery = {};
     mockPush.mockClear();
-    mockCreateMutate.mockClear();
+    mockInvalidate.mockClear();
+    mockMutateCallback = null;
+    mockOnSuccess = null;
+    mockIsPending = false;
     clearDrawerStack();
     clearFlowCallbacks();
   });
@@ -106,27 +125,27 @@ describe("NewEvaluationMenu", () => {
       await user.click(screen.getByText("New Evaluation"));
     };
 
-    it("shows New Experiment option when menu is open", async () => {
+    it("shows Create Experiment option when menu is open", async () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText("New Experiment")).toBeInTheDocument();
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument();
       });
     });
 
-    it("shows New Online Evaluation option when menu is open", async () => {
+    it("shows Add Online Evaluation option when menu is open", async () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText("New Online Evaluation")).toBeInTheDocument();
+        expect(screen.getByText("Add Online Evaluation")).toBeInTheDocument();
       });
     });
 
-    it("shows New Guardrail option when menu is open", async () => {
+    it("shows Setup Guardrail option when menu is open", async () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText("New Guardrail")).toBeInTheDocument();
+        expect(screen.getByText("Setup Guardrail")).toBeInTheDocument();
       });
     });
 
@@ -134,7 +153,7 @@ describe("NewEvaluationMenu", () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText(/compare prompts and model performance/i)).toBeInTheDocument();
+        expect(screen.getByText(/compare prompts and agents performance/i)).toBeInTheDocument();
       });
     });
 
@@ -155,77 +174,105 @@ describe("NewEvaluationMenu", () => {
     });
   });
 
-  describe("New Experiment option", () => {
-    it("opens experiment dialog when clicked", async () => {
+  describe("Create Experiment option", () => {
+    it("calls mutation with generated name when clicked", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let mutateData: unknown = null;
+      mockMutateCallback = (data) => {
+        mutateData = data;
+      };
+
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
 
       await waitFor(() => {
-        expect(screen.getByText("New Experiment")).toBeInTheDocument();
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("New Experiment"));
+      await user.click(screen.getByText("Create Experiment"));
 
-      // Dialog should open
       await waitFor(() => {
-        expect(screen.getByText("Experiment Name")).toBeInTheDocument();
+        expect(mutateData).not.toBeNull();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((mutateData as any).state.experimentSlug).toBe("swift-bright-fox");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((mutateData as any).projectId).toBe("test-project-id");
       });
     });
 
-    it("shows name input in experiment dialog", async () => {
+    it("redirects to v3 page on successful creation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockMutateCallback = () => {
+        // Simulate async mutation success
+        setTimeout(() => {
+          mockOnSuccess?.({ slug: "swift-bright-fox" });
+        }, 10);
+      };
+
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
-      await waitFor(() => expect(screen.getByText("New Experiment")).toBeInTheDocument());
-      await user.click(screen.getByText("New Experiment"));
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter experiment name")).toBeInTheDocument();
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Create Experiment"));
+
+      // Wait for the mutation to complete and redirect
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith("/test-project/experiments/workbench/swift-bright-fox");
       });
     });
 
-    it("Create button is disabled when name is empty", async () => {
+    it("uses human-readable ID as both name and slug", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      let mutateData: unknown = null;
+      mockMutateCallback = (data) => {
+        mutateData = data;
+      };
+
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
-      await waitFor(() => expect(screen.getByText("New Experiment")).toBeInTheDocument());
-      await user.click(screen.getByText("New Experiment"));
+      await waitFor(() => expect(screen.getByText("Create Experiment")).toBeInTheDocument());
+      await user.click(screen.getByText("Create Experiment"));
 
       await waitFor(() => {
-        const createButtons = screen.getAllByText("Create");
-        // Find the one in the dialog (should be the button, not menu item)
-        const createButton = createButtons.find((btn) => btn.tagName === "BUTTON");
-        expect(createButton).toBeDisabled();
+        expect(mutateData).not.toBeNull();
+        // The name in the state should be the human-readable ID
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((mutateData as any).state.name).toBe("swift-bright-fox");
+        // The slug should also be the human-readable ID
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((mutateData as any).state.experimentSlug).toBe("swift-bright-fox");
       });
     });
 
-    it("Create button is enabled when name is entered", async () => {
+    it("invalidates experiments list on successful creation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockMutateCallback = () => {
+        // Simulate async mutation success
+        setTimeout(() => {
+          mockOnSuccess?.({ slug: "swift-bright-fox" });
+        }, 10);
+      };
+
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
-      await waitFor(() => expect(screen.getByText("New Experiment")).toBeInTheDocument());
-      await user.click(screen.getByText("New Experiment"));
+      await waitFor(() => expect(screen.getByText("Create Experiment")).toBeInTheDocument());
+      await user.click(screen.getByText("Create Experiment"));
 
+      // Wait for the mutation to complete
       await waitFor(() => {
-        expect(screen.getByPlaceholderText("Enter experiment name")).toBeInTheDocument();
-      });
-
-      await user.type(screen.getByPlaceholderText("Enter experiment name"), "My Test Experiment");
-
-      await waitFor(() => {
-        const createButtons = screen.getAllByText("Create");
-        const createButton = createButtons.find((btn) => btn.tagName === "BUTTON");
-        expect(createButton).not.toBeDisabled();
+        expect(mockInvalidate).toHaveBeenCalled();
       });
     });
   });
 
-  describe("New Online Evaluation option", () => {
+  describe("Add Online Evaluation option", () => {
     it("opens online evaluation drawer when clicked", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
@@ -233,10 +280,10 @@ describe("NewEvaluationMenu", () => {
       await user.click(screen.getByText("New Evaluation"));
 
       await waitFor(() => {
-        expect(screen.getByText("New Online Evaluation")).toBeInTheDocument();
+        expect(screen.getByText("Add Online Evaluation")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("New Online Evaluation"));
+      await user.click(screen.getByText("Add Online Evaluation"));
 
       // Should update query to open drawer
       await waitFor(() => {
@@ -247,7 +294,7 @@ describe("NewEvaluationMenu", () => {
     });
   });
 
-  describe("New Guardrail option", () => {
+  describe("Setup Guardrail option", () => {
     it("opens guardrails drawer when clicked", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
@@ -255,10 +302,10 @@ describe("NewEvaluationMenu", () => {
       await user.click(screen.getByText("New Evaluation"));
 
       await waitFor(() => {
-        expect(screen.getByText("New Guardrail")).toBeInTheDocument();
+        expect(screen.getByText("Setup Guardrail")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("New Guardrail"));
+      await user.click(screen.getByText("Setup Guardrail"));
 
       // Should update query to open drawer
       await waitFor(() => {
@@ -266,25 +313,6 @@ describe("NewEvaluationMenu", () => {
         const pushCall = mockPush.mock.calls[0]?.[0] as string;
         expect(pushCall).toContain("drawer.open=guardrails");
       });
-    });
-  });
-
-  describe("Does not render without permission", () => {
-    it("returns null when user does not have evaluations:manage permission", async () => {
-      // Override the mock for this test
-      vi.doMock("~/hooks/useOrganizationTeamProject", () => ({
-        useOrganizationTeamProject: () => ({
-          project: {
-            id: "test-project-id",
-            slug: "test-project",
-            name: "Test Project",
-          },
-          hasPermission: () => false,
-        }),
-      }));
-
-      // This test is limited because vi.doMock doesn't work well with already-imported modules
-      // The actual permission check is in the component
     });
   });
 });

@@ -130,7 +130,7 @@ export const useAutosaveEvaluationsV3 = () => {
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
       void router.replace(
-        `/${project.slug}/evaluations/v3/${experimentSlug}`,
+        `/${project.slug}/experiments/workbench/${experimentSlug}`,
         undefined,
         { shallow: true },
       );
