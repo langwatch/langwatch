@@ -34,14 +34,11 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
   // Navigate to root and wait for app to be ready
   await page.goto("/", { waitUntil: "networkidle" });
 
-  // Wait for the navigation sidebar to appear (indicates app is loaded)
-  const nav = page.getByRole("navigation");
-  await expect(nav).toBeVisible({ timeout: 30000 });
+  // Wait for the sidebar Home link to appear (indicates app is loaded)
+  // The Home link is in the sidebar with an href like "/project-slug"
+  const homeLink = page.getByRole("link", { name: "Home", exact: true });
+  await expect(homeLink).toBeVisible({ timeout: 30000 });
 
-  // Get project slug from Home link in the sidebar
-  // The Home link has an href like "/project-slug"
-  const homeLink = nav.getByRole("link", { name: /home/i }).first();
-  await expect(homeLink).toBeVisible({ timeout: 10000 });
   const href = await homeLink.getAttribute("href");
   const projectSlug = href?.replace(/^\//, "") || "";
 
