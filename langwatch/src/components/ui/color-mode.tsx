@@ -165,7 +165,7 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
         disableTransitionOnChange={false}
         enableSystem={isDarkModeEnabled}
         enableColorScheme={isDarkModeEnabled}
-        forcedTheme={isDarkModeEnabled ? void 0 : "light"}
+        forcedTheme={isDarkModeEnabled ? undefined : "light"}
         themes={isDarkModeEnabled ? ["light", "dark", "system"] : ["light"]}
         {...props}
       />
