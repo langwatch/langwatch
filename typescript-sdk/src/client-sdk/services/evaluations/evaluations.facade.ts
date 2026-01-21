@@ -125,7 +125,7 @@ export class EvaluationsFacade {
     const langwatchSpan = createLangWatchSpan(otelSpan);
 
     // Set span input
-    langwatchSpan.setType(spanType as "guardrail" | "evaluation");
+    langwatchSpan.setType(spanType);
     langwatchSpan.setInput({
       data,
       ...(settings && { settings }),

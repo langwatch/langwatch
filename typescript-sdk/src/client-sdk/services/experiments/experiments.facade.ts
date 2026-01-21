@@ -261,7 +261,6 @@ export class ExperimentsFacade {
     summary: ExperimentRunSummary,
     runUrl: string
   ): ExperimentRunResult {
-    const totalCells = summary.totalCells ?? 0;
     const completedCells = summary.completedCells ?? 0;
     const failedCells = summary.failedCells ?? 0;
     const duration = summary.duration ?? 0;
