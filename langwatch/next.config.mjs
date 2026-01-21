@@ -9,7 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const aliasPath =
   process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction =
+  process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test";
 
 const cspHeader = `
     default-src 'self';
