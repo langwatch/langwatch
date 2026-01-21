@@ -1,125 +1,111 @@
 /**
- * Types for scenario worker execution with isolated OTEL context.
+ * Types for scenario execution.
  *
- * These types define the serializable data passed to the worker thread
- * and the results returned from scenario execution.
+ * Interfaces are segregated by responsibility (ISP) so consumers
+ * only depend on what they actually need.
  */
 
+// ============================================================================
+// Adapter Data Types
+// ============================================================================
+
 /**
- * Pre-fetched prompt configuration data for standalone execution.
+ * Pre-fetched prompt configuration data for serialized execution.
  * Contains all data needed to execute prompt-based scenarios without DB access.
  */
 export interface PromptConfigData {
   type: "prompt";
-  /** The prompt ID */
   promptId: string;
-  /** The system prompt content */
   systemPrompt: string;
-  /** Pre-configured messages (excluding system) */
-  messages: Array<{
-    role: "user" | "assistant";
-    content: string;
-  }>;
-  /** Model identifier (e.g., "openai/gpt-4") */
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
   model: string;
-  /** Temperature for generation */
   temperature?: number;
-  /** Max tokens for generation */
   maxTokens?: number;
 }
 
 /**
- * Pre-fetched HTTP agent configuration for standalone execution.
+ * Pre-fetched HTTP agent configuration for serialized execution.
  * Contains all data needed to execute HTTP-based scenarios without DB access.
  */
 export interface HttpAgentData {
   type: "http";
-  /** The agent ID */
   agentId: string;
-  /** HTTP endpoint URL */
   url: string;
-  /** HTTP method */
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** Request headers */
+  method: string;
   headers: Array<{ key: string; value: string }>;
-  /** Authentication configuration */
   auth?: {
-    type: "none" | "bearer" | "api_key" | "basic";
+    type: string;
     token?: string;
     header?: string;
     value?: string;
     username?: string;
     password?: string;
   };
-  /** Request body template with placeholders */
   bodyTemplate?: string;
-  /** JSONPath for extracting response content */
   outputPath?: string;
 }
 
-/**
- * Union type for all supported target adapter data.
- */
+/** Union type for all supported target adapter data */
 export type TargetAdapterData = PromptConfigData | HttpAgentData;
 
-/**
- * LiteLLM proxy parameters for model access.
- */
+// ============================================================================
+// LiteLLM Types
+// ============================================================================
+
+/** LiteLLM proxy parameters for model access */
 export interface LiteLLMParams {
   api_key: string;
   model: string;
   [key: string]: string;
 }
 
-/**
- * Data passed to the scenario worker thread.
- */
-export interface ScenarioWorkerData {
-  /** Unique scenario ID */
+// ============================================================================
+// Segregated Interfaces (ISP)
+// ============================================================================
+
+/** Scenario definition - what to test */
+export interface ScenarioConfig {
+  id: string;
+  name: string;
+  situation: string;
+  criteria: string[];
+}
+
+/** Execution context - grouping and correlation */
+export interface ExecutionContext {
+  projectId: string;
   scenarioId: string;
-  /** Scenario name for display */
-  scenarioName: string;
-  /** Scenario situation/description */
-  scenarioSituation: string;
-  /** Scenario set ID for grouping */
   setId: string;
-  /** Batch run ID for correlation */
   batchRunId: string;
-  /** Pre-fetched target adapter configuration */
-  targetAdapter: TargetAdapterData;
-  /** Criteria for the judge agent */
-  judgeCriteria: string[];
-  /** Model identifier for simulator/judge agents */
+}
+
+/** Model configuration - LLM settings */
+export interface ModelConfig {
   defaultModel: string;
-  /** LiteLLM params for the default model (simulator/judge) */
-  defaultModelLiteLLMParams: LiteLLMParams;
-  /** LiteLLM params for the target model (if prompt-based) */
-  targetModelLiteLLMParams?: LiteLLMParams;
-  /** LangWatch configuration */
-  langwatch: {
-    endpoint: string;
-    apiKey: string;
-  };
-  /** LangWatch NLP service URL for LiteLLM proxy */
+  defaultParams: LiteLLMParams;
   nlpServiceUrl: string;
 }
 
-/**
- * Result returned from the scenario worker.
- */
-export interface ScenarioWorkerResult {
+/** Telemetry configuration - where to send traces */
+export interface TelemetryConfig {
+  endpoint: string;
+  apiKey: string;
+}
+
+/** Target configuration - what to test against */
+export interface TargetConfig {
+  type: "prompt" | "http";
+  referenceId: string;
+}
+
+// ============================================================================
+// Result Types
+// ============================================================================
+
+/** Result of scenario execution */
+export interface ScenarioExecutionResult {
   success: boolean;
   runId?: string;
   reasoning?: string;
   error?: string;
-  metCriteria?: string[];
-  unmetCriteria?: string[];
 }
-
-/**
- * Message types for worker communication.
- */
-export type WorkerMessage =
-  | { type: "result"; data: ScenarioWorkerResult }
-  | { type: "error"; error: string; stack?: string }
-  | { type: "log"; level: "info" | "warn" | "error" | "debug"; message: string };

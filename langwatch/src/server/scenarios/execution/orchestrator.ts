@@ -1,0 +1,139 @@
+/**
+ * Scenario execution orchestrator.
+ *
+ * Coordinates the execution of a scenario by delegating to injected
+ * dependencies. Each method is focused on a single responsibility.
+ */
+
+import { createLogger } from "~/utils/logger";
+import { SCENARIO_DEFAULTS } from "../scenario.constants";
+import type {
+  ExecutionInput,
+  OrchestratorDependencies,
+  TracerHandle,
+} from "./orchestrator.types";
+import type { ScenarioConfig, ScenarioExecutionResult } from "./types";
+
+const logger = createLogger("langwatch:scenarios:orchestrator");
+
+export class ScenarioExecutionOrchestrator {
+  constructor(private readonly deps: OrchestratorDependencies) {}
+
+  async execute(input: ExecutionInput): Promise<ScenarioExecutionResult> {
+    const { context, target } = input;
+    let tracerHandle: TracerHandle | undefined;
+
+    try {
+      const scenario = await this.fetchScenario(context.projectId, context.scenarioId);
+      if (!scenario) {
+        return this.notFound("Scenario", context.scenarioId);
+      }
+
+      const project = await this.fetchProject(context.projectId);
+      if (!project) {
+        return this.notFound("Project", context.projectId);
+      }
+
+      const modelParams = await this.prepareModelParams(
+        context.projectId,
+        project.defaultModel ?? SCENARIO_DEFAULTS.MODEL,
+      );
+      if (!modelParams) {
+        return this.failure(`Failed to prepare model params`);
+      }
+
+      const adapterResult = await this.createAdapter(context.projectId, target, modelParams);
+      if (!adapterResult.success) {
+        return this.failure(adapterResult.error);
+      }
+
+      tracerHandle = this.createTracer(project.apiKey, scenario.id, context);
+
+      return await this.runScenario(
+        scenario,
+        adapterResult.adapter,
+        modelParams,
+        context.batchRunId,
+      );
+    } catch (error) {
+      logger.error({ error, context }, "Scenario execution failed");
+      return this.failure(error instanceof Error ? error.message : String(error));
+    } finally {
+      await this.shutdownTracer(tracerHandle);
+    }
+  }
+
+  private async fetchScenario(projectId: string, scenarioId: string) {
+    return this.deps.scenarioRepository.getById({ projectId, id: scenarioId });
+  }
+
+  private async fetchProject(projectId: string) {
+    return this.deps.projectRepository.getProject(projectId);
+  }
+
+  private async prepareModelParams(projectId: string, model: string) {
+    return this.deps.modelParamsProvider.prepare(projectId, model);
+  }
+
+  private async createAdapter(
+    projectId: string,
+    target: ExecutionInput["target"],
+    modelParams: NonNullable<Awaited<ReturnType<typeof this.prepareModelParams>>>,
+  ) {
+    return this.deps.adapterFactory.create({
+      projectId,
+      target,
+      modelParams,
+      nlpServiceUrl: this.deps.nlpServiceUrl,
+    });
+  }
+
+  private createTracer(
+    apiKey: string,
+    scenarioId: string,
+    context: ExecutionInput["context"],
+  ) {
+    return this.deps.tracerFactory.create({
+      endpoint: this.deps.telemetryEndpoint,
+      apiKey,
+      scenarioId,
+      batchRunId: context.batchRunId,
+      projectId: context.projectId,
+    });
+  }
+
+  private async runScenario(
+    scenario: ScenarioConfig,
+    adapter: Awaited<ReturnType<typeof this.createAdapter>> extends { success: true; adapter: infer A } ? A : never,
+    modelParams: NonNullable<Awaited<ReturnType<typeof this.prepareModelParams>>>,
+    batchRunId: string,
+  ) {
+    return this.deps.scenarioExecutor.run(
+      scenario,
+      adapter,
+      modelParams,
+      this.deps.nlpServiceUrl,
+      batchRunId,
+    );
+  }
+
+  private async shutdownTracer(tracerHandle: TracerHandle | undefined) {
+    if (!tracerHandle) return;
+
+    try {
+      await tracerHandle.shutdown();
+    } catch (error) {
+      // Log but don't propagate - scenario result is more important
+      logger.warn({ error }, "Tracer shutdown failed, traces may be incomplete");
+    }
+  }
+
+  private notFound(entity: string, id: string): ScenarioExecutionResult {
+    logger.error({ entity, id }, `${entity} not found`);
+    return { success: false, error: `${entity} ${id} not found` };
+  }
+
+  private failure(error: string): ScenarioExecutionResult {
+    return { success: false, error };
+  }
+}

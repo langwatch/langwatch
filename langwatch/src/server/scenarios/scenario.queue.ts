@@ -12,11 +12,10 @@ import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 import { QueueWithFallback } from "../background/queues/queueWithFallback";
 import { connection } from "../redis";
+import { SCENARIO_QUEUE } from "./scenario.constants";
 import { processScenarioJob } from "./scenario.processor";
 
 const logger = createLogger("langwatch:scenarios:queue");
-
-export const SCENARIO_QUEUE_NAME = "{scenarios}";
 
 /**
  * Data required to execute a scenario job.
@@ -50,19 +49,19 @@ export const scenarioQueue = new QueueWithFallback<
   ScenarioJob,
   ScenarioJobResult,
   string
->(SCENARIO_QUEUE_NAME, processScenarioJob, {
+>(SCENARIO_QUEUE.NAME, processScenarioJob, {
   connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
       type: "exponential",
-      delay: 1000,
+      delay: SCENARIO_QUEUE.BACKOFF_DELAY_MS,
     },
-    attempts: 3,
+    attempts: SCENARIO_QUEUE.MAX_ATTEMPTS,
     removeOnComplete: {
-      age: 60 * 60, // 1 hour
+      age: SCENARIO_QUEUE.COMPLETED_JOB_RETENTION_SECONDS,
     },
     removeOnFail: {
-      age: 60 * 60 * 24 * 3, // 3 days
+      age: SCENARIO_QUEUE.FAILED_JOB_RETENTION_SECONDS,
     },
   },
 });
