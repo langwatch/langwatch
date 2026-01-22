@@ -9,6 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const aliasPath =
   process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
 
+const isProduction =
+  process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test";
+
 const cspHeader = `
     default-src 'self';
     script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
@@ -19,7 +22,7 @@ const cspHeader = `
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
-    upgrade-insecure-requests;
+    ${isProduction ? "upgrade-insecure-requests;" : ""}
     worker-src 'self' blob:;
     connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
     frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://www.googletagmanager.com https://www.google.com https://*.reo.dev;
@@ -90,27 +93,34 @@ const config = {
   },
 
   async headers() {
+    // Only enable HSTS in production to avoid Safari caching issues in development
+    const securityHeaders = [
+      {
+        key: "Referrer-Policy",
+        value: "no-referrer",
+      },
+      {
+        key: "Content-Security-Policy",
+        value: cspHeader.replace(/\n/g, ""),
+      },
+      {
+        key: "X-Content-Type-Options",
+        value: "nosniff",
+      },
+      ...(isProduction
+        ? [
+            {
+              key: "Strict-Transport-Security",
+              value: "max-age=31536000; includeSubDomains",
+            },
+          ]
+        : []),
+    ];
+
     return [
       {
         source: "/(.*)",
-        headers: [
-          {
-            key: "Referrer-Policy",
-            value: "no-referrer",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
-          },
-          {
-            key: "Content-Security-Policy",
-            value: cspHeader.replace(/\n/g, ""),
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-        ],
+        headers: securityHeaders,
       },
     ];
   },
