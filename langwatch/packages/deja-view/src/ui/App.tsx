@@ -1,7 +1,6 @@
 import { Box, Text, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
 import type { AggregateLinkInfo } from "../discovery/links";
 import type { DiscoveredProjection } from "../discovery/projections.types";

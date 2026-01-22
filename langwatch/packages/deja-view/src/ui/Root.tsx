@@ -1,6 +1,5 @@
 import { Box, Text } from "ink";
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { CliOptions } from "../cli";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
 import type { AggregateLinkInfo } from "../discovery/links";

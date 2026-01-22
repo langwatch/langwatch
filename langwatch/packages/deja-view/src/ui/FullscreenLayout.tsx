@@ -1,5 +1,5 @@
 import { Box, useStdout } from "ink";
-import type React from "react";
+import React from "react";
 import { createContext, useContext } from "react";
 
 interface TerminalDimensions {
