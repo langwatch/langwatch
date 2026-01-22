@@ -72,6 +72,23 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      // If workflowId is provided, check if an evaluator already exists for this workflow
+      if (input.workflowId) {
+        const existingEvaluator = await ctx.prisma.evaluator.findFirst({
+          where: {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+            archivedAt: null,
+          },
+        });
+
+        if (existingEvaluator) {
+          throw new Error(
+            `An evaluator already exists for this workflow: "${existingEvaluator.name}"`
+          );
+        }
+      }
+
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.create({
         id: `evaluator_${nanoid()}`,

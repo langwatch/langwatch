@@ -118,6 +118,30 @@ describe("Evaluators Endpoints", () => {
       expect(result.type).toBe("workflow");
       expect(result.workflowId).toBe("workflow_scorer_123");
     });
+
+    it("prevents creating duplicate evaluators for the same workflow", async () => {
+      const workflowId = "workflow_unique_test_456";
+
+      // Create first evaluator for this workflow
+      await caller.evaluators.create({
+        projectId,
+        name: "First Evaluator",
+        type: "workflow",
+        config: {},
+        workflowId,
+      });
+
+      // Attempt to create second evaluator for same workflow should fail
+      await expect(
+        caller.evaluators.create({
+          projectId,
+          name: "Second Evaluator",
+          type: "workflow",
+          config: {},
+          workflowId,
+        })
+      ).rejects.toThrow(/already exists for this workflow/);
+    });
   });
 
   describe("getAll", () => {
