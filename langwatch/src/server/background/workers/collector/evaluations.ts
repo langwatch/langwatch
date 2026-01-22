@@ -1,5 +1,5 @@
 import { EvaluationExecutionMode } from "@prisma/client";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
@@ -21,7 +21,7 @@ export const evaluationNameAutoslug = (name: string) => {
     lower: true,
     strict: true,
   }).replace(/[^a-z0-9]/g, "_");
-  return `custom_eval_${autoslug}`;
+  return `customeval_${autoslug}`;
 };
 
 export const mapEvaluations = (

@@ -17,11 +17,15 @@ export const MIN_MAX_TOKENS = 256;
 export const FALLBACK_MAX_TOKENS = 64_000;
 
 export const KSUID_RESOURCES = {
+  COST: "cost",
+  EVALUATION: "eval",
   EVENT: "event",
-  TRACKED_EVENT: "trackedevent",
-  TRACE_SUMMARY: "tracesummary",
+  EXPERIMENT: "experiment",
+  MONITOR: "monitor",
+  ORGANIZATION: "organization",
+  PROJECT: "project",
   SPAN: "span",
+  TRACE_SUMMARY: "tracesummary",
+  TRACKED_EVENT: "trackedevent",
   USER: "user",
-  PROJECT: "proj",
-  ORGANIZATION: "org",
 } as const;

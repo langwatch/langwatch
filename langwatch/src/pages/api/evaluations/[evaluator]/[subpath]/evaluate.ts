@@ -1,5 +1,4 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
@@ -11,6 +10,7 @@ import {
   runEvaluation,
 } from "../../../../../server/background/workers/evaluationsWorker";
 import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
+import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -27,6 +27,8 @@ import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
 } from "../../../dataset/evaluate";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:evaluations:evaluate");
 
@@ -197,6 +199,17 @@ export async function handleEvaluatorCall(
 
   let result: SingleEvaluationResult;
 
+  // Generate evaluationId for event sourcing tracking
+  // evaluationId must be unique per execution (not per evaluator definition)
+  // to avoid collapsing all executions into one aggregate stream
+  const evaluationId =
+    params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
+  // evaluatorId identifies which evaluator definition is being used
+  const evaluatorId =
+    storedEvaluator?.id ??
+    params.evaluator_id ??
+    evaluationNameAutoslug(params.name ?? checkType);
+
   const runEval = () =>
     runEvaluation({
       projectId: project.id,
@@ -204,6 +217,31 @@ export async function handleEvaluatorCall(
       data,
       settings,
     });
+
+  // Emit evaluation started event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // should proceed even if event tracking fails. Errors are captured for monitoring.
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.startEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        evaluatorId,
+        evaluatorType: checkType,
+        evaluatorName: storedEvaluator?.name ?? params.name ?? undefined,
+        traceId: params.trace_id ?? undefined,
+        isGuardrail: isGuardrail ?? undefined,
+      });
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "started" },
+      });
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation started event",
+      );
+    }
+  }
 
   try {
     result = await runEval();
@@ -234,10 +272,39 @@ export async function handleEvaluatorCall(
     };
   }
 
+  // Emit evaluation completed event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // result should be returned even if event tracking fails. Errors are captured for monitoring.
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.completeEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        status: result.status,
+        score: "score" in result ? result.score : undefined,
+        passed: "passed" in result ? result.passed : undefined,
+        label: "label" in result ? result.label : undefined,
+        details: "details" in result ? result.details : undefined,
+        error:
+          result.status === "error"
+            ? ("details" in result ? result.details : undefined)
+            : undefined,
+      });
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "completed" },
+      });
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation completed event",
+      );
+    }
+  }
+
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
-        id: `cost_${nanoid()}`,
+        id: generate(KSUID_RESOURCES.COST).toString(),
         projectId: project.id,
         costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
         costName: storedEvaluator?.name ?? checkType,
@@ -274,12 +341,8 @@ export async function handleEvaluatorCall(
   if (params.trace_id) {
     await updateEvaluationStatusInES({
       check: {
-        evaluation_id:
-          storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`,
-        evaluator_id:
-          storedEvaluator?.id ??
-          params.evaluator_id ??
-          evaluationNameAutoslug(params.name ?? checkType),
+        evaluation_id: evaluationId,
+        evaluator_id: evaluatorId,
         type: checkType as EvaluatorTypes,
         name: storedEvaluator?.name ?? params.name ?? checkType,
       },

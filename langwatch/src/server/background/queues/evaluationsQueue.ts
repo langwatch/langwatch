@@ -1,10 +1,13 @@
 import type { ConnectionOptions } from "bullmq";
-import type { EvaluationJob } from "~/server/background/types";
+import { type EvaluationJob, getEvaluationId, getEvaluatorId } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
+import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { prisma } from "../../db";
+import { evaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
@@ -49,6 +52,35 @@ export const scheduleEvaluation = async ({
     trace: trace,
     status: "scheduled",
   });
+
+  // Emit evaluation scheduled event to event sourcing pipeline
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: trace.project_id },
+      select: { featureEventSourcingEvaluationIngestion: true },
+    });
+    if (project?.featureEventSourcingEvaluationIngestion) {
+      await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
+        tenantId: trace.project_id,
+        evaluationId: getEvaluationId(check),
+        evaluatorId: getEvaluatorId(check),
+        evaluatorType: check.type,
+        evaluatorName: check.name,
+        traceId: trace.trace_id,
+        isGuardrail: false,
+      });
+    }
+  } catch (error) {
+    captureException(error, {
+      extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: "scheduled" },
+    });
+    logger.warn(
+      { error, check, trace },
+      "Failed to check feature flag or emit evaluation scheduled event",
+    );
+  }
 
   const jobId = traceCheckIndexId({
     traceId: trace.trace_id,
@@ -121,8 +153,8 @@ export const updateEvaluationStatusInES = async ({
   inputs?: Record<string, any>;
 }) => {
   const evaluation: ElasticSearchEvaluation = {
-    evaluation_id: check.evaluation_id ?? (check as any).id,
-    evaluator_id: check.evaluator_id ?? (check as any).id,
+    evaluation_id: getEvaluationId(check),
+    evaluator_id: getEvaluatorId(check),
     thread_id: trace.thread_id,
     user_id: trace.user_id,
     customer_id: trace.customer_id,
@@ -200,4 +232,58 @@ export const updateEvaluationStatusInES = async ({
     },
     refresh: true,
   });
+
+  // Emit evaluation events to event sourcing pipeline based on status
+  // Skip "scheduled" status here since it's handled in scheduleEvaluation()
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
+  if (status !== "scheduled") {
+    try {
+      const project = await prisma.project.findUnique({
+        where: { id: trace.project_id },
+        select: { featureEventSourcingEvaluationIngestion: true },
+      });
+      if (project?.featureEventSourcingEvaluationIngestion) {
+        const evaluationId = getEvaluationId(check);
+        if (status === "in_progress") {
+          // Emit started event
+          await evaluationProcessingPipeline.commands.startEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            evaluatorId: getEvaluatorId(check),
+            evaluatorType: check.type,
+            evaluatorName: check.name,
+            traceId: trace.trace_id,
+            isGuardrail: is_guardrail,
+          });
+        } else if (
+          status === "processed" ||
+          status === "error" ||
+          status === "skipped"
+        ) {
+          // Emit completed event
+          await evaluationProcessingPipeline.commands.completeEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            status,
+            score,
+            passed,
+            label,
+            details,
+            error: error
+              ? (error instanceof Error ? error.message : String(error))
+              : undefined,
+          });
+        }
+      }
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: status },
+      });
+      logger.warn(
+        { error: eventError, check, trace, status },
+        "Failed to check feature flag or emit evaluation event",
+      );
+    }
+  }
 };
