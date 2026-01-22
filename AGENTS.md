@@ -54,3 +54,13 @@ specs/               # BDD feature specs
 | Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
+
+## Orchestration Model
+
+Implementation tasks use an orchestrator pattern. See:
+- `.claude/skills/orchestrator/` - Auto-activates on implementation requests
+- `.claude/skills/implement/` - Manual trigger: `/implement #123`
+- `.claude/agents/coder.md` - Implementation agent
+- `.claude/agents/uncle-bob-reviewer.md` - Review agent
+
+The main thread acts as orchestrator only - it holds requirements in todos and delegates code work to agents.
