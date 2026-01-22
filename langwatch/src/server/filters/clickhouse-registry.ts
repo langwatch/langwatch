@@ -505,11 +505,103 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
     extractResults: extractStandardResults,
   },
 
-  // Event filters - NOT supported in ClickHouse, fall back to Elasticsearch
-  "events.event_type": null,
-  "events.metrics.key": null,
-  "events.metrics.value": null,
-  "events.event_details.key": null,
+  // Event filters - using stored_spans table with span attributes
+  "events.event_type": {
+    tableName: "stored_spans",
+    buildQuery: (params) => `
+      SELECT
+        SpanAttributes['event.type'] as field,
+        SpanAttributes['event.type'] as label,
+        count() as count
+      FROM stored_spans
+      WHERE ${buildStoredSpansConditions(params)}
+        AND SpanAttributes['event.type'] != ''
+        ${params.query ? `AND lower(SpanAttributes['event.type']) LIKE lower(concat({query:String}, '%'))` : ""}
+      GROUP BY field
+      ORDER BY field ASC
+      LIMIT 10000
+    `,
+    extractResults: extractStandardResults,
+  },
+
+  "events.metrics.key": {
+    tableName: "stored_spans",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          arrayJoin(arrayFilter(k -> startsWith(k, 'event.metrics.'), mapKeys(SpanAttributes))) as full_key,
+          replaceOne(full_key, 'event.metrics.', '') as field,
+          replaceOne(full_key, 'event.metrics.', '') as label,
+          count() as count
+        FROM stored_spans
+        WHERE ${buildStoredSpansConditions(params)}
+          AND SpanAttributes['event.type'] = {key:String}
+        GROUP BY full_key
+        HAVING field != ''
+          ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
+  "events.metrics.value": {
+    tableName: "stored_spans",
+    buildQuery: (params) => {
+      if (!params.key || !params.subkey) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      const attrKey = `event.metrics.${params.subkey}`;
+      return `
+        SELECT
+          min(toFloat64OrNull(SpanAttributes['${attrKey}'])) as min_value,
+          max(toFloat64OrNull(SpanAttributes['${attrKey}'])) as max_value
+        FROM stored_spans
+        WHERE ${buildStoredSpansConditions(params)}
+          AND SpanAttributes['event.type'] = {key:String}
+          AND SpanAttributes['${attrKey}'] != ''
+      `;
+    },
+    extractResults: (rows: unknown[]) => {
+      const row = (rows as Array<{ min_value: number | null; max_value: number | null }>)[0];
+      if (!row || row.min_value === null || row.max_value === null) {
+        return [];
+      }
+      return [
+        { field: String(Math.ceil(row.min_value)), label: "min", count: 0 },
+        { field: String(Math.ceil(row.max_value)), label: "max", count: 0 },
+      ];
+    },
+  },
+
+  "events.event_details.key": {
+    tableName: "stored_spans",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          arrayJoin(arrayFilter(k -> startsWith(k, 'event.details.'), mapKeys(SpanAttributes))) as full_key,
+          replaceOne(full_key, 'event.details.', '') as field,
+          replaceOne(full_key, 'event.details.', '') as label,
+          count() as count
+        FROM stored_spans
+        WHERE ${buildStoredSpansConditions(params)}
+          AND SpanAttributes['event.type'] = {key:String}
+        GROUP BY full_key
+        HAVING field != ''
+          ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
 };
 
 // ============================================================================
@@ -635,11 +727,55 @@ export const clickHouseFilterConditions: Record<
     )`;
   },
 
-  // Events - NOT supported in ClickHouse (stored in Elasticsearch only)
-  "events.event_type": null,
-  "events.metrics.key": null,
-  "events.metrics.value": null,
-  "events.event_details.key": null,
+  // Events - using stored_spans table with span attributes
+  "events.event_type": (values) =>
+    `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['event.type'] IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+    )`,
+
+  "events.metrics.key": (values, key) => {
+    if (!key) return "1=0";
+    // Filter by event type and having any of the specified metric keys
+    const metricConditions = values.map((v) => `sp.SpanAttributes['event.metrics.${escapeString(v)}'] != ''`);
+    return `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
+        AND (${metricConditions.join(" OR ")})
+    )`;
+  },
+
+  "events.metrics.value": (values, key, subkey) => {
+    if (!key || !subkey || values.length < 2) return "1=0";
+    const minValue = parseFloat(values[0] ?? "0");
+    const maxValue = parseFloat(values[1] ?? "0");
+    const attrKey = `event.metrics.${subkey}`;
+    return `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
+        AND toFloat64OrNull(sp.SpanAttributes['${escapeString(attrKey)}']) >= ${minValue}
+        AND toFloat64OrNull(sp.SpanAttributes['${escapeString(attrKey)}']) <= ${maxValue}
+    )`;
+  },
+
+  "events.event_details.key": (values, key) => {
+    if (!key) return "1=0";
+    // Filter by event type and having any of the specified detail keys
+    const detailConditions = values.map((v) => `sp.SpanAttributes['event.details.${escapeString(v)}'] != ''`);
+    return `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
+        AND (${detailConditions.join(" OR ")})
+    )`;
+  },
 };
 
 /**
