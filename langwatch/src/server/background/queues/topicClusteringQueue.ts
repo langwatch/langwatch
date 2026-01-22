@@ -4,15 +4,16 @@ import type { TopicClusteringJob } from "~/server/background/types";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
 import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
+import { TOPIC_CLUSTERING_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
 
-export const TOPIC_CLUSTERING_QUEUE_NAME = "{topic_clustering}";
+export { TOPIC_CLUSTERING_QUEUE } from "./constants";
 
 const topicClusteringQueue = new QueueWithFallback<
   TopicClusteringJob,
   void,
   string
->(TOPIC_CLUSTERING_QUEUE_NAME, runTopicClusteringJob, {
+>(TOPIC_CLUSTERING_QUEUE.NAME, runTopicClusteringJob, {
   connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
@@ -45,7 +46,7 @@ export const scheduleTopicClustering = async () => {
     const yyyymmdd = new Date().toISOString().split("T")[0];
 
     return {
-      name: "topic_clustering",
+      name: TOPIC_CLUSTERING_QUEUE.JOB,
       data: { project_id: project.id },
       opts: {
         jobId: `topic_clustering_${project.id}_${yyyymmdd}`,
@@ -65,7 +66,7 @@ export const scheduleTopicClusteringNextPage = async (
   const yyyymmdd = new Date().toISOString().split("T")[0];
 
   await topicClusteringQueue.add(
-    "topic_clustering",
+    TOPIC_CLUSTERING_QUEUE.JOB,
     { project_id: projectId, search_after: searchAfter },
     {
       jobId: `topic_clustering_${projectId}_${yyyymmdd}_${searchAfter.join(
@@ -86,7 +87,7 @@ export const scheduleTopicClusteringForProject = async (
     : new Date().toISOString().split("T")[0];
 
   await topicClusteringQueue.add(
-    "topic_clustering",
+    TOPIC_CLUSTERING_QUEUE.JOB,
     { project_id: projectId },
     {
       jobId: `topic_clustering_${projectId}_${jobIdSuffix}`,

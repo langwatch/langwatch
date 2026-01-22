@@ -102,7 +102,7 @@ export async function scheduleScenarioRun(
     return existingJob;
   }
 
-  return await scenarioQueue.add("scenario", params, {
+  return await scenarioQueue.add(SCENARIO_QUEUE.JOB, params, {
     jobId,
     delay: options?.delay,
     priority: options?.priority,

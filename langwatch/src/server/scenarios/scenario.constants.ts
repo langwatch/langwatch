@@ -8,6 +8,8 @@
 export const SCENARIO_QUEUE = {
   /** Queue name for BullMQ */
   NAME: "{scenarios}",
+  /** Job name for queue.add() */
+  JOB: "scenario",
   /** How long to keep completed jobs (seconds) */
   COMPLETED_JOB_RETENTION_SECONDS: 60 * 60, // 1 hour
   /** How long to keep failed jobs (seconds) */

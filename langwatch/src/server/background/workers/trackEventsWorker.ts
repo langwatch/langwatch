@@ -16,7 +16,7 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
-import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
+import { TRACK_EVENTS_QUEUE } from "../queues/trackEventsQueue";
 
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
@@ -114,7 +114,7 @@ export const startTrackEventsWorker = () => {
   }
 
   const trackEventsWorker = new Worker<TrackEventJob, void, string>(
-    TRACK_EVENTS_QUEUE_NAME,
+    TRACK_EVENTS_QUEUE.NAME,
     runTrackEventJob,
     {
       connection,

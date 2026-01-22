@@ -11,7 +11,7 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
-import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
+import { TOPIC_CLUSTERING_QUEUE } from "../queues/topicClusteringQueue";
 
 const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
@@ -35,7 +35,7 @@ export const startTopicClusteringWorker = () => {
   }
 
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
-    TOPIC_CLUSTERING_QUEUE_NAME,
+    TOPIC_CLUSTERING_QUEUE.NAME,
     runTopicClusteringJob,
     {
       connection,

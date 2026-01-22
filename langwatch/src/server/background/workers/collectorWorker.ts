@@ -129,7 +129,7 @@ export const scheduleTraceCollectionWithGrouping = async (
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
       try {
         await existingJob.remove();
-        await collectorQueue.add("collector", mergedJob, {
+        await collectorQueue.add(COLLECTOR_QUEUE.JOB, mergedJob, {
           jobId,
           delay: 10_000,
         });
@@ -150,7 +150,7 @@ export const scheduleTraceCollectionWithGrouping = async (
         { collectionJobTraceId: collectorJob.traceId },
         "collecting job trace",
       );
-      await collectorQueue.add("collector", collectorJob, {
+      await collectorQueue.add(COLLECTOR_QUEUE.JOB, collectorJob, {
         jobId,
         delay: index > 1 ? 10_000 : 0,
       });
@@ -894,7 +894,7 @@ export const startCollectorWorker = () => {
   void prewarmTiktokenModels();
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
-    COLLECTOR_QUEUE,
+    COLLECTOR_QUEUE.NAME,
     (job) => processCollectorJob(job.id, job.data),
     {
       connection,

@@ -7,6 +7,7 @@
  * Only for development use.
  */
 
+import "dotenv/config";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { HonoAdapter } from "@bull-board/hono";
@@ -14,18 +15,18 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
 import { Queue } from "bullmq";
 import { Hono } from "hono";
-import { env } from "./env.mjs";
 import IORedis from "ioredis";
 
 const PORT = 6380;
 
 async function main() {
-  if (!env.REDIS_URL) {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
     console.error("REDIS_URL environment variable is required");
     process.exit(1);
   }
 
-  const connection = new IORedis(env.REDIS_URL, {
+  const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
   });
 
@@ -33,9 +34,7 @@ async function main() {
   const queueKeysMeta = await connection.keys("bull:*:meta");
   const discoveredQueues = [
     ...new Set(
-      queueKeysMeta.map((key) =>
-        key.split(":")[1]?.replace("{", "").replace("}", "")
-      )
+      queueKeysMeta.map((key) => key.split(":")[1])
     ),
   ].filter(Boolean) as string[];
 
