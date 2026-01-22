@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/cattleprod",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cattleprod": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup src/cli.tsx --format esm --dts --clean --minify",
+    "dev": "tsx src/cli.tsx",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.955.0",
+    "bullmq": "^5.34.8",
+    "chalk": "^5.4.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "ink": "^6.0.0",
+    "ink-select-input": "^6.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
+    "ioredis": "^5.6.1",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.33",
+    "@types/react": "^19.0.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@10.26.0"
+}
