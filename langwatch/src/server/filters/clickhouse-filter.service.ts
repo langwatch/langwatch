@@ -137,13 +137,18 @@ export class ClickHouseFilterService {
             "Executing ClickHouse filter query"
           );
 
+          // Convert dot-encoded keys back to actual keys for parameterized queries
+          // The UI encodes dots as middle dots (·) to avoid path conflicts
+          const actualKey = options.key?.replaceAll("·", ".") ?? "";
+          const actualSubkey = options.subkey?.replaceAll("·", ".") ?? "";
+
           const result = await this.clickHouseClient.query({
             query: sqlQuery,
             query_params: {
               tenantId: projectId,
               query: options.query ?? "",
-              key: options.key ?? "",
-              subkey: options.subkey ?? "",
+              key: actualKey,
+              subkey: actualSubkey,
               startDate: options.startDate,
               endDate: options.endDate,
             },

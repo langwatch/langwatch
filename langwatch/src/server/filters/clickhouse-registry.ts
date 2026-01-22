@@ -265,17 +265,17 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
-      // Convert the dot-encoded key back to actual key
-      const actualKey = params.key.replaceAll("·", ".");
+      // Note: The key parameter is passed via query_params as {key:String}
+      // We convert the dot-encoded key back in the service layer before passing it
       return `
         SELECT
-          Attributes['${actualKey}'] as field,
-          Attributes['${actualKey}'] as label,
+          Attributes[{key:String}] as field,
+          Attributes[{key:String}] as label,
           count() as count
         FROM trace_summaries FINAL
         WHERE ${buildTraceSummariesConditions(params)}
-          AND Attributes['${actualKey}'] != ''
-          ${params.query ? `AND lower(Attributes['${actualKey}']) LIKE lower(concat({query:String}, '%'))` : ""}
+          AND Attributes[{key:String}] != ''
+          ${params.query ? `AND lower(Attributes[{key:String}]) LIKE lower(concat({query:String}, '%'))` : ""}
         GROUP BY field
         ORDER BY field ASC
         LIMIT 10000
@@ -331,7 +331,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
         SpanAttributes['langwatch.span.type'] as field,
         SpanAttributes['langwatch.span.type'] as label,
         count() as count
-      FROM stored_spans
+      FROM stored_spans FINAL
       WHERE ${buildStoredSpansConditions(params)}
         AND SpanAttributes['langwatch.span.type'] != ''
         ${buildQueryFilter("SpanAttributes['langwatch.span.type']", params)}
@@ -522,7 +522,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
         SpanAttributes['event.type'] as field,
         SpanAttributes['event.type'] as label,
         count() as count
-      FROM stored_spans
+      FROM stored_spans FINAL
       WHERE ${buildStoredSpansConditions(params)}
         AND SpanAttributes['event.type'] != ''
         ${params.query ? `AND lower(SpanAttributes['event.type']) LIKE lower(concat({query:String}, '%'))` : ""}
@@ -545,7 +545,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
           replaceOne(full_key, 'event.metrics.', '') as field,
           replaceOne(full_key, 'event.metrics.', '') as label,
           count() as count
-        FROM stored_spans
+        FROM stored_spans FINAL
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
         GROUP BY full_key
@@ -564,15 +564,15 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       if (!params.key || !params.subkey) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
-      const attrKey = `event.metrics.${params.subkey}`;
+      // Note: subkey is passed via query_params, we construct the full attribute key there
       return `
         SELECT
-          min(toFloat64OrNull(SpanAttributes['${attrKey}'])) as min_value,
-          max(toFloat64OrNull(SpanAttributes['${attrKey}'])) as max_value
-        FROM stored_spans
+          min(toFloat64OrNull(SpanAttributes[concat('event.metrics.', {subkey:String})])) as min_value,
+          max(toFloat64OrNull(SpanAttributes[concat('event.metrics.', {subkey:String})])) as max_value
+        FROM stored_spans FINAL
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
-          AND SpanAttributes['${attrKey}'] != ''
+          AND SpanAttributes[concat('event.metrics.', {subkey:String})] != ''
       `;
     },
     extractResults: (rows: unknown[]) => {
@@ -599,7 +599,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
           replaceOne(full_key, 'event.details.', '') as field,
           replaceOne(full_key, 'event.details.', '') as label,
           count() as count
-        FROM stored_spans
+        FROM stored_spans FINAL
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
         GROUP BY full_key
