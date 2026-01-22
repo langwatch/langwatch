@@ -254,7 +254,7 @@ export function SignaturePropertiesPanelForm({
           mappings[targetHandle] = {
             type: "source",
             sourceId: edge.source,
-            field: sourceField,
+            path: [sourceField],
           };
         }
       });
@@ -281,7 +281,7 @@ export function SignaturePropertiesPanelForm({
           id: `edge-${identifier}-${Date.now()}`,
           source: mapping.sourceId,
           target: node.id,
-          sourceHandle: `outputs.${mapping.field}`,
+          sourceHandle: `outputs.${mapping.path.join(".")}`,
           targetHandle: `inputs.${identifier}`,
           type: "default",
         };

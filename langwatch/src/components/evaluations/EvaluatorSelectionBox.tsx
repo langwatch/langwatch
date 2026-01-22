@@ -5,8 +5,10 @@ import { CheckCircle, ChevronRight } from "lucide-react";
 export type EvaluatorSelectionBoxProps = {
   /** The currently selected evaluator, or null if none selected */
   selectedEvaluator: Evaluator | null;
-  /** Called when the user clicks to select an evaluator */
+  /** Called when the user clicks to select an evaluator (no evaluator selected) */
   onSelectClick: () => void;
+  /** Called when the user clicks on an already-selected evaluator (to edit it) */
+  onEditClick?: () => void;
   /** Placeholder text when no evaluator is selected */
   placeholder?: string;
   /** Show the evaluator slug badge (useful for guardrails) */
@@ -15,18 +17,23 @@ export type EvaluatorSelectionBoxProps = {
 
 /**
  * Reusable component for selecting an evaluator.
- * Shows as a clickable button that opens the evaluator list drawer.
+ * - When no evaluator is selected: shows placeholder, clicking opens evaluator list
+ * - When evaluator is selected: shows evaluator name, clicking opens evaluator editor
  */
 export function EvaluatorSelectionBox({
   selectedEvaluator,
   onSelectClick,
+  onEditClick,
   placeholder = "Select Evaluator",
   showSlug = false,
 }: EvaluatorSelectionBoxProps) {
   if (selectedEvaluator) {
+    // When evaluator is selected, clicking opens the editor (not the list)
+    const handleClick = onEditClick ?? onSelectClick;
+
     return (
       <Button
-        onClick={onSelectClick}
+        onClick={handleClick}
         variant="outline"
         width="full"
         paddingX={4}

@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { z } from "zod";
@@ -239,7 +239,13 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         return;
       }
     }
-    onClose();
+    // If there's a previous drawer in the stack, go back to it
+    // Otherwise, close everything
+    if (canGoBack) {
+      goBack();
+    } else {
+      onClose();
+    }
   };
 
   const hasSettings =
@@ -336,6 +342,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                         availableSources={mappingsConfig.availableSources}
                         initialMappings={mappingsConfig.initialMappings}
                         onMappingChange={mappingsConfig.onMappingChange}
+                        scrollToMissingOnMount={true}
                       />
                     </Box>
                   )}
@@ -383,6 +390,8 @@ type EvaluatorMappingsSectionProps = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  /** Whether to scroll to the first missing mapping on mount */
+  scrollToMissingOnMount?: boolean;
 };
 
 /**
@@ -395,10 +404,13 @@ function EvaluatorMappingsSection({
   availableSources,
   initialMappings,
   onMappingChange,
+  scrollToMissingOnMount = false,
 }: EvaluatorMappingsSectionProps) {
   // Local state for mappings - source of truth for UI
   const [localMappings, setLocalMappings] =
     useState<Record<string, UIFieldMapping>>(initialMappings);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledRef = useRef(false);
 
   // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
   useEffect(() => {
@@ -421,7 +433,7 @@ function EvaluatorMappingsSection({
       if (
         mapping &&
         (mapping.type === "value" ||
-          (mapping.type === "source" && mapping.field))
+          (mapping.type === "source" && mapping.path.length > 0))
       ) {
         hasAnyMapping = true;
         break;
@@ -432,7 +444,7 @@ function EvaluatorMappingsSection({
     for (const field of requiredFields) {
       const mapping = localMappings[field];
       // A mapping is missing if undefined or if it's a source mapping with no field selected
-      if (!mapping || (mapping.type === "source" && !mapping.field)) {
+      if (!mapping || (mapping.type === "source" && mapping.path.length === 0)) {
         missing.add(field);
       }
     }
@@ -449,6 +461,38 @@ function EvaluatorMappingsSection({
     evaluatorDef?.optionalFields,
     localMappings,
   ]);
+
+  // Scroll to first missing mapping on mount
+  useEffect(() => {
+    if (
+      scrollToMissingOnMount &&
+      !hasScrolledRef.current &&
+      missingMappingIds.size > 0 &&
+      containerRef.current
+    ) {
+      // Small delay to ensure DOM is rendered
+      const timer = setTimeout(() => {
+        const firstMissingId = Array.from(missingMappingIds)[0];
+        const missingElement = containerRef.current?.querySelector(
+          `[data-testid="missing-mapping-input"], [data-variable-id="${firstMissingId}"]`,
+        );
+        if (missingElement) {
+          missingElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        } else {
+          // Fallback: scroll to the container itself (mappings section)
+          containerRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+        hasScrolledRef.current = true;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollToMissingOnMount, missingMappingIds]);
 
   // Handler that updates local state AND persists to store
   const handleMappingChange = useCallback(
@@ -491,17 +535,30 @@ function EvaluatorMappingsSection({
   }
 
   return (
-    <VariablesSection
-      title="Variables"
-      variables={variables}
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op - evaluator inputs are read-only
-      onChange={() => {}}
-      showMappings={true}
-      availableSources={availableSources}
-      mappings={localMappings}
-      onMappingChange={handleMappingChange}
-      readOnly={true} // Can't add/remove evaluator inputs
-      missingMappingIds={missingMappingIds}
-    />
+    <Box ref={containerRef}>
+      <VariablesSection
+        title="Variables"
+        variables={variables}
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op - evaluator inputs are read-only
+        onChange={() => {}}
+        showMappings={true}
+        availableSources={availableSources}
+        mappings={localMappings}
+        onMappingChange={handleMappingChange}
+        readOnly={true} // Can't add/remove evaluator inputs
+        missingMappingIds={missingMappingIds}
+      />
+      {/* Red validation message for pending mappings */}
+      {missingMappingIds.size > 0 && (
+        <Text
+          data-testid="pending-mappings-error"
+          color="red.500"
+          fontSize="sm"
+          marginTop={3}
+        >
+          Please map all required fields: {Array.from(missingMappingIds).join(", ")}
+        </Text>
+      )}
+    </Box>
   );
 }

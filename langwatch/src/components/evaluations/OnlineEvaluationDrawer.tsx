@@ -57,19 +57,96 @@ const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
 };
 
 /**
+ * Static children for metadata field.
+ * These are the reserved metadata keys that are always available.
+ */
+const METADATA_CHILDREN = [
+  { name: "thread_id", type: "str" as const },
+  { name: "user_id", type: "str" as const },
+  { name: "customer_id", type: "str" as const },
+  { name: "labels", type: "list" as const },
+  { name: "topic_id", type: "str" as const },
+  { name: "subtopic_id", type: "str" as const },
+];
+
+/**
+ * Static children for spans field.
+ * These are the common span subfields.
+ */
+const SPANS_CHILDREN = [
+  { name: "input", type: "str" as const },
+  { name: "output", type: "str" as const },
+  { name: "params", type: "dict" as const },
+  { name: "contexts", type: "list" as const },
+];
+
+/**
  * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
+ * Provides static children for known nested fields like metadata and spans.
  */
 function getTraceAvailableSources(): AvailableSource[] {
+  // Filter out "threads" from trace-level sources - it's confusing at trace level
+  // (threads is for getting all traces in a thread, which is a thread-level concept)
+  const traceFields = Object.entries(TRACE_MAPPINGS)
+    .filter(([key]) => key !== "threads")
+    .map(([key, config]) => {
+      const hasKeys = "keys" in config && typeof config.keys === "function";
+
+      // Provide static children for known nested fields
+      if (key === "metadata") {
+        return {
+          name: key,
+          type: "dict" as const,
+          children: METADATA_CHILDREN,
+          // Allow selecting metadata itself (returns full metadata object)
+          isComplete: true,
+        };
+      }
+
+      if (key === "spans") {
+        return {
+          name: key,
+          type: "list" as const,
+          children: SPANS_CHILDREN,
+          // Allow selecting spans itself (returns all spans)
+          isComplete: true,
+        };
+      }
+
+      // Other fields with keys() function - mark as complete (no nested selection needed)
+      if (hasKeys) {
+        return {
+          name: key,
+          type: "dict" as const,
+          isComplete: true,
+        };
+      }
+
+      return {
+        name: key,
+        type: "str" as const,
+      };
+    });
+
   return [{
     id: "trace",
     name: "Trace",
     type: "dataset",
-    fields: Object.keys(TRACE_MAPPINGS).map((key) => ({
-      name: key,
-      type: "str" as const,
-    })),
+    fields: traceFields,
   }];
 }
+
+/**
+ * Static children for thread traces field.
+ * These are the common trace fields that can be extracted from each trace in a thread.
+ */
+const THREAD_TRACES_CHILDREN = [
+  { name: "input", type: "str" as const },
+  { name: "output", type: "str" as const },
+  { name: "contexts", type: "list" as const },
+  { name: "timestamp", type: "str" as const },
+  { name: "trace_id", type: "str" as const },
+];
 
 /**
  * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
@@ -79,10 +156,34 @@ function getThreadAvailableSources(): AvailableSource[] {
     id: "thread",
     name: "Thread",
     type: "dataset",
-    fields: Object.keys(THREAD_MAPPINGS).map((key) => ({
-      name: key,
-      type: "str" as const,
-    })),
+    fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
+      // Special handling for "traces" - provide nested children for field selection
+      if (key === "traces") {
+        return {
+          name: key,
+          type: "list" as const,
+          children: THREAD_TRACES_CHILDREN,
+          // Allow selecting traces itself (returns all trace data)
+          isComplete: true,
+        };
+      }
+
+      const hasKeys = "keys" in config && typeof config.keys === "function";
+
+      // For thread mappings, most fields are complete selections
+      if (hasKeys) {
+        return {
+          name: key,
+          type: "dict" as const,
+          isComplete: true,
+        };
+      }
+
+      return {
+        name: key,
+        type: "str" as const,
+      };
+    }),
   }];
 }
 
@@ -112,7 +213,7 @@ function autoInferMappings(
       mappings[field] = {
         type: "source",
         sourceId,
-        field: autoMapping,
+        path: [autoMapping],
       };
     }
   }
@@ -130,7 +231,7 @@ function getPendingFields(
   return requiredFields.filter((field) => {
     const mapping = mappings[field];
     if (!mapping) return true;
-    if (mapping.type === "source" && !mapping.field) return true;
+    if (mapping.type === "source" && mapping.path.length === 0) return true;
     if (mapping.type === "value" && !mapping.value) return true;
     return false;
   });
@@ -317,10 +418,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         const uiMappings: Record<string, UIFieldMapping> = {};
         for (const [field, mapping] of Object.entries(existingMappings.mapping)) {
           if (mapping.source) {
+            const pathParts: string[] = [mapping.source as string];
+            if (mapping.key) pathParts.push(mapping.key);
+            if (mapping.subkey) pathParts.push(mapping.subkey);
             uiMappings[field] = {
               type: "source",
               sourceId: level === "trace" ? "trace" : "thread",
-              field: mapping.source + (mapping.key ? `.${mapping.key}` : "") + (mapping.subkey ? `.${mapping.subkey}` : ""),
+              path: pathParts,
             };
           }
         }
@@ -367,6 +471,53 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
   }, [selectedEvaluator, availableSources, mappings, handleMappingChange, openDrawer]);
 
+  // Open evaluator editor when clicking on already-selected evaluator
+  // This opens the editor directly with mappings config
+  const handleEditSelectedEvaluator = useCallback(() => {
+    if (!selectedEvaluator) return;
+
+    // Set up the flow callback for if user wants to change evaluator from the list
+    setFlowCallbacks("evaluatorList", {
+      onSelect: (evaluator: Evaluator) => {
+        const newName = name || evaluator.name;
+        setSelectedEvaluator(evaluator);
+        if (!name) {
+          setName(newName);
+        }
+
+        // Get evaluator type and required fields
+        const evalType = (evaluator.config as { evaluatorType?: string } | null)
+          ?.evaluatorType as EvaluatorTypes | undefined;
+        const fields = getRequiredFields(evalType);
+        const autoMappings = autoInferMappings(fields, level);
+        setMappings(autoMappings);
+
+        // Persist state
+        onlineEvaluationDrawerState = {
+          level,
+          name: newName,
+          selectedEvaluator: evaluator,
+          sample,
+          mappings: autoMappings,
+          preconditions,
+        };
+      },
+    });
+
+    const mappingsConfig: EvaluatorMappingsConfig = {
+      availableSources,
+      initialMappings: mappings,
+      onMappingChange: handleMappingChange,
+    };
+
+    // Open the evaluator editor directly
+    // The editor's back button will go to the evaluator list (via goBack)
+    openDrawer("evaluatorEditor", {
+      evaluatorId: selectedEvaluator.id,
+      mappingsConfig,
+    });
+  }, [selectedEvaluator, name, level, sample, preconditions, availableSources, mappings, handleMappingChange, openDrawer]);
+
   const handleSelectEvaluator = useCallback(() => {
     // Set flow callback for evaluator selection
     setFlowCallbacks("evaluatorList", {
@@ -398,33 +549,30 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           preconditions,
         };
 
-        // Check for pending mappings
-        const pending = getPendingFields(fields, autoMappings);
+        // Always open the evaluator editor so user can see and configure settings
+        // This gives users a chance to review/edit the evaluator settings and mappings
+        // Use replace: true so Cancel goes back to onlineEvaluation, not evaluatorList
+        setTimeout(() => {
+          const mappingsConfig: EvaluatorMappingsConfig = {
+            availableSources: level === "trace" ? getTraceAvailableSources() : getThreadAvailableSources(),
+            initialMappings: autoMappings,
+            onMappingChange: (identifier, mapping) => {
+              setMappings((prev) => {
+                if (mapping) {
+                  return { ...prev, [identifier]: mapping };
+                } else {
+                  const { [identifier]: _, ...rest } = prev;
+                  return rest;
+                }
+              });
+            },
+          };
 
-        // If there are pending mappings OR we're at thread level, open the editor
-        if (pending.length > 0 || level === "thread") {
-          setTimeout(() => {
-            const mappingsConfig: EvaluatorMappingsConfig = {
-              availableSources: level === "trace" ? getTraceAvailableSources() : getThreadAvailableSources(),
-              initialMappings: autoMappings,
-              onMappingChange: (identifier, mapping) => {
-                setMappings((prev) => {
-                  if (mapping) {
-                    return { ...prev, [identifier]: mapping };
-                  } else {
-                    const { [identifier]: _, ...rest } = prev;
-                    return rest;
-                  }
-                });
-              },
-            };
-
-            openDrawer("evaluatorEditor", {
-              evaluatorId: evaluator.id,
-              mappingsConfig,
-            });
-          }, 100);
-        }
+          openDrawer("evaluatorEditor", {
+            evaluatorId: evaluator.id,
+            mappingsConfig,
+          }, { replaceCurrentInStack: true });
+        }, 100);
       },
     });
     openDrawer("evaluatorList", {});
@@ -441,13 +589,26 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       setMappings(autoMappings);
 
       // For thread level, always open the editor
+      // Compute sources inline with the NEW level value (not from useMemo which uses old level)
       if (newLevel === "thread") {
         setTimeout(() => {
-          openEvaluatorEditorForMappings();
+          // We know newLevel is "thread" here, so use thread sources
+          const newAvailableSources = getThreadAvailableSources();
+
+          const mappingsConfig: EvaluatorMappingsConfig = {
+            availableSources: newAvailableSources,
+            initialMappings: autoMappings,
+            onMappingChange: handleMappingChange,
+          };
+
+          openDrawer("evaluatorEditor", {
+            evaluatorId: selectedEvaluator.id,
+            mappingsConfig,
+          });
         }, 100);
       }
     }
-  }, [selectedEvaluator, requiredFields, openEvaluatorEditorForMappings]);
+  }, [selectedEvaluator, requiredFields, handleMappingChange, openDrawer]);
 
   // Precondition handlers
   const addPrecondition = useCallback(() => {
@@ -485,8 +646,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       expansions: [],
     };
     for (const [field, mapping] of Object.entries(mappings)) {
-      if (mapping.type === "source" && mapping.field) {
-        const parts = mapping.field.split(".");
+      if (mapping.type === "source" && mapping.path.length > 0) {
+        const parts = mapping.path;
         mappingState.mapping[field] = {
           source: parts[0] as keyof typeof TRACE_MAPPINGS,
           key: parts[1],
@@ -601,6 +762,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 <EvaluatorSelectionBox
                   selectedEvaluator={selectedEvaluator}
                   onSelectClick={handleSelectEvaluator}
+                  onEditClick={handleEditSelectedEvaluator}
                   placeholder="Select Evaluator"
                 />
 
@@ -770,13 +932,18 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
             </HorizontalFormControl>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer>
+        <Drawer.Footer
+          borderTopWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+        >
           <HStack gap={3} width="full" justify="flex-end">
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={handleSave}
               disabled={!canSave}
               title={hasPendingMappings ? "Complete all mappings first" : undefined}

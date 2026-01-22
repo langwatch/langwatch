@@ -117,14 +117,6 @@ function Page() {
           </Grid>
         </VStack>
       )}
-
-      {/* Evaluator management drawers */}
-      <EvaluatorListDrawer open={drawerOpen("evaluatorList")} />
-      <EvaluatorCategorySelectorDrawer
-        open={drawerOpen("evaluatorCategorySelector")}
-      />
-      <EvaluatorTypeSelectorDrawer open={drawerOpen("evaluatorTypeSelector")} />
-      <EvaluatorEditorDrawer open={drawerOpen("evaluatorEditor")} />
     </DashboardLayout>
   );
 }

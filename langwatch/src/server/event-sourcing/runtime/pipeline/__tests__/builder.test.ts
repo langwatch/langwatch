@@ -587,9 +587,7 @@ describe("PipelineBuilder", () => {
     });
   });
 
-  describe(
-    "withEventHandler() Registration Contract",
-    () => {
+  describe("withEventHandler() Registration Contract", () => {
       it("stores event handler definition in internal Map with exact name key when called with unique name", () => {
         const eventStore = createMockEventStore<TestEvent>();
 
@@ -609,9 +607,7 @@ describe("PipelineBuilder", () => {
         }).not.toThrow();
       });
 
-      it(
-        "stores handler definition with handler reference matching provided handler",
-        async () => {
+      it("stores handler definition with handler reference matching provided handler", async () => {
           vi.useRealTimers(); // Use real timers for async operations
           const eventStore = createMockEventStore<TestEvent>();
           const factory = createMockQueueProcessorFactory();
@@ -649,9 +645,7 @@ describe("PipelineBuilder", () => {
               tenantId,
             });
           }
-        },
-        { timeout: 10000 },
-      );
+        }, 10000);
 
       it("stores handler definition with options object matching provided options", () => {
         const eventStore = createMockEventStore<TestEvent>();
@@ -767,9 +761,7 @@ describe("PipelineBuilder", () => {
         expect(handleSpy1).toHaveBeenCalled();
         expect(handleSpy2).toHaveBeenCalled();
       });
-    },
-    { timeout: 10000 },
-  );
+    });
 
   describe("withCommand() Registration Contract", () => {
     it("stores handler registration in internal array when called with CommandHandlerClass", () => {

@@ -209,7 +209,7 @@ export const useDrawer = () => {
   const openDrawer = <T extends DrawerType>(
     drawer: T,
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
-    { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
+    { replace, resetStack, replaceCurrentInStack }: { replace?: boolean; resetStack?: boolean; replaceCurrentInStack?: boolean } = {},
   ) => {
     // Guard: Skip if this drawer is already open
     if (currentDrawer === drawer) {
@@ -227,8 +227,18 @@ export const useDrawer = () => {
     if (resetStack || !currentDrawer) {
       // Reset stack - fresh start with no back navigation
       drawerStack = [{ drawer, params: allParams }];
+    } else if (replaceCurrentInStack && drawerStack.length > 0) {
+      // Replace the current entry in the stack (useful for flow callbacks)
+      // This makes "back" skip the replaced drawer
+      drawerStack.pop();
+      drawerStack.push({ drawer, params: allParams });
     } else {
       // A drawer is already open - navigating forward, push to stack
+      // If stack is empty but currentDrawer exists (e.g., opened via direct URL),
+      // add currentDrawer to stack first so we can go back to it
+      if (drawerStack.length === 0 && currentDrawer) {
+        drawerStack.push({ drawer: currentDrawer, params: {} });
+      }
       drawerStack.push({ drawer, params: allParams });
     }
 

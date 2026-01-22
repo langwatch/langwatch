@@ -25,6 +25,7 @@ import {
 } from "react-icons/lu";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
@@ -52,6 +53,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
+  const { openDrawer } = useDrawer();
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     { projectId: project?.id ?? "" },
@@ -153,12 +155,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           onClick={() => {
                             if (!project) return;
 
-                            console.log(
-                              "experimentsSlugMap",
-                              experimentsSlugMap,
-                            );
-                            console.log("monitor", monitor);
-
+                            // Monitors with experimentId are part of the old wizard flow
                             if (
                               monitor.experimentId &&
                               experimentsSlugMap[monitor.experimentId]
@@ -169,9 +166,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 }`,
                               );
                             } else {
-                              void router.push(
-                                `/${project.slug}/evaluations/${monitor.id}/edit`,
-                              );
+                              // Open the OnlineEvaluationDrawer for editing
+                              openDrawer("onlineEvaluation", {
+                                monitorId: monitor.id,
+                              });
                             }
                           }}
                         >

@@ -118,7 +118,7 @@ const convertToVariableMappings = (
       result[key] = {
         type: "source",
         sourceId: mapping.sourceId,
-        field: mapping.sourceField,
+        path: [mapping.sourceField],
       };
     }
   }
@@ -145,7 +145,7 @@ const convertFromVariableMapping = (
     type: "source",
     source: isDataset ? "dataset" : "target",
     sourceId: mapping.sourceId,
-    sourceField: mapping.field,
+    sourceField: mapping.path.join("."),
   };
 };
 
