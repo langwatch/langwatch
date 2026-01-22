@@ -1,15 +1,15 @@
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { BookText, ChevronDown, Globe, Play, Save } from "lucide-react";
 import {
-  BookText,
-  ChevronDown,
-  Globe,
-  Play,
-  RotateCcw,
-  Save,
-} from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { setFlowCallbacks, useDrawer } from "../../hooks/useDrawer";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
@@ -20,14 +20,21 @@ interface SaveAndRunMenuProps {
   onTargetChange: (target: TargetValue) => void;
   onSaveAndRun: (target: TargetValue) => void;
   onSaveWithoutRunning: () => void;
-  onCreateAgent: () => void;
-  onCreatePrompt?: () => void;
+  /** Called when user wants to create a new agent. Receives callback to invoke when creation completes. */
+  onCreateAgent: (onComplete: () => void) => void;
+  /** Called when user wants to create a new prompt. Receives callback to invoke when creation completes. */
+  onCreatePrompt?: (onComplete: () => void) => void;
   isLoading?: boolean;
 }
 
 /**
  * Combined "Save and Run" dropdown menu with target selection.
- * Button-style menu items that open drawer pickers for prompts and agents.
+ *
+ * Flow:
+ * 1. If a target is selected, shows "Run [target]" as primary action
+ * 2. User can pick a different target via drawer (just selects, doesn't run)
+ * 3. After selection, menu reopens with new target ready to run
+ * 4. User explicitly clicks "Run [target]" to save and execute
  */
 export function SaveAndRunMenu({
   selectedTarget,
@@ -44,12 +51,20 @@ export function SaveAndRunMenu({
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
-  const { openDrawer, closeDrawer } = useDrawer();
+  const { openDrawer, goBack } = useDrawer();
 
   const [open, setOpen] = useState(false);
+  // Use a ref to track pending reopen - refs survive across drawer navigation
+  const pendingReopenRef = useRef(false);
 
-  // Get the name of the previous target for display
-  const previousTargetInfo = useMemo(() => {
+  // Function to reopen the menu - can be called after drawer navigation
+  const reopenMenu = useCallback(() => {
+    // Small delay to let drawer close animation complete
+    setTimeout(() => setOpen(true), 150);
+  }, []);
+
+  // Get display info for the selected target
+  const targetInfo = useMemo(() => {
     if (!selectedTarget) return null;
 
     if (selectedTarget.type === "prompt") {
@@ -67,7 +82,7 @@ export function SaveAndRunMenu({
     }
   }, [selectedTarget, prompts, agents]);
 
-  const handleRunPrevious = () => {
+  const handleRunTarget = () => {
     if (selectedTarget) {
       setOpen(false);
       onSaveAndRun(selectedTarget);
@@ -76,18 +91,26 @@ export function SaveAndRunMenu({
 
   const handleOpenPromptDrawer = () => {
     setOpen(false);
-    // Set up callback for when a prompt is selected
+    pendingReopenRef.current = true;
+    // Set up callback for when a prompt is selected - just updates target, doesn't run
     setFlowCallbacks("promptList", {
       onSelect: (prompt) => {
         const target: TargetValue = { type: "prompt", id: prompt.id };
         onTargetChange(target);
-        onSaveAndRun(target);
-        closeDrawer();
+        goBack();
+        // Reopen menu after selection
+        if (pendingReopenRef.current) {
+          pendingReopenRef.current = false;
+          reopenMenu();
+        }
       },
       onCreateNew: onCreatePrompt
         ? () => {
-            closeDrawer();
-            onCreatePrompt();
+            goBack();
+            onCreatePrompt(() => {
+              // After creation, reopen menu
+              reopenMenu();
+            });
           }
         : undefined,
     });
@@ -96,17 +119,25 @@ export function SaveAndRunMenu({
 
   const handleOpenAgentDrawer = () => {
     setOpen(false);
-    // Set up callback for when an agent is selected
+    pendingReopenRef.current = true;
+    // Set up callback for when an agent is selected - just updates target, doesn't run
     setFlowCallbacks("agentList", {
       onSelect: (agent) => {
         const target: TargetValue = { type: "http", id: agent.id };
         onTargetChange(target);
-        onSaveAndRun(target);
-        closeDrawer();
+        goBack();
+        // Reopen menu after selection
+        if (pendingReopenRef.current) {
+          pendingReopenRef.current = false;
+          reopenMenu();
+        }
       },
       onCreateNew: () => {
-        closeDrawer();
-        onCreateAgent();
+        goBack();
+        onCreateAgent(() => {
+          // After creation, reopen menu
+          reopenMenu();
+        });
       },
     });
     openDrawer("agentList");
@@ -134,36 +165,47 @@ export function SaveAndRunMenu({
       <Portal>
         <Popover.Content width="320px" padding={3}>
           <VStack gap={2} align="stretch">
-            {/* Run Previous - only shown if there's a previous target */}
-            {previousTargetInfo && (
+            {/* Primary action: Run selected target */}
+            {targetInfo && (
               <>
                 <MenuButton
-                  icon={<RotateCcw size={16} />}
-                  title="Run previous"
-                  description={`${previousTargetInfo.name} (${previousTargetInfo.type})`}
-                  onClick={handleRunPrevious}
+                  icon={<Play size={16} />}
+                  title={`Run "${targetInfo.name}"`}
+                  description={
+                    targetInfo.type === "prompt" ? "Prompt" : "Agent"
+                  }
+                  onClick={handleRunTarget}
+                  highlighted
                 />
-                <Box
-                  borderBottomWidth="1px"
-                  borderColor="gray.200"
-                  marginY={1}
-                />
+                <SectionDivider label="Or select a different target" />
               </>
             )}
 
-            {/* Run against prompt */}
+            {/* No target selected - show header */}
+            {!targetInfo && (
+              <Text
+                fontSize="xs"
+                color="gray.500"
+                fontWeight="medium"
+                paddingX={1}
+                paddingBottom={1}
+              >
+                Select a target to run against
+              </Text>
+            )}
+
+            {/* Target selection options */}
             <MenuButton
               icon={<BookText size={16} />}
-              title="Run against prompt"
-              description="Test with a prompt config"
+              title="Choose a prompt..."
+              description="Select from your prompts"
               onClick={handleOpenPromptDrawer}
             />
 
-            {/* Run against agent */}
             <MenuButton
               icon={<Globe size={16} />}
-              title="Run against agent"
-              description="Test with an HTTP endpoint"
+              title="Choose an agent..."
+              description="Select from your agents"
               onClick={handleOpenAgentDrawer}
             />
 
@@ -196,9 +238,16 @@ interface MenuButtonProps {
   title: string;
   description: string;
   onClick: () => void;
+  highlighted?: boolean;
 }
 
-function MenuButton({ icon, title, description, onClick }: MenuButtonProps) {
+function MenuButton({
+  icon,
+  title,
+  description,
+  onClick,
+  highlighted,
+}: MenuButtonProps) {
   return (
     <HStack
       as="button"
@@ -206,22 +255,41 @@ function MenuButton({ icon, title, description, onClick }: MenuButtonProps) {
       cursor="pointer"
       borderRadius="md"
       borderWidth="1px"
-      borderColor="gray.200"
-      bg="white"
+      borderColor={highlighted ? "blue.200" : "gray.200"}
+      bg={highlighted ? "blue.50" : "white"}
       width="100%"
-      _hover={{ bg: "gray.50", borderColor: "gray.300" }}
+      _hover={{
+        bg: highlighted ? "blue.100" : "gray.50",
+        borderColor: highlighted ? "blue.300" : "gray.300",
+      }}
       onClick={onClick}
       gap={3}
     >
-      <Box color="gray.500">{icon}</Box>
+      <Box color={highlighted ? "blue.500" : "gray.500"}>{icon}</Box>
       <VStack align="start" gap={0} flex={1}>
-        <Text fontSize="sm" fontWeight="medium">
+        <Text
+          fontSize="sm"
+          fontWeight="medium"
+          color={highlighted ? "blue.700" : undefined}
+        >
           {title}
         </Text>
-        <Text fontSize="xs" color="gray.500">
+        <Text fontSize="xs" color={highlighted ? "blue.500" : "gray.500"}>
           {description}
         </Text>
       </VStack>
+    </HStack>
+  );
+}
+
+function SectionDivider({ label }: { label: string }) {
+  return (
+    <HStack gap={2} paddingY={1}>
+      <Box flex={1} borderBottomWidth="1px" borderColor="gray.200" />
+      <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+        {label}
+      </Text>
+      <Box flex={1} borderBottomWidth="1px" borderColor="gray.200" />
     </HStack>
   );
 }

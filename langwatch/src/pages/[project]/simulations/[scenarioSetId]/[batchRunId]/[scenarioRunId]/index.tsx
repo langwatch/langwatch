@@ -28,7 +28,7 @@ export default function IndividualScenarioRunPage() {
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer, drawerInStack } = useDrawer();
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
@@ -269,7 +269,7 @@ export default function IndividualScenarioRunPage() {
         </VStack>
       </PageLayout.Container>
 
-      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+      <ScenarioFormDrawer open={drawerInStack("scenarioEditor")} />
 
       <RunScenarioModal
         open={runModalOpen}
