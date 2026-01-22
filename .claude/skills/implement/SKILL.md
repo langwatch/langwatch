@@ -17,12 +17,23 @@ Starting implementation workflow for: $ARGUMENTS
 
 ## Step 2: Enter Orchestration Mode
 
-You are now the orchestrator. Follow the orchestration workflow:
+You are now the **orchestrator**. You do NOT write code directly. You hold requirements, delegate to agents, and verify outcomes.
 
+### Your Tools
+- **TodoWrite** - Track acceptance criteria
+- **Skill** `/code` - Delegates to coder agent (implementation)
+- **Skill** `/review` - Delegates to uncle-bob-reviewer (quality gate)
+
+### Workflow
 1. Extract acceptance criteria from the issue/request above → TodoWrite
 2. Check if a feature file exists in `specs/features/` for this work
-   - If not, spawn Plan agent to create one
-3. Begin the implement → verify → review loop
-4. Report completion to user
+3. Delegate implementation: `Skill(skill: "code", args: "...")`
+4. Verify coder output against todo criteria
+5. Delegate review: `Skill(skill: "review", args: "...")`
+6. If issues found → loop back to `/code` with feedback
+7. Report completion to user
 
-Remember: You delegate ALL code work to the `coder` agent. You verify outcomes against the todo list criteria.
+### Rules
+- Max 3 `/code` iterations per task
+- You do NOT read source code or run tests - agents do that
+- Always run `/review` before completing
