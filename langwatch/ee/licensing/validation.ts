@@ -2,10 +2,12 @@ import crypto from "crypto";
 import type { PlanInfo } from "~/server/subscriptionHandler";
 import { FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { mapToPlanInfo } from "./planMapping";
+import { SignedLicenseSchema } from "./types";
 import type { SignedLicense, ValidationResult } from "./types";
 
 /**
  * Parses a base64-encoded license key into a SignedLicense object.
+ * Uses Zod schema validation for type-safe parsing.
  *
  * @param licenseKey - Base64-encoded license string
  * @returns SignedLicense if valid, null if parsing fails
@@ -18,48 +20,12 @@ export function parseLicenseKey(licenseKey: string): SignedLicense | null {
   try {
     const decoded = Buffer.from(licenseKey, "base64").toString("utf-8");
     const parsed = JSON.parse(decoded) as unknown;
+    const result = SignedLicenseSchema.safeParse(parsed);
 
-    // Validate structure
-    if (!isSignedLicense(parsed)) {
-      return null;
-    }
-
-    return parsed;
+    return result.success ? result.data : null;
   } catch {
     return null;
   }
-}
-
-/**
- * Type guard to check if an object is a valid SignedLicense.
- */
-function isSignedLicense(obj: unknown): obj is SignedLicense {
-  if (typeof obj !== "object" || obj === null) {
-    return false;
-  }
-
-  const license = obj as Record<string, unknown>;
-
-  if (typeof license.signature !== "string") {
-    return false;
-  }
-
-  if (typeof license.data !== "object" || license.data === null) {
-    return false;
-  }
-
-  const data = license.data as Record<string, unknown>;
-
-  return (
-    typeof data.licenseId === "string" &&
-    typeof data.version === "number" &&
-    typeof data.organizationName === "string" &&
-    typeof data.email === "string" &&
-    typeof data.issuedAt === "string" &&
-    typeof data.expiresAt === "string" &&
-    typeof data.plan === "object" &&
-    data.plan !== null
-  );
 }
 
 /**

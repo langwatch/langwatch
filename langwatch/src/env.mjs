@@ -106,6 +106,7 @@ export const env = createEnv({
 
     // License Enforcement (COSS-0226)
     LICENSE_ENFORCEMENT_ENABLED: z.boolean().optional(),
+    LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
   },
 
   /**
@@ -209,6 +210,7 @@ export const env = createEnv({
     LICENSE_ENFORCEMENT_ENABLED:
       process.env.LICENSE_ENFORCEMENT_ENABLED === "1" ||
       process.env.LICENSE_ENFORCEMENT_ENABLED?.toLowerCase() === "true",
+    LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

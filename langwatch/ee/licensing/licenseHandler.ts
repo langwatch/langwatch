@@ -3,7 +3,12 @@ import type { PlanInfo } from "~/server/subscriptionHandler";
 import { FREE_PLAN, PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { mapToPlanInfo } from "./planMapping";
 import type { LicenseStatus, StoreLicenseResult } from "./types";
-import { validateLicense, parseLicenseKey } from "./validation";
+import {
+  validateLicense,
+  parseLicenseKey,
+  verifySignature,
+  isExpired,
+} from "./validation";
 
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
@@ -131,22 +136,26 @@ export class LicenseHandler {
       };
     }
 
-    // Parse the license to get plan info even if expired
-    const parsed = parseLicenseKey(organization.license);
-    const result = validateLicense(organization.license, this.publicKey);
+    // Parse once and reuse for validation checks
+    const signedLicense = parseLicenseKey(organization.license);
 
-    if (!parsed) {
+    if (!signedLicense) {
       return {
         hasLicense: true,
         valid: false,
       };
     }
 
-    const { data: licenseData } = parsed;
+    // Check signature and expiry using the already-parsed license
+    const signatureValid = verifySignature(signedLicense, this.publicKey);
+    const expired = isExpired(signedLicense.data.expiresAt);
+    const valid = signatureValid && !expired;
+
+    const { data: licenseData } = signedLicense;
 
     return {
       hasLicense: true,
-      valid: result.valid,
+      valid,
       plan: licenseData.plan.type,
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,

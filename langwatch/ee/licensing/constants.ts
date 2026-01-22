@@ -43,12 +43,19 @@ export const FREE_PLAN: PlanInfo = {
 };
 
 /**
+ * Placeholder public key used when no env var is configured.
+ * This will fail signature verification, which is the safe default.
+ */
+const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+PLACEHOLDER_FOR_PRODUCTION_PUBLIC_KEY
+-----END PUBLIC KEY-----`;
+
+/**
  * PUBLIC_KEY: RSA public key for license signature verification.
  * This key is used to verify that licenses are signed by LangWatch.
  *
- * In production, this should be replaced with the actual production public key.
- * For now, we use a placeholder that will be replaced during deployment.
+ * Set via LANGWATCH_LICENSE_PUBLIC_KEY environment variable in production.
+ * Falls back to placeholder (which will fail validation) if not set.
  */
-export const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-PLACEHOLDER_FOR_PRODUCTION_PUBLIC_KEY
------END PUBLIC KEY-----`;
+export const PUBLIC_KEY =
+  process.env.LANGWATCH_LICENSE_PUBLIC_KEY ?? PLACEHOLDER_PUBLIC_KEY;

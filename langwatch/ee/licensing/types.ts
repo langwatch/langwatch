@@ -1,33 +1,40 @@
+import { z } from "zod";
 import type { PlanInfo } from "~/server/subscriptionHandler";
 
 /** Plan limits embedded within a license */
-export interface LicensePlanLimits {
-  type: string;
-  name: string;
-  maxMembers: number;
-  maxProjects: number;
-  maxMessagesPerMonth: number;
-  evaluationsCredit: number;
-  maxWorkflows: number;
-  canPublish: boolean;
-}
+export const LicensePlanLimitsSchema = z.object({
+  type: z.string(),
+  name: z.string(),
+  maxMembers: z.number(),
+  maxProjects: z.number(),
+  maxMessagesPerMonth: z.number(),
+  evaluationsCredit: z.number(),
+  maxWorkflows: z.number(),
+  canPublish: z.boolean(),
+});
+
+export type LicensePlanLimits = z.infer<typeof LicensePlanLimitsSchema>;
 
 /** Core license data structure (the payload that gets signed) */
-export interface LicenseData {
-  licenseId: string;
-  version: number;
-  organizationName: string;
-  email: string;
-  issuedAt: string; // ISO 8601 date string
-  expiresAt: string; // ISO 8601 date string
-  plan: LicensePlanLimits;
-}
+export const LicenseDataSchema = z.object({
+  licenseId: z.string(),
+  version: z.number(),
+  organizationName: z.string(),
+  email: z.string(),
+  issuedAt: z.string(), // ISO 8601 date string
+  expiresAt: z.string(), // ISO 8601 date string
+  plan: LicensePlanLimitsSchema,
+});
+
+export type LicenseData = z.infer<typeof LicenseDataSchema>;
 
 /** A license with its RSA signature */
-export interface SignedLicense {
-  data: LicenseData;
-  signature: string; // Base64-encoded RSA-SHA256 signature
-}
+export const SignedLicenseSchema = z.object({
+  data: LicenseDataSchema,
+  signature: z.string(), // Base64-encoded RSA-SHA256 signature
+});
+
+export type SignedLicense = z.infer<typeof SignedLicenseSchema>;
 
 /** Result of license validation */
 export type ValidationResult =
