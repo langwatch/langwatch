@@ -171,6 +171,11 @@ model Organization {
     CustomRoles   CustomRole[]
     notifications Notification[]
 
+    // License enforcement fields (COSS-0226)
+    license                String?   @db.Text
+    licenseExpiresAt       DateTime?
+    licenseLastValidatedAt DateTime?
+
     @@index([ssoDomain])
     @@index([ssoProvider])
 }

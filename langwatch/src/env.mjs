@@ -103,6 +103,9 @@ export const env = createEnv({
 
     // ClickHouse Migration Configuration
     CLICKHOUSE_CLUSTER: z.string().optional(),
+
+    // License Enforcement (COSS-0226)
+    LICENSE_ENFORCEMENT_ENABLED: z.boolean().optional(),
   },
 
   /**
@@ -203,6 +206,9 @@ export const env = createEnv({
       process.env.ENABLE_CLICKHOUSE === "true" ||
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
     CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
+    LICENSE_ENFORCEMENT_ENABLED:
+      process.env.LICENSE_ENFORCEMENT_ENABLED === "1" ||
+      process.env.LICENSE_ENFORCEMENT_ENABLED?.toLowerCase() === "true",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

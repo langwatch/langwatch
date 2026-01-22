@@ -1,3 +1,7 @@
+import { LicenseHandler, PUBLIC_KEY, UNLIMITED_PLAN } from "../../ee/licensing";
+import { env } from "../env.mjs";
+import { prisma } from "./db";
+
 export type PlanInfo = {
   type: string;
   name: string;
@@ -25,30 +29,35 @@ export type PlanInfo = {
   };
 };
 
+// Singleton LicenseHandler instance for self-hosted deployments
+let licenseHandler: LicenseHandler | null = null;
+
+function getLicenseHandler(): LicenseHandler {
+  if (!licenseHandler) {
+    licenseHandler = new LicenseHandler({
+      prisma,
+      licenseEnforcementEnabled: env.LICENSE_ENFORCEMENT_ENABLED ?? false,
+      publicKey: PUBLIC_KEY,
+    });
+  }
+  return licenseHandler;
+}
+
 export abstract class SubscriptionHandler {
   static async getActivePlan(
-    _organizationId: string,
+    organizationId: string,
     _user?: {
       id: string;
       email?: string | null;
       name?: string | null;
     },
   ): Promise<PlanInfo> {
-    return {
-      type: "OPEN_SOURCE",
-      name: "Open Source",
-      free: true,
-      overrideAddingLimitations: true,
-      maxMembers: 99_999,
-      maxProjects: 9_999,
-      maxMessagesPerMonth: 999_999,
-      maxWorkflows: 999,
-      evaluationsCredit: 999,
-      canPublish: true,
-      prices: {
-        USD: 0,
-        EUR: 0,
-      },
-    };
+    // When license enforcement is enabled, delegate to LicenseHandler
+    if (env.LICENSE_ENFORCEMENT_ENABLED) {
+      return getLicenseHandler().getActivePlan(organizationId);
+    }
+
+    // Default: return unlimited plan (backward compatible)
+    return UNLIMITED_PLAN;
   }
 }
