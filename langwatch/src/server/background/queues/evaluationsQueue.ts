@@ -15,17 +15,19 @@ import { getEvaluationProcessingPipeline } from "../../event-sourcing/runtime/ev
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
+import { EVALUATIONS_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
 
-export const EVALUATIONS_QUEUE_NAME = "{evaluations}";
+export { EVALUATIONS_QUEUE } from "./constants";
 
 const logger = createLogger("langwatch:evaluations:queue");
 
+// Note: Job name is dynamic (evaluator type), not a constant
 export const evaluationsQueue = new QueueWithFallback<
   EvaluationJob,
   any,
   string
->(EVALUATIONS_QUEUE_NAME, runEvaluationJob, {
+>(EVALUATIONS_QUEUE.NAME, runEvaluationJob, {
   connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {

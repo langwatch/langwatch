@@ -67,6 +67,7 @@ export interface ScenarioExecutor {
     modelParams: LiteLLMParams,
     nlpServiceUrl: string,
     batchRunId: string,
+    telemetry?: { endpoint: string; apiKey: string },
   ): Promise<ScenarioExecutionResult>;
 }
 

@@ -54,6 +54,7 @@ export class ScenarioExecutionOrchestrator {
         adapterResult.adapter,
         modelParams,
         context.batchRunId,
+        { endpoint: this.deps.telemetryEndpoint, apiKey: project.apiKey },
       );
     } catch (error) {
       logger.error({ error, context }, "Scenario execution failed");
@@ -107,6 +108,7 @@ export class ScenarioExecutionOrchestrator {
     adapter: Parameters<typeof this.deps.scenarioExecutor.run>[1],
     modelParams: LiteLLMParams,
     batchRunId: string,
+    telemetry: { endpoint: string; apiKey: string },
   ) {
     return this.deps.scenarioExecutor.run(
       scenario,
@@ -114,6 +116,7 @@ export class ScenarioExecutionOrchestrator {
       modelParams,
       this.deps.nlpServiceUrl,
       batchRunId,
+      telemetry,
     );
   }
 

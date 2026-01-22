@@ -25,6 +25,7 @@ import http from "http";
 import path from "path";
 import { register } from "prom-client";
 import { workerRestartsCounter } from "../metrics";
+import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
 import type { EventSourcingJob } from "./types";
 
@@ -35,6 +36,45 @@ import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
 
 const logger = createLogger("langwatch:workers");
+
+type Closeable = { name: string; close: () => Promise<void> | void };
+const closeables: Closeable[] = [];
+let isShuttingDown = false;
+
+function registerCloseable(name: string, closeable: { close: () => Promise<void> | void } | undefined) {
+  if (closeable) closeables.push({ name, close: () => closeable.close() });
+}
+
+export async function gracefulShutdown() {
+  if (isShuttingDown) return; // Prevent multiple shutdown attempts
+  isShuttingDown = true;
+
+  logger.info({ count: closeables.length }, "Shutting down workers...");
+
+  const results = await Promise.allSettled(
+    closeables.map(async (c) => {
+      try {
+        await c.close();
+        logger.debug({ name: c.name }, "Closed");
+      } catch (error) {
+        logger.error({ name: c.name, error }, "Failed to close");
+        throw error;
+      }
+    })
+  );
+
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed > 0) {
+    logger.warn({ failed, total: closeables.length }, "Shutdown completed with errors");
+  } else {
+    logger.info("Shutdown complete");
+  }
+
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+process.on("SIGINT", () => void gracefulShutdown());
+process.on("SIGTERM", () => void gracefulShutdown());
 
 type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
@@ -68,11 +108,21 @@ export const start = (
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
     const eventSourcingWorker = startEventSourcingWorker();
+    const metricsServer = startMetricsServer();
 
-    startMetricsServer();
+    // Register all closeables for graceful shutdown
+    registerCloseable("collector", collectorWorker);
+    registerCloseable("evaluations", evaluationsWorker);
+    registerCloseable("topicClustering", topicClusteringWorker);
+    registerCloseable("trackEvents", trackEventsWorker);
+    registerCloseable("usageStats", usageStatsWorker);
+    registerCloseable("eventSourcing", eventSourcingWorker);
+    registerCloseable("metricsServer", { close: () => new Promise<void>((resolve) => metricsServer.close(() => resolve())) });
+
     incrementWorkerRestartCount();
 
     const closingListener = () => {
+      if (isShuttingDown) return; // Don't restart during intentional shutdown
       logger.info("closed before expected, restarting");
       reject(new WorkersRestart("Worker closing before expected, restarting"));
     };
@@ -145,8 +195,8 @@ const incrementWorkerRestartCount = () => {
   }
 };
 
-const startMetricsServer = () => {
-  const port = parseInt(process.env.WORKER_METRICS_PORT ?? "2999");
+const startMetricsServer = (): http.Server => {
+  const port = getWorkerMetricsPort();
 
   const server = http.createServer((req, res) => {
     if (req.url === "/metrics") {
@@ -173,4 +223,6 @@ const startMetricsServer = () => {
   server.listen(port, () => {
     logger.info(`metrics server listening on port ${port}`);
   });
+
+  return server;
 };

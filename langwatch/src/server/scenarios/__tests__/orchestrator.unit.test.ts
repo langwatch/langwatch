@@ -27,6 +27,7 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     name: "Test Scenario",
     situation: "User asks a question",
     criteria: ["Must respond politely"],
+    labels: [],
   };
 
   const defaultProject = {

@@ -69,6 +69,7 @@ export interface ScenarioConfig {
   name: string;
   situation: string;
   criteria: string[];
+  labels: string[];
 }
 
 /** Execution context - grouping and correlation */
@@ -108,4 +109,20 @@ export interface ScenarioExecutionResult {
   runId?: string;
   reasoning?: string;
   error?: string;
+}
+
+// ============================================================================
+// Child Process Types (for OTEL isolation)
+// ============================================================================
+
+/**
+ * Complete data package for child process execution.
+ * Contains everything needed to run a scenario without DB access.
+ */
+export interface ChildProcessJobData {
+  context: ExecutionContext;
+  scenario: ScenarioConfig;
+  adapterData: TargetAdapterData;
+  modelParams: LiteLLMParams;
+  nlpServiceUrl: string;
 }
