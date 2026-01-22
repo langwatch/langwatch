@@ -443,7 +443,7 @@ export class ClickHouseTraceService {
           }
 
           // Generate filter conditions from input.filters
-          const { conditions: filterConditions, hasUnsupportedFilters } =
+          const { conditions: filterConditions, params: filterParams, hasUnsupportedFilters } =
             generateClickHouseFilterConditions(input.filters ?? {});
 
           // If there are unsupported filters, fall back to Elasticsearch
@@ -465,7 +465,8 @@ export class ClickHouseTraceService {
               protections,
               input.startDate,
               input.endDate,
-              filterConditions
+              filterConditions,
+              filterParams
             );
 
           // Generate new scrollId from last trace
@@ -986,7 +987,8 @@ export class ClickHouseTraceService {
     protections: Protections,
     startDate?: number,
     endDate?: number,
-    filterConditions?: string[]
+    filterConditions?: string[],
+    filterParams?: Record<string, unknown>
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1059,6 +1061,7 @@ export class ClickHouseTraceService {
             tenantId: projectId,
             startDate: startDate ?? 0,
             endDate: endDate ?? Date.now(),
+            ...filterParams,
           },
           format: "JSONEachRow",
         });
@@ -1107,6 +1110,7 @@ export class ClickHouseTraceService {
             lastTimestamp: cursor?.lastTimestamp ?? 0,
             lastTraceId: cursor?.lastTraceId ?? "",
             pageSize,
+            ...filterParams,
           },
           format: "JSONEachRow",
         });

@@ -1,6 +1,15 @@
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "./types";
 
+/**
+ * Result of building a filter condition - contains both the SQL fragment
+ * and any parameters needed for the query.
+ */
+export type FilterConditionResult = {
+  sql: string;
+  params: Record<string, unknown>;
+};
+
 export type ClickHouseFilterQueryParams = {
   tenantId: string;
   query?: string;
@@ -609,197 +618,279 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
 // ============================================================================
 
 /**
+ * Type for filter condition builder functions.
+ * Each builder takes filter values and returns SQL + params for parameterized queries.
+ * The paramId is used to create unique parameter names when multiple filters are combined.
+ */
+type FilterConditionBuilder = (
+  values: string[],
+  paramId: string,
+  key?: string,
+  subkey?: string
+) => FilterConditionResult;
+
+/**
  * ClickHouse WHERE clause builders for filtering traces.
  * Returns null if the filter is not supported in ClickHouse.
+ * All builders use parameterized queries for SQL injection safety.
  */
-export const clickHouseFilterConditions: Record<
-  FilterField,
-  ((values: string[], key?: string, subkey?: string) => string) | null
-> = {
+export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuilder | null> = {
   // Topics
-  "topics.topics": (values) =>
-    `ts.TopicId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})`,
-  "topics.subtopics": (values) =>
-    `ts.SubTopicId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})`,
+  "topics.topics": (values, paramId) => ({
+    sql: `ts.TopicId IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
+  "topics.subtopics": (values, paramId) => ({
+    sql: `ts.SubTopicId IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
   // Metadata
-  "metadata.user_id": (values) =>
-    `ts.Attributes['user.id'] IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})`,
-  "metadata.thread_id": (values) =>
-    `ts.Attributes['thread.id'] IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})`,
-  "metadata.customer_id": (values) =>
-    `ts.Attributes['customer.id'] IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})`,
-  "metadata.labels": (values) =>
-    `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), [${values.map((v) => `'"${escapeString(v)}"'`).join(", ")}])`,
+  "metadata.user_id": (values, paramId) => ({
+    sql: `ts.Attributes['user.id'] IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
+  "metadata.thread_id": (values, paramId) => ({
+    sql: `ts.Attributes['thread.id'] IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
+  "metadata.customer_id": (values, paramId) => ({
+    sql: `ts.Attributes['customer.id'] IN ({${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
+  "metadata.labels": (values, paramId) => ({
+    sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
+    params: { [`${paramId}_values`]: values },
+  }),
   "metadata.key": null, // Complex nested filter, not supported
   "metadata.value": null, // Complex nested filter, not supported
-  "metadata.prompt_ids": (values) =>
-    `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), [${values.map((v) => `'"${escapeString(v)}"'`).join(", ")}])`,
+  "metadata.prompt_ids": (values, paramId) => ({
+    sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
   // Traces
-  "traces.error": (values) => {
+  "traces.error": (values, _paramId) => {
     const hasTrue = values.includes("true");
     const hasFalse = values.includes("false");
-    if (hasTrue && hasFalse) return "1=1"; // Both selected = no filter
-    if (hasTrue) return "ts.ContainsErrorStatus = true";
-    if (hasFalse) return "ts.ContainsErrorStatus = false";
-    return "1=0"; // Neither = no results
+    if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
+    if (hasTrue) return { sql: "ts.ContainsErrorStatus = true", params: {} };
+    if (hasFalse) return { sql: "ts.ContainsErrorStatus = false", params: {} };
+    return { sql: "1=0", params: {} };
   },
 
   // Spans
   "spans.type": null, // Requires join with stored_spans, handled separately
-  "spans.model": (values) =>
-    `hasAny(ts.Models, [${values.map((v) => `'${escapeString(v)}'`).join(", ")}])`,
+  "spans.model": (values, paramId) => ({
+    sql: `hasAny(ts.Models, {${paramId}_values:Array(String)})`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
   // Annotations
-  "annotations.hasAnnotation": (values) => {
+  "annotations.hasAnnotation": (values, _paramId) => {
     const hasTrue = values.includes("true");
     const hasFalse = values.includes("false");
-    if (hasTrue && hasFalse) return "1=1";
-    if (hasTrue) return "ts.HasAnnotation = true";
-    if (hasFalse) return "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)";
-    return "1=0";
+    if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
+    if (hasTrue) return { sql: "ts.HasAnnotation = true", params: {} };
+    if (hasFalse) return { sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)", params: {} };
+    return { sql: "1=0", params: {} };
   },
 
   // Evaluations - using evaluation_states table with EXISTS subquery
-  "evaluations.evaluator_id": (values) =>
-    `EXISTS (
+  "evaluations.evaluator_id": (values, paramId) => ({
+    sql: `EXISTS (
       SELECT 1 FROM evaluation_states es FINAL
       WHERE es.TenantId = ts.TenantId
         AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
     )`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
-  "evaluations.evaluator_id.guardrails_only": (values) =>
-    `EXISTS (
+  "evaluations.evaluator_id.guardrails_only": (values, paramId) => ({
+    sql: `EXISTS (
       SELECT 1 FROM evaluation_states es FINAL
       WHERE es.TenantId = ts.TenantId
         AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
         AND es.IsGuardrail = 1
     )`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
-  "evaluations.passed": (values, key) => {
-    if (!key) return "1=0";
-    const passedValues = values.map((v) => (v === "true" || v === "1") ? "1" : "0");
-    return `EXISTS (
-      SELECT 1 FROM evaluation_states es FINAL
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId = '${escapeString(key)}'
-        AND es.Passed IN (${passedValues.join(", ")})
-    )`;
+  "evaluations.passed": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    const passedValues = values.map((v) => (v === "true" || v === "1") ? 1 : 0);
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM evaluation_states es FINAL
+        WHERE es.TenantId = ts.TenantId
+          AND es.TraceId = ts.TraceId
+          AND es.EvaluatorId = {${paramId}_key:String}
+          AND es.Passed IN ({${paramId}_values:Array(UInt8)})
+      )`,
+      params: {
+        [`${paramId}_key`]: key,
+        [`${paramId}_values`]: passedValues,
+      },
+    };
   },
 
-  "evaluations.score": (values, key) => {
-    if (!key || values.length < 2) return "1=0";
+  "evaluations.score": (values, paramId, key) => {
+    if (!key || values.length < 2) return { sql: "1=0", params: {} };
     const minScore = parseFloat(values[0] ?? "0");
     const maxScore = parseFloat(values[1] ?? "1");
-    return `EXISTS (
-      SELECT 1 FROM evaluation_states es FINAL
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId = '${escapeString(key)}'
-        AND es.Score >= ${minScore}
-        AND es.Score <= ${maxScore}
-    )`;
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM evaluation_states es FINAL
+        WHERE es.TenantId = ts.TenantId
+          AND es.TraceId = ts.TraceId
+          AND es.EvaluatorId = {${paramId}_key:String}
+          AND es.Score >= {${paramId}_min:Float64}
+          AND es.Score <= {${paramId}_max:Float64}
+      )`,
+      params: {
+        [`${paramId}_key`]: key,
+        [`${paramId}_min`]: minScore,
+        [`${paramId}_max`]: maxScore,
+      },
+    };
   },
 
-  "evaluations.state": (values, key) => {
-    if (!key) return "1=0";
-    return `EXISTS (
-      SELECT 1 FROM evaluation_states es FINAL
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId = '${escapeString(key)}'
-        AND es.Status IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
-    )`;
+  "evaluations.state": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM evaluation_states es FINAL
+        WHERE es.TenantId = ts.TenantId
+          AND es.TraceId = ts.TraceId
+          AND es.EvaluatorId = {${paramId}_key:String}
+          AND es.Status IN ({${paramId}_values:Array(String)})
+      )`,
+      params: {
+        [`${paramId}_key`]: key,
+        [`${paramId}_values`]: values,
+      },
+    };
   },
 
-  "evaluations.label": (values, key) => {
-    if (!key) return "1=0";
-    return `EXISTS (
-      SELECT 1 FROM evaluation_states es FINAL
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId = '${escapeString(key)}'
-        AND es.Label IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
-    )`;
+  "evaluations.label": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM evaluation_states es FINAL
+        WHERE es.TenantId = ts.TenantId
+          AND es.TraceId = ts.TraceId
+          AND es.EvaluatorId = {${paramId}_key:String}
+          AND es.Label IN ({${paramId}_values:Array(String)})
+      )`,
+      params: {
+        [`${paramId}_key`]: key,
+        [`${paramId}_values`]: values,
+      },
+    };
   },
 
   // Events - using stored_spans table with span attributes
-  "events.event_type": (values) =>
-    `EXISTS (
-      SELECT 1 FROM stored_spans sp
+  "events.event_type": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM stored_spans sp FINAL
       WHERE sp.TenantId = ts.TenantId
         AND sp.TraceId = ts.TraceId
-        AND sp.SpanAttributes['event.type'] IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+        AND sp.SpanAttributes['event.type'] IN ({${paramId}_values:Array(String)})
     )`,
+    params: { [`${paramId}_values`]: values },
+  }),
 
-  "events.metrics.key": (values, key) => {
-    if (!key) return "1=0";
-    // Filter by event type and having any of the specified metric keys
-    const metricConditions = values.map((v) => `sp.SpanAttributes['event.metrics.${escapeString(v)}'] != ''`);
-    return `EXISTS (
-      SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = ts.TenantId
-        AND sp.TraceId = ts.TraceId
-        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
-        AND (${metricConditions.join(" OR ")})
-    )`;
+  "events.metrics.key": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    // Build OR conditions for each metric key - these are attribute names, not values
+    // Since attribute names are controlled internally, we use them directly
+    const metricConditions = values.map(
+      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`
+    );
+    const params: Record<string, unknown> = {
+      [`${paramId}_key`]: key,
+    };
+    values.forEach((v, i) => {
+      params[`${paramId}_attrkey_${i}`] = `event.metrics.${v}`;
+    });
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM stored_spans sp FINAL
+        WHERE sp.TenantId = ts.TenantId
+          AND sp.TraceId = ts.TraceId
+          AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
+          AND (${metricConditions.join(" OR ")})
+      )`,
+      params,
+    };
   },
 
-  "events.metrics.value": (values, key, subkey) => {
-    if (!key || !subkey || values.length < 2) return "1=0";
+  "events.metrics.value": (values, paramId, key, subkey) => {
+    if (!key || !subkey || values.length < 2) return { sql: "1=0", params: {} };
     const minValue = parseFloat(values[0] ?? "0");
     const maxValue = parseFloat(values[1] ?? "0");
-    const attrKey = `event.metrics.${subkey}`;
-    return `EXISTS (
-      SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = ts.TenantId
-        AND sp.TraceId = ts.TraceId
-        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
-        AND toFloat64OrNull(sp.SpanAttributes['${escapeString(attrKey)}']) >= ${minValue}
-        AND toFloat64OrNull(sp.SpanAttributes['${escapeString(attrKey)}']) <= ${maxValue}
-    )`;
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM stored_spans sp FINAL
+        WHERE sp.TenantId = ts.TenantId
+          AND sp.TraceId = ts.TraceId
+          AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
+          AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) >= {${paramId}_min:Float64}
+          AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) <= {${paramId}_max:Float64}
+      )`,
+      params: {
+        [`${paramId}_key`]: key,
+        [`${paramId}_attrkey`]: `event.metrics.${subkey}`,
+        [`${paramId}_min`]: minValue,
+        [`${paramId}_max`]: maxValue,
+      },
+    };
   },
 
-  "events.event_details.key": (values, key) => {
-    if (!key) return "1=0";
-    // Filter by event type and having any of the specified detail keys
-    const detailConditions = values.map((v) => `sp.SpanAttributes['event.details.${escapeString(v)}'] != ''`);
-    return `EXISTS (
-      SELECT 1 FROM stored_spans sp
-      WHERE sp.TenantId = ts.TenantId
-        AND sp.TraceId = ts.TraceId
-        AND sp.SpanAttributes['event.type'] = '${escapeString(key)}'
-        AND (${detailConditions.join(" OR ")})
-    )`;
+  "events.event_details.key": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    // Build OR conditions for each detail key
+    const detailConditions = values.map(
+      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`
+    );
+    const params: Record<string, unknown> = {
+      [`${paramId}_key`]: key,
+    };
+    values.forEach((v, i) => {
+      params[`${paramId}_attrkey_${i}`] = `event.details.${v}`;
+    });
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM stored_spans sp FINAL
+        WHERE sp.TenantId = ts.TenantId
+          AND sp.TraceId = ts.TraceId
+          AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
+          AND (${detailConditions.join(" OR ")})
+      )`,
+      params,
+    };
   },
 };
 
 /**
- * Escape a string for use in ClickHouse SQL.
- */
-function escapeString(value: string): string {
-  return value.replace(/'/g, "\\'").replace(/\\/g, "\\\\");
-}
-
-/**
  * Generate ClickHouse WHERE conditions from filter parameters.
- * Returns an array of SQL condition strings.
+ * Returns SQL condition strings and aggregated parameters for parameterized queries.
  *
  * @param filters - The filter parameters from the request
- * @returns Array of SQL WHERE conditions, or null if any filter is unsupported
+ * @returns Object with conditions array, aggregated params, and unsupported filter flag
  */
 export function generateClickHouseFilterConditions(
   filters: Partial<Record<FilterField, FilterParam>>
-): { conditions: string[]; hasUnsupportedFilters: boolean } {
+): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean } {
   const conditions: string[] = [];
+  const allParams: Record<string, unknown> = {};
   let hasUnsupportedFilters = false;
+  let paramCounter = 0;
 
-  for (const [field, params] of Object.entries(filters)) {
-    if (!params || (Array.isArray(params) && params.length === 0)) {
+  for (const [field, filterParams] of Object.entries(filters)) {
+    if (!filterParams || (Array.isArray(filterParams) && filterParams.length === 0)) {
       continue;
     }
 
@@ -813,16 +904,22 @@ export function generateClickHouseFilterConditions(
     }
 
     // Handle simple array filters
-    if (Array.isArray(params)) {
-      conditions.push(conditionBuilder(params));
+    if (Array.isArray(filterParams)) {
+      const paramId = `f${paramCounter++}`;
+      const result = conditionBuilder(filterParams, paramId);
+      conditions.push(result.sql);
+      Object.assign(allParams, result.params);
     }
     // Handle nested filters (key -> values)
-    else if (typeof params === "object") {
+    else if (typeof filterParams === "object") {
       // For nested filters, we need to OR together the conditions for each key
       const nestedConditions: string[] = [];
-      for (const [key, values] of Object.entries(params)) {
+      for (const [key, values] of Object.entries(filterParams)) {
         if (Array.isArray(values) && values.length > 0) {
-          nestedConditions.push(conditionBuilder(values, key));
+          const paramId = `f${paramCounter++}`;
+          const result = conditionBuilder(values, paramId, key);
+          nestedConditions.push(result.sql);
+          Object.assign(allParams, result.params);
         }
       }
       if (nestedConditions.length > 0) {
@@ -831,5 +928,5 @@ export function generateClickHouseFilterConditions(
     }
   }
 
-  return { conditions, hasUnsupportedFilters };
+  return { conditions, params: allParams, hasUnsupportedFilters };
 }
