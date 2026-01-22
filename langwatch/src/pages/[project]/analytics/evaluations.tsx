@@ -9,6 +9,9 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
+import { useRouter } from "next/router";
+import { useCallback } from "react";
+import qs from "qs";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -26,7 +29,16 @@ import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluato
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-const renderGridItems = (checks: any) => {
+const renderGridItems = (
+  checks: any,
+  onGraphClick: (params: {
+    evaluatorId: string;
+    groupKey?: string;
+    date?: string;
+    checkType: string;
+    isGuardrail: boolean;
+  }) => void,
+) => {
   return checks.map((check: any) => {
     let checksAverage = {};
     let checksSummary = {};
@@ -36,6 +48,7 @@ const renderGridItems = (checks: any) => {
 
     if (traceCheck?.isGuardrail) {
       // Boolean/guardrail evaluators: show pass/fail distribution
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
         graphId: "custom",
         graphType: "donnut",
@@ -46,6 +59,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_runs",
             aggregation: "cardinality",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_passed",
@@ -69,6 +87,11 @@ const renderGridItems = (checks: any) => {
               aggregation: "sum",
             },
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_passed",
@@ -79,6 +102,7 @@ const renderGridItems = (checks: any) => {
       };
     } else if (isCategoryEvaluator) {
       // Category evaluators: show category distribution
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
         graphId: "custom",
         graphType: "donnut",
@@ -88,6 +112,11 @@ const renderGridItems = (checks: any) => {
             colorSet: "colors",
             metric: "metadata.trace_id",
             aggregation: "cardinality",
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_label",
@@ -106,6 +135,11 @@ const renderGridItems = (checks: any) => {
             colorSet: "colors",
             metric: "metadata.trace_id",
             aggregation: "cardinality",
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         groupBy: "evaluations.evaluation_label",
@@ -116,6 +150,7 @@ const renderGridItems = (checks: any) => {
       };
     } else {
       // Score-based evaluators: show average score
+      // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
         graphId: "custom",
         graphType: "summary",
@@ -126,6 +161,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_score",
             aggregation: "avg",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         includePrevious: false,
@@ -143,6 +183,11 @@ const renderGridItems = (checks: any) => {
             metric: "evaluations.evaluation_score",
             aggregation: "avg",
             key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
           },
         ],
         includePrevious: false,
@@ -167,7 +212,17 @@ const renderGridItems = (checks: any) => {
               )}
             </Card.Header>
             <Card.Body>
-              <CustomGraph input={checksSummary as CustomGraphInput} />
+              <CustomGraph
+                input={checksSummary as CustomGraphInput}
+                onDataPointClick={(params) => {
+                  onGraphClick({
+                    evaluatorId: check.id,
+                    groupKey: params.groupKey,
+                    checkType: check.checkType,
+                    isGuardrail: traceCheck?.isGuardrail ?? false,
+                  });
+                }}
+              />
             </Card.Body>
           </Card.Root>
         </GridItem>
@@ -188,7 +243,18 @@ const renderGridItems = (checks: any) => {
               )}
             </Card.Header>
             <Card.Body>
-              <CustomGraph input={checksAverage as CustomGraphInput} />
+              <CustomGraph
+                input={checksAverage as CustomGraphInput}
+                onDataPointClick={(params) => {
+                  onGraphClick({
+                    evaluatorId: check.id,
+                    groupKey: params.groupKey,
+                    date: params.date,
+                    checkType: check.checkType,
+                    isGuardrail: traceCheck?.isGuardrail ?? false,
+                  });
+                }}
+              />
             </Card.Body>
           </Card.Root>
         </GridItem>
@@ -199,11 +265,72 @@ const renderGridItems = (checks: any) => {
 
 function EvaluationsContent() {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
   const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
     { enabled: !!project },
+  );
+
+  const handleGraphClick = useCallback(
+    (params: {
+      evaluatorId: string;
+      groupKey?: string;
+      date?: string;
+      checkType: string;
+      isGuardrail: boolean;
+    }) => {
+      if (!project || !params.evaluatorId) {
+        return;
+      }
+
+      const isCategoryEvaluator = params.checkType === "langevals/llm_category";
+
+      // Build filter parameters using dot notation with evaluator ID as key
+      // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_state.{evaluatorId}=processed
+      const filterParams: Record<string, string | string[]> = {
+        [`evaluation_state.${params.evaluatorId}`]: ["processed"], // Only show processed evaluations (excludes error, scheduled, etc.)
+      };
+
+      // Add appropriate filter based on evaluator type
+      // Note: We filter by status="processed" first to exclude error/scheduled,
+      // then add the specific filter (passed/label) which should only apply to processed evaluations
+      if (params.isGuardrail && params.groupKey) {
+        // For guardrail evaluators, filter by passed/failed
+        // The groupKey comes from the graph which only shows processed evaluations with passed=true/false
+        // groupKey can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
+        const passed =
+          params.groupKey === "passed" ||
+          params.groupKey === "true" ||
+          params.groupKey === "positive" ||
+          params.groupKey === "1";
+        const failed =
+          params.groupKey === "failed" ||
+          params.groupKey === "false" ||
+          params.groupKey === "negative" ||
+          params.groupKey === "0";
+
+        if (passed) {
+          filterParams[`evaluation_passed.${params.evaluatorId}`] = "1";
+        } else if (failed) {
+          filterParams[`evaluation_passed.${params.evaluatorId}`] = "0";
+        }
+      } else if (isCategoryEvaluator && params.groupKey) {
+        // For category evaluators, filter by label
+        filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
+      }
+
+      // Build URL with query parameters
+      const queryString = qs.stringify(filterParams, {
+        arrayFormat: "comma",
+        allowDots: true,
+      });
+
+      // Navigate to messages page
+      void router.push(`/${project.slug}/messages?${queryString}`);
+    },
+    [project, router],
   );
 
   return (
@@ -233,12 +360,13 @@ function EvaluationsContent() {
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           {checks.data
             ? renderGridItems(
-                [...checks.data].sort((a, b) => {
-                  // Enabled items first (true > false when comparing booleans)
-                  if (a.enabled === b.enabled) return 0;
-                  return a.enabled ? -1 : 1;
-                }),
-              )
+              [...checks.data].sort((a, b) => {
+                // Enabled items first (true > false when comparing booleans)
+                if (a.enabled === b.enabled) return 0;
+                return a.enabled ? -1 : 1;
+              }),
+              handleGraphClick,
+            )
             : null}
         </SimpleGrid>
         <Box padding={3}>

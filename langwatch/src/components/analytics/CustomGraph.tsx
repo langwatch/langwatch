@@ -123,12 +123,18 @@ export function CustomGraph({
   titleProps,
   hideGroupLabel = false,
   filters,
+  onDataPointClick,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
   size?: "sm" | "md";
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  onDataPointClick?: (params: {
+    evaluatorId?: string;
+    groupKey?: string;
+    date?: string;
+  }) => void;
 }) {
   const publicEnv = usePublicEnv();
 
@@ -149,6 +155,7 @@ export function CustomGraph({
       hideGroupLabel={hideGroupLabel}
       load={!!publicEnv.data}
       filters={filters}
+      onDataPointClick={onDataPointClick}
     />
   );
 }
@@ -161,6 +168,7 @@ const CustomGraph_ = React.memo(
     load = true,
     size,
     filters,
+    onDataPointClick,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -172,6 +180,11 @@ const CustomGraph_ = React.memo(
     load?: boolean;
     size?: "sm" | "md";
     filters?: Record<FilterField, string[] | Record<string, string[]>>;
+    onDataPointClick?: (params: {
+      evaluatorId?: string;
+      groupKey?: string;
+      date?: string;
+    }) => void;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -559,6 +572,22 @@ const CustomGraph_ = React.memo(
               labelLine={false}
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
+              onClick={(data: any, index: number) => {
+                if (onDataPointClick && data && typeof index === "number" && pieData[index]) {
+                  const entry = pieData[index]!;
+                  const { groupKey } = getSeries(seriesByKey, entry.key);
+                  // Extract evaluator ID from the series key or groupByKey
+                  const evaluatorId = input.groupByKey || input.series[0]?.key;
+                  
+                  if (evaluatorId) {
+                    onDataPointClick({
+                      evaluatorId,
+                      groupKey,
+                    });
+                  }
+                }
+              }}
+              style={{ cursor: onDataPointClick ? "pointer" : "default" }}
             >
               {pieData.map((entry, index) => (
                 <Cell
@@ -655,7 +684,22 @@ const CustomGraph_ = React.memo(
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
-            <Bar dataKey="value">
+            <Bar 
+              dataKey="value"
+              onClick={(data: any) => {
+                if (onDataPointClick && data && data.key) {
+                  const { groupKey } = getSeries(seriesByKey, data.key);
+                  const evaluatorId = input.groupByKey || 
+                    input.series[0]?.key;
+                  
+                  onDataPointClick({
+                    evaluatorId,
+                    groupKey,
+                  });
+                }
+              }}
+              style={{ cursor: onDataPointClick ? "pointer" : "default" }}
+            >
               {summaryData.current.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
@@ -756,6 +800,9 @@ const CustomGraph_ = React.memo(
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
+            const { groupKey } = getSeries(seriesByKey, aggKey);
+            const evaluatorId = input.groupByKey || input.series[0]?.key;
+            
             return (
               <React.Fragment key={aggKey}>
                 {/* @ts-ignore */}
@@ -781,6 +828,16 @@ const CustomGraph_ = React.memo(
                       ? true
                       : undefined
                   }
+                  onClick={(data: any) => {
+                    if (onDataPointClick && data && evaluatorId) {
+                      onDataPointClick({
+                        evaluatorId,
+                        groupKey,
+                        date: data.date || data.payload?.date,
+                      });
+                    }
+                  }}
+                  style={{ cursor: onDataPointClick ? "pointer" : "default" }}
                 />
                 {input.includePrevious && (
                   // @ts-ignore
@@ -822,7 +879,8 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-        JSON.stringify(nextProps.titleProps)
+        JSON.stringify(nextProps.titleProps) &&
+      prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
 );
