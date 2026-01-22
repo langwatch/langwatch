@@ -20,7 +20,7 @@ export type ClickHouseFilterDefinition = {
   /**
    * The ClickHouse table to query. If null, this filter is not supported in ClickHouse.
    */
-  tableName: "trace_summaries" | "stored_spans" | null;
+  tableName: "trace_summaries" | "stored_spans" | "evaluation_states" | null;
   /**
    * Build the SQL query for this filter.
    */
@@ -51,6 +51,18 @@ function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): strin
     "TenantId = {tenantId:String}",
     "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})",
+  ];
+  return conditions.join(" AND ");
+}
+
+/**
+ * Build common WHERE conditions for evaluation_states queries.
+ */
+function buildEvaluationStatesConditions(_params: ClickHouseFilterQueryParams): string {
+  const conditions: string[] = [
+    "TenantId = {tenantId:String}",
+    "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
+    "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
   return conditions.join(" AND ");
 }
@@ -358,13 +370,140 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
     extractResults: extractStandardResults,
   },
 
-  // Evaluation filters - NOT supported in ClickHouse, fall back to Elasticsearch
-  "evaluations.evaluator_id": null,
-  "evaluations.evaluator_id.guardrails_only": null,
-  "evaluations.passed": null,
-  "evaluations.score": null,
-  "evaluations.state": null,
-  "evaluations.label": null,
+  // Evaluation filters - using evaluation_states table
+  "evaluations.evaluator_id": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => `
+      SELECT
+        EvaluatorId as field,
+        if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+        count() as count
+      FROM evaluation_states FINAL
+      WHERE ${buildEvaluationStatesConditions(params)}
+        ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+      ORDER BY label ASC
+      LIMIT 10000
+    `,
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.evaluator_id.guardrails_only": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => `
+      SELECT
+        EvaluatorId as field,
+        if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+        count() as count
+      FROM evaluation_states FINAL
+      WHERE ${buildEvaluationStatesConditions(params)}
+        AND IsGuardrail = 1
+        ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+      ORDER BY label ASC
+      LIMIT 10000
+    `,
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.passed": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          if(Passed = 1, 'true', 'false') as field,
+          if(Passed = 1, 'Passed', 'Failed') as label,
+          count() as count
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          AND EvaluatorId = {key:String}
+          AND Passed IS NOT NULL
+        GROUP BY Passed
+        ORDER BY field DESC
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.score": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          min(Score) as min_score,
+          max(Score) as max_score
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          AND EvaluatorId = {key:String}
+          AND Score IS NOT NULL
+      `;
+    },
+    extractResults: (rows: unknown[]) => {
+      const row = (rows as Array<{ min_score: number | null; max_score: number | null }>)[0];
+      if (!row || row.min_score === null || row.max_score === null) {
+        return [];
+      }
+      return [
+        { field: String(row.min_score), label: "min", count: 0 },
+        { field: String(row.max_score), label: "max", count: 0 },
+      ];
+    },
+  },
+
+  "evaluations.state": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          Status as field,
+          Status as label,
+          count() as count
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          AND EvaluatorId = {key:String}
+          AND Status NOT IN ('succeeded', 'failed')
+        GROUP BY Status
+        ORDER BY Status ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.label": {
+    tableName: "evaluation_states",
+    buildQuery: (params) => {
+      if (!params.key) {
+        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+      }
+      return `
+        SELECT
+          Label as field,
+          Label as label,
+          count() as count
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          AND EvaluatorId = {key:String}
+          AND Label IS NOT NULL
+          AND Label != ''
+          AND Label NOT IN ('succeeded', 'failed')
+          ${params.query ? `AND lower(Label) LIKE lower(concat({query:String}, '%'))` : ""}
+        GROUP BY Label
+        ORDER BY Label ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
 
   // Event filters - NOT supported in ClickHouse, fall back to Elasticsearch
   "events.event_type": null,
@@ -430,15 +569,73 @@ export const clickHouseFilterConditions: Record<
     return "1=0";
   },
 
-  // Evaluations - NOT supported in ClickHouse
-  "evaluations.evaluator_id": null,
-  "evaluations.evaluator_id.guardrails_only": null,
-  "evaluations.passed": null,
-  "evaluations.score": null,
-  "evaluations.state": null,
-  "evaluations.label": null,
+  // Evaluations - using evaluation_states table with EXISTS subquery
+  "evaluations.evaluator_id": (values) =>
+    `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+    )`,
 
-  // Events - NOT supported in ClickHouse
+  "evaluations.evaluator_id.guardrails_only": (values) =>
+    `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+        AND es.IsGuardrail = 1
+    )`,
+
+  "evaluations.passed": (values, key) => {
+    if (!key) return "1=0";
+    const passedValues = values.map((v) => (v === "true" || v === "1") ? "1" : "0");
+    return `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId = '${escapeString(key)}'
+        AND es.Passed IN (${passedValues.join(", ")})
+    )`;
+  },
+
+  "evaluations.score": (values, key) => {
+    if (!key || values.length < 2) return "1=0";
+    const minScore = parseFloat(values[0] ?? "0");
+    const maxScore = parseFloat(values[1] ?? "1");
+    return `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId = '${escapeString(key)}'
+        AND es.Score >= ${minScore}
+        AND es.Score <= ${maxScore}
+    )`;
+  },
+
+  "evaluations.state": (values, key) => {
+    if (!key) return "1=0";
+    return `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId = '${escapeString(key)}'
+        AND es.Status IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+    )`;
+  },
+
+  "evaluations.label": (values, key) => {
+    if (!key) return "1=0";
+    return `EXISTS (
+      SELECT 1 FROM evaluation_states es FINAL
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId = '${escapeString(key)}'
+        AND es.Label IN (${values.map((v) => `'${escapeString(v)}'`).join(", ")})
+    )`;
+  },
+
+  // Events - NOT supported in ClickHouse (stored in Elasticsearch only)
   "events.event_type": null,
   "events.metrics.key": null,
   "events.metrics.value": null,

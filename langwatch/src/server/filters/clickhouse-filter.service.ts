@@ -142,6 +142,8 @@ export class ClickHouseFilterService {
             query_params: {
               tenantId: projectId,
               query: options.query ?? "",
+              key: options.key ?? "",
+              subkey: options.subkey ?? "",
               startDate: options.startDate,
               endDate: options.endDate,
             },
