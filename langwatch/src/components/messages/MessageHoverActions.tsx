@@ -140,7 +140,6 @@ export const MessageHoverActions = ({
                 traceId: trace.trace_id,
                 selectedTab: "traceDetails",
               },
-              { replace: true },
             );
           } else {
             openDrawer("traceDetails", {
