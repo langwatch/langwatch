@@ -6,10 +6,6 @@
 
 Focus on **what** the code does, not **how** it does it. Tests should validate user-visible outcomes and contracts, enabling refactoring without rewriting tests.
 
-### One Invariant Per Test
-
-Each test validates a single behavior. When one fails, you immediately know which contract broke. If a new assertion tests a distinct invariant that could fail independently, create a new test.
-
 ### No "Should" in Test Names
 
 Use present tense, active voice. Describe expected behavior directly.
@@ -87,6 +83,15 @@ Is it pure logic or a single class in isolation?
 Is it a regression from production?
   -> Add test at the LOWEST sufficient level (unit > integration > e2e)
 ```
+
+## Scenario Design
+
+Each scenario should test **one invariant**. When deciding whether to extend an existing scenario or create a new one:
+
+- **Extend** (add `And`/`But`): The new assertion is a natural consequence of the same behavior
+- **New scenario**: The assertion tests a distinct invariant that could fail independently
+
+Example: "Cache returns stale data" and "Cache key includes version" are orthogonal invariants — separate scenarios. If one fails, you immediately know which contract broke.
 
 ## What We Don't Test
 

@@ -11,7 +11,7 @@ Specialized Claude sub-agents invoked via the Task tool.
 
 Keep prompts minimal. Agents inherit Claude's knowledge - only document:
 - Project-specific context
-- File references (`TESTING.md`, `AGENTS.md`, `docs/BEST_PRACTICES.md`)
+- File references (`docs/TESTING_PHILOSOPHY.md`, `AGENTS.md`, `docs/best_practices/`)
 - Behavioral overrides (tone, output format)
 
 Don't explain standard concepts (SOLID, Clean Code) - agents already know them.

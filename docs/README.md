@@ -9,7 +9,7 @@
 ## Also See
 
 - `CLAUDE.md` (root) - Project overview, common mistakes
-- `TESTING.md` (root) - Test hierarchy and BDD workflow
+- `TESTING_PHILOSOPHY.md` - Test hierarchy and BDD workflow
 
 ## Writing Docs
 

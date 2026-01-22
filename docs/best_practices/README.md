@@ -1,6 +1,6 @@
 # Best Practices
 
-Project coding conventions. See also `TESTING.md` at root.
+Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 
 ## Files
 
