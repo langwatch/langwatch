@@ -30,7 +30,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
       {publicEnv.data?.IS_SAAS && (
         <Box
           as="button"
-          width="full"
+          width={showLabel ? "full" : "auto"}
           cursor="pointer"
           aria-label="Chat"
           onClick={(e) => {
@@ -64,7 +64,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         <Menu.Trigger asChild>
           <Box
             as="button"
-            width="full"
+            width={showLabel ? "full" : "auto"}
             cursor="pointer"
             aria-label="Support"
             onMouseEnter={() => setIsOpen(true)}

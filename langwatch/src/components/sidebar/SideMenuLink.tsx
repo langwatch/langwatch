@@ -56,7 +56,7 @@ export const SideMenuItem = ({
 
   return (
     <HStack
-      width="full"
+      width={showLabel ? "full" : "auto"}
       height={MENU_ITEM_HEIGHT}
       gap={3}
       paddingX={3}
