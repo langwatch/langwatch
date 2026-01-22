@@ -1,7 +1,11 @@
-import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
+import { ExternalLink } from "lucide-react";
 import numeral from "numeral";
+import { useRouter } from "next/router";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import {
@@ -10,6 +14,7 @@ import {
 } from "../checks/EvaluationStatus";
 import { HoverableBigText } from "../HoverableBigText";
 import { Tooltip } from "../ui/tooltip";
+import { useDrawer } from "../../hooks/useDrawer";
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
@@ -39,11 +44,36 @@ export function EvaluationStatusItem({
 }: {
   check: ElasticSearchEvaluation;
 }) {
+  const router = useRouter();
+  const projectSlug = router.query.project as string | undefined;
+  const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
   const checkType = check.type as EvaluatorTypes;
 
   const evaluator = getEvaluatorDefinitions(checkType);
 
+  // Fetch monitor data to get evaluator config with prompt
+  const monitorQuery = api.monitors.getById.useQuery(
+    { id: check.evaluator_id, projectId: project?.id ?? "" },
+    {
+      enabled: !!check.evaluator_id && !!project?.id,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    }
+  );
+
   const color = evaluationStatusColor(check);
+
+  // Get the prompt from evaluator config if available
+  const evaluatorConfig = monitorQuery.data?.evaluator?.config as {
+    settings?: { prompt?: string };
+  } | undefined;
+  const customPrompt = evaluatorConfig?.settings?.prompt;
+
+  const handleOpenMonitorConfig = () => {
+    if (check.evaluator_id) {
+      openDrawer("onlineEvaluation", { monitorId: check.evaluator_id });
+    }
+  };
 
   return (
     <Box
@@ -62,9 +92,20 @@ export function EvaluationStatusItem({
               <b>{check.name || evaluator?.name}</b>
             </Text>
             <Spacer />
-            <Text fontSize={"sm"} color="fg.subtle">
-              {check.evaluator_id}
-            </Text>
+            {projectSlug && check.evaluator_id && (
+              <Link
+                fontSize="sm"
+                color="blue.500"
+                onClick={handleOpenMonitorConfig}
+                cursor="pointer"
+                display="flex"
+                alignItems="center"
+                gap={1}
+              >
+                <ExternalLink size={12} />
+                Configure
+              </Link>
+            )}
             <Text color="fg.subtle">·</Text>
             <Text fontSize={"sm"}>
               {check.timestamps.finished_at && (
@@ -89,10 +130,36 @@ export function EvaluationStatusItem({
               )}
             </Text>
           </HStack>
-          {evaluator && <Text fontSize={"sm"}>{evaluator.description}</Text>}
+          {/* Show default evaluator description when no custom prompt */}
+          {!customPrompt && evaluator?.description && (
+            <Text fontSize={"sm"} color="fg.subtle">
+              {evaluator.description}
+            </Text>
+          )}
           <Text fontSize={"sm"}>
             {check.status == "processed" ? (
               <VStack align="start" gap={1}>
+                {customPrompt && (
+                  <HStack align="start">
+                    <Text>Prompt:</Text>
+                    <Text color="fg.subtle">
+                      <HoverableBigText
+                        expandedVersion={customPrompt}
+                        cursor="pointer"
+                        lineClamp={4}
+                      >
+                        <pre
+                          style={{
+                            whiteSpace: "pre-wrap",
+                            wordWrap: "break-word",
+                          }}
+                        >
+                          {customPrompt}
+                        </pre>
+                      </HoverableBigText>
+                    </Text>
+                  </HStack>
+                )}
                 {check.passed !== undefined && check.passed !== null && (
                   <HStack>
                     <Text>Result:</Text>

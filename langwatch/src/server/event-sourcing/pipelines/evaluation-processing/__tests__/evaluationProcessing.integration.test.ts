@@ -1052,5 +1052,5 @@ describe(
       });
     });
   },
-  { timeout: 60000 } // 60 second timeout for integration tests
+  60000 // 60 second timeout for integration tests
 );

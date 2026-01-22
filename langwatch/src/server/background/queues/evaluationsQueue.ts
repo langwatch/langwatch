@@ -137,10 +137,29 @@ export const scheduleEvaluation = async ({
     if (threadDebounce && (state === "waiting" || state === "delayed")) {
       // Thread debouncing: remove existing job and reschedule with fresh delay
       // This "resets the timer" when a new message arrives in the thread
+      const previousJobData = currentJob.data as EvaluationJob;
       logger.info(
-        { check, trace, threadId: threadDebounce.threadId, state },
+        { check, trace, threadId: threadDebounce.threadId, state, previousTraceId: previousJobData?.trace?.trace_id },
         "thread debounce: resetting timer for thread evaluation"
       );
+
+      // Update the previous trace's evaluation status to "skipped" since it's being superseded
+      if (previousJobData?.trace && previousJobData.trace.trace_id !== trace.trace_id) {
+        try {
+          await updateEvaluationStatusInES({
+            check: previousJobData.check,
+            trace: previousJobData.trace,
+            status: "skipped",
+            details: "Superseded by newer message in thread",
+          });
+        } catch (error) {
+          logger.warn(
+            { error, previousTraceId: previousJobData.trace.trace_id },
+            "Failed to update previous trace evaluation status to skipped"
+          );
+        }
+      }
+
       try {
         await currentJob.remove();
       } catch {
