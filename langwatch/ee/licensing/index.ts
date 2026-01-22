@@ -3,6 +3,7 @@ export type {
   LicenseData,
   LicensePlanLimits,
   LicenseStatus,
+  RemoveLicenseResult,
   SignedLicense,
   StoreLicenseResult,
   ValidationResult,

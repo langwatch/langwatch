@@ -32,11 +32,14 @@ export type PlanInfo = {
 // Singleton LicenseHandler instance for self-hosted deployments
 let licenseHandler: LicenseHandler | null = null;
 
-function getLicenseHandler(): LicenseHandler {
+/**
+ * Gets the singleton LicenseHandler instance.
+ * Exported for use by the license router to ensure consistent handler lifecycle.
+ */
+export function getLicenseHandler(): LicenseHandler {
   if (!licenseHandler) {
     licenseHandler = new LicenseHandler({
       prisma,
-      licenseEnforcementEnabled: env.LICENSE_ENFORCEMENT_ENABLED ?? false,
       publicKey: PUBLIC_KEY,
     });
   }

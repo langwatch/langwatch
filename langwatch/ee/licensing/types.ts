@@ -68,5 +68,14 @@ export type StoreLicenseResult =
     }
   | {
       success: false;
-      error: string;
+      error:
+        | "Invalid license format"
+        | "Invalid signature"
+        | "License expired"
+        | "Organization not found";
     };
+
+/** Result of removing a license */
+export type RemoveLicenseResult = {
+  removed: boolean;
+};

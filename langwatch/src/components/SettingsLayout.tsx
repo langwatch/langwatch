@@ -49,7 +49,8 @@ export default function SettingsLayout({
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           <MenuLink href="/settings/subscription">Subscription</MenuLink>
-          <MenuLink href="/settings/license">License</MenuLink>
+          {/* TODO: Expose when LICENSE_ENFORCEMENT_ENABLED is configured
+          <MenuLink href="/settings/license">License</MenuLink> */}
         </VStack>
         <Container maxWidth="1280px" padding={4} paddingBottom={16}>
           {children}

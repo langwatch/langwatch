@@ -1,38 +1,32 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "~/server/subscriptionHandler";
-import { FREE_PLAN, PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
-import { mapToPlanInfo } from "./planMapping";
-import type { LicenseStatus, StoreLicenseResult } from "./types";
-import {
-  validateLicense,
-  parseLicenseKey,
-  verifySignature,
-  isExpired,
-} from "./validation";
+import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { OrganizationNotFoundError } from "./errors";
+import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import { validateLicense, parseLicenseKey } from "./validation";
 
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
-  licenseEnforcementEnabled?: boolean;
   publicKey?: string;
 }
 
 /**
  * Manages license validation and storage for self-hosted deployments.
  *
- * Key behaviors:
- * - No license = UNLIMITED_PLAN (backward compatible with current OSS behavior)
+ * This handler is only called when LICENSE_ENFORCEMENT_ENABLED=true.
+ * When enforcement is disabled, SubscriptionHandler returns UNLIMITED_PLAN directly.
+ *
+ * Key behaviors (when enforcement is enabled):
+ * - No license stored = FREE_PLAN (restricted access)
  * - Valid license = license-based limits
  * - Invalid/expired license = FREE_PLAN (restricted fallback)
- * - LICENSE_ENFORCEMENT_ENABLED=false = UNLIMITED_PLAN regardless of license
  */
 export class LicenseHandler {
   private prisma: PrismaClient;
-  private licenseEnforcementEnabled: boolean;
   private publicKey: string;
 
   constructor(config: LicenseHandlerConfig) {
     this.prisma = config.prisma;
-    this.licenseEnforcementEnabled = config.licenseEnforcementEnabled ?? false;
     this.publicKey = config.publicKey ?? PUBLIC_KEY;
   }
 
@@ -40,25 +34,19 @@ export class LicenseHandler {
    * Gets the active plan for an organization based on its stored license.
    *
    * Returns:
-   * - UNLIMITED_PLAN if license enforcement is disabled
-   * - UNLIMITED_PLAN if no license is stored (backward compatible)
+   * - FREE_PLAN if no license is stored
    * - License-based PlanInfo if valid license exists
    * - FREE_PLAN if license is invalid or expired
    */
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    // If enforcement is disabled, always return unlimited
-    if (!this.licenseEnforcementEnabled) {
-      return UNLIMITED_PLAN;
-    }
-
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { license: true },
     });
 
-    // No license stored = unlimited (backward compatible)
+    // No license stored = FREE_PLAN (enforcement enabled requires valid license)
     if (!organization?.license) {
-      return UNLIMITED_PLAN;
+      return FREE_PLAN;
     }
 
     // Validate the stored license
@@ -73,13 +61,13 @@ export class LicenseHandler {
   }
 
   /**
-   * Stores a license for an organization after validation.
+   * Validates and stores a license for an organization.
    *
    * - Validates the license key format, signature, and expiry
    * - Updates the organization with license data
    * - Returns the resulting plan info on success
    */
-  async storeLicense(
+  async validateAndStoreLicense(
     organizationId: string,
     licenseKey: string
   ): Promise<StoreLicenseResult> {
@@ -94,6 +82,16 @@ export class LicenseHandler {
     }
 
     const { licenseData, planInfo } = result;
+
+    // Verify organization exists
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+
+    if (!org) {
+      throw new OrganizationNotFoundError();
+    }
 
     // Store the license and metadata
     await this.prisma.organization.update({
@@ -112,17 +110,27 @@ export class LicenseHandler {
   }
 
   /**
+   * @deprecated Use validateAndStoreLicense instead
+   */
+  async storeLicense(
+    organizationId: string,
+    licenseKey: string
+  ): Promise<StoreLicenseResult> {
+    return this.validateAndStoreLicense(organizationId, licenseKey);
+  }
+
+  /**
    * Gets the current license status for an organization.
    *
    * Returns details about whether a license exists, its validity,
-   * plan type, and expiration date.
+   * plan type, and expiration date. Metadata is returned even for
+   * invalid licenses so the UI can display "license expired" messages.
    */
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
         license: true,
-        licenseExpiresAt: true,
         _count: {
           select: { members: true },
         },
@@ -136,7 +144,7 @@ export class LicenseHandler {
       };
     }
 
-    // Parse once and reuse for validation checks
+    // Parse license to get metadata (needed even if invalid)
     const signedLicense = parseLicenseKey(organization.license);
 
     if (!signedLicense) {
@@ -146,16 +154,15 @@ export class LicenseHandler {
       };
     }
 
-    // Check signature and expiry using the already-parsed license
-    const signatureValid = verifySignature(signedLicense, this.publicKey);
-    const expired = isExpired(signedLicense.data.expiresAt);
-    const valid = signatureValid && !expired;
+    // Use validateLicense for validity check (DRY - avoids duplicate verifySignature/isExpired)
+    const validationResult = validateLicense(organization.license, this.publicKey);
 
+    // Return metadata regardless of validity - UI needs this for "license expired" messages
     const { data: licenseData } = signedLicense;
 
     return {
       hasLicense: true,
-      valid,
+      valid: validationResult.valid,
       plan: licenseData.plan.type,
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,
@@ -166,12 +173,24 @@ export class LicenseHandler {
   }
 
   /**
-   * Removes the license from an organization.
+   * Removes the license from an organization (idempotent).
    *
    * This clears all license-related fields, returning the organization
-   * to unlimited mode (no enforcement).
+   * to unlimited mode (when enforcement is disabled) or FREE_PLAN
+   * (when enforcement is enabled).
+   *
+   * @returns { removed: true } if license was removed, { removed: false } if org not found
    */
-  async removeLicense(organizationId: string): Promise<void> {
+  async removeLicense(organizationId: string): Promise<RemoveLicenseResult> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+
+    if (!org) {
+      throw new OrganizationNotFoundError();
+    }
+
     await this.prisma.organization.update({
       where: { id: organizationId },
       data: {
@@ -180,5 +199,7 @@ export class LicenseHandler {
         licenseLastValidatedAt: null,
       },
     });
+
+    return { removed: true };
   }
 }

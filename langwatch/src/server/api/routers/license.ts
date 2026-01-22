@@ -1,25 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
-import {
-  LicenseHandler,
-  PUBLIC_KEY,
-  type LicenseStatus,
-} from "../../../../ee/licensing";
-import { env } from "~/env.mjs";
-
-/**
- * Creates a LicenseHandler instance for the given context.
- */
-function createLicenseHandler(prisma: PrismaClient) {
-  return new LicenseHandler({
-    prisma,
-    licenseEnforcementEnabled: env.LICENSE_ENFORCEMENT_ENABLED ?? false,
-    publicKey: PUBLIC_KEY,
-  });
-}
+import { type LicenseStatus } from "../../../../ee/licensing";
+import { getLicenseHandler } from "~/server/subscriptionHandler";
 
 export const licenseRouter = createTRPCRouter({
   /**
@@ -32,9 +16,8 @@ export const licenseRouter = createTRPCRouter({
       })
     )
     .use(checkOrganizationPermission("organization:view"))
-    .query(async ({ input, ctx }): Promise<LicenseStatus> => {
-      const licenseHandler = createLicenseHandler(ctx.prisma);
-      return licenseHandler.getLicenseStatus(input.organizationId);
+    .query(async ({ input }): Promise<LicenseStatus> => {
+      return getLicenseHandler().getLicenseStatus(input.organizationId);
     }),
 
   /**
@@ -48,9 +31,8 @@ export const licenseRouter = createTRPCRouter({
       })
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const licenseHandler = createLicenseHandler(ctx.prisma);
-      const result = await licenseHandler.storeLicense(
+    .mutation(async ({ input }) => {
+      const result = await getLicenseHandler().validateAndStoreLicense(
         input.organizationId,
         input.licenseKey
       );
@@ -78,12 +60,12 @@ export const licenseRouter = createTRPCRouter({
       })
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const licenseHandler = createLicenseHandler(ctx.prisma);
-      await licenseHandler.removeLicense(input.organizationId);
+    .mutation(async ({ input }) => {
+      const result = await getLicenseHandler().removeLicense(input.organizationId);
 
       return {
         success: true,
+        removed: result.removed,
       };
     }),
 });

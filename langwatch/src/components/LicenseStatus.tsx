@@ -106,7 +106,7 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
       >
         <VStack align="start" gap={4}>
           <VStack align="start" gap={1}>
-            <Text fontWeight="semibold" fontSize="lg">
+            <Text fontWeight="medium" fontSize="md">
               No license installed
             </Text>
             <Text color="gray.500" fontSize="sm">

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPlanFromLicense,
   isExpired,
   parseLicenseKey,
   validateLicense,
   verifySignature,
 } from "../validation";
+import { FREE_PLAN } from "../constants";
 import {
   generateTestLicense,
   generateExpiredTestLicense,
@@ -231,5 +233,40 @@ describe("validateLicense", () => {
       expect(result.licenseData.plan.maxWorkflows).toBe(100);
       expect(result.licenseData.plan.canPublish).toBe(true);
     }
+  });
+});
+
+describe("getPlanFromLicense", () => {
+  it("returns plan info for valid license", () => {
+    const license = generateTestLicense({
+      plan: { type: "PRO", name: "Pro", maxMembers: 50 },
+    });
+
+    const plan = getPlanFromLicense(license, TEST_PUBLIC_KEY);
+
+    expect(plan.type).toBe("PRO");
+    expect(plan.maxMembers).toBe(50);
+  });
+
+  it("returns FREE_PLAN for invalid license format", () => {
+    const plan = getPlanFromLicense("garbage-data", TEST_PUBLIC_KEY);
+
+    expect(plan).toEqual(FREE_PLAN);
+  });
+
+  it("returns FREE_PLAN for expired license", () => {
+    const expired = generateExpiredTestLicense();
+
+    const plan = getPlanFromLicense(expired, TEST_PUBLIC_KEY);
+
+    expect(plan).toEqual(FREE_PLAN);
+  });
+
+  it("returns FREE_PLAN for tampered license", () => {
+    const tampered = generateTamperedTestLicense();
+
+    const plan = getPlanFromLicense(tampered, TEST_PUBLIC_KEY);
+
+    expect(plan).toEqual(FREE_PLAN);
   });
 });

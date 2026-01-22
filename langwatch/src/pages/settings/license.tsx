@@ -10,20 +10,18 @@ export default function License() {
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
-          <Heading as="h2">License</Heading>
+        <Heading fontSize="lg" as="h2">License</Heading>
         </HStack>
-        <VStack width="full" gap={4} align="start">
-          <Text color="gray.600">
-            Manage your LangWatch license for self-hosted deployments. A valid
-            license is required for commercial use and enables specific plan
-            limits.
-          </Text>
-          {organization?.id ? (
-            <LicenseStatus organizationId={organization.id} />
-          ) : (
-            <Text>Loading...</Text>
-          )}
-        </VStack>
+        <Text color="gray.600">
+          Manage your LangWatch license for self-hosted deployments. A valid
+          license is required for commercial use and enables specific plan
+          limits.
+        </Text>
+        {organization?.id ? (
+          <LicenseStatus organizationId={organization.id} />
+        ) : (
+          <Text>Loading...</Text>
+        )}
       </VStack>
     </SettingsLayout>
   );
