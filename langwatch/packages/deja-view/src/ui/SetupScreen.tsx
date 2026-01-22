@@ -1,8 +1,7 @@
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { listRecentAggregates } from "../io/loadFromClickhouse";
 import type { Environment } from "../io/secrets";
 import { FullscreenLayout } from "./FullscreenLayout";
