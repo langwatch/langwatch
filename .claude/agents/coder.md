@@ -34,13 +34,15 @@ Then explore relevant code to understand existing patterns.
 
 ### 4. Self-Verify Before Returning
 
+**Tests must pass before you return.** If tests fail, fix them.
+
 Check EACH acceptance criterion:
 ```
 [x] Criterion 1 - verified by: [test name or how verified]
 [x] Criterion 2 - verified by: [test name or how verified]
 ```
 
-If ANY criterion is not met, fix it before returning.
+If ANY criterion is not met or tests are failing, fix it before returning.
 
 ### 5. Return Summary
 
@@ -67,5 +69,6 @@ Ready for review / Blocked on [X]
 - Starting to code before reading requirements
 - Forgetting to verify against requirements at the end
 - Returning without running tests
+- Returning with failing tests
 - Assuming "it should work" without verification
 - Not reporting pivots/discoveries

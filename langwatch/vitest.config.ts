@@ -5,7 +5,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 config();
 
-const getMaxWorkers = (): number | undefined => {
+const getMaxWorkers = (): number => {
   if (process.env.VITEST_MAX_WORKERS) {
     return parseInt(process.env.VITEST_MAX_WORKERS, 10);
   }
@@ -13,7 +13,8 @@ const getMaxWorkers = (): number | undefined => {
     const percent = parseInt(process.env.VITEST_CPU_PERCENT, 10) / 100;
     return Math.max(1, Math.floor(os.cpus().length * percent));
   }
-  return undefined;
+  // Default: use 50% of CPUs to prevent resource exhaustion during parallel agent runs
+  return Math.max(1, Math.floor(os.cpus().length * 0.5));
 };
 
 export default defineConfig({
