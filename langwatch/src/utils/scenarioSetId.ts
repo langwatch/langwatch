@@ -5,7 +5,7 @@ export function isInternalSetId(setId: string): boolean {
   return setId.startsWith(INTERNAL_SET_PREFIX);
 }
 
-export function isOnPlatformSet(setId: string): boolean {
+export function isOnPlatformSetId(setId: string): boolean {
   return setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(ON_PLATFORM_SET_SUFFIX);
 }
 
@@ -14,7 +14,7 @@ export function getOnPlatformSetId(projectId: string): string {
 }
 
 export function getDisplayName(setId: string): string {
-  if (isOnPlatformSet(setId)) {
+  if (isOnPlatformSetId(setId)) {
     return "On-Platform Scenarios";
   }
   return setId;
