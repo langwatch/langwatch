@@ -117,14 +117,14 @@ export const ComponentIcon = ({
   };
 
   const componentColorMap: Record<ComponentType, string> = {
-    signature: "green.solid",
-    entry: "blue.solid",
-    code: "cyan.solid",
-    retriever: "purple.solid",
-    prompting_technique: "teal.solid",
-    evaluator: "green.solid",
-    end: "orange.solid",
-    custom: "gray.solid",
+    signature: "green.emphasized",
+    entry: "blue.emphasized",
+    code: "cyan.emphasized",
+    retriever: "purple.emphasized",
+    prompting_technique: "teal.emphasized",
+    evaluator: "green.emphasized",
+    end: "orange.emphasized",
+    custom: "gray.emphasized",
   };
 
   let color = componentColorMap[type];

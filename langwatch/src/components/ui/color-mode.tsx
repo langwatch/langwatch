@@ -8,21 +8,18 @@ import * as React from "react";
 import { LuMoon, LuSun } from "react-icons/lu";
 
 export const colorSystem = {
-  // Using Tailwind zinc palette - neutral grays with minimal blue tint
   gray: {
-    950: { value: "#09090b" },
-    900: { value: "#18181b" },
-    800: { value: "#27272a" },
-    700: { value: "#3f3f46" },
-    600: { value: "#52525b" },
-    500: { value: "#71717a" },
-    400: { value: "#a1a1aa" },
-    375: { value: "#b4b4b4" },
-    350: { value: "#d4d4d4" },
-    300: { value: "#d4d4d8" },
-    200: { value: "#e4e4e7" },
-    100: { value: "#f4f4f5" },
-    50: { value: "#fafafa" },
+    800: { value: "#090F1D" },
+    700: { value: "#1F2937" },
+    600: { value: "#213B41" },
+    500: { value: "#51676C" },
+    400: { value: "#9CA3AF" },
+    375: { value: "#B8BDBD" },
+    350: { value: "#DDDDDD" },
+    300: { value: "#E0E2E6" },
+    200: { value: "#E8EBF2" },
+    100: { value: "#F2F4F8" },
+    50: { value: "#F7FAFC" },
   },
   red: {
     50: { value: "#FFF5F5" },

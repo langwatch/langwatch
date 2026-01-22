@@ -31,7 +31,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: { _light: "#F2F4F8", _dark: "{colors.gray.900}" },
+      background: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
@@ -97,7 +97,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.375}", _dark: "{colors.gray.600}" },
           },
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
@@ -114,7 +114,7 @@ export const system = createSystem(defaultConfig, {
           },
           subtle: {
             value: {
-              _light: "{colors.orange.50}",
+              _light: "{colors.orange.100}",
               _dark: "{colors.orange.900}",
             },
           },
@@ -126,7 +126,7 @@ export const system = createSystem(defaultConfig, {
           },
           emphasized: {
             value: {
-              _light: "{colors.orange.200}",
+              _light: "{colors.orange.400}",
               _dark: "{colors.orange.700}",
             },
           },
@@ -162,7 +162,7 @@ export const system = createSystem(defaultConfig, {
           },
           emphasized: {
             value: {
-              _light: "{colors.green.200}",
+              _light: "{colors.green.400}",
               _dark: "{colors.green.700}",
             },
           },
@@ -188,7 +188,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.blue.100}", _dark: "{colors.blue.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.blue.200}", _dark: "{colors.blue.700}" },
+            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.700}" },
           },
           fg: {
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.200}" },
@@ -222,7 +222,7 @@ export const system = createSystem(defaultConfig, {
           },
           emphasized: {
             value: {
-              _light: "{colors.yellow.200}",
+              _light: "{colors.yellow.500}",
               _dark: "{colors.yellow.700}",
             },
           },
@@ -248,7 +248,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.red.100}", _dark: "{colors.red.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.red.200}", _dark: "{colors.red.700}" },
+            value: { _light: "{colors.red.400}", _dark: "{colors.red.700}" },
           },
           fg: {
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
@@ -269,7 +269,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.pink.100}", _dark: "{colors.pink.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.pink.200}", _dark: "{colors.pink.700}" },
+            value: { _light: "{colors.pink.500}", _dark: "{colors.pink.700}" },
           },
           fg: {
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
@@ -303,7 +303,7 @@ export const system = createSystem(defaultConfig, {
           },
           emphasized: {
             value: {
-              _light: "{colors.purple.200}",
+              _light: "{colors.purple.400}",
               _dark: "{colors.purple.700}",
             },
           },
@@ -329,7 +329,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.teal.100}", _dark: "{colors.teal.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.teal.200}", _dark: "{colors.teal.700}" },
+            value: { _light: "{colors.teal.500}", _dark: "{colors.teal.700}" },
           },
           fg: {
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
@@ -350,7 +350,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.cyan.100}", _dark: "{colors.cyan.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.cyan.200}", _dark: "{colors.cyan.700}" },
+            value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.700}" },
           },
           fg: {
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
@@ -362,27 +362,27 @@ export const system = createSystem(defaultConfig, {
         status: {
           success: {
             value: {
-              _light: "{colors.green.600}",
+              _light: "{colors.green.400}",
               _dark: "{colors.green.400}",
             },
           },
           error: {
-            value: { _light: "{colors.red.600}", _dark: "{colors.red.400}" },
+            value: { _light: "{colors.red.400}", _dark: "{colors.red.400}" },
           },
           warning: {
             value: {
-              _light: "{colors.yellow.600}",
+              _light: "{colors.yellow.500}",
               _dark: "{colors.yellow.400}",
             },
           },
           pending: {
             value: {
-              _light: "{colors.yellow.600}",
+              _light: "{colors.yellow.500}",
               _dark: "{colors.yellow.400}",
             },
           },
           info: {
-            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" },
+            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.400}" },
           },
         },
 
@@ -415,14 +415,14 @@ export const system = createSystem(defaultConfig, {
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
           // Page/sidebar background - lighter gray in dark mode
-          page: { value: { _light: "#F2F4F8", _dark: "{colors.gray.900}" } },
+          page: { value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" } },
           // Main content area - darkest in dark mode
           surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Cards and panels - same as surface (darkest)
           panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "#F2F4F8", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
           },
           // Emphasized background for active states
           emphasized: {
