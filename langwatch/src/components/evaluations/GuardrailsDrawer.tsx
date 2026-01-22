@@ -42,7 +42,7 @@ export const clearGuardrailsDrawerState = () => {
 };
 
 export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, goBack } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
   const onClose = props.onClose ?? closeDrawer;
@@ -88,10 +88,12 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
         setSelectedEvaluator(evaluator);
         // Also update persisted state immediately
         guardrailsDrawerState = { selectedEvaluator: evaluator, activeLanguage };
+        // Navigate back to guardrails drawer after selection
+        goBack();
       },
     });
     openDrawer("evaluatorList", {});
-  }, [openDrawer, activeLanguage]);
+  }, [openDrawer, activeLanguage, goBack]);
 
   const evaluatorSlug = selectedEvaluator?.slug ?? "your-evaluator-slug";
   const evaluatorName = selectedEvaluator?.name ?? "My Guardrail";

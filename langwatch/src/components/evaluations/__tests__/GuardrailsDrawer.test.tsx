@@ -7,11 +7,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import qs from "qs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { GuardrailsDrawer, clearGuardrailsDrawerState } from "../GuardrailsDrawer";
 import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
+import { CurrentDrawer } from "~/components/CurrentDrawer";
 import {
   clearDrawerStack,
   clearFlowCallbacks,
@@ -68,7 +70,7 @@ vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
     asPath: Object.keys(mockQuery).length > 0
-      ? "/test?" + new URLSearchParams(mockQuery).toString()
+      ? "/test?" + qs.stringify(mockQuery)
       : "/test",
     push: mockPush,
     replace: mockPush,
@@ -112,6 +114,94 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+/**
+ * CRITICAL Integration test using CurrentDrawer - Tests the REAL navigation flow
+ * exactly as it happens in production, using the CurrentDrawer component.
+ *
+ * REGRESSION BUG: When selecting an evaluator in EvaluatorListDrawer, nothing happens!
+ * The drawer doesn't close or go back. This broke when the goBack()/onClose() call
+ * was removed from EvaluatorListDrawer.handleSelectEvaluator.
+ */
+describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQuery = {};
+    clearDrawerStack();
+    clearFlowCallbacks();
+    clearGuardrailsDrawerState();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("REGRESSION: selecting evaluator in list should return to guardrails drawer", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    // Start with guardrails drawer open
+    mockQuery = { "drawer.open": "guardrails" };
+
+    const { rerender } = render(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>
+    );
+
+    // Step 1: GuardrailsDrawer should be visible
+    await waitFor(() => {
+      expect(screen.getByText("New Guardrail")).toBeInTheDocument();
+      expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+    });
+
+    // Step 2: Click "Select Evaluator" to open evaluator list
+    await user.click(screen.getByText("Select Evaluator"));
+
+    // Step 3: URL should change to evaluatorList
+    await waitFor(() => {
+      expect(mockQuery["drawer.open"]).toBe("evaluatorList");
+    });
+
+    // Step 4: Re-render to show EvaluatorListDrawer
+    rerender(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>
+    );
+
+    // Step 5: EvaluatorListDrawer should be visible with evaluators
+    await waitFor(() => {
+      expect(screen.getByText("Choose Evaluator")).toBeInTheDocument();
+      expect(screen.getByText("PII Check")).toBeInTheDocument();
+    });
+
+    // Step 6: Click on "PII Check" evaluator to select it
+    const piiCheckCard = screen.getByTestId("evaluator-card-evaluator-1");
+    await user.click(piiCheckCard);
+
+    // Step 7: EXPECTED BEHAVIOR - Should return to guardrails drawer
+    // ACTUAL BUG - Nothing happens, drawer stays on evaluatorList
+    await waitFor(() => {
+      expect(mockQuery["drawer.open"]).toBe("guardrails");
+    }, { timeout: 2000 });
+
+    // Step 8: Re-render to show GuardrailsDrawer with selection
+    rerender(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>
+    );
+
+    // Step 9: GuardrailsDrawer should show the selected evaluator
+    await waitFor(() => {
+      expect(screen.getByText("New Guardrail")).toBeInTheDocument();
+      expect(screen.getByText("PII Check")).toBeInTheDocument();
+      expect(screen.getByText("Integration Code")).toBeInTheDocument();
+    });
+  });
+});
 
 /**
  * CRITICAL Integration test - Tests the REAL navigation flow where the drawer's
