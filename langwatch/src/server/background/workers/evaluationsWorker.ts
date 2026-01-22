@@ -89,6 +89,7 @@ export async function runEvaluationJob(
     evaluatorType: job.data.check.type,
     settings,
     mappings: check.mappings as MappingState | null,
+    level: check.level as "trace" | "thread",
     protections,
   });
 }
@@ -273,26 +274,24 @@ const buildDataForEvaluation = async (
   evaluatorType: EvaluatorTypes,
   trace: Trace,
   mappings: MappingState | null,
+  isThreadLevel: boolean,
   projectId: string,
   protections: Protections,
 ): Promise<DataForEvaluation> => {
   let data: Record<string, any>;
-
-  // Check if we have thread mappings
-  const hasThread = hasThreadMappings(mappings);
 
   logger.info(
     {
       evaluatorType,
       traceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
-      hasThreadMappings: hasThread,
+      isThreadLevel,
       mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
     },
     "Building data for evaluation",
   );
 
-  if (hasThread) {
+  if (isThreadLevel) {
     // Use thread-based data extraction
     logger.info(
       {
@@ -342,6 +341,7 @@ export const runEvaluationForTrace = async ({
   evaluatorType,
   settings,
   mappings,
+  level,
   protections,
 }: {
   projectId: string;
@@ -349,6 +349,7 @@ export const runEvaluationForTrace = async ({
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState | null;
+  level?: "trace" | "thread"; // New: explicit level from monitor, falls back to mapping detection for backward compat
   protections: Protections;
 }): Promise<EvaluationResultWithThreadId> => {
   const trace = await getTraceById({
@@ -369,10 +370,11 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  // Check if thread mappings are used and track the thread_id
-  const hasThread = hasThreadMappings(mappings);
+  // Determine if this is a thread-level evaluation
+  // Use explicit level if provided, otherwise fall back to mapping detection for backward compatibility
+  const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
   const evaluation_thread_id =
-    hasThread && trace.metadata?.thread_id
+    isThreadLevel && trace.metadata?.thread_id
       ? trace.metadata.thread_id
       : undefined;
 
@@ -380,6 +382,7 @@ export const runEvaluationForTrace = async ({
     evaluatorType,
     trace,
     mappings,
+    isThreadLevel,
     projectId,
     protections,
   );
