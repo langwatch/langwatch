@@ -9,10 +9,6 @@ import {
 import { CheckSquare, Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
-import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
-import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
-import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
-import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";

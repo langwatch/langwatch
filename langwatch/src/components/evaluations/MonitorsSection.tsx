@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -22,6 +23,7 @@ import {
   LuPencil,
   LuPlay,
   LuTrash,
+  LuTrendingUp,
 } from "react-icons/lu";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -105,18 +107,25 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
               {monitors.data?.length} Active
             </Badge>
           </HStack>
-          <IconButton
-            aria-label={isCollapsed ? "Expand section" : "Collapse section"}
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? (
-              <LuChevronDown size={16} />
-            ) : (
-              <LuChevronUp size={16} />
-            )}
-          </IconButton>
+          <HStack gap={2}>
+            <Link href={`/${project?.slug}/analytics/evaluations`}>
+              <Button size="sm" variant="outline" textDecoration="none">
+                <LuTrendingUp /> View analytics
+              </Button>
+            </Link>
+            <IconButton
+              aria-label={isCollapsed ? "Expand section" : "Collapse section"}
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? (
+                <LuChevronDown size={16} />
+              ) : (
+                <LuChevronUp size={16} />
+              )}
+            </IconButton>
+          </HStack>
         </HStack>
 
         {!isCollapsed && (
@@ -161,8 +170,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               experimentsSlugMap[monitor.experimentId]
                             ) {
                               void router.push(
-                                `/${project.slug}/evaluations/wizard/${
-                                  experimentsSlugMap[monitor.experimentId]
+                                `/${project.slug}/evaluations/wizard/${experimentsSlugMap[monitor.experimentId]
                                 }`,
                               );
                             } else {
@@ -229,9 +237,8 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 onSuccess: () => {
                                   void monitors.refetch();
                                   toaster.create({
-                                    title: `Monitor ${
-                                      monitor.enabled ? "disabled" : "enabled"
-                                    }`,
+                                    title: `Monitor ${monitor.enabled ? "disabled" : "enabled"
+                                      }`,
                                     type: "info",
                                     meta: { closable: true },
                                   });
