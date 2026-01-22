@@ -761,8 +761,11 @@ export const clickHouseFilterConditions: Record<
 
   "evaluations.score": (values, paramId, key) => {
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
-    const minScore = parseFloat(values[0] ?? "0");
-    const maxScore = parseFloat(values[1] ?? "1");
+    const parsedMin = parseFloat(values[0] ?? "");
+    const parsedMax = parseFloat(values[1] ?? "");
+    // Validate numeric values, use safe defaults if parsing fails
+    const minScore = Number.isFinite(parsedMin) ? parsedMin : 0;
+    const maxScore = Number.isFinite(parsedMax) ? parsedMax : 1;
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_states es FINAL
@@ -830,7 +833,7 @@ export const clickHouseFilterConditions: Record<
     // Build OR conditions for each metric key - these are attribute names, not values
     // Since attribute names are controlled internally, we use them directly
     const metricConditions = values.map(
-      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
+      (_v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
     );
     const params: Record<string, unknown> = {
       [`${paramId}_key`]: key,
@@ -852,8 +855,11 @@ export const clickHouseFilterConditions: Record<
 
   "events.metrics.value": (values, paramId, key, subkey) => {
     if (!key || !subkey || values.length < 2) return { sql: "1=0", params: {} };
-    const minValue = parseFloat(values[0] ?? "0");
-    const maxValue = parseFloat(values[1] ?? "0");
+    const parsedMin = parseFloat(values[0] ?? "");
+    const parsedMax = parseFloat(values[1] ?? "");
+    // Validate numeric values, use safe defaults if parsing fails
+    const minValue = Number.isFinite(parsedMin) ? parsedMin : 0;
+    const maxValue = Number.isFinite(parsedMax) ? parsedMax : 0;
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp FINAL
@@ -876,7 +882,7 @@ export const clickHouseFilterConditions: Record<
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each detail key
     const detailConditions = values.map(
-      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
+      (_v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
     );
     const params: Record<string, unknown> = {
       [`${paramId}_key`]: key,
