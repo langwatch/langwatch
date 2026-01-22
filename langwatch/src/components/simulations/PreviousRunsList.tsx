@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React from "react";
+import React, { useMemo } from "react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
@@ -18,6 +18,34 @@ import { LuCircleOff } from "react-icons/lu";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+function getStatusBadgeProps(status: string): {
+  colorPalette: string;
+  label: string;
+} {
+  switch (status) {
+    case ScenarioRunStatus.SUCCESS:
+      return { colorPalette: "green", label: "completed" };
+    case ScenarioRunStatus.FAILED:
+    case ScenarioRunStatus.ERROR:
+      return { colorPalette: "red", label: "failed" };
+    case ScenarioRunStatus.CANCELLED:
+      return { colorPalette: "gray", label: "cancelled" };
+    case ScenarioRunStatus.IN_PROGRESS:
+    case ScenarioRunStatus.PENDING:
+    default:
+      return { colorPalette: "orange", label: "running" };
+  }
+}
+
+function calculateAccuracyPercentage(
+  results: ScenarioRunData["results"],
+): number {
+  const met = results?.metCriteria?.length ?? 0;
+  const unmet = results?.unmetCriteria?.length ?? 0;
+  const total = met + unmet;
+  return total > 0 ? Math.round((met / total) * 100) : 0;
+}
 
 // Previous Runs List Component
 export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
@@ -35,6 +63,14 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
         enabled: !!project?.id && !!scenarioId,
       },
     );
+
+  const sortedRuns = useMemo(
+    () =>
+      scenarioRunData?.data
+        ?.slice()
+        .sort((a, b) => b.timestamp - a.timestamp) ?? [],
+    [scenarioRunData?.data],
+  );
 
   return (
     <VStack gap={3} align="stretch">
@@ -64,15 +100,15 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
         </EmptyState.Root>
       )}
 
-      {scenarioRunData?.data?.map((run: ScenarioRunData) => (
+      {sortedRuns.map((run: ScenarioRunData) => (
         <Box
           key={run.scenarioRunId}
           p={4}
           borderRadius="md"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           cursor="pointer"
-          _hover={{ bg: "gray.100" }}
+          _hover={{ bg: "bg.muted" }}
           onClick={() => {
             if (scenarioSetId && batchRunId) {
               goToSimulationRun({
@@ -97,7 +133,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                 boxSize={12}
               />
               <Badge
-                colorPalette={run.status === "SUCCESS" ? "green" : "orange"}
+                colorPalette={getStatusBadgeProps(run.status).colorPalette}
                 variant="subtle"
                 display="flex"
                 alignItems="center"
@@ -107,39 +143,27 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                 borderRadius="md"
               >
                 <Text fontSize="xs" fontWeight="medium">
-                  {run.status === "SUCCESS" ? "completed" : "running"}
+                  {getStatusBadgeProps(run.status).label}
                 </Text>
               </Badge>
             </Flex>
 
             {/* Metrics Row */}
             <VStack align="start" gap={1} w="100%">
-              <Text fontSize="xs" color="gray.600">
+              <Box fontSize="xs" color="fg.muted">
                 <Text>Duration: {Math.round(run.durationInMs / 1000)}s</Text>
                 <Text>
-                  Accuracy:{" "}
-                  {run.results?.metCriteria?.length &&
-                  run.results?.unmetCriteria?.length
-                    ? (run.results?.metCriteria?.length /
-                        (run.results?.metCriteria?.length +
-                          run.results?.unmetCriteria?.length)) *
-                      100
-                    : 0}
-                  %
+                  Accuracy: {calculateAccuracyPercentage(run.results)}%
                 </Text>
-              </Text>
-              <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+              </Box>
+              <Text fontSize="xs" color="fg.subtle" whiteSpace="nowrap">
                 {new Date(run.timestamp).toLocaleDateString()},{" "}
                 {new Date(run.timestamp).toLocaleTimeString()}
               </Text>
             </VStack>
           </VStack>
         </Box>
-      )) ?? (
-        <Text color="gray.500" fontSize="sm">
-          No previous runs found
-        </Text>
-      )}
+      ))}
     </VStack>
   );
 }

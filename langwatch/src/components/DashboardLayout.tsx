@@ -13,32 +13,34 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
+import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
+import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { FullLogo } from "./icons/FullLogo";
+import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { useColorRawValue } from "./ui/color-mode";
+import { ProjectAvatar } from "./ProjectAvatar";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
-import { FullLogo } from "./icons/FullLogo";
-import { LogoIcon } from "./icons/LogoIcon";
-import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -46,7 +48,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   if (!currentRoute) return null;
 
   return (
-    <HStack gap={2} fontSize="13px" color="gray.500" alignItems="center">
+    <HStack gap={2} fontSize="13px" color="fg.muted" alignItems="center">
       <ChevronRight width="12" style={{ minWidth: "12px" }} />
       <Link href={`/${project?.slug ?? ""}`}>Dashboard</Link>
       {currentRoute.parent && (
@@ -65,29 +67,12 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
       {currentRoute.title !== "Home" && (
         <>
           <ChevronRight width="12" style={{ minWidth: "12px" }} />
-          <Text color="gray.500" whiteSpace="nowrap">
+          <Text color="fg.muted" whiteSpace="nowrap">
             {currentRoute.title}
           </Text>
         </>
       )}
     </HStack>
-  );
-};
-
-const ProjectAvatar = ({
-  name,
-  size = "2xs",
-}: {
-  name: string;
-  size?: "2xs" | "xs" | "sm";
-}) => {
-  return (
-    <RandomColorAvatar
-      size={size}
-      name={name.slice(0, 1)}
-      width={size === "2xs" ? "20px" : undefined}
-      height={size === "2xs" ? "20px" : undefined}
-    />
   );
 };
 
@@ -107,8 +92,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-      ? 1
-      : 0;
+        ? 1
+        : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -129,9 +114,9 @@ export const ProjectSelector = React.memo(function ProjectSelector({
           height="auto"
           fontWeight="normal"
           minWidth="fit-content"
-          color="gray.700"
+          color="fg"
           _hover={{
-            backgroundColor: "gray.200",
+            backgroundColor: "bg.muted",
           }}
         >
           <HStack gap={2}>
@@ -181,6 +166,24 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               );
 
                               if (hasProjectInRoute) {
+                                // Check if route has other dynamic segments beyond [project]
+                                // If so, redirect to parent route to avoid 404
+                                const hasOtherDynamicSegments =
+                                  currentRoute?.path
+                                    .replace("[project]", "")
+                                    .includes("[");
+
+                                if (
+                                  hasOtherDynamicSegments &&
+                                  currentRoute?.parent
+                                ) {
+                                  const parentRoute =
+                                    projectRoutes[currentRoute.parent];
+                                  return parentRoute.path
+                                    .replace("[project]", project_.slug)
+                                    .replace(/\/\/+/g, "/");
+                                }
+
                                 return currentRoute?.path
                                   .replace("[project]", project_.slug)
                                   .replace(/\/\/+/g, "/");
@@ -241,6 +244,7 @@ export const AddProjectButton = ({
   organization: Organization;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -250,19 +254,20 @@ export const AddProjectButton = ({
     },
   );
 
-  return !usage.data ||
-    usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
-    <Link
-      href={`/onboarding/${team.slug}/project`}
-      _hover={{
-        textDecoration: "none",
-      }}
+  return canAddProjects(usage.data) ? (
+    <Menu.Item
+      value={`new-project-${team.slug}`}
+      fontSize="14px"
+      onClick={() =>
+        openDrawer("createProject", {
+          navigateOnCreate: true,
+          defaultTeamId: team.id,
+        })
+      }
     >
-      <Menu.Item value={`new-project-${team.slug}`} fontSize="14px">
-        <Plus />
-        New Project
-      </Menu.Item>
-    </Link>
+      <Plus />
+      New Project
+    </Menu.Item>
   ) : (
     <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
@@ -280,7 +285,7 @@ export const AddProjectButton = ({
         <Menu.Item
           value={`new-project-${team.slug}`}
           fontSize="14px"
-          color="gray.400"
+          color="fg.subtle"
           _hover={{
             backgroundColor: "transparent",
           }}
@@ -301,13 +306,12 @@ export type DashboardLayoutProps = {
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  compactMenu : compactMenuProp = false,
+  compactMenu: compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
   const isSmallScreen = useBreakpointValue({ base: true, lg: false });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
-  const gray400 = useColorRawValue("gray.400");
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
@@ -355,7 +359,7 @@ export const DashboardLayout = ({
     <Box
       width="full"
       minHeight="100vh"
-      background="gray.100"
+      background="bg.page"
       overflowX={["auto", "auto", "clip"]}
     >
       <Head>
@@ -372,7 +376,7 @@ export const DashboardLayout = ({
         width="full"
         paddingX={4}
         paddingY={3}
-        background="gray.100"
+        background="bg.page"
         justifyContent="space-between"
         gap={4}
       >
@@ -439,25 +443,25 @@ export const DashboardLayout = ({
                 }
               }}
             >
-              <InputGroup startElement={<Search color={gray400} size={14} />}>
+              <InputGroup startElement={<Search color="var(--chakra-colors-fg-muted)" size={14} />}>
                 <Input
                   name="query"
                   type="search"
                   placeholder="Search"
-                  _placeholder={{ color: "gray.500" }}
+                  _placeholder={{ color: "fg.muted" }}
                   fontSize="13px"
                   paddingY={1}
                   paddingLeft={8}
                   paddingRight={3}
                   width="120px"
                   height="32px"
-                  backgroundColor="gray.200"
+                  backgroundColor="bg.input"
                   border="none"
                   borderRadius="full"
                   transition="all 0.2s ease-in-out"
                   _focus={{
                     width: "240px",
-                    backgroundColor: "white",
+                    backgroundColor: "bg.inputHover",
                     boxShadow: "sm",
                     outline: "none",
                   }}
@@ -540,7 +544,7 @@ export const DashboardLayout = ({
         <Box
           width="full"
           height="full"
-          background="white"
+          background="bg.surface"
           borderTopLeftRadius="xl"
           overflow="auto"
           display="flex"

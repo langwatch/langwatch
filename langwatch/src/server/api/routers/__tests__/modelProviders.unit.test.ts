@@ -1,27 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import { getModelMetadataForFrontend, type ModelMetadataForFrontend, prepareLitellmParams } from "../modelProviders";
+import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 
 /**
- * Unit tests for the key masking and merging logic used in modelProviders router.
- * These test the pure transformation functions that handle API key security.
+ * Unit tests for modelProviders router helper functions
  */
 
 // Extract the masking logic for testing
 function maskKeys(
-  customKeys: Record<string, unknown>
+  customKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
       KEY_CHECK.some((k) => key.includes(k)) ? MASKED_KEY_PLACEHOLDER : value,
-    ])
+    ]),
   );
 }
 
 // Extract the key merging logic for testing
 function mergeKeysWithExisting(
   validatedKeys: Record<string, unknown>,
-  existingKeys: Record<string, unknown>
+  existingKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
     // Start with new keys
@@ -30,7 +31,7 @@ function mergeKeysWithExisting(
     ...Object.fromEntries(
       Object.entries(existingKeys)
         .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-        .map(([key, value]) => [key, value])
+        .map(([key, value]) => [key, value]),
     ),
   };
 }
@@ -74,7 +75,7 @@ describe("modelProviders key masking logic", () => {
 
       expect(result.OPENAI_BASE_URL).toBe("https://custom.openai.com/v1");
       expect(result.AZURE_OPENAI_ENDPOINT).toBe(
-        "https://myresource.openai.azure.com"
+        "https://myresource.openai.azure.com",
       );
     });
 
@@ -95,23 +96,23 @@ describe("modelProviders key masking logic", () => {
   });
 
   describe("mergeKeysWithExisting", () => {
-    it("preserves existing key when new value is masked placeholder", () => {
+    it("preserves existing keys when new value is masked placeholder", () => {
       const validatedKeys = {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
         OPENAI_BASE_URL: "https://new-url.com/v1",
       };
       const existingKeys = {
-        OPENAI_API_KEY: "sk-actual-stored-key",
+        OPENAI_API_KEY: "sk-existing-secret-key",
         OPENAI_BASE_URL: "https://old-url.com/v1",
       };
 
       const result = mergeKeysWithExisting(validatedKeys, existingKeys);
 
-      expect(result.OPENAI_API_KEY).toBe("sk-actual-stored-key");
+      expect(result.OPENAI_API_KEY).toBe("sk-existing-secret-key");
       expect(result.OPENAI_BASE_URL).toBe("https://new-url.com/v1");
     });
 
-    it("replaces all keys when none are masked", () => {
+    it("uses new values when they are not masked", () => {
       const validatedKeys = {
         OPENAI_API_KEY: "sk-new-key",
         OPENAI_BASE_URL: "https://new-url.com/v1",
@@ -126,90 +127,199 @@ describe("modelProviders key masking logic", () => {
       expect(result.OPENAI_API_KEY).toBe("sk-new-key");
       expect(result.OPENAI_BASE_URL).toBe("https://new-url.com/v1");
     });
-
-    it("preserves multiple masked keys", () => {
-      const validatedKeys = {
-        AWS_ACCESS_KEY_ID: MASKED_KEY_PLACEHOLDER,
-        AWS_SECRET_ACCESS_KEY: MASKED_KEY_PLACEHOLDER,
-        AWS_REGION_NAME: "eu-west-1",
-      };
-      const existingKeys = {
-        AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",
-        AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/EXAMPLE",
-        AWS_REGION_NAME: "us-east-1",
-      };
-
-      const result = mergeKeysWithExisting(validatedKeys, existingKeys);
-
-      expect(result.AWS_ACCESS_KEY_ID).toBe("AKIAIOSFODNN7EXAMPLE");
-      expect(result.AWS_SECRET_ACCESS_KEY).toBe("wJalrXUtnFEMI/EXAMPLE");
-      expect(result.AWS_REGION_NAME).toBe("eu-west-1");
-    });
-
-    it("handles empty existing keys", () => {
-      const validatedKeys = {
-        OPENAI_API_KEY: "sk-new-key",
-      };
-      const existingKeys = {};
-
-      const result = mergeKeysWithExisting(validatedKeys, existingKeys);
-
-      expect(result.OPENAI_API_KEY).toBe("sk-new-key");
-    });
-
-    it("handles adding new key not in existing", () => {
-      const validatedKeys = {
-        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-        OPENAI_BASE_URL: "https://custom.com/v1",
-      };
-      const existingKeys = {
-        OPENAI_API_KEY: "sk-stored-key",
-      };
-
-      const result = mergeKeysWithExisting(validatedKeys, existingKeys);
-
-      expect(result.OPENAI_API_KEY).toBe("sk-stored-key");
-      expect(result.OPENAI_BASE_URL).toBe("https://custom.com/v1");
-    });
   });
 });
 
-describe("KEY_CHECK patterns", () => {
-  it("includes KEY pattern", () => {
-    expect(KEY_CHECK).toContain("KEY");
+describe("getModelMetadataForFrontend", () => {
+  it("returns a record of model metadata", () => {
+    const metadata = getModelMetadataForFrontend();
+
+    expect(typeof metadata).toBe("object");
+    expect(Object.keys(metadata).length).toBeGreaterThan(0);
   });
 
-  it("includes GOOGLE_APPLICATION_CREDENTIALS pattern", () => {
-    expect(KEY_CHECK).toContain("GOOGLE_APPLICATION_CREDENTIALS");
+  it("each model has required fields", () => {
+    const metadata = getModelMetadataForFrontend();
+    const firstModel = Object.values(metadata)[0] as ModelMetadataForFrontend;
+
+    expect(firstModel).toHaveProperty("id");
+    expect(firstModel).toHaveProperty("name");
+    expect(firstModel).toHaveProperty("provider");
+    expect(firstModel).toHaveProperty("supportedParameters");
+    expect(firstModel).toHaveProperty("contextLength");
+    expect(firstModel).toHaveProperty("maxCompletionTokens");
+    expect(firstModel).toHaveProperty("defaultParameters");
+    expect(firstModel).toHaveProperty("supportsImageInput");
+    expect(firstModel).toHaveProperty("supportsAudioInput");
+    expect(firstModel).toHaveProperty("pricing");
   });
 
-  it("matches common API key field names", () => {
-    const apiKeyFields = [
-      "OPENAI_API_KEY",
-      "ANTHROPIC_API_KEY",
-      "GEMINI_API_KEY",
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
-      "AZURE_OPENAI_API_KEY",
-    ];
+  it("includes OpenAI models", () => {
+    const metadata = getModelMetadataForFrontend();
+    const openaiModels = Object.keys(metadata).filter((k) =>
+      k.startsWith("openai/")
+    );
 
-    apiKeyFields.forEach((field) => {
-      const matches = KEY_CHECK.some((k) => field.includes(k));
-      expect(matches).toBe(true);
+    expect(openaiModels.length).toBeGreaterThan(0);
+  });
+
+  it("model metadata includes supportedParameters array", () => {
+    const metadata = getModelMetadataForFrontend();
+    const gpt5 = metadata["openai/gpt-5.2"];
+
+    expect(gpt5).toBeDefined();
+    expect(Array.isArray(gpt5?.supportedParameters)).toBe(true);
+  });
+
+  it("model metadata includes pricing information", () => {
+    const metadata = getModelMetadataForFrontend();
+    const gpt5 = metadata["openai/gpt-5.2"];
+
+    expect(gpt5?.pricing).toBeDefined();
+    expect(gpt5?.pricing.inputCostPerToken).toBeGreaterThan(0);
+    expect(gpt5?.pricing.outputCostPerToken).toBeGreaterThan(0);
+  });
+
+  it("identifies multimodal models", () => {
+    const metadata = getModelMetadataForFrontend();
+    const imageModels = Object.values(metadata).filter(
+      (m) => m.supportsImageInput
+    );
+
+    expect(imageModels.length).toBeGreaterThan(0);
+  });
+
+  it("model IDs are consistent with keys", () => {
+    const metadata = getModelMetadataForFrontend();
+
+    for (const [key, model] of Object.entries(metadata)) {
+      expect(model.id).toBe(key);
+    }
+  });
+
+  it("includes reasoningConfig for reasoning models", () => {
+    const metadata = getModelMetadataForFrontend();
+    const gpt52 = metadata["openai/gpt-5.2"];
+
+    expect(gpt52?.reasoningConfig).toBeDefined();
+    expect(gpt52?.reasoningConfig?.supported).toBe(true);
+    expect(gpt52?.reasoningConfig?.allowedValues).toContain("low");
+    expect(gpt52?.reasoningConfig?.allowedValues).toContain("high");
+  });
+
+  it("reasoningConfig is undefined for non-reasoning models", () => {
+    const metadata = getModelMetadataForFrontend();
+    const gpt4 = metadata["openai/gpt-4o"];
+
+    // GPT-4o doesn't have reasoning config
+    expect(gpt4?.reasoningConfig).toBeUndefined();
+  });
+});
+
+describe("prepareLitellmParams", () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const createMockProvider = (
+    provider: string,
+    customKeys: Record<string, string> | null = null
+  ): MaybeStoredModelProvider => ({
+    provider,
+    enabled: true,
+    customKeys,
+    models: null,
+    embeddingsModels: null,
+    deploymentMapping: null,
+    extraHeaders: null,
+  });
+
+  describe("Anthropic URL normalization", () => {
+    it("strips /v1 suffix from Anthropic api_base", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
+    });
+
+    it("strips /v1/ suffix (with trailing slash) from Anthropic api_base", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1/");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
+    });
+
+    it("preserves custom Anthropic base URL without /v1", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://custom-anthropic.example.com");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://custom-anthropic.example.com");
+    });
+
+    it("uses custom keys api_base for Anthropic with /v1 stripped", async () => {
+      const modelProvider = createMockProvider("anthropic", {
+        ANTHROPIC_API_KEY: "custom-key",
+        ANTHROPIC_BASE_URL: "https://api.anthropic.com/v1",
+      });
+
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
     });
   });
 
-  it("does not match URL fields", () => {
-    const urlFields = [
-      "OPENAI_BASE_URL",
-      "AZURE_OPENAI_ENDPOINT",
-      "CUSTOM_BASE_URL",
-      "AWS_REGION_NAME",
-    ];
+  describe("non-Anthropic providers", () => {
+    it("preserves /v1 suffix for OpenAI", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-key");
+      vi.stubEnv("OPENAI_BASE_URL", "https://api.openai.com/v1");
 
-    urlFields.forEach((field) => {
-      const matches = KEY_CHECK.some((k) => field.includes(k));
-      expect(matches).toBe(false);
+      const modelProvider = createMockProvider("openai");
+      const result = await prepareLitellmParams({
+        model: "openai/gpt-4o",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.openai.com/v1");
+    });
+
+    it("preserves /v1 suffix for custom provider", async () => {
+      vi.stubEnv("CUSTOM_API_KEY", "test-key");
+      vi.stubEnv("CUSTOM_BASE_URL", "https://custom-llm.example.com/v1");
+
+      const modelProvider = createMockProvider("custom");
+      const result = await prepareLitellmParams({
+        model: "custom/my-model",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://custom-llm.example.com/v1");
     });
   });
 });

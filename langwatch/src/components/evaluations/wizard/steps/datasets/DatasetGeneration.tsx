@@ -501,13 +501,13 @@ export function DatasetGeneration() {
       padding={4}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
     >
       <HStack>
         <LuSparkles size={16} />
         <Text fontWeight="medium">AI Data Generation</Text>
       </HStack>
-      <Text fontSize="13px" color="gray.500">
+      <Text fontSize="13px" color="fg.muted">
         Describe the sample data you need for running the evaluation or ask for
         modifications to the dataset.
       </Text>
@@ -526,7 +526,7 @@ export function DatasetGeneration() {
         <Input
           placeholder="e.g. Add 10 customer support examples"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           borderRadius="md"
           padding={2}
           value={input}
@@ -556,14 +556,14 @@ export function DatasetGeneration() {
         {lastUserMessage && (
           <HStack gap={1} _icon={{ marginTop: "1px", marginLeft: "-4px" }}>
             <LuChevronRight size={16} />
-            <Text fontSize="14px" color="gray.500">
+            <Text fontSize="14px" color="fg.muted">
               {lastUserMessage.parts[0]?.type === "text"
                 ? lastUserMessage.parts[0].text
                 : ""}
             </Text>
           </HStack>
         )}
-        <Text fontSize="13px" color="gray.500">
+        <Text fontSize="13px" color="fg.muted">
           <Markdown className="">
             {assistantMessage?.parts[0]?.type === "text"
               ? assistantMessage.parts[0].text
@@ -573,7 +573,7 @@ export function DatasetGeneration() {
         {!isReady && lastPart?.type?.startsWith("tool-") && (
           <HStack>
             <Spinner size="sm" />{" "}
-            <Text fontSize="13px" color="gray.500">
+            <Text fontSize="13px" color="fg.muted">
               {
                 toolNames[
                   (lastPart as any).toolName as

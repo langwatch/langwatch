@@ -1,8 +1,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import { Menu } from "~/components/ui/menu";
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 /**
  * Editing mode for the prompt messages field.
@@ -16,10 +16,10 @@ export type PromptEditingMode = "prompt" | "messages";
  * Returns "messages" if there are messages beyond just system + optional user with {{input}}.
  */
 export const getDefaultEditingMode = (
-  messages: Array<{ role: string; content?: string }>
+  messages: Array<{ role: string; content?: string }>,
 ): PromptEditingMode => {
   // Find system and non-system messages
-  const systemMessages = messages.filter((m) => m.role === "system");
+  const _systemMessages = messages.filter((m) => m.role === "system");
   const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
   // If only system message(s), default to prompt mode
@@ -71,13 +71,13 @@ export function EditingModeTitle({
           <Box
             opacity={isHovered ? 1 : 0}
             transition="opacity 0.15s"
-            color="gray.500"
+            color="fg.muted"
           >
             <LuChevronDown size={14} />
           </Box>
         </HStack>
       </Menu.Trigger>
-      <Menu.Content portalled={false} zIndex={10} backgroundColor="white">
+      <Menu.Content portalled={false} zIndex={10} backgroundColor="bg.panel">
         <Menu.Item
           value="prompt"
           onClick={() => onChange("prompt")}

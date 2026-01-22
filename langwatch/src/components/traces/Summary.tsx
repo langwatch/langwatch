@@ -4,11 +4,11 @@ import numeral from "numeral";
 import qs from "qs";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
-import { availableFilters } from "../../server/filters/registry";
-import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { availableFilters } from "../../server/filters/registry";
 import type { Trace } from "../../server/tracer/types";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
 import { MetadataTag } from "../MetadataTag";
@@ -22,7 +22,7 @@ const SummaryItem = ({
   return (
     <VStack
       borderRightWidth="1px"
-      borderRightColor="gray.300"
+      borderRightColor="border"
       alignItems="flex-start"
       paddingRight={4}
       paddingLeft={{ base: 4, lg: 0 }}
@@ -38,7 +38,7 @@ const SummaryItem = ({
           </Tooltip>
         )}
       </HStack>
-      <Box color="gray.700">{children}</Box>
+      <Box color="fg">{children}</Box>
     </VStack>
   );
 };
@@ -155,7 +155,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
               ? 1
               : 0
           }
-          borderColor="gray.300"
+          borderColor="border.emphasized"
           width="full"
           align="stretch"
           gap={[4, 4, 4, 4]}

@@ -3,7 +3,6 @@ import React from "react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
-import { useColorModeValue } from "../../ui/color-mode";
 import type { RunItem } from "./types";
 
 // Single test case row
@@ -32,7 +31,7 @@ export const RunHistoryItem = ({ item }: { item: RunItem }) => {
         <Text fontWeight="semibold" fontSize="xs">
           {item.title}
         </Text>
-        <Text fontSize="xs" color={useColorModeValue("gray.600", "gray.400")}>
+        <Text fontSize="xs" color="fg.muted">
           {item.description}
         </Text>
       </Box>

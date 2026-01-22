@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
-import { TargetHeader } from "../../TargetSection/TargetHeader";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TargetConfig } from "../../../types";
+import { TargetHeader } from "../../TargetSection/TargetHeader";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -35,6 +35,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 
 describe("TargetHeader", () => {
   const mockOnEdit = vi.fn();
+  const mockOnDuplicate = vi.fn();
   const mockOnRemove = vi.fn();
 
   beforeEach(() => {
@@ -63,7 +64,7 @@ describe("TargetHeader", () => {
           target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       expect(screen.getByText("my-assistant")).toBeInTheDocument();
@@ -75,7 +76,7 @@ describe("TargetHeader", () => {
           target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       expect(screen.getByTestId("target-play-button")).toBeInTheDocument();
@@ -87,14 +88,16 @@ describe("TargetHeader", () => {
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       await user.click(screen.getByTestId("target-header-button"));
 
       await waitFor(() => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+        expect(screen.getByText("Duplicate")).toBeInTheDocument();
         expect(screen.getByText("Remove from Workbench")).toBeInTheDocument();
       });
     });
@@ -105,8 +108,9 @@ describe("TargetHeader", () => {
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       await user.click(screen.getByTestId("target-header-button"));
@@ -118,14 +122,35 @@ describe("TargetHeader", () => {
       expect(mockOnEdit).toHaveBeenCalledWith(promptTarget);
     });
 
+    it("calls onDuplicate when clicking Duplicate", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Duplicate")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Duplicate"));
+
+      expect(mockOnDuplicate).toHaveBeenCalledWith(promptTarget);
+    });
+
     it("calls onRemove when clicking Remove from Workbench", async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       await user.click(screen.getByTestId("target-header-button"));
@@ -173,10 +198,12 @@ describe("TargetHeader", () => {
           target={promptTargetWithoutLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
-      expect(screen.queryByTestId("unpublished-indicator")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("unpublished-indicator"),
+      ).not.toBeInTheDocument();
     });
 
     it("shows orange dot when localPromptConfig exists", () => {
@@ -185,7 +212,7 @@ describe("TargetHeader", () => {
           target={promptTargetWithLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
@@ -208,10 +235,12 @@ describe("TargetHeader", () => {
           target={agentWithLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
-      expect(screen.queryByTestId("unpublished-indicator")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("unpublished-indicator"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -232,7 +261,7 @@ describe("TargetHeader", () => {
           target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       expect(screen.getByText("Python Processor")).toBeInTheDocument();
@@ -245,7 +274,7 @@ describe("TargetHeader", () => {
           target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       await user.click(screen.getByTestId("target-header-button"));
@@ -263,7 +292,7 @@ describe("TargetHeader", () => {
           target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
-        />
+        />,
       );
 
       await user.click(screen.getByTestId("target-header-button"));

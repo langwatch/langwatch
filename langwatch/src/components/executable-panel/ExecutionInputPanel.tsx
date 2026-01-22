@@ -99,7 +99,7 @@ export const ExecutionInputPanel = ({
           fontSize="16px"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.600"
+          color="fg.muted"
           paddingBottom={4}
         >
           {title}

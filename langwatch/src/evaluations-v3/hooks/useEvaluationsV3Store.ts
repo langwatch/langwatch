@@ -6,21 +6,22 @@ import { create, type StateCreator } from "zustand";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import {
-  createInitialState,
-  type TargetConfig,
   type CellPosition,
+  createInitialResults,
+  createInitialState,
   type DatasetColumn,
   type DatasetReference,
-  type EvaluatorConfig,
   type EvaluationsV3Actions,
   type EvaluationsV3State,
   type EvaluationsV3Store,
+  type EvaluatorConfig,
   type FieldMapping,
   type OverlayType,
+  type TargetConfig,
 } from "../types";
 import {
-  inferAllTargetMappings,
   inferAllEvaluatorMappings,
+  inferAllTargetMappings,
   propagateMappingsToNewDataset,
 } from "../utils/mappingInference";
 
@@ -34,7 +35,7 @@ import {
  */
 const removeMappingsForDataset = (
   state: EvaluationsV3State,
-  datasetId: string
+  datasetId: string,
 ): { targets: TargetConfig[]; evaluators: EvaluatorConfig[] } => {
   // Remove dataset mappings from targets (delete the dataset key)
   const targets = state.targets.map((target) => {
@@ -94,7 +95,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const newDatasetMappings = propagateMappingsToNewDataset(
         target.inputs,
         target.mappings,
-        dataset
+        dataset,
       );
       if (Object.keys(newDatasetMappings).length > 0) {
         return {
@@ -116,7 +117,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const newMappings = inferAllEvaluatorMappings(
         evaluator,
         [dataset],
-        targetsWithNewMappings
+        targetsWithNewMappings,
       );
       const datasetMappings = newMappings[dataset.id];
       if (datasetMappings && Object.keys(datasetMappings).length > 0) {
@@ -132,8 +133,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
 
     // Update targets and evaluators with new mappings if any changed
-    const targetsChanged = targetsWithNewMappings.some((r, i) => r !== state.targets[i]);
-    const evaluatorsChanged = evaluatorsWithNewMappings.some((e, i) => e !== state.evaluators[i]);
+    const targetsChanged = targetsWithNewMappings.some(
+      (r, i) => r !== state.targets[i],
+    );
+    const evaluatorsChanged = evaluatorsWithNewMappings.some(
+      (e, i) => e !== state.evaluators[i],
+    );
 
     if (targetsChanged || evaluatorsChanged) {
       set({
@@ -158,7 +163,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           : state.activeDatasetId;
 
       // Clean up mappings pointing to this dataset
-      const { targets, evaluators } = removeMappingsForDataset(state, datasetId);
+      const { targets, evaluators } = removeMappingsForDataset(
+        state,
+        datasetId,
+      );
 
       return {
         datasets: newDatasets,
@@ -180,7 +188,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateDataset: (datasetId, updates) => {
     set((state) => ({
       datasets: state.datasets.map((d) =>
-        d.id === datasetId ? { ...d, ...updates } : d
+        d.id === datasetId ? { ...d, ...updates } : d,
       ),
     }));
   },
@@ -195,7 +203,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
               datasetId: savedDatasetId,
               inline: undefined,
             }
-          : d
+          : d,
       ),
     }));
   },
@@ -217,7 +225,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     // For inline datasets, update local records
     if (dataset.type === "inline" && dataset.inline) {
       set((state) => {
-        const records = { ...(state.datasets.find((d) => d.id === datasetId)?.inline?.records ?? {}) };
+        const records = {
+          ...(state.datasets.find((d) => d.id === datasetId)?.inline?.records ??
+            {}),
+        };
         const columnValues = [...(records[columnId] ?? [])];
 
         // Ensure array is long enough
@@ -238,7 +249,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                     records,
                   },
                 }
-              : d
+              : d,
           ),
         };
       });
@@ -270,7 +281,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                   },
                 },
               }
-            : d
+            : d,
         ),
       };
     });
@@ -299,7 +310,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                   records,
                 },
               }
-            : d
+            : d,
         ),
       };
     });
@@ -326,7 +337,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                   columns: updateColumns(d.inline!.columns),
                 },
               }
-            : d
+            : d,
         ),
       };
     });
@@ -353,7 +364,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                   columns: updateColumns(d.inline!.columns),
                 },
               }
-            : d
+            : d,
         ),
       };
     });
@@ -448,9 +459,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
         return {
           datasets: state.datasets.map((d) =>
-            d.id === datasetId
-              ? { ...d, savedRecords: updatedRecords }
-              : d
+            d.id === datasetId ? { ...d, savedRecords: updatedRecords } : d,
           ),
           pendingSavedChanges,
         };
@@ -478,9 +487,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       return {
         datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? { ...d, savedRecords: updatedRecords }
-            : d
+          d.id === datasetId ? { ...d, savedRecords: updatedRecords } : d,
         ),
         pendingSavedChanges,
       };
@@ -506,7 +513,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   getSavedRecordInfo: (datasetId, rowIndex) => {
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (!dataset || dataset.type !== "saved" || !dataset.savedRecords || !dataset.datasetId) {
+    if (
+      !dataset ||
+      dataset.type !== "saved" ||
+      !dataset.savedRecords ||
+      !dataset.datasetId
+    ) {
       return null;
     }
 
@@ -533,7 +545,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       // Auto-map target inputs to dataset columns based on name matching
       // This only happens when the target is ADDED - not on subsequent edits
-      const autoMappings = inferAllTargetMappings(targetWithInputs, state.datasets);
+      const autoMappings = inferAllTargetMappings(
+        targetWithInputs,
+        state.datasets,
+      );
       const targetWithMappings: TargetConfig = {
         ...targetWithInputs,
         mappings: {
@@ -547,7 +562,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const newMappings = inferAllEvaluatorMappings(
           evaluator,
           state.datasets,
-          [targetWithMappings] // Only auto-map for the new target
+          [targetWithMappings], // Only auto-map for the new target
         );
         // Merge new target mappings into existing evaluator mappings
         const mergedMappings = { ...evaluator.mappings };
@@ -579,10 +594,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       if (newInputs) {
         const existingInputs = existingTarget.inputs ?? [];
         const newInputIds = new Set(newInputs.map((i) => i.identifier));
-        const existingInputIds = new Set(existingInputs.map((i) => i.identifier));
+        const existingInputIds = new Set(
+          existingInputs.map((i) => i.identifier),
+        );
 
         // Find removed inputs (need to clean up mappings)
-        const removedInputIds = [...existingInputIds].filter((id) => !newInputIds.has(id));
+        const removedInputIds = [...existingInputIds].filter(
+          (id) => !newInputIds.has(id),
+        );
 
         if (removedInputIds.length > 0) {
           const mergedMappings = { ...existingTarget.mappings };
@@ -599,7 +618,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       return {
         targets: state.targets.map((r) =>
-          r.id === targetId ? { ...r, ...finalUpdates } : r
+          r.id === targetId ? { ...r, ...finalUpdates } : r,
         ),
       };
     });
@@ -625,11 +644,16 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         .filter((r) => r.id !== targetId)
         .map((target) => {
           const newMappings: typeof target.mappings = {};
-          for (const [datasetId, fieldMappings] of Object.entries(target.mappings)) {
+          for (const [datasetId, fieldMappings] of Object.entries(
+            target.mappings,
+          )) {
             const newFieldMappings: Record<string, FieldMapping> = {};
             for (const [field, mapping] of Object.entries(fieldMappings)) {
               // Keep value mappings and source mappings that don't reference the removed target
-              const isTargetMapping = mapping.type === "source" && mapping.source === "target" && mapping.sourceId === targetId;
+              const isTargetMapping =
+                mapping.type === "source" &&
+                mapping.source === "target" &&
+                mapping.sourceId === targetId;
               if (!isTargetMapping) {
                 newFieldMappings[field] = mapping;
               }
@@ -657,7 +681,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                 },
               },
             }
-          : r
+          : r,
       ),
     }));
   },
@@ -689,7 +713,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const autoMappings = inferAllEvaluatorMappings(
         evaluator,
         state.datasets,
-        state.targets
+        state.targets,
       );
       const evaluatorWithMappings = {
         ...evaluator,
@@ -707,7 +731,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateEvaluator: (evaluatorId, updates) => {
     set((state) => ({
       evaluators: state.evaluators.map((e) =>
-        e.id === evaluatorId ? { ...e, ...updates } : e
+        e.id === evaluatorId ? { ...e, ...updates } : e,
       ),
     }));
   },
@@ -722,7 +746,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
-  setEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField, mapping) => {
+  setEvaluatorMapping: (
+    evaluatorId,
+    datasetId,
+    targetId,
+    inputField,
+    mapping,
+  ) => {
     set((state) => ({
       evaluators: state.evaluators.map((e) =>
         e.id === evaluatorId
@@ -739,7 +769,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                 },
               },
             }
-          : e
+          : e,
       ),
     }));
   },
@@ -781,8 +811,11 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       results: {
         status: "idle",
         targetOutputs: {},
+        targetMetadata: {},
         evaluatorResults: {},
         errors: {},
+        executingCells: undefined,
+        runningEvaluators: undefined,
       },
     });
   },
@@ -876,21 +909,31 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     // Sort indices in descending order to delete from end first
     // This prevents index shifting issues
-    const sortedIndices = Array.from(selectedRows).sort((a, b) => b - a);
+    const _sortedIndices = Array.from(selectedRows).sort((a, b) => b - a);
 
     if (dataset.type === "inline" && dataset.inline) {
       // For inline datasets, remove values from each column's array
       set((currentState) => {
-        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
-        if (!currentDataset || currentDataset.type !== "inline" || !currentDataset.inline) {
+        const currentDataset = currentState.datasets.find(
+          (d) => d.id === datasetId,
+        );
+        if (
+          !currentDataset ||
+          currentDataset.type !== "inline" ||
+          !currentDataset.inline
+        ) {
           return currentState;
         }
 
         const newRecords: Record<string, string[]> = {};
 
         // For each column, filter out the selected row indices
-        for (const [columnId, values] of Object.entries(currentDataset.inline.records)) {
-          const newValues = values.filter((_, index) => !selectedRows.has(index));
+        for (const [columnId, values] of Object.entries(
+          currentDataset.inline.records,
+        )) {
+          const newValues = values.filter(
+            (_, index) => !selectedRows.has(index),
+          );
           newRecords[columnId] = newValues;
         }
 
@@ -912,7 +955,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                     records: newRecords,
                   },
                 }
-              : d
+              : d,
           ),
           ui: {
             ...currentState.ui,
@@ -926,14 +969,20 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     } else if (dataset.type === "saved" && dataset.savedRecords) {
       // For saved datasets, filter out the records and track which to delete from DB
       set((currentState) => {
-        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
-        if (!currentDataset || currentDataset.type !== "saved" || !currentDataset.savedRecords) {
+        const currentDataset = currentState.datasets.find(
+          (d) => d.id === datasetId,
+        );
+        if (
+          !currentDataset ||
+          currentDataset.type !== "saved" ||
+          !currentDataset.savedRecords
+        ) {
           return currentState;
         }
 
         // Filter out selected records
         const newRecords = currentDataset.savedRecords.filter(
-          (_, index) => !selectedRows.has(index)
+          (_, index) => !selectedRows.has(index),
         );
 
         // Track record IDs to delete (for existing records, not new ones)
@@ -963,7 +1012,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
                   ...d,
                   savedRecords: newRecords,
                 }
-              : d
+              : d,
           ),
           pendingSavedChanges: pendingChanges,
           ui: {
@@ -1017,6 +1066,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         rowHeightMode: mode,
         // Clear individually expanded cells when switching modes
         expandedCells: new Set(),
+      },
+    }));
+  },
+
+  setConcurrency: (concurrency) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        concurrency,
       },
     }));
   },
@@ -1083,25 +1141,89 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   reset: () => {
-    set(createInitialState());
+    // IMPORTANT: Explicitly clear experimentId and experimentSlug
+    // createInitialState() doesn't include these optional fields,
+    // and Zustand's set() does a shallow merge, so we need to explicitly set them
+    set({
+      ...createInitialState(),
+      experimentId: undefined,
+      experimentSlug: undefined,
+    });
   },
 
-  loadState: (wizardState: unknown) => {
-    if (!wizardState || typeof wizardState !== "object") return;
+  loadState: (workbenchState: unknown) => {
+    if (!workbenchState || typeof workbenchState !== "object") return;
 
-    const state = wizardState as Record<string, unknown>;
+    const state = workbenchState as Record<string, unknown>;
 
-    set((current) => ({
-      ...current,
-      experimentId: (state.experimentId as string) ?? current.experimentId,
-      experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
-      name: (state.name as string) ?? current.name,
-      datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
-      activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
-      evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-      // Support loading old state format (agents) and new format (targets)
-      targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
-    }));
+    // Load persisted results if available
+    const persistedResults = state.results as
+      | Record<string, unknown>
+      | undefined;
+    const loadedResults = persistedResults
+      ? {
+          ...createInitialResults(),
+          runId: persistedResults.runId as string | undefined,
+          versionId: persistedResults.versionId as string | undefined,
+          targetOutputs:
+            (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
+          targetMetadata:
+            (persistedResults.targetMetadata as Record<
+              string,
+              Array<{ cost?: number; duration?: number; traceId?: string }>
+            >) ?? {},
+          evaluatorResults:
+            (persistedResults.evaluatorResults as Record<
+              string,
+              Record<string, unknown[]>
+            >) ?? {},
+          errors: (persistedResults.errors as Record<string, string[]>) ?? {},
+        }
+      : undefined;
+
+    set((current) => {
+      // Load hidden columns from persisted state (convert array to Set)
+      const hiddenColumns = Array.isArray(state.hiddenColumns)
+        ? new Set(state.hiddenColumns as string[])
+        : current.ui.hiddenColumns;
+
+      // Load concurrency from persisted state
+      const concurrency =
+        typeof state.concurrency === "number"
+          ? state.concurrency
+          : current.ui.concurrency;
+
+      return {
+        ...current,
+        experimentId: (state.experimentId as string) ?? current.experimentId,
+        experimentSlug:
+          (state.experimentSlug as string) ?? current.experimentSlug,
+        name: (state.name as string) ?? current.name,
+        datasets:
+          (state.datasets as typeof current.datasets) ?? current.datasets,
+        activeDatasetId:
+          (state.activeDatasetId as string) ?? current.activeDatasetId,
+        evaluators:
+          (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+        // Support loading old state format (agents) and new format (targets)
+        targets:
+          (state.targets as typeof current.targets) ??
+          (state.agents as typeof current.targets) ??
+          current.targets,
+        // Load persisted results if available
+        results: loadedResults ?? current.results,
+        // Load UI settings
+        ui: {
+          ...current.ui,
+          hiddenColumns,
+          concurrency,
+        },
+      };
+    });
+
+    // Clear undo/redo history after loading state
+    // This prevents undoing back to the pre-load state
+    useEvaluationsV3Store.temporal.getState().clear();
   },
 
   setSavedDatasetRecords: (datasetId: string, records) => {
@@ -1109,7 +1231,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       datasets: state.datasets.map((d) =>
         d.id === datasetId && d.type === "saved"
           ? { ...d, savedRecords: records }
-          : d
+          : d,
       ),
     }));
   },
@@ -1159,16 +1281,16 @@ export const useEvaluationsV3Store = create<EvaluationsV3Store>()(
         },
         // Debounce to batch rapid changes (like typing) into single undo entries
         100,
-        { leading: true, trailing: false }
+        { leading: true, trailing: false },
       );
     },
     equality: (pastState, currentState) => {
       return isDeepEqual(
         partializeState(pastState as EvaluationsV3Store),
-        partializeState(currentState as EvaluationsV3Store)
+        partializeState(currentState as EvaluationsV3Store),
       );
     },
-  })
+  }),
 );
 
 // ============================================================================

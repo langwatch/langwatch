@@ -149,7 +149,7 @@ export function PromptsList({
         borderStyle="dashed"
         width="full"
       >
-        <Text fontSize="lg" color="gray.600" textAlign="center">
+        <Text fontSize="lg" color="fg.muted" textAlign="center">
           No prompts found. Create your first one!
         </Text>
       </Box>
@@ -180,10 +180,7 @@ export function PromptsList({
                 : {}
             }
             borderWidth="1px"
-            borderColor="gray.200"
-            _dark={{
-              borderColor: "gray.700",
-            }}
+            borderColor="border"
           >
             <Card.Header pb={3}>
               <HStack justify="space-between" align="flex-start">
@@ -198,7 +195,7 @@ export function PromptsList({
                           </Text>
                           <Text
                             fontWeight="normal"
-                            color="gray.500"
+                            color="fg.muted"
                             fontFamily="mono"
                           >
                             ({config.handle})
@@ -217,7 +214,7 @@ export function PromptsList({
                         <Badge
                           colorPalette="green"
                           border="1px solid"
-                          borderColor="green.200"
+                          borderColor="green.muted"
                         >
                           v{config.version}
                         </Badge>
@@ -379,7 +376,7 @@ export function PromptsList({
                       >
                         <Menu.Item
                           value="delete"
-                          color="red.600"
+                          color="red.fg"
                           onClick={(_event) => {
                             if (hasPromptsDeletePermission) {
                               void onDelete(config);
@@ -398,8 +395,7 @@ export function PromptsList({
 
             <Card.Body pt={0} pb={4}>
               <Box
-                bg="gray.50"
-                _dark={{ bg: "gray.800" }}
+                bg="bg.muted"
                 p={4}
                 borderRadius="md"
                 fontFamily="mono"
@@ -411,8 +407,7 @@ export function PromptsList({
                 <Text
                   whiteSpace="pre-wrap"
                   lineClamp={4}
-                  color="gray.700"
-                  _dark={{ color: "gray.300" }}
+                  color="fg"
                 >
                   {config.prompt.trim() === "" ? "<empty>" : config.prompt}
                 </Text>
@@ -424,8 +419,7 @@ export function PromptsList({
                 mt={4}
                 pt={3}
                 borderTopWidth="1px"
-                borderColor="gray.100"
-                _dark={{ borderColor: "gray.700" }}
+                borderColor="border"
               >
                 <UpdatedInfo
                   author={config.author}
@@ -476,7 +470,7 @@ function UpdatedInfo({
   updatedAt: Date;
 }) {
   return (
-    <Text fontSize="xs" color="gray.500" _dark={{ color: "gray.400" }}>
+    <Text fontSize="xs" color="fg.muted">
       updated {formatTimeAgo(updatedAt.getTime(), "dd/MMM HH:mm", 24 * 30)} by{" "}
       <Text as="span" fontWeight="medium">
         {author?.name ?? "Anonymous User"}

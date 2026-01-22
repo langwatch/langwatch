@@ -20,6 +20,7 @@ import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
+import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -36,7 +37,6 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
-import { LuZap } from "react-icons/lu";
 
 export function QueryStringFieldsFilters({
   hideTriggerButton = false,
@@ -164,14 +164,9 @@ function FieldsFilter({
         onOpenChange={({ open }) => setOpen(open)}
       >
         <Popover.Trigger asChild>
-          <Button
-            variant="subtle"
-            size="sm"
-            width="100%"
-            fontWeight="normal"
-          >
+          <Button variant="subtle" size="sm" width="100%" fontWeight="normal">
             <HStack width="full" gap={1}>
-              <Text color="gray.500" fontWeight="500" paddingRight={4}>
+              <Text color="fg.muted" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
               {currentStringList.length > 0 ? (
@@ -207,7 +202,7 @@ function FieldsFilter({
                 </>
               ) : (
                 <>
-                  <Text color="gray.400">Any</Text>
+                  <Text color="fg.subtle">Any</Text>
                   <Spacer />
                 </>
               )}
@@ -514,7 +509,7 @@ function ListSelection({
                     {details && (
                       <OverflownTextWithTooltip
                         fontSize="sm"
-                        color="gray.500"
+                        color="fg.muted"
                         lineClamp={1}
                         wordBreak="break-all"
                       >
@@ -531,7 +526,7 @@ function ListSelection({
                 </Checkbox>
                 <Spacer />
                 {typeof count !== "undefined" && (
-                  <Text fontSize="13px" color="gray.400">
+                  <Text fontSize="13px" color="fg.subtle">
                     {count}
                   </Text>
                 )}

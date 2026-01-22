@@ -13,14 +13,14 @@ export {
   getEventSourcingRuntime,
   resetEventSourcingRuntime,
 } from "./eventSourcingRuntime";
+export type { PipelineBuilderOptions } from "./pipeline/builder";
+export { PipelineBuilder } from "./pipeline/builder";
 export type {
   EventSourcingPipelineDefinition,
+  PipelineMetadata,
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
-export type { PipelineBuilderOptions } from "./pipeline/builder";
-export { PipelineBuilder } from "./pipeline/builder";
-export type { PipelineMetadata } from "./pipeline/types";
 export {
   BullmqQueueProcessorFactory,
   DefaultQueueProcessorFactory,

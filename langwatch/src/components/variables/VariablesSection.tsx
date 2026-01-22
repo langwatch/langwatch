@@ -12,14 +12,18 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  VariableTypeIcon,
   TYPE_LABELS,
+  VariableTypeIcon,
 } from "~/prompts/components/ui/VariableTypeIcon";
 import {
-  VariableMappingInput,
+  generateUniqueIdentifier,
+  normalizeIdentifier,
+} from "~/utils/identifierUtils";
+import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  VariableMappingInput,
 } from "./VariableMappingInput";
 
 // ============================================================================
@@ -75,29 +79,6 @@ export type VariablesSectionProps = {
   disabledMappings?: Set<string>;
   /** Disable mapping input */
   isMappingDisabled?: boolean;
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const generateUniqueIdentifier = (
-  baseName: string,
-  existingIdentifiers: string[],
-): string => {
-  if (!existingIdentifiers.includes(baseName)) {
-    return baseName;
-  }
-
-  let counter = 1;
-  while (existingIdentifiers.includes(`${baseName}_${counter}`)) {
-    counter++;
-  }
-  return `${baseName}_${counter}`;
-};
-
-const normalizeIdentifier = (value: string): string => {
-  return value.replace(/ /g, "_").toLowerCase();
 };
 
 // ============================================================================
@@ -199,7 +180,7 @@ export const VariablesSection = ({
           fontSize="xs"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.500"
+          color="fg.muted"
         >
           {title}
         </Text>
@@ -219,7 +200,7 @@ export const VariablesSection = ({
 
       {/* Variables List */}
       {variables.length === 0 ? (
-        <Text fontSize="13px" color="gray.400">
+        <Text fontSize="13px" color="fg.subtle">
           No variables defined
         </Text>
       ) : (
@@ -227,7 +208,8 @@ export const VariablesSection = ({
           {variables.map((variable) => {
             const isLocked = lockedVariables.has(variable.identifier);
             const infoTooltip = variableInfo[variable.identifier];
-            const isMappingDisabled_internal = isMappingDisabled || disabledMappings.has(variable.identifier);
+            const isMappingDisabled_internal =
+              isMappingDisabled || disabledMappings.has(variable.identifier);
 
             return (
               <VariableRow
@@ -276,12 +258,12 @@ export const VariablesSection = ({
 
 // Type options for the dropdown - uses shared TYPE_LABELS for consistency
 const INPUT_TYPE_OPTIONS = [
-  { value: "str", label: TYPE_LABELS["str"] ?? "Text" },
-  { value: "float", label: TYPE_LABELS["float"] ?? "Number" },
-  { value: "bool", label: TYPE_LABELS["bool"] ?? "Boolean" },
-  { value: "image", label: TYPE_LABELS["image"] ?? "Image" },
-  { value: "list", label: TYPE_LABELS["list"] ?? "List" },
-  { value: "dict", label: TYPE_LABELS["dict"] ?? "Object" },
+  { value: "str", label: TYPE_LABELS.str ?? "Text" },
+  { value: "float", label: TYPE_LABELS.float ?? "Number" },
+  { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
+  { value: "image", label: TYPE_LABELS.image ?? "Image" },
+  { value: "list", label: TYPE_LABELS.list ?? "List" },
+  { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
 ];
 
 type VariableRowProps = {
@@ -372,7 +354,7 @@ const VariableRow = ({
             borderRadius="lg"
             padding={1}
             paddingRight={5}
-            _hover={{ borderColor: "gray.200" }}
+            _hover={{ borderColor: "border" }}
             css={{
               // Hide the default text, show only icon
               color: "transparent",
@@ -429,7 +411,7 @@ const VariableRow = ({
             marginX={-2}
             marginY={-1}
             borderRadius="lg"
-            _hover={readOnly ? undefined : { borderColor: "gray.200" }}
+            _hover={readOnly ? undefined : { borderColor: "border" }}
             minWidth="60px"
             data-testid={`variable-name-${variable.identifier}`}
           >
@@ -438,7 +420,7 @@ const VariableRow = ({
           {infoTooltip && (
             <Tooltip content={infoTooltip} positioning={{ placement: "top" }}>
               <Box
-                color="gray.400"
+                color="fg.subtle"
                 cursor="help"
                 data-testid={`variable-info-${variable.identifier}`}
               >
@@ -452,7 +434,7 @@ const VariableRow = ({
       {!isMappingDisabled && (
         <>
           {/* = sign and value/mapping input */}
-          <Text color="gray.400" fontSize="sm" flexShrink={0}>
+          <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
             =
           </Text>
 
@@ -479,7 +461,7 @@ const VariableRow = ({
               fontFamily="mono"
               fontSize="13px"
               variant="flushed"
-              borderColor="gray.200"
+              borderColor="border"
             />
           )}
         </>
@@ -494,7 +476,7 @@ const VariableRow = ({
             colorPalette="gray"
             onClick={onRemove}
             flexShrink={0}
-            color="gray.400"
+            color="fg.subtle"
             data-testid={`remove-variable-${variable.identifier}`}
           >
             <X size={14} />

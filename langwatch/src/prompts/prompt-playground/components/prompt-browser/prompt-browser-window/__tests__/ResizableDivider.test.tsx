@@ -24,7 +24,7 @@ const renderDivider = (props: {
     ...render(
       <ChakraProvider value={defaultSystem}>
         <ResizableDivider {...defaultProps} />
-      </ChakraProvider>
+      </ChakraProvider>,
     ),
     ...defaultProps,
   };
@@ -152,10 +152,9 @@ describe("ResizableDivider", () => {
             onDragEnd={vi.fn()}
             onToggle={vi.fn()}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
       expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
     });
   });
 });
-

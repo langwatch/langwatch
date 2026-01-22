@@ -2,9 +2,7 @@ import type {
   NormalizedAttributes,
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type {
   BaseSpan,
   ChatMessage,
@@ -17,7 +15,13 @@ import type {
   SpanTypes,
 } from "~/server/tracer/types";
 
-type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
+type JsonSerializable =
+  | string
+  | number
+  | boolean
+  | null
+  | Record<string, unknown>
+  | unknown[];
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -46,7 +50,7 @@ function toJsonSerializable(value: unknown): JsonSerializable {
  * Looks for common semantic convention keys for input.
  */
 function extractInput(
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): SpanInputOutput | null {
   // Priority 1: gen_ai.input.messages (canonical GenAI semantic convention)
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
@@ -98,7 +102,7 @@ function extractInput(
  * Looks for common semantic convention keys for output.
  */
 function extractOutput(
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): SpanInputOutput | null {
   // Priority 1: gen_ai.output.messages (canonical GenAI semantic convention)
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
@@ -149,7 +153,7 @@ function extractOutput(
  * Extracts metrics from span attributes.
  */
 function extractMetrics(
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
   const promptTokens =
     spanAttributes["gen_ai.usage.prompt_tokens"] ??
@@ -212,7 +216,7 @@ function extractVendor(spanAttributes: NormalizedAttributes): string | null {
  * Extracts RAG contexts from span attributes.
  */
 function extractContexts(
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): RAGChunk[] | undefined {
   const contexts =
     spanAttributes["retrieval.documents"] ?? spanAttributes["rag.contexts"];
@@ -244,7 +248,7 @@ function extractContexts(
 function extractError(
   statusCode: NormalizedStatusCode | null,
   statusMessage: string | null,
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
@@ -272,7 +276,7 @@ function extractError(
  * Filters out known semantic convention keys to get custom params.
  */
 function _extractParams(
-  spanAttributes: NormalizedAttributes
+  spanAttributes: NormalizedAttributes,
 ): Record<string, unknown> | null {
   const knownKeys = new Set([
     "gen_ai.prompt",
@@ -357,7 +361,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
 
   // Check for first token event
   const firstTokenEvent = normalizedSpan.events.find(
-    (e) => e.name === "first_token" || e.name === "gen_ai.content.first_token"
+    (e) => e.name === "first_token" || e.name === "gen_ai.content.first_token",
   );
   if (firstTokenEvent) {
     timestamps.first_token_at = firstTokenEvent.timeUnixMs;
@@ -378,7 +382,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     error: extractError(
       normalizedSpan.statusCode,
       normalizedSpan.statusMessage,
-      normalizedSpan.spanAttributes
+      normalizedSpan.spanAttributes,
     ),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),
@@ -411,7 +415,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
  * Maps multiple NormalizedSpans to legacy Span format.
  */
 export function mapNormalizedSpansToSpans(
-  normalizedSpans: NormalizedSpan[]
+  normalizedSpans: NormalizedSpan[],
 ): Span[] {
   return normalizedSpans.map(mapNormalizedSpanToSpan);
 }

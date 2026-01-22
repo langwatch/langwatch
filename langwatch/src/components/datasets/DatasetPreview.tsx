@@ -4,7 +4,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
-  DatasetRecordEntry,
+  DatasetRecordInput,
 } from "../../server/datasets/types";
 import { type DatasetColumnDef, DatasetGrid } from "./DatasetGrid";
 
@@ -14,7 +14,8 @@ export function DatasetPreview({
   onClick,
   ...props
 }: {
-  rows: DatasetRecordEntry[];
+  // Accepts input records (optional id) since we're just displaying a preview
+  rows: DatasetRecordInput[];
   columns: DatasetColumns;
   onClick?: () => void;
 } & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {

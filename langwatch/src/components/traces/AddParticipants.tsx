@@ -115,7 +115,7 @@ export const AddParticipants = ({
                         paddingY={1}
                         paddingX={2}
                         borderRadius="full"
-                        background="gray.100"
+                        background="bg.muted"
                       >
                         {item.value.startsWith("user-") ? (
                           <Avatar.Root
@@ -135,7 +135,7 @@ export const AddParticipants = ({
                         {item.label}
                         <CloseButton
                           size="2xs"
-                          color="gray.500"
+                          color="fg.muted"
                           onClick={(e) => {
                             e.stopPropagation();
                             setAnnotators(
@@ -188,9 +188,9 @@ export const AddParticipants = ({
               p={2}
               position="sticky"
               bottom={0}
-              bg="white"
+              bg="bg.panel"
               borderTop="1px solid"
-              borderColor="gray.100"
+              borderColor="border.muted"
             >
               <Button
                 width="100%"

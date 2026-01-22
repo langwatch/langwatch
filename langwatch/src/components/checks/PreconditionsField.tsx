@@ -63,7 +63,7 @@ export const PreconditionsField = ({
               position="relative"
             >
               <Text>Requires RAG Contexts</Text>
-              <Text color="gray.500" fontStyle="italic">
+              <Text color="fg.muted" fontStyle="italic">
                 This evaluator will only run if the RAG contexts are provided
               </Text>
             </VStack>
@@ -79,7 +79,7 @@ export const PreconditionsField = ({
               position="relative"
             >
               <Text>Requires an Expected Output</Text>
-              <Text color="gray.500" fontStyle="italic">
+              <Text color="fg.muted" fontStyle="italic">
                 This evaluator will only run if the expected output is provided
               </Text>
             </VStack>
@@ -95,7 +95,7 @@ export const PreconditionsField = ({
               position="relative"
             >
               <Text>Requires Expected Contexts</Text>
-              <Text color="gray.500" fontStyle="italic">
+              <Text color="fg.muted" fontStyle="italic">
                 This evaluator will only run if the expected contexts are
                 provided
               </Text>
@@ -124,7 +124,7 @@ export const PreconditionsField = ({
                 size="sm"
                 variant="ghost"
                 onClick={() => remove(index)}
-                color="gray.400"
+                color="fg.subtle"
               >
                 <X />
               </Button>

@@ -13,6 +13,8 @@ import type {
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
+import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
+import { transformCamelToSnake } from "./transformToDbFormat";
 import { PromptVersionService } from "./prompt-version.service";
 import {
   type CreateLlmConfigParams,
@@ -50,6 +52,19 @@ export type VersionedPrompt = {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  // Traditional sampling parameters
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  // Other sampling parameters
+  seed?: number;
+  topK?: number;
+  minP?: number;
+  repetitionPenalty?: number;
+  // Reasoning parameter (canonical/unified field)
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+  reasoning?: string;
+  verbosity?: string;
   prompt: string;
   projectId: string;
   organizationId: string;
@@ -219,6 +234,18 @@ export class PromptService {
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    // Traditional sampling parameters
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+    // Other sampling parameters
+    seed?: number;
+    topK?: number;
+    minP?: number;
+    repetitionPenalty?: number;
+    // Reasoning parameter (canonical/unified field)
+    reasoning?: string;
+    verbosity?: string;
     promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
     demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
     responseFormat?: LatestConfigVersionSchema["configData"]["response_format"];
@@ -290,6 +317,18 @@ export class PromptService {
               model: params.model,
               temperature: params.temperature,
               maxTokens: params.maxTokens,
+              // Traditional sampling parameters
+              topP: params.topP,
+              frequencyPenalty: params.frequencyPenalty,
+              presencePenalty: params.presencePenalty,
+              // Other sampling parameters
+              seed: params.seed,
+              topK: params.topK,
+              minP: params.minP,
+              repetitionPenalty: params.repetitionPenalty,
+              // Reasoning parameter (canonical/unified field)
+              reasoning: params.reasoning,
+              verbosity: params.verbosity,
               promptingTechnique: params.promptingTechnique,
               demonstrations: params.demonstrations,
               responseFormat: params.responseFormat,
@@ -764,6 +803,8 @@ export class PromptService {
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
+    const configData = config.latestVersion.configData;
+
     return {
       id: config.id,
       name: config.name,
@@ -772,9 +813,26 @@ export class PromptService {
       version: config.latestVersion.version ?? 0,
       versionId: config.latestVersion.id ?? "",
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-      model: config.latestVersion.configData.model,
-      temperature: config.latestVersion.configData.temperature,
-      maxTokens: config.latestVersion.configData.max_tokens,
+      model: configData.model,
+      temperature: configData.temperature,
+      maxTokens: configData.max_tokens,
+      // Traditional sampling parameters
+      topP: configData.top_p,
+      frequencyPenalty: configData.frequency_penalty,
+      presencePenalty: configData.presence_penalty,
+      // Other sampling parameters
+      seed: configData.seed,
+      topK: configData.top_k,
+      minP: configData.min_p,
+      repetitionPenalty: configData.repetition_penalty,
+      // Reasoning parameter (normalized from any provider-specific fields for backward compat)
+      reasoning: normalizeReasoningFromProviderFields({
+        reasoning: configData.reasoning,
+        reasoning_effort: configData.reasoning_effort,
+        thinkingLevel: configData.thinkingLevel,
+        effort: configData.effort,
+      }),
+      verbosity: configData.verbosity,
       prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,
@@ -782,11 +840,11 @@ export class PromptService {
       // but in the database, we only have the prompt field above
       messages: [
         { role: "system", content: prompt },
-        ...(config.latestVersion.configData.messages ?? []),
+        ...(configData.messages ?? []),
       ],
-      inputs: config.latestVersion.configData.inputs,
-      outputs: config.latestVersion.configData.outputs,
-      responseFormat: config.latestVersion.configData.response_format,
+      inputs: configData.inputs,
+      outputs: configData.outputs,
+      responseFormat: configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
       author: config.latestVersion.author
         ? {
@@ -796,8 +854,8 @@ export class PromptService {
         : null,
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
-      demonstrations: config.latestVersion.configData.demonstrations,
-      promptingTechnique: config.latestVersion.configData.prompting_technique,
+      demonstrations: configData.demonstrations,
+      promptingTechnique: configData.prompting_technique,
       commitMessage: config.latestVersion.commitMessage,
       copiedFromPromptId: config.copiedFromPromptId ?? null,
       _count: config._count ?? undefined,
@@ -827,19 +885,20 @@ export class PromptService {
    * Transforms camelCase service params to snake_case for repository/database
    * Single Responsibility: Handle naming convention conversion at data boundary
    *
+   * Uses transformCamelToSnake utility which derives mappings from PARAM_NAME_MAPPING
+   * (single source of truth) plus prompt-specific mappings.
+   *
+   * The 'reasoning' field passes through unchanged as the canonical field.
+   * Provider-specific mapping happens at the boundary layer (reasoningBoundary.ts)
+   * when making actual LLM API calls, not when saving to the database.
+   *
    * TODO: Move to repository layer - the repository should handle this transformation
    * to properly isolate database schema concerns from service business logic.
    */
-  private transformToDbFormat(data: any): any {
-    const { maxTokens, promptingTechnique, responseFormat, ...rest } = data;
-    return {
-      ...rest,
-      ...(maxTokens !== undefined && { max_tokens: maxTokens }),
-      ...(promptingTechnique !== undefined && {
-        prompting_technique: promptingTechnique,
-      }),
-      ...(responseFormat !== undefined && { response_format: responseFormat }),
-    };
+  private transformToDbFormat(
+    data: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return transformCamelToSnake(data);
   }
 
   /**

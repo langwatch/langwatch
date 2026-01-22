@@ -38,7 +38,7 @@ export function NodeSelectionPanelButton({
       display={isOpen ? "none" : "block"}
       background="white"
       borderRadius={4}
-      borderColor="gray.350"
+      borderColor="border.emphasized"
       variant="outline"
       onClick={() => {
         setIsOpen(!isOpen);
@@ -111,7 +111,7 @@ export const NodeSelectionPanel = ({
       left={0}
       background="white"
       borderRight="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       zIndex={100}
       height="calc(100vh - 49px)"
       fontSize="14px"

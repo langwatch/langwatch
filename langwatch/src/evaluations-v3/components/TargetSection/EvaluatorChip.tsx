@@ -4,22 +4,25 @@ import {
   Circle,
   HStack,
   Icon,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import {
-  LuCircleAlert,
   LuChevronDown,
+  LuCircleAlert,
+  LuCircleX,
   LuPencil,
+  LuRefreshCw,
   LuTrash2,
 } from "react-icons/lu";
-import { keyframes } from "@emotion/react";
 
 import { Menu } from "~/components/ui/menu";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import type { EvaluatorConfig } from "../../types";
 
@@ -34,40 +37,57 @@ type EvaluatorChipProps = {
   result: unknown;
   /** Whether this evaluator has missing required mappings */
   hasMissingMappings?: boolean;
+  /** Whether this specific evaluator is currently running (from runningEvaluators state) */
+  isRunning?: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  /** Called when user wants to re-run this evaluator */
+  onRerun?: () => void;
 };
 
 export function EvaluatorChip({
   evaluator,
   result,
   hasMissingMappings = false,
+  isRunning = false,
   onEdit,
   onRemove,
+  onRerun,
 }: EvaluatorChipProps) {
-  const { status, score, label, details } = parseEvaluationResult(result);
+  const parsed = parseEvaluationResult(result);
+
+  // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
+  // If result already exists, it overrides isRunning (evaluator completed)
+  const status =
+    isRunning && parsed.status === "pending" ? "running" : parsed.status;
+  const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];
 
   // Format inline result display
   const getInlineResult = () => {
     if (status === "pending") return null;
+
+    // Show spinner when running
+    if (status === "running") {
+      return <Spinner size="xs" color="fg.muted" />;
+    }
+
+    // Show error icon for error status
+    if (status === "error") {
+      return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
+    }
+
     if (score !== undefined) {
       return (
-        <Text fontSize="10px" fontWeight="semibold" color={statusColor}>
+        <Text fontSize="10px" fontWeight="semibold">
           {score.toFixed(2)}
         </Text>
       );
     }
     if (label) {
       return (
-        <Text
-          fontSize="10px"
-          fontWeight="medium"
-          color={statusColor}
-          maxWidth="60px"
-          truncate
-        >
+        <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
           {label}
         </Text>
       );
@@ -83,7 +103,7 @@ export function EvaluatorChip({
           size="xs"
           fontSize="11px"
           fontWeight="medium"
-          borderColor={hasMissingMappings ? "orange.400" : undefined}
+          borderColor={hasMissingMappings ? "orange.solid" : undefined}
           css={{
             "& .chevron-icon": {
               display: "none",
@@ -94,16 +114,22 @@ export function EvaluatorChip({
           }}
         >
           <HStack gap={1.5}>
-            {/* Status indicator dot */}
-            <Circle size="6px" bg={statusColor} flexShrink={0} />
+            {/* Status indicator - spinning for running, static for others */}
+            {status === "running" ? (
+              <Box flexShrink={0}>
+                <Spinner size="xs" color="fg.muted" marginBottom="-2px" />
+              </Box>
+            ) : (
+              <Circle size="10px" bg={statusColor} flexShrink={0} />
+            )}
             <Text>{evaluator.name}</Text>
-            {/* Inline result (score or label) */}
-            {getInlineResult()}
+            {/* Inline result (score, label, or error icon) */}
+            {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}
             {hasMissingMappings && (
               <Icon
                 as={LuCircleAlert}
-                color="yellow.500"
+                color="yellow.fg"
                 boxSize="14px"
                 css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
                 onClick={(e) => {
@@ -119,7 +145,7 @@ export function EvaluatorChip({
           </HStack>
         </Button>
       </Menu.Trigger>
-      <Menu.Content minWidth="220px">
+      <Menu.Content minWidth="220px" maxWidth="360px">
         {/* Result section (if there's a result) */}
         {status !== "pending" && (
           <>
@@ -127,7 +153,7 @@ export function EvaluatorChip({
               <Text
                 fontSize="11px"
                 fontWeight="semibold"
-                color="gray.500"
+                color="fg.muted"
                 marginBottom={1}
               >
                 Result
@@ -135,34 +161,26 @@ export function EvaluatorChip({
               <VStack align="stretch" gap={1}>
                 {score !== undefined && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">
+                    <Text fontSize="12px" color="fg.muted">
                       Score:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                      color={statusColor}
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {score.toFixed(2)}
                     </Text>
                   </HStack>
                 )}
                 {label && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">
+                    <Text fontSize="12px" color="fg.muted">
                       Label:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                      color={statusColor}
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {label}
                     </Text>
                   </HStack>
                 )}
                 <HStack justify="space-between">
-                  <Text fontSize="12px" color="gray.600">
+                  <Text fontSize="12px" color="fg.muted">
                     Status:
                   </Text>
                   <Text
@@ -175,14 +193,14 @@ export function EvaluatorChip({
                 </HStack>
                 {details && (
                   <Box marginTop={1}>
-                    <Text fontSize="11px" color="gray.500" marginBottom={0.5}>
+                    <Text fontSize="11px" color="fg.muted" marginBottom={0.5}>
                       Details:
                     </Text>
                     <Text
                       fontSize="11px"
-                      color="gray.600"
+                      color="fg.muted"
                       whiteSpace="pre-wrap"
-                      maxHeight="100px"
+                      maxHeight="200px"
                       overflow="auto"
                     >
                       {details}
@@ -191,8 +209,17 @@ export function EvaluatorChip({
                 )}
               </VStack>
             </Box>
-            <Box borderTopWidth="1px" borderColor="gray.200" />
+            <Box borderTopWidth="1px" borderColor="border" />
           </>
+        )}
+        {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
+        {status !== "pending" && status !== "running" && onRerun && (
+          <Menu.Item value="rerun" onClick={onRerun}>
+            <HStack gap={2}>
+              <LuRefreshCw size={14} />
+              <Text>Rerun</Text>
+            </HStack>
+          </Menu.Item>
         )}
         <Menu.Item value="edit" onClick={onEdit}>
           <HStack gap={2}>
@@ -200,9 +227,9 @@ export function EvaluatorChip({
             <Text>Edit Configuration</Text>
           </HStack>
         </Menu.Item>
-        <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
+        <Box borderTopWidth="1px" borderColor="border" my={1} />
         <Menu.Item value="remove" onClick={onRemove}>
-          <HStack gap={2} color="red.600">
+          <HStack gap={2} color="red.fg">
             <LuTrash2 size={14} />
             <Text>Remove from Workbench</Text>
           </HStack>

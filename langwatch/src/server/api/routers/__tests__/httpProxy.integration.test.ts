@@ -8,7 +8,15 @@
  * SSRF protection has its own dedicated unit tests. This allows us to
  * focus on testing the HTTP proxy functionality.
  */
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -62,7 +70,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ result: "success" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       await caller.httpProxy.execute({
@@ -77,9 +85,14 @@ describe("HTTP Proxy", () => {
       });
 
       expect(mockSsrfSafeFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
+        string,
+        RequestInit,
+      ];
       expect(fetchOptions.headers).toBeDefined();
-      expect((fetchOptions.headers as Record<string, string>)["Authorization"]).toBe("Bearer test-token-123");
+      expect(
+        (fetchOptions.headers as Record<string, string>).Authorization,
+      ).toBe("Bearer test-token-123");
     });
   });
 
@@ -89,7 +102,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ result: "success" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       await caller.httpProxy.execute({
@@ -105,8 +118,13 @@ describe("HTTP Proxy", () => {
       });
 
       expect(mockSsrfSafeFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
-      expect((fetchOptions.headers as Record<string, string>)["X-API-Key"]).toBe("secret-key-456");
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
+        string,
+        RequestInit,
+      ];
+      expect(
+        (fetchOptions.headers as Record<string, string>)["X-API-Key"],
+      ).toBe("secret-key-456");
     });
   });
 
@@ -116,7 +134,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ result: "success" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       await caller.httpProxy.execute({
@@ -133,8 +151,13 @@ describe("HTTP Proxy", () => {
 
       const expectedAuth = `Basic ${Buffer.from("user:pass").toString("base64")}`;
       expect(mockSsrfSafeFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
-      expect((fetchOptions.headers as Record<string, string>)["Authorization"]).toBe(expectedAuth);
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
+        string,
+        RequestInit,
+      ];
+      expect(
+        (fetchOptions.headers as Record<string, string>).Authorization,
+      ).toBe(expectedAuth);
     });
   });
 
@@ -144,7 +167,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ result: "success" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       await caller.httpProxy.execute({
@@ -159,25 +182,35 @@ describe("HTTP Proxy", () => {
       });
 
       expect(mockSsrfSafeFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
-      expect((fetchOptions.headers as Record<string, string>)["X-Custom-1"]).toBe("value1");
-      expect((fetchOptions.headers as Record<string, string>)["X-Custom-2"]).toBe("value2");
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [
+        string,
+        RequestInit,
+      ];
+      expect(
+        (fetchOptions.headers as Record<string, string>)["X-Custom-1"],
+      ).toBe("value1");
+      expect(
+        (fetchOptions.headers as Record<string, string>)["X-Custom-2"],
+      ).toBe("value2");
     });
   });
 
   describe("when outputPath extracts value", () => {
     it("extracts string using JSONPath", async () => {
       mockSsrfSafeFetch.mockResolvedValue(
-        new Response(JSON.stringify({
-          data: {
-            nested: {
-              value: "extracted text",
+        new Response(
+          JSON.stringify({
+            data: {
+              nested: {
+                value: "extracted text",
+              },
             },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
           },
-        }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        })
+        ),
       );
 
       const result = await caller.httpProxy.execute({
@@ -197,7 +230,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ data: "value" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       const result = await caller.httpProxy.execute({
@@ -214,14 +247,17 @@ describe("HTTP Proxy", () => {
 
     it("stringifies non-string values", async () => {
       mockSsrfSafeFetch.mockResolvedValue(
-        new Response(JSON.stringify({
-          data: {
-            obj: { key: "value" },
+        new Response(
+          JSON.stringify({
+            data: {
+              obj: { key: "value" },
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
           },
-        }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        })
+        ),
       );
 
       const result = await caller.httpProxy.execute({
@@ -244,7 +280,7 @@ describe("HTTP Proxy", () => {
           status: 404,
           statusText: "Not Found",
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       const result = await caller.httpProxy.execute({
@@ -280,7 +316,7 @@ describe("HTTP Proxy", () => {
         new Response(JSON.stringify({ result: "success" }), {
           status: 200,
           headers: { "content-type": "application/json" },
-        })
+        }),
       );
 
       const result = await caller.httpProxy.execute({
@@ -301,7 +337,7 @@ describe("HTTP Proxy", () => {
         new Response("plain text response", {
           status: 200,
           headers: { "content-type": "text/plain" },
-        })
+        }),
       );
 
       const result = await caller.httpProxy.execute({

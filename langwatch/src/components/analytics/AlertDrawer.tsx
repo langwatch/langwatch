@@ -11,25 +11,25 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Trash } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { Drawer } from "../ui/drawer";
-import { Radio, RadioGroup } from "../ui/radio";
-import { Tooltip } from "../ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { api } from "../../utils/api";
-import { toaster } from "../ui/toaster";
 import type { CustomGraphFormData } from "../../pages/[project]/analytics/custom/index";
 import {
   customGraphFormToCustomGraphInput,
   customGraphInputToFormData,
 } from "../../pages/[project]/analytics/custom/index";
-import type { CustomGraphInput } from "./CustomGraph";
+import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { Drawer } from "../ui/drawer";
+import { Radio, RadioGroup } from "../ui/radio";
+import { toaster } from "../ui/toaster";
+import { Tooltip } from "../ui/tooltip";
 import { AlertDrawerMultiSelect } from "./AlertDrawerMultiSelect";
+import type { CustomGraphInput } from "./CustomGraph";
 
 interface AlertDrawerProps {
   form?: UseFormReturn<CustomGraphFormData>;
@@ -358,7 +358,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
           <Heading>Configure Alert</Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <Text color="gray.600" fontSize="sm" marginBottom={6}>
+          <Text color="fg.muted" fontSize="sm" marginBottom={6}>
             Set up an alert to be notified when a metric crosses a threshold.
           </Text>
 
@@ -389,7 +389,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 <Text
                   padding={2}
                   borderWidth={1}
-                  borderColor="gray.200"
+                  borderColor="border"
                   borderRadius="md"
                   backgroundColor="gray.50"
                 >

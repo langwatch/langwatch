@@ -1,16 +1,15 @@
 import { Box, Portal, Textarea } from "@chakra-ui/react";
 import {
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
 } from "react";
-
-import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 
 // Max characters to display before truncating (for rendering performance)
 const MAX_DISPLAY_CHARS = 5000;
@@ -33,7 +32,9 @@ const JSON_LIKE_TYPES: DatasetColumnType[] = [
  * Try to parse and format a value as JSON.
  * Returns the formatted JSON string if successful, or the original value if not.
  */
-const tryFormatAsJson = (value: string): { formatted: string; isJson: boolean } => {
+const tryFormatAsJson = (
+  value: string,
+): { formatted: string; isJson: boolean } => {
   if (!value || typeof value !== "string") {
     return { formatted: value, isJson: false };
   }
@@ -55,7 +56,10 @@ const tryFormatAsJson = (value: string): { formatted: string; isJson: boolean } 
 /**
  * Truncate a string to a maximum length with an ellipsis indicator.
  */
-const truncateValue = (value: string, maxLength: number): { text: string; truncated: boolean } => {
+const truncateValue = (
+  value: string,
+  maxLength: number,
+): { text: string; truncated: boolean } => {
   if (value.length <= maxLength) {
     return { text: value, truncated: false };
   }
@@ -76,20 +80,20 @@ type EditableCellProps = {
  * Note: Selection outline is handled by the parent table on the <td> element.
  * This component only handles the edit mode textarea.
  */
-export function EditableCell({ value, row, columnId, datasetId, dataType }: EditableCellProps) {
-  const {
-    setCellValue,
-    setEditingCell,
-    ui,
-    setSelectedCell,
-    toggleCellExpanded,
-  } = useEvaluationsV3Store((state) => ({
-    setCellValue: state.setCellValue,
-    setEditingCell: state.setEditingCell,
-    ui: state.ui,
-    setSelectedCell: state.setSelectedCell,
-    toggleCellExpanded: state.toggleCellExpanded,
-  }));
+export function EditableCell({
+  value,
+  row,
+  columnId,
+  datasetId,
+  dataType,
+}: EditableCellProps) {
+  const { setCellValue, setEditingCell, ui, toggleCellExpanded } =
+    useEvaluationsV3Store((state) => ({
+      setCellValue: state.setCellValue,
+      setEditingCell: state.setEditingCell,
+      ui: state.ui,
+      toggleCellExpanded: state.toggleCellExpanded,
+    }));
 
   const rowHeightMode = ui.rowHeightMode;
   const cellKey = `${row}-${columnId}`;
@@ -111,7 +115,9 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
   }, [isEditing, value]);
 
   // Track the calculated textarea height
-  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(undefined);
+  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(
+    undefined,
+  );
 
   // Position editor and focus when editing starts
   useLayoutEffect(() => {
@@ -125,7 +131,10 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         const footerHeight = 28;
         const padding = 16;
         // Make textarea at least 80px, but expand to fit cell content
-        const calculatedHeight = Math.max(80, rect.height + padding - footerHeight);
+        const calculatedHeight = Math.max(
+          80,
+          rect.height + padding - footerHeight,
+        );
         setTextareaHeight(calculatedHeight);
         setEditorStyle({
           position: "fixed",
@@ -174,7 +183,7 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         // TODO: Move to next cell
       }
     },
-    [handleSave, handleCancel]
+    [handleSave, handleCancel],
   );
 
   const handleBlur = useCallback(() => {
@@ -219,7 +228,8 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
 
   useLayoutEffect(() => {
     if (contentRef.current && rowHeightMode === "compact" && !isCellExpanded) {
-      const isContentOverflowing = contentRef.current.scrollHeight > COMPACT_MAX_HEIGHT;
+      const isContentOverflowing =
+        contentRef.current.scrollHeight > COMPACT_MAX_HEIGHT;
       setIsOverflowing(isContentOverflowing);
     } else {
       setIsOverflowing(false);
@@ -234,10 +244,12 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
   }, [isCellExpanded]);
 
   // Determine if we should show clamped view
-  const showClamped = rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
+  const showClamped =
+    rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
 
   // Calculate the effective max height for expanded cells with custom height
-  const expandedMaxHeight = customHeight !== null ? `${customHeight}px` : undefined;
+  const expandedMaxHeight =
+    customHeight !== null ? `${customHeight}px` : undefined;
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
@@ -247,7 +259,7 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         toggleCellExpanded(row, columnId);
       }
     },
-    [toggleCellExpanded, row, columnId]
+    [toggleCellExpanded, row, columnId],
   );
 
   // Track if we started dragging from compact state and if we've expanded during drag
@@ -269,7 +281,8 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
       if (!isCellExpanded) {
         dragStartHeightRef.current = COMPACT_MAX_HEIGHT;
       } else if (contentRef.current) {
-        dragStartHeightRef.current = customHeight ?? contentRef.current.scrollHeight;
+        dragStartHeightRef.current =
+          customHeight ?? contentRef.current.scrollHeight;
       }
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -281,7 +294,10 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         }
 
         if (isDraggingRef.current) {
-          const newHeight = Math.max(COMPACT_MAX_HEIGHT, dragStartHeightRef.current + deltaY);
+          const newHeight = Math.max(
+            COMPACT_MAX_HEIGHT,
+            dragStartHeightRef.current + deltaY,
+          );
           currentHeightRef.current = newHeight;
           setCustomHeight(newHeight);
 
@@ -298,7 +314,11 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         document.removeEventListener("mouseup", handleMouseUp);
 
         // If dragged to minimum height, collapse the cell
-        if (isDraggingRef.current && currentHeightRef.current !== null && currentHeightRef.current <= COMPACT_MAX_HEIGHT) {
+        if (
+          isDraggingRef.current &&
+          currentHeightRef.current !== null &&
+          currentHeightRef.current <= COMPACT_MAX_HEIGHT
+        ) {
           // Collapse if we expanded during drag, or if we were already expanded
           if (expandedDuringDragRef.current || !startedFromCompactRef.current) {
             toggleCellExpanded(row, columnId);
@@ -316,7 +336,7 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [isCellExpanded, toggleCellExpanded, row, columnId, customHeight]
+    [isCellExpanded, toggleCellExpanded, row, columnId, customHeight],
   );
 
   return (
@@ -341,15 +361,22 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
           maxHeight={
             showClamped
               ? `${COMPACT_MAX_HEIGHT}px`
-              : rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight
+              : rowHeightMode === "compact" &&
+                  isCellExpanded &&
+                  expandedMaxHeight
                 ? expandedMaxHeight
                 : undefined
           }
-          overflow={showClamped || (rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight) ? "hidden" : undefined}
+          overflow={
+            showClamped ||
+            (rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight)
+              ? "hidden"
+              : undefined
+          }
         >
           {displayValue.text}
           {displayValue.truncated && (
-            <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+            <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
               (truncated)
             </Box>
           )}
@@ -367,42 +394,53 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
             onClick={handleExpandClick}
             className="cell-fade-overlay"
             css={{
-              background: "linear-gradient(to bottom, transparent, var(--cell-bg, white))",
+              background:
+                "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
+              "tr:hover &": {
+                background:
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
+              },
+              // Selected row takes priority over hover
+              "tr[data-selected='true'] &": {
+                background:
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
+              },
             }}
           />
         )}
 
         {/* Resize/collapse bar - shows on expanded cells OR on hover for compact cells with overflow */}
-        {rowHeightMode === "compact" && (isCellExpanded || (isHovered && isOverflowing)) && (
-          <Box
-            position="absolute"
-            bottom={"-8px"}
-            left={"-12px"}
-            right={"-12px"}
-            height="20px"
-            cursor="ns-resize"
-            onMouseDown={handleDragStart}
-            onClick={handleExpandClick}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            opacity={0.5}
-            transition="opacity 0.15s"
-            _hover={{ opacity: 1 }}
-            css={{
-              background: "var(--cell-bg, white)",
-            }}
-          >
+        {rowHeightMode === "compact" &&
+          (isCellExpanded || (isHovered && isOverflowing)) && (
             <Box
-              width="40px"
-              height="4px"
-              borderRadius="full"
-              bg="gray.300"
-              _hover={{ bg: "gray.400" }}
-              transition="background 0.15s"
-            />
-          </Box>
-        )}
+              position="absolute"
+              bottom={"-8px"}
+              left={"-12px"}
+              right={"-12px"}
+              height="20px"
+              cursor="ns-resize"
+              onMouseDown={handleDragStart}
+              onClick={handleExpandClick}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              opacity={0.5}
+              transition="opacity 0.15s"
+              _hover={{ opacity: 1 }}
+              css={{
+                background: "var(--cell-bg, var(--chakra-colors-bg-panel))",
+              }}
+            >
+              <Box
+                width="40px"
+                height="4px"
+                borderRadius="full"
+                bg="gray.muted"
+                _hover={{ bg: "gray.emphasized" }}
+                transition="background 0.15s"
+              />
+            </Box>
+          )}
       </Box>
 
       {/* Expanded editor (positioned over cell via portal) */}
@@ -410,9 +448,9 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         <Portal>
           <Box
             style={editorStyle}
-            bg="white"
+            bg="bg.panel"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-blue-500), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
             overflow="hidden"
           >
             <Textarea
@@ -433,10 +471,10 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
               paddingX={2}
               paddingY={1}
               fontSize="10px"
-              color="gray.500"
+              color="fg.muted"
               borderTop="1px solid"
-              borderColor="gray.100"
-              bg="gray.50"
+              borderColor="border.muted"
+              bg="bg.subtle"
             >
               Enter to save • Escape to cancel • Shift+Enter for newline
             </Box>

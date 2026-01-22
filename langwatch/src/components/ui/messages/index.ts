@@ -2,15 +2,14 @@
 // Used by prompt playground and HTTP agent test panel
 
 export {
-  MessageRoleLabel,
-  type MessageRoleLabelProps,
-  type MessageRole,
-} from "./MessageRoleLabel";
-
-export {
   AddMessageButton,
   type AddMessageButtonProps,
 } from "./AddMessageButton";
+export {
+  type MessageRole,
+  MessageRoleLabel,
+  type MessageRoleLabelProps,
+} from "./MessageRoleLabel";
 
 export {
   RemoveMessageButton,

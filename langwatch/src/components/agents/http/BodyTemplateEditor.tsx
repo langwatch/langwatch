@@ -6,7 +6,10 @@ import { Box, Code, Text, Textarea, VStack } from "@chakra-ui/react";
  */
 export const STANDARD_AGENT_VARIABLES = [
   { name: "input", description: "The user's input message to the agent" },
-  { name: "threadId", description: "Unique identifier for the conversation thread" },
+  {
+    name: "threadId",
+    description: "Unique identifier for the conversation thread",
+  },
   { name: "messages", description: "Array of chat messages in OpenAI format" },
 ] as const;
 
@@ -39,12 +42,17 @@ export function BodyTemplateEditor({
       />
       <Box
         padding={3}
-        bg="gray.50"
+        bg="bg.subtle"
         borderRadius="md"
         borderWidth="1px"
-        borderColor="gray.200"
+        borderColor="border"
       >
-        <Text fontSize="xs" fontWeight="medium" color="gray.600" marginBottom={2}>
+        <Text
+          fontSize="xs"
+          fontWeight="medium"
+          color="fg.muted"
+          marginBottom={2}
+        >
           Available Variables
         </Text>
         <VStack align="stretch" gap={1}>

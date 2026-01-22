@@ -5,13 +5,18 @@
  * Tests actual user behavior with react-testing-library.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DatasetTabs } from "../components/DatasetSection/DatasetTabs";
-import { DEFAULT_TEST_DATA_ID, type DatasetReference } from "../types";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { type DatasetReference, DEFAULT_TEST_DATA_ID } from "../types";
 
 // Mock callbacks
 const mockOnSelectExisting = vi.fn();
@@ -32,7 +37,7 @@ const renderDatasetTabs = () => {
       onEditDataset={mockOnEditDataset}
       onSaveAsDataset={mockOnSaveAsDataset}
     />,
-    { wrapper: Wrapper }
+    { wrapper: Wrapper },
   );
 };
 
@@ -43,7 +48,7 @@ const createInlineDataset = (
   columns = [
     { id: "input", name: "input", type: "string" as const },
     { id: "expected_output", name: "expected_output", type: "string" as const },
-  ]
+  ],
 ): DatasetReference => ({
   id,
   name,
@@ -113,13 +118,17 @@ describe("DatasetTabs user interactions", () => {
       renderDatasetTabs();
 
       // Verify Test Data is active
-      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(DEFAULT_TEST_DATA_ID);
+      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+        DEFAULT_TEST_DATA_ID,
+      );
 
       // Click the Production Samples tab (which should be inactive)
       await user.click(screen.getByText("Production Samples"));
 
       // Verify it switched
-      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe("production");
+      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+        "production",
+      );
     });
 
     it("does not show dropdown menu when clicking inactive tab", async () => {
@@ -135,7 +144,9 @@ describe("DatasetTabs user interactions", () => {
 
       // Should NOT show dropdown menu items
       expect(screen.queryByText("Save as dataset")).not.toBeInTheDocument();
-      expect(screen.queryByText("Remove from workbench")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Remove from workbench"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -145,7 +156,9 @@ describe("DatasetTabs user interactions", () => {
       renderDatasetTabs();
 
       // Click the active Test Data tab
-      await user.click(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`));
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
 
       // Should show dropdown menu
       await waitFor(() => {
@@ -157,7 +170,9 @@ describe("DatasetTabs user interactions", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`));
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Save as dataset")).toBeInTheDocument();
@@ -193,7 +208,9 @@ describe("DatasetTabs user interactions", () => {
 
       renderDatasetTabs();
 
-      await user.click(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`));
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Remove from workbench")).toBeInTheDocument();
@@ -204,13 +221,19 @@ describe("DatasetTabs user interactions", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`));
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
 
       await waitFor(() => {
         // Menu should open
         expect(screen.getByText("Save as dataset")).toBeInTheDocument();
-        // But no remove option
-        expect(screen.queryByText("Remove from workbench")).not.toBeInTheDocument();
+        // But remove from workbench option should be disabled
+        expect(
+          screen
+            .queryByText("Remove from workbench")
+            ?.closest('[role="menuitem"]'),
+        ).toHaveAttribute("aria-disabled", "true");
       });
     });
   });
@@ -221,7 +244,9 @@ describe("DatasetTabs user interactions", () => {
       renderDatasetTabs();
 
       // Open dropdown
-      await user.click(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`));
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
 
       // Click Save as dataset
       await waitFor(() => {
@@ -236,7 +261,7 @@ describe("DatasetTabs user interactions", () => {
           id: DEFAULT_TEST_DATA_ID,
           name: "Test Data",
           type: "inline",
-        })
+        }),
       );
     });
   });
@@ -341,7 +366,9 @@ describe("DatasetTabs user interactions", () => {
       const newDataset = state.datasets[1];
       expect(newDataset?.name).toBe("Dataset 2");
       expect(newDataset?.columns.map((c) => c.name)).toContain("input");
-      expect(newDataset?.columns.map((c) => c.name)).toContain("expected_output");
+      expect(newDataset?.columns.map((c) => c.name)).toContain(
+        "expected_output",
+      );
       expect(newDataset?.columns.map((c) => c.name)).toContain("context");
 
       // Should become active

@@ -47,7 +47,7 @@ export const ExecutionOutputPanel = ({
           fontSize="16px"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.600"
+          color="fg.muted"
           paddingBottom={4}
         >
           Outputs
@@ -84,14 +84,14 @@ const ExecutionMetadata = ({
   return (
     <HStack gap={3}>
       {executionState.cost !== undefined && (
-        <Text color="gray.500">
+        <Text color="fg.muted">
           {numeral(executionState.cost).format("$0.00[000]a")}
         </Text>
       )}
 
       {hasTiming && (
         <>
-          {executionState.cost !== undefined && <Text color="gray.400">·</Text>}
+          {executionState.cost !== undefined && <Text color="fg.subtle">·</Text>}
           <SpanDuration
             span={{
               error:
@@ -109,7 +109,7 @@ const ExecutionMetadata = ({
 
       {isTracingEnabled && executionState?.trace_id && (
         <>
-          <Text color="gray.400">·</Text>
+          <Text color="fg.subtle">·</Text>
           <Button
             size="sm"
             onClick={() => {
@@ -135,7 +135,7 @@ const renderExecutionContent = (
   nodeType?: string,
 ) => {
   if (!executionState) {
-    return <Text color="gray.500">Waiting for execution</Text>;
+    return <Text color="fg.muted">Waiting for execution</Text>;
   }
 
   return (
@@ -180,7 +180,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
         fontSize="13px"
         fontWeight="bold"
         textTransform="uppercase"
-        color="gray.600"
+        color="fg.muted"
       >
         Error
       </Text>
@@ -266,7 +266,7 @@ const OutputBox = ({ value, ...props }: { value: any } & BoxProps) => {
       borderRadius="6px"
       padding={4}
       borderWidth="1px"
-      borderColor="gray.300"
+      borderColor="border.emphasized"
       width="full"
       whiteSpace="pre-wrap"
       {...props}

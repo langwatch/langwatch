@@ -1,5 +1,12 @@
 import type { Protections } from "~/server/elasticsearch/protections";
-import type { Span, SpanInputOutput, SpanMetrics, Trace, TraceInput, TraceOutput } from "~/server/tracer/types";
+import type {
+  Span,
+  SpanInputOutput,
+  SpanMetrics,
+  Trace,
+  TraceInput,
+  TraceOutput,
+} from "~/server/tracer/types";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 
 /**
@@ -64,7 +71,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
         // Not valid Python repr either
       }
       return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction)
+        object.includes(redaction),
       ).length > 0
         ? ("[REDACTED]" as T)
         : object;
@@ -78,7 +85,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       Object.entries(object).map(([key, value]) => [
         key,
         redactObject(value, redactions),
-      ])
+      ]),
     ) as T;
   }
   return object;
@@ -91,9 +98,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
  * @returns Array of strings that should be redacted
  */
 export function extractRedactionsFromAllSpanInputs(spans: Span[]): string[] {
-  return spans.flatMap((span) =>
-    extractRedactionsForObject(span.input?.value)
-  );
+  return spans.flatMap((span) => extractRedactionsForObject(span.input?.value));
 }
 
 /**
@@ -104,7 +109,7 @@ export function extractRedactionsFromAllSpanInputs(spans: Span[]): string[] {
  */
 export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
   return spans.flatMap((span) =>
-    extractRedactionsForObject(span.output?.value)
+    extractRedactionsForObject(span.output?.value),
   );
 }
 
@@ -119,7 +124,7 @@ export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
 export function applySpanProtections(
   span: Span,
   protections: Protections,
-  redactions: Set<string>
+  redactions: Set<string>,
 ): Span {
   let transformedInput: SpanInputOutput | null | undefined = span.input;
   let transformedOutput: SpanInputOutput | null | undefined = span.output;
@@ -180,7 +185,7 @@ export function applySpanProtections(
  */
 export function applyTraceProtections(
   trace: Trace,
-  protections: Protections
+  protections: Protections,
 ): Trace {
   // Build redaction set from trace input/output if not visible
   let redactions = new Set<string>([
@@ -239,7 +244,7 @@ export function applyTraceProtections(
 
   // Apply protections to spans
   const transformedSpans = trace.spans?.map((span) =>
-    applySpanProtections(span, protections, redactions)
+    applySpanProtections(span, protections, redactions),
   );
 
   return {

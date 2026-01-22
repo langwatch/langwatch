@@ -7,7 +7,6 @@ import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
-import { LangWatch } from "@/client-sdk";
 
 interface AddOptions {
   version?: string;

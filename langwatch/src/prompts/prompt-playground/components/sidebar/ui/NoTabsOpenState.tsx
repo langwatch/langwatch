@@ -13,7 +13,7 @@ export function NoTabsOpenState() {
         <Spacer />
         <AddPromptButton />
       </HStack>
-      <Center width="full" height="full" bg="white">
+      <Center width="full" height="full" bg="bg.panel">
         <EmptyState.Root>
           <EmptyState.Content>
             <EmptyState.Indicator>

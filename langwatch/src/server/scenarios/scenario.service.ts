@@ -24,5 +24,3 @@ export class ScenarioService {
     return this.repository.update.bind(this.repository);
   }
 }
-
-

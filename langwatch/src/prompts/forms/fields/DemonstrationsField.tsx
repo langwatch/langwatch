@@ -73,7 +73,7 @@ function DemonstrationsLabel({
         <Text>
           Demonstrations{" "}
           {total !== undefined && total > 0 && (
-            <Text as="span" color="gray.400">
+            <Text as="span" color="fg.subtle">
               ({total} rows)
             </Text>
           )}

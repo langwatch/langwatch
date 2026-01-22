@@ -1,8 +1,8 @@
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
-import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
@@ -132,13 +132,12 @@ export function SyncedChatInput({
         position="relative"
         borderRadius="xl"
         border="1px solid"
-        borderColor="gray.300"
+        borderColor="border.emphasized"
         transition="box-shadow 0.2s"
-        bg="white"
+        bg="bg.panel"
         width="full"
         maxWidth="768px"
         margin="0 auto"
-        background="white"
       >
         <ChatTextArea
           borderRadius="xl"
@@ -157,15 +156,15 @@ export function SyncedChatInput({
         >
           {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
           {totalTabCount > 1 && (
-          <ChatSyncCheckbox
-            position="absolute"
-            left="50%"
-            bottom={2}
-            transform="translateX(-50%)"
-            checked={isSynced}
-            onChange={setIsSynced}
-            visible={isHovered}
-          />
+            <ChatSyncCheckbox
+              position="absolute"
+              left="50%"
+              bottom={2}
+              transform="translateX(-50%)"
+              checked={isSynced}
+              onChange={setIsSynced}
+              visible={isHovered}
+            />
           )}
 
           {/* Right icon - Send button */}

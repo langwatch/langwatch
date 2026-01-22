@@ -29,7 +29,7 @@ export function PulsingDot() {
           width="8px"
           height="8px"
           borderRadius="full"
-          bg="blue.300"
+          bg="blue.muted"
           style={{ animation: "evalRadar 1.5s ease-out infinite" }}
         />
         {/* Fixed center dot */}
@@ -39,10 +39,9 @@ export function PulsingDot() {
           width="6px"
           height="6px"
           borderRadius="full"
-          bg="blue.500"
+          bg="blue.solid"
         />
       </Box>
     </>
   );
 }
-

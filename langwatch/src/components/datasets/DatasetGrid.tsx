@@ -40,7 +40,7 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
 
 export const ImageCellRenderer = (props: { value: string | undefined }) => {
   if (!props.value) {
-    return <Text color="gray.500">No image</Text>;
+    return <Text color="fg.muted">No image</Text>;
   }
 
   // Check if it's a valid URL
@@ -97,7 +97,7 @@ export const ImageCellRenderer = (props: { value: string | undefined }) => {
       />
     );
   } else {
-    return <Text color="gray.500">Invalid image URL</Text>;
+    return <Text color="fg.muted">Invalid image URL</Text>;
   }
 };
 

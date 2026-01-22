@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildDefaultFormValues } from "../buildDefaultFormValues";
 
 describe("buildDefaultFormValues", () => {
@@ -26,7 +26,7 @@ describe("buildDefaultFormValues", () => {
     it("creates system message with default content", () => {
       const defaults = buildDefaultFormValues();
       const systemMessage = defaults.version.configData.messages.find(
-        (m) => m.role === "system"
+        (m) => m.role === "system",
       );
 
       expect(systemMessage).toBeDefined();
@@ -36,7 +36,7 @@ describe("buildDefaultFormValues", () => {
     it("creates user message with {{input}} variable", () => {
       const defaults = buildDefaultFormValues();
       const userMessage = defaults.version.configData.messages.find(
-        (m) => m.role === "user"
+        (m) => m.role === "user",
       );
 
       expect(userMessage).toBeDefined();
@@ -63,13 +63,13 @@ describe("buildDefaultFormValues", () => {
       });
 
       expect(defaults.version.configData.llm.model).toBe(
-        "anthropic/claude-sonnet-4-20250514"
+        "anthropic/claude-sonnet-4-20250514",
       );
       // Other defaults should be preserved
       expect(defaults.version.configData.inputs[0]?.identifier).toBe("input");
     });
 
-    it("preserves default temperature when only model is overridden", () => {
+    it("preserves default temperature as undefined when only model is overridden", () => {
       const defaults = buildDefaultFormValues({
         version: {
           configData: {
@@ -78,7 +78,8 @@ describe("buildDefaultFormValues", () => {
         },
       });
 
-      expect(defaults.version.configData.llm.temperature).toBe(1);
+      // Temperature is undefined by default since not all models support it
+      expect(defaults.version.configData.llm.temperature).toBeUndefined();
     });
 
     it("allows overriding handle", () => {
@@ -91,16 +92,18 @@ describe("buildDefaultFormValues", () => {
   });
 
   describe("llm configuration", () => {
-    it("sets temperature to 1 by default (for GPT-5 compatibility)", () => {
+    it("sets temperature to undefined by default (not all models support it)", () => {
       const defaults = buildDefaultFormValues();
 
-      expect(defaults.version.configData.llm.temperature).toBe(1);
+      // Temperature is undefined since reasoning models don't support it
+      // The UI applies model-appropriate defaults based on supportedParameters
+      expect(defaults.version.configData.llm.temperature).toBeUndefined();
     });
 
-    it("sets maxTokens to 1000 by default", () => {
+    it("sets maxTokens to 4096 by default", () => {
       const defaults = buildDefaultFormValues();
 
-      expect(defaults.version.configData.llm.maxTokens).toBe(1000);
+      expect(defaults.version.configData.llm.maxTokens).toBe(4096);
     });
   });
 });

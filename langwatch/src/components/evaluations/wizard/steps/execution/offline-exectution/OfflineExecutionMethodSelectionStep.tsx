@@ -35,8 +35,8 @@ export function OfflineExecutionMethodSelectionStep() {
   ]);
 
   const { executionMethod } = useEvaluationWizardStore(
-    useShallow(({ wizardState }) => ({
-      executionMethod: wizardState.executionMethod,
+    useShallow(({ workbenchState }) => ({
+      executionMethod: workbenchState.executionMethod,
     })),
   );
 

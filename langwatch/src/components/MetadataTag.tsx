@@ -75,7 +75,7 @@ export const MetadataTag = ({
     >
       <Text
         borderWidth={1}
-        borderColor="gray.200"
+        borderColor="border"
         paddingX={2}
         borderLeftRadius="md"
       >
@@ -84,10 +84,10 @@ export const MetadataTag = ({
       <HStack
         as={Text}
         borderWidth={1}
-        borderColor="gray.200"
+        borderColor="border"
         paddingX={2}
         borderLeft="none"
-        backgroundColor="gray.100"
+        backgroundColor="bg.muted"
         borderRightRadius="md"
         fontFamily="mono"
         gap={1}

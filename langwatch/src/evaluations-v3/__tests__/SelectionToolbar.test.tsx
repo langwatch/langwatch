@@ -15,9 +15,9 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { SelectionToolbar } from "../components/SelectionToolbar";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -69,6 +69,11 @@ vi.mock("~/utils/api", () => ({
       },
       prompts: {
         getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
+      evaluators: {
+        getById: {
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
@@ -157,7 +162,7 @@ describe("SelectionToolbar", () => {
           onDelete={mockOnDelete}
           onClear={mockOnClear}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("selection-count")).not.toBeInTheDocument();
@@ -175,10 +180,12 @@ describe("SelectionToolbar", () => {
           onDelete={mockOnDelete}
           onClear={mockOnClear}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
-      expect(screen.getByTestId("selection-count")).toHaveTextContent("3 selected");
+      expect(screen.getByTestId("selection-count")).toHaveTextContent(
+        "3 selected",
+      );
     });
 
     it("shows confirmation dialog when delete is clicked", async () => {
@@ -194,7 +201,7 @@ describe("SelectionToolbar", () => {
           onDelete={mockOnDelete}
           onClear={mockOnClear}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("selection-delete-btn"));
@@ -217,7 +224,7 @@ describe("SelectionToolbar", () => {
           onDelete={mockOnDelete}
           onClear={mockOnClear}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("selection-delete-btn"));
@@ -244,7 +251,7 @@ describe("SelectionToolbar", () => {
           onDelete={mockOnDelete}
           onClear={mockOnClear}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("selection-delete-btn"));
@@ -288,7 +295,9 @@ describe("Row deletion - inline dataset", () => {
 
       // Verify only row 1 remains (but now at index 0)
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.getCellValue("test-data", 0, "input")).toBe("row 1 input");
+      expect(updatedStore.getCellValue("test-data", 0, "input")).toBe(
+        "row 1 input",
+      );
       expect(updatedStore.getRowCount("test-data")).toBe(1);
     });
 
@@ -364,7 +373,7 @@ describe("Selected row visual indication", () => {
     store.setCellValue("test-data", 1, "input", "row 1");
     store.toggleRowSelection(0);
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       const rows = document.querySelectorAll("tbody tr");

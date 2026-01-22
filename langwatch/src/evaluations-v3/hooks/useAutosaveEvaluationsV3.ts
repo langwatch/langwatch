@@ -1,30 +1,38 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/router";
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { toaster } from "../../components/ui/toaster";
 import { captureException } from "../../utils/posthogErrorCapture";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
 const stringifiedInitialState = JSON.stringify(
-  extractPersistedState(createInitialState())
+  extractPersistedState(createInitialState()),
 );
 
 /**
  * Manages syncing the evaluations v3 state with the database.
- * Uses wizardState field in the Experiment model for persistence.
+ * Uses workbenchState field in the Experiment model for persistence.
+ *
+ * This hook expects the experiment to already exist - it only loads and saves.
+ * New experiments are created by the index page before redirecting here.
  */
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasLoadedExistingRef = useRef(false);
+  // Track which slug we've successfully loaded in THIS component instance
+  // This prevents re-loading on every render while allowing reload after navigation
+  const loadedSlugRef = useRef<string | null>(null);
 
   const {
     experimentId,
@@ -34,6 +42,9 @@ export const useAutosaveEvaluationsV3 = () => {
     activeDatasetId,
     evaluators,
     targets,
+    results,
+    hiddenColumns,
+    concurrency,
     setExperimentId,
     setExperimentSlug,
     setName,
@@ -48,12 +59,15 @@ export const useAutosaveEvaluationsV3 = () => {
       activeDatasetId: state.activeDatasetId,
       evaluators: state.evaluators,
       targets: state.targets,
+      results: state.results,
+      hiddenColumns: state.ui.hiddenColumns,
+      concurrency: state.ui.concurrency,
       setExperimentId: state.setExperimentId,
       setExperimentSlug: state.setExperimentSlug,
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
       loadState: state.loadState,
-    }))
+    })),
   );
 
   const persistedState = extractPersistedState({
@@ -64,20 +78,16 @@ export const useAutosaveEvaluationsV3 = () => {
     activeDatasetId,
     evaluators,
     targets,
-    results: {
-      status: "idle",
-      targetOutputs: {},
-      evaluatorResults: {},
-      errors: {},
-    },
+    results,
     pendingSavedChanges: {},
     ui: {
       selectedRows: new Set(),
       columnWidths: {},
       rowHeightMode: "compact",
       expandedCells: new Set(),
-      hiddenColumns: new Set(),
+      hiddenColumns,
       autosaveStatus: { evaluation: "idle", dataset: "idle" },
+      concurrency,
     },
   });
 
@@ -87,8 +97,25 @@ export const useAutosaveEvaluationsV3 = () => {
 
   const routerSlug = router.query.slug as string | undefined;
 
-  // Only try to load existing experiment if we don't already have an experimentId loaded
-  const shouldLoadExisting = !!project && !!routerSlug && !experimentId && !hasLoadedExistingRef.current;
+  // Detect if the store was reset while component stayed mounted
+  // This happens when user navigates away and back - reset() is called but component might not remount
+  // If we previously loaded this slug but experimentSlug is now different (or undefined), reset the ref
+  if (loadedSlugRef.current === routerSlug && experimentSlug !== routerSlug) {
+    loadedSlugRef.current = null;
+  }
+
+  // Determine if we need to load the experiment from the database.
+  // We should load if:
+  // 1. We have a project and a slug in the URL
+  // 2. The store's experimentSlug doesn't match the URL slug
+  //    (this means either: new page, store was reset, or navigated to different experiment)
+  // 3. We haven't already loaded this slug in this component instance
+  //    (prevents duplicate loads during the same mount)
+  const shouldLoadExisting =
+    !!project &&
+    !!routerSlug &&
+    experimentSlug !== routerSlug &&
+    loadedSlugRef.current !== routerSlug;
 
   // Load existing experiment if navigating to one
   const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
@@ -96,49 +123,47 @@ export const useAutosaveEvaluationsV3 = () => {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
     },
-    { enabled: shouldLoadExisting }
+    { enabled: shouldLoadExisting },
   );
 
-  // Update URL when experiment slug changes
+  // Update URL when experiment slug changes (for URL sync after save)
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
       void router.replace(
         `/${project.slug}/evaluations/v3/${experimentSlug}`,
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
 
-  // Load existing experiment data into store OR set slug from URL for new experiments
+  // Load existing experiment data into store
   useEffect(() => {
-    if (existingExperiment.data && !hasLoadedExistingRef.current) {
-      hasLoadedExistingRef.current = true;
+    if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
+      // Mark this slug as loaded BEFORE updating store to prevent race conditions
+      loadedSlugRef.current = routerSlug ?? null;
 
       // Set experiment ID and slug first
       setExperimentId(existingExperiment.data.id);
       setExperimentSlug(existingExperiment.data.slug);
 
       // Load the full wizard state if available
-      if (existingExperiment.data.wizardState && loadState) {
-        loadState(existingExperiment.data.wizardState);
+      if (existingExperiment.data.workbenchState && loadState) {
+        loadState(existingExperiment.data.workbenchState);
       }
-    } else if (
-      !existingExperiment.isLoading &&
-      !existingExperiment.data &&
-      routerSlug &&
-      !hasLoadedExistingRef.current &&
-      !experimentSlug
-    ) {
-      // No existing experiment found - this is a new one
-      // Set the slug from the URL so it's included in the first save
-      hasLoadedExistingRef.current = true;
-      setExperimentSlug(routerSlug);
     }
-  }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
+  }, [
+    existingExperiment.data,
+    routerSlug,
+    setExperimentId,
+    setExperimentSlug,
+    loadState,
+  ]);
 
-  // Clear timeouts on unmount
+  // Clear timeouts and invalidate query cache on unmount
+  // Invalidating the cache ensures that when user navigates back,
+  // fresh data is fetched from DB instead of returning stale cached data
   useEffect(() => {
     return () => {
       if (savedTimeoutRef.current) {
@@ -147,8 +172,26 @@ export const useAutosaveEvaluationsV3 = () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
+      // Invalidate the query cache for this experiment so that when
+      // user navigates back, it fetches fresh data instead of stale cache
+      if (routerSlug) {
+        // Use a predicate to match the query key pattern for tRPC queries
+        // tRPC query keys are arrays like [["experiments", "getEvaluationsV3BySlug"], { input: {...}, type: "query" }]
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = query.queryKey;
+            if (!Array.isArray(key) || key.length < 2) return false;
+            const [path] = key;
+            if (!Array.isArray(path)) return false;
+            return (
+              path[0] === "experiments" &&
+              path[1] === "getEvaluationsV3BySlug"
+            );
+          },
+        });
+      }
     };
-  }, []);
+  }, [queryClient, routerSlug]);
 
   // Transition to "saved" then back to "idle" after delay
   const markSaved = useCallback(() => {
@@ -164,14 +207,17 @@ export const useAutosaveEvaluationsV3 = () => {
   // Autosave effect with debounce
   useEffect(() => {
     if (!project) return;
-    // Only wait if we're actually trying to load an existing experiment
-    if (shouldLoadExisting && existingExperiment.isLoading) return;
     // Don't save while we're loading an existing experiment
     if (existingExperiment.isLoading) return;
+    // CRITICAL: Don't save if we should be loading (store doesn't match URL)
+    // This prevents saving blank/stale data when navigating back
+    if (shouldLoadExisting) return;
+    // Don't save if we don't have an experiment ID yet (experiment must exist first)
+    if (!experimentId) return;
     if (!name) return;
 
-    // Only save if we have an existing experiment OR there are actual changes from initial state
-    if (!experimentId && stringifiedState === stringifiedInitialState) {
+    // Only save if there are actual changes from initial state
+    if (stringifiedState === stringifiedInitialState) {
       return;
     }
 
@@ -191,7 +237,9 @@ export const useAutosaveEvaluationsV3 = () => {
             experimentId: experimentId,
             // Cast to any since the actual types are more complex than the schema
             // The schema is designed to be lenient for storage
-            state: persistedState as Parameters<typeof saveExperiment.mutateAsync>[0]["state"],
+            state: persistedState as Parameters<
+              typeof saveExperiment.mutateAsync
+            >[0]["state"],
           });
 
           setExperimentId(updatedExperiment.id);
@@ -202,7 +250,11 @@ export const useAutosaveEvaluationsV3 = () => {
           markSaved();
         } catch (error) {
           console.error("Failed to autosave evaluations v3:", error);
-          setAutosaveStatus("evaluation", "error", error instanceof Error ? error.message : "Unknown error");
+          setAutosaveStatus(
+            "evaluation",
+            "error",
+            error instanceof Error ? error.message : "Unknown error",
+          );
           toaster.create({
             title: "Failed to autosave evaluation",
             type: "error",
@@ -228,11 +280,31 @@ export const useAutosaveEvaluationsV3 = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
+  }, [
+    stringifiedState,
+    project?.id,
+    shouldLoadExisting,
+    experimentId,
+    existingExperiment.isLoading,
+  ]);
+
+  // Determine if experiment was truly not found
+  // Check if the error is a NOT_FOUND error (using multiple checks for robustness)
+  const isNotFoundError =
+    isTrpcNotFound(existingExperiment.error) ||
+    existingExperiment.error?.data?.code === "NOT_FOUND" ||
+    existingExperiment.error?.data?.httpStatus === 404;
+
+  // isNotFound: query completed with error AND that error is NOT_FOUND
+  const isNotFound = existingExperiment.isError && isNotFoundError;
 
   return {
     isLoading: existingExperiment.isLoading,
     isSaving: saveExperiment.isPending,
     existingExperiment: existingExperiment.data,
+    isNotFound,
+    // Only show isError for non-NOT_FOUND errors (e.g., permission denied)
+    isError: existingExperiment.isError && !isNotFoundError,
+    error: existingExperiment.error,
   };
 };

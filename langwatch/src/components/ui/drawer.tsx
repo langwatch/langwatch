@@ -21,7 +21,7 @@ export const DrawerContent = React.forwardRef<
           ref={ref}
           margin={2}
           borderRadius="lg"
-          background="white/75"
+          background="bg.surface/75"
           backdropFilter="blur(8px)"
           pointerEvents="auto"
           {...rest}
@@ -52,12 +52,7 @@ export const DrawerCloseTrigger = React.forwardRef<
 });
 
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
-  return (
-    <ChakraDrawer.Root
-      {...props}
-      preventScroll={false}
-    />
-  );
+  return <ChakraDrawer.Root {...props} preventScroll={false} />;
 };
 
 export const DrawerTrigger = ChakraDrawer.Trigger;

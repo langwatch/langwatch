@@ -1,4 +1,4 @@
-import { PromptsApiService, type SyncResult } from "./prompts-api.service";
+import { PromptsApiService } from "./prompts-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
 import { FetchPolicy } from "./types";

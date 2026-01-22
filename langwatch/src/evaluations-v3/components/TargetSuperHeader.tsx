@@ -26,16 +26,16 @@ export function TargetSuperHeader({
   const addButtonText = hasComparison ? "Add Comparison" : "Add";
 
   return (
-    <SuperHeader colSpan={colSpan} color="green.400" icon={<LLMIcon />}>
+    <SuperHeader colSpan={colSpan} color="green.solid" icon={<LLMIcon />}>
       {isLoading ? (
         <>
-          <Text fontWeight="semibold" fontSize="sm" color="gray.700">
+          <Text fontWeight="semibold" fontSize="sm" color="fg">
             Prompts or Agents
           </Text>
           <Skeleton height="20px" width="150px" />
         </>
       ) : (
-        <Text fontWeight="semibold" fontSize="sm" color="gray.700">
+        <Text fontWeight="semibold" fontSize="sm" color="fg">
           Prompts or Agents
         </Text>
       )}
@@ -44,8 +44,8 @@ export function TargetSuperHeader({
           size="xs"
           variant="ghost"
           onClick={onAddClick}
-          color="gray.500"
-          _hover={{ color: "gray.700" }}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
         >
           <Plus size={12} />
           {addButtonText}
@@ -55,4 +55,3 @@ export function TargetSuperHeader({
     </SuperHeader>
   );
 }
-

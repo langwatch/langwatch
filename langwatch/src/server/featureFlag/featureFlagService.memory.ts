@@ -1,5 +1,5 @@
-import { createLogger } from "~/utils/logger";
 import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "~/utils/logger";
 import type { FeatureFlagServiceInterface } from "./types";
 
 /**
@@ -7,10 +7,10 @@ import type { FeatureFlagServiceInterface } from "./types";
  */
 export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
   private readonly logger = createLogger(
-    "langwatch:memory-feature-flag-service"
+    "langwatch:memory-feature-flag-service",
   );
   private readonly tracer = getLangWatchTracer(
-    "langwatch.memory-feature-flag-service"
+    "langwatch.memory-feature-flag-service",
   );
 
   // In-memory feature flags storage
@@ -33,7 +33,7 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
   async isEnabled(
     flagKey: string,
     distinctId: string,
-    defaultValue: boolean = true
+    defaultValue = true,
   ): Promise<boolean> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServiceMemory.isEnabled",
@@ -49,7 +49,7 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
         span.setAttribute("feature.flag.source", "memory");
         span.setAttribute("feature.flag.enabled", isEnabled);
         return isEnabled;
-      }
+      },
     );
   }
 
@@ -59,7 +59,7 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
   async getMultiple(
     flagKeys: string[],
     distinctId: string,
-    defaults: Record<string, boolean> = {}
+    defaults: Record<string, boolean> = {},
   ): Promise<Record<string, boolean>> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServiceMemory.getMultiple",
@@ -79,10 +79,10 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
 
         span.setAttribute(
           "feature.flag.results_count",
-          Object.keys(results).length
+          Object.keys(results).length,
         );
         return results;
-      }
+      },
     );
   }
 

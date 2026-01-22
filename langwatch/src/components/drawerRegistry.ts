@@ -11,32 +11,33 @@ import type { ComponentProps } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
-import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
+import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
+import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
+import { AgentListDrawer } from "./agents/AgentListDrawer";
+import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
+import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
+import { AlertDrawer } from "./analytics/AlertDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
+import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
+import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
+import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
+import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
+import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
+import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
+import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { AlertDrawer } from "./analytics/AlertDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
-import { PromptListDrawer } from "./prompts/PromptListDrawer";
-import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
-import { AgentListDrawer } from "./agents/AgentListDrawer";
-import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
-import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
-import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
-import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
-import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
-import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
-import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
-import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
-import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 
 /**
  * Map of drawer names to their React components.
@@ -74,6 +75,8 @@ export const drawers = {
   workflowSelectorForEvaluator: WorkflowSelectorDrawer,
   // Scenarios
   scenarioEditor: ScenarioFormDrawer,
+  // Project management
+  createProject: CreateProjectDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

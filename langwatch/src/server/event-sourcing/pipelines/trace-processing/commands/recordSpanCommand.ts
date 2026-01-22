@@ -9,12 +9,12 @@ import {
 } from "../../../library";
 import type { RecordSpanCommandData } from "../schemas/commands";
 import { recordSpanCommandDataSchema } from "../schemas/commands";
-import type { SpanReceivedEvent } from "../schemas/events";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
+import type { SpanReceivedEvent } from "../schemas/events";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**

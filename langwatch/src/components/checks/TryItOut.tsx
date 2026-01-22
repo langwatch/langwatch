@@ -249,7 +249,7 @@ export function TryItOut({
         <Spacer />
         <InputGroup
           maxWidth="350px"
-          borderColor="gray.300"
+          borderColor="border.emphasized"
           startElement={<Search color={gray400} width={16} />}
         >
           <Input

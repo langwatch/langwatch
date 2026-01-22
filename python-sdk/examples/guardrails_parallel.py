@@ -8,8 +8,8 @@ from openai import AsyncOpenAI
 
 client = AsyncOpenAI()
 
-import langwatch.openai
-import langwatch.guardrails
+import langwatch
+import langwatch.evaluation
 
 
 @cl.on_message
@@ -24,14 +24,19 @@ async def main(message: cl.Message):
         content="",
     )
 
+    # New API: Use langwatch.evaluation.async_evaluate() for parallel guardrails
     jailbreak_guardrail = asyncio.create_task(
-        langwatch.get_current_span().async_evaluate(
-            "jailbreak-detection", as_guardrail=True, input=message.content
+        langwatch.evaluation.async_evaluate(
+            "jailbreak-detection",
+            data={"input": message.content},
+            as_guardrail=True,
         )
     )
     off_topic_guardrail = asyncio.create_task(
-        langwatch.get_current_span().async_evaluate(
-            "off-topic-evaluator", as_guardrail=True, input=message.content
+        langwatch.evaluation.async_evaluate(
+            "off-topic-evaluator",
+            data={"input": message.content},
+            as_guardrail=True,
         )
     )
 
@@ -39,14 +44,14 @@ async def main(message: cl.Message):
         if jailbreak_guardrail.done():
             result = await jailbreak_guardrail
             if not result.passed:
-                await msg.stream_token(f"I'm sorry, I can't help you with that.")
+                await msg.stream_token("I'm sorry, I can't help you with that.")
                 await msg.update()
                 return True
 
         if off_topic_guardrail.done():
             result = await off_topic_guardrail
             if not result.passed:
-                await msg.stream_token(f"I'm sorry, I can't help you with that.")
+                await msg.stream_token("I'm sorry, I can't help you with that.")
                 await msg.update()
                 return True
 

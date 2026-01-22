@@ -26,9 +26,9 @@ export const SetRunHistorySidebarComponent = (
 
   return (
     <Box
-      bg={useColorModeValue("white", "gray.900")}
+      bg="bg.panel"
       borderRight="1px"
-      borderColor={useColorModeValue("gray.200", "gray.700")}
+      borderColor="border"
       w="full"
       overflowY="auto"
       h="100%"
@@ -38,7 +38,7 @@ export const SetRunHistorySidebarComponent = (
         fontWeight="bold"
         p={4}
         borderBottom="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
       >
         History
       </Text>
@@ -51,7 +51,7 @@ export const SetRunHistorySidebarComponent = (
               p={3}
               borderRadius="md"
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
               w="100%"
             >
               <VStack align="start" gap={2} w="100%">
@@ -101,12 +101,12 @@ export const SetRunHistorySidebarComponent = (
       )}
 
       {/* Pagination Info */}
-      <Box p={4} borderBottom="1px solid" borderColor="gray.200">
+      <Box p={4} borderBottom="1px solid" borderColor="border">
         <HStack justify="space-between" align="center">
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="fg.muted">
             {pagination.totalCount} total runs
           </Text>
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="fg.muted">
             Page {pagination.page} of {Math.max(1, pagination.totalPages)}
           </Text>
         </HStack>
@@ -114,7 +114,7 @@ export const SetRunHistorySidebarComponent = (
 
       {/* Pagination Controls */}
       {pagination.totalPages > 1 && (
-        <Box p={4} borderTop="1px solid" borderColor="gray.200">
+        <Box p={4} borderTop="1px solid" borderColor="border">
           <HStack justify="space-between" align="center">
             <Button
               size="sm"
@@ -126,7 +126,7 @@ export const SetRunHistorySidebarComponent = (
               Previous
             </Button>
 
-            <Text fontSize="sm" color="gray.600">
+            <Text fontSize="sm" color="fg.muted">
               {pagination.page} of {pagination.totalPages}
             </Text>
 

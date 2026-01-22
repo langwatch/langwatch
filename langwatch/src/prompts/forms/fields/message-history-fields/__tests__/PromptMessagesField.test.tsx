@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
-import React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import React from "react";
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptMessagesField } from "../PromptMessagesField";
 
@@ -45,13 +46,18 @@ const switchEditingMode = async (
     await user.click(menuItem);
     // Wait for menu to close and state to update
     await waitFor(() => {
-      expect(screen.queryByTestId(`editing-mode-${targetMode}`)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId(`editing-mode-${targetMode}`),
+      ).not.toBeInTheDocument();
     });
   }
 };
 
 type WrapperProps = {
-  defaultMessages?: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  defaultMessages?: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
 };
 
 // Wrapper component that provides form context
@@ -62,7 +68,7 @@ function TestWrapper({ defaultMessages }: WrapperProps) {
       scope: "PROJECT",
       version: {
         configData: {
-          llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+          llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
           messages: defaultMessages ?? [
             { role: "system", content: "You are a helpful assistant." },
             { role: "user", content: "{{input}}" },
@@ -100,7 +106,10 @@ function TestWrapper({ defaultMessages }: WrapperProps) {
 function TestWrapperWithDelayedReset({
   messagesAfterReset,
 }: {
-  messagesAfterReset: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  messagesAfterReset: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
 }) {
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
@@ -108,7 +117,7 @@ function TestWrapperWithDelayedReset({
       scope: "PROJECT",
       version: {
         configData: {
-          llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+          llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
           // Start with default messages (system + user with {{input}}) -> defaults to Prompt mode
           messages: [
             { role: "system", content: "You are a helpful assistant." },
@@ -134,7 +143,7 @@ function TestWrapperWithDelayedReset({
         scope: "PROJECT",
         version: {
           configData: {
-            llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+            llm: { model: "test-model", temperature: 1, maxTokens: 4096 },
             messages: messagesAfterReset,
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

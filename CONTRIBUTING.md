@@ -32,6 +32,15 @@ Please note, all contributions should start with an issue first.
 
 Go to the [issues](https://github.com/langwatch/langwatch/issues) tab to report any bug or suggest features.
 
+### Design Guidelines
+
+Before implementing UI features, please review our [Design Guidelines](./docs/design/README.md). These guidelines ensure consistency across the LangWatch platform and include:
+
+- Rounded corners and translucent overlay standards
+- Component preferences (Drawer vs Dialog)
+- Page layout patterns
+- Code examples for common patterns
+
 ### Pull Requests
 
 The process described here has several goals:

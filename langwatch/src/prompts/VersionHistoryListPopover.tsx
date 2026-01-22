@@ -5,9 +5,9 @@ import {
   Button,
   HStack,
   Separator,
+  Spacer,
   Tag,
   Text,
-  Spacer,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
@@ -49,13 +49,13 @@ const VersionNumberBox = ({
 } & BoxProps) => {
   return (
     <Box
-      backgroundColor="orange.100"
+      backgroundColor="orange.subtle"
       paddingY={3}
       paddingX={2}
       borderRadius="lg"
       fontWeight={600}
       fontSize="13px"
-      color="gray.600"
+      color="fg.muted"
       whiteSpace="nowrap"
       textAlign="center"
       minWidth="0px"
@@ -125,7 +125,7 @@ function VersionHistoryItem({
           <HStack fontSize="12px">
             <Avatar.Root
               size="2xs"
-              backgroundColor="orange.400"
+              backgroundColor="orange.solid"
               color="white"
               width="16px"
               height="16px"
@@ -219,7 +219,7 @@ function VersionHistoryTrigger({
     <Popover.Trigger asChild onClick={onClick}>
       <Button
         variant="ghost"
-        color="gray.500"
+        color="fg.muted"
         minWidth={0}
         data-testid="version-history-button"
       >

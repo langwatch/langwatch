@@ -41,7 +41,7 @@ import { RenderInputOutput } from "./RenderInputOutput";
 export function SpanDetails({ span }: { project: Project; span: Span }) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
-      <Text as="span" color="gray.400" borderBottom="1px dotted">
+      <Text as="span" color="fg.subtle" borderBottom="1px dotted">
         {" (estimated)"}
       </Text>
     </Tooltip>
@@ -68,7 +68,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         </Heading>
         <Spacer />
       </HStack>
-      <VStack align="start" color="gray.500" width="full">
+      <VStack align="start" color="fg.muted" width="full">
         <HStack width="full" justifyContent="space-between">
           <Text>
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
@@ -152,7 +152,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
-            color="gray.400"
+            color="fg.subtle"
             textTransform="uppercase"
             fontWeight="bold"
           >
@@ -163,10 +163,10 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             borderRadius="6px"
             padding={4}
             borderWidth="1px"
-            borderColor="gray.300"
+            borderColor="border.emphasized"
             width="full"
             whiteSpace="pre-wrap"
-            background="white/75"
+            background="bg.panel/75"
           >
             <RenderInputOutput
               value={JSON.stringify(
@@ -189,7 +189,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
-            color="gray.400"
+            color="fg.subtle"
             textTransform="uppercase"
             fontWeight="bold"
           >
@@ -200,7 +200,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             borderRadius="6px"
             padding={4}
             borderWidth="1px"
-            borderColor="gray.300"
+            borderColor="border.emphasized"
             width="full"
             whiteSpace="pre-wrap"
           >
@@ -214,7 +214,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
-            color="gray.400"
+            color="fg.subtle"
             textTransform="uppercase"
             fontWeight="bold"
           >
@@ -225,7 +225,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             borderRadius="6px"
             padding={4}
             borderWidth="1px"
-            borderColor="gray.300"
+            borderColor="border.emphasized"
             width="full"
             whiteSpace="pre-wrap"
           >
@@ -254,7 +254,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
-            color="red.400"
+            color="red.fg"
             textTransform="uppercase"
             fontWeight="bold"
           >
@@ -265,10 +265,11 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             borderRadius="6px"
             padding={4}
             borderWidth="1px"
-            borderColor="gray.300"
+            borderColor="red.emphasized"
+            backgroundColor="red.subtle"
             width="full"
             whiteSpace="pre-wrap"
-            color="red.900"
+            color="fg"
           >
             {span.error.message}
             {span.error.stacktrace && (
@@ -286,7 +287,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
           <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
             <Box
               fontSize="13px"
-              color="gray.400"
+              color="fg.subtle"
               textTransform="uppercase"
               fontWeight="bold"
             >
@@ -299,7 +300,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
                 borderRadius="6px"
                 padding={4}
                 borderWidth="1px"
-                borderColor="gray.300"
+                borderColor="border.emphasized"
                 width="full"
                 whiteSpace="pre-wrap"
               >

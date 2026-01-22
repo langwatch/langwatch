@@ -28,7 +28,8 @@ export function buildProjectionTimelines({
     const steps: ProjectionTimelineTypes["Step"][] = [];
 
     // Get the expected aggregate type for this projection's pipeline
-    const expectedAggregateType = pipelineAggregateTypes[projection.pipelineName];
+    const expectedAggregateType =
+      pipelineAggregateTypes[projection.pipelineName];
 
     let lastState: ProjectionTimelineTypes["Snapshot"][] = [];
 
@@ -58,11 +59,18 @@ export function buildProjectionTimelines({
               if (value instanceof Promise) {
                 // For async, we can't await here, so return a placeholder
                 // In practice, projection handlers should be synchronous for deja-view
-                throw new Error("Async projection handlers are not supported in deja-view");
+                throw new Error(
+                  "Async projection handlers are not supported in deja-view",
+                );
               }
 
               // TypeScript narrowing: value is now definitely not a Promise
-              const projection = value as { aggregateId: string; tenantId: string; version: string; data: unknown };
+              const projection = value as {
+                aggregateId: string;
+                tenantId: string;
+                version: string;
+                data: unknown;
+              };
 
               return {
                 aggregateId: projection.aggregateId,
@@ -100,4 +108,3 @@ export function buildProjectionTimelines({
     };
   });
 }
-

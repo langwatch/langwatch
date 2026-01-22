@@ -40,7 +40,7 @@ export async function discoverPipelines(): Promise<DiscoveredPipeline[]> {
       const moduleExports = await importPipeline(file);
 
       // Look for exported static pipeline definition
-      for (const [exportName, exported] of Object.entries(moduleExports)) {
+      for (const [_exportName, exported] of Object.entries(moduleExports)) {
         if (isStaticPipelineDefinition(exported)) {
           results.push({
             name: exported.metadata.name,
@@ -89,7 +89,9 @@ function isStaticPipelineDefinition(
 /**
  * Imports a pipeline module, handling both .ts and .js extensions.
  */
-async function importPipeline(modulePath: string): Promise<Record<string, unknown>> {
+async function importPipeline(
+  modulePath: string,
+): Promise<Record<string, unknown>> {
   const url = pathToFileURL(modulePath).href;
   try {
     return await import(url);
@@ -105,8 +107,3 @@ async function importPipeline(modulePath: string): Promise<Record<string, unknow
     throw error;
   }
 }
-
-
-
-
-

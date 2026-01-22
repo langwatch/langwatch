@@ -1,8 +1,8 @@
-import { z } from "zod";
 import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import { z } from "zod";
 
 export const longBitsSchema = z.object({
   low: z.number(),
@@ -38,7 +38,8 @@ export const bytesSchema = z.instanceof(Uint8Array);
 
 export const idSchema = z.union([
   z.string(),
-  bytesSchema,
+  // Transform Uint8Array to hex string for JSON serialization safety
+  bytesSchema.transform((bytes) => Buffer.from(bytes).toString("hex")),
   // This is needed, because JSON.stringify converts Uint8Array to an object, lol.
   z
     .record(z.string(), z.number())
@@ -107,7 +108,18 @@ const STATUS_CODE_SET = {
   2: true,
 } as const satisfies Record<EStatusCode, true>;
 
-export const eSpanKindSchema = z.nativeEnum(ESpanKind);
+// OTLP span kind can be either numeric (from binary format) or string (from JSON format)
+export const eSpanKindSchema = z.union([
+  z.nativeEnum(ESpanKind),
+  z.enum([
+    "SPAN_KIND_UNSPECIFIED",
+    "SPAN_KIND_INTERNAL",
+    "SPAN_KIND_SERVER",
+    "SPAN_KIND_CLIENT",
+    "SPAN_KIND_PRODUCER",
+    "SPAN_KIND_CONSUMER",
+  ]),
+]);
 
 export const eStatusCodeSchema = z
   .number()
@@ -150,13 +162,13 @@ export const spanSchema = z.object({
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
   attributes: z.array(keyValueSchema),
-  events: z.array(eventSchema),
-  links: z.array(linkSchema),
+  events: z.array(eventSchema).optional().default([]),
+  links: z.array(linkSchema).optional().default([]),
   status: statusSchema,
   flags: z.number().optional().nullable(),
-  droppedAttributesCount: z.number().nullable(),
-  droppedEventsCount: z.number().nullable(),
-  droppedLinksCount: z.number().nullable(),
+  droppedAttributesCount: z.number().optional().nullable().default(0),
+  droppedEventsCount: z.number().optional().nullable().default(0),
+  droppedLinksCount: z.number().optional().nullable().default(0),
 });
 
 /**

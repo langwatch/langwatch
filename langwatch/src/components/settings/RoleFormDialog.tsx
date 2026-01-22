@@ -87,11 +87,7 @@ export function RoleFormDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content
-        maxWidth="900px"
-        maxHeight="90vh"
-        overflowY="auto"
-      >
+      <Dialog.Content maxWidth="900px" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
@@ -132,7 +128,7 @@ export function RoleFormDialog({
 
               <VStack align="start" width="full" gap={4}>
                 <Heading size="sm">Permissions</Heading>
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color="fg.muted">
                   Select the permissions this role should have
                 </Text>
 

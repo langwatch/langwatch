@@ -32,7 +32,7 @@ export function ConfigPanel({
       top={0}
       bottom={0}
       width={width}
-      bg="rgba(240, 230, 235, 0.25)"
+      bg="bg.panel/85"
       backdropFilter="blur(8px)"
       transform={isOpen ? "translateX(0)" : "translateX(100%)"}
       transition="transform 0.25s ease-out"
@@ -40,20 +40,27 @@ export function ConfigPanel({
       display="flex"
       flexDirection="column"
       overflow="hidden"
-      borderLeft="1px solid rgba(0, 0, 0, 0.1)"
+      borderLeft="1px solid"
+      borderColor="border.muted"
     >
       {/* Header */}
       <HStack
         paddingX={4}
         paddingY={2}
-        borderBottom="1px solid rgba(0, 0, 0, 0.1)"
+        borderBottom="1px solid"
+        borderColor="border.muted"
         flexShrink={0}
       >
         <Heading size="sm" fontWeight="semibold">
           {title}
         </Heading>
         <Spacer />
-        <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
+        <IconButton
+          aria-label="Close"
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+        >
           <LuX size={18} />
         </IconButton>
       </HStack>

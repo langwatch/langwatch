@@ -11,6 +11,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Span, SpanTypes } from "../../server/tracer/types";
 import { api } from "../../utils/api";
+import { useColorMode } from "../ui/color-mode";
 import { Select } from "../ui/select";
 
 // Invisible UTF-8 character for clean return messages
@@ -370,7 +371,13 @@ export const generateMermaidSyntax = (
  * Mermaid Sequence Diagram Renderer
  * Single Responsibility: Render Mermaid sequence diagram from syntax
  */
-const MermaidRenderer = ({ syntax }: { syntax: string }) => {
+const MermaidRenderer = ({
+  syntax,
+  colorMode,
+}: {
+  syntax: string;
+  colorMode: "light" | "dark";
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -382,36 +389,60 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
         // Dynamic import to avoid SSR issues
         const mermaid = (await import("mermaid")).default;
 
+        // Theme variables for light and dark modes
+        const lightTheme = {
+          primaryColor: "#F7FAFC",
+          primaryTextColor: "#1A202C",
+          primaryBorderColor: "#E2E8F0",
+          lineColor: "#4A5568",
+          secondaryColor: "#F7FAFC",
+          tertiaryColor: "#EDF2F7",
+          actorBkg: "#F7FAFC",
+          actorBorder: "#D2D8E0",
+          actorTextColor: "#2D3748",
+          participantBkg: "#F7FAFC",
+          participantBorder: "#E2E8F0",
+          participantTextColor: "#2D3748",
+          labelTextColor: "#2D3748",
+          labelBoxBkgColor: "#FFFFFF",
+          labelBoxBorderColor: "#E2E8F0",
+          signalColor: "#2D3748",
+          signalTextColor: "#2D3748",
+          activationBkgColor: "#DBEAFE",
+          activationBorderColor: "#60A5FA",
+        };
+
+        const darkTheme = {
+          primaryColor: "#27272a",
+          primaryTextColor: "#fafafa",
+          primaryBorderColor: "#3f3f46",
+          lineColor: "#a1a1aa",
+          secondaryColor: "#27272a",
+          tertiaryColor: "#18181b",
+          actorBkg: "#27272a",
+          actorBorder: "#3f3f46",
+          actorTextColor: "#fafafa",
+          participantBkg: "#27272a",
+          participantBorder: "#3f3f46",
+          participantTextColor: "#fafafa",
+          labelTextColor: "#fafafa",
+          labelBoxBkgColor: "#18181b",
+          labelBoxBorderColor: "#3f3f46",
+          signalColor: "#fafafa",
+          signalTextColor: "#fafafa",
+          activationBkgColor: "#1e3a5f",
+          activationBorderColor: "#3b82f6",
+        };
+
+        const themeVariables =
+          colorMode === "dark" ? darkTheme : lightTheme;
+
         // Initialize mermaid with configuration
         mermaid.initialize({
           startOnLoad: false,
           theme: "base",
           themeVariables: {
-            // Modern color scheme
-            primaryColor: "#F7FAFC", // Light light gray background for boxes
-            primaryTextColor: "#1A202C", // Dark text
-            primaryBorderColor: "#E2E8F0", // Light gray border
-            lineColor: "#4A5568", // Darker gray for lines
-            secondaryColor: "#F7FAFC", // Light light gray
-            tertiaryColor: "#EDF2F7",
-            // Actor (agent) styling - light light gray
-            actorBkg: "#F7FAFC",
-            actorBorder: "#D2D8E0",
-            actorTextColor: "#2D3748",
-            // Participant (LLM) styling - light light gray
-            participantBkg: "#F7FAFC",
-            participantBorder: "#E2E8F0",
-            participantTextColor: "#2D3748",
-            // Labels
-            labelTextColor: "#2D3748",
-            labelBoxBkgColor: "#FFFFFF",
-            labelBoxBorderColor: "#E2E8F0",
-            // Signal (message) colors
-            signalColor: "#2D3748",
-            signalTextColor: "#2D3748",
-            // Activation boxes - light blue
-            activationBkgColor: "#DBEAFE",
-            activationBorderColor: "#60A5FA",
+            ...themeVariables,
             // Font
             fontFamily:
               '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
@@ -466,12 +497,12 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
     };
 
     void loadMermaid();
-  }, [syntax, isLoaded]);
+  }, [syntax, isLoaded, colorMode]);
 
-  // Reset when syntax changes
+  // Reset when syntax or colorMode changes
   useEffect(() => {
     setIsLoaded(false);
-  }, [syntax]);
+  }, [syntax, colorMode]);
 
   return (
     <Box
@@ -496,6 +527,7 @@ const SequenceDiagram = ({
   spans: Span[];
   selectedSpanTypes: SpanTypes[];
 }) => {
+  const { colorMode } = useColorMode();
   const mermaidSyntax = useMemo(() => {
     if (!spans || spans.length === 0) return "";
 
@@ -504,7 +536,7 @@ const SequenceDiagram = ({
 
   if (!mermaidSyntax) {
     return (
-      <Box padding={8} textAlign="center" color="gray.500">
+      <Box padding={8} textAlign="center" color="fg.muted">
         No agent or LLM interactions found in this trace.
       </Box>
     );
@@ -514,29 +546,29 @@ const SequenceDiagram = ({
     <VStack align="start" width="full" gap={4}>
       <Box
         width="full"
-        background="white"
+        background="bg.panel"
         borderRadius="md"
         padding={4}
         boxShadow="sm"
       >
-        <MermaidRenderer syntax={mermaidSyntax} />
+        <MermaidRenderer syntax={mermaidSyntax} colorMode={colorMode} />
       </Box>
 
       <Box
         as="details"
         width="full"
-        background="white"
+        background="bg.panel"
         borderRadius="md"
         padding={4}
         boxShadow="sm"
       >
-        <Box as="summary" cursor="pointer" color="gray.500" fontSize="sm">
+        <Box as="summary" cursor="pointer" color="fg.muted" fontSize="sm">
           Show Mermaid Syntax
         </Box>
         <Box
           as="pre"
           fontSize="xs"
-          background="gray.50"
+          background="bg.muted"
           padding={4}
           marginTop={4}
           borderRadius="md"
@@ -641,7 +673,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
         <HStack width="full">
           <Spacer />
           <Select.Label>Include span types:</Select.Label>
-          <Select.Control width="120px" background="white/75">
+          <Select.Control width="120px" background="bg.panel/75">
             <Select.Trigger>
               <Select.ValueText placeholder="Select span types" />
             </Select.Trigger>

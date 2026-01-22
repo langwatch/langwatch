@@ -1,9 +1,4 @@
-import {
-  Field,
-  Input,
-  NativeSelect,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import type { HttpAuth, HttpAuthType } from "~/optimization_studio/types/dsl";
 
 export type AuthConfigSectionProps = {

@@ -1,6 +1,26 @@
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
+export type { Dataset, DatasetEntry, GetDatasetOptions } from "./services/datasets";
+export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./services/datasets";
+export type { ExperimentRunResult, RunExperimentOptions } from "./services/experiments";
+export {
+  ExperimentsError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
+  ExperimentsApiError,
+} from "./services/experiments";
+export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./services/evaluations";
+export {
+  EvaluationError,
+  EvaluatorCallError,
+  EvaluatorNotFoundError,
+  EvaluationsApiError,
+} from "./services/evaluations";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
+import { ExperimentsFacade } from "./services/experiments";
+import { DatasetsFacade } from "./services/datasets";
+import { EvaluationsFacade } from "./services/evaluations";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -16,10 +36,47 @@ export interface LangWatchConstructorOptions {
 }
 
 export class LangWatch {
-  private readonly config: InternalConfig;
+  private readonly config: InternalConfig & { endpoint: string; apiKey: string };
 
   readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;
+  readonly datasets: DatasetsFacade;
+
+  /**
+   * Run experiments on LangWatch platform or via SDK.
+   *
+   * Platform experiments (CI/CD):
+   * ```typescript
+   * const result = await langwatch.experiments.run("my-experiment-slug");
+   * result.printSummary();
+   * ```
+   *
+   * SDK-defined experiments:
+   * ```typescript
+   * const experiment = await langwatch.experiments.init("my-experiment");
+   * // ... run evaluators using experiment.evaluate()
+   * ```
+   */
+  readonly experiments: ExperimentsFacade;
+
+  /**
+   * Run evaluators and guardrails in real-time (Online Evaluations).
+   *
+   * @example
+   * ```typescript
+   * // Run a guardrail
+   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+   *   data: { input: userInput, output: generatedResponse },
+   *   name: "PII Detection",
+   *   asGuardrail: true,
+   * });
+   *
+   * if (!guardrail.passed) {
+   *   return "I'm sorry, I can't do that.";
+   * }
+   * ```
+   */
+  readonly evaluations: EvaluationsFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -37,6 +94,24 @@ export class LangWatch {
       ...this.config,
     });
     this.traces = new TracesFacade(this.config);
+
+    this.experiments = new ExperimentsFacade({
+      langwatchApiClient: this.config.langwatchApiClient,
+      endpoint: this.config.endpoint,
+      apiKey: this.config.apiKey,
+      logger: this.config.logger,
+    });
+
+    this.datasets = new DatasetsFacade({
+      langwatchApiClient: this.config.langwatchApiClient,
+      logger: this.config.logger,
+    });
+
+    this.evaluations = new EvaluationsFacade({
+      endpoint: this.config.endpoint,
+      apiKey: this.config.apiKey,
+      logger: this.config.logger,
+    });
   }
 
   get apiClient(): LangwatchApiClient {
@@ -51,10 +126,12 @@ export class LangWatch {
     apiKey: string;
     endpoint: string;
     options?: LangWatchConstructorOptions["options"];
-  }): InternalConfig {
+  }): InternalConfig & { endpoint: string; apiKey: string } {
     return {
       logger: options?.logger ?? new NoOpLogger(),
       langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),
+      endpoint,
+      apiKey,
     };
   }
 }

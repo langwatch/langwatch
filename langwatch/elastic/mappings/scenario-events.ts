@@ -4,13 +4,13 @@
  */
 
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
-import { FLATENNED_TYPE } from "~/server/elasticsearch";
 import type {
   ScenarioEvent,
-  ScenarioRunStartedEvent,
-  ScenarioRunFinishedEvent,
   ScenarioMessageSnapshotEvent,
+  ScenarioRunFinishedEvent,
+  ScenarioRunStartedEvent,
 } from "~/app/api/scenario-events/[[...route]]/types";
+import { FLATENNED_TYPE } from "~/server/elasticsearch";
 import type { ElasticSearchMappingFrom } from "../schema";
 
 type BaseScenarioEventMapping = Pick<

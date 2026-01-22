@@ -1,9 +1,16 @@
-import { Box,Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Bot, Code, Globe, MessageSquare, MoreVertical, Workflow } from "lucide-react";
+import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Bot,
+  Code,
+  Globe,
+  MessageSquare,
+  MoreVertical,
+  Workflow,
+} from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import { Menu } from "../ui/menu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { Menu } from "../ui/menu";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -55,8 +62,8 @@ export function AgentCard({
         <VStack align="start" gap={2} height="full">
           {/* Top row: Icon and menu */}
           <HStack width="full">
-            <Box bg="blue.50" padding={1} borderRadius="md">
-              <Icon size={18} color="var(--chakra-colors-blue-600)" />
+            <Box bg="blue.subtle" padding={1} borderRadius="md">
+              <Icon size={18} color="var(--chakra-colors-blue-fg)" />
             </Box>
             <Spacer />
             {(onEdit || onDelete) && (
@@ -101,12 +108,12 @@ export function AgentCard({
           <Spacer />
 
           {/* Name */}
-          <Text color="gray.600" fontSize="sm" fontWeight={500}>
+          <Text color="fg.muted" fontSize="sm" fontWeight={500}>
             {agent.name}
           </Text>
 
           {/* Metadata */}
-          <Text color="gray.400" fontSize="12px">
+          <Text color="fg.subtle" fontSize="12px">
             {typeLabel} • {formatTimeAgo(new Date(agent.updatedAt).getTime())}
           </Text>
         </VStack>

@@ -23,7 +23,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   if (!usage.data || !isSaaS) {
@@ -34,7 +34,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     (usage.data.currentMonthMessagesCount /
       usage.data.activePlan.maxMessagesPerMonth) *
       100,
-    100
+    100,
   );
 
   return (
@@ -53,19 +53,19 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
           borderRadius="lg"
           cursor="pointer"
           _hover={{
-            backgroundColor: "gray.200",
+            backgroundColor: "nav.bgHover",
           }}
         >
           {showLabel ? (
             <VStack width="full" gap={1} align="start">
               <HStack width="full" justifyContent="space-between">
                 <HStack gap={1}>
-                  <Text fontSize="12px" color="gray.600">
+                  <Text fontSize="12px" color="nav.fgMuted">
                     Usage
                   </Text>
-                  <Info size={12} color="gray" />
+                  <Info size={12} color="var(--chakra-colors-fg-muted)" />
                 </HStack>
-                <Text fontSize="12px" color="gray.500">
+                <Text fontSize="12px" color="fg.muted">
                   {Math.round(percentage)}%
                 </Text>
               </HStack>
@@ -78,7 +78,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
               >
                 <Progress.Track
                   borderRadius="full"
-                  backgroundColor="gray.300"
+                  backgroundColor="bg.muted"
                   height="8px"
                 >
                   <Progress.Range />
@@ -94,7 +94,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
               width="16px"
               height="16px"
             >
-              <Info size={16} color="gray" />
+              <Info size={16} color="var(--chakra-colors-fg-muted)" />
             </Box>
           )}
         </HStack>
@@ -102,4 +102,3 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     </Tooltip>
   );
 };
-

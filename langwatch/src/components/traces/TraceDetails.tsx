@@ -204,7 +204,7 @@ export function TraceDetails(props: {
           top={0}
           zIndex={2}
           align="start"
-          background="white/75"
+          background="bg.panel/75"
           backdropFilter="blur(8px)"
           borderTopRadius="lg"
         >
@@ -246,7 +246,9 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button data-scope="header" colorPalette="gray">Annotation Queue</Button>
+                      <Button data-scope="header" colorPalette="gray">
+                        Annotation Queue
+                      </Button>
                     </Popover.Trigger>
                     <Popover.Content
                       display={queueDrawerOpen.open ? "none" : "block"}
@@ -359,7 +361,7 @@ export function TraceDetails(props: {
             paddingX={0}
             padding={0}
             paddingY={6}
-            background="gray.400/10"
+            background="bg.muted"
             flexGrow={1}
           >
             <Conversation threadId={threadId} traceId={props.traceId} />
@@ -378,7 +380,7 @@ export function TraceDetails(props: {
           paddingX={0}
           padding={0}
           paddingY={6}
-          background="gray.400/10"
+          background="bg.muted"
           flexGrow={1}
         >
           {selectedTab === "sequenceDiagram" && (

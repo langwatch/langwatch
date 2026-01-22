@@ -29,7 +29,7 @@ const Header = ({ children, icon }: HeaderProps) => (
 );
 
 const Description = ({ children }: DescriptionProps) => (
-  <Text fontSize="13px" color="gray.500">
+  <Text fontSize="13px" color="fg.muted">
     {children}
   </Text>
 );
@@ -48,7 +48,7 @@ function DatasetGenerationTemplateRoot({
       padding={4}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
     >
       {React.Children.toArray(children).filter(Boolean)}
     </VStack>

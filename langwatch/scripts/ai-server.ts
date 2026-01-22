@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
-import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { generateText } from "ai";
 
 /**
  * Test AI Server
@@ -39,7 +39,7 @@ type RequestBody = {
 function jsonResponse(
   res: import("node:http").ServerResponse,
   status: number,
-  data: unknown
+  data: unknown,
 ) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
@@ -52,7 +52,10 @@ const server = createServer(async (req, res) => {
   // CORS headers for browser testing
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, X-Client-ID");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-API-Key, X-Client-ID",
+  );
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -120,9 +123,8 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-
     console.log(
-      `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`
+      `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`,
     );
 
     try {
@@ -131,7 +133,9 @@ const server = createServer(async (req, res) => {
 
       const { text } = await generateText({
         model: openai(model),
-        messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
+        messages: messages as NonNullable<
+          Parameters<typeof generateText>[0]["messages"]
+        >,
       });
 
       console.log(`[${timestamp}] 200 Generation success`);
@@ -156,7 +160,10 @@ const server = createServer(async (req, res) => {
       console.error(`[${timestamp}] 500 Generation error:`, errorMessage);
 
       // Check for common OpenAI errors
-      if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
+      if (
+        errorMessage.includes("401") ||
+        errorMessage.includes("invalid_api_key")
+      ) {
         jsonResponse(res, 401, {
           error: "Unauthorized",
           message: "Invalid OpenAI API key",
@@ -182,7 +189,9 @@ const server = createServer(async (req, res) => {
 
   console.log(`[${timestamp}] 404 Not found: ${req.method} ${req.url}`);
   res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "Not Found", message: `${req.method} ${req.url}` }));
+  res.end(
+    JSON.stringify({ error: "Not Found", message: `${req.method} ${req.url}` }),
+  );
 });
 
 server.listen(PORT, () => {

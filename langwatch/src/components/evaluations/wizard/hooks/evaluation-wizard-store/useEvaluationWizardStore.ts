@@ -79,7 +79,7 @@ export const EXECUTION_METHODS = {
   api: "Run on Notebook or CI/CD Pipeline",
 } as const;
 
-export const wizardStateSchema = z.object({
+export const workbenchStateSchema = z.object({
   name: z.string().optional(),
   step: z.enum(STEPS),
   task: z.enum(Object.keys(TASK_TYPES) as [keyof typeof TASK_TYPES]).optional(),
@@ -113,12 +113,12 @@ export const wizardStateSchema = z.object({
     .optional(),
 });
 
-export type WizardState = z.infer<typeof wizardStateSchema>;
+export type WizardState = z.infer<typeof workbenchStateSchema>;
 
 export type State = {
   experimentId?: string;
   experimentSlug?: string;
-  wizardState: z.infer<typeof wizardStateSchema>;
+  workbenchState: z.infer<typeof workbenchStateSchema>;
   isAutosaving: boolean;
   autosaveDisabled: boolean;
   workflowStore: WorkflowStoreState;
@@ -131,10 +131,10 @@ export type EvaluationWizardStore = State & {
   setExperimentSlug: (experimentSlug: string) => void;
   setWizardState: (
     state:
-      | Partial<State["wizardState"]>
-      | ((state: State["wizardState"]) => Partial<State["wizardState"]>),
+      | Partial<State["workbenchState"]>
+      | ((state: State["workbenchState"]) => Partial<State["workbenchState"]>),
   ) => void;
-  getWizardState: () => State["wizardState"];
+  getWizardState: () => State["workbenchState"];
   setDSL: (
     dsl:
       | Partial<Workflow & { workflowId?: string }>
@@ -152,7 +152,7 @@ export type EvaluationWizardStore = State & {
 
 export const initialState: State = {
   experimentSlug: undefined,
-  wizardState: {
+  workbenchState: {
     step: "task",
     workspaceTab: "dataset",
   },
@@ -191,12 +191,12 @@ const store = (
     setWizardState(state) {
       const applyChanges = (
         current: EvaluationWizardStore,
-        next: Partial<State["wizardState"]>,
+        next: Partial<State["workbenchState"]>,
       ) => {
         return {
           ...current,
-          wizardState: {
-            ...current.wizardState,
+          workbenchState: {
+            ...current.workbenchState,
             ...next,
             ...(next.step === "dataset"
               ? { workspaceTab: "dataset" as const }
@@ -206,13 +206,13 @@ const store = (
       };
 
       if (typeof state === "function") {
-        set((current) => applyChanges(current, state(current.wizardState)));
+        set((current) => applyChanges(current, state(current.workbenchState)));
       } else {
         set((current) => applyChanges(current, state));
       }
     },
     getWizardState() {
-      return get().wizardState;
+      return get().workbenchState;
     },
     setDSL(dsl) {
       get().workflowStore.setWorkflow(dsl);
@@ -231,12 +231,12 @@ const store = (
     },
     nextStep() {
       set((current) => {
-        const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+        const currentStepIndex = STEPS.indexOf(current.workbenchState.step);
         if (currentStepIndex < STEPS.length - 1) {
           const nextStep = STEPS[currentStepIndex + 1];
           return {
             ...current,
-            wizardState: { ...current.wizardState, step: nextStep! },
+            workbenchState: { ...current.workbenchState, step: nextStep! },
           };
         }
         return current;
@@ -244,12 +244,12 @@ const store = (
     },
     previousStep() {
       set((current) => {
-        const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+        const currentStepIndex = STEPS.indexOf(current.workbenchState.step);
         if (currentStepIndex > 0) {
           const previousStep = STEPS[currentStepIndex - 1];
           return {
             ...current,
-            wizardState: { ...current.wizardState, step: previousStep! },
+            workbenchState: { ...current.workbenchState, step: previousStep! },
           };
         }
         return current;

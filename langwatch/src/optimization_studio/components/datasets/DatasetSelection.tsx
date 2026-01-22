@@ -5,8 +5,8 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
-import type { AddDatasetDrawerProps } from "../../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
+import type { AddDatasetDrawerProps } from "../../../components/AddOrEditDatasetDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { Menu } from "../../../components/ui/menu";
@@ -211,7 +211,7 @@ export function DatasetSelectionItem({
       width="300px"
       border="1px solid"
       borderRadius="8px"
-      borderColor="gray.350"
+      borderColor="border.emphasized"
       background="#F5F7F7"
       className="ag-borderless"
       position="relative"
@@ -227,7 +227,7 @@ export function DatasetSelectionItem({
                 minHeight="0"
                 height="auto"
                 minWidth="0"
-                color="gray.400"
+                color="fg.subtle"
                 colorPalette="gray"
                 rounded="md"
                 onClick={(event) => {

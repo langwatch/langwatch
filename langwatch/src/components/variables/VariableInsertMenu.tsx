@@ -1,23 +1,21 @@
-import {
-  Box,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Database, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ComponentIcon,
   ColorfulBlockIcon,
+  ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType } from "~/optimization_studio/types/dsl";
 import {
-  VariableTypeIcon,
   VariableTypeBadge,
+  VariableTypeIcon,
 } from "~/prompts/components/ui/VariableTypeIcon";
-import type { AvailableSource, SourceType, FieldType } from "./VariableMappingInput";
 import { Popover } from "../ui/popover";
+import type {
+  AvailableSource,
+  FieldType,
+  SourceType,
+} from "./VariableMappingInput";
 
 // ============================================================================
 // Types
@@ -70,7 +68,7 @@ const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
   if (type === "dataset") {
     return (
       <ColorfulBlockIcon
-        color="blue.400"
+        color="blue.solid"
         size="xs"
         icon={<Database size={12} />}
       />
@@ -145,11 +143,11 @@ export const VariableInsertMenu = ({
         .map((source) => ({
           ...source,
           fields: source.fields.filter((field) =>
-            field.name.toLowerCase().includes(query.toLowerCase())
+            field.name.toLowerCase().includes(query.toLowerCase()),
           ),
         }))
         .filter((source) => source.fields.length > 0),
-    [availableSources, query]
+    [availableSources, query],
   );
 
   // Normalize query for variable creation
@@ -160,10 +158,10 @@ export const VariableInsertMenu = ({
     () =>
       filteredSources.some((source) =>
         source.fields.some(
-          (field) => field.name.toLowerCase() === normalizedQuery
-        )
+          (field) => field.name.toLowerCase() === normalizedQuery,
+        ),
       ),
-    [filteredSources, normalizedQuery]
+    [filteredSources, normalizedQuery],
   );
 
   // Show "Create variable" option when:
@@ -222,20 +220,22 @@ export const VariableInsertMenu = ({
         onCreateVariable(option.name);
       }
     },
-    [flattenedOptions, onSelect, onCreateVariable]
+    [flattenedOptions, onSelect, onCreateVariable],
   );
 
   // Expose methods for parent to call on keyboard events
-  const selectHighlighted = useCallback(() => {
+  const _selectHighlighted = useCallback(() => {
     handleSelect(highlightedIndex);
   }, [handleSelect, highlightedIndex]);
 
-  const moveHighlightUp = useCallback(() => {
+  const _moveHighlightUp = useCallback(() => {
     onHighlightChange(Math.max(highlightedIndex - 1, 0));
   }, [highlightedIndex, onHighlightChange]);
 
-  const moveHighlightDown = useCallback(() => {
-    onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
+  const _moveHighlightDown = useCallback(() => {
+    onHighlightChange(
+      Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
+    );
   }, [highlightedIndex, flattenedOptions.length, onHighlightChange]);
 
   // Attach keyboard handlers to parent (via ref or expose)
@@ -270,11 +270,11 @@ export const VariableInsertMenu = ({
         ref={menuRef}
         width={`${MENU_WIDTH}px`}
         maxHeight={`${MENU_MAX_HEIGHT}px`}
-        background="white"
+        background="bg.panel"
         borderRadius="8px"
         boxShadow="lg"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border"
         overflow="hidden"
         padding={0}
         // Prevent focus on container in readonly mode
@@ -284,7 +284,7 @@ export const VariableInsertMenu = ({
       >
         {/* Search input (editable) or Query display (readonly) */}
         {onQueryChange ? (
-          <Box padding={2} borderBottom="1px solid" borderColor="gray.100">
+          <Box padding={2} borderBottom="1px solid" borderColor="border.muted">
             <Input
               ref={searchInputRef}
               value={query}
@@ -294,7 +294,7 @@ export const VariableInsertMenu = ({
                   e.preventDefault();
                   setIsKeyboardNav(true);
                   onHighlightChange(
-                    Math.min(highlightedIndex + 1, flattenedOptions.length - 1)
+                    Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
                   );
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
@@ -318,10 +318,10 @@ export const VariableInsertMenu = ({
             <Box
               padding={2}
               borderBottom="1px solid"
-              borderColor="gray.100"
-              background="gray.50"
+              borderColor="border.muted"
+              background="bg.subtle"
             >
-              <Text fontSize="sm" color="gray.600" fontFamily="mono">
+              <Text fontSize="sm" color="fg.muted" fontFamily="mono">
                 {`{{${query}`}
               </Text>
             </Box>
@@ -332,11 +332,11 @@ export const VariableInsertMenu = ({
         <Box maxHeight="280px" overflowY="auto">
           {flattenedOptions.length === 0 ? (
             <Box padding={3}>
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 No matching fields found
               </Text>
               {onCreateVariable && !query && (
-                <Text fontSize="xs" color="gray.400" marginTop={1}>
+                <Text fontSize="xs" color="fg.subtle" marginTop={1}>
                   Type a name to create a new variable
                 </Text>
               )}
@@ -350,13 +350,13 @@ export const VariableInsertMenu = ({
                     paddingX={2}
                     paddingY={1}
                     gap={2}
-                    background="gray.50"
+                    background="bg.subtle"
                     borderRadius="4px"
                     marginBottom={1}
                     marginTop={sourceIndex > 0 ? 2 : 0}
                   >
                     <SourceTypeIconSmall type={source.type} />
-                    <Text fontSize="xs" fontWeight="semibold" color="gray.600">
+                    <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                       {source.name}
                     </Text>
                   </HStack>
@@ -376,7 +376,10 @@ export const VariableInsertMenu = ({
                         borderRadius="4px"
                         background={isHighlighted ? "blue.50" : undefined}
                         onMouseMove={() => {
-                          if (isKeyboardNav || highlightedIndex !== optionIndex) {
+                          if (
+                            isKeyboardNav ||
+                            highlightedIndex !== optionIndex
+                          ) {
                             setIsKeyboardNav(false);
                             onHighlightChange(optionIndex);
                           }
@@ -403,16 +406,21 @@ export const VariableInsertMenu = ({
                   cursor="pointer"
                   borderRadius="4px"
                   background={
-                    highlightedIndex === createOptionIndex ? "blue.50" : undefined
+                    highlightedIndex === createOptionIndex
+                      ? "blue.50"
+                      : undefined
                   }
                   onMouseMove={() => {
-                    if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
+                    if (
+                      isKeyboardNav ||
+                      highlightedIndex !== createOptionIndex
+                    ) {
                       setIsKeyboardNav(false);
                       onHighlightChange(createOptionIndex);
                     }
                   }}
                   borderTop="1px solid"
-                  borderColor="gray.100"
+                  borderColor="border.muted"
                   marginTop={filteredSources.length > 0 ? 2 : 0}
                   onClick={() => onCreateVariable?.(normalizedQuery)}
                 >
@@ -434,7 +442,7 @@ export const VariableInsertMenu = ({
 export const getMenuOptionCount = (
   availableSources: AvailableSource[],
   query: string,
-  canCreate: boolean
+  canCreate: boolean,
 ): number => {
   const normalizedQuery = query.trim().replace(/ /g, "_").toLowerCase();
   let count = 0;
@@ -449,7 +457,7 @@ export const getMenuOptionCount = (
 
   // Check for exact match
   const hasExactMatch = availableSources.some((source) =>
-    source.fields.some((field) => field.name.toLowerCase() === normalizedQuery)
+    source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
   );
 
   if (canCreate && normalizedQuery && !hasExactMatch) {

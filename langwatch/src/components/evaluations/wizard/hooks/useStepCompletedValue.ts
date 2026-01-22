@@ -14,13 +14,13 @@ export const useStepCompletedValue = () => {
   const { task, executionMethod, datasetId, evaluator } =
     useEvaluationWizardStore(
       ({
-        wizardState,
+        workbenchState,
         setWizardState,
         getDatasetId,
         getFirstEvaluatorNode,
       }) => ({
-        task: wizardState.task,
-        executionMethod: wizardState.executionMethod,
+        task: workbenchState.task,
+        executionMethod: workbenchState.executionMethod,
         setWizardState,
         datasetId: getDatasetId(),
         evaluator: getFirstEvaluatorNode(),

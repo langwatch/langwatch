@@ -1,6 +1,6 @@
 import type {
-  NormalizedAttrValue,
   NormalizedAttrScalar,
+  NormalizedAttrValue,
 } from "../schemas/spans";
 
 export const toAttrValue = (v: unknown): NormalizedAttrValue | null => {

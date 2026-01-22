@@ -32,8 +32,8 @@ export function ExecutionMethodSelectionStepAccordion({
   const { executionMethod, upsertExecutorNodeByType, setWizardState } =
     useEvaluationWizardStore(
       useShallow(
-        ({ wizardState, setWizardState, upsertExecutorNodeByType }) => ({
-          executionMethod: wizardState.executionMethod,
+        ({ workbenchState, setWizardState, upsertExecutorNodeByType }) => ({
+          executionMethod: workbenchState.executionMethod,
           setWizardState,
           upsertExecutorNodeByType,
         }),

@@ -8,7 +8,7 @@ import {
 } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { hasProjectPermission } from "../../../../server/api/rbac";
 import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
@@ -41,10 +41,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const hasPermission = await backendHasTeamProjectPermission(
+  const hasPermission = await hasProjectPermission(
     { prisma, session },
-    { projectId },
-    "DATASETS_MANAGE",
+    projectId,
+    "datasets:manage",
   );
   if (!hasPermission) {
     return NextResponse.json(
@@ -90,7 +90,7 @@ ${dataset}`,
     },
     providerOptions: {
       openai: {
-        reasoningEffort: "minimal",
+        reasoningEffort: "low",
       } satisfies OpenAIResponsesProviderOptions,
     },
   });

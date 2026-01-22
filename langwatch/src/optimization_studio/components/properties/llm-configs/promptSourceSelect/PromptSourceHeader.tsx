@@ -55,7 +55,9 @@ export function PromptSourceHeader({
         duration: 2000,
       });
       // IMPORTANT: Use WithSystemMessage to include the system prompt in messages array
-      formProps.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      formProps.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
     };
 
     const onError = () => {
@@ -89,7 +91,8 @@ export function PromptSourceHeader({
   const handleOnRestore = async (params: VersionedPrompt) => {
     // Update the form with the new values
     // IMPORTANT: Use WithSystemMessage to include the system prompt in messages array
-    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
+    const newFormValues =
+      versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
     formProps.reset(newFormValues);
   };
 
@@ -108,7 +111,7 @@ export function PromptSourceHeader({
         <HStack
           justifyContent="space-between"
           border="1px solid"
-          borderColor="gray.200"
+          borderColor="border"
           borderRadius="md"
           padding={2}
           background="gray.50"
@@ -130,7 +133,9 @@ export function PromptSourceHeader({
           {configId && (
             <VersionHistoryButton
               configId={configId}
-              currentVersionId={formProps.getValues("versionMetadata")?.versionId}
+              currentVersionId={
+                formProps.getValues("versionMetadata")?.versionId
+              }
               onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}

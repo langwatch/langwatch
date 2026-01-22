@@ -13,10 +13,13 @@ export const studioBackendPostEvent = async ({
   projectId,
   message: message,
   onEvent,
+  isAborted,
 }: {
   projectId: string;
   message: StudioClientEvent;
   onEvent: (event: StudioServerEvent) => void;
+  /** Optional function to check if execution should be aborted */
+  isAborted?: () => Promise<boolean>;
 }) => {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
@@ -28,7 +31,7 @@ export const studioBackendPostEvent = async ({
       (error as any)?.cause?.code === "ECONNREFUSED" ||
       (error as any)?.cause?.code === "ETIMEDOUTA"
     ) {
-      throw new Error("Python runtime is unreachable");
+      throw new Error("LangWatch NLP is unreachable");
     }
     if (
       (error as any)?.message === "fetch failed" &&
@@ -70,6 +73,13 @@ export const studioBackendPostEvent = async ({
     let chunksBuffer = "";
     let events = 0;
     while (true) {
+      // Check abort before each read
+      if (isAborted && (await isAborted())) {
+        logger.info("Execution aborted, cancelling stream reader");
+        await reader.cancel();
+        break;
+      }
+
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -84,7 +94,7 @@ export const studioBackendPostEvent = async ({
         chunksBuffer = chunks[chunks.length - 1] ?? "";
       }
     }
-    if (events === 0) {
+    if (events === 0 && !(isAborted && (await isAborted()))) {
       throw new Error(`Studio invalid response: ${chunksBuffer}`);
     }
   } catch (error) {

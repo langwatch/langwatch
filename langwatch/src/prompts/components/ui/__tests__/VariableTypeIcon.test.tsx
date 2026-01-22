@@ -5,55 +5,55 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  VariableTypeIcon,
-  VariableTypeBadge,
   getTypeLabel,
   TYPE_LABELS,
+  VariableTypeBadge,
+  VariableTypeIcon,
 } from "../VariableTypeIcon";
 
 describe("TYPE_LABELS", () => {
   it("maps str to Text", () => {
-    expect(TYPE_LABELS["str"]).toBe("Text");
+    expect(TYPE_LABELS.str).toBe("Text");
   });
 
   it("maps string to Text", () => {
-    expect(TYPE_LABELS["string"]).toBe("Text");
+    expect(TYPE_LABELS.string).toBe("Text");
   });
 
   it("maps float to Number", () => {
-    expect(TYPE_LABELS["float"]).toBe("Number");
+    expect(TYPE_LABELS.float).toBe("Number");
   });
 
   it("maps int to Number", () => {
-    expect(TYPE_LABELS["int"]).toBe("Number");
+    expect(TYPE_LABELS.int).toBe("Number");
   });
 
   it("maps bool to Boolean", () => {
-    expect(TYPE_LABELS["bool"]).toBe("Boolean");
+    expect(TYPE_LABELS.bool).toBe("Boolean");
   });
 
   it("maps boolean to Boolean", () => {
-    expect(TYPE_LABELS["boolean"]).toBe("Boolean");
+    expect(TYPE_LABELS.boolean).toBe("Boolean");
   });
 
   it("maps image to Image", () => {
-    expect(TYPE_LABELS["image"]).toBe("Image");
+    expect(TYPE_LABELS.image).toBe("Image");
   });
 
   it("maps list to List", () => {
-    expect(TYPE_LABELS["list"]).toBe("List");
+    expect(TYPE_LABELS.list).toBe("List");
   });
 
   it("maps dict to Object", () => {
-    expect(TYPE_LABELS["dict"]).toBe("Object");
+    expect(TYPE_LABELS.dict).toBe("Object");
   });
 
   it("maps json to Object", () => {
-    expect(TYPE_LABELS["json"]).toBe("Object");
+    expect(TYPE_LABELS.json).toBe("Object");
   });
 
   it("maps chat_messages to Messages", () => {
-    expect(TYPE_LABELS["chat_messages"]).toBe("Messages");
+    expect(TYPE_LABELS.chat_messages).toBe("Messages");
   });
 });
 
@@ -76,7 +76,7 @@ describe("VariableTypeIcon", () => {
     return render(
       <ChakraProvider value={defaultSystem}>
         <VariableTypeIcon type={type} />
-      </ChakraProvider>
+      </ChakraProvider>,
     );
   };
 
@@ -121,7 +121,7 @@ describe("VariableTypeBadge", () => {
     return render(
       <ChakraProvider value={defaultSystem}>
         <VariableTypeBadge type={type} size={size} />
-      </ChakraProvider>
+      </ChakraProvider>,
     );
   };
 

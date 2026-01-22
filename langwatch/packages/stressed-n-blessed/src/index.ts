@@ -1,118 +1,173 @@
-import { program } from 'commander';
-import { performance } from 'perf_hooks';
-import { BatchSpanProcessor, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base';
-import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
-import { setupObservability } from 'langwatch/observability/node';
-import { getLangWatchTracer, LangWatchTraceExporter } from 'langwatch/observability';
 import 'dotenv/config';
+
+import { performance } from 'node:perf_hooks';
+
+import { SpanKind, context, trace } from '@opentelemetry/api';
+import { program } from 'commander';
+import { getLangWatchTracer } from 'langwatch/observability';
+import { setupObservability } from 'langwatch/observability/node';
+
+import { getRandomSpanGenerator } from './generators.js';
+import {
+  createReport,
+  generateDefaultReportPath,
+  generateRunId,
+  printReportSummary,
+  saveReport,
+} from './report.js';
+import type {
+  SpanRecord,
+  StressTestConfig,
+  StressTestStats,
+  TestMode,
+  TraceRecord,
+} from './types.js';
+import { MODE_CONFIGS } from './types.js';
+import { printVerificationResult, runVerification } from './verify.js';
 
 setupObservability({
   attributes: {
-    "service.name": "langwatch-backend",
-    "deployment.environment": process.env.ENVIRONMENT,
+    'service.name': 'langwatch-backend',
+    'deployment.environment': process.env.ENVIRONMENT,
   },
-  spanProcessors: [new BatchSpanProcessor(new LangWatchTraceExporter({ filters: null }))],
-  sampler: new TraceIdRatioBasedSampler(1.0),
 });
 
-const tracer = getLangWatchTracer("stress-test-tracer");
+const tracer = getLangWatchTracer('stress-test-tracer');
 
-program
-  .name('stressed-n-blessed')
-  .description('Stress test OTLP traces endpoint with spans and traces')
-  .version('1.0.0')
-  .option('-t, --traces <number>', 'Number of traces to generate', '1000')
-  .option('-d, --depth <number>', 'Maximum depth of nested spans', '30')
-  .option('-s, --spans-per-trace <number>', 'Average spans per trace', '30')
-  .option('--duration <seconds>', 'Test duration in seconds (0 for unlimited)', '120')
-  .option('--json', 'Send JSON format instead of protobuf')
-  .parse();
+const traceRecords: TraceRecord[] = [];
 
-const options = program.opts();
+function createSpansForTrace(
+  traceIndex: number,
+  spansToCreate: number,
+  config: StressTestConfig
+): { spansCreated: number; traceRecord: TraceRecord } {
+  const spanRecords: SpanRecord[] = [];
 
-// Configuration
-const config = {
-  totalTraces: parseInt(options.traces),
-  maxDepth: parseInt(options.depth),
-  avgSpansPerTrace: parseInt(options.spansPerTrace),
-  duration: parseInt(options.duration),
-  useJson: options.json
-};
+  const rootSpan = tracer.startSpan(`trace-${traceIndex}-root`, {
+    kind: SpanKind.SERVER,
+    attributes: {
+      'stress-test.trace-index': traceIndex,
+      'stress-test.mode': config.mode,
+      'langwatch.customer.id': `customer_stress_${traceIndex % 10}`,
+      'langwatch.user.id': `user_stress_${traceIndex % 100}`,
+      'langwatch.thread.id': `thread_stress_${traceIndex}`,
+      'langwatch.tags': JSON.stringify(['stress-test', config.mode]),
+    },
+  });
 
-// Global state
-let stats = {
-  requestsSent: 0,
-  tracesSent: 0,
-  spansSent: 0,
-  errors: 0,
-  startTime: performance.now(),
-  endTime: 0
-};
+  const rootSpanContext = trace.setSpan(context.active(), rootSpan);
+  const rootTraceId = rootSpan.spanContext().traceId;
+  const rootSpanId = rootSpan.spanContext().spanId;
 
-// Function to create spans for a trace (simplified to avoid validation issues)
-function createSpansForTrace(traceIndex: number, spansToCreate: number): number {
-  const traceId = `trace-${traceIndex}-${Date.now()}`;
+  const { type: rootType, generator: rootGenerator } = getRandomSpanGenerator();
+  rootGenerator(rootSpan, `trace-${traceIndex}-root`);
 
-  for (let i = 0; i < spansToCreate; i++) {
-    const spanName = `span-${traceIndex}-${i}`;
-    const span = tracer.startSpan(spanName, {
-      kind: SpanKind.INTERNAL,
-      attributes: {
-        'stress-test.trace-id': traceId,
-        'stress-test.trace-index': traceIndex,
-        'stress-test.span-index': i,
-        'stress-test.type': 'test-span'
-      }
-    });
+  spanRecords.push({
+    spanId: rootSpanId,
+    name: `trace-${traceIndex}-root`,
+    type: rootType,
+  });
 
-    // Add some mock attributes
-    span.setAttributes({
-      'stress-test.operation': `operation-${i}`,
-      'stress-test.duration': Math.floor(Math.random() * 1000) + 100,
-      'stress-test.success': Math.random() > 0.05 // 95% success rate
-    });
+  context.with(rootSpanContext, () => {
+    for (let i = 1; i < spansToCreate; i++) {
+      const spanName = `trace-${traceIndex}-span-${i}`;
+      const { type, generator } = getRandomSpanGenerator();
 
-    // End span immediately
-    span.setStatus({ code: SpanStatusCode.OK });
-    span.end();
-  }
+      const span = tracer.startSpan(spanName, {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          'stress-test.trace-index': traceIndex,
+          'stress-test.span-index': i,
+          'stress-test.mode': config.mode,
+        },
+      });
 
-  return spansToCreate;
+      generator(span, spanName);
+
+      spanRecords.push({
+        spanId: span.spanContext().spanId,
+        name: spanName,
+        type,
+      });
+
+      span.end();
+    }
+  });
+
+  rootSpan.end();
+
+  return {
+    spansCreated: spansToCreate,
+    traceRecord: {
+      traceId: rootTraceId,
+      spans: spanRecords,
+    },
+  };
 }
 
-// Function to create a complete trace
-function createTrace(traceIndex: number): void {
-  // Determine how many spans to create for this trace
+async function createTrace(traceIndex: number, config: StressTestConfig): Promise<number> {
   const spansForThisTrace = Math.max(
     1,
-    Math.floor(config.avgSpansPerTrace * (0.5 + Math.random())) // Vary around the average
+    Math.floor(config.avgSpansPerTrace * (0.5 + Math.random()))
   );
 
   console.log(`Creating trace ${traceIndex} with ${spansForThisTrace} spans`);
 
-  // Create spans for this trace (simplified approach)
-  const spansCreated = createSpansForTrace(traceIndex, spansForThisTrace);
+  const { spansCreated, traceRecord } = createSpansForTrace(
+    traceIndex,
+    spansForThisTrace,
+    config
+  );
 
-  console.log(`Trace ${traceIndex} completed: created ${spansCreated} spans`);
+  traceRecords.push(traceRecord);
 
-  stats.tracesSent++;
-  stats.spansSent += spansCreated;
+  console.log(`Trace ${traceIndex} completed: created ${spansCreated} spans (traceId: ${traceRecord.traceId})`);
+
+  return spansCreated;
 }
 
-// Main stress test function
-async function runStressTest(): Promise<void> {
-  console.log(`Starting stress test with ${config.totalTraces} traces...`);
-  console.log(`Configuration:`, config);
+async function runStressTest(config: StressTestConfig): Promise<void> {
+  const stats: StressTestStats = {
+    requestsSent: 0,
+    tracesSent: 0,
+    spansSent: 0,
+    errors: 0,
+    startTime: performance.now(),
+    endTime: 0,
+  };
+
+  const runId = generateRunId();
+  const modeConfig = MODE_CONFIGS[config.mode];
+
+  console.log(`\nStress Test: ${config.mode.toUpperCase()} mode`);
+  console.log(`Description: ${modeConfig.description}`);
+  console.log(`Run ID: ${runId}`);
+  console.log(`Configuration:`, {
+    totalTraces: config.totalTraces,
+    avgSpansPerTrace: config.avgSpansPerTrace,
+    maxDepth: config.maxDepth,
+    delayRange: `${modeConfig.minDelay}-${modeConfig.maxDelay}ms`,
+  });
+  console.log('\n');
 
   const promises: Promise<void>[] = [];
 
   for (let i = 0; i < config.totalTraces; i++) {
-    // Add some delay between trace creation to simulate real traffic patterns
-    const delay = Math.floor(Math.random() * 100);
+    const delay =
+      modeConfig.minDelay +
+      Math.floor(Math.random() * (modeConfig.maxDelay - modeConfig.minDelay));
+
     promises.push(
-      new Promise(resolve => {
-        setTimeout(() => {
-          createTrace(i);
+      new Promise((resolve) => {
+        setTimeout(async () => {
+          try {
+            const spansCreated = await createTrace(i, config);
+            stats.tracesSent++;
+            stats.spansSent += spansCreated;
+          } catch (error) {
+            console.error(`Error creating trace ${i}:`, error);
+            stats.errors++;
+          }
           resolve();
         }, delay);
       })
@@ -121,21 +176,87 @@ async function runStressTest(): Promise<void> {
 
   await Promise.all(promises);
 
-  // Wait for all spans to be sent
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log('\nWaiting for spans to be sent...');
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
   stats.endTime = performance.now();
-  const duration = (stats.endTime - stats.startTime) / 1000;
 
-  console.log(`\nStress test completed:`);
-  console.log(`- Duration: ${duration.toFixed(2)}s`);
-  console.log(`- Traces sent: ${stats.tracesSent}`);
-  console.log(`- Spans sent: ${stats.spansSent}`);
-  console.log(`- Average spans per trace: ${(stats.spansSent / stats.tracesSent).toFixed(2)}`);
-  console.log(`- Throughput: ${(stats.spansSent / duration).toFixed(2)} spans/second`);
+  const report = createReport({
+    runId,
+    mode: config.mode,
+    config,
+    stats,
+    traces: traceRecords,
+  });
 
-  // Wait for all spans to calm down
-  await new Promise(resolve => setTimeout(resolve, 10000));
+  printReportSummary(report);
+
+  const reportPath = config.reportPath ?? generateDefaultReportPath();
+  await saveReport(report, reportPath);
+
+  console.log('\nStress test completed successfully.');
+  console.log(`\nTo verify the traces, run:`);
+  console.log(`  npx stressed-n-blessed verify --report ${reportPath}`);
 }
 
-runStressTest().catch(console.error);
+program
+  .name('stressed-n-blessed')
+  .description('Stress test OTLP traces endpoint with realistic span data')
+  .version('1.0.0');
+
+program
+  .command('run', { isDefault: true })
+  .description('Run the stress test')
+  .option('-m, --mode <mode>', 'Test mode: realistic, heavy, or scale', 'realistic')
+  .option('-t, --traces <number>', 'Number of traces to generate (overrides mode default)')
+  .option('-d, --depth <number>', 'Maximum depth of nested spans', '5')
+  .option(
+    '-s, --spans-per-trace <number>',
+    'Average spans per trace (overrides mode default)'
+  )
+  .option('--report <path>', 'Custom report file path')
+  .action(async (options) => {
+    const mode = options.mode as TestMode;
+
+    if (!MODE_CONFIGS[mode]) {
+      console.error(`Invalid mode: ${mode}. Valid modes: realistic, heavy, scale`);
+      process.exit(1);
+    }
+
+    const modeConfig = MODE_CONFIGS[mode];
+
+    const config: StressTestConfig = {
+      mode,
+      totalTraces: options.traces
+        ? parseInt(options.traces, 10)
+        : modeConfig.defaultTraces,
+      maxDepth: parseInt(options.depth, 10),
+      avgSpansPerTrace: options.spansPerTrace
+        ? parseInt(options.spansPerTrace, 10)
+        : modeConfig.defaultSpansPerTrace,
+      duration: 0,
+      reportPath: options.report ?? null,
+    };
+
+    await runStressTest(config);
+  });
+
+program
+  .command('verify')
+  .description('Verify traces from a stress test report exist in LangWatch')
+  .requiredOption('--report <path>', 'Path to the stress test report file')
+  .action(async (options) => {
+    try {
+      const result = await runVerification(options.report);
+      printVerificationResult(result);
+
+      if (result.tracesMissing > 0 || result.spansMissing > 0) {
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error('Verification failed:', error);
+      process.exit(1);
+    }
+  });
+
+program.parse();

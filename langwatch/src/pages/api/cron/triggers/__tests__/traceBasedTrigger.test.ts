@@ -1,4 +1,4 @@
-import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { processTraceBasedTrigger } from "../traceBasedTrigger";
 
@@ -202,9 +202,7 @@ describe("processTraceBasedTrigger", () => {
       } as unknown as Trigger;
 
       mockTraceService.getAllTracesForProject.mockResolvedValue({
-        groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
-        ],
+        groups: [[{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }]],
         totalHits: 1,
         traceChecks: {},
       });
@@ -232,9 +230,7 @@ describe("processTraceBasedTrigger", () => {
       } as unknown as Trigger;
 
       mockTraceService.getAllTracesForProject.mockResolvedValue({
-        groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
-        ],
+        groups: [[{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }]],
         totalHits: 1,
         traceChecks: {},
       });
@@ -257,9 +253,7 @@ describe("processTraceBasedTrigger", () => {
       } as unknown as Trigger;
 
       mockTraceService.getAllTracesForProject.mockResolvedValue({
-        groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
-        ],
+        groups: [[{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }]],
         totalHits: 1,
         traceChecks: {},
       });
@@ -282,9 +276,7 @@ describe("processTraceBasedTrigger", () => {
       } as unknown as Trigger;
 
       mockTraceService.getAllTracesForProject.mockResolvedValue({
-        groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
-        ],
+        groups: [[{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }]],
         totalHits: 1,
         traceChecks: {},
       });

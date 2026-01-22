@@ -14,9 +14,8 @@ import {
 import { createTRPCNext } from "@trpc/next";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
-
-import { sseLink } from "./sseLink";
 import type { AppRouter } from "~/server/api/root";
+import { sseLink } from "./sseLink";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -52,7 +51,7 @@ export const api = createTRPCNext<AppRouter>({
         // Split subscriptions to SSE link, everything else to HTTP
         splitLink({
           condition(op) {
-            return op.type === 'subscription';
+            return op.type === "subscription";
           },
           true: sseLink({
             url: getBaseUrl(),

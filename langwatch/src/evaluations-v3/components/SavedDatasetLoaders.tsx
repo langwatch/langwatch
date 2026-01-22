@@ -1,5 +1,5 @@
-import type { DatasetReference } from "../types";
 import { useSavedDatasetRecords } from "../hooks/useSavedDatasetLoader";
+import type { DatasetReference } from "../types";
 
 /**
  * Loads records for a single saved dataset.
@@ -21,7 +21,7 @@ export const SavedDatasetLoaders = ({
   datasets: DatasetReference[];
 }) => {
   const savedDatasets = datasets.filter(
-    (d) => d.type === "saved" && d.datasetId && !d.savedRecords
+    (d) => d.type === "saved" && d.datasetId && !d.savedRecords,
   );
 
   return (

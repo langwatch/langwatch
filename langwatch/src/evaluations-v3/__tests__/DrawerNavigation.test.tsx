@@ -1,16 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ReactElement } from "react";
-
-import { TargetTypeSelectorDrawer } from "~/components/targets/TargetTypeSelectorDrawer";
-import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
+import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
+import { TargetTypeSelectorDrawer } from "~/components/targets/TargetTypeSelectorDrawer";
 
 const renderWithProviders = (ui: ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

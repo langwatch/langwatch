@@ -14,7 +14,7 @@ import { StepAccordion } from "../../components/StepAccordion";
 
 export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
-  const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
+  const { workbenchState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
   const evaluator = getFirstEvaluatorNode();
@@ -110,9 +110,9 @@ export const EvaluatorSettingsAccordion = () => {
     <StepAccordion
       value="settings"
       width="full"
-      borderColor="green.400"
+      borderColor="green.fg"
       title="Evaluator Settings"
-      showTrigger={!!wizardState.evaluatorCategory && !!hasEvaluatorFields}
+      showTrigger={!!workbenchState.evaluatorCategory && !!hasEvaluatorFields}
       indicatorProps={{
         id: "js-expand-settings-button",
         focusRing: "outside",

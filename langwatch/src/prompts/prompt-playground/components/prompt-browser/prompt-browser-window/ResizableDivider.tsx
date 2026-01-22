@@ -1,6 +1,6 @@
 import { Box, Center } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LuGripHorizontal, LuChevronUp, LuChevronDown } from "react-icons/lu";
+import { LuChevronDown, LuChevronUp, LuGripHorizontal } from "react-icons/lu";
 
 export type ResizableDividerProps = {
   /** Whether the top panel is expanded */
@@ -93,39 +93,38 @@ export function ResizableDivider({
         left: 0,
         right: 0,
         height: "1px",
-        bg: "gray.100",
+        bg: "border.muted",
         transform: "translateY(-50%)",
       }}
     >
       {/* Center grip/toggle indicator - sits on the horizontal line */}
       <Center
         position="relative"
-        bg="white"
+        bg="bg.panel"
         borderRadius="full"
         border="1px solid"
-        borderColor={isDragging || isHovered ? "gray.400" : "gray.200"}
+        borderColor={isDragging || isHovered ? "border.emphasized" : "border"}
         width="28px"
         height="14px"
         cursor="row-resize"
         transition="border-color 0.15s, background 0.15s"
         _hover={{
-          borderColor: "gray.400",
-          bg: "gray.50",
+          borderColor: "border.emphasized",
+          bg: "bg.muted",
         }}
         zIndex={11}
         pointerEvents="none"
       >
         {isDragging || isHovered ? (
           isExpanded ? (
-            <LuChevronUp size={12} color="var(--chakra-colors-gray-500)" />
+            <LuChevronUp size={12} color="var(--chakra-colors-fg-muted)" />
           ) : (
-            <LuChevronDown size={12} color="var(--chakra-colors-gray-500)" />
+            <LuChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
           )
         ) : (
-          <LuGripHorizontal size={12} color="var(--chakra-colors-gray-400)" />
+          <LuGripHorizontal size={12} color="var(--chakra-colors-fg-subtle)" />
         )}
       </Center>
     </Box>
   );
 }
-

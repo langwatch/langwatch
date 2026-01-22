@@ -74,7 +74,9 @@ function InnerPromptConfigForm() {
     const data = formValuesToTriggerSaveVersionParams(values);
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       setIsSaving(false);
     };
 
@@ -108,7 +110,9 @@ function InnerPromptConfigForm() {
 
   const handleRestore = useCallback(
     async (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
     },
     [methods],
   );
@@ -132,9 +136,9 @@ function InnerPromptConfigForm() {
           width="full"
           position="absolute"
           bottom={0}
-          background="white"
+          background="bg.panel"
           padding={3}
-          boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
+          boxShadow="sm"
         >
           {configId && (
             <VersionHistoryButton

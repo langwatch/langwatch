@@ -1,12 +1,12 @@
 import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
+import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { AddPromptButton } from "../sidebar/AddPromptButton";
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
@@ -124,7 +124,7 @@ export function PromptPlaygroundBrowser() {
                     bottom: 0,
                     width: "10px",
                     height: "50px",
-                    background: "linear-gradient(to right, transparent, white)",
+                    background: "linear-gradient(to right, transparent, var(--chakra-colors-bg-panel))",
                     zIndex: 10,
                     pointerEvents: "none",
                   }}
@@ -151,7 +151,7 @@ export function PromptPlaygroundBrowser() {
                 height="full"
                 borderRadius="lg"
                 boxShadow="md"
-                background="white"
+                background="bg.panel"
                 padding={0}
                 minHeight="0"
               >

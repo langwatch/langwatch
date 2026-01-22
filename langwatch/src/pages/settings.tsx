@@ -557,7 +557,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
                           <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="gray.500">
+                          <Text fontSize="13px" color="fg.muted">
                             {option.description}
                           </Text>
                         </VStack>
@@ -615,7 +615,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
                           <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="gray.500">
+                          <Text fontSize="13px" color="fg.muted">
                             {option.description}
                           </Text>
                         </VStack>
@@ -672,7 +672,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
                           <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="gray.500">
+                          <Text fontSize="13px" color="fg.muted">
                             {option.description}
                           </Text>
                         </VStack>

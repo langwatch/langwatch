@@ -6,10 +6,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
-import { Checkbox } from "../ui/checkbox";
-import { Dialog } from "../ui/dialog";
-import { Select } from "../ui/select";
-import { toaster } from "../ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import {
@@ -17,6 +13,10 @@ import {
   teamRoleHasPermission,
 } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { Checkbox } from "../ui/checkbox";
+import { Dialog } from "../ui/dialog";
+import { Select } from "../ui/select";
+import { toaster } from "../ui/toaster";
 
 export const CopyEvaluationDialog = ({
   open,
@@ -158,7 +158,7 @@ export const CopyEvaluationDialog = ({
                           <Text
                             display="inline-block"
                             fontSize="sm"
-                            color="gray.400"
+                            color="fg.subtle"
                             ml={2}
                           >
                             (no permission)
@@ -201,4 +201,3 @@ export const CopyEvaluationDialog = ({
     </Dialog.Root>
   );
 };
-

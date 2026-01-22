@@ -1,6 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
+import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import type { EventHandlerDefinition } from "../../eventHandler.types";
@@ -19,7 +20,6 @@ import {
 } from "../errorHandling";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
-import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 
 /**
  * Dispatches events to registered event handlers.

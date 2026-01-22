@@ -75,8 +75,8 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     py={2}
     borderRadius="md"
     borderWidth={1}
-    borderColor="gray.200"
-    _hover={{ textDecoration: "none", bg: "gray.50", borderColor: "gray.300" }}
+    borderColor="border"
+    _hover={{ textDecoration: "none", bg: "bg.muted", borderColor: "border.emphasized" }}
     transition="all 0.2s"
     onClick={onClick}
     aria-label={guide.label + " (opens in a new tab)"}
@@ -85,7 +85,7 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     <Text flex={1} textAlign="left">
       {guide.label}
     </Text>
-    <Box as="span" color="gray.400" ml={1} display="flex" alignItems="center">
+    <Box as="span" color="fg.subtle" ml={1} display="flex" alignItems="center">
       <LuExternalLink size={16} />
     </Box>
   </ChakraLink>

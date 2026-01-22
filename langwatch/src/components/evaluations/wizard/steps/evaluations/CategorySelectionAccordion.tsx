@@ -186,7 +186,7 @@ export const CategorySelectionAccordion = ({
 }: {
   setAccordeonValue: (value: string[]) => void;
 }) => {
-  const { setWizardState, wizardState } = useEvaluationWizardStore();
+  const { setWizardState, workbenchState } = useEvaluationWizardStore();
 
   const handleCategorySelect = (categoryId: EvaluationCategory) => {
     setWizardState({
@@ -203,14 +203,14 @@ export const CategorySelectionAccordion = ({
     <StepAccordion
       value="category"
       width="full"
-      borderColor="green.400"
+      borderColor="green.fg"
       title="Evaluation Category"
-      showTrigger={!!wizardState.evaluatorCategory}
+      showTrigger={!!workbenchState.evaluatorCategory}
     >
       <RadioCard.Root
         variant="outline"
         colorPalette="green"
-        value={wizardState.evaluatorCategory}
+        value={workbenchState.evaluatorCategory}
         onValueChange={(e) => {
           if (e.value) {
             handleCategorySelect(e.value as EvaluationCategory);
@@ -223,7 +223,7 @@ export const CategorySelectionAccordion = ({
         <Grid width="full" gap={3}>
           {evaluatorCategories
             .sort((a, b) => {
-              if (wizardState.task === "real_time") {
+              if (workbenchState.task === "real_time") {
                 if (a.realtime && !b.realtime) return -1;
                 if (!a.realtime && b.realtime) return 1;
               }
@@ -231,7 +231,7 @@ export const CategorySelectionAccordion = ({
             })
             .map((category) => {
               const isDisabled =
-                !category.realtime && wizardState.task === "real_time";
+                !category.realtime && workbenchState.task === "real_time";
               return (
                 <Tooltip
                   key={category.id}

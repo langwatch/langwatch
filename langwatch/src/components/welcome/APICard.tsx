@@ -16,8 +16,8 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { trackEvent } from "../../utils/tracking";
 import { CopyInput } from "../CopyInput";
 import { useIntegrationChecks } from "../IntegrationChecks";
-import ObservabilityCard from "./ObservabilityCard";
 import { Link } from "../ui/link";
+import ObservabilityCard from "./ObservabilityCard";
 
 const getLangWatchEndpoint = () => {
   if (typeof window === "undefined") return "";
@@ -45,7 +45,7 @@ const APICard: React.FC = () => {
         <Heading size="md" textAlign="left">
           Connect to LangWatch
         </Heading>
-        <Text fontSize="xs" color="gray.500" textAlign="left">
+        <Text fontSize="xs" color="fg.muted" textAlign="left">
           Follow the instructions on our docs to setup your project with
           LangWatch!
         </Text>
@@ -53,10 +53,10 @@ const APICard: React.FC = () => {
       <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
         <HStack width="full" align="end">
           <VStack align="start">
-            <Text fontSize="sm" color="gray.900" fontWeight="medium">
+            <Text fontSize="sm" color="fg" fontWeight="medium">
               API key
             </Text>
-            <Text fontSize="xs" color="gray.500" fontWeight="normal" mt={-1}>
+            <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
               Keep it secret, keep it safe. Don&apos;t let this key fall into
               prying eyes.
             </Text>
@@ -86,10 +86,10 @@ const APICard: React.FC = () => {
         <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
           <HStack width="full" align="end">
             <VStack align="start">
-              <Text fontSize="sm" color="gray.900" fontWeight="medium">
+              <Text fontSize="sm" color="fg" fontWeight="medium">
                 Endpoint
               </Text>
-              <Text fontSize="xs" color="gray.500" fontWeight="normal" mt={-1}>
+              <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
                 This is the endpoint you should configure in your SDK to send
                 data to LangWatch.
               </Text>

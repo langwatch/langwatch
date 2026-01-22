@@ -351,7 +351,7 @@ export function EvaluatorSelection({
                   //@ts-ignore
                   href={`/${project?.slug}/workflows`}
                   border="dashed"
-                  borderColor="gray.300"
+                  borderColor="border.emphasized"
                   borderWidth={3}
                   borderRadius={6}
                   padding={6}
@@ -365,10 +365,10 @@ export function EvaluatorSelection({
                   }}
                 >
                   <VStack gap={3}>
-                    <Box p={3} borderRadius="full" bg="gray.100">
+                    <Box p={3} borderRadius="full" bg="bg.muted">
                       <Plus size={24} color="gray" />
                     </Box>
-                    <Text color="gray.600">Create Custom Evaluator</Text>
+                    <Text color="fg.muted">Create Custom Evaluator</Text>
                   </VStack>
                 </GridItem>
               )}

@@ -96,7 +96,7 @@ export const TracesMapping = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const { task } = useEvaluationWizardStore((state) => ({
-    task: state.wizardState.task,
+    task: state.workbenchState.task,
   }));
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
@@ -533,7 +533,7 @@ export const TracesMapping = ({
                               height="24px"
                               border="2px solid"
                               borderRadius="0 0 0 6px"
-                              borderColor="gray.300"
+                              borderColor="border.emphasized"
                               borderTop={0}
                               borderRight={0}
                               marginLeft="12px"
@@ -583,7 +583,7 @@ export const TracesMapping = ({
                             height="24px"
                             border="2px solid"
                             borderRadius="0 0 0 6px"
-                            borderColor="gray.300"
+                            borderColor="border.emphasized"
                             borderTop={0}
                             borderRight={0}
                             marginLeft="12px"
@@ -631,7 +631,7 @@ export const TracesMapping = ({
                             height="24px"
                             border="2px solid"
                             borderRadius="0 0 0 6px"
-                            borderColor="gray.300"
+                            borderColor="border.emphasized"
                             borderTop={0}
                             borderRight={0}
                             marginLeft="12px"

@@ -9,13 +9,12 @@
  * 3. The useEvaluationMappings hook returns correct data reactively
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useEvaluationMappings } from "../hooks/useEvaluationMappings";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetReference, TargetConfig } from "../types";
-import { DEFAULT_TEST_DATA_ID, createInitialInlineDataset } from "../types";
+import { createInitialInlineDataset, DEFAULT_TEST_DATA_ID } from "../types";
 
 // ============================================================================
 // Test Data
@@ -24,7 +23,7 @@ import { DEFAULT_TEST_DATA_ID, createInitialInlineDataset } from "../types";
 const createTestDataset = (
   id: string,
   name: string,
-  columns: Array<{ name: string; type: "string" | "number" | "boolean" }>
+  columns: Array<{ name: string; type: "string" | "number" | "boolean" }>,
 ): DatasetReference => ({
   id,
   name,
@@ -94,10 +93,12 @@ describe("Per-Dataset Mappings", () => {
     it("stores different mappings for different datasets", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
-        { name: "foo", type: "string" },
-        { name: "bar", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("dataset-2", "Dataset 2", [
+          { name: "foo", type: "string" },
+          { name: "bar", type: "string" },
+        ]),
+      );
       store.addTarget(createTestTarget("target-1"));
 
       // Set mapping for default dataset
@@ -159,9 +160,11 @@ describe("Per-Dataset Mappings", () => {
     it("returns available sources from active dataset only", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
-        { name: "foo", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("dataset-2", "Dataset 2", [
+          { name: "foo", type: "string" },
+        ]),
+      );
       store.addTarget(createTestTarget("target-1"));
 
       const { result } = renderHook(() => useEvaluationMappings("target-1"));
@@ -197,9 +200,11 @@ describe("Per-Dataset Mappings", () => {
       const store = useEvaluationsV3Store.getState();
 
       // Setup: two datasets with different mappings
-      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
-        { name: "foo", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("dataset-2", "Dataset 2", [
+          { name: "foo", type: "string" },
+        ]),
+      );
       store.addTarget(createTestTarget("target-1"));
 
       store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
@@ -215,7 +220,9 @@ describe("Per-Dataset Mappings", () => {
         sourceField: "foo",
       });
 
-      const { result, rerender } = renderHook(() => useEvaluationMappings("target-1"));
+      const { result, rerender } = renderHook(() =>
+        useEvaluationMappings("target-1"),
+      );
 
       // Initially shows default dataset mappings
       const initialMapping = result.current.inputMappings.question;
@@ -243,9 +250,11 @@ describe("Per-Dataset Mappings", () => {
     it("returns empty mappings for new dataset without mappings", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
-        { name: "foo", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("dataset-2", "Dataset 2", [
+          { name: "foo", type: "string" },
+        ]),
+      );
       store.addTarget(createTestTarget("target-1"));
 
       // Only add mapping for default dataset
@@ -256,7 +265,9 @@ describe("Per-Dataset Mappings", () => {
         sourceField: "input",
       });
 
-      const { result, rerender } = renderHook(() => useEvaluationMappings("target-1"));
+      const { result, rerender } = renderHook(() =>
+        useEvaluationMappings("target-1"),
+      );
 
       // Default dataset has mapping
       expect(result.current.inputMappings.question).toBeDefined();
@@ -273,7 +284,9 @@ describe("Per-Dataset Mappings", () => {
     });
 
     it("returns isValid false when target not found", () => {
-      const { result } = renderHook(() => useEvaluationMappings("non-existent"));
+      const { result } = renderHook(() =>
+        useEvaluationMappings("non-existent"),
+      );
 
       expect(result.current.isValid).toBe(false);
       expect(result.current.availableSources).toHaveLength(1); // Still has active dataset
@@ -296,24 +309,33 @@ describe("Per-Dataset Mappings", () => {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [{ identifier: "output", type: "str" }],
         mappings: {},
       });
 
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
-        type: "source",
-        source: "target",
-        sourceId: "target-1",
-        sourceField: "output",
-      });
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-1",
+        "output",
+        {
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "output",
+        },
+      );
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
 
       expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]).toBeDefined();
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]).toBeDefined();
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.output).toEqual({
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"],
+      ).toBeDefined();
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.output,
+      ).toEqual({
         type: "source",
         source: "target",
         sourceId: "target-1",
@@ -324,15 +346,16 @@ describe("Per-Dataset Mappings", () => {
     it("can have different evaluator mappings for different datasets", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
-        { name: "expected", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("dataset-2", "Dataset 2", [
+          { name: "expected", type: "string" },
+        ]),
+      );
       store.addTarget(createTestTarget("target-1"));
       store.addEvaluator({
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
         name: "Exact Match",
-        settings: {},
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected", type: "str" },
@@ -341,12 +364,18 @@ describe("Per-Dataset Mappings", () => {
       });
 
       // Different expected_output mappings for different datasets
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "expected", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "expected_output",
-      });
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-1",
+        "expected",
+        {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "expected_output",
+        },
+      );
       store.setEvaluatorMapping("eval-1", "dataset-2", "target-1", "expected", {
         type: "source",
         source: "dataset",
@@ -357,13 +386,18 @@ describe("Per-Dataset Mappings", () => {
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
 
-      const mapping1 = evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.expected;
+      const mapping1 =
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.expected;
       const mapping2 = evaluator?.mappings["dataset-2"]?.["target-1"]?.expected;
 
       expect(mapping1?.type).toBe("source");
-      expect(mapping1?.type === "source" && mapping1.sourceField).toBe("expected_output");
+      expect(mapping1?.type === "source" && mapping1.sourceField).toBe(
+        "expected_output",
+      );
       expect(mapping2?.type).toBe("source");
-      expect(mapping2?.type === "source" && mapping2.sourceField).toBe("expected");
+      expect(mapping2?.type === "source" && mapping2.sourceField).toBe(
+        "expected",
+      );
     });
   });
 
@@ -371,10 +405,12 @@ describe("Per-Dataset Mappings", () => {
     it("preserves existing mappings when target is updated", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.addDataset(createTestDataset("ds-1", "Dataset 1", [
-        { name: "input", type: "string" },
-        { name: "context", type: "string" },
-      ]));
+      store.addDataset(
+        createTestDataset("ds-1", "Dataset 1", [
+          { name: "input", type: "string" },
+          { name: "context", type: "string" },
+        ]),
+      );
       store.setActiveDataset("ds-1");
 
       // Add target with one input

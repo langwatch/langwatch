@@ -15,7 +15,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
-import React, { useMemo, useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
 import {
   Area,
@@ -39,7 +39,10 @@ import {
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
-import { useColorRawValue } from "../../components/ui/color-mode";
+import {
+  useColorModeValue,
+  useColorRawValue,
+} from "../../components/ui/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -183,8 +186,8 @@ const CustomGraph_ = React.memo(
       const timeScale_ = shouldUseFull
         ? "full"
         : input.timeScale === "full"
-        ? input.timeScale
-        : parseInt(input.timeScale.toString(), 10);
+          ? input.timeScale
+          : parseInt(input.timeScale.toString(), 10);
 
       // Show 1 hour granularity for full period when days difference is 2 days or less
       if (
@@ -329,12 +332,12 @@ const CustomGraph_ = React.memo(
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
-          ? uppercaseFirstLetter(groupName)
-              .replace("Evaluation passed passed", "Evaluation Passed")
-              .replace("Evaluation passed failed", "Evaluation Failed")
-              .replace("Contains error", "Traces")
-              .replace(/^Evaluation label /i, "")
-          : series?.name ?? aggKey;
+            ? uppercaseFirstLetter(groupName)
+                .replace("Evaluation passed passed", "Evaluation Passed")
+                .replace("Evaluation passed failed", "Evaluation Failed")
+                .replace("Contains error", "Traces")
+                .replace(/^Evaluation label /i, "")
+            : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
     );
@@ -1099,14 +1102,30 @@ function MonitorGraph({
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
     : average > 0.8 || !hasLoaded
-    ? "greenTones"
-    : average < 0.4
-    ? "redTones"
-    : "orangeTones";
+      ? "greenTones"
+      : average < 0.4
+        ? "redTones"
+        : "orangeTones";
 
   const maxValue = isPassRate
     ? 1
     : Math.max(...(allValues && allValues.length > 0 ? allValues : [1]));
+
+  // Color adjustments for light/dark mode
+  // Light mode: light backgrounds, dark text
+  // Dark mode: dark backgrounds, light text
+  const bgAdjustment = useColorModeValue(-400, 200);
+  const borderAdjustment = useColorModeValue(-200, 100);
+  const textAdjustment = useColorModeValue(300, -300);
+  const areaAdjustment = useColorModeValue(-300, 100);
+  const skeletonAdjustment = useColorModeValue(-100, 100);
+
+  // Glow effect for dark mode based on colorSet
+  const glowColor = getColor(colorSet, 0, 0);
+  const boxShadow = useColorModeValue(
+    "none",
+    `0 0 20px ${glowColor}40, 0 0 40px ${glowColor}20`,
+  );
 
   return (
     <Box
@@ -1114,11 +1133,12 @@ function MonitorGraph({
       height="full"
       position="relative"
       border="1px solid"
-      borderColor={getColor(colorSet, 0, -200)}
-      backgroundColor={getColor(colorSet, 0, -400)}
+      borderColor={getColor(colorSet, 0, borderAdjustment)}
+      backgroundColor={getColor(colorSet, 0, bgAdjustment)}
       borderRadius="lg"
       paddingTop={2}
       overflow="hidden"
+      boxShadow={boxShadow}
     >
       <VStack
         position="absolute"
@@ -1128,7 +1148,7 @@ function MonitorGraph({
         padding={8}
         gap={2}
         align="start"
-        color={getColor(colorSet, 0, 300)}
+        color={getColor(colorSet, 0, textAdjustment)}
       >
         <HStack>
           {input.monitorGraph?.isGuardrail && (
@@ -1155,7 +1175,7 @@ function MonitorGraph({
               <Skeleton
                 width="56px"
                 height="36px"
-                backgroundColor={getColor(colorSet, 0, -100)}
+                backgroundColor={getColor(colorSet, 0, skeletonAdjustment)}
               />
             )}
           </Text>
@@ -1239,13 +1259,13 @@ function MonitorGraph({
               key={aggKey}
               type="monotone"
               dataKey={aggKey}
-              stroke={getColor(colorSet, index, -300)}
+              stroke={getColor(colorSet, index, areaAdjustment)}
               stackId={
                 ["stacked_bar", "stacked_area"].includes(input.graphType)
                   ? "same"
                   : undefined
               }
-              fill={getColor(colorSet, index, -300)}
+              fill={getColor(colorSet, index, areaAdjustment)}
               strokeWidth={2.5}
               dot={false}
               name={nameForSeries(aggKey)}

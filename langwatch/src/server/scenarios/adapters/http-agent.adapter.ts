@@ -1,11 +1,17 @@
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { AgentInput } from "@langwatch/scenario";
-import { JSONPath } from "jsonpath-plus";
+import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
-import { AgentRepository, type AgentRepository as AgentRepositoryType } from "../../agents/agent.repository";
-import type { HttpComponentConfig, HttpAuth } from "~/optimization_studio/types/dsl";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { JSONPath } from "jsonpath-plus";
+import type {
+  HttpAuth,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import { createLogger } from "~/utils/logger";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import {
+  AgentRepository,
+  type AgentRepository as AgentRepositoryType,
+} from "../../agents/agent.repository";
 
 const logger = createLogger("HttpAgentAdapter");
 
@@ -20,7 +26,7 @@ const AUTH_STRATEGIES: Record<string, AuthStrategy> = {
   bearer: (auth) => {
     if (auth.type !== "bearer") return {};
     const headers: Record<string, string> = {};
-    headers["Authorization"] = `Bearer ${auth.token}`;
+    headers.Authorization = `Bearer ${auth.token}`;
     return headers;
   },
   api_key: (auth) => {
@@ -31,9 +37,11 @@ const AUTH_STRATEGIES: Record<string, AuthStrategy> = {
   },
   basic: (auth) => {
     if (auth.type !== "basic") return {};
-    const credentials = Buffer.from(`${auth.username}:${auth.password}`).toString("base64");
+    const credentials = Buffer.from(
+      `${auth.username}:${auth.password}`,
+    ).toString("base64");
     const headers: Record<string, string> = {};
-    headers["Authorization"] = `Basic ${credentials}`;
+    headers.Authorization = `Basic ${credentials}`;
     return headers;
   },
 };
@@ -90,7 +98,10 @@ export class HttpAgentAdapter extends AgentAdapter {
       const headers = this.buildRequestHeaders(config);
       const body = this.buildRequestBody(config.bodyTemplate, input);
       const responseData = await this.executeHttpRequest(config, headers, body);
-      const result = this.extractResponseContent(responseData, config.outputPath);
+      const result = this.extractResponseContent(
+        responseData,
+        config.outputPath,
+      );
 
       logger.info(
         { agentId: this.agentId, url: config.url, resultLength: result.length },
@@ -114,24 +125,36 @@ export class HttpAgentAdapter extends AgentAdapter {
     });
 
     if (!agent) {
-      logger.error({ agentId: this.agentId, projectId: this.projectId }, "HTTP agent not found");
+      logger.error(
+        { agentId: this.agentId, projectId: this.projectId },
+        "HTTP agent not found",
+      );
       throw new Error(`HTTP agent ${this.agentId} not found`);
     }
 
     if (agent.type !== "http") {
-      throw new Error(`Agent ${this.agentId} is not an HTTP agent (type: ${agent.type})`);
+      throw new Error(
+        `Agent ${this.agentId} is not an HTTP agent (type: ${agent.type})`,
+      );
     }
 
     logger.debug(
-      { url: (agent.config as HttpComponentConfig).url, method: (agent.config as HttpComponentConfig).method },
+      {
+        url: (agent.config as HttpComponentConfig).url,
+        method: (agent.config as HttpComponentConfig).method,
+      },
       "HTTP agent config loaded",
     );
 
     return agent.config as HttpComponentConfig;
   }
 
-  private buildRequestHeaders(config: HttpComponentConfig): Record<string, string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
+  private buildRequestHeaders(
+    config: HttpComponentConfig,
+  ): Record<string, string> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
     this.applyCustomHeaders(headers, config.headers);
     this.applyAuthentication(headers, config.auth);
     return headers;
@@ -168,7 +191,10 @@ export class HttpAgentAdapter extends AgentAdapter {
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
-    logger.debug({ url: config.url, method: config.method }, "Making HTTP request");
+    logger.debug(
+      { url: config.url, method: config.method },
+      "Making HTTP request",
+    );
 
     const response = await ssrfSafeFetch(config.url, {
       method: config.method,
@@ -176,7 +202,10 @@ export class HttpAgentAdapter extends AgentAdapter {
       body: config.method !== "GET" ? body : undefined,
     });
 
-    logger.debug({ status: response.status, ok: response.ok }, "HTTP response received");
+    logger.debug(
+      { status: response.status, ok: response.ok },
+      "HTTP response received",
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -189,7 +218,10 @@ export class HttpAgentAdapter extends AgentAdapter {
     return response.text();
   }
 
-  private extractResponseContent(data: unknown, outputPath: string | undefined): string {
+  private extractResponseContent(
+    data: unknown,
+    outputPath: string | undefined,
+  ): string {
     if (!outputPath?.trim() || !data) {
       return this.stringify(data);
     }
@@ -211,7 +243,10 @@ export class HttpAgentAdapter extends AgentAdapter {
     return typeof value === "string" ? value : JSON.stringify(value);
   }
 
-  private buildRequestBody(template: string | undefined, input: AgentInput): string {
+  private buildRequestBody(
+    template: string | undefined,
+    input: AgentInput,
+  ): string {
     if (!template) {
       return JSON.stringify({ messages: input.messages });
     }

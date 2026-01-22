@@ -1,6 +1,4 @@
 import {
-  Box,
-  Button,
   Card,
   HStack,
   Icon,
@@ -12,48 +10,26 @@ import {
   Check,
   CircleDot,
   MessageSquare,
-  Sparkles,
   TriangleAlert,
   Users,
 } from "lucide-react";
+import type { UseFormReturn } from "react-hook-form";
+import { ScenarioAIGeneration } from "./ScenarioAIGeneration";
+import type { ScenarioFormData } from "./ScenarioForm";
+
+type ScenarioEditorSidebarProps = {
+  form?: UseFormReturn<ScenarioFormData> | null;
+};
 
 /**
  * Help sidebar for the scenario editor.
  * Provides tips and best practices for writing scenarios.
  */
-export function ScenarioEditorSidebar() {
+export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
   return (
     <VStack align="stretch" gap={4}>
-      {/* Need Help Card */}
-      <Card.Root>
-        <Card.Body>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <Box
-                p={2}
-                bg="blue.50"
-                borderRadius="md"
-                color="blue.500"
-              >
-                <Icon as={Sparkles} boxSize={5} />
-              </Box>
-              <VStack align="start" gap={0}>
-                <Text fontWeight="semibold" fontSize="sm">
-                  Need Help?
-                </Text>
-                <Text fontSize="xs" color="gray.600">
-                  Our AI can help you write better scenarios based on your
-                  agent&apos;s purpose and common user patterns.
-                </Text>
-              </VStack>
-            </HStack>
-            <Button variant="outline" width="full" size="sm">
-              <Sparkles size={14} />
-              Generate with AI
-            </Button>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+      {/* AI Generation */}
+      <ScenarioAIGeneration form={form ?? null} />
 
       {/* Writing Great Scenarios */}
       <Card.Root>
@@ -72,7 +48,7 @@ export function ScenarioEditorSidebar() {
                   <Text fontSize="sm" fontWeight="medium">
                     Define Success Clearly
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     What does &apos;good&apos; look like? Be specific about
                     expected outcomes.
                   </Text>
@@ -87,7 +63,7 @@ export function ScenarioEditorSidebar() {
                   <Text fontSize="sm" fontWeight="medium">
                     Consider Edge Cases
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     What unusual situations should your agent handle?
                   </Text>
                 </VStack>
@@ -101,7 +77,7 @@ export function ScenarioEditorSidebar() {
                   <Text fontSize="sm" fontWeight="medium">
                     Think About Personas
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     Who are your users? Different users have different needs.
                   </Text>
                 </VStack>
@@ -115,7 +91,7 @@ export function ScenarioEditorSidebar() {
                   <Text fontSize="sm" fontWeight="medium">
                     Conversation Flow
                   </Text>
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     How should the conversation progress?
                   </Text>
                 </VStack>
@@ -134,25 +110,25 @@ export function ScenarioEditorSidebar() {
             </Text>
 
             <List.Root gap={2} listStyleType="none">
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Start with small simulations to validate quickly
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Use specific prompts for better results
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
                 Include edge cases in your testing
               </List.Item>
-              <List.Item fontSize="xs" color="gray.600">
+              <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
@@ -165,7 +141,3 @@ export function ScenarioEditorSidebar() {
     </VStack>
   );
 }
-
-
-
-

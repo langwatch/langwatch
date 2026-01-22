@@ -12,7 +12,7 @@ export function SetCard({
   lastRunAt,
   onClick,
 }: SetCardProps) {
-  const formatDate = (timestamp: number) => {
+  const _formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
 
     return new Intl.DateTimeFormat("en-US", {
@@ -24,14 +24,14 @@ export function SetCard({
 
   return (
     <Card.Root
-      bg="white"
+      bg="bg.panel"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       borderRadius="xl"
       boxShadow="lg"
       p="5"
       _hover={{
-        borderColor: "gray.300",
+        borderColor: "border.emphasized",
         transform: "translateY(-1px)",
         shadow: "xl",
       }}
@@ -41,8 +41,10 @@ export function SetCard({
       position="relative"
     >
       <VStack align="stretch" gap="2">
-        <Text fontSize="2xl" paddingBottom="2">{"🎭"}</Text>
-        <Text fontWeight="500" color="gray.900">
+        <Text fontSize="2xl" paddingBottom="2">
+          {"🎭"}
+        </Text>
+        <Text fontWeight="500" color="fg">
           {scenarioSetId}
         </Text>
 
@@ -50,7 +52,7 @@ export function SetCard({
         <HStack
           justify="space-between"
           align="center"
-          color="gray.400"
+          color="fg.subtle"
           fontSize="sm"
         >
           <Text>{scenarioCount} scenarios</Text>

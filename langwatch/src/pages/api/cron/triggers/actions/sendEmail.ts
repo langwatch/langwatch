@@ -28,4 +28,3 @@ export const handleSendEmail = async (context: TriggerContext) => {
     });
   }
 };
-

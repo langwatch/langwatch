@@ -1,17 +1,17 @@
 import {
-  VStack,
-  HStack,
   Button,
   Grid,
   GridItem,
+  HStack,
   Input,
+  VStack,
 } from "@chakra-ui/react";
-import React from "react";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import React from "react";
 import type {
-  UseModelProviderFormState,
-  UseModelProviderFormActions,
   ExtraHeader,
+  UseModelProviderFormActions,
+  UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
@@ -46,7 +46,7 @@ export const ExtraHeadersSection = ({
           rowGap={2}
           width="full"
         >
-          <GridItem color="gray.500" colSpan={4}>
+          <GridItem color="fg.muted" colSpan={4}>
             <SmallLabel>Extra Headers</SmallLabel>
           </GridItem>
           {state.extraHeaders.map((h: ExtraHeader, index: number) => (
@@ -55,10 +55,7 @@ export const ExtraHeadersSection = ({
                 <Input
                   value={h.key}
                   onChange={(e) =>
-                    actions.setExtraHeaderKey(
-                      index,
-                      e.target.value,
-                    )
+                    actions.setExtraHeaderKey(index, e.target.value)
                   }
                   placeholder="Header name"
                   autoComplete="off"
@@ -69,10 +66,7 @@ export const ExtraHeadersSection = ({
                 <Input
                   value={h.value}
                   onChange={(e) =>
-                    actions.setExtraHeaderValue(
-                      index,
-                      e.target.value,
-                    )
+                    actions.setExtraHeaderValue(index, e.target.value)
                   }
                   type={h.concealed ? "password" : "text"}
                   placeholder="Header value"
@@ -84,15 +78,9 @@ export const ExtraHeadersSection = ({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() =>
-                    actions.toggleExtraHeaderConcealed(index)
-                  }
+                  onClick={() => actions.toggleExtraHeaderConcealed(index)}
                 >
-                  {h.concealed ? (
-                    <EyeOff size={16} />
-                  ) : (
-                    <Eye size={16} />
-                  )}
+                  {h.concealed ? <EyeOff size={16} /> : <Eye size={16} />}
                 </Button>
               </GridItem>
               <GridItem>
@@ -111,11 +99,7 @@ export const ExtraHeadersSection = ({
       )}
 
       <HStack width="full" justify="end">
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={actions.addExtraHeader}
-        >
+        <Button size="xs" variant="outline" onClick={actions.addExtraHeader}>
           <Plus size={16} />
           Add Header
         </Button>

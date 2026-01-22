@@ -92,7 +92,7 @@ export function EditPromptHandleButton() {
         onClick={handleTriggerChangeHandle}
         variant="ghost"
         _hover={{
-          backgroundColor: canEdit ? "gray.100" : undefined,
+          backgroundColor: canEdit ? "bg.subtle" : undefined,
         }}
         textTransform="uppercase"
         size="xs"
@@ -105,4 +105,3 @@ export function EditPromptHandleButton() {
     </Tooltip>
   );
 }
-

@@ -3,8 +3,8 @@ import {
   Grid,
   HStack,
   Progress,
-  Text,
   Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -172,20 +172,20 @@ function StepItem({ step, onClick }: StepItemProps) {
       borderRadius="md"
       cursor={step.complete ? "default" : "pointer"}
       onClick={step.complete ? undefined : onClick}
-      _hover={step.complete ? {} : { background: "gray.50" }}
+      _hover={step.complete ? {} : { background: "bg.muted" }}
       transition="all 0.15s"
     >
       <Box
         padding={1}
         borderRadius="full"
-        background={step.complete ? "green.100" : "gray.100"}
-        color={step.complete ? "green.600" : "gray.400"}
+        background={step.complete ? "green.subtle" : "bg.muted"}
+        color={step.complete ? "green.solid" : "fg.muted"}
       >
         {step.complete ? <LuCheck size={10} /> : getIconForStep(step.key)}
       </Box>
       <Text
         fontSize="13px"
-        color={step.complete ? "gray.400" : "gray.700"}
+        color={step.complete ? "fg.muted" : "fg"}
         textDecoration={step.complete ? "line-through" : "none"}
       >
         {step.title}
@@ -290,12 +290,12 @@ export function OnboardingProgress() {
       {/* Header with progress */}
       <HStack justify="space-between" align="center" width="full">
         <HStack gap={3}>
-          <Text fontSize="sm" fontWeight="medium" color="gray.700">
+          <Text fontSize="sm" fontWeight="medium" color="fg">
             Get started with LangWatch
           </Text>
         </HStack>
         <Spacer />
-        <Text fontSize="xs" color="gray.500">
+        <Text fontSize="xs" color="fg.muted">
           {completionPercentage}% completed
         </Text>
         <Box width="80px">

@@ -1,22 +1,24 @@
-import * as llmModelCostsRaw from "../server/modelProviders/llmModelCosts.json";
+import { getModelById } from "../server/modelProviders/registry";
 import { createLogger } from "./logger";
 
 const logger = createLogger("modelLimits");
 
+/**
+ * Model token limits for context window and output generation.
+ *
+ * Semantic differences:
+ * - maxInputTokens: Maximum tokens in input context (prompt + conversation history)
+ * - maxOutputTokens: Maximum tokens the model can generate in response
+ * - maxTokens: General context length reference (same as maxInputTokens for most models)
+ *
+ * Note: Currently maxInputTokens and maxTokens are both set from contextLength.
+ * maxInputTokens is retained for semantic clarity in contexts that specifically
+ * need to reference input limits vs output limits.
+ */
 export interface ModelLimits {
   maxInputTokens?: number;
   maxOutputTokens?: number;
   maxTokens?: number;
-}
-
-/**
- * Load model costs data with proper default handling
- * Extracted from llmModelCost.tsx to avoid duplication
- */
-function loadModelCostsData() {
-  return "default" in llmModelCostsRaw
-    ? (llmModelCostsRaw.default as typeof llmModelCostsRaw)
-    : llmModelCostsRaw;
 }
 
 /**
@@ -27,26 +29,20 @@ function loadModelCostsData() {
 function generateModelNameVariations(modelName: string): string[] {
   const variations: string[] = [];
 
+  // Add the original full name first
+  variations.push(modelName);
+
   // Extract base name (everything after the last /)
   const baseName = modelName.split("/").pop() ?? modelName;
-  variations.push(baseName);
-
-  // Add the original full name
-  if (modelName !== baseName) {
-    variations.push(modelName);
-  }
-
-  // Try with openrouter prefix (common in some setups)
-  variations.push(`openrouter/${baseName}`);
-  if (modelName !== baseName) {
-    variations.push(`openrouter/${modelName}`);
+  if (baseName !== modelName) {
+    variations.push(baseName);
   }
 
   return variations;
 }
 
 /**
- * Get model limits from the model costs data
+ * Get model limits from the model registry
  * Tries multiple name variations to find the model data
  *
  * @param modelName - The model name to get limits for (e.g., "openai/gpt-5")
@@ -54,24 +50,17 @@ function generateModelNameVariations(modelName: string): string[] {
  */
 export function getModelLimits(modelName: string): ModelLimits | null {
   try {
-    const llmModelCosts = loadModelCostsData();
-
     // Try different variations of the model name
     const variations = generateModelNameVariations(modelName);
 
     for (const variation of variations) {
-      const name_ = variation as keyof typeof llmModelCosts;
-      const model = llmModelCosts[name_] as {
-        max_input_tokens?: number;
-        max_output_tokens?: number;
-        max_tokens?: number;
-      };
+      const model = getModelById(variation);
 
-      if (model && typeof model === "object") {
+      if (model) {
         return {
-          maxInputTokens: model.max_input_tokens,
-          maxOutputTokens: model.max_output_tokens,
-          maxTokens: model.max_tokens,
+          maxInputTokens: model.contextLength,
+          maxOutputTokens: model.maxCompletionTokens ?? undefined,
+          maxTokens: model.contextLength,
         };
       }
     }

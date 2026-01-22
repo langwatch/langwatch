@@ -39,7 +39,7 @@ export function FeedbackLink() {
         variant="plain"
         onClick={onOpen}
         fontWeight="normal"
-        color="gray.800"
+        color="fg"
       >
         Give Feedback
       </Button>

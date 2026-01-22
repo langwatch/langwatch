@@ -3,20 +3,20 @@ import { useCallback, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
-import { VariablesSection, type Variable } from "~/components/variables";
 import { Tooltip } from "~/components/ui/tooltip";
+import { type Variable, VariablesSection } from "~/components/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { LlmConfigInputType } from "~/types";
+import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
-import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../ui/TabContext";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
-import { ResizableDivider } from "./ResizableDivider";
 import type { LayoutMode } from "./PromptBrowserWindowContent";
+import { ResizableDivider } from "./ResizableDivider";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);
@@ -156,7 +156,7 @@ export function PromptTabbedSection({
         flexShrink={0}
         minHeight="32px"
         borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
-        borderColor={layoutMode === "horizontal" ? "gray.100" : undefined}
+        borderColor={layoutMode === "horizontal" ? "border" : undefined}
         paddingBottom={2}
       >
         <HStack

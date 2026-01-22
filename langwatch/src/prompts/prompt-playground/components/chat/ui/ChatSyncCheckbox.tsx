@@ -38,7 +38,7 @@ export function ChatSyncCheckbox({
         size="xs"
         colorPalette="orange"
       >
-        <Box fontSize="xs" color="gray.600">
+        <Box fontSize="xs" color="fg.muted">
           Sync across tabs
         </Box>
       </Checkbox>

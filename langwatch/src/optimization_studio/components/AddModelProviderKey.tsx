@@ -38,7 +38,7 @@ export const AddModelProviderKey = ({
                     ]
                   }
                 </Box>
-                <Text color="gray.800">{titleCase(provider)}</Text>
+                <Text color="fg">{titleCase(provider)}</Text>
                 <Spacer />
 
                 <Link href="/settings/model-providers" isExternal>

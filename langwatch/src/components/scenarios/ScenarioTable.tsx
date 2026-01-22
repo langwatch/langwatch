@@ -1,15 +1,15 @@
 import { HStack, Table, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import {
+  type ColumnFiltersState,
   createColumnHelper,
+  type FilterFn,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  useReactTable,
-  type ColumnFiltersState,
-  type FilterFn,
   type SortingState,
+  useReactTable,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -62,7 +62,7 @@ export function ScenarioTable({
               <Text
                 key={label}
                 fontSize="xs"
-                bg="gray.100"
+                bg="bg.muted"
                 px={2}
                 py={0.5}
                 borderRadius="md"
@@ -76,13 +76,13 @@ export function ScenarioTable({
       columnHelper.accessor("updatedAt", {
         header: "Updated",
         cell: (info) => (
-          <Text color="gray.500">
+          <Text color="fg.muted">
             {formatTimeAgo(info.getValue().getTime())}
           </Text>
         ),
       }),
     ],
-    []
+    [],
   );
 
   const table = useReactTable({
@@ -116,7 +116,7 @@ export function ScenarioTable({
                 <HStack gap={1}>
                   {flexRender(
                     header.column.columnDef.header,
-                    header.getContext()
+                    header.getContext(),
                   )}
                   {header.column.getIsSorted() === "asc" && (
                     <ChevronUp size={14} />

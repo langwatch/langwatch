@@ -38,7 +38,7 @@ function PromptBrowserTabView({
         </Text>
         {hasUnsavedChanges && (
           <Box>
-            <Circle size="10px" bg="orange.400" color="gray.50" />
+            <Circle size="10px" bg="orange.solid" />
           </Box>
         )}
         {showVersionBadge && meta.versionNumber != null && (

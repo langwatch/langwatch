@@ -891,6 +891,66 @@ def test_langwatch_evaluator_llm_boolean_with_multiline_prompt():
 
 
 @pytest.mark.integration
+def test_invalid_evaluator_returns_error_status():
+    """
+    Test that an invalid/non-existent evaluator type returns an error status,
+    not 'processed'. This ensures errors from langevals are properly propagated.
+    """
+    disable_dsp_caching()
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        EvaluatorNode(
+            id="invalid_evaluator",
+            data=Evaluator(
+                name="Invalid Evaluator",
+                cls="LangWatchEvaluator",
+                evaluator="langevals/this_evaluator_does_not_exist",  # Invalid evaluator
+                inputs=[
+                    Field(
+                        identifier="output",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                ],
+                outputs=[],
+                parameters=[],
+            ),
+            type="evaluator",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e-invalid-eval",
+            source="generate_answer",
+            sourceHandle="outputs.answer",
+            target="invalid_evaluator",
+            targetHandle="inputs.output",
+            type="default",
+        )
+    )
+
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
+        instance = Module(run_evaluations=True)  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
+
+    # The evaluator should return error status, NOT processed
+    assert "invalid_evaluator" in result.evaluations
+    eval_result = result.evaluations["invalid_evaluator"]
+    assert eval_result.status == "error", f"Expected 'error' status but got '{eval_result.status}'"
+    assert eval_result.details is not None, "Error details should be present"
+
+
+@pytest.mark.integration
 def test_parse_workflow_with_until_node():
     disable_dsp_caching()
 

@@ -11,8 +11,8 @@ import {
 import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
 import { CopyIcon } from "lucide-react";
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,
@@ -30,9 +30,9 @@ import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { api } from "../../utils/api";
 import { CustomGraph } from "../analytics/CustomGraph";
-import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
+import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
 
 type MonitorsSectionProps = {
   title: string;
@@ -60,8 +60,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
   const experimentsSlugMap = useMemo(() => {
     return Object.fromEntries(
-      experiments.data?.experiments?.map((experiment) => [experiment.id, experiment.slug]) ??
-        [],
+      experiments.data?.experiments?.map((experiment) => [
+        experiment.id,
+        experiment.slug,
+      ]) ?? [],
     );
   }, [experiments.data]);
 
@@ -139,7 +141,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           size="sm"
                           aria-label="More options"
                           _hover={{
-                            backgroundColor: "white",
+                            backgroundColor: "bg.panel",
                           }}
                         >
                           <LuEllipsis size={16} />
@@ -193,9 +195,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 if (!project || !monitor.experimentId) return;
 
                                 if (hasPermission("evaluations:manage")) {
-                                  const experiment = experiments.data?.experiments?.find(
-                                    (e) => e.id === monitor.experimentId,
-                                  );
+                                  const experiment =
+                                    experiments.data?.experiments?.find(
+                                      (e) => e.id === monitor.experimentId,
+                                    );
                                   if (experiment) {
                                     setCopyDialogState({
                                       open: true,
@@ -253,7 +256,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                         </Menu.Item>
                         <Menu.Item
                           value="delete"
-                          color="red.500"
+                          color="red.fg"
                           onClick={() => {
                             if (!project) return;
 
@@ -304,7 +307,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
               })}
             </SimpleGrid>
             {monitors.data?.length === 0 && (
-              <Text color="gray.600">
+              <Text color="fg.muted">
                 No real-time monitors or guardrails set up yet.
                 {project && hasPermission("evaluations:manage") && (
                   <>

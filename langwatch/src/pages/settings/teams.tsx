@@ -8,7 +8,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, MoreVertical, Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "lucide-react";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
@@ -18,7 +19,6 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function Teams() {
   const { organization } = useOrganizationTeamProject();

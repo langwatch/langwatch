@@ -36,7 +36,7 @@ export function LLMModelCost(props: { projectId?: string }) {
           {llmModelCosts.data && (
             <>
               <Text fontSize="md">·</Text>
-              <Text fontSize="md" color="gray.500">
+              <Text fontSize="md" color="fg.muted">
                 {llmModelCosts.data?.length} models
               </Text>
             </>

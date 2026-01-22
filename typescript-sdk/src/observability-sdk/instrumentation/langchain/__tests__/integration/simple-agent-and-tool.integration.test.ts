@@ -65,7 +65,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5-mini",
-          reasoning: { effort: "minimal" },
+          reasoning: { effort: "low" },
           temperature: 1,
         });
 
@@ -119,7 +119,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5-mini",
-          reasoning: { effort: "minimal" },
+          reasoning: { effort: "low" },
           temperature: 1,
         });
 
@@ -176,7 +176,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5-mini",
-          reasoning: { effort: "minimal" },
+          reasoning: { effort: "low" },
           temperature: 1,
         });
 
@@ -256,7 +256,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -304,7 +304,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -367,7 +367,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -422,7 +422,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -466,7 +466,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -504,7 +504,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -539,7 +539,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 
@@ -580,7 +580,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5-mini",
-            reasoning: { effort: "minimal" },
+            reasoning: { effort: "low" },
             temperature: 1,
           });
 

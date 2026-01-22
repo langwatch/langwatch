@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.12.0...typescript-sdk@v0.13.0) (2026-01-21)
+
+
+### Features
+
+* **llm-config:** upgrade model registry with dynamic parameters and OpenRouter sync ([#1115](https://github.com/langwatch/langwatch/issues/1115)) ([f03a283](https://github.com/langwatch/langwatch/commit/f03a283c1e49fa4127bbc82d01f301c6cc3fcf49))
+* **sdk:** add online evaluations API and ensureSetup for TypeScript ([2209258](https://github.com/langwatch/langwatch/commit/22092580433b9a3014123e62f39cf8c44543d8cc))
+
+
+### Miscellaneous
+
+* add pnpm-workspace to typescript-sdk to avoid issues with nested pnpm installation ([671b025](https://github.com/langwatch/langwatch/commit/671b025e42402bbd5eda84c89fa4a3224d1ed235))
+
+
+### Code Refactoring
+
+* **sdk:** rename evaluation API to experiment for new terminology ([f10326c](https://github.com/langwatch/langwatch/commit/f10326c0f2ee5818fbcf51507a95933bfe83caeb))
+* **sdk:** rename internal evaluation classes to experiment ([ff70cab](https://github.com/langwatch/langwatch/commit/ff70cab904905b85a77a68e7b1eb60e9c364a18d))
+
+## [0.12.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.11.0...typescript-sdk@v0.12.0) (2026-01-18)
+
+
+### Features
+
+* add CI/CD execution support for evaluations v3 ([#1118](https://github.com/langwatch/langwatch/issues/1118)) ([d28adac](https://github.com/langwatch/langwatch/commit/d28adaceeb87921d9c7c0f1cf76b5e03f3b90fbd))
+
+
+### Bug Fixes
+
+* various evaluations v3 fixes ([#1122](https://github.com/langwatch/langwatch/issues/1122)) ([c9904fc](https://github.com/langwatch/langwatch/commit/c9904fc898a7982ec0b23b11fcfeed83f34fbeb7))
+
+## [0.11.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.10.0...typescript-sdk@v0.11.0) (2026-01-16)
+
+
+### Features
+
+* evaluations v3 execution and new evaluations results page ([#1113](https://github.com/langwatch/langwatch/issues/1113)) ([510f65d](https://github.com/langwatch/langwatch/commit/510f65d17e13c539b877e7eed2fefff118ceb705))
+
+
+### Bug Fixes
+
+* remove localhost:5560 fallback from integration tests ([6a8909f](https://github.com/langwatch/langwatch/commit/6a8909f4418e3ea99bfd704032918e550752b73e))
+* resolve all eslint warnings and errors ([670d623](https://github.com/langwatch/langwatch/commit/670d623061cec1e966982de90bf18bb863853f55))
+* respect prompt version when fetching prompts via CLI ([#1075](https://github.com/langwatch/langwatch/issues/1075)) ([4daa0b0](https://github.com/langwatch/langwatch/commit/4daa0b0ac4cadf6c1a5999244bbfaba6513598d1))
+
+
+### Miscellaneous
+
+* trigger release ([#1011](https://github.com/langwatch/langwatch/issues/1011)) ([6173f53](https://github.com/langwatch/langwatch/commit/6173f53b041d9ee7e6b930270224954ba3c6621e))
+
 ## [0.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.9.0...typescript-sdk@v0.10.0) (2025-12-15)
 
 

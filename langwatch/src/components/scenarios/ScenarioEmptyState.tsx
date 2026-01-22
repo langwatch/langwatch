@@ -11,10 +11,10 @@ type ScenarioEmptyStateProps = {
 export function ScenarioEmptyState({ onCreateClick }: ScenarioEmptyStateProps) {
   return (
     <VStack gap={4} align="center" py={12}>
-      <Text fontSize="lg" color="gray.500">
+      <Text fontSize="lg" color="fg.muted">
         No scenarios yet
       </Text>
-      <Text fontSize="sm" color="gray.400">
+      <Text fontSize="sm" color="fg.subtle">
         Create your first scenario to get started
       </Text>
       <Button colorPalette="blue" onClick={onCreateClick}>
@@ -23,8 +23,3 @@ export function ScenarioEmptyState({ onCreateClick }: ScenarioEmptyStateProps) {
     </VStack>
   );
 }
-
-
-
-
-

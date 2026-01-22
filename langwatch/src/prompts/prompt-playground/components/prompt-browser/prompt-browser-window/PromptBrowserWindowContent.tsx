@@ -233,8 +233,8 @@ function PromptBrowserWindowInner(props: {
   const messagesMaxHeight = isCollapsed
     ? 0
     : userMaxHeight !== null
-    ? userMaxHeight
-    : getMaxAllowedHeight();
+      ? userMaxHeight
+      : getMaxAllowedHeight();
 
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
@@ -257,7 +257,7 @@ function PromptBrowserWindowInner(props: {
               minWidth="300px"
               maxWidth="600px"
               borderRight="1px solid"
-              borderColor="gray.100"
+              borderColor="border.muted"
               overflow="hidden"
               boxShadow="md"
             >
@@ -296,8 +296,11 @@ function PromptBrowserWindowInner(props: {
               <PromptTabbedSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onPositionChange={() => {}}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onDragEnd={() => {}}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onToggle={() => {}}
               />
             </Box>
@@ -333,8 +336,8 @@ function PromptBrowserWindowInner(props: {
               isCollapsed
                 ? 0
                 : messagesMaxHeight
-                ? `${messagesMaxHeight}px`
-                : undefined
+                  ? `${messagesMaxHeight}px`
+                  : undefined
             }
             overflow="hidden"
             position="relative"
@@ -359,7 +362,7 @@ function PromptBrowserWindowInner(props: {
                 left={0}
                 right={0}
                 height="12px"
-                background="linear-gradient(to bottom, transparent, white)"
+                background="linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))"
                 pointerEvents="none"
               />
             )}

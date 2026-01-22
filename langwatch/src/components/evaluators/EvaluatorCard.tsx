@@ -1,9 +1,9 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { Evaluator } from "@prisma/client";
 import { CheckSquare, MoreVertical, Workflow } from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
-import type { Evaluator } from "@prisma/client";
-import { Menu } from "../ui/menu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { Menu } from "../ui/menu";
 
 const evaluatorTypeIcons: Record<string, typeof CheckSquare> = {
   evaluator: CheckSquare,
@@ -48,8 +48,8 @@ export function EvaluatorCard({
         <VStack align="start" gap={2} height="full">
           {/* Top row: Icon and menu */}
           <HStack width="full">
-            <Box bg="green.50" padding={1} borderRadius="md">
-              <Icon size={18} color="var(--chakra-colors-green-600)" />
+            <Box bg="green.subtle" padding={1} borderRadius="md">
+              <Icon size={18} color="var(--chakra-colors-green-fg)" />
             </Box>
             <Spacer />
             {(onEdit || onDelete) && (
@@ -94,12 +94,12 @@ export function EvaluatorCard({
           <Spacer />
 
           {/* Name */}
-          <Text color="gray.600" fontSize="sm" fontWeight={500}>
+          <Text color="fg.muted" fontSize="sm" fontWeight={500}>
             {evaluator.name}
           </Text>
 
           {/* Metadata */}
-          <Text color="gray.400" fontSize="12px">
+          <Text color="fg.subtle" fontSize="12px">
             {typeLabel}
             {evaluatorType && ` • ${evaluatorType}`} •{" "}
             {formatTimeAgo(new Date(evaluator.updatedAt).getTime())}

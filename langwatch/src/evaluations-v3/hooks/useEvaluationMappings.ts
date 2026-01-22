@@ -10,10 +10,13 @@
 
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+import {
+  type AvailableSource,
+  datasetColumnTypeToFieldType,
+  type FieldMapping as UIFieldMapping,
+} from "~/components/variables";
 import { convertToUIMapping } from "../utils/fieldMappingConverters";
-import { datasetColumnTypeToFieldType, type AvailableSource, type FieldMapping as UIFieldMapping } from "~/components/variables";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 type UseEvaluationMappingsResult = {
   /** Available sources for variable mapping (active dataset columns) */
@@ -32,13 +35,17 @@ type UseEvaluationMappingsResult = {
  * @param targetId - The target ID to get mappings for. If undefined, returns empty data.
  * @returns Reactive mappings and sources that update when the active dataset changes.
  */
-export const useEvaluationMappings = (targetId: string | undefined): UseEvaluationMappingsResult => {
+export const useEvaluationMappings = (
+  targetId: string | undefined,
+): UseEvaluationMappingsResult => {
   const { activeDatasetId, datasets, target } = useEvaluationsV3Store(
     useShallow((state) => ({
       activeDatasetId: state.activeDatasetId,
       datasets: state.datasets,
-      target: targetId ? state.targets.find((r) => r.id === targetId) : undefined,
-    }))
+      target: targetId
+        ? state.targets.find((r) => r.id === targetId)
+        : undefined,
+    })),
   );
 
   // Build available sources from the active dataset only
@@ -46,15 +53,17 @@ export const useEvaluationMappings = (targetId: string | undefined): UseEvaluati
     const activeDataset = datasets.find((d) => d.id === activeDatasetId);
     if (!activeDataset) return [];
 
-    return [{
-      id: activeDataset.id,
-      name: activeDataset.name,
-      type: "dataset" as const,
-      fields: activeDataset.columns.map((col) => ({
-        name: col.name,
-        type: datasetColumnTypeToFieldType(col.type),
-      })),
-    }];
+    return [
+      {
+        id: activeDataset.id,
+        name: activeDataset.name,
+        type: "dataset" as const,
+        fields: activeDataset.columns.map((col) => ({
+          name: col.name,
+          type: datasetColumnTypeToFieldType(col.type),
+        })),
+      },
+    ];
   }, [datasets, activeDatasetId]);
 
   // Convert target mappings for the active dataset to UI format

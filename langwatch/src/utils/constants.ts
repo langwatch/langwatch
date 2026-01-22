@@ -18,6 +18,7 @@ export const FALLBACK_MAX_TOKENS = 64_000;
 
 export const KSUID_RESOURCES = {
   EVENT: "event",
+  TRACKED_EVENT: "trackedevent",
   TRACE_SUMMARY: "tracesummary",
   SPAN: "span",
   USER: "user",

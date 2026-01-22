@@ -136,7 +136,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
           <PropertySectionTitle>
             Dataset{" "}
             {total && (
-              <Text as="span" color="gray.400">
+              <Text as="span" color="fg.subtle">
                 ({total} rows)
               </Text>
             )}
@@ -193,7 +193,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
                 fontSize="13px"
                 fontWeight="600"
                 paddingLeft={4}
-                color="gray.500"
+                color="fg.muted"
               >
                 Optimization Set
               </Text>
@@ -240,7 +240,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
                 fontSize="13px"
                 fontWeight="600"
                 paddingLeft={4}
-                color="gray.500"
+                color="fg.muted"
               >
                 Test Set
               </Text>
@@ -295,7 +295,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
                 fontSize="13px"
                 fontWeight="600"
                 paddingLeft={4}
-                color="gray.500"
+                color="fg.muted"
               >
                 Shuffle Seed
               </Text>

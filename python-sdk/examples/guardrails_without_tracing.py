@@ -7,7 +7,7 @@ from openai import OpenAI
 
 client = OpenAI()
 
-import langwatch.guardrails
+import langwatch.evaluation
 
 
 @cl.on_message
@@ -16,11 +16,14 @@ async def main(message: cl.Message):
         content="",
     )
 
-    jailbreak_guardrail = langwatch.guardrails.evaluate(
-        "jailbreak-detection", input=message.content
+    # New API: Use langwatch.evaluation.evaluate() with as_guardrail=True
+    jailbreak_guardrail = langwatch.evaluation.evaluate(
+        "jailbreak-detection",
+        data={"input": message.content},
+        as_guardrail=True,
     )
     if not jailbreak_guardrail.passed:
-        await msg.stream_token(f"I'm sorry, I can't help you with that.")
+        await msg.stream_token("I'm sorry, I can't help you with that.")
         await msg.update()
         return
 

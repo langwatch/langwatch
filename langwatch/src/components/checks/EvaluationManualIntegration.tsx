@@ -56,38 +56,44 @@ export function EvaluationManualIntegration({
   );
 
   const PythonInstructions = ({ async }: { async: boolean }) => {
-    const nameParam = storeSettingsOnCode ? `\n        name="${name}",` : "";
-    const contextsParams = evaluatorDefinition.requiredFields.includes(
-      "contexts",
-    )
-      ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"],`
-      : evaluatorDefinition.optionalFields.includes("contexts")
-        ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
-        : "";
-    const inputParams = evaluatorDefinition.requiredFields.includes("input")
-      ? `\n        input=user_input,`
-      : evaluatorDefinition.optionalFields.includes("input")
-        ? `\n        input=user_input, # optional`
-        : "";
-    const outputParams = evaluatorDefinition.requiredFields.includes("output")
-      ? `\n        output=generated_response,`
-      : evaluatorDefinition.optionalFields.includes("output")
-        ? `\n        output=generated_response, # optional`
-        : "";
-    const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
-      "expected_output",
-    )
-      ? `\n        expected_output=gold_answer,`
-      : evaluatorDefinition.optionalFields.includes("expected_output")
-        ? `\n        expected_output=gold_answer, # optional`
-        : "";
-    const conversationParams = evaluatorDefinition.requiredFields.includes(
-      "conversation",
-    )
-      ? `\n        conversation=conversation_history,`
-      : evaluatorDefinition.optionalFields.includes("conversation")
-        ? `\n        conversation=conversation_history, # optional`
-        : "";
+    const nameParam = `\n        name="${name}",`;
+    const dataFields: string[] = [];
+
+    // Build data dict fields
+    if (evaluatorDefinition.requiredFields.includes("input")) {
+      dataFields.push(`"input": user_input`);
+    } else if (evaluatorDefinition.optionalFields.includes("input")) {
+      dataFields.push(`"input": user_input  # optional`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("output")) {
+      dataFields.push(`"output": generated_response`);
+    } else if (evaluatorDefinition.optionalFields.includes("output")) {
+      dataFields.push(`"output": generated_response  # optional`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("contexts")) {
+      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`);
+    } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
+      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]  # optional`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("expected_output")) {
+      dataFields.push(`"expected_output": gold_answer`);
+    } else if (evaluatorDefinition.optionalFields.includes("expected_output")) {
+      dataFields.push(`"expected_output": gold_answer  # optional`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("conversation")) {
+      dataFields.push(`"conversation": conversation_history`);
+    } else if (evaluatorDefinition.optionalFields.includes("conversation")) {
+      dataFields.push(`"conversation": conversation_history  # optional`);
+    }
+
+    const dataParam = dataFields.length > 0
+      ? `\n        data={\n            ${dataFields.join(",\n            ")}\n        },`
+      : `\n        data={},`;
+
     const settingsParams = storeSettingsOnCode
       ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
           .replace(/true/g, "True")
@@ -96,6 +102,8 @@ export function EvaluationManualIntegration({
           .map((line, index) => (index === 0 ? line : "        " + line))
           .join("\n")},`
       : "";
+
+    const asGuardrailParam = isGuardrail ? `\n        as_guardrail=True,` : "";
 
     return (
       <VStack align="start" width="full" gap={3}>
@@ -116,22 +124,15 @@ export function EvaluationManualIntegration({
             </Text>
             <Box className="markdown" width="full">
               <RenderCode
-                code={`@langwatch.span()
-def llm_step():
+                code={`def llm_step():
     ... # your existing code
 
     ${isGuardrail ? "guardrail" : "result"} = ${
       async
-        ? `await langwatch.get_current_span().async_evaluate`
-        : `langwatch.get_current_span().evaluate`
+        ? `await langwatch.evaluation.async_evaluate`
+        : `langwatch.evaluation.evaluate`
     }(
-        "${checkSlug}",${
-          isGuardrail
-            ? "\n        as_guardrail=True," +
-              nameParam +
-              "\n        input=user_input,"
-            : nameParam + inputParams
-        }${contextsParams}${outputParams}${expectedOutputParams}${conversationParams}${settingsParams}
+        "${checkSlug}",${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
     )
 ${
   isGuardrail
@@ -152,46 +153,54 @@ ${
   };
 
   const TypeScriptInstructions = () => {
-    const nameParam = storeSettingsOnCode ? `\n        name: "${name}",` : "";
-    const contextsParams = evaluatorDefinition.requiredFields.includes(
-      "contexts",
-    )
-      ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"],`
-      : evaluatorDefinition.optionalFields.includes("contexts")
-        ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"], // optional`
-        : "";
-    const inputParams = evaluatorDefinition.requiredFields.includes("input")
-      ? `\n        input: message,`
-      : evaluatorDefinition.optionalFields.includes("input")
-        ? `\n        input: message, // optional`
-        : "";
-    const outputParams = evaluatorDefinition.requiredFields.includes("output")
-      ? `\n        output: generatedResponse,`
-      : evaluatorDefinition.optionalFields.includes("output")
-        ? `\n        output: generatedResponse, // optional`
-        : "";
-    const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
-      "expected_output",
-    )
-      ? `\n        expectedOutput: goldAnswer,`
-      : evaluatorDefinition.optionalFields.includes("expected_output")
-        ? `\n        expectedOutput: goldAnswer, // optional`
-        : "";
-    const conversationParams = evaluatorDefinition.requiredFields.includes(
-      "conversation",
-    )
-      ? `\n        conversation: conversationHistory,`
-      : evaluatorDefinition.optionalFields.includes("conversation")
-        ? `\n        conversation: conversationHistory, // optional`
-        : "";
+    const nameParam = `\n        name: "${name}",`;
+    const dataFields: string[] = [];
+
+    // Build data object fields
+    if (evaluatorDefinition.requiredFields.includes("input")) {
+      dataFields.push(`input: message`);
+    } else if (evaluatorDefinition.optionalFields.includes("input")) {
+      dataFields.push(`input: message /* optional */`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("output")) {
+      dataFields.push(`output: generatedResponse`);
+    } else if (evaluatorDefinition.optionalFields.includes("output")) {
+      dataFields.push(`output: generatedResponse /* optional */`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("contexts")) {
+      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"]`);
+    } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
+      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"] /* optional */`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("expected_output")) {
+      dataFields.push(`expectedOutput: goldAnswer`);
+    } else if (evaluatorDefinition.optionalFields.includes("expected_output")) {
+      dataFields.push(`expectedOutput: goldAnswer /* optional */`);
+    }
+
+    if (evaluatorDefinition.requiredFields.includes("conversation")) {
+      dataFields.push(`conversation: conversationHistory`);
+    } else if (evaluatorDefinition.optionalFields.includes("conversation")) {
+      dataFields.push(`conversation: conversationHistory /* optional */`);
+    }
+
+    const dataParam = dataFields.length > 0
+      ? `\n        data: {\n          ${dataFields.join(",\n          ")}\n        },`
+      : `\n        data: {},`;
+
     const settingsParams = storeSettingsOnCode
       ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)
           // remove quotes on json keys that have only safe characters in it
           .replace(/"(\w+)"\s*:/g, "$1:")
           .split("\n")
-          .map((line, index) => (index === 0 ? line : "        " + line))
+          .map((line, index) => (index === 0 ? line : "      " + line))
           .join("\n")},`
       : "";
+
+    const asGuardrailParam = isGuardrail ? `\n        asGuardrail: true,` : "";
 
     return (
       <VStack align="start" width="full" gap={3}>
@@ -216,23 +225,19 @@ ${
             </Text>
             <Box className="markdown" width="full">
               <RenderCode
-                code={`import { type LangWatchTrace } from "langwatch";
+                code={`import { LangWatch } from "langwatch";
 
-async function llmStep({ message, trace }: { message: string, trace: LangWatchTrace }): Promise<string> {
-    const span = trace.startLLMSpan({ name: "llmStep" });
-    ${isGuardrail ? "" : "\n    // ... your existing code\n"}
-    // call the ${
+const langwatch = new LangWatch();
+
+async function llmStep({ message }: { message: string }): Promise<string> {
+    ${isGuardrail ? "" : "// ... your existing code\n\n    "}// call the ${
       isGuardrail ? "guardrail" : "evaluator"
-    } either on a span or on a trace
-    const ${isGuardrail ? "guardrail" : "result"} = await span.evaluate({
-        ${storeSettingsOnCode ? "evaluator:" : "slug:"} "${checkSlug}",${
-          isGuardrail
-            ? "\n        asGuardrail: true," +
-              nameParam +
-              "\n        input: message,"
-            : nameParam + inputParams
-        }${contextsParams}${outputParams}${expectedOutputParams}${conversationParams}${settingsParams}
-    })
+    }
+    const ${isGuardrail ? "guardrail" : "result"} = await langwatch.evaluations.evaluate(
+      "${checkSlug}",
+      {${dataParam}${nameParam}${settingsParams}${asGuardrailParam}
+      }
+    );
 ${
   isGuardrail
     ? `
@@ -244,6 +249,7 @@ ${
     // ... your existing code`
     : `
     console.log(result);`
+}
 }`}
                 language="typescript"
               />
@@ -341,6 +347,7 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
      -d @- <<EOF
 {
   "trace_id": "trace-123",
+  "name": "${name}",
   "data": {
     ${evaluatorDefinition.requiredFields
       .map((field) => `"${field}": "${field} content"`)

@@ -11,22 +11,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
-import { useEffect } from "react";
 import { Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useDrawer } from "~/hooks/useDrawer";
+import { api } from "~/utils/api";
+import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ProjectSelector } from "../../components/DashboardLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useDrawer } from "~/hooks/useDrawer";
-import { api } from "~/utils/api";
 import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -37,7 +36,11 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-import { isProviderUsedForDefaultModels, isProviderEffectiveDefault, isProviderDefaultModel } from "../../utils/modelProviderHelpers";
+import {
+  isProviderDefaultModel,
+  isProviderEffectiveDefault,
+  isProviderUsedForDefaultModels,
+} from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
   const { project, organization, organizations, hasPermission } =
@@ -85,8 +88,13 @@ export default function ModelsPage() {
       })
       .map((providerKey) => ({
         provider: providerKey as keyof typeof modelProvidersRegistry,
-        name: modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry]?.name ?? providerKey,
-        icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
+        name:
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ]?.name ?? providerKey,
+        icon: modelProviderIcons[
+          providerKey as keyof typeof modelProviderIcons
+        ],
       }));
   }, [providers]);
 
@@ -110,8 +118,11 @@ export default function ModelsPage() {
               disabled={hasModelProvidersManagePermission}
             >
               <Menu.Trigger asChild>
-                <PageLayout.HeaderButton 
-                  disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}
+                <PageLayout.HeaderButton
+                  disabled={
+                    !hasModelProvidersManagePermission ||
+                    notEnabledProviders.length === 0
+                  }
                 >
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
@@ -169,83 +180,85 @@ export default function ModelsPage() {
             </Table.Header>
             <Table.Body>
               {enabledProviders.map((provider) => {
-                    const providerIcon = modelProviderIcons[
-                      provider.provider as keyof typeof modelProviderIcons
-                    ];
-                    const providerSpec = modelProvidersRegistry[
-                      provider.provider as keyof typeof modelProvidersRegistry
-                    ];
+                const providerIcon =
+                  modelProviderIcons[
+                    provider.provider as keyof typeof modelProviderIcons
+                  ];
+                const providerSpec =
+                  modelProvidersRegistry[
+                    provider.provider as keyof typeof modelProvidersRegistry
+                  ];
 
-                    return (
-                      <Table.Row key={provider.id ?? provider.provider}>
-                        <Table.Cell>
-                          <HStack gap={3} align="center">
-                            <Box width="24px" height="24px">
-                              {providerIcon}
-                            </Box>
-                            <Text>{providerSpec?.name ?? provider.provider}</Text>
-                            {isDefaultProvider(provider.provider) && (
-                              <Badge colorPalette="blue">Default Model</Badge>
-                            )}
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell textAlign="right">
-                          <Menu.Root>
-                            <Tooltip
-                              content="You need model provider manage permissions to edit or delete providers."
-                              disabled={hasModelProvidersManagePermission}
+                return (
+                  <Table.Row key={provider.id ?? provider.provider}>
+                    <Table.Cell>
+                      <HStack gap={3} align="center">
+                        <Box width="24px" height="24px">
+                          {providerIcon}
+                        </Box>
+                        <Text>{providerSpec?.name ?? provider.provider}</Text>
+                        {isDefaultProvider(provider.provider) && (
+                          <Badge colorPalette="blue">Default Model</Badge>
+                        )}
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      <Menu.Root>
+                        <Tooltip
+                          content="You need model provider manage permissions to edit or delete providers."
+                          disabled={hasModelProvidersManagePermission}
+                        >
+                          <Menu.Trigger asChild>
+                            <Button
+                              variant="ghost"
+                              disabled={!hasModelProvidersManagePermission}
                             >
-                              <Menu.Trigger asChild>
-                                <Button 
-                                  variant="ghost"
-                                  disabled={!hasModelProvidersManagePermission}
-                                >
-                                  <MoreVertical />
-                                </Button>
-                              </Menu.Trigger>
-                            </Tooltip>
-                            <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openDrawer("editModelProvider", {
-                                    projectId: project?.id,
-                                    organizationId: organization?.id,
-                                    modelProviderId: provider.id,
-                                    providerKey: provider.provider,
-                                  });
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Edit size={14} />
-                                  Edit Provider
-                                </Box>
-                              </Menu.Item>
-                              <Menu.Item
-                                value="disable"
-                                color="red"
-                                // css={{ color: "var(--chakra-colors-red-600)" }}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setProviderToDisable({
-                                    id: provider.id ?? undefined,
-                                    provider: provider.provider,
-                                    name: providerSpec?.name ?? provider.provider,
-                                  });
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Trash2 size={14} />
-                                  Delete Provider
-                                </Box>
-                              </Menu.Item>
-                            </Menu.Content>
-                          </Menu.Root>
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                        </Tooltip>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="edit"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openDrawer("editModelProvider", {
+                                projectId: project?.id,
+                                organizationId: organization?.id,
+                                modelProviderId: provider.id,
+                                providerKey: provider.provider,
+                              });
+                            }}
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Edit size={14} />
+                              Edit Provider
+                            </Box>
+                          </Menu.Item>
+                          <Menu.Item
+                            value="disable"
+                            color="red"
+                            // css={{ color: "var(--chakra-colors-red-600)" }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setProviderToDisable({
+                                id: provider.id ?? undefined,
+                                provider: provider.provider,
+                                name: providerSpec?.name ?? provider.provider,
+                              });
+                            }}
+                          >
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Trash2 size={14} />
+                              Delete Provider
+                            </Box>
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
             </Table.Body>
           </Table.Root>
         )}
@@ -263,10 +276,12 @@ export default function ModelsPage() {
               <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              {providerToDisable && isProviderUsedForAnyDefault(providerToDisable.provider) ? (
+              {providerToDisable &&
+              isProviderUsedForAnyDefault(providerToDisable.provider) ? (
                 <VStack gap={3} align="start">
                   <Text>
-                    This provider is currently being used for one or more default models and cannot be deleted.
+                    This provider is currently being used for one or more
+                    default models and cannot be deleted.
                   </Text>
                   <Text fontWeight="medium">
                     Please change the following before deleting:
@@ -276,19 +291,19 @@ export default function ModelsPage() {
                       providerToDisable.provider,
                       project?.defaultModel ?? null,
                       null,
-                      null
+                      null,
                     ) && <Text>• Default Model</Text>}
                     {isProviderUsedForDefaultModels(
                       providerToDisable.provider,
                       null,
                       null,
-                      project?.embeddingsModel ?? null
+                      project?.embeddingsModel ?? null,
                     ) && <Text>• Embeddings Model</Text>}
                     {isProviderUsedForDefaultModels(
                       providerToDisable.provider,
                       null,
                       project?.topicClusteringModel ?? null,
-                      null
+                      null,
                     ) && <Text>• Topic Clustering Model</Text>}
                   </VStack>
                 </VStack>
@@ -303,7 +318,11 @@ export default function ModelsPage() {
               <Button
                 colorPalette="red"
                 loading={updateMutation.isPending}
-                disabled={providerToDisable ? isProviderUsedForAnyDefault(providerToDisable.provider) : false}
+                disabled={
+                  providerToDisable
+                    ? isProviderUsedForAnyDefault(providerToDisable.provider)
+                    : false
+                }
                 onClick={async () => {
                   if (!providerToDisable) return;
                   if (!project?.id) return;
@@ -391,4 +410,3 @@ export function EmbeddingsModel() {
     </HorizontalFormControl>
   );
 }
-

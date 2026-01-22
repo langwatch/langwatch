@@ -1,8 +1,13 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
@@ -105,7 +110,97 @@ export default async function handler(
     }
   }
 
-  const eventId = body.event_id ?? `event_${nanoid()}`;
+  const eventId =
+    body.event_id ?? generate(KSUID_RESOURCES.TRACKED_EVENT).toString();
+
+  if (project.featureEventSourcingTraceIngestion) {
+    try {
+      const timestampMs = body.timestamp ?? Date.now();
+      const timestampNano = String(timestampMs * 1_000_000);
+      const spanId = generateOtelSpanId();
+
+      // Build attributes array for the span
+      const attributes: {
+        key: string;
+        value: { stringValue?: string; doubleValue?: number };
+      }[] = [
+        { key: "event.type", value: { stringValue: body.event_type } },
+        { key: "event.id", value: { stringValue: eventId } },
+      ];
+
+      // Add metrics as attributes
+      for (const [key, value] of Object.entries(body.metrics)) {
+        attributes.push({
+          key: `event.metrics.${key}`,
+          value: { doubleValue: value },
+        });
+      }
+
+      // Add event_details as attributes
+      if (body.event_details) {
+        for (const [key, value] of Object.entries(body.event_details)) {
+          if (typeof value === "string") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: value },
+            });
+          } else if (typeof value === "number") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { doubleValue: value },
+            });
+          } else if (value != null) {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: String(value) },
+            });
+          }
+        }
+      }
+
+      await traceProcessingPipeline.commands.recordSpan.send({
+        tenantId: project.id,
+        span: {
+          traceId: body.trace_id,
+          spanId: spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.track_event",
+          kind: ESpanKind.SPAN_KIND_INTERNAL,
+          startTimeUnixNano: timestampNano,
+          endTimeUnixNano: timestampNano,
+          attributes: attributes,
+          events: [
+            {
+              name: body.event_type,
+              timeUnixNano: timestampNano,
+              attributes: attributes,
+            },
+          ],
+          links: [],
+          status: {
+            code: SpanStatusCode.OK as 1,
+          },
+          droppedAttributesCount: null,
+          droppedEventsCount: null,
+          droppedLinksCount: null,
+        },
+        resource: {
+          attributes: [],
+        },
+        instrumentationScope: {
+          name: "langwatch.track_event",
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          error,
+        },
+        "unable to dispatch tracked event span",
+      );
+    }
+  }
 
   await trackEventsQueue.add(
     "track_event",

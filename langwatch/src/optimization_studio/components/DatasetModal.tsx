@@ -150,7 +150,7 @@ export function DatasetModal({
               <Button
                 fontSize="14px"
                 fontWeight="bold"
-                color="gray.500"
+                color="fg.muted"
                 variant="plain"
                 onClick={() => setEditingDataset(undefined)}
               >

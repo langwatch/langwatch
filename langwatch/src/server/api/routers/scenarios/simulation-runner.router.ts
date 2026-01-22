@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkProjectPermission } from "../../rbac";
 import {
-  SimulationRunnerService,
   generateBatchRunId,
+  SimulationRunnerService,
 } from "~/server/scenarios/simulation-runner.service";
-import { projectSchema } from "./schemas";
 import { createLogger } from "~/utils/logger";
+import { checkProjectPermission } from "../../rbac";
+import { projectSchema } from "./schemas";
 
 const logger = createLogger("SimulationRunnerRouter");
 
@@ -51,6 +51,11 @@ export const simulationRunnerRouter = createTRPCRouter({
       const setId = "local-scenarios";
       const batchRunId = generateBatchRunId();
 
+      logger.info(
+        { setId, batchRunId, scenarioId: input.scenarioId },
+        "Generated batchRunId for scenario run",
+      );
+
       const runnerService = SimulationRunnerService.create(ctx.prisma);
 
       // Fire and forget - execution happens async
@@ -62,7 +67,8 @@ export const simulationRunnerRouter = createTRPCRouter({
         batchRunId,
       });
 
+      logger.info({ setId, batchRunId }, "Returning from run mutation");
+
       return { setId, batchRunId };
     }),
 });
-

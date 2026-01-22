@@ -31,7 +31,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const { name } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
-        name: state.wizardState.name,
+        name: state.workbenchState.name,
         workflowId: state.getDSL().workflow_id,
       };
     }),
@@ -58,7 +58,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
           <Dialog.Content width="full" height="full" minHeight="fit-content">
             <Dialog.CloseTrigger />
             <Dialog.Header
-              background="white"
+              background="bg.surface"
               paddingLeft={2}
               paddingY={0}
               display="flex"
@@ -118,7 +118,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
             <Dialog.Body
               display="flex"
               minHeight="fit-content"
-              background="white"
+              background="bg.surface"
               width="full"
               padding={0}
             >

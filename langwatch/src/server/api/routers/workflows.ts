@@ -892,7 +892,7 @@ export const workflowRouter = createTRPCRouter({
         model: await getVercelAIModel(input.projectId),
         providerOptions: {
           openai: {
-            reasoningEffort: "minimal",
+            reasoningEffort: "low",
           } satisfies OpenAIResponsesProviderOptions,
         },
         messages: [

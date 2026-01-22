@@ -7,9 +7,9 @@ import { useShallow } from "zustand/react/shallow";
 
 import { toaster } from "~/components/ui/toaster";
 import {
-  FormVariablesSection,
   type AvailableSource,
   type FieldMapping,
+  FormVariablesSection,
   type PromptTextAreaOnAddMention,
 } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,9 +26,9 @@ import { api } from "~/utils/api";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
-import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
+import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -226,7 +226,9 @@ export function SignaturePropertiesPanelForm({
           : undefined;
         return {
           id: n.id,
-          name: isEntry ? entryDataset?.name ?? "Dataset" : n.data.name ?? n.id,
+          name: isEntry
+            ? (entryDataset?.name ?? "Dataset")
+            : (n.data.name ?? n.id),
           type: isEntry ? "dataset" : (n.type as AvailableSource["type"]),
           fields:
             n.data.outputs?.map((output) => ({
@@ -311,7 +313,7 @@ export function SignaturePropertiesPanelForm({
     return { node: stateNode, newPrompt: content_, newHandle };
   };
 
-  const onAddPromptEdge = (
+  const _onAddPromptEdge = (
     id: string,
     handle: string,
     content: PromptTextAreaOnAddMention,
@@ -333,7 +335,11 @@ export function SignaturePropertiesPanelForm({
     content: PromptTextAreaOnAddMention,
     idx: number,
   ): string | undefined => {
-    const { node: stateNode, newPrompt, newHandle } = onAddEdge(id, handle, content);
+    const {
+      node: stateNode,
+      newPrompt,
+      newHandle,
+    } = onAddEdge(id, handle, content);
 
     // Get form messages to correctly map form index to node parameter
     const formMessages = messageFields.fields.map((f) => ({

@@ -9,8 +9,8 @@ import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
 
 export function ExecutionStep() {
   const { task } = useEvaluationWizardStore(
-    useShallow(({ wizardState }) => ({
-      task: wizardState.task,
+    useShallow(({ workbenchState }) => ({
+      task: workbenchState.task,
     })),
   );
 

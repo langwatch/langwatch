@@ -1,7 +1,11 @@
 import { HStack, IconButton } from "@chakra-ui/react";
 import { Redo2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { useEvaluationsV3Store, performUndo, performRedo } from "../hooks/useEvaluationsV3Store";
+import {
+  performRedo,
+  performUndo,
+  useEvaluationsV3Store,
+} from "../hooks/useEvaluationsV3Store";
 
 /**
  * UndoRedo component with keyboard shortcuts.
@@ -14,12 +18,12 @@ export function UndoRedo() {
   const pastStatesLength = useSyncExternalStore(
     temporal.subscribe,
     () => temporal.getState().pastStates.length,
-    () => 0
+    () => 0,
   );
   const futureStatesLength = useSyncExternalStore(
     temporal.subscribe,
     () => temporal.getState().futureStates.length,
-    () => 0
+    () => 0,
   );
 
   const canUndo = pastStatesLength > 0;
@@ -75,8 +79,8 @@ export function UndoRedo() {
         size="sm"
         onClick={handleUndo}
         disabled={!canUndo}
-        color={canUndo ? "gray.600" : "gray.300"}
-        _hover={canUndo ? { bg: "gray.100" } : {}}
+        color={canUndo ? "fg.muted" : "fg.subtle"}
+        _hover={canUndo ? { bg: "bg.subtle" } : {}}
       >
         <Undo2 size={18} />
       </IconButton>
@@ -87,8 +91,8 @@ export function UndoRedo() {
         size="sm"
         onClick={handleRedo}
         disabled={!canRedo}
-        color={canRedo ? "gray.600" : "gray.300"}
-        _hover={canRedo ? { bg: "gray.100" } : {}}
+        color={canRedo ? "fg.muted" : "fg.subtle"}
+        _hover={canRedo ? { bg: "bg.subtle" } : {}}
       >
         <Redo2 size={18} />
       </IconButton>

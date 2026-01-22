@@ -1,8 +1,7 @@
 import { Badge, Box, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import React from "react";
+import type React from "react";
 import { trackEvent } from "../../utils/tracking";
-import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 
 export const MENU_ITEM_HEIGHT = "32px";
@@ -29,8 +28,6 @@ export const SideMenuItem = ({
   showLabel = true,
   rightElement,
 }: SideMenuItemProps) => {
-  const gray600 = useColorRawValue("gray.600");
-
   const badge =
     badgeNumber && badgeNumber > 0 ? (
       <Badge
@@ -48,10 +45,11 @@ export const SideMenuItem = ({
     size?: string | number;
     color?: string;
   }>;
+  // Use CSS variable for icon color to support dark mode
   const iconNode =
     typeof IconElem === "function" ||
     (IconElem as unknown as { render?: unknown }).render ? (
-      <IconElem size={ICON_SIZE} color={gray600} />
+      <IconElem size={ICON_SIZE} color="var(--chakra-colors-nav-fg-muted)" />
     ) : (
       (icon as React.ReactNode)
     );
@@ -63,9 +61,9 @@ export const SideMenuItem = ({
       gap={3}
       paddingX={3}
       borderRadius="lg"
-      backgroundColor={isActive ? "gray.200" : "transparent"}
+      backgroundColor={isActive ? "nav.bgActive" : "transparent"}
       _hover={{
-        backgroundColor: "gray.200",
+        backgroundColor: "nav.bgHover",
       }}
       transition="background-color 0.15s ease-in-out"
     >
@@ -90,7 +88,7 @@ export const SideMenuItem = ({
           <Text
             fontSize="14px"
             fontWeight="normal"
-            color="gray.700"
+            color="nav.fg"
             whiteSpace="nowrap"
           >
             {label}
@@ -145,4 +143,3 @@ export const SideMenuLink = ({
     </Link>
   );
 };
-

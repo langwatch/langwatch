@@ -1,17 +1,13 @@
 import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
-import * as llmModelCosts from "./llmModelCosts.json";
+import llmModels from "./llmModels.json";
+import type { LLMModelRegistry } from "./llmModels.types";
 
 const getImportedModelCosts = () => {
-  type ImportedLLMModelCost =
-    (typeof llmModelCosts)[keyof typeof llmModelCosts];
+  const registry = llmModels as LLMModelRegistry;
+  const models = registry.models;
 
-  const models: Record<string, ImportedLLMModelCost> =
-    "default" in llmModelCosts
-      ? (llmModelCosts.default as typeof llmModelCosts)
-      : llmModelCosts;
-
-  // Filter only models based on input and output costs per token
+  // Convert models to cost entries with regex patterns
   const tokenModels: Record<
     string,
     {
@@ -19,41 +15,26 @@ const getImportedModelCosts = () => {
       inputCostPerToken: number;
       outputCostPerToken: number;
     }
-  > = Object.fromEntries(
-    Object.entries(models)
-      .filter(
-        ([_, model]) =>
-          "input_cost_per_token" in model &&
-          "output_cost_per_token" in model &&
-          typeof model.input_cost_per_token === "number" &&
-          typeof model.output_cost_per_token === "number",
-      )
-      .map(([model_name, model]) => {
-        const model_ = model as {
-          input_cost_per_token: number;
-          output_cost_per_token: number;
-        };
+  > = {};
 
-        return [
-          model_name,
-          {
-            regex:
-              "^" +
-              // Fix for anthropic/ models not comming with vendor name from litellm
-              (model_name.startsWith("claude-") ? "(anthropic\\/)?" : "") +
-              escapeStringRegexp(model_name)
-                // @ts-ignore
-                .replaceAll("\\x2d", "-")
-                .replaceAll("/", "\\/")
-                // Fix for langchain using vertexai while litellm uses vertex_ai
-                .replace("vertex_ai", "(vertex_ai|vertexai)") +
-              "$",
-            inputCostPerToken: model_.input_cost_per_token,
-            outputCostPerToken: model_.output_cost_per_token,
-          },
-        ];
-      }),
-  );
+  for (const [modelId, model] of Object.entries(models)) {
+    if (model.pricing?.inputCostPerToken != null || model.pricing?.outputCostPerToken != null) {
+      tokenModels[modelId] = {
+        regex:
+          "^" +
+          // Fix for anthropic/ models not coming with vendor name from litellm
+          (modelId.startsWith("claude-") ? "(anthropic\\/)?" : "") +
+          escapeStringRegexp(modelId)
+            .replaceAll("\\x2d", "-")
+            .replaceAll("/", "\\/")
+            // Fix for langchain using vertexai while litellm uses vertex_ai
+            .replace("vertex_ai", "(vertex_ai|vertexai)") +
+          "$",
+        inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
+        outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
+      };
+    }
+  }
 
   // Exclude models with : after it if there is already the same model there without the :
   const mergedModels = Object.entries(tokenModels)
@@ -77,16 +58,16 @@ const getImportedModelCosts = () => {
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
-    (model) => !!model.inputCostPerToken || !!model.outputCostPerToken,
+    (model) => model.inputCostPerToken != null || model.outputCostPerToken != null
   );
 
-  // Exclude some vendors
+  // Exclude some vendors (openrouter is already excluded as we're using their API)
   const relevantModels = paidModels.filter(
-    (model) => !model.model.includes("openrouter/"),
+    (model) => !model.model.includes("openrouter/")
   );
 
   return Object.fromEntries(
-    relevantModels.map((model) => [model.model, model]),
+    relevantModels.map((model) => [model.model, model])
   );
 };
 
@@ -123,7 +104,7 @@ export const getLLMModelCosts = async ({
           outputCostPerToken: record.outputCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
-        }) as MaybeStoredLLMModelCost,
+        }) as MaybeStoredLLMModelCost
     )
     .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
     .concat(
@@ -133,7 +114,7 @@ export const getLLMModelCosts = async ({
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
-      })),
+      }))
     );
 
   return data;

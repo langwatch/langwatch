@@ -37,9 +37,9 @@ import {
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
     useEvaluationWizardStore(
-      useShallow(({ wizardState, setWizardState }) => ({
-        executionMethod: wizardState.executionMethod,
-        realTimeExecution: wizardState.realTimeExecution,
+      useShallow(({ workbenchState, setWizardState }) => ({
+        executionMethod: workbenchState.executionMethod,
+        realTimeExecution: workbenchState.realTimeExecution,
         setWizardState,
       })),
     );
@@ -107,7 +107,7 @@ export function RealTimeExecutionStep() {
   const sample = form.watch("sample");
 
   const runOn = (
-    <Text color="gray.500" fontStyle="italic">
+    <Text color="fg.muted" fontStyle="italic">
       This evaluation will run on{" "}
       {sample >= 1
         ? "every message"
@@ -220,7 +220,7 @@ export function RealTimeExecutionStep() {
                       sample == 1 ? (
                         runOn
                       ) : (
-                        <Text color="gray.500" fontStyle="italic">
+                        <Text color="fg.muted" fontStyle="italic">
                           No preconditions defined
                         </Text>
                       )

@@ -3,9 +3,9 @@ import qs from "qs";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
+  type DrawerType,
   getComplexProps,
   getFlowCallbacks,
-  type DrawerType,
 } from "../hooks/useDrawer";
 import { drawers } from "./drawerRegistry";
 
@@ -37,12 +37,14 @@ export function CurrentDrawer() {
 
     // Check after render settles
     const timer = setTimeout(() => {
-      const drawerElements = document.querySelectorAll('[data-scope="drawer"][data-part="positioner"]');
+      const drawerElements = document.querySelectorAll(
+        '[data-scope="drawer"][data-part="positioner"]',
+      );
       if (drawerElements.length > 1) {
         console.warn(
           `[Drawer Duplicate] Multiple drawer positioners found (${drawerElements.length}). ` +
             `"${drawerType}" may be rendered both by CurrentDrawer and explicitly in a page. ` +
-            `Remove the explicit drawer - CurrentDrawer handles it globally.`
+            `Remove the explicit drawer - CurrentDrawer handles it globally.`,
         );
       }
     }, 100);

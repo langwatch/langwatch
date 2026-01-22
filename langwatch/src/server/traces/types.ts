@@ -1,7 +1,13 @@
 import type { z } from "zod";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
-import type { ChatMessage, Evaluation, LLMSpan, Span, SpanTimestamps } from "~/server/tracer/types";
 import type { sharedFiltersInputSchema } from "~/server/analytics/types";
+import type {
+  ChatMessage,
+  Evaluation,
+  LLMSpan,
+  Span,
+  SpanTimestamps,
+} from "~/server/tracer/types";
 
 /**
  * Input parameters for getAllTracesForProject.
@@ -74,4 +80,3 @@ export interface PromptStudioSpanResult {
   timestamps: SpanTimestamps | undefined;
   metrics: LLMSpan["metrics"] | null;
 }
-

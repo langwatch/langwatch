@@ -5,7 +5,7 @@ import { handle } from "hono/vercel";
 import { CompletionCopilot } from "monacopilot";
 import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
-import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { hasProjectPermission } from "../../../../server/api/rbac";
 import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
@@ -33,10 +33,10 @@ app.post("/code-completion", async (c) => {
     return c.json({ error: "Project ID is required." }, { status: 400 });
   }
 
-  const hasPermission = await backendHasTeamProjectPermission(
+  const hasPermission = await hasProjectPermission(
     { prisma, session },
-    { projectId },
-    "WORKFLOWS_MANAGE",
+    projectId,
+    "workflows:manage",
   );
   if (!hasPermission) {
     return c.json(
@@ -65,7 +65,7 @@ app.post("/code-completion", async (c) => {
         temperature: 0,
         providerOptions: {
           openai: {
-            reasoningEffort: "minimal",
+            reasoningEffort: "low",
           } satisfies OpenAIResponsesProviderOptions,
         },
       });

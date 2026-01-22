@@ -76,7 +76,7 @@ function SimulationsPageContent() {
         {error && (
           <VStack gap={4} align="center" py={8}>
             <Text color="red.500">Error loading simulation batches</Text>
-            <Text fontSize="sm" color="gray.600">
+            <Text fontSize="sm" color="fg.muted">
               {error.message}
             </Text>
           </VStack>

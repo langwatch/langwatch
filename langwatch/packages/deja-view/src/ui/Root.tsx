@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { Text, Box } from "ink";
+import { Box, Text } from "ink";
+import type React from "react";
+import { useEffect, useState } from "react";
 import type { CliOptions } from "../cli";
-import type { DiscoveredProjection } from "../discovery/projections.types";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
 import type { AggregateLinkInfo } from "../discovery/links";
 import { getLinksForAggregate } from "../discovery/links";
-import type { Event } from "../lib/types";
+import type { DiscoveredProjection } from "../discovery/projections.types";
 import { loadEventLog } from "../io/loadEvents";
 import {
   loadEventsFromClickhouse,
   queryChildAggregates,
 } from "../io/loadFromClickhouse";
-import { SetupScreen } from "./SetupScreen";
-import { FullscreenLayout } from "./FullscreenLayout";
+import type { Event } from "../lib/types";
 import App from "./App";
+import { FullscreenLayout } from "./FullscreenLayout";
+import { SetupScreen } from "./SetupScreen";
 
 /** Resolved child aggregate info with actual IDs from the database */
 export interface ResolvedChildAggregate {
@@ -53,7 +54,11 @@ function getInitialState(options: CliOptions): RootState {
     return { phase: "loading", mode: "file" };
   } else if (options.aggregate) {
     // Database mode with aggregate already specified: go to loading
-    return { phase: "loading", mode: "database", aggregateId: options.aggregate };
+    return {
+      phase: "loading",
+      mode: "database",
+      aggregateId: options.aggregate,
+    };
   } else {
     // Database mode: need to collect aggregate ID via setup screen
     return { phase: "setup", mode: "database" };
@@ -67,7 +72,12 @@ function getInitialState(options: CliOptions): RootState {
  * @example
  * <Root options={cliOptions} projections={projections} />
  */
-export const Root: React.FC<RootProps> = ({ options, projections, eventHandlers, pipelineAggregateTypes }) => {
+export const Root: React.FC<RootProps> = ({
+  options,
+  projections,
+  eventHandlers,
+  pipelineAggregateTypes,
+}) => {
   const mode: LoadMode = options.file ? "file" : "database";
   const [state, setState] = useState<RootState>(() => getInitialState(options));
   const [env, setEnv] = useState(options.env);
@@ -75,18 +85,32 @@ export const Root: React.FC<RootProps> = ({ options, projections, eventHandlers,
   const [profile] = useState(options.profile);
 
   // Handle setup completion
-  const handleSetupComplete = (selectedAggregateId: string, selectedEnv?: string) => {
+  const handleSetupComplete = (
+    selectedAggregateId: string,
+    selectedEnv?: string,
+  ) => {
     setAggregateId(selectedAggregateId);
     if (selectedEnv) {
       setEnv(selectedEnv as typeof env);
     }
-    setState({ phase: "loading", mode: "database", aggregateId: selectedAggregateId });
+    setState({
+      phase: "loading",
+      mode: "database",
+      aggregateId: selectedAggregateId,
+    });
   };
 
   // Handle navigation to related aggregate
-  const handleNavigateToAggregate = (targetAggregateId: string, _aggregateType: string) => {
+  const handleNavigateToAggregate = (
+    targetAggregateId: string,
+    _aggregateType: string,
+  ) => {
     setAggregateId(targetAggregateId);
-    setState({ phase: "loading", mode: "database", aggregateId: targetAggregateId });
+    setState({
+      phase: "loading",
+      mode: "database",
+      aggregateId: targetAggregateId,
+    });
   };
 
   // Load events when entering loading phase
@@ -154,9 +178,11 @@ export const Root: React.FC<RootProps> = ({ options, projections, eventHandlers,
             // Load events from all child aggregates and merge into timeline
             const childEventPromises = resolvedChildren.flatMap((child) =>
               child.aggregateIds.map((id) =>
-                loadEventsFromClickhouse({ aggregateId: id, env, profile }).catch(
-                  () => [] as Event[],
-                ),
+                loadEventsFromClickhouse({
+                  aggregateId: id,
+                  env,
+                  profile,
+                }).catch(() => [] as Event[]),
               ),
             );
             const childEventArrays = await Promise.all(childEventPromises);
@@ -169,7 +195,8 @@ export const Root: React.FC<RootProps> = ({ options, projections, eventHandlers,
 
         setState({ phase: "ready", events, mode, linkInfo, resolvedChildren });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         setState({ phase: "error", message });
       }
     };
@@ -241,10 +268,10 @@ export const Root: React.FC<RootProps> = ({ options, projections, eventHandlers,
           env={mode === "database" ? env : undefined}
           linkInfo={state.linkInfo}
           resolvedChildren={state.resolvedChildren}
-          onNavigateToAggregate={mode === "database" ? handleNavigateToAggregate : undefined}
+          onNavigateToAggregate={
+            mode === "database" ? handleNavigateToAggregate : undefined
+          }
         />
       );
   }
 };
-
-

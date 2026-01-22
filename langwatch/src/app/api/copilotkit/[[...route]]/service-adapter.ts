@@ -18,10 +18,13 @@ import type {
 } from "~/optimization_studio/types/events";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
+import { mapReasoningToProvider } from "~/server/prompt-config/reasoningBoundary";
 import type { ChatMessage } from "~/server/tracer/types";
+import { parseLLMError } from "~/utils/formatLLMError";
 import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
 
@@ -68,6 +71,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     let nodeId: string;
     let traceId: string;
     let threadId: string;
+    let outputConfigs: OutputConfig[] | undefined;
 
     try {
       // @ts-expect-error - Total hack
@@ -77,6 +81,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         variables: z.infer<typeof runtimeInputsSchema>;
       };
       threadId = fallbackThreadId;
+      // Capture all output configurations for dynamic field lookup during streaming
+      outputConfigs = formValues.version.configData.outputs ?? [
+        { identifier: "output", type: "str" },
+      ];
       nodeId = "prompt_node";
       traceId = generateOtelTraceId();
       const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
@@ -168,16 +176,19 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
       /**
        * Sends an error message to the client and finishes the stream.
-       * @param message - Error message to display (without ❌ prefix)
+       * @param message - Error message to display
        */
       const sendError = (message: string) => {
         if (!started) {
           started = true;
           eventStream$.sendTextMessageStart({ messageId });
         }
+        const parsed = parseLLMError(message);
+        // Escape backticks to prevent code blocks in chat
+        parsed.message = parsed.message.replace(/`/g, "'");
         eventStream$.sendTextMessageContent({
           messageId,
-          content: `❌ ${message.replace(/`/g, "'")}`, // Otherwise we'll get code blocks in the message
+          content: `[ERROR]${JSON.stringify(parsed)}`,
         });
         finishIfNeeded();
       };
@@ -203,17 +214,20 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
                 });
               }
 
-              // Stream incremental output deltas
-              const current =
-                typeof state.outputs?.output === "string"
-                  ? state.outputs.output
-                  : undefined;
-              if (current && current.length >= lastOutput.length) {
+              // Stream incremental output deltas using dynamic field lookup
+              const current = extractStreamableOutput(
+                state.outputs,
+                outputConfigs,
+              );
+              if (
+                current !== undefined &&
+                current.length >= lastOutput.length
+              ) {
                 const delta = current.slice(lastOutput.length);
                 if (delta) {
                   eventStream$.sendTextMessageContent({
                     messageId,
-                    content: String(delta),
+                    content: delta,
                     // @ts-expect-error - Total hack
                     traceId,
                   });
@@ -322,7 +336,27 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          value: formValues.version.configData.llm,
+          // Convert camelCase form values to snake_case for Python backend
+          // Reasoning is mapped to provider-specific parameter at this boundary
+          value: {
+            model: formValues.version.configData.llm.model,
+            temperature: formValues.version.configData.llm.temperature,
+            max_tokens: formValues.version.configData.llm.maxTokens,
+            top_p: formValues.version.configData.llm.topP,
+            frequency_penalty: formValues.version.configData.llm.frequencyPenalty,
+            presence_penalty: formValues.version.configData.llm.presencePenalty,
+            seed: formValues.version.configData.llm.seed,
+            top_k: formValues.version.configData.llm.topK,
+            min_p: formValues.version.configData.llm.minP,
+            repetition_penalty: formValues.version.configData.llm.repetitionPenalty,
+            // Map unified 'reasoning' to provider-specific parameter at runtime boundary
+            ...mapReasoningToProvider(
+              formValues.version.configData.llm.model,
+              formValues.version.configData.llm.reasoning,
+            ),
+            verbosity: formValues.version.configData.llm.verbosity,
+            litellm_params: formValues.version.configData.llm.litellmParams,
+          },
         },
         {
           identifier: "prompting_technique",

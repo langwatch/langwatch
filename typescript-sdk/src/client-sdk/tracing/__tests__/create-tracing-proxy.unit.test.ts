@@ -93,7 +93,7 @@ describe("createTracingProxy", () => {
 
     it("should not trace private methods", () => {
       const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
+      createTracingProxy(testInstance, langwatchTracer);
 
       // Private methods should not be traced
       expect(mockTracer.getSpanCount()).toBe(0);
@@ -101,11 +101,11 @@ describe("createTracingProxy", () => {
 
     it("should not trace getters and setters", () => {
       const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
+      const tracingProxy = createTracingProxy(testInstance, langwatchTracer);
 
       // Access getter and setter
-      const getterValue = proxy.getterMethod;
-      proxy.setterMethod = "test";
+      const getterValue = tracingProxy.getterMethod;
+      tracingProxy.setterMethod = "test";
 
       expect(getterValue).toBe("getter-result");
       expect(mockTracer.getSpanCount()).toBe(0);
@@ -125,7 +125,7 @@ describe("createTracingProxy", () => {
 
     it("should not trace constructor", () => {
       const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
+      createTracingProxy(testInstance, langwatchTracer);
 
       // Constructor should not be traced
       expect(mockTracer.getSpanCount()).toBe(0);
@@ -371,9 +371,9 @@ describe("createTracingProxy", () => {
       class PromiseChainClass {
         public async promiseChain() {
           return Promise.resolve("step1")
-            .then(result => Promise.resolve(result + " -> step2"))
-            .then(result => Promise.resolve(result + " -> step3"))
-            .then(result => {
+            .then(_result => Promise.resolve(_result + " -> step2"))
+            .then(_result => Promise.resolve(_result + " -> step3"))
+            .then(() => {
               throw new Error("Error in promise chain");
             });
         }
@@ -423,19 +423,19 @@ describe("createTracingProxy", () => {
         this.target = target;
       }
 
-      public publicMethod(span: any, ...args: any[]) {
+      public publicMethod(span: any, ..._args: any[]) {
         span.setAttribute("decorator.called", true);
-        span.setAttribute("decorator.args", args.length);
+        span.setAttribute("decorator.args", _args.length);
         return this.target.publicMethod();
       }
 
-      public methodWithArgs(span: any, arg1: string, arg2: number) {
-        span.setAttribute("decorator.arg1", arg1);
-        span.setAttribute("decorator.arg2", arg2);
-        return this.target.methodWithArgs(arg1, arg2);
+      public methodWithArgs(span: any, _arg1: string, _arg2: number) {
+        span.setAttribute("decorator.arg1", _arg1);
+        span.setAttribute("decorator.arg2", _arg2);
+        return this.target.methodWithArgs(_arg1, _arg2);
       }
 
-      public async publicAsyncMethod(span: any, ...args: any[]) {
+      public async publicAsyncMethod(span: any, ..._args: any[]) {
         span.setAttribute("decorator.async", true);
         const result = await this.target.publicAsyncMethod();
         span.setAttribute("decorator.result", result);
@@ -539,7 +539,7 @@ describe("createTracingProxy", () => {
       }
 
       const emptyInstance = new EmptyClass();
-      const proxy = createTracingProxy(emptyInstance, langwatchTracer);
+      createTracingProxy(emptyInstance, langwatchTracer);
 
       // Should not create any spans
       expect(mockTracer.getSpanCount()).toBe(0);
@@ -597,7 +597,7 @@ describe("createTracingProxy", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
-      const promises = Array.from({ length: 5 }, (_, i) =>
+      const promises = Array.from({ length: 5 }, () =>
         proxy.publicAsyncMethod()
       );
 
@@ -643,27 +643,27 @@ describe("createTracingProxy", () => {
         this.target = target;
       }
 
-      public publicMethod(span: any, ...args: any[]): string {
+      public publicMethod(span: any, ..._args: any[]): string {
         span.setAttribute("decorator.error", true);
         throw new Error("Decorator error");
       }
 
-      public publicAsyncMethod(span: any, ...args: any[]): Promise<string> {
+      public publicAsyncMethod(span: any, ..._args: any[]): Promise<string> {
         span.setAttribute("decorator.error", true);
         throw new Error("Decorator error");
       }
 
-      public methodWithArgs(span: any, arg1: string, arg2: number): string {
+      public methodWithArgs(span: any, _arg1: string, _arg2: number): string {
         span.setAttribute("decorator.error", true);
         throw new Error("Decorator error");
       }
 
-      public methodThatThrows(span: any, ...args: any[]): string {
+      public methodThatThrows(span: any, ..._args: any[]): string {
         span.setAttribute("decorator.error", true);
         throw new Error("Decorator error");
       }
 
-      public methodThatThrowsAsync(span: any, ...args: any[]): Promise<void> {
+      public methodThatThrowsAsync(span: any, ..._args: any[]): Promise<void> {
         span.setAttribute("decorator.error", true);
         throw new Error("Decorator error");
       }

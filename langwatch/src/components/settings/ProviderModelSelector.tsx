@@ -1,17 +1,21 @@
 import {
+  Box,
+  createListCollection,
+  Field,
   HStack,
   Input,
-  Box,
-  Field,
   Text,
 } from "@chakra-ui/react";
-import React, { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { createListCollection } from "@chakra-ui/react";
+import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
-import { Select } from "../ui/select";
-import { InputGroup } from "../ui/input-group";
 import { titleCase } from "../../utils/stringCasing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "../llmPromptConfigs/constants";
+import { InputGroup } from "../ui/input-group";
+import { Select } from "../ui/select";
 
 type ModelOption = {
   label: string;
@@ -45,54 +49,58 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   const [modelSearch, setModelSearch] = useState("");
 
   // Create model options with labels and derive icon from each model's provider
-  const selectOptions = useMemo(() => 
-    options.map((modelValue) => {
-      const modelProvider = modelValue.split("/")[0] ?? "";
-      const icon = modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
-      return {
-        label: modelValue.split("/").slice(1).join("/"),
-        value: modelValue,
-        icon,
-      };
-    }),
-    [options]
+  const selectOptions = useMemo(
+    () =>
+      options.map((modelValue) => {
+        const modelProvider = modelValue.split("/")[0] ?? "";
+        const icon =
+          modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
+        return {
+          label: modelValue.split("/").slice(1).join("/"),
+          value: modelValue,
+          icon,
+        };
+      }),
+    [options],
   );
 
   // Group models by provider
-  const groupedByProvider: GroupedModelOptions = useMemo(() => 
-    Object.entries(
-      selectOptions.reduce(
-        (acc, option) => {
-          const provider = option.value.split("/")[0]!;
-          if (!acc[provider]) {
-            acc[provider] = [];
-          }
-          acc[provider].push(option);
-          return acc;
-        },
-        {} as Record<string, ModelOption[]>
-      )
-    ).map(([provider, models]) => ({
-      provider,
-      icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-      models,
-    })),
-    [selectOptions]
+  const groupedByProvider: GroupedModelOptions = useMemo(
+    () =>
+      Object.entries(
+        selectOptions.reduce(
+          (acc, option) => {
+            const provider = option.value.split("/")[0]!;
+            if (!acc[provider]) {
+              acc[provider] = [];
+            }
+            acc[provider].push(option);
+            return acc;
+          },
+          {} as Record<string, ModelOption[]>,
+        ),
+      ).map(([provider, models]) => ({
+        provider,
+        icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+        models,
+      })),
+    [selectOptions],
   );
 
   // Filter models by search and group by provider
-  const filteredGroups = useMemo(() => 
-    groupedByProvider
-      .map((group) => ({
-        ...group,
-        models: group.models.filter(
-          (item) =>
-            item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-            item.value.toLowerCase().includes(modelSearch.toLowerCase())
-        ),
-      }))
-      .filter((group) => group.models.length > 0),
-    [groupedByProvider, modelSearch]
+  const filteredGroups = useMemo(
+    () =>
+      groupedByProvider
+        .map((group) => ({
+          ...group,
+          models: group.models.filter(
+            (item) =>
+              item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
+              item.value.toLowerCase().includes(modelSearch.toLowerCase()),
+          ),
+        }))
+        .filter((group) => group.models.length > 0),
+    [groupedByProvider, modelSearch],
   );
 
   // Flatten for collection
@@ -104,30 +112,34 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
 
   const selectedItem = selectOptions.find((option) => option.value === model);
   const selectedIcon = selectedItem?.icon ?? modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
+  const isUnknown = !selectedItem;
 
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedIcon && (
-        <Box minWidth="16px">
+        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
           {selectedIcon}
         </Box>
       )}
       <Box
-        fontSize={14}
+        fontSize={size === "sm" ? 12 : 14}
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
+        color={isUnknown ? "gray.500" : undefined}
       >
         {selectedItem?.label ?? model.split("/").slice(1).join("/")}
       </Box>
     </HStack>
   );
 
-  const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(
+    model,
+  );
 
   useEffect(() => {
     const highlightedItem = modelCollection.items.find(
-      (item) => item.value === highlightedValue
+      (item) => item.value === highlightedValue,
     );
     if (!highlightedItem) {
       setHighlightedValue(modelCollection.items[0]?.value ?? null);
@@ -189,7 +201,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             key={group.provider}
             label={
               <HStack gap={2}>
-                <Box width="14px" minWidth="14px">
+                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
                   {group.icon}
                 </Box>
                 <Text fontWeight="medium">{titleCase(group.provider)}</Text>
@@ -198,9 +210,20 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           >
             {group.models.map((item) => (
               <Select.Item key={item.value} item={item}>
-                <Box fontSize={14} fontFamily="mono" paddingY="2px">
-                  {item.label}
-                </Box>
+                <HStack gap={2}>
+                  {item.icon && (
+                    <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                      {item.icon}
+                    </Box>
+                  )}
+                  <Box
+                    fontSize={size === "sm" ? 12 : 14}
+                    fontFamily="mono"
+                    paddingY={size === "sm" ? 0 : "2px"}
+                  >
+                    {item.label}
+                  </Box>
+                </HStack>
               </Select.Item>
             ))}
           </Select.ItemGroup>

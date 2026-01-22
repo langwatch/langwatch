@@ -1,20 +1,25 @@
 import type { Agent, Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
-  signatureComponentSchema,
-  codeComponentSchema,
-  customComponentSchema,
-  httpComponentSchema,
-  type SignatureComponentConfig,
   type CodeComponentConfig,
   type CustomComponentConfig,
+  codeComponentSchema,
+  customComponentSchema,
   type HttpComponentConfig,
+  httpComponentSchema,
+  type SignatureComponentConfig,
+  signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http
  */
-export const agentTypeSchema = z.enum(["signature", "code", "workflow", "http"]);
+export const agentTypeSchema = z.enum([
+  "signature",
+  "code",
+  "workflow",
+  "http",
+]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
 /**

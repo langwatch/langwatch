@@ -27,7 +27,7 @@ export const SimulationLayout = ({
         isHistorySidebarOpen={isHistorySidebarOpen}
         onHistorySidebarOpenChange={onToggle}
       />
-      <HStack w="full" h="full" alignItems="stretch" gap={0} bg="white">
+      <HStack w="full" h="full" alignItems="stretch" gap={0} bg="bg.surface">
         <Box
           w={isHistorySidebarOpen ? "500px" : "0px"}
           position="relative"
@@ -43,7 +43,7 @@ export const SimulationLayout = ({
           borderTopLeftRadius={isHistorySidebarOpen ? "lg" : "0px"}
           transition="border-top-left-radius 0.2s"
           overflow="hidden"
-          bg="gray.100"
+          bg="bg.muted"
         >
           {children}
         </Box>
@@ -61,11 +61,11 @@ const Header = ({
 }) => {
   const { scenarioSetId } = useSimulationRouter();
   return (
-    <Box w="full" p={4} borderBottom="1px" bg="white" borderColor="gray.200">
+    <Box w="full" p={4} borderBottom="1px" bg="bg.surface" borderColor="border">
       <HStack>
         <Button
           size="sm"
-          bg={isHistorySidebarOpen ? "gray.200" : "gray.100"}
+          bg={isHistorySidebarOpen ? "bg.emphasized" : "bg.muted"}
           onClick={() => onHistorySidebarOpenChange(!isHistorySidebarOpen)}
           title={isHistorySidebarOpen ? "Close History" : "Open History"}
         >
@@ -77,7 +77,7 @@ const Header = ({
         </Button>
         <Flex alignItems="center" gap={1}>
           <Text fontWeight="semibold">
-            <Text fontSize={"xs"} color={"GrayText"} as="span">
+            <Text fontSize={"xs"} color={"fg.muted"} as="span">
               Scenario Set ID:
             </Text>{" "}
             <code>{scenarioSetId ?? "unknown"}</code>

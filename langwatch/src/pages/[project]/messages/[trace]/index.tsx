@@ -43,7 +43,7 @@ export default function TraceDetails() {
             flexDirection={{ base: "column", md: "row" }}
           >
             <Heading as="h1">Message Details</Heading>
-            <Text color="gray.400" fontFamily="mono">
+            <Text color="fg.subtle" fontFamily="mono">
               (ID: {traceId})
             </Text>
           </HStack>

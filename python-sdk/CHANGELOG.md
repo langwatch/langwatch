@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.10.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.9.0...python-sdk@v0.10.0) (2026-01-21)
+
+
+### Features
+
+* **sdk:** add online evaluations API and ensureSetup for TypeScript ([2209258](https://github.com/langwatch/langwatch/commit/22092580433b9a3014123e62f39cf8c44543d8cc))
+
+
+### Bug Fixes
+
+* **python-sdk:** resolve name collision between Evaluation TypedDict and class alias ([873909a](https://github.com/langwatch/langwatch/commit/873909a09414bb309fa955b68e4a19bddc93e21f))
+
+
+### Code Refactoring
+
+* **sdk:** fix evaluation API naming consistency ([3aef2a3](https://github.com/langwatch/langwatch/commit/3aef2a353cc4939c8087b53044f441e7501530ae))
+* **sdk:** rename evaluation API to experiment for new terminology ([f10326c](https://github.com/langwatch/langwatch/commit/f10326c0f2ee5818fbcf51507a95933bfe83caeb))
+* **sdk:** rename internal evaluation classes to experiment ([ff70cab](https://github.com/langwatch/langwatch/commit/ff70cab904905b85a77a68e7b1eb60e9c364a18d))
+
+## [0.9.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.8.1...python-sdk@v0.9.0) (2026-01-18)
+
+
+### Features
+
+* add CI/CD execution support for evaluations v3 ([#1118](https://github.com/langwatch/langwatch/issues/1118)) ([d28adac](https://github.com/langwatch/langwatch/commit/d28adaceeb87921d9c7c0f1cf76b5e03f3b90fbd))
+* evaluations v3 execution and new evaluations results page ([#1113](https://github.com/langwatch/langwatch/issues/1113)) ([510f65d](https://github.com/langwatch/langwatch/commit/510f65d17e13c539b877e7eed2fefff118ceb705))
+
+
+### Bug Fixes
+
+* various evaluations v3 fixes ([#1122](https://github.com/langwatch/langwatch/issues/1122)) ([c9904fc](https://github.com/langwatch/langwatch/commit/c9904fc898a7982ec0b23b11fcfeed83f34fbeb7))
+
 ## [0.8.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.8.0...python-sdk@v0.8.1) (2026-01-06)
 
 

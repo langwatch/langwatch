@@ -17,7 +17,7 @@ import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Track which drawer was opened
-let openedDrawer: string | null = null;
+let _openedDrawer: string | null = null;
 
 // Mock dependencies
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -59,6 +59,11 @@ vi.mock("~/utils/api", () => ({
       },
       prompts: {
         getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
+      evaluators: {
+        getById: {
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
@@ -115,26 +120,36 @@ vi.mock("~/components/prompts/PromptListDrawer", () => ({
 // Mock Evaluator Drawers - track which one is opened
 vi.mock("~/components/evaluators/EvaluatorListDrawer", () => ({
   EvaluatorListDrawer: ({ open }: { open: boolean }) => {
-    if (open) openedDrawer = "evaluatorList";
-    return open ? <div data-testid="evaluator-list-drawer">Evaluator List Drawer</div> : null;
+    if (open) _openedDrawer = "evaluatorList";
+    return open ? (
+      <div data-testid="evaluator-list-drawer">Evaluator List Drawer</div>
+    ) : null;
   },
 }));
 vi.mock("~/components/evaluators/EvaluatorCategorySelectorDrawer", () => ({
   EvaluatorCategorySelectorDrawer: ({ open }: { open: boolean }) => {
-    if (open) openedDrawer = "evaluatorCategorySelector";
-    return open ? <div data-testid="evaluator-category-drawer">Evaluator Category Drawer</div> : null;
+    if (open) _openedDrawer = "evaluatorCategorySelector";
+    return open ? (
+      <div data-testid="evaluator-category-drawer">
+        Evaluator Category Drawer
+      </div>
+    ) : null;
   },
 }));
 vi.mock("~/components/evaluators/EvaluatorTypeSelectorDrawer", () => ({
   EvaluatorTypeSelectorDrawer: ({ open }: { open: boolean }) => {
-    if (open) openedDrawer = "evaluatorTypeSelector";
-    return open ? <div data-testid="evaluator-type-drawer">Evaluator Type Drawer</div> : null;
+    if (open) _openedDrawer = "evaluatorTypeSelector";
+    return open ? (
+      <div data-testid="evaluator-type-drawer">Evaluator Type Drawer</div>
+    ) : null;
   },
 }));
 vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
   EvaluatorEditorDrawer: ({ open }: { open: boolean }) => {
-    if (open) openedDrawer = "evaluatorEditor";
-    return open ? <div data-testid="evaluator-editor-drawer">Evaluator Editor Drawer</div> : null;
+    if (open) _openedDrawer = "evaluatorEditor";
+    return open ? (
+      <div data-testid="evaluator-editor-drawer">Evaluator Editor Drawer</div>
+    ) : null;
   },
 }));
 
@@ -144,7 +159,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 describe("Add Evaluator Button", () => {
   beforeEach(() => {
-    openedDrawer = null;
+    _openedDrawer = null;
     vi.clearAllMocks();
 
     // Reset store state
@@ -184,20 +199,24 @@ describe("Add Evaluator Button", () => {
   });
 
   it("renders Add evaluator button for each target", async () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       // There should be at least one add evaluator button
-      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
     });
   });
 
   it("calls openDrawer with evaluatorList when Add evaluator is clicked", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
     });
 
     // Click the first Add evaluator button (there's one per row)
@@ -208,4 +227,3 @@ describe("Add Evaluator Button", () => {
     // Since we use URL-based drawer management, we just verify the action was triggered
   });
 });
-

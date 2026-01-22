@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import {
   Box,
   Button,
@@ -7,7 +6,7 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { generate } from "@langwatch/ksuid";
 import {
   ChevronDown,
   Database,
@@ -18,6 +17,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import { Menu } from "~/components/ui/menu";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -63,7 +63,11 @@ export function DatasetTabs({
     if (!first) {
       return [
         { id: "input", name: "input", type: "string" as const },
-        { id: "expected_output", name: "expected_output", type: "string" as const },
+        {
+          id: "expected_output",
+          name: "expected_output",
+          type: "string" as const,
+        },
       ];
     }
     return first.columns;
@@ -98,8 +102,19 @@ export function DatasetTabs({
   };
 
   return (
-    <HStack gap={2} flexWrap="nowrap" alignItems="center" overflow="auto" width="full">
-      <Text fontWeight="semibold" fontSize="sm" color="gray.700" paddingRight={2}>
+    <HStack
+      gap={2}
+      flexWrap="nowrap"
+      alignItems="center"
+      overflow="auto"
+      width="full"
+    >
+      <Text
+        fontWeight="semibold"
+        fontSize="sm"
+        color="fg"
+        paddingRight={2}
+      >
         Datasets
       </Text>
 
@@ -123,8 +138,8 @@ export function DatasetTabs({
             aria-label="Add dataset"
             size="xs"
             variant="ghost"
-            color="gray.500"
-            _hover={{ color: "gray.700", bg: "gray.100" }}
+            color="fg.muted"
+            _hover={{ color: "fg", bg: "bg.subtle" }}
           >
             <Plus size={14} />
           </IconButton>
@@ -158,8 +173,8 @@ export function DatasetTabs({
         aria-label="Edit dataset columns"
         size="xs"
         variant="ghost"
-        color="gray.500"
-        _hover={{ color: "gray.700", bg: "gray.100" }}
+        color="fg.muted"
+        _hover={{ color: "fg", bg: "bg.subtle" }}
         onClick={onEditDataset}
       >
         <Settings2 size={14} />
@@ -201,7 +216,7 @@ function DatasetTab({
         paddingX={2}
         paddingY={1}
         height="auto"
-        _hover={{ bg: "gray.100" }}
+        _hover={{ bg: "bg.subtle" }}
         data-testid={`dataset-tab-${dataset.id}`}
       >
         <HStack gap={1}>
@@ -224,12 +239,12 @@ function DatasetTab({
         <Button
           size="xs"
           variant="outline"
-          bg="gray.100"
-          borderColor="gray.300"
+          bg="bg.muted"
+          borderColor="border.emphasized"
           paddingX={2}
           paddingY={1}
           height="auto"
-          _hover={{ bg: "gray.200" }}
+          _hover={{ bg: "bg.emphasized" }}
           data-testid={`dataset-tab-${dataset.id}`}
         >
           <HStack gap={1}>
@@ -253,20 +268,15 @@ function DatasetTab({
             </HStack>
           </Menu.Item>
         )}
-        {canRemove && dataset.type === "inline" && (
-          <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
+        {dataset.type === "inline" && (
+          <Box borderTopWidth="1px" borderColor="border" my={1} />
         )}
-        {canRemove && (
-          <Menu.Item
-            value="remove"
-            onClick={onRemove}
-          >
-            <HStack gap={2}>
-              <Trash2 size={14} />
-              <Text>Remove from workbench</Text>
-            </HStack>
-          </Menu.Item>
-        )}
+        <Menu.Item value="remove" onClick={onRemove} disabled={!canRemove}>
+          <HStack gap={2}>
+            <Trash2 size={14} />
+            <Text>Remove from workbench</Text>
+          </HStack>
+        </Menu.Item>
       </Menu.Content>
     </Menu.Root>
   );

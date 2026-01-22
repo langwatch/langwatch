@@ -2,13 +2,19 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PromptTextAreaWithVariables } from "..";
 import type { AvailableSource } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
+import { PromptTextAreaWithVariables } from "..";
 
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect properly
 vi.mock("rich-textarea", () => ({
@@ -28,10 +34,21 @@ vi.mock("rich-textarea", () => ({
       onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
       "data-role"?: string;
     }
-  >(({ children, autoHeight, onSelectionChange, "data-role": dataRole, ...props }, ref) => {
-    // Simple textarea that mimics RichTextarea behavior
-    return <textarea ref={ref} data-role={dataRole} {...props} />;
-  }),
+  >(
+    (
+      {
+        children,
+        autoHeight,
+        onSelectionChange,
+        "data-role": dataRole,
+        ...props
+      },
+      ref,
+    ) => {
+      // Simple textarea that mimics RichTextarea behavior
+      return <textarea ref={ref} data-role={dataRole} {...props} />;
+    },
+  ),
 }));
 
 const mockSources: AvailableSource[] = [
@@ -52,7 +69,7 @@ const mockVariables: Variable[] = [
 ];
 
 const renderComponent = (
-  props: Partial<Parameters<typeof PromptTextAreaWithVariables>[0]> = {}
+  props: Partial<Parameters<typeof PromptTextAreaWithVariables>[0]> = {},
 ) => {
   const defaultProps = {
     value: "",
@@ -62,7 +79,7 @@ const renderComponent = (
   return render(
     <ChakraProvider value={defaultSystem}>
       <PromptTextAreaWithVariables {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -74,7 +91,9 @@ describe("PromptTextAreaWithVariables", () => {
   describe("rendering", () => {
     it("renders textarea with placeholder", () => {
       renderComponent({ placeholder: "Enter your prompt..." });
-      expect(screen.getByPlaceholderText("Enter your prompt...")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Enter your prompt..."),
+      ).toBeInTheDocument();
     });
 
     it("renders with initial value", () => {
@@ -87,7 +106,9 @@ describe("PromptTextAreaWithVariables", () => {
         value: "Hello {{question}}",
         variables: mockVariables,
       });
-      expect(screen.getByDisplayValue("Hello {{question}}")).toBeInTheDocument();
+      expect(
+        screen.getByDisplayValue("Hello {{question}}"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -98,7 +119,9 @@ describe("PromptTextAreaWithVariables", () => {
       renderComponent({ onChange });
 
       const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Hello", selectionStart: 5 } });
+      fireEvent.change(textarea, {
+        target: { value: "Hello", selectionStart: 5 },
+      });
 
       // onChange is debounced, so advance timers
       vi.advanceTimersByTime(200);
@@ -127,7 +150,9 @@ describe("PromptTextAreaWithVariables", () => {
         variables: mockVariables,
       });
 
-      expect(screen.queryByText(/Undefined variables:/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Undefined variables:/),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -196,7 +221,9 @@ describe("PromptTextAreaWithVariables", () => {
       renderComponent({ onChange });
 
       const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "{{test", selectionStart: 6 } });
+      fireEvent.change(textarea, {
+        target: { value: "{{test", selectionStart: 6 },
+      });
 
       // onChange is debounced
       vi.advanceTimersByTime(200);
@@ -288,7 +315,9 @@ describe("PromptTextAreaWithVariables", () => {
       renderComponent({ onChange });
 
       const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Hello", selectionStart: 5 } });
+      fireEvent.change(textarea, {
+        target: { value: "Hello", selectionStart: 5 },
+      });
 
       // Local value updates immediately (visible in textarea)
       expect(screen.getByDisplayValue("Hello")).toBeInTheDocument();
@@ -303,8 +332,12 @@ describe("PromptTextAreaWithVariables", () => {
 
       // Type multiple characters quickly
       fireEvent.change(textarea, { target: { value: "H", selectionStart: 1 } });
-      fireEvent.change(textarea, { target: { value: "He", selectionStart: 2 } });
-      fireEvent.change(textarea, { target: { value: "Hel", selectionStart: 3 } });
+      fireEvent.change(textarea, {
+        target: { value: "He", selectionStart: 2 },
+      });
+      fireEvent.change(textarea, {
+        target: { value: "Hel", selectionStart: 3 },
+      });
 
       // Before debounce delay, onChange should NOT be called yet
       expect(onChange).not.toHaveBeenCalled();
@@ -324,19 +357,21 @@ describe("PromptTextAreaWithVariables", () => {
       const { rerender } = render(
         <ChakraProvider value={defaultSystem}>
           <PromptTextAreaWithVariables value="initial" onChange={onChange} />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       const textarea = screen.getByRole("textbox");
 
       // Start typing
-      fireEvent.change(textarea, { target: { value: "typed", selectionStart: 5 } });
+      fireEvent.change(textarea, {
+        target: { value: "typed", selectionStart: 5 },
+      });
 
       // External value changes while typing
       rerender(
         <ChakraProvider value={defaultSystem}>
           <PromptTextAreaWithVariables value="external" onChange={onChange} />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Should keep the typed value, not sync external (within typing window)
@@ -348,7 +383,7 @@ describe("PromptTextAreaWithVariables", () => {
       rerender(
         <ChakraProvider value={defaultSystem}>
           <PromptTextAreaWithVariables value="external2" onChange={onChange} />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       expect(screen.getByDisplayValue("external2")).toBeInTheDocument();
@@ -363,7 +398,7 @@ describe("PromptTextAreaWithVariables", () => {
       const { rerender } = render(
         <ChakraProvider value={defaultSystem}>
           <PromptTextAreaWithVariables value="initial" onChange={onChange} />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       expect(screen.getByDisplayValue("initial")).toBeInTheDocument();
@@ -372,7 +407,7 @@ describe("PromptTextAreaWithVariables", () => {
       rerender(
         <ChakraProvider value={defaultSystem}>
           <PromptTextAreaWithVariables value="updated" onChange={onChange} />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       expect(screen.getByDisplayValue("updated")).toBeInTheDocument();
@@ -441,7 +476,9 @@ describe("PromptTextAreaWithVariables", () => {
         variables: mockVariables,
       });
 
-      expect(screen.queryByText(/Undefined variables:/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Undefined variables:/),
+      ).not.toBeInTheDocument();
     });
 
     it("shows warning for partially undefined variables", () => {
@@ -488,7 +525,9 @@ describe("PromptTextAreaWithVariables", () => {
 
       const textarea = screen.getByRole("textbox");
       // Type text without {{ trigger
-      fireEvent.change(textarea, { target: { value: "Hello world", selectionStart: 11 } });
+      fireEvent.change(textarea, {
+        target: { value: "Hello world", selectionStart: 11 },
+      });
 
       // Component should render without menu issues
       expect(screen.getByDisplayValue("Hello world")).toBeInTheDocument();

@@ -10,10 +10,10 @@ import { ColorfulBlockIcon } from "../../../../optimization_studio/components/Co
 import { StepButton } from "../components/StepButton";
 
 export function TaskStep() {
-  const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
+  const { workbenchState, setWizardState, setDSL } = useEvaluationWizardStore();
 
-  const handleTaskSelection = (task: State["wizardState"]["task"]) => {
-    if (task !== wizardState.task) {
+  const handleTaskSelection = (task: State["workbenchState"]["task"]) => {
+    if (task !== workbenchState.task) {
       // Reset the workflow
       // TODO: delete the executor node only
       setDSL({
@@ -40,9 +40,9 @@ export function TaskStep() {
         <Text>Select what evaluation flow you want to follow</Text>
       </VStack>
       <RadioCard.Root
-        value={wizardState.task}
+        value={workbenchState.task}
         onValueChange={(e) =>
-          handleTaskSelection(e.value as State["wizardState"]["task"])
+          handleTaskSelection(e.value as State["workbenchState"]["task"])
         }
       >
         <VStack width="full" gap={3}>
@@ -54,7 +54,7 @@ export function TaskStep() {
             onClick={() => handleTaskSelection("llm_app")}
             icon={
               <ColorfulBlockIcon
-                color="blue.400"
+                color="blue.solid"
                 size="md"
                 icon={<LuListChecks />}
                 marginTop="-2px"
@@ -69,7 +69,7 @@ export function TaskStep() {
             onClick={() => handleTaskSelection("real_time")}
             icon={
               <ColorfulBlockIcon
-                color="green.400"
+                color="green.solid"
                 size="md"
                 icon={<Activity />}
                 marginTop="-2px"
@@ -86,7 +86,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="purple.400"
+                color="purple.solid"
                 size="md"
                 icon={<Edit3 />}
                 marginTop="-2px"
@@ -103,7 +103,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="orange.400"
+                color="orange.solid"
                 size="md"
                 icon={<LuBadgeCheck />}
                 marginTop="-2px"
@@ -120,7 +120,7 @@ export function TaskStep() {
             disabled
             icon={
               <ColorfulBlockIcon
-                color="teal.400"
+                color="teal.solid"
                 size="md"
                 icon={<LuShield />}
                 marginTop="-2px"

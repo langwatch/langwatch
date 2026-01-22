@@ -1,14 +1,14 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { EventUtils } from "~/server/event-sourcing/library";
 import { createLogger } from "../../../../../utils/logger";
-import type { SpanRepository } from "./spanRepository";
 import type {
   NormalizedEvent,
   NormalizedLink,
   NormalizedSpan,
 } from "../schemas/spans";
-import { EventUtils } from "~/server/event-sourcing/library";
+import type { SpanRepository } from "./spanRepository";
 
 const TABLE_NAME = "stored_spans" as const;
 

@@ -29,8 +29,8 @@ export function SuperHeader({
         padding: "12px 12px",
         paddingLeft,
         textAlign: "left",
-        borderBottom: "1px solid var(--chakra-colors-gray-200)",
-        backgroundColor: "white",
+        borderBottom: "1px solid var(--chakra-colors-border)",
+        backgroundColor: "var(--chakra-colors-bg-panel)",
         height: "48px",
       }}
     >
@@ -41,4 +41,3 @@ export function SuperHeader({
     </th>
   );
 }
-

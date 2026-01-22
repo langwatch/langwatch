@@ -1,5 +1,5 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { EventHandlerTimelineTypes } from "../runner/eventHandlerTimeline.types";
 import { JsonViewer } from "./JsonViewer";
 
@@ -39,32 +39,40 @@ export const EventHandlerRow: React.FC<EventHandlerRowProps> = ({
   // Note: scroll indicators are handled internally by JsonViewer
   const titleLines = 1; // The expandable handler name line
   const metadataLines = 1; // "Event: X | Processed: Y" line
-  
+
   // Calculate how many lines the content box can have (including JsonViewer + its indicators)
-  const contentBoxMaxLines = maxLines !== undefined ? maxLines - titleLines : undefined;
-  
+  const contentBoxMaxLines =
+    maxLines !== undefined ? maxLines - titleLines : undefined;
+
   // Calculate how many lines JsonViewer can display (it will add indicators if needed)
   const jsonMaxLines =
-    contentBoxMaxLines !== undefined 
-      ? Math.max(5, contentBoxMaxLines - metadataLines) 
+    contentBoxMaxLines !== undefined
+      ? Math.max(5, contentBoxMaxLines - metadataLines)
       : undefined;
 
   return (
-    <Box flexDirection="column" flexShrink={0} flexGrow={isExpanded && hasDisplayData ? 1 : 0}>
+    <Box
+      flexDirection="column"
+      flexShrink={0}
+      flexGrow={isExpanded && hasDisplayData ? 1 : 0}
+    >
       <Box flexShrink={0}>
         {/* Focus indicator */}
         <Text color="cyan" bold={isFocused}>
           {isFocused ? " " : " "}
         </Text>
-        <Text color={isFocused ? "cyan" : undefined} bold={isFocused} wrap="truncate">
+        <Text
+          color={isFocused ? "cyan" : undefined}
+          bold={isFocused}
+          wrap="truncate"
+        >
           {expandIndicator} {handler.pipelineName}/{handler.handlerName}
         </Text>
-        <Text color={processed ? "green" : "gray"}>
-          {" "}{processedIndicator}
-        </Text>
+        <Text color={processed ? "green" : "gray"}> {processedIndicator}</Text>
         {handler.eventTypes && handler.eventTypes.length > 0 && (
           <Text color="gray" dimColor>
-            {" "}({handler.eventTypes.join(", ")})
+            {" "}
+            ({handler.eventTypes.join(", ")})
           </Text>
         )}
         {isFocused && isExpanded && scrollOffset > 0 && (
@@ -78,41 +86,42 @@ export const EventHandlerRow: React.FC<EventHandlerRowProps> = ({
         </Box>
       )}
 
-      {isExpanded && processed && hasDisplayData && currentStep?.displayData !== undefined && (
-        <Box
-          marginLeft={2}
-          borderStyle="round"
-          borderColor={isFocused ? "cyan" : "gray"}
-          paddingX={1}
-          flexDirection="column"
-          flexGrow={1}
-          flexShrink={1}
-          minHeight={0}
-          height={contentBoxMaxLines}
-          overflow="hidden"
-        >
-          <Text dimColor>
-            Event: {currentStep.eventType} | Processed: {processed ? "Yes" : "No"}
-          </Text>
-          <JsonViewer
-            data={currentStep.displayData}
-            maxLines={jsonMaxLines}
-            scrollOffset={scrollOffset}
-            dimmed={false}
-          />
-        </Box>
-      )}
+      {isExpanded &&
+        processed &&
+        hasDisplayData &&
+        currentStep?.displayData !== undefined && (
+          <Box
+            marginLeft={2}
+            borderStyle="round"
+            borderColor={isFocused ? "cyan" : "gray"}
+            paddingX={1}
+            flexDirection="column"
+            flexGrow={1}
+            flexShrink={1}
+            minHeight={0}
+            height={contentBoxMaxLines}
+            overflow="hidden"
+          >
+            <Text dimColor>
+              Event: {currentStep.eventType} | Processed:{" "}
+              {processed ? "Yes" : "No"}
+            </Text>
+            <JsonViewer
+              data={currentStep.displayData}
+              maxLines={jsonMaxLines}
+              scrollOffset={scrollOffset}
+              dimmed={false}
+            />
+          </Box>
+        )}
 
       {isExpanded && processed && !hasDisplayData && (
         <Box marginLeft={4}>
-          <Text dimColor>(handler processed this event but has no display data)</Text>
+          <Text dimColor>
+            (handler processed this event but has no display data)
+          </Text>
         </Box>
       )}
     </Box>
   );
 };
-
-
-
-
-

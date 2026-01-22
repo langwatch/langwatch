@@ -105,7 +105,7 @@ export const PushToCopiesDialog = ({
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
-            <Text fontSize="sm" color="gray.600">
+            <Text fontSize="sm" color="fg.muted">
               Select which replicas to push the latest version to:
             </Text>
             {isLoading ? (
@@ -115,7 +115,7 @@ export const PushToCopiesDialog = ({
                 Error loading replicas: {error.message}
               </Text>
             ) : availableCopies.length === 0 ? (
-              <Text color="gray.500">
+              <Text color="fg.muted">
                 No replicas found. This may be because you don't have
                 workflows:update permission on the replica projects, or the
                 replicas have been archived.
@@ -130,7 +130,7 @@ export const PushToCopiesDialog = ({
                   >
                     <VStack align={"start"} gap={0}>
                       <Text fontWeight="medium">{copy.name}</Text>
-                      <Text fontSize="sm" color="gray.500">
+                      <Text fontSize="sm" color="fg.muted">
                         {copy.fullPath}
                       </Text>
                     </VStack>

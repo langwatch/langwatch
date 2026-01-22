@@ -1,8 +1,9 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, Clock, Edit2 } from "lucide-react";
-import React, { useState } from "react";
+import { ArrowLeft, Clock, Edit2, Play } from "lucide-react";
+import { useCallback, useState } from "react";
+import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import {
   CustomCopilotKitChat,
   PreviousRunsList,
@@ -11,6 +12,9 @@ import {
   SimulationLayout,
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useRunScenario } from "~/hooks/useRunScenario";
+import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
@@ -20,10 +24,15 @@ import { api } from "~/utils/api";
 // Main component
 export default function IndividualScenarioRunPage() {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
+  const [runModalOpen, setRunModalOpen] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
   const { openDrawer, drawerOpen } = useDrawer();
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
   // Fetch scenario run data using the correct API
   const { data: scenarioState } = api.scenarios.getRunState.useQuery(
     {
@@ -42,8 +51,46 @@ export default function IndividualScenarioRunPage() {
   // Check if the scenario exists in our database
   const { data: scenarioExists } = api.scenarios.getById.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project?.id && !!scenarioId }
+    { enabled: !!project?.id && !!scenarioId },
   );
+
+  // Target selection persistence for "Run Again"
+  const {
+    target: persistedTarget,
+    setTarget: persistTarget,
+    hasPersistedTarget,
+  } = useScenarioTarget(scenarioId);
+
+  // Handle running the scenario again
+  const handleRunAgain = useCallback(
+    async (target: TargetValue, remember: boolean) => {
+      if (!scenarioId || !target) return;
+
+      if (remember) {
+        persistTarget(target);
+      }
+
+      try {
+        await runScenario(scenarioId, target);
+      } catch (error) {
+        console.error("Failed to run scenario:", error);
+      }
+
+      setRunModalOpen(false);
+    },
+    [scenarioId, persistTarget, runScenario],
+  );
+
+  // Handle "Run Again" button click
+  const handleRunAgainClick = useCallback(() => {
+    if (hasPersistedTarget && persistedTarget) {
+      // Run immediately with persisted target
+      void handleRunAgain(persistedTarget, true);
+    } else {
+      // Show modal to select target
+      setRunModalOpen(true);
+    }
+  }, [hasPersistedTarget, persistedTarget, handleRunAgain]);
 
   if (!scenarioRunId) {
     return null;
@@ -63,7 +110,7 @@ export default function IndividualScenarioRunPage() {
       >
         <VStack height="full" w="full">
           {/* Header with Back Button and Title */}
-          <Box borderBottom="1px" borderColor="gray.200" w="100%" mb={2}>
+          <Box borderBottom="1px" borderColor="border" w="100%" mb={2}>
             <HStack justify="space-between" align="center">
               {scenarioSetId && batchRunId && (
                 <VStack>
@@ -83,18 +130,29 @@ export default function IndividualScenarioRunPage() {
 
               <HStack gap={2}>
                 {scenarioExists && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      openDrawer("scenarioEditor", {
-                        urlParams: { scenarioId: scenarioId ?? "" },
-                      });
-                    }}
-                  >
-                    <Edit2 size={14} />
-                    Edit Scenario
-                  </Button>
+                  <>
+                    <Button
+                      colorPalette="blue"
+                      size="sm"
+                      onClick={handleRunAgainClick}
+                      loading={isRunning}
+                    >
+                      <Play size={14} />
+                      Run Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        openDrawer("scenarioEditor", {
+                          urlParams: { scenarioId: scenarioId ?? "" },
+                        });
+                      }}
+                    >
+                      <Edit2 size={14} />
+                      Edit Scenario
+                    </Button>
+                  </>
                 )}
                 <Button
                   variant="outline"
@@ -113,7 +171,7 @@ export default function IndividualScenarioRunPage() {
             borderRadius="lg"
             boxShadow="sm"
             border="1px"
-            borderColor="gray.200"
+            borderColor="border"
             overflow="hidden"
             w="full"
           >
@@ -161,7 +219,7 @@ export default function IndividualScenarioRunPage() {
                         <Box
                           w="100%"
                           borderTop="1px"
-                          borderColor="gray.100"
+                          borderColor="border.muted"
                           flex="1"
                         >
                           <SimulationConsole
@@ -181,7 +239,7 @@ export default function IndividualScenarioRunPage() {
                       w="250px"
                       height="100%"
                       borderLeft="1px"
-                      borderColor="gray.200"
+                      borderColor="border"
                       borderStyle="solid"
                       borderTopRightRadius="lg"
                       borderBottomRightRadius="lg"
@@ -192,7 +250,7 @@ export default function IndividualScenarioRunPage() {
                       <Box
                         p={6}
                         borderBottom="1px"
-                        borderColor="gray.200"
+                        borderColor="border"
                         borderStyle="solid"
                       >
                         <Text fontSize="md" fontWeight="semibold">
@@ -212,6 +270,14 @@ export default function IndividualScenarioRunPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+
+      <RunScenarioModal
+        open={runModalOpen}
+        onClose={() => setRunModalOpen(false)}
+        onRun={handleRunAgain}
+        initialTarget={persistedTarget}
+        isLoading={isRunning}
+      />
     </SimulationLayout>
   );
 }

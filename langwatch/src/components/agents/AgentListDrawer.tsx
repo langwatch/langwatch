@@ -7,14 +7,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, Code, MessageSquare, Plus, Workflow } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Bot, Code, MessageSquare, Plus, Workflow } from "lucide-react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
 
 export type AgentListDrawerProps = {
   open?: boolean;
@@ -37,13 +37,16 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as AgentListDrawerProps["onSelect"]);
-  const onCreateNew = props.onCreateNew ?? (() => openDrawer("agentTypeSelector"));
+  const onSelect =
+    props.onSelect ??
+    (complexProps.onSelect as AgentListDrawerProps["onSelect"]);
+  const onCreateNew =
+    props.onCreateNew ?? (() => openDrawer("agentTypeSelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen }
+    { enabled: !!project?.id && isOpen },
   );
 
   const handleSelectAgent = (agent: TypedAgent) => {
@@ -73,9 +76,14 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             </Button>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an existing agent or create a new one.
             </Text>
 
@@ -106,7 +114,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -123,19 +131,14 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
   return (
     <VStack paddingY={12} gap={4} textAlign="center">
-      <Box
-        padding={4}
-        borderRadius="full"
-        bg="gray.100"
-        color="gray.500"
-      >
+      <Box padding={4} borderRadius="full" bg="bg.muted" color="fg.muted">
         <Bot size={32} />
       </Box>
       <VStack gap={1}>
-        <Text fontWeight="medium" color="gray.700">
+        <Text fontWeight="medium" color="fg">
           No agents yet
         </Text>
-        <Text fontSize="sm" color="gray.500">
+        <Text fontSize="sm" color="fg.muted">
           Create your first agent to get started
         </Text>
       </VStack>
@@ -183,27 +186,30 @@ function AgentCard({ agent, onClick }: AgentCardProps) {
       padding={4}
       borderRadius="md"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
+      _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
       transition="all 0.15s"
       data-testid={`agent-card-${agent.id}`}
     >
       <HStack gap={3}>
-        <Box color="blue.500">
+        <Box color="blue.fg">
           <Icon size={20} />
         </Box>
         <VStack align="start" gap={0} flex={1}>
           <Text fontWeight="medium" fontSize="sm">
             {agent.name}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
+          <HStack gap={2} fontSize="xs" color="fg.muted">
             <Text>{typeLabel}</Text>
             <Text>•</Text>
             <Text>
-              Updated {formatDistanceToNow(new Date(agent.updatedAt), { addSuffix: true })}
+              Updated{" "}
+              {formatDistanceToNow(new Date(agent.updatedAt), {
+                addSuffix: true,
+              })}
             </Text>
           </HStack>
         </VStack>

@@ -26,7 +26,7 @@ export function ExpandedTextDialog({
     >
       <Dialog.Content>
         <Dialog.Header
-          background="gray.100"
+          background="bg.muted"
           padding={3}
           borderRadius="12px 12px 0 0"
           fontSize="14px"

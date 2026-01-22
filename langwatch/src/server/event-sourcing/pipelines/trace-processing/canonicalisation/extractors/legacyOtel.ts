@@ -23,14 +23,14 @@
  * - error.type (from exception.*, status.message, span.error.*)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import { ATTR_KEYS } from "./_constants";
 import {
-  safeJsonParse,
-  isNonEmptyString,
   ALLOWED_SPAN_TYPES,
   inferSpanTypeIfAbsent,
+  isNonEmptyString,
+  safeJsonParse,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
   readonly id = "legacy-otel-traces";

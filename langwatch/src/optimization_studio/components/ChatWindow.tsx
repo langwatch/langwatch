@@ -240,7 +240,7 @@ export const ChatBox = ({
         width="100%"
         height="100%"
         border="1px"
-        borderColor="gray.200"
+        borderColor="border"
         borderRadius="lg"
         padding={2}
       >
@@ -371,7 +371,7 @@ const MultipleInput = ({
     <VStack
       width="xl"
       border="1px"
-      borderColor="gray.200"
+      borderColor="border"
       borderRadius="lg"
       height="100%"
       padding={2}

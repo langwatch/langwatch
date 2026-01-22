@@ -1,7 +1,6 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 import { getCurrentWriteIndex } from "../helpers";
-
-import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({

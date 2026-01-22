@@ -113,7 +113,9 @@ export class BatchEventProcessor<EventType extends Event = Event> {
 
   constructor(
     private readonly eventStore: EventStore<EventType>,
-    private readonly processorCheckpointStore: ProcessorCheckpointStore | undefined,
+    private readonly processorCheckpointStore:
+      | ProcessorCheckpointStore
+      | undefined,
     private readonly distributedLock: DistributedLock,
     private readonly pipelineName: string,
     private readonly aggregateType: AggregateType,
@@ -294,7 +296,10 @@ export class BatchEventProcessor<EventType extends Event = Event> {
             (_, index) => index + 1 > lastProcessedSequence,
           );
 
-          span.setAttribute("batch.unprocessed_count", unprocessedEvents.length);
+          span.setAttribute(
+            "batch.unprocessed_count",
+            unprocessedEvents.length,
+          );
 
           this.logger.info(
             {
@@ -500,4 +505,3 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     }
   }
 }
-

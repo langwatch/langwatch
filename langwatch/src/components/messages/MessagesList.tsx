@@ -15,6 +15,7 @@ import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
+import { LuLayers, LuRefreshCw } from "react-icons/lu";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
@@ -26,15 +27,11 @@ import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
+import { NavigationFooter, useNavigationFooter } from "../NavigationFooter";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
+import { PageLayout } from "../ui/layouts/PageLayout";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
-import {
-  NavigationFooter,
-  useNavigationFooter,
-} from "../NavigationFooter";
-import { PageLayout } from "../ui/layouts/PageLayout";
-import { LuLayers, LuRefreshCw } from "react-icons/lu";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -236,14 +233,14 @@ const ExpandableMessages = React.memo(
           {...(isExpanded
             ? {
                 className: "card-stack-content expanded",
-                background: "#ECEEF2",
+                background: "bg.muted",
                 borderRadius: "10px",
                 padding: "40px",
                 width: "calc(100% + 80px)",
                 cursor: "n-resize",
               }
             : {
-                background: "#ECEEF200",
+                background: "transparent",
                 className: "card-stack-content",
                 marginBottom:
                   traceGroup.length > 2 ? 4 : traceGroup.length > 1 ? 2 : 0,
@@ -276,7 +273,7 @@ const ExpandableMessages = React.memo(
               marginTop="-22px"
               fontSize="13px"
               fontWeight={600}
-              color="gray.500"
+              color="fg.muted"
               cursor="default"
             >
               <HStack gap={1}>
@@ -295,7 +292,7 @@ const ExpandableMessages = React.memo(
                 marginTop="-22px"
                 fontSize="13px"
                 fontWeight={600}
-                color="gray.500"
+                color="fg.muted"
                 cursor="default"
               >
                 <HStack gap={1}>
@@ -310,7 +307,7 @@ const ExpandableMessages = React.memo(
                 marginTop="-22px"
                 fontSize="13px"
                 fontWeight={600}
-                color="gray.500"
+                color="fg.muted"
                 cursor="default"
               >
                 <HStack gap={1}>
@@ -477,7 +474,7 @@ function GroupingSelector() {
         </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content>
-        <Box paddingX={3} paddingY={2} fontWeight="medium" color="gray.500">
+        <Box paddingX={3} paddingY={2} fontWeight="medium" color="fg.muted">
           Group by
         </Box>
         <RadioGroup

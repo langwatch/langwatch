@@ -1,8 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { SpanStatusCode } from "@opentelemetry/api";
 import { createLangWatchSpan } from "../implementation";
 import { type ChatMessage, type SpanInputOutput } from "../../../internal/generated/types/tracer";
-import { type Prompt } from "@/client-sdk/services/prompts";
 
 // Mock OpenTelemetry Span
 const createMockSpan = () => ({

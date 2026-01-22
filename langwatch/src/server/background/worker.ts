@@ -26,10 +26,10 @@ import path from "path";
 import { register } from "prom-client";
 import { workerRestartsCounter } from "../metrics";
 import { WorkersRestart } from "./errors";
-import { startUsageStatsWorker } from "./workers/usageStatsWorker";
+import type { EventSourcingJob } from "./types";
 
 import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
-import type { EventSourcingJob } from "./types";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 const logger = createLogger("langwatch:workers");
 

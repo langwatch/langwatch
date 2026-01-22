@@ -16,4 +16,3 @@ export class DashboardReorderError extends Error {
     this.name = "DashboardReorderError";
   }
 }
-

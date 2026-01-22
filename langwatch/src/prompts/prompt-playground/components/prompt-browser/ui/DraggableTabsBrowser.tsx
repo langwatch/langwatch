@@ -203,9 +203,9 @@ function DragOverlayContent({
   return (
     <div
       style={{
-        background: "white",
+        background: "var(--chakra-colors-bg-panel)",
         padding: 8,
-        border: "1px solid #DDD",
+        border: "1px solid var(--chakra-colors-border)",
         borderRadius: 6,
         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
         pointerEvents: "none",
@@ -290,14 +290,24 @@ interface DraggableTabsTabBarProps extends StackProps {
  * @param children - Tab trigger components
  * @param tabIds - Array of tab IDs for sortable context
  */
-function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBarProps) {
+function DraggableTabsTabBar({
+  children,
+  tabIds,
+  ...props
+}: DraggableTabsTabBarProps) {
   return (
     <HStack gap={0} width="full" {...props}>
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}
       >
-        <Tabs.List width="full" gap={0} height="full" paddingY={0} background="none">
+        <Tabs.List
+          width="full"
+          gap={0}
+          height="full"
+          paddingY={0}
+          background="none"
+        >
           {children}
         </Tabs.List>
       </SortableContext>

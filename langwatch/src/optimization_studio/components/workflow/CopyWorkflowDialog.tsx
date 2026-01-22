@@ -159,7 +159,7 @@ export const CopyWorkflowDialog = ({
                           <Text
                             display="inline-block"
                             fontSize="sm"
-                            color="gray.400"
+                            color="fg.subtle"
                             ml={2}
                           >
                             (no permission)

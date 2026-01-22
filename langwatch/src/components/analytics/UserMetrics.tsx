@@ -134,8 +134,7 @@ export function UserMetrics() {
                     input={{ ...messagesGraph, graphType: "summary" }}
                     titleProps={{
                       fontSize: 14,
-                      color: "black",
-                      paddingBottom: 2,
+                      color: "fg",
                     }}
                   />
                 </Tabs.Trigger>
@@ -149,8 +148,7 @@ export function UserMetrics() {
                     input={{ ...threadsGraph, graphType: "summary" }}
                     titleProps={{
                       fontSize: 14,
-                      color: "black",
-                      paddingBottom: 2,
+                      color: "fg",
                     }}
                   />
                 </Tabs.Trigger>
@@ -164,8 +162,7 @@ export function UserMetrics() {
                     input={{ ...usersGraph, graphType: "summary" }}
                     titleProps={{
                       fontSize: 14,
-                      color: "black",
-                      paddingBottom: 2,
+                      color: "fg",
                     }}
                   />
                 </Tabs.Trigger>

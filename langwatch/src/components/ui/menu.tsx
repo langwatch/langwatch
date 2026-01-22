@@ -17,7 +17,7 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
         <ChakraMenu.Positioner>
           <ChakraMenu.Content
             borderRadius="lg"
-            background="white/75"
+            background="bg.panel/75"
             backdropFilter="blur(8px)"
             ref={ref}
             {...rest}

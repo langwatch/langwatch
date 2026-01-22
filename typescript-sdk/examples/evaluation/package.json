@@ -1,0 +1,24 @@
+{
+  "name": "evaluation-example",
+  "version": "1.0.0",
+  "description": "Example of running batch evaluations with LangWatch TypeScript SDK",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "start:with-evaluator": "tsx src/with-evaluator.ts",
+    "start:multi-target": "tsx src/multi-target.ts",
+    "start:guardrail": "tsx src/guardrail.ts"
+  },
+  "keywords": [],
+  "author": "LangWatch",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.6",
+    "@opentelemetry/context-async-hooks": "^2.0.1",
+    "@opentelemetry/sdk-node": "^0.203.0",
+    "ai": "^5.0.8",
+    "dotenv": "^16.6.1",
+    "langwatch": "file:../../",
+    "tsx": "^4.19.0"
+  }
+}

@@ -8,18 +8,21 @@ import * as React from "react";
 import { LuMoon, LuSun } from "react-icons/lu";
 
 export const colorSystem = {
+  // Using Tailwind zinc palette - neutral grays with minimal blue tint
   gray: {
-    800: { value: "#090F1D" },
-    700: { value: "#1F2937" },
-    600: { value: "#213B41" },
-    500: { value: "#51676C" },
-    400: { value: "#9CA3AF" },
-    375: { value: "#B8BDBD" },
-    350: { value: "#DDDDDD" },
-    300: { value: "#E0E2E6" },
-    200: { value: "#E8EBF2" },
-    100: { value: "#F2F4F8" },
-    50: { value: "#F7FAFC" },
+    950: { value: "#09090b" },
+    900: { value: "#18181b" },
+    800: { value: "#27272a" },
+    700: { value: "#3f3f46" },
+    600: { value: "#52525b" },
+    500: { value: "#71717a" },
+    400: { value: "#a1a1aa" },
+    375: { value: "#b4b4b4" },
+    350: { value: "#d4d4d4" },
+    300: { value: "#d4d4d8" },
+    200: { value: "#e4e4e7" },
+    100: { value: "#f4f4f5" },
+    50: { value: "#fafafa" },
   },
   red: {
     50: { value: "#FFF5F5" },
@@ -134,9 +137,39 @@ export const colorSystem = {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ColorModeProviderProps extends ThemeProviderProps {}
 
+// Check if dark mode feature is enabled via build-time env var
+const isDarkModeEnabled =
+  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
+  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
+
 export function ColorModeProvider(props: ColorModeProviderProps) {
+  // When dark mode feature is disabled, force light mode
+  // When enabled, use system preference for automatic light/dark switching
+  // Chakra v3 uses ".dark &" selector for dark mode, so we need attribute="class"
   return (
-    <ThemeProvider attribute="class" disableTransitionOnChange {...props} />
+    <>
+      <style jsx global>{`
+        html {
+          transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        html *,
+        html *::before,
+        html *::after {
+          transition: background-color 0.3s ease, border-color 0.3s ease,
+            box-shadow 0.3s ease;
+        }
+      `}</style>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={isDarkModeEnabled ? "system" : "light"}
+        disableTransitionOnChange={false}
+        enableSystem={isDarkModeEnabled}
+        enableColorScheme={isDarkModeEnabled}
+        forcedTheme={isDarkModeEnabled ? undefined : "light"}
+        themes={isDarkModeEnabled ? ["light", "dark", "system"] : ["light"]}
+        {...props}
+      />
+    </>
   );
 }
 
@@ -160,22 +193,38 @@ export function useColorMode(): UseColorModeReturn {
   };
 }
 
+// Mapping for semantic token names to numeric color values
+// Used to resolve tokens like "blue.fg" to actual hex colors
+const semanticToNumeric: Record<string, number> = {
+  fg: 600,
+  solid: 500,
+  subtle: 100,
+  muted: 200,
+  emphasized: 300,
+  contrast: 900,
+  hover: 600,
+};
+
 export function getRawColorValue(color: string): string {
   if (color === "white") {
     return "white";
   }
 
-  const [colorName, number] = color.split(".");
+  const [colorName, numberOrToken] = color.split(".");
 
-  if (!colorName || !number) {
+  if (!colorName || !numberOrToken) {
     return "pink";
   }
 
+  // Try parsing as number first, then check semantic token mapping
+  let numericValue = parseInt(numberOrToken, 10);
+  if (isNaN(numericValue)) {
+    numericValue = semanticToNumeric[numberOrToken] ?? 500;
+  }
+
   return (
-    colorSystem[colorName as keyof typeof colorSystem][
-      (parseInt(
-        number,
-      ) as keyof (typeof colorSystem)[keyof typeof colorSystem]) ?? 0
+    colorSystem[colorName as keyof typeof colorSystem]?.[
+      numericValue as keyof (typeof colorSystem)[keyof typeof colorSystem]
     ]?.value ?? "pink"
   );
 }

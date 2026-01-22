@@ -25,7 +25,6 @@ interface TraceMessageProps extends StackProps {
   traceId: string;
 }
 
-
 export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
   const { project } = useOrganizationTeamProject();
 

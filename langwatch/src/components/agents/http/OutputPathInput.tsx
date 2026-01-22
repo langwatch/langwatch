@@ -25,7 +25,7 @@ export function OutputPathInput({
         fontSize="13px"
         disabled={disabled}
       />
-      <Text fontSize="xs" color="gray.500">
+      <Text fontSize="xs" color="fg.muted">
         Path to extract the agent response from the API response.
       </Text>
       <Text fontSize="xs" color="yellow.500">

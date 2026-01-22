@@ -1,12 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { PromptConfigAdapter } from "../prompt-config.adapter";
-import type { PromptService } from "../../../prompt-config/prompt.service";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { CoreMessage } from "ai";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PromptService } from "../../../prompt-config/prompt.service";
+import { PromptConfigAdapter } from "../prompt-config.adapter";
 
 const createAgentInput = (
   messages: CoreMessage[],
-  overrides: Partial<AgentInput> = {}
+  overrides: Partial<AgentInput> = {},
 ): AgentInput => ({
   threadId: "test-thread-id",
   messages,
@@ -34,7 +34,7 @@ const createMockPromptService = (
     model: string;
     temperature: number;
     maxTokens: number;
-  }> = {}
+  }> = {},
 ) => {
   return {
     getPromptByIdOrHandle: vi.fn().mockResolvedValue({
@@ -62,11 +62,11 @@ describe("PromptConfigAdapter", () => {
       const adapter = new PromptConfigAdapter(
         "prompt-id",
         promptService,
-        "project-id"
+        "project-id",
       );
 
       await adapter.call(
-        createAgentInput([{ role: "user", content: "Hello" }])
+        createAgentInput([{ role: "user", content: "Hello" }]),
       );
 
       const callArgs = mockGenerateText.mock.calls[0]?.[0];
@@ -97,7 +97,7 @@ describe("PromptConfigAdapter", () => {
       const adapter = new PromptConfigAdapter(
         "prompt-id",
         promptService,
-        "project-id"
+        "project-id",
       );
 
       await adapter.call(createAgentInput([]));
@@ -129,11 +129,11 @@ describe("PromptConfigAdapter", () => {
       const adapter = new PromptConfigAdapter(
         "prompt-id",
         promptService,
-        "project-id"
+        "project-id",
       );
 
       await adapter.call(
-        createAgentInput([{ role: "user", content: "New user input" }])
+        createAgentInput([{ role: "user", content: "New user input" }]),
       );
 
       const callArgs = mockGenerateText.mock.calls[0]?.[0];
@@ -163,7 +163,7 @@ describe("PromptConfigAdapter", () => {
       const adapter = new PromptConfigAdapter(
         "prompt-id",
         promptService,
-        "project-id"
+        "project-id",
       );
 
       await adapter.call(createAgentInput([]));
@@ -183,13 +183,12 @@ describe("PromptConfigAdapter", () => {
       const adapter = new PromptConfigAdapter(
         "nonexistent",
         promptService,
-        "project-id"
+        "project-id",
       );
 
       await expect(adapter.call(createAgentInput([]))).rejects.toThrow(
-        "Prompt nonexistent not found"
+        "Prompt nonexistent not found",
       );
     });
   });
 });
-

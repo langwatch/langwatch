@@ -1,6 +1,4 @@
 import { Box, Button, Input, Spinner } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -9,6 +7,8 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { useRouter } from "next/router";
+import { useEffect, useRef, useState } from "react";
 import { MenuLink } from "~/components/MenuLink";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -28,14 +28,14 @@ export function CustomDashboardsSection({
   const currentDashboardId = router.query.dashboard as string | undefined;
 
   const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
-    null
+    null,
   );
   const [editingName, setEditingName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const dashboardsQuery = api.dashboards.getAll.useQuery(
     { projectId },
-    { enabled: !!projectId }
+    { enabled: !!projectId },
   );
 
   const createDashboard = api.dashboards.create.useMutation();
@@ -56,7 +56,7 @@ export function CustomDashboardsSection({
   const handleCreateDashboard = () => {
     const name = prompt(
       "Enter dashboard name:",
-      `Dashboard ${dashboards.length + 1}`
+      `Dashboard ${dashboards.length + 1}`,
     );
     if (!name) return;
 
@@ -66,7 +66,7 @@ export function CustomDashboardsSection({
         onSuccess: (newDashboard) => {
           void dashboardsQuery.refetch();
           void router.push(
-            `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`
+            `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
           );
         },
         onError: () => {
@@ -77,7 +77,7 @@ export function CustomDashboardsSection({
             meta: { closable: true },
           });
         },
-      }
+      },
     );
   };
 
@@ -106,7 +106,7 @@ export function CustomDashboardsSection({
               meta: { closable: true },
             });
           },
-        }
+        },
       );
     }
     setEditingDashboardId(null);
@@ -115,7 +115,7 @@ export function CustomDashboardsSection({
 
   const handleMoveDashboard = (
     dashboardId: string,
-    direction: "up" | "down"
+    direction: "up" | "down",
   ) => {
     const currentIndex = dashboards.findIndex((p) => p.id === dashboardId);
     if (currentIndex === -1) return;
@@ -143,7 +143,7 @@ export function CustomDashboardsSection({
             meta: { closable: true },
           });
         },
-      }
+      },
     );
   };
 
@@ -162,7 +162,7 @@ export function CustomDashboardsSection({
     }
 
     const confirmed = window.confirm(
-      "Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted."
+      "Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted.",
     );
     if (!confirmed) return;
 
@@ -174,11 +174,11 @@ export function CustomDashboardsSection({
           // If we deleted the current dashboard, redirect to the first dashboard
           if (currentDashboardId === dashboardId) {
             const remainingDashboards = dashboards.filter(
-              (d) => d.id !== dashboardId
+              (d) => d.id !== dashboardId,
             );
             if (remainingDashboards[0]) {
               void router.push(
-                `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`
+                `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`,
               );
             }
           }
@@ -191,7 +191,7 @@ export function CustomDashboardsSection({
             meta: { closable: true },
           });
         },
-      }
+      },
     );
   };
 
@@ -262,7 +262,7 @@ export function CustomDashboardsSection({
                       transition="opacity 0.2s"
                       padding={1}
                       cursor="pointer"
-                      color="gray.500"
+                      color="fg.muted"
                       _hover={{ color: "gray.700" }}
                     >
                       <MoreVertical size={14} />
@@ -325,4 +325,3 @@ export function CustomDashboardsSection({
     </>
   );
 }
-

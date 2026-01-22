@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
 import SelectInput from "ink-select-input";
-import { FullscreenLayout } from "./FullscreenLayout";
-import type { Environment } from "../io/secrets";
+import TextInput from "ink-text-input";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { listRecentAggregates } from "../io/loadFromClickhouse";
+import type { Environment } from "../io/secrets";
+import { FullscreenLayout } from "./FullscreenLayout";
 
 interface SetupScreenProps {
   env: Environment;
@@ -44,11 +45,17 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
 
     const loadAggregates = async () => {
       try {
-        const aggregates = await listRecentAggregates({ env, profile, limit: 20 });
+        const aggregates = await listRecentAggregates({
+          env,
+          profile,
+          limit: 20,
+        });
         setRecentAggregates(aggregates);
         setPhase("aggregate-list");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load aggregates");
+        setError(
+          err instanceof Error ? err.message : "Failed to load aggregates",
+        );
         setPhase("aggregate-input");
       }
     };
@@ -76,7 +83,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
 
   return (
     <FullscreenLayout>
-      <Box flexDirection="column" alignItems="center" justifyContent="center" flexGrow={1}>
+      <Box
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        flexGrow={1}
+      >
         {/* Banner */}
         <Box
           flexDirection="column"
@@ -124,9 +136,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
                 />
               </Box>
               <Box marginTop={2}>
-                <Text dimColor>
-                  Enter to load • Tab to browse recent
-                </Text>
+                <Text dimColor>Enter to load • Tab to browse recent</Text>
               </Box>
             </Box>
           )}
@@ -166,11 +176,3 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({
     </FullscreenLayout>
   );
 };
-
-
-
-
-
-
-
-

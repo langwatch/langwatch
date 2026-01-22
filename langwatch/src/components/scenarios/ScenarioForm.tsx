@@ -11,7 +11,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Controller, useForm, type UseFormReturn } from "react-hook-form";
+import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { InlineTagsInput } from "./ui/InlineTagsInput";
@@ -68,7 +68,12 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
   const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
     const currentDefaults = defaultValues
-      ? JSON.stringify([defaultValues.name, defaultValues.situation, defaultValues.criteria, defaultValues.labels])
+      ? JSON.stringify([
+          defaultValues.name,
+          defaultValues.situation,
+          defaultValues.criteria,
+          defaultValues.labels,
+        ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
       prevDefaultsRef.current = currentDefaults;
@@ -101,10 +106,11 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         </Field.Root>
 
         {/* Labels */}
-        <VStack align="stretch" gap={2}>
-          <Text fontWeight="medium" fontSize="sm">
-            Labels
-          </Text>
+        <Field.Root>
+          <Field.Label fontWeight="medium">Labels</Field.Label>
+          <Field.HelperText margin={0} marginBottom={2} fontSize="13px">
+            Use labels for filtering, e.g. critical, billing, edge-case
+          </Field.HelperText>
           <Controller
             name="labels"
             control={control}
@@ -112,21 +118,28 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
               <InlineTagsInput
                 value={field.value}
                 onChange={field.onChange}
-                placeholder="Label name..."
+                placeholder="Add label..."
               />
             )}
           />
-        </VStack>
+        </Field.Root>
       </VStack>
 
       {/* SITUATION Section */}
       <VStack align="stretch" gap={3}>
-        <SectionHeader>Situation</SectionHeader>
+        <VStack align="stretch" gap={1}>
+          <SectionHeader>Situation</SectionHeader>
+          <Text fontSize="13px" color="fg.muted">
+            Describe the user, their context, and what they're trying to
+            accomplish. Think about a critical path or a complex edge case.
+          </Text>
+        </VStack>
         <Field.Root invalid={!!errors.situation}>
           <Textarea
             {...register("situation")}
-            placeholder="Describe the context and setup for this scenario..."
+            placeholder="e.g., A frustrated premium subscriber who was charged twice..."
             rows={5}
+            _placeholder={{ color: "gray.400", fontStyle: "italic" }}
           />
           <Field.ErrorText>{errors.situation?.message}</Field.ErrorText>
         </Field.Root>
@@ -134,7 +147,13 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
 
       {/* CRITERIA Section */}
       <VStack align="stretch" gap={3}>
-        <SectionHeader>Criteria</SectionHeader>
+        <VStack align="stretch" gap={1}>
+          <SectionHeader>Criteria</SectionHeader>
+          <Text fontSize="13px" color="fg.muted">
+            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
+            "Must NOT offer refund without manager approval"
+          </Text>
+        </VStack>
         <Controller
           name="criteria"
           control={control}
@@ -142,7 +161,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
             <CriteriaInput
               value={field.value}
               onChange={field.onChange}
-              placeholder="Add a criterion..."
+              placeholder="e.g., Must apologize for the inconvenience"
             />
           )}
         />

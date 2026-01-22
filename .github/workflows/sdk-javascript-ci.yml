@@ -55,6 +55,7 @@ jobs:
 
       - name: Run tests
         env:
+          LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test

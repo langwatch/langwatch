@@ -1,6 +1,6 @@
-import { Button, HStack, Input, Text } from "@chakra-ui/react";
+import { HStack, Input, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type InlineTagsInputProps = {
   value: string[];
@@ -9,46 +9,82 @@ type InlineTagsInputProps = {
 };
 
 /**
- * Inline tags input matching the design.
- * Shows tags with x buttons, input field, Add/Cancel buttons.
+ * Inline tags input with auto-add on blur/Enter.
+ * Shows tags with x buttons and an input that automatically adds labels.
+ * Labels are added when: pressing Enter, pressing comma, or clicking outside.
  */
 export function InlineTagsInput({
   value,
   onChange,
-  placeholder = "Label name...",
+  placeholder = "Add label...",
 }: InlineTagsInputProps) {
   const [inputValue, setInputValue] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleAdd = () => {
-    if (inputValue.trim()) {
-      onChange([...value, inputValue.trim()]);
-      setInputValue("");
-      setIsAdding(false);
+  const addLabel = (label: string) => {
+    const trimmed = label.trim();
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
     }
+    setInputValue("");
   };
 
   const handleRemove = (index: number) => {
     onChange(value.filter((_, i) => i !== index));
   };
 
-  const handleCancel = () => {
-    setInputValue("");
-    setIsAdding(false);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addLabel(inputValue);
+    }
+    if (e.key === "Backspace" && inputValue === "" && value.length > 0) {
+      // Remove last tag when pressing backspace on empty input
+      onChange(value.slice(0, -1));
+    }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAdd();
+  const handleBlur = () => {
+    // Auto-add label when user clicks away
+    if (inputValue.trim()) {
+      addLabel(inputValue);
     }
-    if (e.key === "Escape") {
-      handleCancel();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // If user types a comma, add the label immediately
+    if (val.includes(",")) {
+      const parts = val.split(",");
+      parts.forEach((part, i) => {
+        if (i < parts.length - 1) {
+          addLabel(part);
+        } else {
+          setInputValue(part);
+        }
+      });
+    } else {
+      setInputValue(val);
     }
   };
 
   return (
-    <HStack flexWrap="wrap" gap={2} align="center">
+    <HStack
+      flexWrap="wrap"
+      gap={2}
+      align="center"
+      padding={2}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      minHeight="40px"
+      cursor="text"
+      onClick={() => inputRef.current?.focus()}
+      _focusWithin={{
+        borderColor: "blue.500",
+        boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)",
+      }}
+    >
       {/* Existing tags */}
       {value.map((tag, index) => (
         <HStack
@@ -56,7 +92,7 @@ export function InlineTagsInput({
           bg="blue.50"
           color="blue.700"
           px={2}
-          py={1}
+          py={0.5}
           borderRadius="md"
           fontSize="sm"
           gap={1}
@@ -64,7 +100,10 @@ export function InlineTagsInput({
           <Text>{tag}</Text>
           <button
             type="button"
-            onClick={() => handleRemove(index)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemove(index);
+            }}
             style={{
               cursor: "pointer",
               display: "flex",
@@ -85,57 +124,23 @@ export function InlineTagsInput({
         </HStack>
       ))}
 
-      {/* Input field */}
-      {isAdding || value.length === 0 ? (
-        <HStack gap={2}>
-          <Input
-            size="sm"
-            width="140px"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={placeholder}
-            onKeyDown={handleKeyDown}
-            autoFocus={isAdding}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={handleAdd}
-            color="blue.500"
-            fontWeight="medium"
-          >
-            Add
-          </Button>
-          {value.length > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={handleCancel}
-              color="gray.500"
-              fontWeight="medium"
-            >
-              Cancel
-            </Button>
-          )}
-        </HStack>
-      ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => setIsAdding(true)}
-          color="blue.500"
-          fontWeight="medium"
-        >
-          + Add Label
-        </Button>
-      )}
+      {/* Input field - always visible */}
+      <Input
+        ref={inputRef}
+        size="sm"
+        variant="flushed"
+        border="none"
+        width="auto"
+        minWidth="100px"
+        flex={1}
+        value={inputValue}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        placeholder={value.length === 0 ? placeholder : ""}
+        _placeholder={{ color: "gray.400" }}
+        _focus={{ boxShadow: "none" }}
+      />
     </HStack>
   );
 }
-
-
-
-

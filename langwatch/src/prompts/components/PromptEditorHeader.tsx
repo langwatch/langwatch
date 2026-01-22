@@ -1,4 +1,4 @@
-import { HStack, Spacer } from "@chakra-ui/react";
+import { Box, HStack } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
@@ -46,12 +46,11 @@ export function PromptEditorHeader({
   const configId = formMethods.watch("configId");
 
   return (
-    <HStack width="full">
-      <HStack>
+    <Box width="full" display="flex" flexWrap="wrap" gap={2}>
+      <Box flex="1" minWidth="260px">
         <ModelSelectFieldMini />
-      </HStack>
-      <Spacer />
-      <HStack gap={2}>
+      </Box>
+      <HStack gap={2} flexShrink={0}>
         {configId && onVersionRestore && (
           <VersionHistoryButton
             configId={configId}
@@ -75,6 +74,6 @@ export function PromptEditorHeader({
           isSaving={isSaving}
         />
       </HStack>
-    </HStack>
+    </Box>
   );
 }

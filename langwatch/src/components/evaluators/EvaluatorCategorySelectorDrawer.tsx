@@ -10,7 +10,7 @@ import {
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 export type EvaluatorCategoryId =
   | "expected_answer"
@@ -121,7 +121,7 @@ export function EvaluatorCategorySelectorDrawer(
           padding={0}
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
+            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
               Select a category to see available evaluators, or create a custom
               one from a workflow.
             </Text>
@@ -137,7 +137,7 @@ export function EvaluatorCategorySelectorDrawer(
               ))}
 
               {/* Workflow option - separated */}
-              <Box borderTopWidth="1px" borderColor="gray.200" paddingTop={3}>
+              <Box borderTopWidth="1px" borderColor="border" paddingTop={3}>
                 <CategoryCard
                   id="workflow"
                   icon={Workflow}
@@ -149,7 +149,7 @@ export function EvaluatorCategorySelectorDrawer(
             </VStack>
           </VStack>
         </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -185,23 +185,23 @@ function CategoryCard({
       padding={4}
       borderRadius="lg"
       border="1px solid"
-      borderColor="gray.200"
-      bg="white"
+      borderColor="border"
+      bg="bg.panel"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "green.400", bg: "green.50" }}
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
       transition="all 0.15s"
       data-testid={`evaluator-category-${id}`}
     >
       <HStack gap={3} align="start">
-        <Box padding={1} borderRadius="md" bg="green.50" color="green.600">
+        <Box padding={1} borderRadius="md" bg="green.subtle" color="green.fg">
           <Icon size={18} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
           <Text fontWeight="500" fontSize="sm">
             {title}
           </Text>
-          <Text fontSize="xs" color="gray.600">
+          <Text fontSize="xs" color="fg.muted">
             {description}
           </Text>
         </VStack>

@@ -1,6 +1,6 @@
-import { TRACE_INDEX, FLATENNED_TYPE } from "../../src/server/elasticsearch";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
+import { FLATENNED_TYPE, TRACE_INDEX } from "../../src/server/elasticsearch";
 import { getCurrentWriteIndex } from "../helpers";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({
@@ -26,6 +26,6 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   });
 
   console.log(
-    "✓ Added evaluation_thread_id (keyword) and inputs fields to evaluations"
+    "✓ Added evaluation_thread_id (keyword) and inputs fields to evaluations",
   );
 };

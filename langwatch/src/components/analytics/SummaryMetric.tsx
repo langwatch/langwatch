@@ -42,13 +42,13 @@ export function SummaryMetric({
       align="start"
       justifyContent="space-between"
       borderLeftWidth="1px"
-      borderLeftColor="gray.100"
+      borderLeftColor="border"
       paddingX={4}
       _first={{ paddingLeft: 0, borderLeft: "none" }}
     >
       <Heading
         fontSize="12px"
-        color="gray.500"
+        color="fg.muted"
         fontWeight="normal"
         lineHeight="1.5em"
         lineClamp={3}

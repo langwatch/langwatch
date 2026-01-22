@@ -217,7 +217,7 @@ export const NewWorkflowModal = ({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderColor={isDragging ? "blue.500" : "gray.200"}
+                borderColor={isDragging ? "blue.500" : "border"}
                 transition="all 0.2s"
                 _hover={{ borderColor: "blue.300" }}
                 paddingX={4}
@@ -235,10 +235,10 @@ export const NewWorkflowModal = ({
                     <Upload color="#666" size={16} />
                     <Text fontWeight="bold">From Export</Text>
                   </HStack>
-                  <Text fontSize="sm" color="gray.600" textAlign="center">
+                  <Text fontSize="sm" color="fg.muted" textAlign="center">
                     Import a workflow from an exported JSON file
                   </Text>
-                  <Text fontSize="xs" color="gray.500">
+                  <Text fontSize="xs" color="fg.muted">
                     Drag and drop or click to select
                   </Text>
                 </VStack>

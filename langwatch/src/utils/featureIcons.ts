@@ -4,16 +4,19 @@
  */
 import {
   BookText,
+  Bot,
   CheckSquare,
+  FileText,
   Home,
   ListTree,
+  type LucideIcon,
   Pencil,
   Play,
+  PlayCircle,
   Settings,
   Table,
   TrendingUp,
   Workflow,
-  type LucideIcon,
 } from "lucide-react";
 
 export type FeatureKey =
@@ -21,12 +24,15 @@ export type FeatureKey =
   | "analytics"
   | "traces"
   | "simulations"
+  | "scenarios"
+  | "simulation_runs"
   | "evaluations"
   | "workflows"
   | "prompts"
   | "datasets"
   | "annotations"
-  | "settings";
+  | "settings"
+  | "agents";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -59,6 +65,16 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "pink.500",
     label: "Simulations",
   },
+  scenarios: {
+    icon: FileText,
+    color: "pink.500",
+    label: "Scenarios",
+  },
+  simulation_runs: {
+    icon: PlayCircle,
+    color: "pink.500",
+    label: "Runs",
+  },
   evaluations: {
     icon: CheckSquare,
     color: "orange.500",
@@ -89,6 +105,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "gray.600",
     label: "Settings",
   },
+  agents: {
+    icon: Bot,
+    color: "cyan.500",
+    label: "Agents",
+  },
 };
 
 /**
@@ -102,4 +123,3 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   annotation: "annotations",
   simulation: "simulations",
 };
-

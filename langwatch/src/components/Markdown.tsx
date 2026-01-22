@@ -1,5 +1,5 @@
 import { memo } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createLogger } from "~/utils/logger";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
@@ -32,10 +32,14 @@ function MarkdownWithPluginsAndProxy({
     );
   }
 
+  const urlTransform = (url: string) =>
+    url.startsWith("data:") ? url : defaultUrlTransform(url);
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       className={className}
+      urlTransform={urlTransform}
       components={{
         code(props) {
           const { children, className, ...rest } = props;

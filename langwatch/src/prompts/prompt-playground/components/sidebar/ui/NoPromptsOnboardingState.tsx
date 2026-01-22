@@ -10,7 +10,7 @@ export function NoPromptsOnboardingState() {
   const { createDraftPrompt } = useCreateDraftPrompt();
 
   return (
-    <Center width="full" height="full" bg="white">
+    <Center width="full" height="full" bg="bg.panel">
       <EmptyState.Root>
         <EmptyState.Content>
           <EmptyState.Indicator>

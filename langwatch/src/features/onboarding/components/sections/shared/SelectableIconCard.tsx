@@ -47,10 +47,8 @@ export function SelectableIconCard(
     "border.inverted/10",
     "border.inverted/30",
   );
-  const selectedBorderColor = useColorModeValue(
-    "border.inverted/30",
-    "border.inverted/60",
-  );
+  const selectedBorderColor = useColorModeValue("orange.400", "orange.300");
+  const selectedBg = useColorModeValue("orange.50", "orange.950/30");
 
   const iconSrc =
     actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
@@ -69,9 +67,9 @@ export function SelectableIconCard(
         aria-pressed={selected}
         onClick={onClick}
         cursor="pointer"
-        borderWidth={size === "sm" ? "1px" : "2px"}
+        borderWidth={selected ? "2px" : size === "sm" ? "1px" : "2px"}
         borderColor={selected ? selectedBorderColor : borderColor}
-        bg="bg.subtle/30"
+        bg={selected ? selectedBg : "bg.subtle/30"}
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
         display="flex"

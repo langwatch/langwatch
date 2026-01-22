@@ -24,6 +24,7 @@ import {
   ConfigurationError,
   extractPreviousSequenceNumber,
   isLockError,
+  isNoEventsFoundError,
   isSequentialOrderingError,
   QueueError,
 } from "../../library/services/errorHandling";
@@ -61,6 +62,23 @@ const PROGRESSIVE_DELAY_CONFIG = {
   perAttemptDelayMs: 50,
   /** Maximum delay cap to prevent excessive waits */
   maxDelayMs: 5000,
+} as const;
+
+/**
+ * Configuration for exponential backoff when events are not yet visible in ClickHouse.
+ * This handles the "No events found for aggregate" error caused by replication lag.
+ * Uses exponential backoff since we're waiting for data replication which can take variable time.
+ *
+ * Formula: min(baseDelayMs * (multiplier ^ attemptsMade), maxDelayMs)
+ * Attempt 0: 2000ms, Attempt 1: 4000ms, Attempt 2: 8000ms, Attempt 3: 16000ms, etc.
+ */
+const NO_EVENTS_FOUND_DELAY_CONFIG = {
+  /** Initial delay for first retry */
+  baseDelayMs: 2000,
+  /** Multiplier for exponential growth */
+  multiplier: 2,
+  /** Maximum delay cap */
+  maxDelayMs: 60000,
 } as const;
 
 /**
@@ -171,17 +189,15 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
-      // Don't log ordering/lock errors at ERROR level - they're expected behavior
-      if (isSequentialOrderingError(error) || isLockError(error)) {
+      // Don't log ordering/lock/replication-lag errors at ERROR level - they're expected behavior
+      if (this.isExpectedError(error)) {
         this.logger.debug(
           {
             queueName: this.queueName,
             jobId: job?.id,
             error: error instanceof Error ? error.message : String(error),
           },
-          isSequentialOrderingError(error)
-            ? "Job delayed due to ordering (previous event not yet processed)"
-            : "Job failed due to lock contention, will retry",
+          this.getExpectedErrorMessage(error),
         );
         return;
       }
@@ -292,6 +308,39 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         throw error;
       }
 
+      // For "no events found" errors (ClickHouse replication lag), use exponential backoff
+      // Note: BullMQ doesn't increment attemptsMade for DelayedError, so we track retries in job.data
+      if (isNoEventsFoundError(error)) {
+        const jobData = job.data as Payload & {
+          _noEventsFoundRetryCount?: number;
+        };
+        const currentRetryCount = jobData._noEventsFoundRetryCount ?? 0;
+        const nextRetryCount = currentRetryCount + 1;
+
+        // Update job data with incremented retry count
+        await job.updateData({
+          ...jobData,
+          _noEventsFoundRetryCount: nextRetryCount,
+        });
+
+        const exponentialDelayMs =
+          this.calculateExponentialBackoff(currentRetryCount);
+
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job.id,
+            delayMs: exponentialDelayMs,
+            noEventsFoundRetryCount: nextRetryCount,
+          },
+          "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
+        );
+
+        const targetTimestamp = Date.now() + exponentialDelayMs;
+        await job.moveToDelayed(targetTimestamp, job.token);
+        throw new DelayedError();
+      }
+
       // Non-expected errors are actual failures
       this.logger.error(
         {
@@ -305,6 +354,31 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
       throw error;
     }
+  }
+
+  /**
+   * Checks if an error is an expected error type that should be logged at DEBUG level.
+   * Expected errors include ordering errors, lock contention, and ClickHouse replication lag.
+   */
+  private isExpectedError(error: unknown): boolean {
+    return (
+      isSequentialOrderingError(error) ||
+      isLockError(error) ||
+      isNoEventsFoundError(error)
+    );
+  }
+
+  /**
+   * Returns the appropriate log message for an expected error type.
+   */
+  private getExpectedErrorMessage(error: unknown): string {
+    if (isSequentialOrderingError(error)) {
+      return "Job delayed due to ordering (previous event not yet processed)";
+    }
+    if (isLockError(error)) {
+      return "Job failed due to lock contention, will retry";
+    }
+    return "Job delayed due to events not yet visible in ClickHouse";
   }
 
   /**
@@ -335,6 +409,29 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   }
 
   /**
+   * Calculates exponential backoff delay for "no events found" errors.
+   * Used when events aren't yet visible in ClickHouse due to replication lag.
+   *
+   * Formula: min(baseDelayMs * (multiplier ^ attemptsMade), maxDelayMs)
+   * - Attempt 0: 2000ms
+   * - Attempt 1: 4000ms
+   * - Attempt 2: 8000ms
+   * - Attempt 3: 16000ms
+   * - Attempt 4: 32000ms
+   * - Attempt 5+: 60000ms (capped)
+   */
+  private calculateExponentialBackoff(
+    attemptsMade: number | undefined,
+  ): number {
+    const attempts = attemptsMade ?? 0;
+    const delay =
+      NO_EVENTS_FOUND_DELAY_CONFIG.baseDelayMs *
+      NO_EVENTS_FOUND_DELAY_CONFIG.multiplier ** attempts;
+
+    return Math.min(delay, NO_EVENTS_FOUND_DELAY_CONFIG.maxDelayMs);
+  }
+
+  /**
    * Generates a unique job ID for the payload.
    * Uses payload.id if available (for Event payloads), otherwise generates a random ID.
    * Format: ${queueName}:${payloadId}
@@ -359,17 +456,19 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     const opts: JobsOptions = {
       jobId,
       ...(this.delay !== void 0 ? { delay: this.delay } : {}),
-      ...(this.deduplication !== void 0 ? {
-        deduplication: {
-          // Sanitize deduplication ID for BullMQ (replace colons with dots)
-          id: this.deduplication.makeId(payload).replaceAll(":", "."),
-          ttl: this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS,
-          // Enable Debounce Mode by default: new jobs replace existing ones and reset TTL
-          // This ensures the latest event is always processed, and batch processor catches up on missed events
-          extend: this.deduplication.extend ?? true,
-          replace: this.deduplication.replace ?? true,
-        },
-      } : {}),
+      ...(this.deduplication !== void 0
+        ? {
+            deduplication: {
+              // Sanitize deduplication ID for BullMQ (replace colons with dots)
+              id: this.deduplication.makeId(payload).replaceAll(":", "."),
+              ttl: this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS,
+              // Enable Debounce Mode by default: new jobs replace existing ones and reset TTL
+              // This ensures the latest event is always processed, and batch processor catches up on missed events
+              extend: this.deduplication.extend ?? true,
+              replace: this.deduplication.replace ?? true,
+            },
+          }
+        : {}),
     };
 
     const customAttributes = this.spanAttributes

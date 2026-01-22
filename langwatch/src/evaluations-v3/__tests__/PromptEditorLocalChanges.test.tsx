@@ -7,9 +7,10 @@
  * 2. Changes to prompts are saved locally via onLocalConfigChange callback
  * 3. Closing the drawer does NOT prompt for save when onLocalConfigChange is set
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { forwardRef } from "react";
@@ -70,7 +71,7 @@ const mockPromptData = {
   versionCreatedAt: new Date(),
   model: "gpt-4",
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
   prompt: "You are a helpful assistant.",
   projectId: "test-project",
   messages: [{ role: "system", content: "You are a helpful assistant." }],
@@ -79,10 +80,12 @@ const mockPromptData = {
 };
 
 // Store reference to mutation callbacks for testing
-let updateMutationCallbacks: { onSuccess?: (data: typeof mockPromptData) => void } = {};
+let _updateMutationCallbacks: {
+  onSuccess?: (data: typeof mockPromptData) => void;
+} = {};
 
 // Updated prompt data that includes new fields added during editing
-const mockSavedPromptData = {
+const _mockSavedPromptData = {
   ...mockPromptData,
   inputs: [
     { identifier: "input", type: "str" },
@@ -110,10 +113,14 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       update: {
-        useMutation: (callbacks?: { onSuccess?: (data: typeof mockPromptData) => void }) => {
-          updateMutationCallbacks = callbacks ?? {};
+        useMutation: (callbacks?: {
+          onSuccess?: (data: typeof mockPromptData) => void;
+        }) => {
+          _updateMutationCallbacks = callbacks ?? {};
           return {
-            mutate: (mutationData: { data?: { inputs?: Array<{ identifier: string; type: string }> } }) => {
+            mutate: (mutationData: {
+              data?: { inputs?: Array<{ identifier: string; type: string }> };
+            }) => {
               // Simulate server returning what was actually saved
               const savedData = {
                 ...mockPromptData,
@@ -144,7 +151,11 @@ vi.mock("~/utils/api", () => ({
     llmModelCost: {
       getModelLimits: {
         useQuery: () => ({
-          data: { maxTokens: 128000, inputTokenCost: 0.01, outputTokenCost: 0.03 },
+          data: {
+            maxTokens: 128000,
+            inputTokenCost: 0.01,
+            outputTokenCost: 0.03,
+          },
           isLoading: false,
         }),
       },
@@ -153,6 +164,28 @@ vi.mock("~/utils/api", () => ({
       getAllForProject: {
         useQuery: () => ({
           data: [{ provider: "openai", enabled: true }],
+          isLoading: false,
+        }),
+      },
+      getAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: {
+            providers: { openai: { provider: "openai", enabled: true } },
+            modelMetadata: {
+              "openai/gpt-4": {
+                id: "openai/gpt-4",
+                name: "GPT-4",
+                provider: "openai",
+                supportedParameters: ["temperature", "top_p", "max_tokens"],
+                contextLength: 128000,
+                maxCompletionTokens: 8192,
+                defaultParameters: null,
+                supportsImageInput: false,
+                supportsAudioInput: false,
+                pricing: { inputCostPerToken: 0.00003, outputCostPerToken: 0.00006 },
+              },
+            },
+          },
           isLoading: false,
         }),
       },
@@ -218,7 +251,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+          expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
@@ -257,7 +290,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+          expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
@@ -277,7 +310,10 @@ describe("Prompt Editor Local Changes", () => {
       );
 
       // Verify the callback was called with a local config object
-      const lastCall = mockOnLocalConfigChange.mock.calls[mockOnLocalConfigChange.mock.calls.length - 1];
+      const lastCall =
+        mockOnLocalConfigChange.mock.calls[
+          mockOnLocalConfigChange.mock.calls.length - 1
+        ];
       expect(lastCall?.[0]).toBeDefined();
       expect(lastCall?.[0]).toHaveProperty("messages");
     }, 10000);
@@ -302,7 +338,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("New Prompt")).toBeInTheDocument();
+          expect(screen.getByText("New Prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
@@ -334,7 +370,7 @@ describe("Prompt Editor Local Changes", () => {
       // 5. BUG: Alert icon disappears because target.inputs still only has [input]!
       //    The saved prompt has [input, wtf] but target.inputs wasn't updated
 
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
 
       // Set up target with only "input" field - all mapped, NO alert initially
       useEvaluationsV3Store.setState({
@@ -348,7 +384,12 @@ describe("Prompt Editor Local Changes", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-data": {
-                input: { type: "source", source: "dataset", sourceId: "test-data", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-data",
+                  sourceField: "input",
+                },
               },
             },
             localPromptConfig: undefined,
@@ -375,15 +416,24 @@ describe("Prompt Editor Local Changes", () => {
         activeDatasetId: "test-data",
       });
 
-      const { TargetHeader } = await import("../components/TargetSection/TargetHeader");
+      const { TargetHeader } = await import(
+        "../components/TargetSection/TargetHeader"
+      );
 
       // Step 1: Initially NO alert - all fields are mapped
       let target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader
+          target={target}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRun={vi.fn()}
+        />,
         { wrapper: Wrapper },
       );
-      expect(screen.queryByTestId("missing-mapping-alert")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("missing-mapping-alert"),
+      ).not.toBeInTheDocument();
       cleanup();
 
       // Step 2: User edits prompt and adds "wtf" field via localPromptConfig
@@ -403,7 +453,12 @@ describe("Prompt Editor Local Changes", () => {
       // Step 3: Alert icon should NOW show because wtf is unmapped
       target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader
+          target={target}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRun={vi.fn()}
+        />,
         { wrapper: Wrapper },
       );
       expect(screen.queryByTestId("missing-mapping-alert")).toBeInTheDocument();
@@ -425,7 +480,12 @@ describe("Prompt Editor Local Changes", () => {
       // Step 5: Verify alert icon STILL shows
       target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader
+          target={target}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+          onRun={vi.fn()}
+        />,
         { wrapper: Wrapper },
       );
 
@@ -448,7 +508,7 @@ describe("Prompt Editor Local Changes", () => {
         llm: {
           model: "openai/gpt-4",
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: 4096,
         },
         messages: [{ role: "user", content: "LOCAL UNSAVED CONTENT" }],
         inputs: [{ identifier: "input", type: "str" }],
@@ -489,7 +549,10 @@ describe("Prompt Editor Local Changes", () => {
         activeDatasetId: "test-data",
       });
 
-      mockRouterQuery = { "drawer.open": "promptEditor", "drawer.promptId": "prompt-1" };
+      mockRouterQuery = {
+        "drawer.open": "promptEditor",
+        "drawer.promptId": "prompt-1",
+      };
 
       let saveWasCalled = false;
       const handleSave = () => {
@@ -509,7 +572,10 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => expect(screen.getByText("test-prompt")).toBeInTheDocument(), { timeout: 5000 });
+      await waitFor(
+        () => expect(screen.getByText("test-prompt")).toBeInTheDocument(),
+        { timeout: 5000 },
+      );
 
       // Form should initially show LOCAL UNSAVED CONTENT (from initialLocalConfig)
       let textareas = screen.getAllByRole("textbox");
@@ -527,31 +593,44 @@ describe("Prompt Editor Local Changes", () => {
       const saveButton = screen.getByTestId("save-prompt-button");
 
       // Wait for hasUnsavedChanges to be computed
-      await waitFor(() => {
-        expect(saveButton).not.toBeDisabled();
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          expect(saveButton).not.toBeDisabled();
+        },
+        { timeout: 5000 },
+      );
 
       // CLICK THE SAVE BUTTON!
       await user.click(saveButton);
 
       // For existing prompts, a SaveVersionDialog appears asking for commit message
       // Wait for the dialog and submit it
-      await waitFor(() => {
-        expect(screen.getByText("Save Version")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText("Save Version")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       // Type a commit message (required for the Save button to be enabled)
-      const commitMessageInput = screen.getByPlaceholderText("Enter a description for this version");
+      const commitMessageInput = screen.getByPlaceholderText(
+        "Enter a description for this version",
+      );
       await user.type(commitMessageInput, "Test commit message");
 
       // Find and click the save button in the dialog (may say "Save" or "Update to vX")
-      const dialogSaveButton = screen.getByRole("button", { name: /save$|update to v\d+$/i });
+      const dialogSaveButton = screen.getByRole("button", {
+        name: /save$|update to v\d+$/i,
+      });
       await user.click(dialogSaveButton);
 
       // Verify save was actually called
-      await waitFor(() => {
-        expect(saveWasCalled).toBe(true);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(saveWasCalled).toBe(true);
+        },
+        { timeout: 3000 },
+      );
 
       // After save, the form resets to the server response (saved state).
       // The key assertion: it does NOT reset to the stale initialLocalConfig.
@@ -565,7 +644,6 @@ describe("Prompt Editor Local Changes", () => {
       expect(textareas[0]).toHaveValue("You are a helpful assistant.");
     }, 20000);
   });
-
 
   describe("switching between targets preserves local changes", () => {
     it("local changes are NOT lost when switching between targets without closing drawer", async () => {
@@ -621,12 +699,16 @@ describe("Prompt Editor Local Changes", () => {
 
       const onLocalConfigChangeA = (config: LocalPromptConfig | undefined) => {
         targetAChanges.push(config);
-        useEvaluationsV3Store.getState().updateTarget("target-A", { localPromptConfig: config });
+        useEvaluationsV3Store
+          .getState()
+          .updateTarget("target-A", { localPromptConfig: config });
       };
 
       const onLocalConfigChangeB = (config: LocalPromptConfig | undefined) => {
         targetBChanges.push(config);
-        useEvaluationsV3Store.getState().updateTarget("target-B", { localPromptConfig: config });
+        useEvaluationsV3Store
+          .getState()
+          .updateTarget("target-B", { localPromptConfig: config });
       };
 
       // Step 1: Open drawer for target B (which has local changes)
@@ -646,7 +728,10 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => expect(screen.getByText("test-prompt")).toBeInTheDocument(), { timeout: 5000 });
+      await waitFor(
+        () => expect(screen.getByText("test-prompt")).toBeInTheDocument(),
+        { timeout: 5000 },
+      );
 
       // Verify target B's changes are shown
       let textareas = screen.getAllByRole("textbox");
@@ -671,15 +756,22 @@ describe("Prompt Editor Local Changes", () => {
       );
 
       // Target A should show server data (no local changes)
-      await waitFor(() => {
-        textareas = screen.getAllByRole("textbox");
-        expect(textareas[0]).toHaveValue("You are a helpful assistant.");
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          textareas = screen.getAllByRole("textbox");
+          expect(textareas[0]).toHaveValue("You are a helpful assistant.");
+        },
+        { timeout: 5000 },
+      );
 
       // KEY CHECK: Target B's local config should NOT have been cleared during switch
-      const targetBAfterSwitch = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+      const targetBAfterSwitch = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === "target-B");
       expect(targetBAfterSwitch?.localPromptConfig).toBeDefined();
-      expect(targetBAfterSwitch?.localPromptConfig?.messages[0]?.content).toBe("Hello with STAR *");
+      expect(targetBAfterSwitch?.localPromptConfig?.messages[0]?.content).toBe(
+        "Hello with STAR *",
+      );
 
       // Step 3: Switch BACK to target B
       mockRouterQuery = {
@@ -689,7 +781,9 @@ describe("Prompt Editor Local Changes", () => {
       };
 
       // Get the CURRENT local config from the store (should still have the changes)
-      const currentTargetB = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+      const currentTargetB = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === "target-B");
 
       rerender(
         <Wrapper>
@@ -703,15 +797,22 @@ describe("Prompt Editor Local Changes", () => {
       );
 
       // Target B should still show its local changes
-      await waitFor(() => {
-        textareas = screen.getAllByRole("textbox");
-        expect(textareas[0]).toHaveValue("Hello with STAR *");
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          textareas = screen.getAllByRole("textbox");
+          expect(textareas[0]).toHaveValue("Hello with STAR *");
+        },
+        { timeout: 5000 },
+      );
 
       // FINAL CHECK: Verify local config was NOT cleared during the switch
-      const finalTargetB = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+      const finalTargetB = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === "target-B");
       expect(finalTargetB?.localPromptConfig).toBeDefined();
-      expect(finalTargetB?.localPromptConfig?.messages[0]?.content).toBe("Hello with STAR *");
+      expect(finalTargetB?.localPromptConfig?.messages[0]?.content).toBe(
+        "Hello with STAR *",
+      );
     }, 30000);
   });
 
@@ -743,7 +844,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+          expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );

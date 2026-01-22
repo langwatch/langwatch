@@ -23,7 +23,7 @@ import numeral from "numeral";
 import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
-import { LuChevronsUpDown, LuRefreshCw } from "react-icons/lu";
+import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -42,12 +42,14 @@ import { Delayed } from "../Delayed";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
 import { HoverableBigText } from "../HoverableBigText";
+import { NavigationFooter, useNavigationFooter } from "../NavigationFooter";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { AddParticipants } from "../traces/AddParticipants";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
+import { PageLayout } from "../ui/layouts/PageLayout";
 import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { RedactedField } from "../ui/RedactedField";
@@ -55,12 +57,6 @@ import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
-import {
-  NavigationFooter,
-  useNavigationFooter,
-} from "../NavigationFooter";
-import { PageLayout } from "../ui/layouts/PageLayout";
-import { LuList } from "react-icons/lu";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -266,7 +262,7 @@ export function MessagesTable({
               ? "Pass"
               : "Fail"
             : formatEvaluationSingleValue(traceCheck)
-          : traceCheck?.status ?? "-";
+          : (traceCheck?.status ?? "-");
       },
     };
   };
@@ -289,7 +285,7 @@ export function MessagesTable({
                 : "0 0 0 rgba(0, 0, 0, 0)"
             }
             paddingX={4}
-            background="white"
+            background="bg.panel"
           >
             <HStack>
               <Checkbox
@@ -410,10 +406,10 @@ export function MessagesTable({
                   {safeOutputValue
                     ? safeOutputValue
                     : trace.lastGuardrail
-                    ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
-                        .filter((x) => x)
-                        .join(": ")
-                    : undefined}
+                      ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
+                          .filter((x) => x)
+                          .join(": ")
+                      : undefined}
                 </Box>
               }
             >
@@ -729,7 +725,7 @@ export function MessagesTable({
         height={4}
         cursor="pointer"
         onClick={() => sortBy(columnKey)}
-        color="gray.400"
+        color="fg.subtle"
       >
         <LuChevronsUpDown />
       </Icon>
@@ -886,10 +882,10 @@ export function MessagesTable({
 
   const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
-      ? traceGroups.data ?? {
+      ? (traceGroups.data ?? {
           groups: [],
           traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
-        }
+        })
       : await fetchAllTraces();
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
@@ -1126,7 +1122,7 @@ export function MessagesTable({
                           key={index}
                           paddingX={4}
                           paddingY={4}
-                          background="white"
+                          background="bg.panel"
                           borderRadius="4px 0 0 0"
                           {...(columnKey === "checked"
                             ? {

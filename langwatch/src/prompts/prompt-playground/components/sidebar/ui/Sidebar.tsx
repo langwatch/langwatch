@@ -77,7 +77,7 @@ function SidebarSectionHeader({
       paddingY="2"
       fontSize="sm"
       fontWeight="medium"
-      color="gray.700"
+      color="fg"
       display="flex"
       alignItems="center"
       justifyContent="space-between"
@@ -202,7 +202,7 @@ function SidebarItem({
 }: SidebarItemProps) {
   if (variant === "empty") {
     return (
-      <Box padding="3" fontSize="sm" color="gray.500" textAlign="center">
+      <Box padding="3" fontSize="sm" color="fg.muted" textAlign="center">
         {children}
       </Box>
     );
@@ -211,11 +211,11 @@ function SidebarItem({
   return (
     <Box
       fontSize="sm"
-      color={active ? "blue.600" : "gray.700"}
-      bg={active ? "blue.50" : "transparent"}
+      color={active ? "blue.fg" : "fg"}
+      bg={active ? "blue.subtle" : "transparent"}
       borderRadius="md"
       cursor="pointer"
-      _hover={{ bg: active ? "blue.100" : "gray.100" }}
+      _hover={{ bg: active ? "blue.muted" : "bg.muted" }}
       onClick={onClick}
       display="flex"
       alignItems="center"
@@ -227,7 +227,7 @@ function SidebarItem({
         <Box
           width="16px"
           borderRadius="full"
-          bg="gray.100"
+          bg="bg.muted"
           display="flex"
           alignItems="center"
           justifyContent="center"
@@ -241,7 +241,7 @@ function SidebarItem({
         {meta && (
           <Text
             fontSize="xs"
-            color="gray.500"
+            color="fg.muted"
             overflow="hidden"
             textOverflow="ellipsis"
             whiteSpace="nowrap"

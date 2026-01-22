@@ -36,7 +36,7 @@ export function LineHighlights({
             left={0}
             right={0}
             height={`${positions[gripHoveredParagraph]?.height ?? 0}px`}
-            background="gray.50"
+            background="bg.muted"
             pointerEvents="none"
             borderRadius="md"
           />
@@ -109,7 +109,9 @@ export function GripHandles({
             justifyContent="center"
             pointerEvents="auto"
             cursor={draggedParagraph === idx ? "grabbing" : "grab"}
-            opacity={hoveredParagraph === idx || draggedParagraph === idx ? 1 : 0}
+            opacity={
+              hoveredParagraph === idx || draggedParagraph === idx ? 1 : 0
+            }
             transition="opacity 0.1s"
             draggable
             onMouseEnter={() => onGripHover(idx)}
@@ -117,9 +119,9 @@ export function GripHandles({
             onDragStart={(e) => onDragStart(e as unknown as DragEvent, idx)}
             onDragEnd={onDragEnd}
             borderRadius="md"
-            _hover={{ background: "gray.100" }}
+            _hover={{ background: "bg.muted" }}
           >
-            <Box color="gray.400">
+            <Box color="fg.subtle">
               <GripVertical size={14} />
             </Box>
           </Box>
@@ -142,7 +144,7 @@ export function GripHandles({
             left={0}
             right={0}
             height="2px"
-            background="blue.500"
+            background="blue.solid"
             pointerEvents="none"
             zIndex={10}
             borderRadius="full"

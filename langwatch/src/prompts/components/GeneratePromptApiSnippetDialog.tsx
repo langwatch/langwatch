@@ -40,7 +40,7 @@ export function GeneratePromptApiSnippetDialog({
       <Link
         href="https://docs.langwatch.ai/api-reference/prompts/get-prompt"
         isExternal
-        color="blue.500"
+        color="blue.fg"
         _hover={{ textDecoration: "underline" }}
         fontSize="xs"
       >
