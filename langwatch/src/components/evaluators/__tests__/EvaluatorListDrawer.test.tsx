@@ -54,7 +54,7 @@ const mockEvaluators = [
     id: "evaluator-2",
     name: "Answer Correctness",
     type: "evaluator",
-    config: { evaluatorType: "langevals/llm_judge", model: "gpt-4o" },
+    config: { evaluatorType: "langevals/llm_boolean", model: "gpt-4o" },
     workflowId: null,
     projectId: "test-project-id",
     archivedAt: null,
@@ -158,10 +158,10 @@ describe("EvaluatorListDrawer", () => {
     it("shows evaluator type labels", async () => {
       renderDrawer();
       await waitFor(() => {
-        // Two built-in evaluators
-        const builtInLabels = screen.getAllByText("Built-in");
-        expect(builtInLabels).toHaveLength(2);
-        // One workflow evaluator
+        // Shows evaluator type display names
+        expect(screen.getByText("Exact Match Evaluator")).toBeInTheDocument();
+        expect(screen.getByText("LLM-as-a-Judge Boolean Evaluator")).toBeInTheDocument();
+        // One workflow evaluator shows "Workflow"
         expect(screen.getByText("Workflow")).toBeInTheDocument();
       });
     });
