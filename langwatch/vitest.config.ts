@@ -7,7 +7,7 @@ config();
 export default defineConfig({
   test: {
     watch: false,
-    maxWorkers: "25%", // Override with VITEST_MAX_WORKERS env var
+    maxWorkers: 2, // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,

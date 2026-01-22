@@ -51,6 +51,7 @@ jobs:
 
   test-unit:
     env:
+      VITEST_MAX_WORKERS: "50%"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
@@ -100,6 +101,7 @@ jobs:
 
   test-integration:
     env:
+      VITEST_MAX_WORKERS: "50%"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
