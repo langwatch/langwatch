@@ -1,15 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
+import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger";
-import { getLangWatchTracer } from "langwatch";
-import type { FilterField } from "./types";
 import {
-  clickHouseFilters,
   type ClickHouseFilterQueryParams,
+  clickHouseFilters,
   type FilterOption,
 } from "./clickhouse-registry";
+import type { FilterField } from "./types";
 
 /**
  * Service for fetching filter options from ClickHouse.
@@ -22,9 +22,11 @@ import {
  */
 export class ClickHouseFilterService {
   private readonly clickHouseClient: ClickHouseClient | null;
-  private readonly logger = createLogger("langwatch:filters:clickhouse-service");
+  private readonly logger = createLogger(
+    "langwatch:filters:clickhouse-service",
+  );
   private readonly tracer = getLangWatchTracer(
-    "langwatch.filters.clickhouse-service"
+    "langwatch.filters.clickhouse-service",
   );
 
   constructor(private readonly prisma: PrismaClient) {
@@ -59,11 +61,11 @@ export class ClickHouseFilterService {
 
         span.setAttribute(
           "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceTraces === true
+          project?.featureClickHouseDataSourceTraces === true,
         );
 
         return project?.featureClickHouseDataSourceTraces === true;
-      }
+      },
     );
   }
 
@@ -89,7 +91,7 @@ export class ClickHouseFilterService {
       subkey?: string;
       startDate: number;
       endDate: number;
-    }
+    },
   ): Promise<FilterOption[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseFilterService.getFilterOptions",
@@ -112,7 +114,7 @@ export class ClickHouseFilterService {
           span.setAttribute("clickhouse.filter_supported", false);
           this.logger.debug(
             { projectId, field },
-            "Filter not supported in ClickHouse, will fall back to Elasticsearch"
+            "Filter not supported in ClickHouse, will fall back to Elasticsearch",
           );
           return null;
         }
@@ -134,7 +136,7 @@ export class ClickHouseFilterService {
 
           this.logger.debug(
             { projectId, field, query: options.query },
-            "Executing ClickHouse filter query"
+            "Executing ClickHouse filter query",
           );
 
           // Convert dot-encoded keys back to actual keys for parameterized queries
@@ -162,7 +164,7 @@ export class ClickHouseFilterService {
 
           this.logger.debug(
             { projectId, field, resultCount: filterOptions.length },
-            "Successfully fetched filter options from ClickHouse"
+            "Successfully fetched filter options from ClickHouse",
           );
 
           return filterOptions;
@@ -173,14 +175,14 @@ export class ClickHouseFilterService {
               field,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch filter options from ClickHouse"
+            "Failed to fetch filter options from ClickHouse",
           );
 
           // Return null to trigger Elasticsearch fallback
           span.setAttribute("clickhouse.error", true);
           return null;
         }
-      }
+      },
     );
   }
 }

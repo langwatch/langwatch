@@ -66,7 +66,9 @@ export class FilterService {
    * @param input - Query parameters including project ID, field, and filters
    * @returns Array of filter options with field, label, and count
    */
-  async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
+  async getFilterOptions(
+    input: GetFilterOptionsInput,
+  ): Promise<FilterOption[]> {
     return this.tracer.withActiveSpan(
       "FilterService.getFilterOptions",
       {
@@ -77,7 +79,10 @@ export class FilterService {
       },
       async (span) => {
         const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getFilterOptions(
@@ -89,7 +94,7 @@ export class FilterService {
               subkey: input.subkey,
               startDate: input.startDate,
               endDate: input.endDate,
-            }
+            },
           );
 
           if (result !== null) {
@@ -100,14 +105,14 @@ export class FilterService {
           // Fall back to Elasticsearch if ClickHouse returns null (filter not supported)
           this.logger.debug(
             { projectId: input.projectId, field: input.field },
-            "ClickHouse enabled but returned null for filter, falling back to Elasticsearch"
+            "ClickHouse enabled but returned null for filter, falling back to Elasticsearch",
           );
           span.setAttribute("backend.used", "elasticsearch");
           span.setAttribute("clickhouse.fallback", true);
         }
 
         return this.elasticsearchService.getFilterOptions(input);
-      }
+      },
     );
   }
 }

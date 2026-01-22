@@ -43,7 +43,9 @@ export type ClickHouseFilterDefinition = {
 /**
  * Build common WHERE conditions for trace_summaries queries.
  */
-function buildTraceSummariesConditions(_params: ClickHouseFilterQueryParams): string {
+function buildTraceSummariesConditions(
+  _params: ClickHouseFilterQueryParams,
+): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -55,7 +57,9 @@ function buildTraceSummariesConditions(_params: ClickHouseFilterQueryParams): st
 /**
  * Build common WHERE conditions for stored_spans queries.
  */
-function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): string {
+function buildStoredSpansConditions(
+  _params: ClickHouseFilterQueryParams,
+): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -67,7 +71,9 @@ function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams): strin
 /**
  * Build common WHERE conditions for evaluation_states queries.
  */
-function buildEvaluationStatesConditions(_params: ClickHouseFilterQueryParams): string {
+function buildEvaluationStatesConditions(
+  _params: ClickHouseFilterQueryParams,
+): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -79,7 +85,10 @@ function buildEvaluationStatesConditions(_params: ClickHouseFilterQueryParams): 
 /**
  * Build a LIKE filter clause for optional query string matching.
  */
-function buildQueryFilter(column: string, params: ClickHouseFilterQueryParams): string {
+function buildQueryFilter(
+  column: string,
+  params: ClickHouseFilterQueryParams,
+): string {
   if (!params.query) {
     return "";
   }
@@ -95,7 +104,7 @@ function extractStandardResults(rows: unknown[]): FilterOption[] {
       field: row.field,
       label: row.label,
       count: parseInt(row.count, 10),
-    })
+    }),
   );
 }
 
@@ -119,7 +128,10 @@ const ATTRIBUTE_KEYS = {
  * ClickHouse filter definitions for each filter field.
  * Set to null for filters not supported in ClickHouse (will fall back to Elasticsearch).
  */
-export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition | null> = {
+export const clickHouseFilters: Record<
+  FilterField,
+  ClickHouseFilterDefinition | null
+> = {
   // Topics filters
   "topics.topics": {
     tableName: "trace_summaries",
@@ -454,7 +466,9 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (rows as Array<{ min_score: number | null; max_score: number | null }>)[0];
+      const row = (
+        rows as Array<{ min_score: number | null; max_score: number | null }>
+      )[0];
       if (!row || row.min_score === null || row.max_score === null) {
         return [];
       }
@@ -576,7 +590,9 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (rows as Array<{ min_value: number | null; max_value: number | null }>)[0];
+      const row = (
+        rows as Array<{ min_value: number | null; max_value: number | null }>
+      )[0];
       if (!row || row.min_value === null || row.max_value === null) {
         return [];
       }
@@ -626,7 +642,7 @@ type FilterConditionBuilder = (
   values: string[],
   paramId: string,
   key?: string,
-  subkey?: string
+  subkey?: string,
 ) => FilterConditionResult;
 
 /**
@@ -634,7 +650,10 @@ type FilterConditionBuilder = (
  * Returns null if the filter is not supported in ClickHouse.
  * All builders use parameterized queries for SQL injection safety.
  */
-export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuilder | null> = {
+export const clickHouseFilterConditions: Record<
+  FilterField,
+  FilterConditionBuilder | null
+> = {
   // Topics
   "topics.topics": (values, paramId) => ({
     sql: `ts.TopicId IN ({${paramId}_values:Array(String)})`,
@@ -692,7 +711,11 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
     if (hasTrue) return { sql: "ts.HasAnnotation = true", params: {} };
-    if (hasFalse) return { sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)", params: {} };
+    if (hasFalse)
+      return {
+        sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)",
+        params: {},
+      };
     return { sql: "1=0", params: {} };
   },
 
@@ -720,7 +743,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
 
   "evaluations.passed": (values, paramId, key) => {
     if (!key) return { sql: "1=0", params: {} };
-    const passedValues = values.map((v) => (v === "true" || v === "1") ? 1 : 0);
+    const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_states es FINAL
@@ -807,7 +830,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     // Build OR conditions for each metric key - these are attribute names, not values
     // Since attribute names are controlled internally, we use them directly
     const metricConditions = values.map(
-      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`
+      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
     );
     const params: Record<string, unknown> = {
       [`${paramId}_key`]: key,
@@ -853,7 +876,7 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each detail key
     const detailConditions = values.map(
-      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`
+      (v, i) => `sp.SpanAttributes[{${paramId}_attrkey_${i}:String}] != ''`,
     );
     const params: Record<string, unknown> = {
       [`${paramId}_key`]: key,
@@ -882,15 +905,22 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
  * @returns Object with conditions array, aggregated params, and unsupported filter flag
  */
 export function generateClickHouseFilterConditions(
-  filters: Partial<Record<FilterField, FilterParam>>
-): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean } {
+  filters: Partial<Record<FilterField, FilterParam>>,
+): {
+  conditions: string[];
+  params: Record<string, unknown>;
+  hasUnsupportedFilters: boolean;
+} {
   const conditions: string[] = [];
   const allParams: Record<string, unknown> = {};
   let hasUnsupportedFilters = false;
   let paramCounter = 0;
 
   for (const [field, filterParams] of Object.entries(filters)) {
-    if (!filterParams || (Array.isArray(filterParams) && filterParams.length === 0)) {
+    if (
+      !filterParams ||
+      (Array.isArray(filterParams) && filterParams.length === 0)
+    ) {
       continue;
     }
 
