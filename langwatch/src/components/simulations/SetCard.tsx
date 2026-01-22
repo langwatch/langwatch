@@ -1,6 +1,8 @@
 import { Card, HStack, Text, VStack } from "@chakra-ui/react";
+import { Settings } from "react-feather";
 import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { getDisplayName, isOnPlatformSet } from "~/utils/scenarioSetId";
 
 export interface SetCardProps extends ScenarioSetData {
   onClick: () => void;
@@ -42,10 +44,14 @@ export function SetCard({
     >
       <VStack align="stretch" gap="2">
         <Text fontSize="2xl" paddingBottom="2">
-          {"🎭"}
+          {isOnPlatformSet(scenarioSetId) ? (
+            <Settings size={28} />
+          ) : (
+            "🎭"
+          )}
         </Text>
         <Text fontWeight="500" color="fg">
-          {scenarioSetId}
+          {getDisplayName(scenarioSetId)}
         </Text>
 
         {/* Scenarios count and last run in a row */}

@@ -5,6 +5,7 @@ import {
   SimulationRunnerService,
 } from "~/server/scenarios/simulation-runner.service";
 import { createLogger } from "~/utils/logger";
+import { getOnPlatformSetId } from "~/utils/scenarioSetId";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
@@ -48,7 +49,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         "scenarios.run mutation called",
       );
 
-      const setId = "local-scenarios";
+      const setId = getOnPlatformSetId(input.projectId);
       const batchRunId = generateBatchRunId();
 
       logger.info(

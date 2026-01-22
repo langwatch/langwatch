@@ -8,6 +8,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isInternalSetId } from "~/utils/scenarioSetId";
 
 function SimulationsPageContent() {
   const router = useRouter();
@@ -45,7 +46,17 @@ function SimulationsPageContent() {
       return undefined;
     }
 
-    return [...scenarioSetsData].sort((a, b) => b.lastRunAt - a.lastRunAt);
+    return [...scenarioSetsData].sort((a, b) => {
+      const aIsInternal = isInternalSetId(a.scenarioSetId);
+      const bIsInternal = isInternalSetId(b.scenarioSetId);
+
+      // Pin internal sets to the top
+      if (aIsInternal && !bIsInternal) return -1;
+      if (!aIsInternal && bIsInternal) return 1;
+
+      // Within the same category, sort by last run time (most recent first)
+      return b.lastRunAt - a.lastRunAt;
+    });
   }, [scenarioSetsData]);
 
   const handleSetClick = (scenarioSetId: string) => {
