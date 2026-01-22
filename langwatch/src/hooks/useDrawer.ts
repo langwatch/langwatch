@@ -251,17 +251,18 @@ export const useDrawer = () => {
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
     { replace, resetStack, replaceCurrentInStack }: { replace?: boolean; resetStack?: boolean; replaceCurrentInStack?: boolean } = {},
   ) => {
-    // Guard: Skip if this drawer is already open
-    if (currentDrawer === drawer) {
-      return;
-    }
-
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
     const allParams = { ...drawerProps, ...urlParams } as Record<
       string,
       unknown
     >;
+
+    // If the same drawer is already open, just update the URL params without modifying the stack
+    if (currentDrawer === drawer) {
+      updateDrawerUrl(drawer, allParams, { replace: true });
+      return;
+    }
 
     // Manage drawer stack for navigation history
     if (resetStack || !currentDrawer) {

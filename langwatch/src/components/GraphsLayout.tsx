@@ -74,7 +74,7 @@ export default function GraphsLayout({
               LLM Metrics
             </MenuLink>
             <MenuLink href={`/${project?.slug}/analytics/evaluations`}>
-              Evaluations
+              Online Evaluations
             </MenuLink>
           </VStack>
           <VStack align="start" width="full" gap={1}>
