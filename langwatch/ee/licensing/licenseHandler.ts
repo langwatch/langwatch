@@ -110,16 +110,6 @@ export class LicenseHandler {
   }
 
   /**
-   * @deprecated Use validateAndStoreLicense instead
-   */
-  async storeLicense(
-    organizationId: string,
-    licenseKey: string
-  ): Promise<StoreLicenseResult> {
-    return this.validateAndStoreLicense(organizationId, licenseKey);
-  }
-
-  /**
    * Gets the current license status for an organization.
    *
    * Returns details about whether a license exists, its validity,
