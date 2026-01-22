@@ -4,6 +4,7 @@ Specialized Claude sub-agents invoked via the Task tool.
 
 ## Available Agents
 
+- **coder** - Implementation with TDD, self-verification
 - **repo-sherpa** - Repository navigation, documentation maintenance
 - **uncle-bob-reviewer** - Clean Code review (SOLID, TDD, best practices)
 
@@ -15,3 +16,7 @@ Keep prompts minimal. Agents inherit Claude's knowledge - only document:
 - Behavioral overrides (tone, output format)
 
 Don't explain standard concepts (SOLID, Clean Code) - agents already know them.
+
+## Related
+
+- `.claude/skills/` - Skills that orchestrate these agents (orchestrator, implement)
