@@ -38,14 +38,44 @@ export const evaluationsQueue = new QueueWithFallback<
   },
 });
 
+/**
+ * Thread debounce configuration for thread-level evaluations.
+ * When set, the evaluation will be debounced per thread - each new message
+ * in a thread resets the timer, and the evaluation only runs after the
+ * thread has been idle for timeoutSeconds.
+ */
+export type ThreadDebounceConfig = {
+  threadId: string;
+  timeoutSeconds: number;
+};
+
+/**
+ * Generate a job ID for thread-based debouncing.
+ * Uses threadId + checkId so all messages in a thread share the same job.
+ */
+const threadCheckIndexId = ({
+  threadId,
+  checkId,
+  projectId,
+}: {
+  threadId: string;
+  checkId: string;
+  projectId: string;
+}): string => {
+  return `thread_${projectId}_${threadId}_${checkId}`;
+};
+
 export const scheduleEvaluation = async ({
   check,
   trace,
   delay,
+  threadDebounce,
 }: {
   check: EvaluationJob["check"];
   trace: EvaluationJob["trace"];
   delay?: number;
+  /** Thread-based debouncing configuration. When set, delays evaluation until thread is idle. */
+  threadDebounce?: ThreadDebounceConfig;
 }) => {
   await updateEvaluationStatusInES({
     check,
@@ -82,47 +112,86 @@ export const scheduleEvaluation = async ({
     );
   }
 
-  const jobId = traceCheckIndexId({
-    traceId: trace.trace_id,
-    checkId: check.evaluator_id,
-    projectId: trace.project_id,
-  });
+  // For thread debouncing, use thread-based job ID; otherwise use trace-based
+  const jobId = threadDebounce
+    ? threadCheckIndexId({
+        threadId: threadDebounce.threadId,
+        checkId: check.evaluator_id,
+        projectId: trace.project_id,
+      })
+    : traceCheckIndexId({
+        traceId: trace.trace_id,
+        checkId: check.evaluator_id,
+        projectId: trace.project_id,
+      });
+
+  // Calculate delay: for thread debouncing use the configured timeout, otherwise default 30s
+  const effectiveDelay = threadDebounce
+    ? threadDebounce.timeoutSeconds * 1000
+    : (delay ?? 30_000);
+
   const currentJob = await evaluationsQueue.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
-    if (state == "failed" || state == "completed") {
+
+    if (threadDebounce && (state === "waiting" || state === "delayed")) {
+      // Thread debouncing: remove existing job and reschedule with fresh delay
+      // This "resets the timer" when a new message arrives in the thread
+      logger.info(
+        { check, trace, threadId: threadDebounce.threadId, state },
+        "thread debounce: resetting timer for thread evaluation"
+      );
+      try {
+        await currentJob.remove();
+      } catch {
+        // Job might have been processed in the meantime, ignore
+      }
+      // Fall through to schedule new job
+    } else if (state === "failed" || state === "completed") {
       logger.info({ check, trace, state }, "retrying");
       await currentJob.retry(state);
+      return;
+    } else {
+      // Job exists and is not in a state we should replace (active, etc.)
+      logger.info({ check, trace, state }, "job already exists, skipping");
+      return;
     }
-  } else {
-    logger.info({ check, trace }, "scheduling");
-    await evaluationsQueue.add(
-      check.type,
-      {
-        // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
-        check: {
-          evaluation_id: check.evaluation_id,
-          evaluator_id: check.evaluator_id,
-          type: check.type,
-          name: check.name,
-        },
-        // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
-        trace: {
-          trace_id: trace.trace_id,
-          project_id: trace.project_id,
-          thread_id: trace.thread_id,
-          user_id: trace.user_id,
-          customer_id: trace.customer_id,
-          labels: trace.labels,
-        },
-      },
-      {
-        jobId,
-        // Add a little delay to wait for the spans to be fully collected
-        delay: delay ?? 30_000,
-      },
-    );
   }
+
+  logger.info(
+    {
+      check,
+      trace,
+      delay: effectiveDelay,
+      ...(threadDebounce && { threadDebounce: true, threadId: threadDebounce.threadId }),
+    },
+    "scheduling"
+  );
+  await evaluationsQueue.add(
+    check.type,
+    {
+      // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
+      check: {
+        evaluation_id: check.evaluation_id,
+        evaluator_id: check.evaluator_id,
+        type: check.type,
+        name: check.name,
+      },
+      // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
+      trace: {
+        trace_id: trace.trace_id,
+        project_id: trace.project_id,
+        thread_id: trace.thread_id,
+        user_id: trace.user_id,
+        customer_id: trace.customer_id,
+        labels: trace.labels,
+      },
+    },
+    {
+      jobId,
+      delay: effectiveDelay,
+    },
+  );
 };
 
 export const updateEvaluationStatusInES = async ({

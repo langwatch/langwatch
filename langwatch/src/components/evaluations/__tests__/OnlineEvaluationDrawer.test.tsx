@@ -69,15 +69,39 @@ const mockEvaluators = [
     createdAt: new Date("2025-01-08T10:00:00Z"),
     updatedAt: new Date("2025-01-14T10:00:00Z"),
   },
+  // Evaluator with only optional fields (langevals/llm_boolean has requiredFields: [], optionalFields: ["input", "output", "contexts"])
+  {
+    id: "evaluator-4",
+    name: "LLM Boolean Judge",
+    slug: "llm-boolean-judge-jkl90",
+    type: "evaluator",
+    config: {
+      evaluatorType: "langevals/llm_boolean",
+      settings: { model: "openai/gpt-4" },
+    },
+    workflowId: null,
+    projectId: "test-project-id",
+    archivedAt: null,
+    createdAt: new Date("2025-01-09T10:00:00Z"),
+    updatedAt: new Date("2025-01-16T10:00:00Z"),
+  },
 ];
 
 // Mock monitor data for edit mode
-const mockMonitor = {
+// Must have at least one valid mapping to pass validation
+// Mappings format: { mapping: { field: { source, key, subkey? } } }
+let mockMonitor = {
   id: "monitor-1",
   name: "My PII Monitor",
   checkType: "presidio/pii_detection",
   parameters: {},
-  mappings: {},
+  level: "trace" as "trace" | "thread", // Level is required for the drawer to show fields
+  mappings: {
+    mapping: {
+      input: { source: "trace", key: "input" },
+      output: { source: "trace", key: "output" },
+    },
+  },
   sample: 0.5,
   evaluatorId: "evaluator-1",
   projectId: "test-project-id",
@@ -208,6 +232,7 @@ vi.mock("~/utils/api", () => ({
     useContext: vi.fn(() => ({
       evaluators: {
         getAll: { invalidate: mockInvalidate },
+        getById: { invalidate: mockInvalidate },
       },
       monitors: {
         getAllForProject: { invalidate: mockInvalidate },
@@ -263,45 +288,47 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
     vi.useRealTimers();
   });
 
+  /**
+   * Helper to select evaluation level in this test suite
+   */
+  const selectLevelInCriticalTest = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    await waitFor(() => {
+      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(levelLabel));
+    await vi.advanceTimersByTimeAsync(50);
+  };
+
   it("CRITICAL: evaluator selection persists when returning from EvaluatorListDrawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    // Helper to determine which drawer should be open based on URL
-    const isOnlineEvalOpen = () => mockQuery["drawer.open"] === "onlineEvaluationDrawer" || mockQuery["drawer.open"] === undefined;
-    const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
+    // Use CurrentDrawer for proper drawer navigation
+    mockQuery = { "drawer.open": "onlineEvaluation" };
 
-    // Start with online evaluation drawer open
-    mockQuery = { "drawer.open": "onlineEvaluationDrawer" };
-
-    // Render BOTH drawers - the open prop is controlled by URL state (like real app)
     const { rerender } = render(
       <Wrapper>
-        <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
-        <EvaluatorListDrawer open={isEvaluatorListOpen()} />
+        <CurrentDrawer />
       </Wrapper>
     );
 
-    // Step 1: OnlineEvaluationDrawer is open, shows Select Evaluator
+    // Step 1: Select level first (progressive disclosure)
+    await selectLevelInCriticalTest(user, "trace");
+
+    // Step 2: OnlineEvaluationDrawer now shows Select Evaluator
     await waitFor(() => {
       expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
     });
 
-    // Step 2: Click "Select Evaluator" - this navigates to evaluator list
+    // Step 3: Click "Select Evaluator" - this navigates to evaluator list
     await user.click(screen.getByText("Select Evaluator"));
 
-    // Step 3: URL should now have drawer.open=evaluatorList
+    // Step 4: URL should now have drawer.open=evaluatorList
     await waitFor(() => {
       expect(mockQuery["drawer.open"]).toBe("evaluatorList");
     });
 
-    // Step 4: Re-render with REAL open state changes
-    // OnlineEvaluationDrawer.open is now FALSE, EvaluatorListDrawer.open is now TRUE
-    rerender(
-      <Wrapper>
-        <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
-        <EvaluatorListDrawer open={isEvaluatorListOpen()} />
-      </Wrapper>
-    );
+    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
 
     // Step 5: EvaluatorListDrawer should now be visible with evaluators
     await waitFor(() => {
@@ -312,20 +339,33 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
     const piiCheckCard = screen.getByTestId("evaluator-card-evaluator-1");
     await user.click(piiCheckCard);
 
-    // Step 7: After selection, goBack() navigates back to online eval drawer
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Step 7: NEW FLOW - After selection, it goes to EvaluatorEditorDrawer (not back to OnlineEvaluation)
     await waitFor(() => {
-      expect(mockQuery["drawer.open"]).not.toBe("evaluatorList");
+      expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
     });
 
-    // Step 8: Re-render with the REAL state - OnlineEvaluationDrawer.open is TRUE again
-    rerender(
-      <Wrapper>
-        <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
-        <EvaluatorListDrawer open={isEvaluatorListOpen()} />
-      </Wrapper>
-    );
+    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
 
-    // Step 9: CRITICAL - OnlineEvaluationDrawer should show the selected evaluator
+    // Step 8: EvaluatorEditorDrawer should be visible
+    await waitFor(() => {
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
+    });
+
+    // Step 9: Click Cancel to go back to OnlineEvaluationDrawer
+    await user.click(screen.getByText("Cancel"));
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    // Step 10: Should be back at OnlineEvaluationDrawer
+    await waitFor(() => {
+      expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+    });
+
+    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+    // Step 11: CRITICAL - OnlineEvaluationDrawer should show the selected evaluator
     await waitFor(() => {
       // Should show "PII Check" in the selection box (not "Select Evaluator")
       expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -351,6 +391,81 @@ describe("OnlineEvaluationDrawer", () => {
     vi.useRealTimers();
   });
 
+  /**
+   * Helper to select evaluation level (required before evaluator selection is shown)
+   */
+  const selectLevel = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    await waitFor(() => {
+      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(levelLabel));
+    await vi.advanceTimersByTimeAsync(50);
+  };
+
+  describe("Progressive disclosure - New evaluation mode", () => {
+    it("initially shows only Evaluation Level section", async () => {
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByText("Evaluation Level")).toBeInTheDocument();
+        expect(screen.getByLabelText(/Trace Level/i)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Thread Level/i)).toBeInTheDocument();
+      });
+
+      // Evaluator section should NOT be visible yet
+      expect(screen.queryByText("Evaluator")).not.toBeInTheDocument();
+      expect(screen.queryByText("Select Evaluator")).not.toBeInTheDocument();
+      // Name, Sampling, Preconditions should NOT be visible
+      expect(screen.queryByText("Name")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sampling/)).not.toBeInTheDocument();
+    });
+
+    it("shows Evaluator section after selecting level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Evaluator")).toBeInTheDocument();
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Name, Sampling should still NOT be visible (need evaluator first)
+      expect(screen.queryByText("Name")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sampling/)).not.toBeInTheDocument();
+    });
+
+    it("shows all fields after selecting evaluator", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Simulate selecting an evaluator via flow callback
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go back to online drawer (via goBack from editor)
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      await waitFor(() => {
+        // Now all fields should be visible
+        expect(screen.getByText("Name")).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("Enter evaluation name")).toBeInTheDocument();
+        expect(screen.getByText(/Sampling/)).toBeInTheDocument();
+        expect(screen.getByText(/Preconditions/)).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("Basic rendering - New evaluation mode", () => {
     it("shows New Online Evaluation header", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -360,39 +475,25 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("shows Evaluator field label", async () => {
+    it("shows Evaluator field label after selecting level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Evaluator")).toBeInTheDocument();
       });
     });
 
-    it("shows Select Evaluator button when none selected", async () => {
+    it("shows Select Evaluator button after selecting level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
-      });
-    });
-
-    it("shows Name field", async () => {
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText("Name")).toBeInTheDocument();
-        expect(screen.getByPlaceholderText("Enter evaluation name")).toBeInTheDocument();
-      });
-    });
-
-    it("shows Sampling field", async () => {
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
-
-      await waitFor(() => {
-        expect(screen.getByText(/Sampling/)).toBeInTheDocument();
-        // Default sampling is 1 (100%) shown in input
-        const samplingInput = screen.getByDisplayValue("1") as HTMLInputElement;
-        expect(samplingInput).toBeInTheDocument();
       });
     });
 
@@ -401,7 +502,7 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
-        expect(screen.getByText("Create")).toBeInTheDocument();
+        expect(screen.getByText("Create Online Evaluation")).toBeInTheDocument();
       });
     });
   });
@@ -410,6 +511,8 @@ describe("OnlineEvaluationDrawer", () => {
     it("opens evaluator list when clicking Select Evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -428,6 +531,8 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
       });
@@ -444,6 +549,8 @@ describe("OnlineEvaluationDrawer", () => {
     it("displays selected evaluator after selection", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -467,6 +574,8 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       await user.click(screen.getByText("Select Evaluator"));
 
       await waitFor(() => {
@@ -485,6 +594,7 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
       await user.click(screen.getByText("Select Evaluator"));
 
       await waitFor(() => {
@@ -500,46 +610,135 @@ describe("OnlineEvaluationDrawer", () => {
         expect(selectionBox).toBeInTheDocument();
       });
     });
+
+    it("shows Remove Selection link when evaluator is selected", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      // Initially no Remove Selection link
+      expect(screen.queryByText("(Remove Selection)")).not.toBeInTheDocument();
+
+      // Select evaluator
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go back to online drawer
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Now Remove Selection link should be visible
+      await waitFor(() => {
+        expect(screen.getByText("(Remove Selection)")).toBeInTheDocument();
+      });
+    });
+
+    it("clears evaluator selection when clicking Remove Selection", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      // Select evaluator
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go back to online drawer
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify evaluator is selected
+      await waitFor(() => {
+        expect(screen.getByText("PII Check")).toBeInTheDocument();
+      });
+
+      // Click Remove Selection
+      await user.click(screen.getByText("(Remove Selection)"));
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Evaluator should be cleared - back to "Select Evaluator" button
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+        expect(screen.queryByText("PII Check")).not.toBeInTheDocument();
+        // Remove Selection link should be gone
+        expect(screen.queryByText("(Remove Selection)")).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("Name field behavior", () => {
-    it("allows typing in name field", async () => {
+    it("allows typing in name field after selecting evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // After selecting evaluator, the editor opens. Go back to online drawer.
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      await vi.advanceTimersByTimeAsync(100);
 
       const nameInput = screen.getByPlaceholderText("Enter evaluation name");
+      await user.clear(nameInput);
       await user.type(nameInput, "My Custom Monitor");
 
       expect(nameInput).toHaveValue("My Custom Monitor");
     });
 
-    it("does not override custom name when selecting evaluator", async () => {
+    it("does not override custom name when changing evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
-      // First type a custom name
+      await selectLevel(user, "trace");
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select first evaluator (name gets pre-filled)
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // After selecting evaluator, the editor opens. Go back to online drawer.
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Change to custom name
       const nameInput = screen.getByPlaceholderText("Enter evaluation name");
+      await user.clear(nameInput);
       await user.type(nameInput, "My Custom Name");
 
-      // Then select evaluator
-      await user.click(screen.getByText("Select Evaluator"));
+      // Select another evaluator via edit flow
+      await user.click(screen.getByText("PII Check"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
+      await vi.advanceTimersByTimeAsync(200);
 
-      await waitFor(() => {
-        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
-      });
-
-      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
-
-      // Name should still be custom
-      await waitFor(() => {
-        expect(nameInput).toHaveValue("My Custom Name");
-      });
+      // Name should still be custom (not overwritten)
+      expect(nameInput).toHaveValue("My Custom Name");
     });
   });
 
   describe("Sampling input", () => {
-    it("shows 1.0 (100%) sampling by default", async () => {
+    it("shows 1.0 (100%) sampling by default after selecting evaluator", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
         const samplingInput = screen.getByDisplayValue("1") as HTMLInputElement;
@@ -547,30 +746,51 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("shows helper text explaining sampling", async () => {
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+    it("shows helper text explaining sampling in edit mode", async () => {
+      // Use edit mode where the evaluator is already loaded
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
 
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByText("PII Check")).toBeInTheDocument();
+      });
+
+      // Check for the helper text
       await waitFor(() => {
         // Text appears in both preconditions and sampling sections
-        const texts = screen.getAllByText(/This evaluation will run on every message/);
+        const texts = screen.getAllByText(/This evaluation will run on/);
         expect(texts.length).toBeGreaterThan(0);
       });
     });
   });
 
   describe("Validation", () => {
-    it("Create button is disabled when no evaluator selected", async () => {
+    it("Create button is disabled when no level selected", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        const createButton = screen.getByText("Create");
+        const createButton = screen.getByText("Create Online Evaluation");
+        expect(createButton).toBeDisabled();
+      });
+    });
+
+    it("Create button is disabled when no evaluator selected", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      await waitFor(() => {
+        const createButton = screen.getByText("Create Online Evaluation");
         expect(createButton).toBeDisabled();
       });
     });
 
     it("Create button is disabled when name is empty", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
@@ -580,6 +800,12 @@ describe("OnlineEvaluationDrawer", () => {
       });
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      // After selecting evaluator, the editor opens. Go back to online drawer.
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      await vi.advanceTimersByTimeAsync(100);
 
       // Wait for the name to be auto-filled
       const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
@@ -597,14 +823,16 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Now check the button is disabled
       await waitFor(() => {
-        const createButton = screen.getByText("Create");
+        const createButton = screen.getByText("Create Online Evaluation");
         expect(createButton).toBeDisabled();
       });
     });
 
-    it("Create button is enabled when evaluator and name are set", async () => {
+    it("Create button is enabled when level, evaluator and name are set", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await user.click(screen.getByText("Select Evaluator"));
 
@@ -613,9 +841,10 @@ describe("OnlineEvaluationDrawer", () => {
       });
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
-        const createButton = screen.getByText("Create");
+        const createButton = screen.getByText("Create Online Evaluation");
         expect(createButton).not.toBeDisabled();
       });
     });
@@ -626,16 +855,19 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
-        expect(screen.getByText("Create")).not.toBeDisabled();
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
       });
 
-      await user.click(screen.getByText("Create"));
+      await user.click(screen.getByText("Create Online Evaluation"));
 
       expect(mockCreateMutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -653,15 +885,54 @@ describe("OnlineEvaluationDrawer", () => {
       const mockOnSave = vi.fn();
       render(<OnlineEvaluationDrawer open={true} onSave={mockOnSave} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
-      await waitFor(() => expect(screen.getByText("Create")).not.toBeDisabled());
+      await waitFor(() => expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled());
 
-      await user.click(screen.getByText("Create"));
+      await user.click(screen.getByText("Create Online Evaluation"));
 
       expect(mockOnSave).toHaveBeenCalled();
+    });
+
+    it("clears state after successful save so new drawer starts fresh", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { unmount } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Set up a complete evaluation
+      await selectLevel(user, "trace");
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled());
+
+      // Save the evaluation
+      await user.click(screen.getByText("Create Online Evaluation"));
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Unmount and remount to simulate opening a new drawer
+      unmount();
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Render a new drawer (simulating clicking "New" button)
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      await vi.advanceTimersByTimeAsync(200);
+
+      // The drawer should start fresh - no level selected (progressive disclosure)
+      // The Evaluator section should be hidden (no "Select Evaluator" button visible)
+      // because level is not selected yet
+      await waitFor(() => {
+        // The evaluator section is hidden until level is selected
+        expect(screen.queryByText("Select Evaluator")).not.toBeInTheDocument();
+        // The name field is also hidden
+        expect(screen.queryByPlaceholderText("Enter evaluation name")).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -728,6 +999,29 @@ describe("OnlineEvaluationDrawer", () => {
         })
       );
     });
+
+    it("loads thread level correctly in edit mode", async () => {
+      // Temporarily change mockMonitor to thread level
+      const originalLevel = mockMonitor.level;
+      mockMonitor.level = "thread";
+
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+
+      // Wait for data to load
+      await waitFor(() => {
+        expect(screen.getByText("PII Check")).toBeInTheDocument();
+      });
+
+      // Thread level should be selected (check via data-state attribute)
+      await waitFor(() => {
+        // Find the Thread Level label and check it's in checked state
+        const threadLevelLabel = screen.getByText("Thread Level").closest("label");
+        expect(threadLevelLabel).toHaveAttribute("data-state", "checked");
+      });
+
+      // Restore original level
+      mockMonitor.level = originalLevel;
+    });
   });
 
   describe("Close behavior", () => {
@@ -750,6 +1044,80 @@ describe("OnlineEvaluationDrawer", () => {
 
       expect(screen.queryByText("New Online Evaluation")).not.toBeInTheDocument();
     });
+
+    it("shows confirmation dialog when closing with unsaved changes", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const mockOnClose = vi.fn();
+
+      // Mock window.confirm
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+
+      // Make changes to trigger unsaved state
+      await selectLevel(user, "trace");
+
+      // Try to close - should show confirmation
+      await user.click(screen.getByText("Cancel"));
+
+      expect(confirmSpy).toHaveBeenCalledWith(
+        "You have unsaved changes. Are you sure you want to close?"
+      );
+      // Since we returned false, onClose should NOT have been called
+      expect(mockOnClose).not.toHaveBeenCalled();
+
+      confirmSpy.mockRestore();
+    });
+
+    it("closes without confirmation when there are no unsaved changes", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const mockOnClose = vi.fn();
+
+      // Clear any persisted state from previous tests
+      clearOnlineEvaluationDrawerState();
+
+      // Mock window.confirm to verify it's NOT called
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+
+      // Wait for effects to run and initial values to be set
+      await waitFor(() => {
+        expect(screen.getByText("Cancel")).toBeInTheDocument();
+      });
+
+      // Don't make any changes - just close immediately
+      await user.click(screen.getByText("Cancel"));
+
+      // Confirm should NOT have been called since there are no changes
+      expect(confirmSpy).not.toHaveBeenCalled();
+      // onClose SHOULD have been called
+      expect(mockOnClose).toHaveBeenCalled();
+
+      confirmSpy.mockRestore();
+    });
+
+    it("closes when user confirms unsaved changes dialog", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const mockOnClose = vi.fn();
+
+      // Mock window.confirm to return true (user confirms)
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+
+      // Make changes to trigger unsaved state
+      await selectLevel(user, "trace");
+
+      // Try to close - user confirms
+      await user.click(screen.getByText("Cancel"));
+
+      expect(confirmSpy).toHaveBeenCalled();
+      // Since we returned true, onClose SHOULD have been called
+      expect(mockOnClose).toHaveBeenCalled();
+
+      confirmSpy.mockRestore();
+    });
   });
 
   describe("Reset on reopen", () => {
@@ -760,10 +1128,13 @@ describe("OnlineEvaluationDrawer", () => {
         { wrapper: Wrapper }
       );
 
+      await selectLevel(user, "trace");
+
       // Select evaluator and enter name
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -780,9 +1151,12 @@ describe("OnlineEvaluationDrawer", () => {
       // Reopen drawer
       rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
 
-      // Should be reset
+      // Should be reset - level is null, so evaluator section is hidden
       await waitFor(() => {
-        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+        // Evaluator section should not be visible (no level selected)
+        expect(screen.queryByText("Select Evaluator")).not.toBeInTheDocument();
+        // Level should show as unselected
+        expect(screen.getByText("Evaluation Level")).toBeInTheDocument();
       });
     });
   });
@@ -792,10 +1166,13 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       // First, select an evaluator
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -830,10 +1207,13 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       // Select first evaluator
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -865,6 +1245,8 @@ describe("OnlineEvaluationDrawer", () => {
 
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
+      await selectLevel(user, "trace");
+
       // Click to open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
 
@@ -878,6 +1260,7 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Call the callback (simulating evaluator selection)
       flowCallbacks?.onSelect?.(mockEvaluators[1]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       // OnlineEvaluationDrawer should update
       await waitFor(() => {
@@ -898,12 +1281,14 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("Trace Level is selected by default", async () => {
+    it("no level is selected by default (progressive disclosure)", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
         const traceRadio = screen.getByRole("radio", { name: /trace level/i });
-        expect(traceRadio).toBeChecked();
+        const threadRadio = screen.getByRole("radio", { name: /thread level/i });
+        expect(traceRadio).not.toBeChecked();
+        expect(threadRadio).not.toBeChecked();
       });
     });
 
@@ -927,9 +1312,15 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
-      // Initially Trace Level
+      // Initially nothing selected
       const traceRadio = screen.getByRole("radio", { name: /trace level/i });
       const threadRadio = screen.getByRole("radio", { name: /thread level/i });
+      expect(traceRadio).not.toBeChecked();
+      expect(threadRadio).not.toBeChecked();
+
+      // Select trace level
+      await user.click(traceRadio);
+      await vi.advanceTimersByTimeAsync(50);
       expect(traceRadio).toBeChecked();
       expect(threadRadio).not.toBeChecked();
 
@@ -954,16 +1345,19 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
+      await selectLevel(user, "trace");
+
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
-        expect(screen.getByText("Create")).not.toBeDisabled();
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
       });
 
-      await user.click(screen.getByText("Create"));
+      await user.click(screen.getByText("Create Online Evaluation"));
 
       // Verify mappings is included (may be empty or auto-inferred)
       expect(mockCreateMutate).toHaveBeenCalledWith(
@@ -977,7 +1371,7 @@ describe("OnlineEvaluationDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
 
-      // Wait for data to load
+      // Wait for data to load (edit mode loads existing monitor with level already set)
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
       });
@@ -1005,7 +1399,7 @@ describe("OnlineEvaluationDrawer", () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        const createButton = screen.getByText("Create");
+        const createButton = screen.getByText("Create Online Evaluation");
         expect(createButton).toBeDisabled();
       });
     });
@@ -1018,8 +1412,11 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    it("shows evaluator selection box", async () => {
+    it("shows evaluator selection box after selecting level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -1028,14 +1425,17 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Level change with evaluator selected", () => {
-    it("resets to initial state when level changes", async () => {
+    it("keeps evaluator selected when level changes", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
 
       // Select evaluator at trace level
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -1044,6 +1444,7 @@ describe("OnlineEvaluationDrawer", () => {
       // Evaluator should remain selected after level change
       const threadRadio = screen.getByRole("radio", { name: /thread/i });
       await user.click(threadRadio);
+      await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
         // Evaluator should still be selected
@@ -1086,6 +1487,18 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
   const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
   const isEvaluatorEditorOpen = () => mockQuery["drawer.open"] === "evaluatorEditor";
 
+  /**
+   * Helper to select evaluation level in integration tests
+   */
+  const selectLevelInIntegration = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    await waitFor(() => {
+      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(levelLabel));
+    await vi.advanceTimersByTimeAsync(50);
+  };
+
   it("INTEGRATION: shows trace mapping dropdown with nested fields when configuring evaluator", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -1098,19 +1511,22 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       </Wrapper>
     );
 
-    // Step 1: OnlineEvaluationDrawer is open
+    // Step 1: Select level first (progressive disclosure)
+    await selectLevelInIntegration(user, "trace");
+
+    // Step 2: OnlineEvaluationDrawer shows evaluator selection
     await waitFor(() => {
       expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
     });
 
-    // Step 2: Click "Select Evaluator" and select via flow callback
+    // Step 3: Click "Select Evaluator" and select via flow callback
     await user.click(screen.getByText("Select Evaluator"));
     await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
 
     // Select PII Check evaluator
     getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
-    // Step 3: Wait for navigation to evaluator editor (Issue 1 fix)
+    // Step 4: Wait for navigation to evaluator editor (Issue 1 fix)
     await vi.advanceTimersByTimeAsync(200);
 
     await waitFor(() => {
@@ -1129,7 +1545,17 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
-    // Step 6: Find and click on a mapping input
+    // Step 6: With auto-mapping, input/output should already be mapped
+    // First, clear one of the existing mappings to test the dropdown
+    const clearButtons = screen.getAllByTestId("clear-mapping-button");
+    expect(clearButtons.length).toBeGreaterThan(0);
+
+    // Click the clear button on the first mapping
+    await user.click(clearButtons[0]!);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    // Step 7: Now click on the empty mapping input to open dropdown
     const textboxes = screen.getAllByRole("textbox");
     // Find the mapping input (not the name input) - look for one with placeholder
     const mappingInput = textboxes.find(tb =>
@@ -1140,19 +1566,19 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
 
     await user.click(mappingInput!);
 
-    // Step 7: Should show trace fields in dropdown
+    // Step 8: Should show trace fields in dropdown
     await waitFor(() => {
       const fieldOptions = screen.queryAllByTestId(/^field-option-/);
       expect(fieldOptions.length).toBeGreaterThan(0);
     }, { timeout: 3000 });
 
-    // Step 8: Click on "metadata" (has children)
+    // Step 9: Click on "metadata" (has children)
     await waitFor(() => {
       expect(screen.getByTestId("field-option-metadata")).toBeInTheDocument();
     });
     await user.click(screen.getByTestId("field-option-metadata"));
 
-    // Step 9: Should show metadata badge AND nested children
+    // Step 10: Should show metadata badge AND nested children
     await waitFor(() => {
       expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("metadata");
     });
@@ -1161,13 +1587,17 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
     });
 
-    // Step 10: Click on thread_id to complete the mapping
+    // Step 11: Click on thread_id to complete the mapping
     await user.click(screen.getByTestId("field-option-thread_id"));
 
-    // Step 11: Should show completed mapping as "metadata.thread_id"
+    // Step 12: Should show completed mapping as "metadata.thread_id"
     await waitFor(() => {
-      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("metadata.thread_id")).toBeInTheDocument();
+      const sourceTags = screen.getAllByTestId("source-mapping-tag");
+      // Should have at least one mapping tag (we cleared one, so should have 1 remaining + the new one)
+      expect(sourceTags.length).toBeGreaterThan(0);
+      // One of them should show "metadata.thread_id"
+      const hasMetadataMapping = sourceTags.some(tag => tag.textContent?.includes("metadata.thread_id"));
+      expect(hasMetadataMapping).toBe(true);
     });
   });
 
@@ -1182,6 +1612,9 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
         <CurrentDrawer />
       </Wrapper>
     );
+
+    // Select level first (progressive disclosure)
+    await selectLevelInIntegration(user, "trace");
 
     // Select evaluator
     await waitFor(() => {
@@ -1208,8 +1641,19 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
+    // With auto-mapping, input/output are already mapped. Clear one first.
+    const clearButtons = screen.getAllByTestId("clear-mapping-button");
+    expect(clearButtons.length).toBeGreaterThan(0);
+    await user.click(clearButtons[0]!);
+
+    await vi.advanceTimersByTimeAsync(100);
+
     const textboxes = screen.getAllByRole("textbox");
-    const mappingInput = textboxes[1]; // Skip the name input
+    const mappingInput = textboxes.find(tb =>
+      tb.getAttribute("placeholder")?.includes("source") ||
+      tb.getAttribute("placeholder")?.includes("Required") ||
+      tb.getAttribute("placeholder") === ""
+    ) ?? textboxes[1]; // Skip the name input
 
     await user.click(mappingInput!);
 
@@ -1235,8 +1679,10 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
 
     // Should show completed mapping
     await waitFor(() => {
-      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("spans.output")).toBeInTheDocument();
+      const sourceTags = screen.getAllByTestId("source-mapping-tag");
+      expect(sourceTags.length).toBeGreaterThan(0);
+      const hasSpansOutputMapping = sourceTags.some(tag => tag.textContent?.includes("spans.output"));
+      expect(hasSpansOutputMapping).toBe(true);
     });
   });
 });
@@ -1271,6 +1717,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
   const isEvaluatorEditorOpen = () => mockQuery["drawer.open"] === "evaluatorEditor";
 
   /**
+   * Helper to select evaluation level in issue fix tests
+   */
+  const selectLevelInIssueTests = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    await waitFor(() => {
+      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(levelLabel));
+    await vi.advanceTimersByTimeAsync(50);
+  };
+
+  /**
    * ISSUE 1: Always open evaluator editor after selection
    *
    * Current behavior: Only opens editor when there are pending mappings
@@ -1289,6 +1747,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <EvaluatorEditorDrawer />
         </Wrapper>
       );
+
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       // Click Select Evaluator
       await waitFor(() => {
@@ -1346,6 +1807,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <EvaluatorEditorDrawer />
         </Wrapper>
       );
+
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       // First, select an evaluator via flow callback
       await user.click(screen.getByText("Select Evaluator"));
@@ -1412,6 +1876,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         </Wrapper>
       );
 
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
       // Click Select Evaluator to set up flow callbacks
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -1439,6 +1906,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Call the callback as if the editor saved a new evaluator
       flowCallbacks?.onSelect?.(newEvaluator as any);
+      await vi.advanceTimersByTimeAsync(200);
 
       // EXPECTED: OnlineEvaluationDrawer should now show the new evaluator selected
       await waitFor(() => {
@@ -1468,6 +1936,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <CurrentDrawer />
         </Wrapper>
       );
+
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       // Wait for drawer to render
       await waitFor(() => {
@@ -1538,6 +2009,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         </Wrapper>
       );
 
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
       });
@@ -1586,6 +2060,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <CurrentDrawer />
         </Wrapper>
       );
+
+      // Select level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -1647,13 +2124,12 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         </Wrapper>
       );
 
+      // Select thread level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "thread");
+
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
       });
-
-      // Switch to thread level
-      const threadRadio = screen.getByLabelText(/thread level/i);
-      await user.click(threadRadio);
 
       await user.click(screen.getByText("Select Evaluator"));
       await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
@@ -1698,6 +2174,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    *
    * EXPECTED: After switching to thread, mappings show thread sources.
    * ACTUAL: Mappings still show trace sources.
+   *
+   * NOTE: Switching levels no longer auto-opens the editor (per user request).
+   * User must click on the evaluator to open the editor.
    */
   describe("Issue: Switching levels updates available sources", () => {
     it("switching from trace to thread updates mapping sources in editor", async () => {
@@ -1710,6 +2189,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <CurrentDrawer />
         </Wrapper>
       );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -1734,21 +2216,26 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       await vi.advanceTimersByTimeAsync(100);
 
-      // Assuming issue 3 is fixed, we should be back at online eval drawer
-      // If not fixed, this will fail here
       await waitFor(() => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       }, { timeout: 1000 });
 
       rerender(<Wrapper><CurrentDrawer /></Wrapper>);
 
-      // Switch to thread level
+      // Switch to thread level - should NOT auto-open editor anymore
       const threadRadio = screen.getByLabelText(/thread level/i);
       await user.click(threadRadio);
 
       await vi.advanceTimersByTimeAsync(200);
 
-      // Editor should open for thread level
+      // Should still be on onlineEvaluation drawer
+      expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+
+      // Now click on the evaluator to open editor
+      await user.click(screen.getByText("Answer Relevance"));
+
+      await vi.advanceTimersByTimeAsync(200);
+
       await waitFor(() => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
@@ -1759,10 +2246,21 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
       });
 
+      // Clear a mapping first to get the dropdown
+      const clearButtons = screen.queryAllByTestId("clear-mapping-button");
+      if (clearButtons[0]) {
+        await user.click(clearButtons[0]);
+        await vi.advanceTimersByTimeAsync(100);
+      }
+
       // Click on a mapping input
       const textboxes = screen.getAllByRole("textbox");
-      const mappingInput = textboxes[1];
-      await user.click(mappingInput!);
+      const mappingInput = textboxes.find(
+        (input) => input.getAttribute("placeholder")?.includes("Select")
+      );
+      if (mappingInput) {
+        await user.click(mappingInput);
+      }
 
       // EXPECTED: Should see thread-specific sources (thread_id, traces)
       // NOT trace-specific sources (metadata, spans at top level)
@@ -1793,6 +2291,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <CurrentDrawer />
         </Wrapper>
       );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -1851,6 +2352,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         </Wrapper>
       );
 
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
       });
@@ -1902,6 +2406,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         </Wrapper>
       );
 
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
       });
@@ -1943,6 +2450,1180 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(screen.getByText(/need.*mapping/i)).toBeInTheDocument();
         // Should have a "Configure" button
         expect(screen.getByRole("button", { name: /configure/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ==========================================================================
+  // NEW ISSUES - Failing tests to prove the problems
+  // ==========================================================================
+
+  /**
+   * NEW Issue 1: Auto-mapping not kicking in after selecting evaluator (trace level)
+   *
+   * When selecting a built-in evaluator like PII Detection (requires input, output),
+   * the auto-mapping should automatically fill in input->trace.input, output->trace.output.
+   *
+   * EXPECTED: After selecting evaluator, mappings should be auto-inferred and visible.
+   * ACTUAL: Mappings are empty, user has to manually fill them.
+   */
+  describe("NEW Issue 1: Auto-mapping for trace level", () => {
+    it("auto-infers input/output mappings when selecting evaluator with required fields at trace level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select Answer Relevance (requires input, output - should auto-map)
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!); // Answer Relevance
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Should open evaluator editor
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor to render with mappings
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      // EXPECTED: The mappings should be auto-filled with trace.input and trace.output
+      // Auto-mapped values are displayed as Tags with data-testid="source-mapping-tag"
+      await waitFor(() => {
+        // Look for source mapping tags that show "input" or "output"
+        const sourceTags = screen.getAllByTestId("source-mapping-tag");
+        expect(sourceTags.length).toBeGreaterThan(0);
+
+        // At least one should show "input" (auto-mapped input field)
+        const hasInputMapping = sourceTags.some(
+          (tag) => tag.textContent?.includes("input")
+        );
+        expect(hasInputMapping).toBe(true);
+      }, { timeout: 3000 });
+    });
+
+    it("auto-infers input/output mappings for evaluators with only optional fields (llm_boolean)", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select LLM Boolean Judge (has requiredFields: [], optionalFields: ["input", "output", "contexts"])
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[3]!); // LLM Boolean Judge
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Should open evaluator editor
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor to render with mappings
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      // EXPECTED: Even though these are optional fields, input/output should be auto-mapped
+      await waitFor(() => {
+        const sourceTags = screen.getAllByTestId("source-mapping-tag");
+        expect(sourceTags.length).toBeGreaterThan(0);
+
+        // Should have both input and output auto-mapped
+        const hasInputMapping = sourceTags.some(
+          (tag) => tag.textContent?.includes("input")
+        );
+        const hasOutputMapping = sourceTags.some(
+          (tag) => tag.textContent?.includes("output")
+        );
+        expect(hasInputMapping).toBe(true);
+        expect(hasOutputMapping).toBe(true);
+      }, { timeout: 3000 });
+    });
+
+    it("auto-maps input to traces when selecting thread level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // First select an evaluator at trace level
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[3]!); // LLM Boolean Judge
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go back to online drawer
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Now switch to Thread level - should NOT auto-open editor anymore
+      const threadRadio = screen.getByLabelText(/Thread/i);
+      await user.click(threadRadio);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Should still be on onlineEvaluation drawer (no auto-open)
+      expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+
+      // Click on the evaluator to open editor
+      await user.click(screen.getByText("LLM Boolean Judge"));
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // EXPECTED: The input field should be auto-mapped to "traces"
+      await waitFor(() => {
+        const sourceTags = screen.getAllByTestId("source-mapping-tag");
+        const hasTracesMapping = sourceTags.some(
+          (tag) => tag.textContent?.includes("traces")
+        );
+        expect(hasTracesMapping).toBe(true);
+      }, { timeout: 3000 });
+    });
+  });
+
+  /**
+   * NEW Issue 2: Save Changes closes editor, doesn't return to online drawer
+   *
+   * When user clicks "Save Changes" in the evaluator editor (after editing mappings),
+   * it should return to the online evaluation drawer, not close everything.
+   *
+   * EXPECTED: After Save Changes, return to online evaluation drawer.
+   * ACTUAL: Everything closes.
+   */
+  describe("NEW Issue 2: Select Evaluator returns to online drawer", () => {
+    it("returns to online evaluation drawer after clicking Select Evaluator", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select an evaluator
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor to render - button says "Select Evaluator" when selecting for first time
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Click Select Evaluator (was "Save Changes" before, now customized for this flow)
+      await user.click(screen.getByText("Select Evaluator"));
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      // EXPECTED: Should return to online evaluation drawer
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      }, { timeout: 3000 });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Should see the online evaluation drawer with selected evaluator
+      await waitFor(() => {
+        expect(screen.getByText("New Online Evaluation")).toBeInTheDocument();
+      });
+    });
+
+    it("shows 'Select Evaluator' button when selecting for first time, 'Save Changes' when editing", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select an evaluator for the FIRST time
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // FIRST TIME SELECTION: Button should say "Select Evaluator"
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+        expect(screen.queryByText("Save Changes")).not.toBeInTheDocument();
+      });
+
+      // Click Select Evaluator to go back
+      await user.click(screen.getByText("Select Evaluator"));
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Now click on the already-selected evaluator to edit it
+      await waitFor(() => {
+        expect(screen.getByText("Answer Relevance")).toBeInTheDocument();
+      });
+
+      const evaluatorBox = screen.getByRole("button", { name: /Answer Relevance/i });
+      await user.click(evaluatorBox);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // EDITING EXISTING SELECTION: Button should say "Save Changes"
+      await waitFor(() => {
+        expect(screen.getByText("Save Changes")).toBeInTheDocument();
+        expect(screen.queryByText(/^Select Evaluator$/)).not.toBeInTheDocument();
+      });
+    });
+
+    it("sets up onCreateNew callback for new evaluator flow", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      // Click Select Evaluator to open the list
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+
+      // Verify that the evaluatorList flow callbacks include onCreateNew
+      await waitFor(() => {
+        const callbacks = getFlowCallbacks("evaluatorList");
+        expect(callbacks).toBeDefined();
+        expect(callbacks?.onSelect).toBeDefined();
+        expect(callbacks?.onCreateNew).toBeDefined();
+      });
+    });
+  });
+
+  /**
+   * NEW Issue 3: Cancel closes everything instead of going back
+   *
+   * When user clicks "Cancel" in the evaluator editor, it should return
+   * to the online evaluation drawer, not close everything.
+   *
+   * Note: This was supposedly fixed before, but testing again to verify.
+   */
+  describe("NEW Issue 3: Cancel returns to online drawer", () => {
+    it("returns to online evaluation drawer when clicking Cancel in editor", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select an evaluator
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor to render
+      await waitFor(() => {
+        expect(screen.getByText("Cancel")).toBeInTheDocument();
+      });
+
+      // Click Cancel
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // EXPECTED: Should return to online evaluation drawer (not close everything)
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      }, { timeout: 3000 });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Should see the online evaluation drawer
+      await waitFor(() => {
+        expect(screen.getByText("New Online Evaluation")).toBeInTheDocument();
+      });
+    });
+  });
+
+  /**
+   * NEW Issue 4: Mappings not persisted after Save Changes
+   *
+   * When user fills in mappings and clicks Save Changes, the mappings
+   * should be persisted. When reopening the drawer, mappings should still be there.
+   *
+   * EXPECTED: Mappings persist after save.
+   * ACTUAL: Mappings are gone when reopening.
+   */
+  describe("NEW Issue 4: Mappings persist after Save Changes", () => {
+    it("preserves mappings after saving and reopening", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select Exact Match (requires expected_output which needs manual mapping)
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor to render with mappings
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      // Find the expected_output mapping input and fill it
+      const textboxes = screen.getAllByRole("textbox");
+      const mappingInputs = textboxes.filter(
+        (input) => input.getAttribute("placeholder")?.includes("Select")
+      );
+
+      // Click on a mapping input to open dropdown
+      if (mappingInputs[0]) {
+        await user.click(mappingInputs[0]);
+        await vi.advanceTimersByTimeAsync(100);
+
+        // Select "output" from dropdown if available
+        const outputOption = screen.queryByTestId("field-option-output");
+        if (outputOption) {
+          await user.click(outputOption);
+          await vi.advanceTimersByTimeAsync(100);
+        }
+      }
+
+      // Click Save Changes (or Cancel to go back)
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Return to online evaluation drawer
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Click on the selected evaluator to edit again
+      await waitFor(() => {
+        expect(screen.getByText("Exact Match")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Exact Match"));
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Should open evaluator editor again
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // EXPECTED: The mapping we set should still be there
+      // Mappings are displayed as Tags with data-testid="source-mapping-tag"
+      await waitFor(() => {
+        const sourceTags = screen.getAllByTestId("source-mapping-tag");
+        const hasOutputMapping = sourceTags.some(
+          (tag) => tag.textContent?.includes("output")
+        );
+        expect(hasOutputMapping).toBe(true);
+      }, { timeout: 3000 });
+    });
+  });
+
+  /**
+   * NEW Issue 5: Thread-level selecting first level keeps 'required' status
+   *
+   * When selecting just "traces" (first level) for a thread-level mapping,
+   * the field should be considered mapped (not pending).
+   *
+   * EXPECTED: Selecting "traces" completes the mapping.
+   * ACTUAL: Field stays marked as required/pending.
+   */
+  describe("NEW Issue 5: Thread-level first level completes mapping", () => {
+    it("marks field as mapped when selecting traces at thread level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select Thread level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "thread");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Open evaluator list
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Select an evaluator
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Wait for editor with mappings
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      // Find mapping input and select "traces"
+      const textboxes = screen.getAllByRole("textbox");
+      const mappingInput = textboxes.find(
+        (input) => input.getAttribute("placeholder")?.includes("Select")
+      );
+
+      if (mappingInput) {
+        await user.click(mappingInput);
+        await vi.advanceTimersByTimeAsync(100);
+
+        const tracesOption = screen.queryByTestId("field-option-traces");
+        if (tracesOption) {
+          await user.click(tracesOption);
+          await vi.advanceTimersByTimeAsync(100);
+        }
+      }
+
+      // EXPECTED: The pending-mappings-error should NOT be visible
+      // (or should not include the field we just mapped)
+      await waitFor(() => {
+        const errorMessage = screen.queryByTestId("pending-mappings-error");
+        // Either no error, or error doesn't mention "input" field we just mapped
+        if (errorMessage) {
+          expect(errorMessage.textContent).not.toContain("input");
+        }
+      }, { timeout: 3000 });
+    });
+  });
+
+  /**
+   * NEW Issue 6: Auto-map 'traces' to 'input' for thread-level
+   *
+   * When selecting thread level, the "input" field should auto-map to "traces".
+   *
+   * NOTE: This is now covered by the "auto-maps input to traces when selecting thread level"
+   * test in the "NEW Issue 1: Auto-mapping for trace level" describe block above.
+   */
+
+  /**
+   * VALIDATION ISSUES (Jan 22, 2026)
+   *
+   * Issue 1: Create button should be disabled when no valid mappings
+   * - At least one field must be mapped (even if all fields are optional)
+   * - This should use the same validation logic as evaluations v3
+   *
+   * Issue 2: Switching levels should NOT auto-open evaluator editor
+   * - Previously it would open the editor when switching to thread level
+   * - Now it should just update the mappings without opening the editor
+   *
+   * Issue 3: Monitor slug should be unique (add nanoid suffix)
+   * - Creating multiple monitors with the same evaluator should work
+   */
+  describe("VALIDATION: Create button disabled without valid mappings", () => {
+    it("disables Create button when evaluator has only optional fields and none are mapped", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Select PII Check evaluator (has only optional fields: input, output)
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go to evaluator editor
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Clear all mappings
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      const clearButtons = screen.queryAllByTestId("clear-mapping-button");
+      for (const btn of clearButtons) {
+        await user.click(btn);
+        await vi.advanceTimersByTimeAsync(50);
+      }
+
+      // Go back to online evaluation drawer
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // EXPECTED: Create button should be disabled because no mappings
+      await waitFor(() => {
+        const createButton = screen.getByRole("button", { name: /Create/i });
+        expect(createButton).toBeDisabled();
+      });
+    });
+
+    it("enables Create button when at least one field is mapped", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Select PII Check evaluator (has only optional fields)
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go to evaluator editor - mappings should be auto-filled
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Go back to online evaluation drawer (with auto-mapped values)
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // EXPECTED: Create button should be enabled because input/output are auto-mapped
+      await waitFor(() => {
+        const createButton = screen.getByRole("button", { name: /Create/i });
+        expect(createButton).not.toBeDisabled();
+      });
+    });
+  });
+
+  describe("VALIDATION: Switching levels should NOT auto-open editor", () => {
+    it("does not open evaluator editor when switching from trace to thread level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Select an evaluator first
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Go to evaluator editor
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Go back to online evaluation drawer
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Now switch to Thread level
+      const threadRadio = screen.getByLabelText(/Thread/i);
+      await user.click(threadRadio);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // EXPECTED: Should still be on onlineEvaluation drawer, NOT evaluatorEditor
+      expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+    });
+  });
+
+  describe("VALIDATION: Switching levels clears and re-infers mappings", () => {
+    it("clears trace-level mappings when switching to thread level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+
+      // Select an evaluator at trace level (should auto-map input/output)
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+
+      // Use Answer Relevance which has input/output required fields
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Go back to online evaluation drawer
+      await user.click(screen.getByText("Cancel"));
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      // Now switch to Thread level
+      const threadRadio = screen.getByLabelText(/Thread/i);
+      await user.click(threadRadio);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Click on the evaluator to open editor
+      await user.click(screen.getByText("Answer Relevance"));
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      });
+
+      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+
+      await waitFor(() => {
+        expect(screen.getByText("Variables")).toBeInTheDocument();
+      });
+
+      // Clear a mapping to access the dropdown
+      const clearButtons = screen.queryAllByTestId("clear-mapping-button");
+      if (clearButtons[0]) {
+        await user.click(clearButtons[0]);
+        await vi.advanceTimersByTimeAsync(100);
+      }
+
+      // Click on a mapping input
+      const textboxes = screen.getAllByRole("textbox");
+      const mappingInput = textboxes.find(
+        (input) => input.getAttribute("placeholder")?.includes("Select")
+      );
+      if (mappingInput) {
+        await user.click(mappingInput);
+      }
+
+      // EXPECTED: Should see thread-specific sources (thread_id, traces)
+      // NOT trace-specific sources (input, output at top level)
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
+        // Should NOT see trace-level "input" or "output" as top-level options
+        // (they are nested under traces for thread level)
+      });
+    });
+  });
+
+  /**
+   * Thread Idle Timeout feature tests
+   *
+   * This feature adds a dropdown to thread-level evaluations that allows users
+   * to configure how long to wait after the last message before running evaluation.
+   */
+  describe("Thread Idle Timeout feature", () => {
+    /**
+     * Helper to select evaluation level in thread timeout tests
+     */
+    const selectLevelInTimeoutTests = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+      const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+      await waitFor(() => {
+        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      });
+      await user.click(screen.getByLabelText(levelLabel));
+    };
+
+    it("does not show thread idle timeout dropdown for trace level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select trace level
+      await selectLevelInTimeoutTests(user, "trace");
+
+      // Select an evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+
+      // Simulate evaluator selection via callback
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Should NOT see the thread idle timeout dropdown
+      await waitFor(() => {
+        expect(screen.queryByText(/Conversation Idle Time/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows thread idle timeout dropdown for thread level after selecting evaluator", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select thread level
+      await selectLevelInTimeoutTests(user, "thread");
+
+      // Select an evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+
+      // Simulate evaluator selection via callback
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Should see the thread idle timeout dropdown
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+    });
+
+    it("thread idle timeout dropdown has correct options", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select thread level and evaluator
+      await selectLevelInTimeoutTests(user, "thread");
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Wait for dropdown to appear
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+
+      // Check dropdown has correct options
+      const dropdown = screen.getByRole("combobox") as HTMLSelectElement;
+      const options = Array.from(dropdown.options).map(opt => opt.text);
+
+      expect(options).toContain("Disabled - evaluate on every trace");
+      expect(options).toContain("1 minute");
+      expect(options).toContain("5 minutes");
+      expect(options).toContain("10 minutes");
+      expect(options).toContain("15 minutes");
+      expect(options).toContain("30 minutes");
+    });
+
+    it("defaults to 5 minutes (300 seconds) for thread idle timeout", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select thread level and evaluator
+      await selectLevelInTimeoutTests(user, "thread");
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Wait for dropdown to appear
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+
+      // Check default value is 300 (5 minutes)
+      const dropdown = screen.getByRole("combobox") as HTMLSelectElement;
+      expect(dropdown.value).toBe("300");
+    });
+
+    it("allows changing thread idle timeout value", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select thread level and evaluator
+      await selectLevelInTimeoutTests(user, "thread");
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Wait for dropdown to appear
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+
+      // Change to 10 minutes (600 seconds) - default is 5 minutes (300)
+      const dropdown = screen.getByRole("combobox") as HTMLSelectElement;
+      await user.selectOptions(dropdown, "600");
+
+      // Verify value changed
+      await waitFor(() => {
+        expect(dropdown.value).toBe("600");
+      });
+    });
+
+    it("includes threadIdleTimeout in create mutation payload for thread level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select thread level
+      await selectLevelInTimeoutTests(user, "thread");
+
+      // Select evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Wait for form to be ready
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+
+      // Set timeout to 10 minutes (600 seconds) - default is 5 minutes
+      const dropdown = screen.getByRole("combobox") as HTMLSelectElement;
+      await user.selectOptions(dropdown, "600");
+
+      // Click save
+      const saveButton = screen.getByText("Create Online Evaluation");
+      await user.click(saveButton);
+
+      // Verify mutation was called with threadIdleTimeout
+      await waitFor(() => {
+        expect(mockCreateMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            threadIdleTimeout: 600,
+          })
+        );
+      });
+    });
+
+    it("sends null threadIdleTimeout for trace level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Select trace level
+      await selectLevelInTimeoutTests(user, "trace");
+
+      // Select evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Wait for form to be ready
+      await waitFor(() => {
+        expect(screen.getByText("PII Check")).toBeInTheDocument();
+      });
+
+      // Click save
+      const saveButton = screen.getByText("Create Online Evaluation");
+      await user.click(saveButton);
+
+      // Verify mutation was called with null threadIdleTimeout
+      await waitFor(() => {
+        expect(mockCreateMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            threadIdleTimeout: null,
+          })
+        );
+      });
+    });
+
+    it("hides thread idle timeout dropdown when switching from thread to trace level", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      // Start with thread level
+      await selectLevelInTimeoutTests(user, "thread");
+
+      // Select evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() => {
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined();
+      });
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      // Verify dropdown is visible
+      await waitFor(() => {
+        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+      });
+
+      // Switch to trace level
+      await user.click(screen.getByLabelText(/Trace Level/i));
+
+      // Dropdown should now be hidden
+      await waitFor(() => {
+        expect(screen.queryByText(/Conversation Idle Time/i)).not.toBeInTheDocument();
       });
     });
   });

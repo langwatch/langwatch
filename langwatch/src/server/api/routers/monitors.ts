@@ -1,5 +1,6 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
 import { slugify } from "~/utils/slugify";
 import {
@@ -12,6 +13,65 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
+/**
+ * Generates a unique slug for a monitor.
+ * Format: slugified-name-XXXXX (where XXXXX is a 5-char nanoid)
+ * This ensures uniqueness even when creating multiple monitors with the same name.
+ */
+const generateMonitorSlug = (name: string): string => {
+  const nanoidShort = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 5);
+  const baseSlug = slugify(name);
+  return baseSlug ? `${baseSlug}-${nanoidShort()}` : nanoidShort();
+};
+
+/**
+ * Finds a unique name for a monitor by appending (2), (3), etc. if needed.
+ * Checks existing monitors in the project to avoid conflicts.
+ */
+const findUniqueMonitorName = async (
+  prisma: { monitor: { findFirst: (args: { where: { projectId: string; name: string } }) => Promise<unknown>; findMany: (args: { where: { projectId: string; name: { startsWith: string } }; select: { name: true } }) => Promise<{ name: string }[]> } },
+  projectId: string,
+  baseName: string,
+): Promise<string> => {
+  // First, check if the base name is available
+  const existing = await prisma.monitor.findFirst({
+    where: { projectId, name: baseName },
+  });
+
+  if (!existing) {
+    return baseName;
+  }
+
+  // Find all monitors with names like "baseName" or "baseName (N)"
+  const pattern = `${baseName} (`;
+  const existingWithSuffix = await prisma.monitor.findMany({
+    where: {
+      projectId,
+      name: { startsWith: pattern },
+    },
+    select: { name: true },
+  });
+
+  // Extract the numbers from existing names
+  const usedNumbers = new Set<number>();
+  usedNumbers.add(1); // Base name counts as (1)
+
+  for (const monitor of existingWithSuffix) {
+    const match = monitor.name.match(/\((\d+)\)$/);
+    if (match?.[1]) {
+      usedNumbers.add(parseInt(match[1], 10));
+    }
+  }
+
+  // Find the next available number
+  let nextNumber = 2;
+  while (usedNumbers.has(nextNumber)) {
+    nextNumber++;
+  }
+
+  return `${baseName} (${nextNumber})`;
+};
 
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -61,6 +121,8 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.MANUALLY,
         ]),
         evaluatorId: z.string().optional(),
+        level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
+        threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),
     )
     .use(checkProjectPermission("evaluations:create"))
@@ -75,9 +137,10 @@ export const monitorsRouter = createTRPCRouter({
         sample,
         executionMode,
         evaluatorId,
+        level,
+        threadIdleTimeout,
       } = input;
       const prisma = ctx.prisma;
-      const slug = slugify(name, { lower: true, strict: true });
 
       // Validate evaluator exists and belongs to project if provided
       if (evaluatorId) {
@@ -94,11 +157,16 @@ export const monitorsRouter = createTRPCRouter({
 
       validateCheckSettings(checkType, parameters);
 
+      // Find a unique name (appends (2), (3), etc. if needed)
+      const uniqueName = await findUniqueMonitorName(prisma, projectId, name);
+      // Slug uses nanoid for true uniqueness
+      const slug = generateMonitorSlug(name);
+
       const newCheck = await prisma.monitor.create({
         data: {
           id: generate(KSUID_RESOURCES.MONITOR).toString(),
           projectId,
-          name,
+          name: uniqueName,
           checkType,
           slug,
           preconditions,
@@ -108,6 +176,8 @@ export const monitorsRouter = createTRPCRouter({
           enabled: true,
           executionMode,
           evaluatorId,
+          level: level ?? "trace",
+          threadIdleTimeout,
         },
       });
 
@@ -131,6 +201,8 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.MANUALLY,
         ]),
         evaluatorId: z.string().nullable().optional(),
+        level: z.enum(["trace", "thread"]).optional(), // Evaluation level: trace or thread
+        threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),
     )
     .use(checkProjectPermission("evaluations:update"))
@@ -147,6 +219,8 @@ export const monitorsRouter = createTRPCRouter({
         executionMode,
         mappings,
         evaluatorId,
+        level,
+        threadIdleTimeout,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -179,6 +253,8 @@ export const monitorsRouter = createTRPCRouter({
           executionMode,
           mappings,
           ...(evaluatorId !== undefined && { evaluatorId }),
+          ...(level !== undefined && { level }),
+          ...(threadIdleTimeout !== undefined && { threadIdleTimeout }),
         },
       });
 

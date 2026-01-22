@@ -197,6 +197,106 @@ export const targetHasMissingMappings = (
 // ============================================================================
 
 /**
+ * Simple mapping validation result.
+ */
+export type SimpleMappingValidationResult = {
+  /** Whether the mappings are valid */
+  isValid: boolean;
+  /** Whether at least one field has a mapping */
+  hasAnyMapping: boolean;
+  /** Fields that are missing required mappings */
+  missingRequiredFields: string[];
+};
+
+/**
+ * Core validation logic for evaluator mappings.
+ * Used by both validateEvaluatorMappings and validateEvaluatorMappingsWithFields.
+ */
+const validateMappingsCore = (
+  requiredFields: string[],
+  optionalFields: string[],
+  mappings: Record<string, { type: string; path?: string[] } | undefined>,
+): SimpleMappingValidationResult => {
+  const allFields = [...requiredFields, ...optionalFields];
+
+  let hasAnyMapping = false;
+  const missingRequiredFields: string[] = [];
+
+  // Check all fields
+  for (const field of allFields) {
+    const mapping = mappings[field];
+    // A mapping is valid if it exists and has a non-empty path (for source type)
+    // or has a value (for value type)
+    const isValidMapping =
+      mapping &&
+      (mapping.type === "value" ||
+        (mapping.type === "source" && mapping.path && mapping.path.length > 0));
+
+    if (isValidMapping) {
+      hasAnyMapping = true;
+    } else if (requiredFields.includes(field)) {
+      missingRequiredFields.push(field);
+    }
+  }
+
+  // Invalid if:
+  // 1. Any required field is missing, OR
+  // 2. ALL fields are empty (must have at least one mapping) - unless there are no fields
+  const isValid =
+    missingRequiredFields.length === 0 &&
+    (allFields.length === 0 || hasAnyMapping);
+
+  return {
+    isValid,
+    hasAnyMapping,
+    missingRequiredFields,
+  };
+};
+
+/**
+ * Check if mappings are valid for an evaluator type.
+ * This is a simpler version that works with just mappings and evaluator type,
+ * without needing the full EvaluatorConfig.
+ *
+ * Validation rules:
+ * 1. ALL required fields MUST have mappings
+ * 2. Optional fields MAY have mappings
+ * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
+ *    (at least one field must be mapped)
+ *
+ * @param evaluatorType - The evaluator type (e.g., "langevals/exact_match")
+ * @param mappings - The current mappings (field -> mapping)
+ * @returns Validation result
+ */
+export const validateEvaluatorMappings = (
+  evaluatorType: string,
+  mappings: Record<string, { type: string; path?: string[] } | undefined>,
+): SimpleMappingValidationResult => {
+  const evaluatorDef = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  const requiredFields = evaluatorDef?.requiredFields ?? [];
+  const optionalFields = evaluatorDef?.optionalFields ?? [];
+
+  return validateMappingsCore(requiredFields, optionalFields, mappings);
+};
+
+/**
+ * Check if mappings are valid given explicit field definitions.
+ * Use this when you already have the field definitions and don't need to look them up.
+ *
+ * @param requiredFields - List of required field names
+ * @param optionalFields - List of optional field names
+ * @param mappings - The current mappings (field -> mapping)
+ * @returns Validation result
+ */
+export const validateEvaluatorMappingsWithFields = (
+  requiredFields: string[],
+  optionalFields: string[],
+  mappings: Record<string, { type: string; path?: string[] } | undefined>,
+): SimpleMappingValidationResult => {
+  return validateMappingsCore(requiredFields, optionalFields, mappings);
+};
+
+/**
  * Check if an evaluator has all required mappings for a specific target and dataset.
  *
  * Validation rules:

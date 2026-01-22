@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronRight, Database, Type } from "lucide-react";
+import { Check, ChevronRight, Database, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ColorfulBlockIcon,
@@ -249,20 +249,26 @@ export const VariableMappingInput = ({
     // If we have an in-progress path, show children of the last selected field
     if (inProgressPath) {
       const source = availableSources.find((s) => s.id === inProgressPath.sourceId);
-      if (!source) return { fields: [], source: null, depth: 0 };
+      if (!source) return { fields: [], source: null, depth: 0, parentFieldName: null, isParentComplete: false };
 
       let currentFields = source.fields;
+      let parentField: NestedField | undefined;
       for (const segment of inProgressPath.path) {
         const field = findFieldByName(currentFields, segment);
-        if (!field) return { fields: [], source, depth: inProgressPath.path.length };
+        if (!field) return { fields: [], source, depth: inProgressPath.path.length, parentFieldName: null, isParentComplete: false };
+        parentField = field;
         currentFields = getFieldChildren(field);
       }
 
-      return { fields: currentFields, source, depth: inProgressPath.path.length };
+      // Check if the parent (last segment in path) is complete
+      const isParentComplete = parentField ? isFieldComplete(parentField) : false;
+      const parentFieldName = inProgressPath.path[inProgressPath.path.length - 1] ?? null;
+
+      return { fields: currentFields, source, depth: inProgressPath.path.length, parentFieldName, isParentComplete };
     }
 
     // Otherwise show top-level fields from all sources
-    return { fields: null, source: null, depth: 0 };
+    return { fields: null, source: null, depth: 0, parentFieldName: null, isParentComplete: false };
   }, [availableSources, inProgressPath]);
 
   // Get display value for the input (only for value mappings now)
@@ -383,10 +389,23 @@ export const VariableMappingInput = ({
         const currentPath = inProgressPath?.path ?? [];
         const newPath = [...currentPath, field.name];
 
-        // If field has children, always drill down to show nested options
-        // This provides the cascading dropdown UX where selecting a parent
-        // immediately shows its children
+        // Create the mapping for this selection
+        const newMapping: FieldMapping = {
+          type: "source",
+          sourceId: option.sourceId,
+          path: newPath,
+        };
+
+        // If field has children, show nested options
+        // But if the field is also "complete" (can be selected as-is), set the mapping too
         if (hasChildren(field)) {
+          // If field is complete, set the mapping now (user can still drill down)
+          // This allows selecting "traces" as a valid value while also showing nested options
+          if (isFieldComplete(field)) {
+            setLocalMapping(newMapping);
+            onMappingChange?.(newMapping);
+          }
+
           // Continue building the path - show children
           setInProgressPath({
             sourceId: option.sourceId,
@@ -399,11 +418,6 @@ export const VariableMappingInput = ({
         }
 
         // Field has no children - finalize the mapping
-        const newMapping: FieldMapping = {
-          type: "source",
-          sourceId: option.sourceId,
-          path: newPath,
-        };
         setLocalMapping(newMapping);
         setInProgressPath(null);
         onMappingChange?.(newMapping);
@@ -420,6 +434,22 @@ export const VariableMappingInput = ({
     },
     [onMappingChange, inProgressPath],
   );
+
+  // Handle selecting the current path as-is (for "Use all X" option)
+  const handleSelectCurrentPath = useCallback(() => {
+    if (!inProgressPath) return;
+
+    const newMapping: FieldMapping = {
+      type: "source",
+      sourceId: inProgressPath.sourceId,
+      path: inProgressPath.path,
+    };
+    setLocalMapping(newMapping);
+    setInProgressPath(null);
+    onMappingChange?.(newMapping);
+    setIsOpen(false);
+    setSearchQuery("");
+  }, [inProgressPath, onMappingChange]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
@@ -514,39 +544,57 @@ export const VariableMappingInput = ({
   const DROPDOWN_MAX_HEIGHT = 300;
   const DROPDOWN_GAP = 4;
 
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
+  // Update dropdown position - called on open and after content changes
+  const updateDropdownPosition = useCallback(() => {
+    if (!containerRef.current) return;
 
-      // Check if there's enough space below
-      const spaceBelow = viewportHeight - rect.bottom - DROPDOWN_GAP;
-      const spaceAbove = rect.top - DROPDOWN_GAP;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
 
-      // If not enough space below but more space above, flip to top
-      const shouldFlipToTop = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+    // Check if there's enough space below
+    const spaceBelow = viewportHeight - rect.bottom - DROPDOWN_GAP;
+    const spaceAbove = rect.top - DROPDOWN_GAP;
 
-      if (shouldFlipToTop) {
-        // Position above the input
-        // Calculate the actual dropdown height (capped at max)
-        const dropdownHeight = Math.min(DROPDOWN_MAX_HEIGHT, spaceAbove);
-        setDropdownPosition({
-          top: rect.top - dropdownHeight - DROPDOWN_GAP,
-          left: rect.left,
-          width: rect.width,
-          placement: "top",
-        });
-      } else {
-        // Position below the input (default)
-        setDropdownPosition({
-          top: rect.bottom + DROPDOWN_GAP,
-          left: rect.left,
-          width: rect.width,
-          placement: "bottom",
-        });
-      }
+    // If not enough space below but more space above, flip to top
+    const shouldFlipToTop = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+
+    if (shouldFlipToTop) {
+      // Position above the input - measure actual dropdown height
+      const actualDropdownHeight = dropdownRef.current?.offsetHeight ?? DROPDOWN_MAX_HEIGHT;
+      const dropdownHeight = Math.min(actualDropdownHeight, spaceAbove);
+      setDropdownPosition({
+        top: rect.top - dropdownHeight - DROPDOWN_GAP,
+        left: rect.left,
+        width: rect.width,
+        placement: "top",
+      });
+    } else {
+      // Position below the input (default)
+      setDropdownPosition({
+        top: rect.bottom + DROPDOWN_GAP,
+        left: rect.left,
+        width: rect.width,
+        placement: "bottom",
+      });
     }
-  }, [isOpen]);
+  }, []);
+
+  // Initial position calculation when opening
+  useEffect(() => {
+    if (isOpen) {
+      updateDropdownPosition();
+    }
+  }, [isOpen, updateDropdownPosition]);
+
+  // Recalculate position when content changes (nested navigation, filtering)
+  useEffect(() => {
+    if (isOpen) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        updateDropdownPosition();
+      });
+    }
+  }, [isOpen, filteredSources, inProgressPath, updateDropdownPosition]);
 
   // Track current option index for highlighting
   let currentOptionIndex = -1;
@@ -721,6 +769,35 @@ export const VariableMappingInput = ({
                     </Text>
                     <Text fontSize="xs" color="blue.400">
                       →
+                    </Text>
+                  </HStack>
+                )}
+
+                {/* "Use all X" option when parent is complete */}
+                {currentDropdownContext.isParentComplete && currentDropdownContext.parentFieldName && (
+                  <HStack
+                    paddingX={3}
+                    paddingY={2}
+                    gap={2}
+                    cursor="pointer"
+                    borderRadius="4px"
+                    background={highlightedIndex === -1 ? "blue.50" : "transparent"}
+                    _hover={{ background: "blue.50" }}
+                    onClick={handleSelectCurrentPath}
+                    onMouseMove={() => {
+                      if (isKeyboardNav || highlightedIndex !== -1) {
+                        setIsKeyboardNav(false);
+                        setHighlightedIndex(-1);
+                      }
+                    }}
+                    data-testid="use-all-option"
+                    borderBottom="1px solid"
+                    borderColor="gray.100"
+                    marginBottom={1}
+                  >
+                    <Check size={12} color="var(--chakra-colors-green-500)" />
+                    <Text fontSize="13px" fontWeight="medium" color="green.600">
+                      Use all {currentDropdownContext.parentFieldName}
                     </Text>
                   </HStack>
                 )}

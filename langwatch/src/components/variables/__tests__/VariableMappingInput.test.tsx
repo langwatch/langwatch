@@ -987,7 +987,7 @@ describe("VariableMappingInput", () => {
        * 3. A NEW dropdown immediately opens showing the nested children
        * 4. User can then select a child, which adds another badge
        * 5. This continues until user selects a leaf field (no children)
-       * 
+       *
        * This is the "cascading selection" UX pattern.
        */
       it("after selecting a field with children, shows badge AND immediately shows nested options dropdown", async () => {
@@ -1107,6 +1107,139 @@ describe("VariableMappingInput", () => {
         // Should show the mapping tag
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
         expect(screen.getByText("input")).toBeInTheDocument();
+      });
+
+      it("selecting a field with children marked as isComplete sets the mapping immediately while showing children", async () => {
+        // This tests the case where a field like "traces" in thread-level mappings
+        // can be selected as a valid value (the whole array) while also allowing
+        // the user to drill down to nested fields like "traces.input"
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+
+        // Create a source with a field that has children but is also complete
+        const sourcesWithCompleteParent: AvailableSource[] = [
+          {
+            id: "thread",
+            name: "Thread",
+            type: "dataset",
+            fields: [
+              {
+                name: "traces",
+                type: "list",
+                isComplete: true, // Can select "traces" itself
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "str" },
+                ],
+              },
+              { name: "thread_id", type: "str" },
+            ],
+          },
+        ];
+
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <VariableMappingInput
+              availableSources={sourcesWithCompleteParent}
+              onMappingChange={onMappingChange}
+            />
+          </ChakraProvider>,
+        );
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select "traces" which has children but is also isComplete: true
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-traces"));
+
+        // Should IMMEDIATELY set the mapping (because isComplete: true)
+        await waitFor(() => {
+          expect(onMappingChange).toHaveBeenCalledWith({
+            type: "source",
+            sourceId: "thread",
+            path: ["traces"],
+          });
+        });
+
+        // But should ALSO show nested children (dropdown stays open)
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+          expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
+        });
+
+        // The "traces" should be shown as a path segment (indicating it's selected)
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("traces");
+      });
+
+      it("shows 'Use all X' option when in nested view with complete parent", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+
+        const sourcesWithCompleteParent: AvailableSource[] = [
+          {
+            id: "thread",
+            name: "Thread",
+            type: "dataset",
+            fields: [
+              {
+                name: "traces",
+                type: "list",
+                isComplete: true,
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "str" },
+                ],
+              },
+            ],
+          },
+        ];
+
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <VariableMappingInput
+              availableSources={sourcesWithCompleteParent}
+              onMappingChange={onMappingChange}
+            />
+          </ChakraProvider>,
+        );
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select "traces" to enter nested view
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-traces"));
+
+        // Should show "Use all traces" option at the top
+        await waitFor(() => {
+          expect(screen.getByTestId("use-all-option")).toBeInTheDocument();
+          expect(screen.getByText("Use all traces")).toBeInTheDocument();
+        });
+
+        // Click "Use all traces" to close dropdown and keep current selection
+        onMappingChange.mockClear();
+        await user.click(screen.getByTestId("use-all-option"));
+
+        // Should close dropdown
+        await waitFor(() => {
+          expect(screen.queryByTestId("use-all-option")).not.toBeInTheDocument();
+        });
+
+        // Mapping should be set to just ["traces"]
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "thread",
+          path: ["traces"],
+        });
+
+        // Should show the mapping tag
+        expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+        expect(screen.getByText("traces")).toBeInTheDocument();
       });
     });
   });

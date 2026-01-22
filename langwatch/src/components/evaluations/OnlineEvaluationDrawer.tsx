@@ -463,6 +463,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     [level]
   );
 
+  // Track if we've already loaded the monitor data (to prevent re-loading on remount)
+  const monitorDataLoadedRef = useRef(false);
+
   // Track previous open state to reset form when drawer opens fresh (no persisted state)
   // This effect must run BEFORE the persist effect to check the state before it's updated
   const prevIsOpenRef = useRef(false); // Start as false so first open is detected
@@ -480,6 +483,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       setMappings({});
       setHasUnsavedChanges(false); // Reset dirty state for new form
       isInitialRenderRef.current = true; // Reset the initial render flag
+      monitorDataLoadedRef.current = false; // Reset so data can be loaded for edit mode
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen, form]);
@@ -515,12 +519,27 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     }
     onlineEvaluationDrawerState = null;
     setHasUnsavedChanges(false);
+    monitorDataLoadedRef.current = false; // Reset so data reloads next time
     onClose();
   }, [onClose, hasUnsavedChanges]);
 
-  // Load existing monitor data
+  // Load existing monitor data - only once when data first becomes available
+  // Skip if we already have persisted state for this monitor (user navigated away and back)
   useEffect(() => {
+    // Skip if already loaded for this monitor
+    if (monitorDataLoadedRef.current) {
+      return;
+    }
+
+    // Skip if there's persisted state (user made changes and navigated away)
+    // This preserves user's changes when they go to evaluator editor and come back
+    if (onlineEvaluationDrawerState && onlineEvaluationDrawerState.selectedEvaluator) {
+      return;
+    }
+
     if (monitorQuery.data && monitorId) {
+      monitorDataLoadedRef.current = true;
+
       const monitorName = monitorQuery.data.name;
       const monitorSample = monitorQuery.data.sample;
       const monitorPreconditions = (monitorQuery.data.preconditions as CheckPrecondition[]) ?? [];
@@ -558,6 +577,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
       // Loading existing data doesn't count as "dirty"
       setHasUnsavedChanges(false);
+      isInitialRenderRef.current = true; // Reset watch trigger flag
     }
   }, [monitorQuery.data, monitorId, form]);
 

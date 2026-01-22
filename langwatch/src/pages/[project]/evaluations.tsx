@@ -166,7 +166,7 @@ function EvaluationsV2() {
             </Box>
           ) : (
             <>
-              <MonitorsSection title="Active Monitors" monitors={monitors} />
+              <MonitorsSection title="Online Evaluations" monitors={monitors} />
 
               <VStack align="start" gap={1}>
                 <Heading as="h1">Evaluations</Heading>

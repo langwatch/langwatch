@@ -20,7 +20,7 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import { getComplexProps, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { getComplexProps, getDrawerStack, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -29,6 +29,7 @@ import {
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
+import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 /**
@@ -51,7 +52,8 @@ export type EvaluatorMappingsConfig = {
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (evaluator: { id: string; name: string }) => void;
+  /** Called when evaluator is saved. Return true to indicate navigation was handled. */
+  onSave?: (evaluator: { id: string; name: string }) => boolean | void | Promise<void>;
   /** Evaluator type (e.g., "langevals/exact_match") */
   evaluatorType?: string;
   /** If provided, loads an existing evaluator for editing */
@@ -64,6 +66,11 @@ export type EvaluatorEditorDrawerProps = {
    * The caller is responsible for providing sources, current mappings, and missing field IDs.
    */
   mappingsConfig?: EvaluatorMappingsConfig;
+  /**
+   * Optional custom text for the save button.
+   * Useful for flows like Online Evaluation where we're "selecting" rather than "saving".
+   */
+  saveButtonText?: string;
 };
 
 /**
@@ -78,8 +85,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
+  const flowCallbacks = getFlowCallbacks("evaluatorEditor");
   const onSave =
     props.onSave ??
+    flowCallbacks?.onSave ??
     (complexProps.onSave as EvaluatorEditorDrawerProps["onSave"]);
 
   // Get evaluatorId from props, URL params, or complexProps
@@ -92,6 +101,11 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+
+  // Get custom save button text from props or complexProps
+  const saveButtonText =
+    props.saveButtonText ??
+    (complexProps.saveButtonText as string | undefined);
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -171,11 +185,20 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   }, [form]);
 
   // Mutations
+  // Note: We check canGoBack and call goBack() directly in onSuccess
+  // because we need the current stack state at the time of save, not at render time
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
-      onSave?.({ id: evaluator.id, name: evaluator.name });
-      onClose();
+      // If onSave returns true, it handled navigation - don't call goBack()
+      const handledNavigation = onSave?.({ id: evaluator.id, name: evaluator.name });
+      if (handledNavigation) return;
+      // Check stack state at save time and navigate accordingly
+      if (getDrawerStack().length > 1) {
+        goBack();
+      } else {
+        onClose();
+      }
     },
   });
 
@@ -186,8 +209,15 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         id: evaluator.id,
         projectId: project?.id ?? "",
       });
-      onSave?.({ id: evaluator.id, name: evaluator.name });
-      onClose();
+      // If onSave returns true, it handled navigation - don't call goBack()
+      const handledNavigation = onSave?.({ id: evaluator.id, name: evaluator.name });
+      if (handledNavigation) return;
+      // Check stack state at save time and navigate accordingly
+      if (getDrawerStack().length > 1) {
+        goBack();
+      } else {
+        onClose();
+      }
     },
   });
 
@@ -362,7 +392,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               loading={isSaving}
               data-testid="save-evaluator-button"
             >
-              {evaluatorId ? "Save Changes" : "Create Evaluator"}
+              {saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator")}
             </Button>
           </HStack>
         </Drawer.Footer>
@@ -417,50 +447,29 @@ function EvaluatorMappingsSection({
     setLocalMappings(initialMappings);
   }, [initialMappings]);
 
-  // Compute missingMappingIds REACTIVELY from local state
-  // Uses same logic as getEvaluatorMissingMappings in mappingValidation.ts
+  // Compute missingMappingIds REACTIVELY from local state using shared validation
   const missingMappingIds = useMemo(() => {
     const requiredFields = evaluatorDef?.requiredFields ?? [];
     const optionalFields = evaluatorDef?.optionalFields ?? [];
     const allFields = [...requiredFields, ...optionalFields];
 
-    const missing = new Set<string>();
+    // Use the same shared validation logic as OnlineEvaluationDrawer
+    const validation = validateEvaluatorMappingsWithFields(
+      requiredFields,
+      optionalFields,
+      localMappings,
+    );
 
-    // Check if ANY field has a valid mapping
-    let hasAnyMapping = false;
-    for (const field of allFields) {
-      const mapping = localMappings[field];
-      if (
-        mapping &&
-        (mapping.type === "value" ||
-          (mapping.type === "source" && mapping.path.length > 0))
-      ) {
-        hasAnyMapping = true;
-        break;
-      }
-    }
-
-    // Required fields that are missing
-    for (const field of requiredFields) {
-      const mapping = localMappings[field];
-      // A mapping is missing if undefined or if it's a source mapping with no field selected
-      if (!mapping || (mapping.type === "source" && mapping.path.length === 0)) {
-        missing.add(field);
-      }
-    }
+    const missing = new Set<string>(validation.missingRequiredFields);
 
     // Special case: if ALL fields are empty and there are no required fields,
     // highlight the first field to indicate something is needed
-    if (!hasAnyMapping && requiredFields.length === 0 && allFields.length > 0) {
+    if (!validation.hasAnyMapping && validation.missingRequiredFields.length === 0 && allFields.length > 0) {
       missing.add(allFields[0]!);
     }
 
     return missing;
-  }, [
-    evaluatorDef?.requiredFields,
-    evaluatorDef?.optionalFields,
-    localMappings,
-  ]);
+  }, [evaluatorDef, localMappings]);
 
   // Scroll to first missing mapping on mount
   useEffect(() => {

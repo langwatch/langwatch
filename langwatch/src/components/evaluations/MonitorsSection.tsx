@@ -74,7 +74,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
       void monitors.refetch();
       void experiments.refetch();
       toaster.create({
-        title: "Successfully deleted monitor",
+        title: "Successfully deleted online evaluation",
         type: "success",
         meta: {
           closable: true,
