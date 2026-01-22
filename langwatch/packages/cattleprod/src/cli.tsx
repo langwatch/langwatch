@@ -21,7 +21,7 @@ const program = new Command();
 
 function parseEnv(value: string): Environment {
   if (!isValidEnvironment(value)) {
-    console.error(chalk.red(`Invalid environment: ${value}. Must be local, dev, staging, or prod.`));
+    console.error(chalk.red(`Invalid environment: ${value}. Must be local, dev, or prod.`));
     process.exit(1);
   }
   return value;
@@ -31,7 +31,7 @@ program
   .name("cattleprod")
   .description("CLI tool for managing BullMQ queues")
   .version("0.0.1")
-  .option("-e, --env <env>", "Environment (local, dev, staging, prod)");
+  .option("-e, --env <env>", "Environment (local, dev, prod)", "dev");
 
 // List all queues with stats
 program
@@ -40,10 +40,6 @@ program
   .description("List all queues with their stats")
   .action(async () => {
     const opts = program.opts();
-    if (!opts.env) {
-      console.error(chalk.red("Error: --env is required for non-interactive commands"));
-      process.exit(1);
-    }
     const env = parseEnv(opts.env);
     try {
       const connection = await getConnection(env);
@@ -64,10 +60,6 @@ program
   .option("-q, --queue <queue>", "Queue name (searches all if not specified)")
   .action(async (jobId: string, options: { queue?: string }) => {
     const opts = program.opts();
-    if (!opts.env) {
-      console.error(chalk.red("Error: --env is required for non-interactive commands"));
-      process.exit(1);
-    }
     const env = parseEnv(opts.env);
     try {
       const connection = await getConnection(env);
@@ -97,10 +89,6 @@ program
       traceId?: string;
     }) => {
       const opts = program.opts();
-      if (!opts.env) {
-        console.error(chalk.red("Error: --env is required for non-interactive commands"));
-        process.exit(1);
-      }
       const env = parseEnv(opts.env);
       try {
         const connection = await getConnection(env);
@@ -144,10 +132,6 @@ program
       yes?: boolean;
     }) => {
       const opts = program.opts();
-      if (!opts.env) {
-        console.error(chalk.red("Error: --env is required for non-interactive commands"));
-        process.exit(1);
-      }
       const env = parseEnv(opts.env);
 
       if (!options.jobId && !options.all) {
@@ -184,10 +168,6 @@ program
   .option("-i, --interval <ms>", "Refresh interval in milliseconds", "2000")
   .action(async (options: { interval: string }) => {
     const opts = program.opts();
-    if (!opts.env) {
-      console.error(chalk.red("Error: --env is required for non-interactive commands"));
-      process.exit(1);
-    }
     const env = parseEnv(opts.env);
     try {
       const connection = await getConnection(env);
@@ -208,7 +188,7 @@ program
   .description("Interactive TUI mode for managing queues")
   .action(async () => {
     const opts = program.opts();
-    const env = opts.env ? parseEnv(opts.env) : undefined;
+    const env = parseEnv(opts.env);
 
     try {
       const { waitUntilExit } = render(<Root initialEnv={env} />);

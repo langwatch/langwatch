@@ -6,6 +6,21 @@ import { getRedisUrl } from "./secrets.js";
 let connection: IORedis | undefined;
 let usingPortForward = false;
 
+function getEnvConfig(env: Environment): { secretName: string; profile: string } {
+  const prefix = env.toUpperCase();
+  const secretName = process.env[`${prefix}_REDIS_SECRET_NAME`];
+  const profile = process.env[`${prefix}_AWS_PROFILE`] ?? `lw-${env}`;
+
+  if (!secretName) {
+    throw new Error(
+      `${prefix}_REDIS_SECRET_NAME environment variable is not set. ` +
+      `Check your .env file.`
+    );
+  }
+
+  return { secretName, profile };
+}
+
 export async function getConnection(env: Environment): Promise<IORedis> {
   if (connection) {
     return connection;
@@ -14,19 +29,18 @@ export async function getConnection(env: Environment): Promise<IORedis> {
   const config = getEnvironmentConfig(env);
   let redisUrl: string;
 
-  if (config.usePortForward) {
+  if (env === "local") {
+    // Local development - connect to localhost Redis
+    redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+  } else if (config.usePortForward) {
     // Start port forwarding and connect to localhost
     const localPort = await startPortForward({ localPort: 6378 });
     usingPortForward = true;
     redisUrl = `redis://localhost:${localPort}`;
-  } else if (config.useAwsSecrets && config.secretName) {
-    // Get Redis URL from AWS Secrets Manager
-    console.log(`Fetching Redis credentials from AWS (profile: ${config.awsProfile})...`);
-    redisUrl = await getRedisUrl(config.secretName, { profile: config.awsProfile });
-  } else if (config.redisUrl) {
-    redisUrl = config.redisUrl;
   } else {
-    throw new Error(`No Redis URL configured for environment: ${env}`);
+    // AWS environments - get URL from secrets
+    const { secretName, profile } = getEnvConfig(env);
+    redisUrl = await getRedisUrl(secretName, { profile });
   }
 
   connection = new IORedis(redisUrl, {

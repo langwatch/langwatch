@@ -12,14 +12,13 @@ pnpm run tool:cattleprod
 You'll see an environment selector:
 - **Local** - connects to `localhost:6379`
 - **Development** - connects to AWS dev Redis (via Secrets Manager)
-- **Staging** - connects via `kubectl port-forward`
 - **Production** - connects via `kubectl port-forward`
 
-Or skip the prompt with `--env`:
+Options:
 
 ```bash
 pnpm run tool:cattleprod -- --env local   # localhost:6379
-pnpm run tool:cattleprod -- --env dev     # AWS dev
+pnpm run tool:cattleprod -- --env dev     # AWS dev (default)
 pnpm run tool:cattleprod -- --env prod    # kubectl port-forward
 ```
 
@@ -29,13 +28,36 @@ pnpm run tool:cattleprod -- --env prod    # kubectl port-forward
 - Redis running on `localhost:6379`
 
 **Development (AWS):**
-- AWS CLI configured with `lw-dev` profile
+- AWS CLI configured
 - Access to AWS Secrets Manager
+- `.env` file configured (see below)
 
-**Production/Staging:**
+**Production:**
 - `kubectl` installed and in your PATH
 - Access to the Kubernetes cluster (`kubectl get pods` to verify)
 - The tool will automatically run `kubectl port-forward svc/db-tunnel 6378:6379`
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
+```env
+# Dev environment
+DEV_REDIS_SECRET_NAME="langwatch/dev/redis-url"
+DEV_AWS_PROFILE="lw-dev"
+
+# Prod environment
+PROD_REDIS_SECRET_NAME="langwatch/prod/redis-url"
+PROD_AWS_PROFILE="lw-prod"
+
+# Optional: Local Redis URL
+# REDIS_URL="redis://localhost:6379"
+```
+
+The secret in AWS Secrets Manager can be:
+- A raw Redis URL (`redis://...` or `rediss://...`)
+- JSON with `{ "url": "..." }` or `{ "connectionString": "..." }`
+- JSON with `{ "host": "...", "port": 6379, "password": "...", "tls": true }`
 
 ## Interactive Mode
 

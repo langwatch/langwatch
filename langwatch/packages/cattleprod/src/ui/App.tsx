@@ -103,7 +103,7 @@ export const App: React.FC<AppProps> = ({ connection, env }) => {
             <Text bold color="cyan">
               🐄⚡ Cattleprod
             </Text>
-            <Text color={env === "prod" ? "red" : env === "staging" ? "yellow" : "green"}>
+            <Text color={env === "prod" ? "red" : "green"}>
               [{envConfig.name}]
             </Text>
           </Box>

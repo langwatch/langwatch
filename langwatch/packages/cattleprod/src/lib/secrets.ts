@@ -3,15 +3,18 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 
-const DEFAULT_REGION = "eu-central-1";
+const AWS_REGION = "eu-central-1";
 
-export interface SecretsConfig {
+interface SecretsConfig {
   profile?: string;
   region?: string;
 }
 
+/**
+ * Creates an AWS Secrets Manager client with the specified profile.
+ */
 function createSecretsClient(config: SecretsConfig): SecretsManagerClient {
-  const { profile, region = DEFAULT_REGION } = config;
+  const { profile, region = AWS_REGION } = config;
 
   if (profile) {
     process.env.AWS_PROFILE = profile;
@@ -20,6 +23,9 @@ function createSecretsClient(config: SecretsConfig): SecretsManagerClient {
   return new SecretsManagerClient({ region });
 }
 
+/**
+ * Fetches a secret value from AWS Secrets Manager.
+ */
 export async function getSecret(
   secretName: string,
   config: SecretsConfig = {}
@@ -35,6 +41,9 @@ export async function getSecret(
   return response.SecretString;
 }
 
+/**
+ * Fetches the Redis URL from AWS Secrets Manager.
+ */
 export async function getRedisUrl(
   secretName: string,
   config: SecretsConfig = {}
@@ -45,7 +54,6 @@ export async function getRedisUrl(
   try {
     const parsed = JSON.parse(secretValue);
 
-    // Handle different secret formats
     if (typeof parsed === "string") {
       return parsed;
     }
