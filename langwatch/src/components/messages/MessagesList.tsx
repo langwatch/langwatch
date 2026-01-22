@@ -21,6 +21,7 @@ import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -54,6 +55,10 @@ export function MessagesList() {
     queryOpts,
   );
   navigationFooter.useUpdateTotalHits(traceGroups);
+
+  const isRefreshing = useMinimumSpinDuration(
+    traceGroups.isLoading || traceGroups.isRefetching
+  );
 
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
@@ -115,7 +120,7 @@ export function MessagesList() {
           >
             <LuRefreshCw
               className={
-                traceGroups.isLoading || traceGroups.isRefetching
+                isRefreshing
                   ? "refresh-icon animation-spinning"
                   : "refresh-icon"
               }

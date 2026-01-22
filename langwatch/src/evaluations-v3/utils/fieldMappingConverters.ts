@@ -18,7 +18,7 @@ export const convertToUIMapping = (
   return {
     type: "source",
     sourceId: mapping.sourceId,
-    field: mapping.sourceField,
+    path: [mapping.sourceField],
   };
 };
 
@@ -40,6 +40,6 @@ export const convertFromUIMapping = (
     type: "source",
     source: isDatasetSource(mapping.sourceId) ? "dataset" : "target",
     sourceId: mapping.sourceId,
-    sourceField: mapping.field,
+    sourceField: mapping.path.join("."),
   };
 };

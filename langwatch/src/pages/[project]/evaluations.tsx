@@ -25,7 +25,7 @@ import {
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
-import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
+import { NewEvaluationMenu } from "~/components/evaluations/NewEvaluationMenu";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
@@ -147,7 +147,7 @@ function EvaluationsV2() {
         <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
-          <NewEvaluationButton />
+          <NewEvaluationMenu />
         </HStack>
       </PageLayout.Header>
       <Container
@@ -166,7 +166,7 @@ function EvaluationsV2() {
             </Box>
           ) : (
             <>
-              <MonitorsSection title="Active Monitors" monitors={monitors} />
+              <MonitorsSection title="Online Evaluations" monitors={monitors} />
 
               <VStack align="start" gap={1}>
                 <Heading as="h1">Evaluations</Heading>
@@ -266,12 +266,12 @@ function EvaluationsV2() {
                                   <Table.Row
                                     cursor="pointer"
                                     onClick={() => {
-                                      // EVALUATIONS_V3 type goes to the V3 workbench page
+                                      // EVALUATIONS_V3 type goes to the experiments workbench page
                                       if (
                                         experiment.type === "EVALUATIONS_V3"
                                       ) {
                                         void router.push({
-                                          pathname: `/${project?.slug}/evaluations/v3/${experiment.slug}`,
+                                          pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
                                         });
                                       } else if (experiment.workbenchState) {
                                         void router.push({

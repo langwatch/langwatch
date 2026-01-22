@@ -104,14 +104,19 @@ describe("useDrawer", () => {
       mockQuery = { "drawer.open": "targetTypeSelector" };
       const { result } = renderHook(() => useDrawer());
 
-      // First drawer opens
+      // First drawer opens from URL - stack is empty initially
       expect(getDrawerStack()).toHaveLength(0);
 
       act(() => {
         result.current.openDrawer("promptList");
       });
 
-      expect(getDrawerStack()).toHaveLength(1);
+      // Stack should have 2 entries: the current drawer from URL (targetTypeSelector)
+      // was added first, then promptList was pushed
+      // This ensures we can go back to the original drawer
+      expect(getDrawerStack()).toHaveLength(2);
+      expect(getDrawerStack()[0]?.drawer).toBe("targetTypeSelector");
+      expect(getDrawerStack()[1]?.drawer).toBe("promptList");
 
       // Simulate being on promptList now
       mockQuery = { "drawer.open": "promptList" };
@@ -121,7 +126,7 @@ describe("useDrawer", () => {
         result2.current.openDrawer("promptEditor", { promptId: "abc" });
       });
 
-      expect(getDrawerStack()).toHaveLength(2);
+      expect(getDrawerStack()).toHaveLength(3);
     });
   });
 
@@ -449,7 +454,7 @@ describe("Complex Props (backward compatibility)", () => {
       },
     ];
     const inputMappings = {
-      input: { type: "source", sourceId: "ds1", field: "input" },
+      input: { type: "source", sourceId: "ds1", path: ["input"] },
     };
 
     act(() => {

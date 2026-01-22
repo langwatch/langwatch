@@ -399,14 +399,19 @@ export function EvaluationsV3Table({
   // Handler for opening the evaluator selector (evaluators apply to ALL targets)
   const handleAddEvaluator = useCallback(() => {
     // Set up flow callback to handle evaluator selection (existing evaluator)
+    // Note: EvaluatorListDrawer does NOT navigate after onSelect - caller must handle it
     setFlowCallbacks("evaluatorList", {
-      onSelect: addEvaluatorToWorkbench,
+      onSelect: (evaluator) => {
+        addEvaluatorToWorkbench(evaluator);
+        closeDrawer(); // Close drawer after adding evaluator to workbench
+      },
     });
 
     // Set up flow callback to handle newly created evaluator
     // When user creates a new evaluator via the editor drawer, we need to:
     // 1. Fetch the newly created evaluator from DB
     // 2. Add it to the workbench
+    // 3. Close the drawer
     setFlowCallbacks("evaluatorEditor", {
       onSave: async (savedEvaluator: { id: string; name: string }) => {
         // Fetch the full evaluator data from DB
@@ -418,12 +423,14 @@ export function EvaluationsV3Table({
         if (evaluator) {
           addEvaluatorToWorkbench(evaluator);
         }
+        closeDrawer(); // Close drawer after adding evaluator to workbench
       },
     });
 
     openDrawer("evaluatorList");
   }, [
     openDrawer,
+    closeDrawer,
     addEvaluatorToWorkbench,
     trpcUtils.evaluators.getById,
     project?.id,

@@ -1,4 +1,4 @@
-import { Box, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
@@ -38,7 +38,7 @@ export const MainMenu = React.memo(function MainMenu({
   );
 
   // Feature flag: show collapsible navigation for @langwatch.ai users
-  const showCollapsibleNav = session?.user?.email?.endsWith("@langwatch.ai");
+  const showScenariosOnThePlatform = session?.user?.email?.endsWith("@langwatch.ai");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -87,6 +87,11 @@ export const MainMenu = React.memo(function MainMenu({
               }
               showLabel={showExpanded}
             />
+
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+              {showExpanded ? "Observe" : <>&nbsp;</>}
+            </Text>
+
             <PageMenuLink
               path={projectRoutes.analytics.path}
               icon={featureIcons.analytics.icon}
@@ -103,7 +108,12 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
-            {showCollapsibleNav ? (
+
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+              {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
+            </Text>
+
+            {showScenariosOnThePlatform ? (
               <CollapsibleMenuGroup
                 icon={featureIcons.simulations.icon}
                 label={projectRoutes.simulations.title}
@@ -115,9 +125,9 @@ export const MainMenu = React.memo(function MainMenu({
                     label: projectRoutes.scenarios.title,
                     href: project
                       ? projectRoutes.scenarios.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
+                        "[project]",
+                        project.slug,
+                      )
                       : "/auth/signin",
                     isActive: router.pathname.includes(
                       "/simulations/scenarios",
@@ -128,9 +138,9 @@ export const MainMenu = React.memo(function MainMenu({
                     label: projectRoutes.simulation_runs.title,
                     href: project
                       ? projectRoutes.simulation_runs.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
+                        "[project]",
+                        project.slug,
+                      )
                       : "/auth/signin",
                     isActive:
                       router.pathname.includes("/simulations") &&
@@ -148,16 +158,6 @@ export const MainMenu = React.memo(function MainMenu({
                 showLabel={showExpanded}
               />
             )}
-            {showCollapsibleNav && (
-              <PageMenuLink
-                path={projectRoutes.agents.path}
-                icon={featureIcons.agents.icon}
-                label={projectRoutes.agents.title}
-                project={project}
-                isActive={router.pathname.includes("/agents")}
-                showLabel={showExpanded}
-              />
-            )}
             <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={featureIcons.evaluations.icon}
@@ -171,13 +171,18 @@ export const MainMenu = React.memo(function MainMenu({
             />
 
             <PageMenuLink
-              path={projectRoutes.workflows.path}
-              icon={featureIcons.workflows.icon}
-              label={projectRoutes.workflows.title}
+              path={projectRoutes.annotations.path}
+              icon={featureIcons.annotations.icon}
+              label={projectRoutes.annotations.title}
               project={project}
-              isActive={router.pathname.includes("/workflows")}
+              badgeNumber={pendingItemsCount.data}
+              isActive={router.pathname.includes("/annotations")}
               showLabel={showExpanded}
             />
+
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+              {showExpanded ? "Library" : <div>&nbsp;</div>}
+            </Text>
 
             <PageMenuLink
               path={projectRoutes.prompts.path}
@@ -189,6 +194,33 @@ export const MainMenu = React.memo(function MainMenu({
             />
 
             <PageMenuLink
+              path={projectRoutes.agents.path}
+              icon={featureIcons.agents.icon}
+              label={projectRoutes.agents.title}
+              project={project}
+              isActive={router.pathname.includes("/agents")}
+              showLabel={showExpanded}
+            />
+
+            <PageMenuLink
+              path={projectRoutes.workflows.path}
+              icon={featureIcons.workflows.icon}
+              label={projectRoutes.workflows.title}
+              project={project}
+              isActive={router.pathname.includes("/workflows")}
+              showLabel={showExpanded}
+            />
+
+            <PageMenuLink
+              path={projectRoutes.evaluators.path}
+              icon={featureIcons.evaluators.icon}
+              label={projectRoutes.evaluators.title}
+              project={project}
+              isActive={router.pathname.includes("/evaluators")}
+              showLabel={showExpanded}
+            />
+
+            <PageMenuLink
               path={projectRoutes.datasets.path}
               icon={featureIcons.datasets.icon}
               label={projectRoutes.datasets.title}
@@ -196,33 +228,23 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
-            <PageMenuLink
-              path={projectRoutes.annotations.path}
-              icon={featureIcons.annotations.icon}
-              label={projectRoutes.annotations.title}
-              project={project}
-              badgeNumber={pendingItemsCount.data}
-              isActive={router.pathname.includes("/annotations")}
-              showLabel={showExpanded}
-            />
-
-            {(!!hasOrganizationPermission(
-              OrganizationRoleGroup.ORGANIZATION_VIEW,
-            ) ||
-              isPublicRoute) && (
-              <PageMenuLink
-                path={projectRoutes.settings.path}
-                icon={featureIcons.settings.icon}
-                label={projectRoutes.settings.title}
-                project={project}
-                isActive={router.pathname.includes("/settings")}
-                showLabel={showExpanded}
-              />
-            )}
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
             <UsageIndicator showLabel={showExpanded} />
+            {(!!hasOrganizationPermission(
+              OrganizationRoleGroup.ORGANIZATION_VIEW,
+            ) ||
+              isPublicRoute) && (
+                <PageMenuLink
+                  path={projectRoutes.settings.path}
+                  icon={featureIcons.settings.icon}
+                  label={projectRoutes.settings.title}
+                  project={project}
+                  isActive={router.pathname.includes("/settings")}
+                  showLabel={showExpanded}
+                />
+              )}
             <SupportMenu showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>

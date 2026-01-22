@@ -42,9 +42,9 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
       content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
       positioning={{ placement: "right", offset: { mainAxis: 8 } }}
     >
-      <Link href="/settings/usage" width="full">
+      <Link href="/settings/usage" width={showLabel ? "full" : "auto"}>
         <HStack
-          width="full"
+          width={showLabel ? "full" : "auto"}
           height={showLabel ? "auto" : MENU_ITEM_HEIGHT}
           gap={3}
           paddingX={3}

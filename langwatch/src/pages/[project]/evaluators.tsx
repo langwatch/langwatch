@@ -15,7 +15,7 @@ import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer
 import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useDrawer } from "~/hooks/useDrawer";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -27,7 +27,7 @@ import { api } from "~/utils/api";
  */
 function Page() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
@@ -49,6 +49,18 @@ function Page() {
     });
   };
 
+  const handleCreateNewEvaluator = () => {
+    // Set up callback to close drawer after creating new evaluator
+    // (instead of going back through category → type → editor stack)
+    setFlowCallbacks("evaluatorEditor", {
+      onSave: () => {
+        closeDrawer();
+        return true; // Signal that we handled navigation
+      },
+    });
+    openDrawer("evaluatorCategorySelector");
+  };
+
   const handleDeleteEvaluator = (evaluator: { id: string; name: string }) => {
     if (
       window.confirm(`Are you sure you want to delete "${evaluator.name}"?`)
@@ -68,9 +80,7 @@ function Page() {
       <PageLayout.Header>
         <PageLayout.Heading>Evaluators</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton
-          onClick={() => openDrawer("evaluatorCategorySelector")}
-        >
+        <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
           <Plus size={16} /> New Evaluator
         </PageLayout.HeaderButton>
       </PageLayout.Header>
@@ -86,9 +96,7 @@ function Page() {
               <EmptyState.Description>
                 Create reusable evaluators for your evaluations.
               </EmptyState.Description>
-              <PageLayout.HeaderButton
-                onClick={() => openDrawer("evaluatorCategorySelector")}
-              >
+              <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
                 <Plus size={16} /> Create your first evaluator
               </PageLayout.HeaderButton>
             </EmptyState.Content>
@@ -117,14 +125,6 @@ function Page() {
           </Grid>
         </VStack>
       )}
-
-      {/* Evaluator management drawers */}
-      <EvaluatorListDrawer open={drawerOpen("evaluatorList")} />
-      <EvaluatorCategorySelectorDrawer
-        open={drawerOpen("evaluatorCategorySelector")}
-      />
-      <EvaluatorTypeSelectorDrawer open={drawerOpen("evaluatorTypeSelector")} />
-      <EvaluatorEditorDrawer open={drawerOpen("evaluatorEditor")} />
     </DashboardLayout>
   );
 }

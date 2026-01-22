@@ -416,26 +416,6 @@ function PublishMenu({
         <XCircle size={16} /> Unpublish Component
       </SubscriptionMenuItem>
 
-      <Link
-        href={
-          !publishedWorkflow.data?.version || !planAllowsToPublish
-            ? undefined
-            : `/${project?.slug}/chat/${router.query.workflow as string}`
-        }
-        isExternal
-        _hover={{
-          textDecoration: "none",
-        }}
-      >
-        <SubscriptionMenuItem
-          tooltip={publishDisabledLabel}
-          disabled={!!publishDisabledLabel}
-          value="run-app"
-        >
-          <Play size={16} /> Run App
-        </SubscriptionMenuItem>
-      </Link>
-
       <SubscriptionMenuItem
         tooltip={publishDisabledLabel}
         onClick={onToggleApi}
@@ -705,19 +685,6 @@ function PublishModalContent({
                 </Alert.Content>
               </Alert.Root>
               <VStack width="full" align="start">
-                <Link
-                  href={`/${project?.slug}/chat/${
-                    router.query.workflow as string
-                  }`}
-                  isExternal
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                >
-                  <Button colorPalette="green" variant="outline">
-                    <Play size={16} /> Run App
-                  </Button>
-                </Link>
                 <Button
                   colorPalette="green"
                   onClick={() => openApiModal()}

@@ -554,7 +554,7 @@ describe("PromptEditorDrawer", () => {
         question: {
           type: "source" as const,
           sourceId: "dataset-1",
-          field: "question",
+          path: ["question"],
         },
       };
 
@@ -619,7 +619,7 @@ describe("PromptEditorDrawer", () => {
               expect.objectContaining({
                 type: "source",
                 sourceId: "dataset-1",
-                field: "question",
+                path: ["question"],
               }),
             );
           },

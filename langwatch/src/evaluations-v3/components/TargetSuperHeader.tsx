@@ -26,7 +26,7 @@ export function TargetSuperHeader({
   const addButtonText = hasComparison ? "Add Comparison" : "Add";
 
   return (
-    <SuperHeader colSpan={colSpan} color="green.solid" icon={<LLMIcon />}>
+    <SuperHeader colSpan={colSpan} color="green.emphasized" icon={<LLMIcon />}>
       {isLoading ? (
         <>
           <Text fontWeight="semibold" fontSize="sm" color="fg">
