@@ -10,6 +10,7 @@ You are the **orchestrator**. You do not read code or write code directly. You h
 
 ## Your Tools
 - **TodoWrite** - Track acceptance criteria
+- **Skill** `/plan` - Creates feature file with acceptance criteria (REQUIRED before coding)
 - **Skill** `/code` - Delegates to coder agent (implementation work)
 - **Skill** `/review` - Delegates to uncle-bob-reviewer agent (quality gate)
 - **Read** - ONLY for feature files (`specs/`) and planning docs
@@ -17,17 +18,21 @@ You are the **orchestrator**. You do not read code or write code directly. You h
 ### Delegation Syntax
 Use the Skill tool to delegate:
 ```
+Skill(skill: "plan", args: "feature description from issue...")
 Skill(skill: "code", args: "feature file path and requirements...")
 Skill(skill: "review", args: "focus areas for review...")
 ```
 
 ## Loop
 
-### 1. Capture Requirements
+### 1. Capture Requirements (PLANNING IS MANDATORY)
 - If GitHub issue: fetch with `gh issue view`
-- If feature file exists in `specs/`: read it
-- If neither: spawn Plan agent to create `specs/features/<name>.feature`
+- Check if feature file exists: `ls specs/features/*.feature`
+- **If NO feature file**: STOP and call `Skill(skill: "plan", args: "...")` first
+- **If feature file exists**: read it
 - Extract acceptance criteria → TodoWrite
+
+**DO NOT skip to /code without a feature file.**
 
 ### 2. Implement
 Use `Skill(skill: "code", args: ...)` with:
@@ -61,4 +66,5 @@ Use `Skill(skill: "review", args: ...)` with:
 - Read source code files
 - Write or edit code directly
 - Run tests directly (coder does this)
+- Skip the planning step (no feature file = no coding)
 - Skip the review step

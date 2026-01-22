@@ -10,6 +10,7 @@ These skills use `context: fork` to spawn agents in isolated contexts:
 
 | Skill | Agent | Purpose |
 |-------|-------|---------|
+| `/plan` | Plan (built-in) | Create feature file with acceptance criteria |
 | `/code` | coder | Implement with TDD, self-verification |
 | `/review` | uncle-bob-reviewer | SOLID/Clean Code review |
 | `/sherpa` | repo-sherpa | Documentation, DX, meta-layer |

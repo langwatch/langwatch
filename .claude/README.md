@@ -192,6 +192,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | Command | Triggers | Agent | Purpose |
 |---------|----------|-------|---------|
 | `/implement #123` | Manual | (orchestrator mode) | Start implementation workflow |
+| `/plan <feature>` | Manual/Orchestrator | Plan (built-in) | Create feature file (required before /code) |
 | `/code <task>` | Manual/Orchestrator | coder | Implement with TDD |
 | `/review <focus>` | Manual/Orchestrator | uncle-bob-reviewer | Quality review |
 | `/sherpa <question>` | Manual | repo-sherpa | Docs/DX/meta-layer |
