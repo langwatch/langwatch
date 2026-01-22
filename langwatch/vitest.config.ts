@@ -1,26 +1,13 @@
 import { config } from "dotenv";
-import os from "os";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 config();
 
-const getMaxWorkers = (): number => {
-  if (process.env.VITEST_MAX_WORKERS) {
-    return parseInt(process.env.VITEST_MAX_WORKERS, 10);
-  }
-  if (process.env.VITEST_CPU_PERCENT) {
-    const percent = parseInt(process.env.VITEST_CPU_PERCENT, 10) / 100;
-    return Math.max(1, Math.floor(os.cpus().length * percent));
-  }
-  // Default: use 25% of CPUs to prevent resource exhaustion during parallel agent runs
-  return Math.max(1, Math.floor(os.cpus().length * 0.25));
-};
-
 export default defineConfig({
   test: {
     watch: false,
-    maxWorkers: getMaxWorkers(),
+    maxWorkers: "25%", // Override with VITEST_MAX_WORKERS env var
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
