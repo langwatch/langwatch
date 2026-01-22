@@ -13,8 +13,8 @@ const getMaxWorkers = (): number => {
     const percent = parseInt(process.env.VITEST_CPU_PERCENT, 10) / 100;
     return Math.max(1, Math.floor(os.cpus().length * percent));
   }
-  // Default: use 50% of CPUs to prevent resource exhaustion during parallel agent runs
-  return Math.max(1, Math.floor(os.cpus().length * 0.5));
+  // Default: use 25% of CPUs to prevent resource exhaustion during parallel agent runs
+  return Math.max(1, Math.floor(os.cpus().length * 0.25));
 };
 
 export default defineConfig({
