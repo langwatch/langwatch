@@ -82,6 +82,25 @@ const NO_EVENTS_FOUND_DELAY_CONFIG = {
 } as const;
 
 /**
+ * Configuration for lock contention delay.
+ * When another process holds the lock, we delay and retry since:
+ * 1. The lock holder will process ALL unprocessed events (including ours)
+ * 2. With batching + deduplication, most locks are held briefly (few seconds)
+ * 3. Using DelayedError means this doesn't count against retry attempts
+ *
+ * We use short initial delays with progressive backoff to be responsive
+ * while still handling longer batch operations gracefully.
+ */
+const LOCK_CONTENTION_DELAY_CONFIG = {
+  /** Initial delay - short to handle quick lock releases */
+  baseDelayMs: 2000,
+  /** Additional delay per retry attempt */
+  perAttemptDelayMs: 3000,
+  /** Maximum delay cap (half the lock TTL to ensure timely crash recovery) */
+  maxDelayMs: 30000,
+} as const;
+
+/**
  * Default worker configuration.
  */
 const WORKER_CONFIG = {
@@ -295,17 +314,26 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         throw new DelayedError();
       }
 
-      // For lock contention, log at DEBUG and let BullMQ handle retry
+      // For lock contention, delay significantly since the lock holder will process all events
+      // Use DelayedError so it doesn't count against retry attempts
       if (isLockContention) {
+        const lockContentionDelayMs = this.calculateLockContentionDelay(
+          job.attemptsMade,
+        );
+
         this.logger.debug(
           {
             queueName: this.queueName,
             jobId: job.id,
-            error: error instanceof Error ? error.message : String(error),
+            delayMs: lockContentionDelayMs,
+            attemptsMade: job.attemptsMade,
           },
-          "Lock contention detected, will retry (expected behavior)",
+          "Lock contention detected, delaying job (lock holder will process all events)",
         );
-        throw error;
+
+        const targetTimestamp = Date.now() + lockContentionDelayMs;
+        await job.moveToDelayed(targetTimestamp, job.token);
+        throw new DelayedError();
       }
 
       // For "no events found" errors (ClickHouse replication lag), use exponential backoff
@@ -429,6 +457,33 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       NO_EVENTS_FOUND_DELAY_CONFIG.multiplier ** attempts;
 
     return Math.min(delay, NO_EVENTS_FOUND_DELAY_CONFIG.maxDelayMs);
+  }
+
+  /**
+   * Calculates delay for lock contention errors.
+   * Uses progressive delays since the lock holder will process all unprocessed events.
+   *
+   * Formula: min(baseDelayMs + (attemptsMade * perAttemptDelayMs), maxDelayMs)
+   * - Attempt 0: 2000ms (2s)
+   * - Attempt 1: 5000ms (5s)
+   * - Attempt 2: 8000ms (8s)
+   * - Attempt 3: 11000ms (11s)
+   * - ...
+   * - Attempt 9+: 30000ms (30s, capped)
+   *
+   * Short initial delays handle the common case (quick batch processing).
+   * Progressive backoff handles longer operations without excessive polling.
+   * Using DelayedError means attempts don't count against max retries.
+   */
+  private calculateLockContentionDelay(
+    attemptsMade: number | undefined,
+  ): number {
+    const attempts = attemptsMade ?? 0;
+    const delay =
+      LOCK_CONTENTION_DELAY_CONFIG.baseDelayMs +
+      attempts * LOCK_CONTENTION_DELAY_CONFIG.perAttemptDelayMs;
+
+    return Math.min(delay, LOCK_CONTENTION_DELAY_CONFIG.maxDelayMs);
   }
 
   /**
