@@ -4,10 +4,33 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../utils/logger";
 import {
   instrumentationScopeSchema,
+  type OtlpSpan,
   resourceSchema,
   spanSchema,
 } from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { TraceRequestUtils } from "../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { traceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
+
+/**
+ * Normalizes all ID fields in a span to hex strings before queuing.
+ * This prevents issues with Uint8Array serialization through JSON (BullMQ/Redis),
+ * where Uint8Array becomes {"0": 133, "1": 93, ...} objects.
+ */
+function normalizeSpanIds(span: OtlpSpan): OtlpSpan {
+  return {
+    ...span,
+    traceId: TraceRequestUtils.normalizeOtlpId(span.traceId),
+    spanId: TraceRequestUtils.normalizeOtlpId(span.spanId),
+    parentSpanId: span.parentSpanId
+      ? TraceRequestUtils.normalizeOtlpId(span.parentSpanId)
+      : span.parentSpanId,
+    links: span.links.map((link) => ({
+      ...link,
+      traceId: TraceRequestUtils.normalizeOtlpId(link.traceId),
+      spanId: TraceRequestUtils.normalizeOtlpId(link.spanId),
+    })),
+  };
+}
 
 /**
  * Service for collecting trace requests into the trace processing pipeline.
@@ -109,9 +132,13 @@ export class TraceRequestCollectionService {
               }
 
               try {
+                // Normalize IDs to hex strings before queuing to avoid
+                // Uint8Array serialization issues through JSON (BullMQ/Redis)
+                const normalizedSpan = normalizeSpanIds(spanParseResult.data);
+
                 await traceProcessingPipeline.commands.recordSpan.send({
                   tenantId,
-                  span: spanParseResult.data,
+                  span: normalizedSpan,
                   resource: resourceParseResult.data ?? null,
                   instrumentationScope: scopeParseResult.data ?? null,
                 });
