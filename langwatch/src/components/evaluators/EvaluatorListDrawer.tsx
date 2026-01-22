@@ -70,9 +70,13 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   });
 
   const handleSelectEvaluator = (evaluator: Evaluator) => {
-    // Call onSelect callback - the callback is responsible for navigation
-    // (e.g., opening evaluatorEditor with mappings config)
-    // We don't goBack() here because the callback will handle navigation
+    // IMPORTANT: Only call the callback - do NOT navigate here!
+    // Navigation (goBack/closeDrawer) is the CALLER'S responsibility.
+    // Different callers have different navigation needs:
+    // - OnlineEvaluationDrawer: opens evaluatorEditor with mappings config (no goBack here)
+    // - EvaluationsV3: adds to workbench and closes drawer (caller calls closeDrawer)
+    // - Other flows: may have different requirements
+    // If you add goBack() here, you WILL break existing flows.
     onSelect?.(evaluator);
   };
 

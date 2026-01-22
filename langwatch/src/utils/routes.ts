@@ -146,6 +146,10 @@ export const projectRoutes = {
     title: "Simulation Run",
     parent: "simulations",
   },
+  evaluators: {
+    path: "/[project]/evaluators",
+    title: "Evaluators",
+  }
 } as const;
 
 export type Route = {

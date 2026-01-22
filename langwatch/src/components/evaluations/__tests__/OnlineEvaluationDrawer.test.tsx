@@ -121,20 +121,33 @@ const mockPush = vi.fn((url: string) => {
   return Promise.resolve(true);
 });
 
-vi.mock("next/router", () => ({
-  useRouter: () => {
-    const asPath = Object.keys(mockQuery).length > 0
-      ? "/test?" + Object.entries(mockQuery).map(([k, v]) => `${k}=${v}`).join("&")
-      : "/test";
-    // console.log("useRouter called, asPath:", asPath);
-    return {
-      query: mockQuery,
-      asPath,
-      push: mockPush,
-      replace: mockPush,
-    };
-  },
-}));
+vi.mock("next/router", () => {
+  // Create a proxy for the default Router that always accesses the current mockQuery
+  const routerProxy = {
+    get query() {
+      return mockQuery;
+    },
+    push: (url: string) => mockPush(url),
+    replace: (url: string) => mockPush(url),
+  };
+
+  return {
+    useRouter: () => {
+      const asPath = Object.keys(mockQuery).length > 0
+        ? "/test?" + Object.entries(mockQuery).map(([k, v]) => `${k}=${v}`).join("&")
+        : "/test";
+      // console.log("useRouter called, asPath:", asPath);
+      return {
+        query: mockQuery,
+        asPath,
+        push: mockPush,
+        replace: mockPush,
+      };
+    },
+    // Default export for `import Router from "next/router"`
+    default: routerProxy,
+  };
+});
 
 // Mock scrollIntoView which jsdom doesn't support
 Element.prototype.scrollIntoView = vi.fn();
@@ -2817,6 +2830,59 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(callbacks).toBeDefined();
         expect(callbacks?.onSelect).toBeDefined();
         expect(callbacks?.onCreateNew).toBeDefined();
+      });
+    });
+
+    it("creates new evaluator and returns to online evaluation drawer with it selected", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      mockQuery = { "drawer.open": "onlineEvaluation" };
+
+      const { rerender } = render(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>
+      );
+
+      // Select trace level first (progressive disclosure)
+      await selectLevelInIssueTests(user, "trace");
+
+      // Click Select Evaluator to open the list
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+
+      // Wait for callbacks to be set
+      await waitFor(() => {
+        const callbacks = getFlowCallbacks("evaluatorList");
+        expect(callbacks?.onCreateNew).toBeDefined();
+      });
+
+      // Simulate clicking "New Evaluator" - this calls onCreateNew which:
+      // 1. Sets up evaluatorEditor callback
+      // 2. Opens evaluatorCategorySelector
+      const onCreateNew = getFlowCallbacks("evaluatorList")?.onCreateNew;
+      onCreateNew?.();
+
+      // Verify that evaluatorEditor callback was set up
+      await waitFor(() => {
+        const editorCallbacks = getFlowCallbacks("evaluatorEditor");
+        expect(editorCallbacks?.onSave).toBeDefined();
+      });
+
+      // Now simulate the evaluator being saved - call the onSave callback
+      // This should navigate back to onlineEvaluation drawer
+      const onSave = getFlowCallbacks("evaluatorEditor")?.onSave;
+      const result = onSave?.({ id: "new-evaluator-id", name: "New Evaluator" });
+
+      // The callback should return true (handled navigation)
+      expect(result).toBe(true);
+
+      // Verify navigation happened - drawer should be onlineEvaluation
+      await vi.advanceTimersByTimeAsync(200);
+      await waitFor(() => {
+        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
     });
   });

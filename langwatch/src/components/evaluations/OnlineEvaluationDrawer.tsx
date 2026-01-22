@@ -20,6 +20,7 @@ import { Drawer } from "~/components/ui/drawer";
 import {
   getComplexProps,
   setFlowCallbacks,
+  navigateToDrawer,
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
@@ -499,6 +500,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         mappings,
         preconditions,
         threadIdleTimeout,
+        // Preserve pendingEvaluatorId if it exists (don't overwrite with undefined)
+        pendingEvaluatorId: onlineEvaluationDrawerState?.pendingEvaluatorId,
       };
     }
   }, [isOpen, level, name, selectedEvaluator, sample, mappings, preconditions, threadIdleTimeout]);
@@ -783,30 +786,35 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
     // Helper to set up the evaluatorEditor callback for NEW evaluators
     const setupNewEvaluatorCallback = () => {
+      // Capture current values for the callback closure
+      const capturedLevel = level;
+      const capturedName = name;
+      const capturedSample = sample;
+      const capturedPreconditions = preconditions;
+      const capturedThreadIdleTimeout = threadIdleTimeout;
+
       setFlowCallbacks("evaluatorEditor", {
         onSave: (savedEvaluator: { id: string; name: string }) => {
           // Store the new evaluator info in module-level state
           // The evaluator will be loaded when the online evaluation drawer reopens
-          const newName = name || savedEvaluator.name;
-          if (!name) {
-            form.setValue("name", newName);
-          }
+          const newName = capturedName || savedEvaluator.name;
 
           // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
           onlineEvaluationDrawerState = {
-            level,
+            level: capturedLevel,
             name: newName,
             selectedEvaluator: null, // Will be loaded via query
-            sample,
+            sample: capturedSample,
             mappings: {},
-            preconditions,
-            threadIdleTimeout,
+            preconditions: capturedPreconditions,
+            threadIdleTimeout: capturedThreadIdleTimeout,
             // Store the new evaluator ID to load it when the drawer reopens
             pendingEvaluatorId: savedEvaluator.id,
           };
 
           // Navigate directly to online evaluation drawer (resetting the stack)
-          openDrawer("onlineEvaluation", {}, { resetStack: true });
+          // Use module-level navigation since the component may not be mounted
+          navigateToDrawer("onlineEvaluation", { resetStack: true });
 
           // Return true to indicate we handled navigation (prevents default goBack())
           return true;

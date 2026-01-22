@@ -185,15 +185,22 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   }, [form]);
 
   // Mutations
-  // Note: We check canGoBack and call goBack() directly in onSuccess
-  // because we need the current stack state at the time of save, not at render time
+  // IMPORTANT: Navigation after save is the CALLER'S responsibility!
+  // If onSave callback is provided, it should handle navigation (return true to skip default).
+  // Default behavior (goBack/onClose) is only for simple cases without custom callbacks.
+  // Different callers have different needs:
+  // - OnlineEvaluationDrawer: custom navigation back to online evaluation drawer
+  // - EvaluationsV3: closes drawer after adding to workbench
+  // - /evaluators page: should set up onSave callback to closeDrawer
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
-      // If onSave returns true, it handled navigation - don't call goBack()
-      const handledNavigation = onSave?.({ id: evaluator.id, name: evaluator.name });
+      // Get fresh callback from flow callbacks (might have been set after component rendered)
+      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+      // If onSave returns true, it handled navigation - don't do default navigation
+      const handledNavigation = freshOnSave?.({ id: evaluator.id, name: evaluator.name });
       if (handledNavigation) return;
-      // Check stack state at save time and navigate accordingly
+      // Default: go back if there's a stack, otherwise close
       if (getDrawerStack().length > 1) {
         goBack();
       } else {
@@ -209,10 +216,12 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         id: evaluator.id,
         projectId: project?.id ?? "",
       });
-      // If onSave returns true, it handled navigation - don't call goBack()
-      const handledNavigation = onSave?.({ id: evaluator.id, name: evaluator.name });
+      // Get fresh callback from flow callbacks (might have been set after component rendered)
+      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+      // If onSave returns true, it handled navigation - don't do default navigation
+      const handledNavigation = freshOnSave?.({ id: evaluator.id, name: evaluator.name });
       if (handledNavigation) return;
-      // Check stack state at save time and navigate accordingly
+      // Default: go back if there's a stack, otherwise close
       if (getDrawerStack().length > 1) {
         goBack();
       } else {
