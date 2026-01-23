@@ -98,6 +98,7 @@ async function spawnScenarioChildProcess(
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
       env: {
         ...process.env,
+        DEBUG: "", // Disable debug logging to keep stdout clean for JSON parsing
         LANGWATCH_API_KEY: telemetry.apiKey,
         LANGWATCH_ENDPOINT: telemetry.endpoint,
         SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
@@ -162,7 +163,10 @@ async function spawnScenarioChildProcess(
       }
 
       try {
-        const result = JSON.parse(stdout) as ScenarioExecutionResult;
+        // Extract JSON from stdout - it should be at the end after any debug logs
+        const jsonMatch = stdout.match(/\{[\s\S]*\}$/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : stdout;
+        const result = JSON.parse(jsonStr) as ScenarioExecutionResult;
         resolve(result);
       } catch (error) {
         logger.error(
