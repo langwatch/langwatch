@@ -35,6 +35,8 @@ const renderGridItems = (
     evaluatorId: string;
     groupKey?: string;
     date?: string;
+    startDate?: string;
+    endDate?: string;
     checkType: string;
     isGuardrail: boolean;
   }) => void,
@@ -250,6 +252,8 @@ const renderGridItems = (
                     evaluatorId: check.id,
                     groupKey: params.groupKey,
                     date: params.date,
+                    startDate: params.startDate,
+                    endDate: params.endDate,
                     checkType: check.checkType,
                     isGuardrail: traceCheck?.isGuardrail ?? false,
                   });
@@ -278,6 +282,8 @@ function EvaluationsContent() {
       evaluatorId: string;
       groupKey?: string;
       date?: string;
+      startDate?: string;
+      endDate?: string;
       checkType: string;
       isGuardrail: boolean;
     }) => {
@@ -321,14 +327,21 @@ function EvaluationsContent() {
         filterParams[`evaluation_label.${params.evaluatorId}`] = params.groupKey;
       }
 
-      // Build URL with query parameters
-      const queryString = qs.stringify(filterParams, {
-        arrayFormat: "comma",
-        allowDots: true,
-      });
+      // Add date range filter if provided (for bar chart drill-down)
+      if (params.startDate && params.endDate) {
+        filterParams.startDate = params.startDate;
+        filterParams.endDate = params.endDate;
+      }
 
-      // Navigate to messages page
-      void router.push(`/${project.slug}/messages?${queryString}`);
+      // Navigate to messages page with query parameters
+      void router.push(
+        {
+          pathname: `/${project.slug}/messages`,
+          query: filterParams,
+        },
+        undefined,
+        { shallow: false },
+      );
     },
     [project, router],
   );

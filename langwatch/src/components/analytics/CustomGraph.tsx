@@ -72,17 +72,17 @@ export type CustomGraphInput = {
   graphId: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
   graphType:
-    | "line"
-    | "bar"
-    | "horizontal_bar"
-    | "stacked_bar"
-    | "area"
-    | "stacked_area"
-    | "scatter"
-    | "pie"
-    | "donnut"
-    | "summary"
-    | "monitor_graph";
+  | "line"
+  | "bar"
+  | "horizontal_bar"
+  | "stacked_bar"
+  | "area"
+  | "stacked_area"
+  | "scatter"
+  | "pie"
+  | "donnut"
+  | "summary"
+  | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
   groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
@@ -134,6 +134,8 @@ export function CustomGraph({
     evaluatorId?: string;
     groupKey?: string;
     date?: string;
+    startDate?: string;
+    endDate?: string;
   }) => void;
 }) {
   const publicEnv = usePublicEnv();
@@ -184,6 +186,8 @@ const CustomGraph_ = React.memo(
       evaluatorId?: string;
       groupKey?: string;
       date?: string;
+      startDate?: string;
+      endDate?: string;
     }) => void;
   }) {
     const height_ = input.height ?? 300;
@@ -279,13 +283,13 @@ const CustomGraph_ = React.memo(
       input.graphType === "scatter"
         ? currentAndPreviousData
         : fillEmptyData(
-            currentAndPreviousData,
-            expectedKeys,
-            input.graphType === "monitor_graph" &&
-              input.series[0]?.metric.includes("pass_rate")
-              ? 1
-              : 0,
-          );
+          currentAndPreviousData,
+          expectedKeys,
+          input.graphType === "monitor_graph" &&
+            input.series[0]?.metric.includes("pass_rate")
+            ? 1
+            : 0,
+        );
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
@@ -338,18 +342,17 @@ const CustomGraph_ = React.memo(
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
         const groupName = groupKey
-          ? `${
-              hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-            }${groupKey}`
+          ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
+          }${groupKey}`
           : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
             ? uppercaseFirstLetter(groupName)
-                .replace("Evaluation passed passed", "Evaluation Passed")
-                .replace("Evaluation passed failed", "Evaluation Failed")
-                .replace("Contains error", "Traces")
-                .replace(/^Evaluation label /i, "")
+              .replace("Evaluation passed passed", "Evaluation Passed")
+              .replace("Evaluation passed failed", "Evaluation Failed")
+              .replace("Contains error", "Traces")
+              .replace(/^Evaluation label /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -513,9 +516,9 @@ const CustomGraph_ = React.memo(
           .toReversed()
           .map((series) => [
             series.metric +
-              series.aggregation +
-              series.pipeline?.field +
-              series.pipeline?.aggregation,
+            series.aggregation +
+            series.pipeline?.field +
+            series.pipeline?.aggregation,
             series,
           ]),
       );
@@ -578,7 +581,7 @@ const CustomGraph_ = React.memo(
                   const { groupKey } = getSeries(seriesByKey, entry.key);
                   // Extract evaluator ID from the series key or groupByKey
                   const evaluatorId = input.groupByKey || input.series[0]?.key;
-                  
+
                   if (evaluatorId) {
                     onDataPointClick({
                       evaluatorId,
@@ -684,14 +687,14 @@ const CustomGraph_ = React.memo(
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
-            <Bar 
+            <Bar
               dataKey="value"
               onClick={(data: any) => {
                 if (onDataPointClick && data && data.key) {
                   const { groupKey } = getSeries(seriesByKey, data.key);
-                  const evaluatorId = input.groupByKey || 
+                  const evaluatorId = input.groupByKey ||
                     input.series[0]?.key;
-                  
+
                   onDataPointClick({
                     evaluatorId,
                     groupKey,
@@ -802,7 +805,7 @@ const CustomGraph_ = React.memo(
             const fillColor = colorForSeries(aggKey, index);
             const { groupKey } = getSeries(seriesByKey, aggKey);
             const evaluatorId = input.groupByKey || input.series[0]?.key;
-            
+
             return (
               <React.Fragment key={aggKey}>
                 {/* @ts-ignore */}
@@ -830,10 +833,37 @@ const CustomGraph_ = React.memo(
                   }
                   onClick={(data: any) => {
                     if (onDataPointClick && data && evaluatorId) {
+                      // Extract date from data - check multiple possible locations
+                      let date: string | undefined;
+                      if (["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)) {
+                        // For bar charts, check multiple possible locations for the date
+                        date = data.payload?.date || data.date || data.activePayload?.[0]?.payload?.date;
+                      } else {
+                        // For other chart types (line, area, etc.), use existing logic
+                        date = data.date || data.payload?.date;
+                      }
+
+                      // Calculate date range based on timeScale for bar charts (not summary)
+                      let startDate: string | undefined;
+                      let endDate: string | undefined;
+                      if (
+                        date &&
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType) &&
+                        typeof timeScale === "number"
+                      ) {
+                        const clickedDate = new Date(date);
+                        startDate = clickedDate.toISOString();
+                        // Calculate endDate by adding the timeScale in minutes
+                        const endDateObj = new Date(clickedDate.getTime() + timeScale * 60 * 1000);
+                        endDate = endDateObj.toISOString();
+                      }
+
                       onDataPointClick({
                         evaluatorId,
                         groupKey,
-                        date: data.date || data.payload?.date,
+                        date,
+                        startDate,
+                        endDate,
                       });
                     }
                   }}
@@ -879,7 +909,7 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(nextProps.titleProps) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
@@ -1143,11 +1173,11 @@ function MonitorGraph({
   const isPassRate = firstKey.includes("pass_rate");
   const allValues = isPassRate
     ? currentAndPreviousDataFilled
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null)
+      ?.map((entry) => entry[firstKey]!)
+      .filter((x) => x !== undefined && x !== null)
     : currentAndPreviousData
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null);
+      ?.map((entry) => entry[firstKey]!)
+      .filter((x) => x !== undefined && x !== null);
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1251,7 +1281,7 @@ function MonitorGraph({
               );
               const periodDays = Math.ceil(
                 (filterParams.endDate - filterParams.startDate) /
-                  (1000 * 60 * 60 * 24),
+                (1000 * 60 * 60 * 24),
               );
 
               // If end date is within one day of today, show "Last X days"
@@ -1277,10 +1307,10 @@ function MonitorGraph({
           margin={
             size === "md"
               ? {
-                  top: 10,
-                  left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
-                  right: 24,
-                }
+                top: 10,
+                left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+                right: 24,
+              }
               : {}
           }
         >
