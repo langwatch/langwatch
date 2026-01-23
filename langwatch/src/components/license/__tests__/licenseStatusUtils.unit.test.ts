@@ -12,7 +12,7 @@ import {
  */
 
 describe("deriveIsExpired", () => {
-  it("returns true when license exists but is invalid (expired)", () => {
+  it("returns true when license has past expiresAt date", () => {
     const status = {
       hasLicense: true,
       valid: false,
@@ -26,13 +26,27 @@ describe("deriveIsExpired", () => {
     expect(deriveIsExpired(status)).toBe(true);
   });
 
-  it("returns true when license is corrupted", () => {
+  it("returns false when license is corrupted (no metadata)", () => {
     const status = {
       hasLicense: true,
       valid: false,
       corrupted: true,
     } as const;
-    expect(deriveIsExpired(status)).toBe(true);
+    expect(deriveIsExpired(status)).toBe(false);
+  });
+
+  it("returns false when license is invalid but has future expiresAt", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2099-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(deriveIsExpired(status)).toBe(false);
   });
 
   it("returns false when license exists and is valid", () => {
@@ -41,7 +55,7 @@ describe("deriveIsExpired", () => {
       valid: true,
       plan: "team",
       planName: "Team",
-      expiresAt: "2025-12-31",
+      expiresAt: "2099-12-31",
       organizationName: "Test Org",
       currentMembers: 5,
       maxMembers: 10,

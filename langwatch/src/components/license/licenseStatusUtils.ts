@@ -18,14 +18,31 @@ export function hasLicenseMetadata(
 }
 
 /**
- * Determines if a license has expired based on its status.
- * A license is considered expired when it exists but is no longer valid.
+ * Determines if a license has expired based on its expiresAt date.
+ * Returns true only when:
+ * - License exists (hasLicense: true)
+ * - License has metadata with expiresAt
+ * - The expiresAt date is in the past
+ *
+ * Returns false for:
+ * - No license
+ * - Corrupted license (no metadata)
+ * - Invalid license with future expiresAt (signature issues, not expired)
  */
 export function deriveIsExpired(
   status: LicenseStatus | undefined
 ): boolean {
   if (!status) return false;
-  return status.hasLicense && !status.valid;
+  if (!status.hasLicense) return false;
+
+  // Check if we have metadata with expiresAt
+  if (!hasLicenseMetadata(status)) return false;
+
+  // Parse and compare the expiration date
+  const expiresAt = new Date(status.expiresAt);
+  if (isNaN(expiresAt.getTime())) return false;
+
+  return expiresAt.getTime() < Date.now();
 }
 
 /**

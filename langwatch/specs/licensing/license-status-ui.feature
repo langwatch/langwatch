@@ -16,7 +16,7 @@ Feature: License Status UI Component
     Given the organization has no license
     When the component renders
     Then I see text "No license installed"
-    And I see text "Running without a license. Some feature may be limited."
+    And I see text "Running without a license. Some features may be limited."
 
   Scenario: Shows license input textarea when no license
     Given the organization has no license
@@ -51,9 +51,9 @@ Feature: License Status UI Component
     Then I see "Members:" label with value "5 / 10"
 
   Scenario: Displays expiration date
-    Given the organization has a license expiring "December 31, 2025"
+    Given the organization has a license expiring "December 31, 2028"
     When the component renders
-    Then I see "Expires:" label with value "December 31, 2025"
+    Then I see "Expires:" label with value "December 31, 2028"
 
   Scenario: Shows remove license button for valid license
     Given the organization has a valid license

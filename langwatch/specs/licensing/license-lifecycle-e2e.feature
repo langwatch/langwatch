@@ -17,7 +17,7 @@ Feature: License Lifecycle End-to-End
     # Step 1: Verify no-license state
     When I navigate to the license settings page
     Then I see "No license installed"
-    And I see "Running without a license. Some feature may be limited."
+    And I see "Running without a license. Some features may be limited."
 
     # Step 2: Upload a valid license
     Given I have a valid PRO license with:

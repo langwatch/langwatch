@@ -17,7 +17,14 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input }): Promise<LicenseStatus> => {
-      return getLicenseHandler().getLicenseStatus(input.organizationId);
+      try {
+        return await getLicenseHandler().getLicenseStatus(input.organizationId);
+      } catch (error) {
+        if (error instanceof OrganizationNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   /**

@@ -27,7 +27,7 @@ export function NoLicenseCard({
             No license installed
           </Text>
           <Text color="gray.500" fontSize="sm">
-            Running without a license. Some feature may be limited.
+            Running without a license. Some features may be limited.
           </Text>
         </VStack>
 

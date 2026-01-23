@@ -149,7 +149,7 @@ export function LicenseDetailsCard({
           >
             <Text fontSize="sm" color="red.600">
               {isExpired
-                ? "Your license has expired. Please renew to continue using licensed features, or remove to use unlimited mode."
+                ? "Your license has expired. Please renew to continue using licensed features."
                 : "Your license is invalid. Please contact support or upload a valid license."}
             </Text>
           </Box>
