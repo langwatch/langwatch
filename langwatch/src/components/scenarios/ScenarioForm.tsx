@@ -13,6 +13,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
+import { useScenarioFormStore } from "../../hooks/useScenarioFormStore";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { InlineTagsInput } from "./ui/InlineTagsInput";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -33,22 +34,52 @@ export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData>) => void;
+  /** If true, use Zustand store for persistence across drawer navigation */
+  persistToStore?: boolean;
+  /** Current scenario ID - used to validate stored data belongs to this scenario */
+  scenarioId?: string;
 };
 
 /**
  * Pure UI form for creating/editing scenarios.
  * Matches the design mockup layout.
  * Submit is handled externally via formRef.
+ *
+ * When persistToStore is true, form state is synced to Zustand store
+ * so it survives drawer navigation (e.g., opening prompt picker).
  */
-export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
+export function ScenarioForm({
+  defaultValues,
+  formRef,
+  persistToStore = false,
+  scenarioId,
+}: ScenarioFormProps) {
+  const {
+    formData: storedFormData,
+    scenarioId: storedScenarioId,
+    setFormData,
+  } = useScenarioFormStore();
+
+  // Only use stored data if it's for the current scenario
+  // This prevents showing stale data when switching between scenarios
+  const storedDataMatchesScenario =
+    persistToStore &&
+    ((scenarioId && storedScenarioId === scenarioId) ||
+      (!scenarioId && storedScenarioId === null));
+
+  // Use stored data if it matches current scenario, otherwise use defaultValues
+  const initialValues = storedDataMatchesScenario
+    ? { ...storedFormData }
+    : {
+        name: "",
+        situation: "",
+        criteria: [],
+        labels: [],
+        ...defaultValues,
+      };
+
   const form = useForm<ScenarioFormData>({
-    defaultValues: {
-      name: "",
-      situation: "",
-      criteria: [],
-      labels: [],
-      ...defaultValues,
-    },
+    defaultValues: initialValues,
     resolver: zodResolver(scenarioFormSchema),
   });
 
@@ -56,6 +87,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     register,
     control,
     reset,
+    watch,
     formState: { errors },
   } = form;
 
@@ -64,9 +96,37 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     formRef?.(form);
   }, [form, formRef]);
 
-  // Reset form when defaultValues change (using ref to track previous serialized values)
+  // Sync form changes to store when persistToStore is enabled
+  useEffect(() => {
+    if (!persistToStore) return;
+
+    const subscription = watch((data) => {
+      setFormData(data as Partial<ScenarioFormData>);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [watch, setFormData, persistToStore]);
+
+  // Also reset form when defaultValues change AND we're using store persistence
+  // but the stored data doesn't match (i.e., switching scenarios)
+  useEffect(() => {
+    if (!persistToStore || storedDataMatchesScenario) return;
+
+    // Stored data is stale - reset form to defaultValues
+    reset({
+      name: "",
+      situation: "",
+      criteria: [],
+      labels: [],
+      ...defaultValues,
+    });
+  }, [persistToStore, storedDataMatchesScenario, defaultValues, reset]);
+
+  // Reset form when defaultValues change (only when NOT using store persistence)
   const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
+    if (persistToStore) return; // Don't auto-reset when using store
+
     const currentDefaults = defaultValues
       ? JSON.stringify([
           defaultValues.name,
@@ -87,7 +147,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         });
       }
     }
-  }, [defaultValues, reset]);
+  }, [defaultValues, reset, persistToStore]);
 
   return (
     <VStack align="stretch" gap={6}>

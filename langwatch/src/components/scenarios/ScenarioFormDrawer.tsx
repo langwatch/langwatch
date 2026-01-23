@@ -1,14 +1,14 @@
-import { Grid, GridItem, Heading } from "@chakra-ui/react";
+import { Grid, GridItem } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRecentTargets } from "../../hooks/useRecentTargets";
 import { useRunScenario } from "../../hooks/useRunScenario";
+import { useScenarioFormStore } from "../../hooks/useScenarioFormStore";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
-import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
-import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
@@ -27,7 +27,7 @@ export type ScenarioFormDrawerProps = {
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, goBack, drawerOpen } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
@@ -36,14 +36,36 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectId: project?.id,
     projectSlug: project?.slug,
   });
-  const scenarioId = params.scenarioId;
+
+  // Zustand store for form persistence across drawer navigation
+  const { setScenarioId: setStoreScenarioId, resetForm } =
+    useScenarioFormStore();
+
+  // Store scenarioId in local state to preserve it during child drawer navigation
+  // URL params change when navigating to promptList/agentList, but we need to keep the scenarioId
+  const [scenarioId, setScenarioId] = useState<string | undefined>(
+    params.scenarioId,
+  );
+
+  // Update scenarioId when drawer opens with a new value from URL
+  // But don't clear it when navigating to child drawers
+  useEffect(() => {
+    if (params.scenarioId) {
+      setScenarioId(params.scenarioId);
+    }
+  }, [params.scenarioId]);
+
+  // Determine if this drawer is the active/visible one
+  const isActiveDrawer = drawerOpen("scenarioEditor");
+
+  // Track if we've initialized the store for this scenario
+  const hasInitializedRef = useRef<string | null>(null);
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
+  const { addRecentPrompt, addRecentAgent } = useRecentTargets();
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
-  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
-  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -62,12 +84,43 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     [persistTarget, scenarioId],
   );
-  const isOpen = props.open !== false && props.open !== undefined;
+  // props.open controls mounting (via drawerInStack in parent)
+  // isActiveDrawer controls visibility (drawer slides in/out)
+  const isMounted = props.open !== false && props.open !== undefined;
+  const isOpen = isMounted && isActiveDrawer;
   const onClose = props.onClose ?? closeDrawer;
   const { data: scenario } = api.scenarios.getById.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: !!project && !!scenarioId },
   );
+
+  // Initialize/reset store when scenarioId changes or scenario data loads
+  useEffect(() => {
+    const currentKey = scenarioId ?? "new";
+
+    // Only initialize once per scenario
+    if (hasInitializedRef.current === currentKey) return;
+
+    // For editing: wait for scenario data to load before initializing
+    if (scenarioId && !scenario) return;
+
+    hasInitializedRef.current = currentKey;
+    setStoreScenarioId(scenarioId ?? null);
+
+    if (scenario) {
+      // Editing existing scenario - populate store with server data
+      resetForm({
+        name: scenario.name,
+        situation: scenario.situation,
+        criteria: scenario.criteria,
+        labels: scenario.labels,
+      });
+    } else {
+      // Creating new scenario - reset to defaults
+      resetForm();
+    }
+  }, [scenarioId, scenario, setStoreScenarioId, resetForm]);
+
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -140,6 +193,20 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
+          // Track in recent targets for global picker
+          switch (target.type) {
+            case "prompt":
+              addRecentPrompt(target.id);
+              break;
+            case "http":
+              addRecentAgent(target.id);
+              break;
+            default: {
+              const _exhaustiveCheck: never = target.type;
+              return _exhaustiveCheck;
+            }
+          }
+
           await runScenario(savedScenario.id, target);
         })();
       } catch (error) {
@@ -152,7 +219,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, persistTarget, runScenario, formInstance],
+    [
+      handleSave,
+      project?.id,
+      persistTarget,
+      addRecentPrompt,
+      addRecentAgent,
+      runScenario,
+      formInstance,
+    ],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
@@ -177,6 +252,49 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     () => scenario ?? undefined,
     [scenario],
   );
+
+  // Handler to open agent creation drawer using the drawer navigation system
+  const handleCreateAgent = useCallback(
+    (onComplete: () => void) => {
+      openDrawer("agentHttpEditor", {
+        onSave: (agent: { id: string; name: string }) => {
+          // Auto-select the newly created agent
+          handleTargetChange({ type: "http", id: agent.id });
+          goBack(); // Return to scenario drawer (not closeDrawer which closes everything)
+          toaster.create({
+            title: "Agent created",
+            description: `"${agent.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
+          onComplete(); // Reopen the menu
+        },
+      });
+    },
+    [openDrawer, goBack, handleTargetChange],
+  );
+
+  // Handler to open prompt creation drawer using the drawer navigation system
+  const handleCreatePrompt = useCallback(
+    (onComplete: () => void) => {
+      openDrawer("promptEditor", {
+        onSave: (prompt: { id: string; name: string }) => {
+          // Auto-select the newly created prompt
+          handleTargetChange({ type: "prompt", id: prompt.id });
+          goBack(); // Return to scenario drawer (not closeDrawer which closes everything)
+          toaster.create({
+            title: "Prompt created",
+            description: `"${prompt.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
+          onComplete(); // Reopen the menu
+        },
+      });
+    },
+    [openDrawer, goBack, handleTargetChange],
+  );
+
   return (
     <Drawer.Root
       closeOnInteractOutside={false}
@@ -184,13 +302,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
       modal={false}
+      lazyMount={false}
+      unmountOnExit={false}
     >
+      <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
-          <Heading size="md">
+          <Drawer.Title>
             {scenario ? "Edit Scenario" : "Create Scenario"}
-          </Heading>
+          </Drawer.Title>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
@@ -205,6 +326,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
                 formRef={setFormRef}
+                persistToStore={true}
+                scenarioId={scenarioId}
               />
             </GridItem>
             {/* Right: Help Sidebar */}
@@ -220,46 +343,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             onTargetChange={handleTargetChange}
             onSaveAndRun={handleSaveAndRun}
             onSaveWithoutRunning={handleSaveWithoutRunning}
-            onCreateAgent={() => setAgentDrawerOpen(true)}
-            onCreatePrompt={() => setPromptDrawerOpen(true)}
+            onCreateAgent={handleCreateAgent}
+            onCreatePrompt={handleCreatePrompt}
             isLoading={isSubmitting}
           />
         </Drawer.Footer>
       </Drawer.Content>
-
-      {/* Agent Creation Drawer */}
-      <AgentHttpEditorDrawer
-        open={agentDrawerOpen}
-        onClose={() => setAgentDrawerOpen(false)}
-        onSave={(agent) => {
-          // Auto-select the newly created agent
-          handleTargetChange({ type: "http", id: agent.id });
-          setAgentDrawerOpen(false);
-          toaster.create({
-            title: "Agent created",
-            description: `"${agent.name}" is now selected as the target.`,
-            type: "success",
-            meta: { closable: true },
-          });
-        }}
-      />
-
-      {/* Prompt Creation Drawer */}
-      <PromptEditorDrawer
-        open={promptDrawerOpen}
-        onClose={() => setPromptDrawerOpen(false)}
-        onSave={(prompt) => {
-          // Auto-select the newly created prompt
-          handleTargetChange({ type: "prompt", id: prompt.id });
-          setPromptDrawerOpen(false);
-          toaster.create({
-            title: "Prompt created",
-            description: `"${prompt.name}" is now selected as the target.`,
-            type: "success",
-            meta: { closable: true },
-          });
-        }}
-      />
     </Drawer.Root>
   );
 }

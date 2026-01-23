@@ -1,5 +1,6 @@
 import { useLocalStorage } from "usehooks-ts";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
+import { localStorageKeys } from "../utils/localStorageKeys";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 interface PersistedTarget {
@@ -17,12 +18,12 @@ export function useScenarioTarget(scenarioId: string | undefined) {
 
   const storageKey =
     scenarioId && project?.id
-      ? `langwatch:scenario-target:${project.id}:${scenarioId}`
+      ? localStorageKeys.scenarioTarget(project.id, scenarioId)
       : null;
 
   const [persistedTarget, setPersistedTarget] =
     useLocalStorage<PersistedTarget | null>(
-      storageKey ?? "langwatch:scenario-target:temp",
+      storageKey ?? localStorageKeys.scenarioTarget("", undefined),
       null,
     );
 

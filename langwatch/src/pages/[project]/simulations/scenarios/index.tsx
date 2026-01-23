@@ -17,7 +17,7 @@ import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer, drawerInStack } = useDrawer();
 
   const {
     data: scenarios,
@@ -91,7 +91,7 @@ function ScenarioLibraryPage() {
         )}
       </PageLayout.Container>
 
-      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+      <ScenarioFormDrawer open={drawerInStack("scenarioEditor")} />
     </DashboardLayout>
   );
 }

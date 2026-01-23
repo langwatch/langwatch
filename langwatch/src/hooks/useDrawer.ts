@@ -360,10 +360,22 @@ export const useDrawer = () => {
   };
 
   /**
-   * Check if a specific drawer is currently open.
+   * Check if a specific drawer is currently open (the active/visible one).
    */
   const drawerOpen = (drawer: DrawerType) => {
     return router.query["drawer.open"] === drawer;
+  };
+
+  /**
+   * Check if a specific drawer is anywhere in the navigation stack.
+   * Use this to keep a drawer mounted (but possibly behind others) while navigating.
+   *
+   * @example
+   * // Keep ScenarioFormDrawer mounted while navigating to child drawers
+   * <ScenarioFormDrawer open={drawerInStack("scenarioEditor")} />
+   */
+  const drawerInStack = (drawer: DrawerType) => {
+    return drawerStack.some((entry) => entry.drawer === drawer);
   };
 
   /**
@@ -376,6 +388,7 @@ export const useDrawer = () => {
     openDrawer,
     closeDrawer,
     drawerOpen,
+    drawerInStack,
     goBack,
     canGoBack,
     currentDrawer,
