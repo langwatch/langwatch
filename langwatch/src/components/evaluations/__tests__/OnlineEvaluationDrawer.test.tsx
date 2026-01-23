@@ -1909,6 +1909,14 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
     vi.useRealTimers();
   });
 
+  // Helper functions for drawer state
+  const isOnlineEvalOpen = () =>
+    mockQuery["drawer.open"] === "onlineEvaluationDrawer" ||
+    mockQuery["drawer.open"] === undefined ||
+    !mockQuery["drawer.open"];
+  const isEvaluatorListOpen = () =>
+    mockQuery["drawer.open"] === "evaluatorList";
+
   /**
    * Helper to select evaluation level in issue fix tests
    */

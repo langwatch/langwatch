@@ -189,18 +189,10 @@ describe("EvaluatorListDrawer", () => {
       );
     });
 
-    it("closes drawer after selection", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByText("Exact Match")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId("evaluator-card-evaluator-1"));
-
-      expect(mockOnClose).toHaveBeenCalled();
-    });
+    // Note: The drawer does NOT close after selection - this is by design.
+    // Navigation (goBack/closeDrawer) is the CALLER'S responsibility.
+    // Different callers have different navigation needs.
+    // See handleSelectEvaluator comment in EvaluatorListDrawer.tsx
   });
 
   describe("Create new evaluator", () => {

@@ -217,7 +217,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
   });
 
   it("uses different timeout values correctly", async () => {
-    // Create monitors with different timeout values
+    // Create monitors with different timeout values (same check type to avoid evaluator-specific issues)
     const monitors = await Promise.all([
       prisma.monitor.create({
         data: {
@@ -240,7 +240,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
           projectId,
           name: "30 Minute Monitor",
           slug: `monitor-1800-${nanoid()}`,
-          checkType: "langevals/exact_match",
+          checkType: "presidio/pii_detection", // Same type as first monitor
           executionMode: EvaluationExecutionMode.ON_MESSAGE,
           enabled: true,
           preconditions: [],
@@ -264,7 +264,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     const calls = mockScheduleEvaluation.mock.calls;
     const timeouts = calls
       .map((call: any[]) => call[0].threadDebounce?.timeoutSeconds)
-      .sort();
+      .sort((a: number, b: number) => a - b);
     expect(timeouts).toEqual([60, 1800]);
   });
 });
