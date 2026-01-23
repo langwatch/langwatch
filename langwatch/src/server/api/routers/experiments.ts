@@ -635,10 +635,8 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const versionIds = dspySteps.hits.hits
-        .map((hit) => {
-          return hit._source?.workflow_version_id;
-        })
-        .filter(Boolean);
+        .map((hit) => hit._source?.workflow_version_id)
+        .filter((id): id is string => Boolean(id));
 
       const versionsMap = await getVersionMap(input.projectId, versionIds);
 
@@ -1351,10 +1349,8 @@ const getExperimentBatchEvaluationRuns = async (
   });
 
   const versionIds = batchEvaluationRuns.hits.hits
-    .map((hit) => {
-      return hit._source?.workflow_version_id;
-    })
-    .filter(Boolean);
+    .map((hit) => hit._source?.workflow_version_id)
+    .filter((id): id is string => Boolean(id));
 
   const versionsMap = await getVersionMap(projectId, versionIds);
 

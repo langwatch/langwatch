@@ -11,6 +11,7 @@ import {
   ListTree,
   type LucideIcon,
   Pencil,
+  Percent,
   Play,
   PlayCircle,
   Settings,
@@ -18,7 +19,6 @@ import {
   TrendingUp,
   Workflow,
 } from "lucide-react";
-import { LuPercent } from "react-icons/lu";
 
 export type FeatureKey =
   | "home"
@@ -113,7 +113,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     label: "Agents",
   },
   evaluators: {
-    icon: LuPercent,
+    icon: Percent,
     color: "orange.500",
     label: "Evaluators",
   },
