@@ -16,9 +16,9 @@ Feature: License tRPC Router
     Given the organization has no license
     When I call license.getStatus with organizationId "org-456"
     Then the response includes:
-      | hasLicense     | false          |
-      | valid          | false          |
-      | planName       | Self-Hosted (Unlimited) |
+      | hasLicense     | false       |
+      | valid          | false       |
+      | planName       | Open Source |
 
   Scenario: Gets license status with current member count
     Given the organization has a valid license with maxMembers 10

@@ -66,8 +66,8 @@ Feature: License to PlanInfo Mapping
 
   Scenario: UNLIMITED_PLAN has correct structure for backward compatibility
     When I access the UNLIMITED_PLAN constant
-    Then the plan type is "SELF_HOSTED"
-    And the plan name is "Self-Hosted (Unlimited)"
+    Then the plan type is "OPEN_SOURCE"
+    And the plan name is "Open Source"
     And the plan free is true
     And the plan overrideAddingLimitations is true
     And maxMembers is 99999

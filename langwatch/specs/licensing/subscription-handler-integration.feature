@@ -13,11 +13,11 @@ Feature: SubscriptionHandler License Integration
   # Backward compatible: always returns UNLIMITED_PLAN
   # ============================================================================
 
-  Scenario: Returns SELF_HOSTED type when enforcement disabled
+  Scenario: Returns OPEN_SOURCE type when enforcement disabled
     Given LICENSE_ENFORCEMENT_ENABLED is not set
     And the organization has no license
     When I call SubscriptionHandler.getActivePlan
-    Then the plan type is "SELF_HOSTED"
+    Then the plan type is "OPEN_SOURCE"
 
   Scenario: Allows unlimited members when enforcement disabled
     Given LICENSE_ENFORCEMENT_ENABLED is not set
@@ -33,7 +33,7 @@ Feature: SubscriptionHandler License Integration
     Given LICENSE_ENFORCEMENT_ENABLED is not set
     And the organization has a valid license with maxMembers 10
     When I call SubscriptionHandler.getActivePlan
-    Then the plan type is "SELF_HOSTED"
+    Then the plan type is "OPEN_SOURCE"
 
   # ============================================================================
   # Enforcement Enabled: LICENSE_ENFORCEMENT_ENABLED=true

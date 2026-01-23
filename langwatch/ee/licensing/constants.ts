@@ -5,8 +5,8 @@ import type { PlanInfo } from "~/server/subscriptionHandler";
  * Maintains backward compatibility with current OSS behavior.
  */
 export const UNLIMITED_PLAN: PlanInfo = {
-  type: "SELF_HOSTED",
-  name: "Self-Hosted (Unlimited)",
+  type: "OPEN_SOURCE",
+  name: "Open Source",
   free: true,
   overrideAddingLimitations: true,
   maxMembers: 99_999,
