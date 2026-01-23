@@ -166,6 +166,11 @@ export const transformBatchEvaluationData = (
   // For API evaluations without targets/predicted: derive a virtual target
   let targetColumns: BatchTargetColumn[] = [];
 
+  // Check if there are row-level errors without any target_id
+  const hasRowLevelErrorsWithoutTarget = dataset.some(
+    (entry) => entry.error && !entry.target_id,
+  );
+
   if (targets && targets.length > 0) {
     // V3 style with explicit targets
     targetColumns = targets.map((target) => ({
@@ -217,6 +222,17 @@ export const transformBatchEvaluationData = (
           ),
         }),
       );
+    } else if (hasRowLevelErrorsWithoutTarget) {
+      // SDK evaluations with errors but no targets defined - create a virtual "Output" target
+      // This ensures errors are visible in the table
+      targetColumns = [
+        {
+          id: "_default",
+          name: "Output",
+          type: "custom" as const,
+          outputFields: [],
+        },
+      ];
     }
   }
 

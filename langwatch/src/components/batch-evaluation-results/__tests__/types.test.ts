@@ -222,7 +222,7 @@ describe("transformBatchEvaluationData", () => {
       expect(evalResult.details).toBe("API rate limit exceeded");
     });
 
-    it("handles V2 target execution error", () => {
+    it("handles V2 target execution error with virtual target", () => {
       const data: ESBatchEvaluation = {
         project_id: "proj-1",
         experiment_id: "exp-1",
@@ -240,9 +240,13 @@ describe("transformBatchEvaluationData", () => {
 
       const result = transformBatchEvaluationData(data);
 
-      expect(result.targetColumns).toHaveLength(0); // No predictions, no targets
+      // Now creates a virtual target to display the error
+      expect(result.targetColumns).toHaveLength(1);
+      expect(result.targetColumns[0]?.id).toBe("_default");
+      expect(result.targetColumns[0]?.name).toBe("Output");
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "test" });
+      expect(result.rows[0]?.targets["_default"]?.error).toBe("Connection timeout");
     });
   });
 
@@ -779,6 +783,78 @@ describe("transformBatchEvaluationData", () => {
       // Should NOT have derived target - should use the predicted columns
       expect(result.targetColumns[0]?.id).not.toBe("_derived");
       expect(result.targetColumns[0]?.id).toBe("end");
+    });
+
+    it("creates a virtual Output target for row-level errors without any targets or evaluators", () => {
+      // This is the case from SDK's evaluation.run() when the callback throws an error
+      // No targets registered, no evaluations, just dataset rows with errors
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: null,
+        dataset: [
+          {
+            index: 0,
+            entry: { question: "What is 2+2?", expected: "4" },
+            cost: null,
+            duration: 4,
+            error: "Not implemented",
+            trace_id: "trace-1",
+          },
+          {
+            index: 1,
+            entry: { question: "What is the capital of France?", expected: "Paris" },
+            cost: null,
+            duration: 3,
+            error: "Not implemented",
+            trace_id: "trace-2",
+          },
+        ],
+        evaluations: [],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should create a virtual "Output" target to display the errors
+      expect(result.targetColumns).toHaveLength(1);
+      expect(result.targetColumns[0]?.id).toBe("_default");
+      expect(result.targetColumns[0]?.name).toBe("Output");
+      expect(result.targetColumns[0]?.type).toBe("custom");
+
+      // Rows should have the error information attached to the virtual target
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows[0]?.targets["_default"]?.error).toBe("Not implemented");
+      expect(result.rows[0]?.targets["_default"]?.duration).toBe(4);
+      expect(result.rows[0]?.targets["_default"]?.traceId).toBe("trace-1");
+
+      expect(result.rows[1]?.targets["_default"]?.error).toBe("Not implemented");
+      expect(result.rows[1]?.targets["_default"]?.duration).toBe(3);
+      expect(result.rows[1]?.targets["_default"]?.traceId).toBe("trace-2");
+
+      // Output should be null since there's no predicted value
+      expect(result.rows[0]?.targets["_default"]?.output).toBeNull();
+    });
+
+    it("creates virtual target only when there are errors, not for empty dataset", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: null,
+        dataset: [
+          { index: 0, entry: { question: "What is 2+2?" } },
+          { index: 1, entry: { question: "What is 3+3?" } },
+        ],
+        evaluations: [],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // No errors and no evaluators - should NOT create a virtual target
+      expect(result.targetColumns).toHaveLength(0);
     });
   });
 
