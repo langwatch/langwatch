@@ -28,10 +28,8 @@ export const SCENARIO_WORKER = {
   STALLED_INTERVAL_MS: 10 * 60 * 1000, // 10 minutes
 } as const;
 
-/** Model defaults */
+/** Scenario defaults */
 export const SCENARIO_DEFAULTS = {
-  /** Default LLM model when none specified */
-  MODEL: "openai/gpt-4o-mini",
   /** Default set ID for local scenarios */
   SET_ID: "local-scenarios",
 } as const;

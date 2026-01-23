@@ -134,6 +134,23 @@ describe("ScenarioExecutionOrchestrator", () => {
       expect(result.error).toContain("not found");
     });
 
+    it("returns failure when project has no default model configured", async () => {
+      // Given: project exists but has no default model
+      const deps = createTestDeps({
+        projectRepository: {
+          getProject: async () => ({ apiKey: "test-api-key", defaultModel: null }),
+        },
+      });
+      const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+      // When: executing
+      const result = await orchestrator.execute(defaultInput);
+
+      // Then: returns failure with clear error message
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Project default model is not configured");
+    });
+
     it("returns failure when model params cannot be prepared", async () => {
       // Given: model params provider returns null
       const deps = createTestDeps({

@@ -18,7 +18,8 @@ export interface PromptConfigData {
   promptId: string;
   systemPrompt: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
-  model: string;
+  /** Model configured on prompt (if any). Used for model selection logic. */
+  model?: string;
   temperature?: number;
   maxTokens?: number;
 }

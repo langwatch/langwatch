@@ -6,6 +6,7 @@
  */
 
 import { env } from "~/env.mjs";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -48,18 +49,11 @@ export async function prefetchScenarioData(
     return { success: false, error: `Scenario ${context.scenarioId} not found` };
   }
 
-  const project = await fetchProject(context.projectId);
-  if (!project) {
-    return { success: false, error: `Project ${context.projectId} not found` };
+  const projectResult = await fetchProject(context.projectId);
+  if (!projectResult.success) {
+    return { success: false, error: projectResult.error };
   }
-
-  const modelParams = await fetchModelParams(
-    context.projectId,
-    project.defaultModel,
-  );
-  if (!modelParams) {
-    return { success: false, error: "Failed to prepare model params" };
-  }
+  const project = projectResult.data;
 
   const adapterData = await fetchAdapterData(context.projectId, target);
   if (!adapterData) {
@@ -67,6 +61,16 @@ export async function prefetchScenarioData(
       success: false,
       error: `${target.type === "prompt" ? "Prompt" : "HTTP agent"} ${target.referenceId} not found`,
     };
+  }
+
+  // When target is a prompt, use the prompt's configured model for fetching model params
+  const modelForParams =
+    adapterData.type === "prompt" && adapterData.model
+      ? adapterData.model
+      : project.defaultModel;
+  const modelParams = await fetchModelParams(context.projectId, modelForParams);
+  if (!modelParams) {
+    return { success: false, error: "Failed to prepare model params" };
   }
 
   return {
@@ -101,17 +105,25 @@ async function fetchScenario(
   };
 }
 
-async function fetchProject(
-  projectId: string,
-): Promise<{ apiKey: string; defaultModel: string } | null> {
+type FetchProjectResult =
+  | { success: true; data: { apiKey: string; defaultModel: string } }
+  | { success: false; error: string };
+
+async function fetchProject(projectId: string): Promise<FetchProjectResult> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { apiKey: true, defaultModel: true },
   });
-  if (!project?.apiKey) return null;
+  if (!project?.apiKey) {
+    return { success: false, error: `Project ${projectId} not found` };
+  }
+  // Fall back to DEFAULT_MODEL like the rest of the app does
   return {
-    apiKey: project.apiKey,
-    defaultModel: project.defaultModel ?? "openai/gpt-4o-mini",
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      defaultModel: project.defaultModel ?? DEFAULT_MODEL,
+    },
   };
 }
 
@@ -166,7 +178,7 @@ async function fetchPromptConfigData(
       (m): m is { role: "user" | "assistant"; content: string } =>
         m.role === "user" || m.role === "assistant",
     ),
-    model: prompt.model ?? "openai/gpt-4o-mini",
+    model: prompt.model ?? undefined,
     temperature: prompt.temperature ?? undefined,
     maxTokens: prompt.maxTokens ?? undefined,
   };

@@ -141,8 +141,46 @@ Feature: Simulation Runner Service
     And the result includes the error message
 
   # ============================================================================
-  # Error Handling
+  # Error Handling - Early Validation (API Level)
   # ============================================================================
+  # These errors are returned immediately from the API before scheduling a job.
+  # This provides instant feedback to the frontend instead of async job failures.
+
+  @unit
+  Scenario: Return immediate error when project default model not configured
+    Given project has no default model configured
+    When the run scenario API is called
+    Then it returns an immediate error (not scheduled)
+    And the error message is "Project default model is not configured"
+
+  @unit
+  Scenario: Return immediate error when prompt has no model configured
+    Given prompt "Test" exists without a model configured
+    And project has no default model configured
+    When the run scenario API is called with prompt target
+    Then it returns an immediate error (not scheduled)
+    And the error message contains "does not have a model configured"
+
+  @unit
+  Scenario: Return immediate error when scenario not found
+    Given scenario "nonexistent" does not exist
+    When the run scenario API is called
+    Then it returns an immediate error (not scheduled)
+    And the error message contains "not found"
+
+  @unit
+  Scenario: Return immediate error when prompt not found
+    Given scenario "Test" exists
+    And prompt "nonexistent" does not exist
+    When the run scenario API is called with prompt target
+    Then it returns an immediate error (not scheduled)
+    And the error message contains "not found"
+
+  # ============================================================================
+  # Error Handling - Worker Level (Safety Net)
+  # ============================================================================
+  # These errors occur in the worker if data changes after validation passed.
+  # They serve as a safety net but should rarely happen in practice.
 
   @integration
   Scenario: Return error when scenario not found

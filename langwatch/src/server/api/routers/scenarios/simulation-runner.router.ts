@@ -2,8 +2,10 @@
  * Router for running scenarios against targets.
  */
 
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { SCENARIO_DEFAULTS } from "~/server/scenarios/scenario.constants";
 import {
   generateBatchRunId,
@@ -48,6 +50,23 @@ export const simulationRunnerRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const setId = SCENARIO_DEFAULTS.SET_ID;
       const batchRunId = generateBatchRunId();
+
+      // Validate early - prefetch data to catch configuration errors before scheduling
+      const prefetchResult = await prefetchScenarioData(
+        { projectId: input.projectId, scenarioId: input.scenarioId, setId, batchRunId },
+        input.target,
+      );
+
+      if (!prefetchResult.success) {
+        logger.warn(
+          { projectId: input.projectId, scenarioId: input.scenarioId, error: prefetchResult.error },
+          "Scenario validation failed",
+        );
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: prefetchResult.error,
+        });
+      }
 
       logger.info(
         { projectId: input.projectId, scenarioId: input.scenarioId, batchRunId },
