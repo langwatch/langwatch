@@ -72,6 +72,20 @@ describe("isLicenseExpired", () => {
   it("returns false when status is undefined", () => {
     expect(isLicenseExpired(undefined)).toBe(false);
   });
+
+  it("returns false when expiresAt is an invalid date string", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "not-a-valid-date",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(isLicenseExpired(status)).toBe(false);
+  });
 });
 
 describe("normalizeKeyForActivation", () => {

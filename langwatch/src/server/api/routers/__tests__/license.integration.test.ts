@@ -13,7 +13,6 @@ import {
   it,
   vi,
 } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
