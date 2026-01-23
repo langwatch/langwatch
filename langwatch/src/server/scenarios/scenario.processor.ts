@@ -79,12 +79,18 @@ export async function processScenarioJob(
 
 /**
  * Spawn a child process to execute the scenario with isolated OTEL context.
+ *
+ * The child process is self-contained and self-reporting via LangWatch SDK.
+ * We just stream its output and check the exit code.
  */
 async function spawnScenarioChildProcess(
   jobData: ChildProcessJobData,
   telemetry: { endpoint: string; apiKey: string },
 ): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
+    const scenarioId = jobData.scenario.id;
+    const childLogger = createLogger(`langwatch:scenarios:child:${scenarioId}`);
+
     // Use tsx to run the TypeScript file directly, avoiding Next.js bundling issues
     const childPath = path.resolve(
       process.cwd(),
@@ -98,7 +104,6 @@ async function spawnScenarioChildProcess(
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
       env: {
         ...process.env,
-        DEBUG: "", // Disable debug logging to keep stdout clean for JSON parsing
         LANGWATCH_API_KEY: telemetry.apiKey,
         LANGWATCH_ENDPOINT: telemetry.endpoint,
         SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
@@ -107,7 +112,6 @@ async function spawnScenarioChildProcess(
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    let stdout = "";
     let stderr = "";
     let resolved = false;
 
@@ -119,10 +123,7 @@ async function spawnScenarioChildProcess(
     };
 
     const timeout = setTimeout(() => {
-      logger.error(
-        { scenarioId: jobData.scenario.id },
-        "Child process timed out",
-      );
+      childLogger.error("Child process timed out");
       cleanup();
       resolve({
         success: false,
@@ -130,12 +131,20 @@ async function spawnScenarioChildProcess(
       });
     }, CHILD_PROCESS_TIMEOUT_MS);
 
+    // Stream child output to parent logs
     child.stdout?.on("data", (data: Buffer) => {
-      stdout += data.toString();
+      const lines = data.toString().trim().split("\n");
+      for (const line of lines) {
+        if (line) childLogger.info(line);
+      }
     });
 
     child.stderr?.on("data", (data: Buffer) => {
       stderr += data.toString();
+      const lines = data.toString().trim().split("\n");
+      for (const line of lines) {
+        if (line) childLogger.warn(line);
+      }
     });
 
     child.on("close", (code) => {
@@ -143,18 +152,8 @@ async function spawnScenarioChildProcess(
       if (resolved) return;
       resolved = true;
 
-      if (stderr) {
-        logger.warn(
-          { scenarioId: jobData.scenario.id, stderr },
-          "Child process stderr",
-        );
-      }
-
       if (code !== 0) {
-        logger.error(
-          { scenarioId: jobData.scenario.id, code, stderr },
-          "Child process exited with error",
-        );
+        childLogger.error({ code, stderr }, "Child process exited with error");
         resolve({
           success: false,
           error: `Child process exited with code ${code}: ${stderr}`,
@@ -162,22 +161,8 @@ async function spawnScenarioChildProcess(
         return;
       }
 
-      try {
-        // Extract JSON from stdout - it should be at the end after any debug logs
-        const jsonMatch = stdout.match(/\{[\s\S]*\}$/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : stdout;
-        const result = JSON.parse(jsonStr) as ScenarioExecutionResult;
-        resolve(result);
-      } catch (error) {
-        logger.error(
-          { scenarioId: jobData.scenario.id, stdout, error },
-          "Failed to parse child process output",
-        );
-        resolve({
-          success: false,
-          error: `Failed to parse result: ${stdout}`,
-        });
-      }
+      // Child reports results via LangWatch SDK, we just confirm it succeeded
+      resolve({ success: true });
     });
 
     child.on("error", (error) => {
@@ -185,10 +170,7 @@ async function spawnScenarioChildProcess(
       if (resolved) return;
       resolved = true;
 
-      logger.error(
-        { scenarioId: jobData.scenario.id, error },
-        "Child process error",
-      );
+      childLogger.error({ error }, "Child process error");
       resolve({
         success: false,
         error: `Child process error: ${error.message}`,
