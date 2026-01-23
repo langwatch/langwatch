@@ -6,7 +6,7 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { customAlphabet, nanoid } from "nanoid";
+import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import {
@@ -31,6 +31,8 @@ import {
 } from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
+import { auditLog } from "../../auditLog";
+import { generateApiKey } from "../../utils/apiKeyGenerator";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -259,7 +261,14 @@ export const projectRouter = createTRPCRouter({
           },
         });
 
-        return { success: true, apiKey: project.apiKey };
+        // Audit log the security-critical action
+        await auditLog({
+          action: "project.apiKey.regenerated",
+          userId: ctx.session.user.id,
+          projectId: input.projectId,
+        });
+
+        return { apiKey: project.apiKey };
       } catch (error) {
         // Prisma throws P2025 when no record is found
         if (
@@ -637,13 +646,6 @@ export const projectRouter = createTRPCRouter({
       }
     }),
 });
-
-export const generateApiKey = (): string => {
-  const alphabet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const randomPart = customAlphabet(alphabet, 48)();
-  return `sk-lw-${randomPart}`;
-};
 
 async function checkCapturedDataVisibilityPermission({
   ctx,

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { projectRouter } from "../project";
 import { createInnerTRPCContext } from "../../trpc";
+import { auditLog } from "../../../auditLog";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
@@ -72,12 +73,14 @@ describe("project.regenerateApiKey mutation logic", () => {
   });
 
   describe("when project exists", () => {
-    it("generates a new API key with correct format", async () => {
+    it("regenerates the API key and returns the new key", async () => {
       // Arrange
       const projectId = "project_123";
+      const expectedApiKey =
+        "sk-lw-mock48characterrandomstringforapikeygeneration";
       mockPrisma.project.update.mockResolvedValueOnce({
         id: projectId,
-        apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
+        apiKey: expectedApiKey,
         slug: "test-project",
       });
 
@@ -85,26 +88,10 @@ describe("project.regenerateApiKey mutation logic", () => {
       const result = await caller.regenerateApiKey({ projectId });
 
       // Assert
-      expect(result.success).toBe(true);
-      expect(result.apiKey).toMatch(/^sk-lw-/);
-      expect(result.apiKey).toBe(
-        "sk-lw-mock48characterrandomstringforapikeygeneration",
-      );
-    });
-
-    it("calls prisma.project.update with the new API key", async () => {
-      // Arrange
-      const projectId = "project_123";
-      mockPrisma.project.update.mockResolvedValueOnce({
-        id: projectId,
-        apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
-        slug: "test-project",
+      expect(result).toEqual({
+        apiKey: expectedApiKey,
       });
-
-      // Act
-      await caller.regenerateApiKey({ projectId });
-
-      // Assert
+      expect(result.apiKey).toMatch(/^sk-lw-/);
       expect(mockPrisma.project.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: projectId },
@@ -120,25 +107,23 @@ describe("project.regenerateApiKey mutation logic", () => {
       );
     });
 
-    it("returns success with the new API key", async () => {
+    it("logs the security-critical action to audit log", async () => {
       // Arrange
       const projectId = "project_123";
-      const expectedApiKey =
-        "sk-lw-mock48characterrandomstringforapikeygeneration";
-
       mockPrisma.project.update.mockResolvedValueOnce({
         id: projectId,
-        apiKey: expectedApiKey,
+        apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
         slug: "test-project",
       });
 
       // Act
-      const result = await caller.regenerateApiKey({ projectId });
+      await caller.regenerateApiKey({ projectId });
 
-      // Assert
-      expect(result).toEqual({
-        success: true,
-        apiKey: expectedApiKey,
+      // Assert - Verify audit log was called with correct parameters
+      expect(auditLog).toHaveBeenCalledWith({
+        action: "project.apiKey.regenerated",
+        userId: "test-user-id",
+        projectId: projectId,
       });
     });
   });

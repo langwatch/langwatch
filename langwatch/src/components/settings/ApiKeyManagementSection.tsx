@@ -35,12 +35,10 @@ export function ApiKeyManagementSection({
       <HorizontalFormControl
         label="API Key"
         helper={
-          <VStack align="start" gap={1}>
-            <Text>
-              Your API key is used to authenticate requests to LangWatch. Keep
-              it secure and never share it publicly.
-            </Text>
-          </VStack>
+          <Text>
+            Your API key is used to authenticate requests to LangWatch. Keep
+            it secure and never share it publicly.
+          </Text>
         }
       >
         <VStack width="full" align="start" gap={3}>

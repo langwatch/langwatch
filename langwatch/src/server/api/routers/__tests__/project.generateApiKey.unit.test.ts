@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateApiKey } from "../project";
+import { generateApiKey } from "../../utils/apiKeyGenerator";
 
 /**
  * Unit tests for generateApiKey function
