@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     watch: false,
     maxWorkers: 2, // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
+    testTimeout: 30000, // 30s default to handle slower CI runners
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,

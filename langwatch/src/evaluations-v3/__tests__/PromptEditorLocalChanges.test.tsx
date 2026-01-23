@@ -271,7 +271,7 @@ describe("Prompt Editor Local Changes", () => {
       // KEY ASSERTION: window.confirm should NOT be called
       // because onLocalConfigChange is provided (evaluations context)
       expect(window.confirm).not.toHaveBeenCalled();
-    }, 10000);
+    }, 30000);
 
     it("calls onLocalConfigChange when changes are made", async () => {
       const user = userEvent.setup();
@@ -319,7 +319,7 @@ describe("Prompt Editor Local Changes", () => {
         ];
       expect(lastCall?.[0]).toBeDefined();
       expect(lastCall?.[0]).toHaveProperty("messages");
-    }, 10000);
+    }, 30000);
   });
 
   describe("when onLocalConfigChange is NOT provided (standalone prompt editing)", () => {
@@ -358,7 +358,7 @@ describe("Prompt Editor Local Changes", () => {
       // KEY ASSERTION: window.confirm SHOULD be called
       // because onLocalConfigChange is NOT provided
       expect(window.confirm).toHaveBeenCalled();
-    }, 10000);
+    }, 30000);
   });
 
   describe("alert icon persists after saving prompt with unmapped field", () => {
@@ -645,7 +645,7 @@ describe("Prompt Editor Local Changes", () => {
       // Form shows server response (mockPromptData has "You are a helpful assistant.")
       // In reality, server would return the user's saved content
       expect(textareas[0]).toHaveValue("You are a helpful assistant.");
-    }, 20000);
+    }, 30000);
   });
 
   describe("switching between targets preserves local changes", () => {
@@ -868,6 +868,6 @@ describe("Prompt Editor Local Changes", () => {
         },
         { timeout: 2000 },
       );
-    }, 10000);
+    }, 30000);
   });
 });
