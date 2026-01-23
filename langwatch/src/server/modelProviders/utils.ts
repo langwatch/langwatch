@@ -10,7 +10,7 @@ import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { ProjectRepository } from "../repositories/project.repository";
 import type { MaybeStoredModelProvider } from "./registry";
 
-const defaultProjectRepository = new ProjectRepository(prisma);
+const defaultProjectRepository = ProjectRepository.create(prisma);
 
 export const getVercelAIModel = async (
   projectId: string,
