@@ -37,7 +37,7 @@ export function ApiKeyManagementSection({
         title: "API Key Regenerated",
         description:
           "Your old API key has been invalidated. Make sure to update your applications.",
-        type: "warning",
+        type: "danger",
         meta: { closable: true },
       });
     },
@@ -81,7 +81,7 @@ export function ApiKeyManagementSection({
           />
 
           {showNewKey && (
-            <Alert.Root status="warning" borderRadius="md">
+            <Alert.Root status="danger" borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Title>New API Key Generated</Alert.Title>
@@ -121,7 +121,7 @@ export function ApiKeyManagementSection({
                 This will invalidate your current API key immediately. Any
                 applications or services using the old key will stop working.
               </Text>
-              <Alert.Root status="warning" borderRadius="md">
+              <Alert.Root status="danger" borderRadius="md">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Title>This action cannot be undone</Alert.Title>
