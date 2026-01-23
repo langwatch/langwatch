@@ -18,6 +18,16 @@ export function hasLicenseMetadata(
 }
 
 /**
+ * Type guard that checks if a license is corrupted.
+ * Corrupted licenses have hasLicense: true but cannot be read.
+ */
+export function isCorruptedLicense(
+  status: Extract<LicenseStatus, { hasLicense: true }>
+): boolean {
+  return "corrupted" in status && status.corrupted === true;
+}
+
+/**
  * Determines if a license has expired based on its expiresAt date.
  * Returns true only when:
  * - License exists (hasLicense: true)
@@ -29,7 +39,7 @@ export function hasLicenseMetadata(
  * - Corrupted license (no metadata)
  * - Invalid license with future expiresAt (signature issues, not expired)
  */
-export function deriveIsExpired(
+export function isLicenseExpired(
   status: LicenseStatus | undefined
 ): boolean {
   if (!status) return false;
@@ -67,5 +77,6 @@ export function formatLicenseDate(isoDate: string): string {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }

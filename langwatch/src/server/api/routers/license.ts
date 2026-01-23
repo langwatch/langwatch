@@ -12,7 +12,7 @@ export const licenseRouter = createTRPCRouter({
   getStatus: protectedProcedure
     .input(
       z.object({
-        organizationId: z.string(),
+        organizationId: z.string().min(1),
       })
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -33,7 +33,7 @@ export const licenseRouter = createTRPCRouter({
   upload: protectedProcedure
     .input(
       z.object({
-        organizationId: z.string(),
+        organizationId: z.string().min(1),
         licenseKey: z.string().min(1, "License key is required"),
       })
     )
@@ -70,7 +70,7 @@ export const licenseRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(
       z.object({
-        organizationId: z.string(),
+        organizationId: z.string().min(1),
       })
     )
     .use(checkOrganizationPermission("organization:manage"))

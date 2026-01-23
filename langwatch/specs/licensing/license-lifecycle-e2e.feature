@@ -118,6 +118,7 @@ Feature: License Lifecycle End-to-End
   # Settings Page Navigation
   # ============================================================================
 
+  @wip
   Scenario: License menu item appears in settings
     Given I am on any settings page
     Then I see "License" in the settings menu

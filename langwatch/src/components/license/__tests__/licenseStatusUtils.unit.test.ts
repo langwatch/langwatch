@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveIsExpired,
+  isLicenseExpired,
+  isCorruptedLicense,
   formatLicenseDate,
   hasLicenseMetadata,
   normalizeKeyForActivation,
@@ -11,7 +12,7 @@ import {
  * No mocks needed - these are pure functions.
  */
 
-describe("deriveIsExpired", () => {
+describe("isLicenseExpired", () => {
   it("returns true when license has past expiresAt date", () => {
     const status = {
       hasLicense: true,
@@ -23,7 +24,7 @@ describe("deriveIsExpired", () => {
       currentMembers: 5,
       maxMembers: 10,
     } as const;
-    expect(deriveIsExpired(status)).toBe(true);
+    expect(isLicenseExpired(status)).toBe(true);
   });
 
   it("returns false when license is corrupted (no metadata)", () => {
@@ -32,7 +33,7 @@ describe("deriveIsExpired", () => {
       valid: false,
       corrupted: true,
     } as const;
-    expect(deriveIsExpired(status)).toBe(false);
+    expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when license is invalid but has future expiresAt", () => {
@@ -46,7 +47,7 @@ describe("deriveIsExpired", () => {
       currentMembers: 5,
       maxMembers: 10,
     } as const;
-    expect(deriveIsExpired(status)).toBe(false);
+    expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when license exists and is valid", () => {
@@ -60,16 +61,16 @@ describe("deriveIsExpired", () => {
       currentMembers: 5,
       maxMembers: 10,
     } as const;
-    expect(deriveIsExpired(status)).toBe(false);
+    expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when no license exists", () => {
     const status = { hasLicense: false, valid: false } as const;
-    expect(deriveIsExpired(status)).toBe(false);
+    expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when status is undefined", () => {
-    expect(deriveIsExpired(undefined)).toBe(false);
+    expect(isLicenseExpired(undefined)).toBe(false);
   });
 });
 
@@ -128,6 +129,45 @@ describe("hasLicenseMetadata", () => {
       corrupted: true,
     } as const;
     expect(hasLicenseMetadata(status)).toBe(false);
+  });
+});
+
+describe("isCorruptedLicense", () => {
+  it("returns true when license is corrupted", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      corrupted: true,
+    } as const;
+    expect(isCorruptedLicense(status)).toBe(true);
+  });
+
+  it("returns false for valid license with metadata", () => {
+    const status = {
+      hasLicense: true,
+      valid: true,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2099-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(isCorruptedLicense(status)).toBe(false);
+  });
+
+  it("returns false for invalid license with metadata", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2023-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(isCorruptedLicense(status)).toBe(false);
   });
 });
 
