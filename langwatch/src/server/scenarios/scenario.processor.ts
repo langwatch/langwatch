@@ -65,6 +65,7 @@ export async function processScenarioJob(
 
   // Spawn child process with isolated OTEL context
   const result = await spawnScenarioChildProcess(
+    job,
     prefetchResult.data,
     prefetchResult.telemetry,
   );
@@ -84,12 +85,19 @@ export async function processScenarioJob(
  * We just stream its output and check the exit code.
  */
 async function spawnScenarioChildProcess(
+  job: Job<ScenarioJob, ScenarioJobResult, string>,
   jobData: ChildProcessJobData,
   telemetry: { endpoint: string; apiKey: string },
 ): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
     const scenarioId = jobData.scenario.id;
     const childLogger = createLogger(`langwatch:scenarios:child:${scenarioId}`);
+
+    // Helper to log to both pino (stdout) and BullMQ job (visible in Bull Board)
+    const log = (level: "info" | "warn" | "error", message: string) => {
+      childLogger[level](message);
+      void job.log(`[${level.toUpperCase()}] ${message}`);
+    };
 
     // Use tsx to run the TypeScript file directly, avoiding Next.js bundling issues
     const childPath = path.resolve(
@@ -123,7 +131,7 @@ async function spawnScenarioChildProcess(
     };
 
     const timeout = setTimeout(() => {
-      childLogger.error("Child process timed out");
+      log("error", "Child process timed out");
       cleanup();
       resolve({
         success: false,
@@ -131,11 +139,11 @@ async function spawnScenarioChildProcess(
       });
     }, CHILD_PROCESS_TIMEOUT_MS);
 
-    // Stream child output to parent logs
+    // Stream child output to parent logs and Bull Board
     child.stdout?.on("data", (data: Buffer) => {
       const lines = data.toString().trim().split("\n");
       for (const line of lines) {
-        if (line) childLogger.info(line);
+        if (line) log("info", line);
       }
     });
 
@@ -143,7 +151,7 @@ async function spawnScenarioChildProcess(
       stderr += data.toString();
       const lines = data.toString().trim().split("\n");
       for (const line of lines) {
-        if (line) childLogger.warn(line);
+        if (line) log("warn", line);
       }
     });
 
@@ -153,7 +161,7 @@ async function spawnScenarioChildProcess(
       resolved = true;
 
       if (code !== 0) {
-        childLogger.error({ code, stderr }, "Child process exited with error");
+        log("error", `Child process exited with code ${code}: ${stderr}`);
         resolve({
           success: false,
           error: `Child process exited with code ${code}: ${stderr}`,
@@ -161,6 +169,7 @@ async function spawnScenarioChildProcess(
         return;
       }
 
+      log("info", "Scenario completed successfully");
       // Child reports results via LangWatch SDK, we just confirm it succeeded
       resolve({ success: true });
     });
@@ -170,7 +179,7 @@ async function spawnScenarioChildProcess(
       if (resolved) return;
       resolved = true;
 
-      childLogger.error({ error }, "Child process error");
+      log("error", `Child process error: ${error.message}`);
       resolve({
         success: false,
         error: `Child process error: ${error.message}`,
