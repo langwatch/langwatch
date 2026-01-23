@@ -597,26 +597,27 @@ describe("transformBatchEvaluationData", () => {
 
       const result = transformBatchEvaluationData(data);
 
-      // Should have derived target
+      // Should have one virtual target per evaluator
       expect(result.targetColumns).toHaveLength(1);
-      expect(result.targetColumns[0]?.id).toBe("_derived");
-      expect(result.targetColumns[0]?.name).toBe("Output");
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+      expect(result.targetColumns[0]?.name).toBe("Sample Metric");
       expect(result.targetColumns[0]?.type).toBe("legacy");
 
-      // Should have rows with derived output from evaluator inputs
+      // Should have rows with output from evaluator inputs
       expect(result.rows).toHaveLength(2);
-      expect(result.rows[0]?.targets._derived?.output).toEqual({
+      const targetId = "_eval_sample_metric";
+      expect(result.rows[0]?.targets[targetId]?.output).toEqual({
         output: "The answer is 4",
       });
-      expect(result.rows[1]?.targets._derived?.output).toEqual({
+      expect(result.rows[1]?.targets[targetId]?.output).toEqual({
         output: "The answer is 6",
       });
 
       // Evaluator results should be attached
-      expect(result.rows[0]?.targets._derived?.evaluatorResults).toHaveLength(
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults).toHaveLength(
         1,
       );
-      expect(result.rows[0]?.targets._derived?.evaluatorResults[0]?.score).toBe(
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score).toBe(
         0.95,
       );
     });
@@ -649,11 +650,105 @@ describe("transformBatchEvaluationData", () => {
 
         const result = transformBatchEvaluationData(data);
 
-        expect(result.targetColumns[0]?.id).toBe("_derived");
-        expect(result.rows[0]?.targets._derived?.output).toEqual({
+        // Virtual target is created per evaluator
+        const targetId = "_eval_eval-1";
+        expect(result.targetColumns[0]?.id).toBe(targetId);
+        expect(result.rows[0]?.targets[targetId]?.output).toEqual({
           output: value,
         });
       }
+    });
+
+    it("creates multiple virtual targets when multiple evaluators exist", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
+        evaluations: [
+          {
+            evaluator: "sample_metric",
+            name: "Sample Metric",
+            status: "processed",
+            index: 0,
+            score: 0.95,
+            inputs: { response: "The answer is 4" },
+          },
+          {
+            evaluator: "sample_metric2",
+            name: "Sample Metric 2",
+            status: "processed",
+            index: 0,
+            passed: true,
+            inputs: { response: "Another response" },
+          },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should have two virtual targets, one per evaluator
+      expect(result.targetColumns).toHaveLength(2);
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+      expect(result.targetColumns[0]?.name).toBe("Sample Metric");
+      expect(result.targetColumns[1]?.id).toBe("_eval_sample_metric2");
+      expect(result.targetColumns[1]?.name).toBe("Sample Metric 2");
+
+      // Each target should have its own output from evaluator inputs
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+      ).toEqual({ output: "The answer is 4" });
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.output,
+      ).toEqual({ output: "Another response" });
+
+      // Each target should have only its own evaluator result
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults,
+      ).toHaveLength(1);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults[0]
+          ?.score,
+      ).toBe(0.95);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults,
+      ).toHaveLength(1);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults[0]
+          ?.passed,
+      ).toBe(true);
+    });
+
+    it("displays arbitrary data as JSON when no common output field exists", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
+        evaluations: [
+          {
+            evaluator: "sample_metric",
+            name: "Sample Metric",
+            status: "processed",
+            index: 0,
+            score: 0.76,
+            inputs: { foo: "bar", bar: "baz" },
+          },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should have virtual target for the evaluator
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+
+      // Output should be the full inputs object (not wrapped in {output: ...})
+      // This will be displayed as JSON in the UI
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+      ).toEqual({ foo: "bar", bar: "baz" });
     });
 
     it("does not derive target when dataset already has predicted values", () => {
