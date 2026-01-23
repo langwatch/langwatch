@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { LLMConfigFormatUtils, type FormLLMConfig } from "../llm-config-format-utils";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import {
+  type FormLLMConfig,
+  LLMConfigFormatUtils,
+} from "../llm-config-format-utils";
 
 describe("LLMConfigFormatUtils", () => {
   describe("formToDslFormat", () => {

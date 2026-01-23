@@ -443,7 +443,11 @@ export const DashboardLayout = ({
                 }
               }}
             >
-              <InputGroup startElement={<Search color="var(--chakra-colors-fg-muted)" size={14} />}>
+              <InputGroup
+                startElement={
+                  <Search color="var(--chakra-colors-fg-muted)" size={14} />
+                }
+              >
                 <Input
                   name="query"
                   type="search"

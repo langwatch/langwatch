@@ -1,7 +1,9 @@
+import { generate } from "@langwatch/ksuid";
 import { EvaluationExecutionMode } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
   AVAILABLE_EVALUATORS,
@@ -11,8 +13,6 @@ import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
  * Generates a unique slug for a monitor.
@@ -30,7 +30,17 @@ const generateMonitorSlug = (name: string): string => {
  * Checks existing monitors in the project to avoid conflicts.
  */
 const findUniqueMonitorName = async (
-  prisma: { monitor: { findFirst: (args: { where: { projectId: string; name: string } }) => Promise<unknown>; findMany: (args: { where: { projectId: string; name: { startsWith: string } }; select: { name: true } }) => Promise<{ name: string }[]> } },
+  prisma: {
+    monitor: {
+      findFirst: (args: {
+        where: { projectId: string; name: string };
+      }) => Promise<unknown>;
+      findMany: (args: {
+        where: { projectId: string; name: { startsWith: string } };
+        select: { name: true };
+      }) => Promise<{ name: string }[]>;
+    };
+  },
   projectId: string,
   baseName: string,
 ): Promise<string> => {

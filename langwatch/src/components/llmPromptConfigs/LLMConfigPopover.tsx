@@ -165,7 +165,12 @@ export function LLMConfigPopover({
       <VStack paddingY={3} paddingX={4} width="full" align="start" gap={3}>
         {/* Model Selector */}
         <Box width="full">
-          <Text fontSize="sm" fontWeight="medium" color="fg.muted" marginBottom={1}>
+          <Text
+            fontSize="sm"
+            fontWeight="medium"
+            color="fg.muted"
+            marginBottom={1}
+          >
             Model
           </Text>
           <ModelSelector
@@ -173,7 +178,9 @@ export function LLMConfigPopover({
             options={allModelOptions}
             onChange={(model) => {
               const newModelMetadata = modelMetadata?.[model];
-              onChange(buildModelChangeValues(model, undefined, newModelMetadata));
+              onChange(
+                buildModelChangeValues(model, undefined, newModelMetadata),
+              );
             }}
             mode="chat"
             size="full"
@@ -264,7 +271,6 @@ export function LLMConfigPopover({
             )}
           </>
         )}
-
       </VStack>
     </Popover.Content>
   );

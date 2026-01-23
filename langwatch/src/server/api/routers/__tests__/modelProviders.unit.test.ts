@@ -1,7 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
-import { getModelMetadataForFrontend, type ModelMetadataForFrontend, prepareLitellmParams } from "../modelProviders";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
+import {
+  getModelMetadataForFrontend,
+  type ModelMetadataForFrontend,
+  prepareLitellmParams,
+} from "../modelProviders";
 
 /**
  * Unit tests for modelProviders router helper functions
@@ -157,7 +161,7 @@ describe("getModelMetadataForFrontend", () => {
   it("includes OpenAI models", () => {
     const metadata = getModelMetadataForFrontend();
     const openaiModels = Object.keys(metadata).filter((k) =>
-      k.startsWith("openai/")
+      k.startsWith("openai/"),
     );
 
     expect(openaiModels.length).toBeGreaterThan(0);
@@ -183,7 +187,7 @@ describe("getModelMetadataForFrontend", () => {
   it("identifies multimodal models", () => {
     const metadata = getModelMetadataForFrontend();
     const imageModels = Object.values(metadata).filter(
-      (m) => m.supportsImageInput
+      (m) => m.supportsImageInput,
     );
 
     expect(imageModels.length).toBeGreaterThan(0);
@@ -223,7 +227,7 @@ describe("prepareLitellmParams", () => {
 
   const createMockProvider = (
     provider: string,
-    customKeys: Record<string, string> | null = null
+    customKeys: Record<string, string> | null = null,
   ): MaybeStoredModelProvider => ({
     provider,
     enabled: true,

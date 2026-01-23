@@ -13,9 +13,8 @@ import type {
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
-import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
-import { transformCamelToSnake } from "./transformToDbFormat";
 import { PromptVersionService } from "./prompt-version.service";
+import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
   type CreateLlmConfigVersionParams,
@@ -27,6 +26,7 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
+import { transformCamelToSnake } from "./transformToDbFormat";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<

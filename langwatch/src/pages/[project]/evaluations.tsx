@@ -364,9 +364,8 @@ function EvaluationsV2() {
                                             />
                                             <Text fontSize="sm">Stopped</Text>
                                           </>
-                                        ) : experiment.runsSummary.latestRun &&
-                                          experiment.runsSummary.latestRun
-                                            .timestamps?.updated_at &&
+                                        ) : experiment.runsSummary.latestRun
+                                            ?.timestamps?.updated_at &&
                                           Date.now() -
                                             experiment.runsSummary.latestRun
                                               .timestamps.updated_at <

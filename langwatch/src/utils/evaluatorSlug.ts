@@ -16,7 +16,10 @@ const NANOID_SUFFIX_LENGTH = 5;
  * Custom nanoid generator that excludes hyphens to avoid breaking slug parsing.
  * Uses lowercase alphanumeric characters only for cleaner slugs.
  */
-const nanoid = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", NANOID_SUFFIX_LENGTH);
+const nanoid = customAlphabet(
+  "0123456789abcdefghijklmnopqrstuvwxyz",
+  NANOID_SUFFIX_LENGTH,
+);
 
 /**
  * Generates a human-readable slug for an evaluator.

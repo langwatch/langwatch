@@ -15,12 +15,17 @@ import { EvaluationExecutionMode, type Evaluator } from "@prisma/client";
 import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import type { AvailableSource, FieldMapping as UIFieldMapping } from "~/components/variables";
+import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
+import type {
+  AvailableSource,
+  FieldMapping as UIFieldMapping,
+} from "~/components/variables";
+import { validateEvaluatorMappings } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
-  setFlowCallbacks,
   navigateToDrawer,
+  setFlowCallbacks,
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
@@ -30,16 +35,18 @@ import {
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
-import { TRACE_MAPPINGS, THREAD_MAPPINGS, type MappingState } from "~/server/tracer/tracesMapping";
+import {
+  type MappingState,
+  THREAD_MAPPINGS,
+  TRACE_MAPPINGS,
+} from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
-import { validateEvaluatorMappings } from "~/evaluations-v3/utils/mappingValidation";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
 import { StepRadio } from "./wizard/components/StepButton";
-import { LuListTree } from "react-icons/lu";
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
@@ -131,12 +138,14 @@ function getTraceAvailableSources(): AvailableSource[] {
       };
     });
 
-  return [{
-    id: "trace",
-    name: "Trace",
-    type: "dataset",
-    fields: traceFields,
-  }];
+  return [
+    {
+      id: "trace",
+      name: "Trace",
+      type: "dataset",
+      fields: traceFields,
+    },
+  ];
 }
 
 /**
@@ -155,49 +164,41 @@ const THREAD_TRACES_CHILDREN = [
  * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
  */
 function getThreadAvailableSources(): AvailableSource[] {
-  return [{
-    id: "thread",
-    name: "Thread",
-    type: "dataset",
-    fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-      // Special handling for "traces" - provide nested children for field selection
-      if (key === "traces") {
+  return [
+    {
+      id: "thread",
+      name: "Thread",
+      type: "dataset",
+      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
+        // Special handling for "traces" - provide nested children for field selection
+        if (key === "traces") {
+          return {
+            name: key,
+            type: "list" as const,
+            children: THREAD_TRACES_CHILDREN,
+            // Allow selecting traces itself (returns all trace data)
+            isComplete: true,
+          };
+        }
+
+        const hasKeys = "keys" in config && typeof config.keys === "function";
+
+        // For thread mappings, most fields are complete selections
+        if (hasKeys) {
+          return {
+            name: key,
+            type: "dict" as const,
+            isComplete: true,
+          };
+        }
+
         return {
           name: key,
-          type: "list" as const,
-          children: THREAD_TRACES_CHILDREN,
-          // Allow selecting traces itself (returns all trace data)
-          isComplete: true,
+          type: "str" as const,
         };
-      }
-
-      const hasKeys = "keys" in config && typeof config.keys === "function";
-
-      // For thread mappings, most fields are complete selections
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    }),
-  }];
-}
-
-/**
- * Get required fields from an evaluator definition.
- */
-function getRequiredFields(evaluatorType: EvaluatorTypes | undefined): string[] {
-  if (!evaluatorType) return [];
-  const def = AVAILABLE_EVALUATORS[evaluatorType];
-  if (!def) return [];
-  return def.requiredFields ?? ["input", "output"];
+      }),
+    },
+  ];
 }
 
 /**
@@ -218,7 +219,7 @@ function getAllFields(evaluatorType: EvaluatorTypes | undefined): string[] {
  */
 function autoInferMappings(
   allFields: string[],
-  level: EvaluationLevel
+  level: EvaluationLevel,
 ): Record<string, UIFieldMapping> {
   const mappings: Record<string, UIFieldMapping> = {};
   const sourceId = level === "trace" ? "trace" : "thread";
@@ -243,22 +244,6 @@ function autoInferMappings(
   }
 
   return mappings;
-}
-
-/**
- * Compute which fields are pending (unmapped).
- */
-function getPendingFields(
-  requiredFields: string[],
-  mappings: Record<string, UIFieldMapping>
-): string[] {
-  return requiredFields.filter((field) => {
-    const mapping = mappings[field];
-    if (!mapping) return true;
-    if (mapping.type === "source" && mapping.path.length === 0) return true;
-    if (mapping.type === "value" && !mapping.value) return true;
-    return false;
-  });
 }
 
 // Precondition options
@@ -345,10 +330,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // These are managed separately due to complex interactions with drawer system
   const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
-    () => onlineEvaluationDrawerState?.selectedEvaluator ?? null
+    () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
   );
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
-    () => onlineEvaluationDrawerState?.mappings ?? {}
+    () => onlineEvaluationDrawerState?.mappings ?? {},
   );
 
   // Track if the form has been modified (dirty state)
@@ -373,7 +358,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Load existing monitor if editing
   const monitorQuery = api.monitors.getById.useQuery(
     { id: monitorId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!monitorId && !!project?.id && isOpen }
+    { enabled: !!monitorId && !!project?.id && isOpen },
   );
 
   // Load evaluator if monitor has evaluatorId
@@ -384,7 +369,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
     {
       enabled: !!monitorQuery.data?.evaluatorId && !!project?.id && isOpen,
-    }
+    },
   );
 
   // Load pending evaluator (newly created from the flow)
@@ -396,7 +381,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
     {
       enabled: !!pendingEvaluatorId && !!project?.id && isOpen,
-    }
+    },
   );
 
   // Create mutation
@@ -428,18 +413,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Get evaluator type info for display
   const evaluatorType = selectedEvaluator
     ? ((selectedEvaluator.config as { evaluatorType?: string } | null)
-      ?.evaluatorType as EvaluatorTypes | undefined)
+        ?.evaluatorType as EvaluatorTypes | undefined)
     : undefined;
 
-  // Compute required fields and all fields
-  const requiredFields = useMemo(
-    () => getRequiredFields(evaluatorType),
-    [evaluatorType]
-  );
-  const allFields = useMemo(
-    () => getAllFields(evaluatorType),
-    [evaluatorType]
-  );
+  // Compute all fields
+  const allFields = useMemo(() => getAllFields(evaluatorType), [evaluatorType]);
 
   // Use shared validation logic (same as evaluations v3)
   // This ensures consistent validation across the platform
@@ -453,16 +431,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // For backward compatibility with existing code
   const pendingFields = mappingValidation.missingRequiredFields;
   // Invalid if: required fields missing OR no fields mapped (when there are fields)
-  const hasPendingMappings = selectedEvaluator !== null && !mappingValidation.isValid;
+  const hasPendingMappings =
+    selectedEvaluator !== null && !mappingValidation.isValid;
 
   // Get available sources based on level (empty if no level selected)
-  const availableSources = useMemo(
-    () => {
-      if (!level) return [];
-      return level === "trace" ? getTraceAvailableSources() : getThreadAvailableSources();
-    },
-    [level]
-  );
+  const availableSources = useMemo(() => {
+    if (!level) return [];
+    return level === "trace"
+      ? getTraceAvailableSources()
+      : getThreadAvailableSources();
+  }, [level]);
 
   // Track if we've already loaded the monitor data (to prevent re-loading on remount)
   const monitorDataLoadedRef = useRef(false);
@@ -504,7 +482,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         pendingEvaluatorId: onlineEvaluationDrawerState?.pendingEvaluatorId,
       };
     }
-  }, [isOpen, level, name, selectedEvaluator, sample, mappings, preconditions, threadIdleTimeout]);
+  }, [
+    isOpen,
+    level,
+    name,
+    selectedEvaluator,
+    sample,
+    mappings,
+    preconditions,
+    threadIdleTimeout,
+  ]);
 
   // Mark form as dirty when user makes changes to non-form-managed state
   const markDirty = useCallback(() => setHasUnsavedChanges(true), []);
@@ -514,7 +501,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (hasUnsavedChanges) {
       if (
         !window.confirm(
-          "You have unsaved changes. Are you sure you want to close?"
+          "You have unsaved changes. Are you sure you want to close?",
         )
       ) {
         return;
@@ -536,7 +523,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
     // Skip if there's persisted state (user made changes and navigated away)
     // This preserves user's changes when they go to evaluator editor and come back
-    if (onlineEvaluationDrawerState && onlineEvaluationDrawerState.selectedEvaluator) {
+    if (onlineEvaluationDrawerState?.selectedEvaluator) {
       return;
     }
 
@@ -545,10 +532,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
       const monitorName = monitorQuery.data.name;
       const monitorSample = monitorQuery.data.sample;
-      const monitorPreconditions = (monitorQuery.data.preconditions as CheckPrecondition[]) ?? [];
-      const monitorThreadIdleTimeout = monitorQuery.data.threadIdleTimeout ?? null;
+      const monitorPreconditions =
+        (monitorQuery.data.preconditions as CheckPrecondition[]) ?? [];
+      const monitorThreadIdleTimeout =
+        monitorQuery.data.threadIdleTimeout ?? null;
       // Load level from monitor data (defaults to "trace" for backward compatibility)
-      const monitorLevel = (monitorQuery.data.level as EvaluationLevel) ?? "trace";
+      const monitorLevel =
+        (monitorQuery.data.level as EvaluationLevel) ?? "trace";
 
       // Reset form with loaded data
       form.reset({
@@ -560,10 +550,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       });
 
       // Load existing mappings
-      const existingMappings = monitorQuery.data.mappings as MappingState | null;
+      const existingMappings = monitorQuery.data
+        .mappings as MappingState | null;
       const uiMappings: Record<string, UIFieldMapping> = {};
       if (existingMappings?.mapping) {
-        for (const [field, mapping] of Object.entries(existingMappings.mapping)) {
+        for (const [field, mapping] of Object.entries(
+          existingMappings.mapping,
+        )) {
           if (mapping.source) {
             const pathParts: string[] = [mapping.source as string];
             if (mapping.key) pathParts.push(mapping.key);
@@ -620,7 +613,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         };
       }
     }
-  }, [pendingEvaluatorQuery.data, pendingEvaluatorId, name, level, form, markDirty]);
+  }, [
+    pendingEvaluatorQuery.data,
+    pendingEvaluatorId,
+    name,
+    level,
+    form,
+    markDirty,
+  ]);
 
   // Handle mapping change from evaluator editor
   // IMPORTANT: This persists to module-level state FIRST because OnlineEvaluationDrawer
@@ -633,7 +633,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         const prevMappings = onlineEvaluationDrawerState.mappings;
         const newMappings = mapping
           ? { ...prevMappings, [identifier]: mapping }
-          : Object.fromEntries(Object.entries(prevMappings).filter(([k]) => k !== identifier));
+          : Object.fromEntries(
+              Object.entries(prevMappings).filter(([k]) => k !== identifier),
+            );
 
         onlineEvaluationDrawerState = {
           ...onlineEvaluationDrawerState,
@@ -645,13 +647,15 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       setMappings((prev) => {
         return mapping
           ? { ...prev, [identifier]: mapping }
-          : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== identifier));
+          : Object.fromEntries(
+              Object.entries(prev).filter(([k]) => k !== identifier),
+            );
       });
 
       // Mark as dirty since user changed mappings
       setHasUnsavedChanges(true);
     },
-    []
+    [],
   );
 
   // Open evaluator editor with mappings config
@@ -668,7 +672,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
     });
-  }, [selectedEvaluator, availableSources, mappings, handleMappingChange, openDrawer]);
+  }, [
+    selectedEvaluator,
+    availableSources,
+    mappings,
+    handleMappingChange,
+    openDrawer,
+  ]);
 
   // Open evaluator editor when clicking on already-selected evaluator
   // This opens the editor directly with mappings config
@@ -706,17 +716,24 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
         // Build mappings config and navigate to evaluator editor
         const newMappingsConfig: EvaluatorMappingsConfig = {
-          availableSources: level === "trace" ? getTraceAvailableSources() : getThreadAvailableSources(),
+          availableSources:
+            level === "trace"
+              ? getTraceAvailableSources()
+              : getThreadAvailableSources(),
           initialMappings: autoMappings,
           onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
-        openDrawer("evaluatorEditor", {
-          evaluatorId: evaluator.id,
-          mappingsConfig: newMappingsConfig,
-          saveButtonText: "Select Evaluator",
-        }, { replaceCurrentInStack: true });
+        openDrawer(
+          "evaluatorEditor",
+          {
+            evaluatorId: evaluator.id,
+            mappingsConfig: newMappingsConfig,
+            saveButtonText: "Select Evaluator",
+          },
+          { replaceCurrentInStack: true },
+        );
       },
     });
 
@@ -732,7 +749,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
     });
-  }, [selectedEvaluator, name, level, sample, preconditions, availableSources, mappings, handleMappingChange, openDrawer]);
+  }, [
+    selectedEvaluator,
+    name,
+    level,
+    sample,
+    preconditions,
+    availableSources,
+    mappings,
+    handleMappingChange,
+    openDrawer,
+  ]);
 
   const handleSelectEvaluator = useCallback(() => {
     // Helper function to handle evaluator selection (used by both existing and new evaluators)
@@ -769,7 +796,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
-        availableSources: level === "trace" ? getTraceAvailableSources() : getThreadAvailableSources(),
+        availableSources:
+          level === "trace"
+            ? getTraceAvailableSources()
+            : getThreadAvailableSources(),
         initialMappings: autoMappings,
         onMappingChange: handleMappingChange,
       };
@@ -777,11 +807,15 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
       // This way, Cancel/back from evaluatorEditor goes to onlineEvaluation, not evaluatorList
       // Use "Select Evaluator" button text since we're selecting, not editing
-      openDrawer("evaluatorEditor", {
-        evaluatorId: evaluator.id,
-        mappingsConfig,
-        saveButtonText: "Select Evaluator",
-      }, { replaceCurrentInStack: true });
+      openDrawer(
+        "evaluatorEditor",
+        {
+          evaluatorId: evaluator.id,
+          mappingsConfig,
+          saveButtonText: "Select Evaluator",
+        },
+        { replaceCurrentInStack: true },
+      );
     };
 
     // Helper to set up the evaluatorEditor callback for NEW evaluators
@@ -835,41 +869,52 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
 
     openDrawer("evaluatorList", {});
-  }, [name, level, sample, preconditions, openDrawer, handleMappingChange, threadIdleTimeout]);
+  }, [
+    name,
+    level,
+    sample,
+    preconditions,
+    openDrawer,
+    handleMappingChange,
+    threadIdleTimeout,
+  ]);
 
-  const handleLevelChange = useCallback((details: { value: string | null }) => {
-    if (!details.value) return;
-    const newLevel = details.value as EvaluationLevel;
-    form.setValue("level", newLevel);
+  const handleLevelChange = useCallback(
+    (details: { value: string | null }) => {
+      if (!details.value) return;
+      const newLevel = details.value as EvaluationLevel;
+      form.setValue("level", newLevel);
 
-    // Clear and re-infer mappings for new level
-    // Important: We must completely replace mappings when switching levels
-    // because trace-level and thread-level have completely different sources
-    if (selectedEvaluator) {
-      // Start fresh with auto-inferred mappings for the new level
-      const autoMappings = autoInferMappings(allFields, newLevel);
-      setMappings(autoMappings);
+      // Clear and re-infer mappings for new level
+      // Important: We must completely replace mappings when switching levels
+      // because trace-level and thread-level have completely different sources
+      if (selectedEvaluator) {
+        // Start fresh with auto-inferred mappings for the new level
+        const autoMappings = autoInferMappings(allFields, newLevel);
+        setMappings(autoMappings);
 
-      // Also persist to module-level state
-      if (onlineEvaluationDrawerState) {
-        onlineEvaluationDrawerState = {
-          ...onlineEvaluationDrawerState,
-          level: newLevel,
-          mappings: autoMappings, // Replace, don't merge
-        };
+        // Also persist to module-level state
+        if (onlineEvaluationDrawerState) {
+          onlineEvaluationDrawerState = {
+            ...onlineEvaluationDrawerState,
+            level: newLevel,
+            mappings: autoMappings, // Replace, don't merge
+          };
+        }
+      } else {
+        // No evaluator selected, just clear mappings
+        setMappings({});
+        if (onlineEvaluationDrawerState) {
+          onlineEvaluationDrawerState = {
+            ...onlineEvaluationDrawerState,
+            level: newLevel,
+            mappings: {},
+          };
+        }
       }
-    } else {
-      // No evaluator selected, just clear mappings
-      setMappings({});
-      if (onlineEvaluationDrawerState) {
-        onlineEvaluationDrawerState = {
-          ...onlineEvaluationDrawerState,
-          level: newLevel,
-          mappings: {},
-        };
-      }
-    }
-  }, [selectedEvaluator, allFields, form]);
+    },
+    [selectedEvaluator, allFields, form],
+  );
 
   // Precondition handlers
   const addPrecondition = useCallback(() => {
@@ -880,17 +925,27 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     ]);
   }, [form]);
 
-  const removePrecondition = useCallback((index: number) => {
-    const current = form.getValues("preconditions");
-    form.setValue("preconditions", current.filter((_, i) => i !== index));
-  }, [form]);
+  const removePrecondition = useCallback(
+    (index: number) => {
+      const current = form.getValues("preconditions");
+      form.setValue(
+        "preconditions",
+        current.filter((_, i) => i !== index),
+      );
+    },
+    [form],
+  );
 
-  const updatePrecondition = useCallback((index: number, field: keyof CheckPrecondition, value: string) => {
-    const current = form.getValues("preconditions");
-    form.setValue("preconditions",
-      current.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-    );
-  }, [form]);
+  const updatePrecondition = useCallback(
+    (index: number, field: keyof CheckPrecondition, value: string) => {
+      const current = form.getValues("preconditions");
+      form.setValue(
+        "preconditions",
+        current.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
+      );
+    },
+    [form],
+  );
 
   const handleSave = useCallback(() => {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
@@ -968,12 +1023,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   ]);
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
-  const canSave = !!level && !!selectedEvaluator && !!name.trim() && !isLoading && !hasPendingMappings;
+  const canSave =
+    !!level &&
+    !!selectedEvaluator &&
+    !!name.trim() &&
+    !isLoading &&
+    !hasPendingMappings;
 
   // Run on text
-  const runOnText = sample >= 1
-    ? "every trace"
-    : `${+(sample * 100).toFixed(2)}% of traces`;
+  const runOnText =
+    sample >= 1 ? "every trace" : `${+(sample * 100).toFixed(2)}% of traces`;
 
   return (
     <Drawer.Root
@@ -1031,7 +1090,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   <Text lineHeight="1.5">
                     Select an evaluator to run on incoming traces
                     {selectedEvaluator && (
-                      <><br />
+                      <>
+                        <br />
                         <Text
                           as="span"
                           color="blue.500"
@@ -1146,13 +1206,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           <NativeSelect.Root minWidth="fit-content">
                             <NativeSelect.Field
                               value={precondition.field}
-                              onChange={(e) => updatePrecondition(index, "field", e.target.value)}
+                              onChange={(e) =>
+                                updatePrecondition(
+                                  index,
+                                  "field",
+                                  e.target.value,
+                                )
+                              }
                             >
-                              {Object.entries(fieldOptions).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
+                              {Object.entries(fieldOptions).map(
+                                ([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ),
+                              )}
                             </NativeSelect.Field>
                             <NativeSelect.Indicator />
                           </NativeSelect.Root>
@@ -1160,13 +1228,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           <NativeSelect.Root minWidth="fit-content">
                             <NativeSelect.Field
                               value={precondition.rule}
-                              onChange={(e) => updatePrecondition(index, "rule", e.target.value)}
+                              onChange={(e) =>
+                                updatePrecondition(
+                                  index,
+                                  "rule",
+                                  e.target.value,
+                                )
+                              }
                             >
-                              {Object.entries(ruleOptions).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
+                              {Object.entries(ruleOptions).map(
+                                ([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ),
+                              )}
                             </NativeSelect.Field>
                             <NativeSelect.Indicator />
                           </NativeSelect.Root>
@@ -1177,9 +1253,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           )}
                           <Input
                             value={precondition.value}
-                            onChange={(e) => updatePrecondition(index, "value", e.target.value)}
+                            onChange={(e) =>
+                              updatePrecondition(index, "value", e.target.value)
+                            }
                             placeholder={
-                              precondition.rule.includes("regex") ? "regex" : "text"
+                              precondition.rule.includes("regex")
+                                ? "regex"
+                                : "text"
                             }
                           />
                           {precondition.rule.includes("regex") && (
@@ -1222,7 +1302,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                       max="1"
                       step="0.1"
                       value={sample}
-                      onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
+                      onChange={(e) =>
+                        form.setValue("sample", parseFloat(e.target.value) || 1)
+                      }
                     />
                   </HStack>
                   <Text color="gray.500" fontStyle="italic">
@@ -1248,10 +1330,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               >
                 <NativeSelect.Root width="250px">
                   <NativeSelect.Field
-                    value={threadIdleTimeout === null ? "" : String(threadIdleTimeout)}
+                    value={
+                      threadIdleTimeout === null
+                        ? ""
+                        : String(threadIdleTimeout)
+                    }
                     onChange={(e) => {
                       const val = e.target.value;
-                      form.setValue("threadIdleTimeout", val === "" ? null : parseInt(val, 10));
+                      form.setValue(
+                        "threadIdleTimeout",
+                        val === "" ? null : parseInt(val, 10),
+                      );
                     }}
                   >
                     <option value="">Disabled - evaluate on every trace</option>
@@ -1281,7 +1370,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               colorPalette="blue"
               onClick={handleSave}
               disabled={!canSave}
-              title={hasPendingMappings ? "Complete all mappings first" : undefined}
+              title={
+                hasPendingMappings ? "Complete all mappings first" : undefined
+              }
             >
               {isLoading && <Spinner size="sm" marginRight={2} />}
               {monitorId ? "Save Changes" : "Create Online Evaluation"}

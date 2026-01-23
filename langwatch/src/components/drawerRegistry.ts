@@ -25,6 +25,9 @@ import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
+// Online Evaluations (Monitors) drawers
+import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
@@ -39,9 +42,6 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
-// Online Evaluations (Monitors) drawers
-import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
-import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 
 /**
  * Map of drawer names to their React components.

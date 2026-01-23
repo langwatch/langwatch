@@ -10,16 +10,19 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { OnlineEvaluationDrawer, clearOnlineEvaluationDrawerState } from "../OnlineEvaluationDrawer";
-import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
-import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
 import { CurrentDrawer } from "~/components/CurrentDrawer";
+import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
+import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
 import {
   clearDrawerStack,
   clearFlowCallbacks,
-  getFlowCallbacks,
   getDrawerStack,
+  getFlowCallbacks,
 } from "~/hooks/useDrawer";
+import {
+  clearOnlineEvaluationDrawerState,
+  OnlineEvaluationDrawer,
+} from "../OnlineEvaluationDrawer";
 
 // Mock evaluator data
 const mockEvaluators = [
@@ -133,9 +136,13 @@ vi.mock("next/router", () => {
 
   return {
     useRouter: () => {
-      const asPath = Object.keys(mockQuery).length > 0
-        ? "/test?" + Object.entries(mockQuery).map(([k, v]) => `${k}=${v}`).join("&")
-        : "/test";
+      const asPath =
+        Object.keys(mockQuery).length > 0
+          ? "/test?" +
+            Object.entries(mockQuery)
+              .map(([k, v]) => `${k}=${v}`)
+              .join("&")
+          : "/test";
       // console.log("useRouter called, asPath:", asPath);
       return {
         query: mockQuery,
@@ -178,30 +185,34 @@ vi.mock("~/utils/api", () => ({
         })),
       },
       create: {
-        useMutation: vi.fn((options?: { onSuccess?: (evaluator: unknown) => void }) => ({
-          mutate: (data: unknown) => {
-            mockEvaluatorCreateMutate(data);
-            options?.onSuccess?.(mockEvaluators[0]);
-          },
-          mutateAsync: async (data: unknown) => {
-            mockEvaluatorCreateMutate(data);
-            return mockEvaluators[0];
-          },
-          isPending: false,
-        })),
+        useMutation: vi.fn(
+          (options?: { onSuccess?: (evaluator: unknown) => void }) => ({
+            mutate: (data: unknown) => {
+              mockEvaluatorCreateMutate(data);
+              options?.onSuccess?.(mockEvaluators[0]);
+            },
+            mutateAsync: async (data: unknown) => {
+              mockEvaluatorCreateMutate(data);
+              return mockEvaluators[0];
+            },
+            isPending: false,
+          }),
+        ),
       },
       update: {
-        useMutation: vi.fn((options?: { onSuccess?: (evaluator: unknown) => void }) => ({
-          mutate: (data: unknown) => {
-            mockEvaluatorUpdateMutate(data);
-            options?.onSuccess?.(mockEvaluators[0]);
-          },
-          mutateAsync: async (data: unknown) => {
-            mockEvaluatorUpdateMutate(data);
-            return mockEvaluators[0];
-          },
-          isPending: false,
-        })),
+        useMutation: vi.fn(
+          (options?: { onSuccess?: (evaluator: unknown) => void }) => ({
+            mutate: (data: unknown) => {
+              mockEvaluatorUpdateMutate(data);
+              options?.onSuccess?.(mockEvaluators[0]);
+            },
+            mutateAsync: async (data: unknown) => {
+              mockEvaluatorUpdateMutate(data);
+              return mockEvaluators[0];
+            },
+            isPending: false,
+          }),
+        ),
       },
       delete: {
         useMutation: vi.fn(() => ({
@@ -304,7 +315,10 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
   /**
    * Helper to select evaluation level in this test suite
    */
-  const selectLevelInCriticalTest = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+  const selectLevelInCriticalTest = async (
+    user: ReturnType<typeof userEvent.setup>,
+    level: "trace" | "thread" = "trace",
+  ) => {
     const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
       expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
@@ -322,7 +336,7 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
     const { rerender } = render(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 1: Select level first (progressive disclosure)
@@ -341,7 +355,11 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
       expect(mockQuery["drawer.open"]).toBe("evaluatorList");
     });
 
-    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+    rerender(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>,
+    );
 
     // Step 5: EvaluatorListDrawer should now be visible with evaluators
     await waitFor(() => {
@@ -359,7 +377,11 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
       expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
     });
 
-    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+    rerender(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>,
+    );
 
     // Step 8: EvaluatorEditorDrawer should be visible
     await waitFor(() => {
@@ -376,14 +398,20 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
       expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
     });
 
-    rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+    rerender(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>,
+    );
 
     // Step 11: CRITICAL - OnlineEvaluationDrawer should show the selected evaluator
     await waitFor(() => {
       // Should show "PII Check" in the selection box (not "Select Evaluator")
       expect(screen.getByText("PII Check")).toBeInTheDocument();
       // Name should be auto-filled
-      const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+      const nameInput = screen.getByPlaceholderText(
+        "Enter evaluation name",
+      ) as HTMLInputElement;
       expect(nameInput.value).toBe("PII Check");
     });
   });
@@ -407,7 +435,10 @@ describe("OnlineEvaluationDrawer", () => {
   /**
    * Helper to select evaluation level (required before evaluator selection is shown)
    */
-  const selectLevel = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+  const selectLevel = async (
+    user: ReturnType<typeof userEvent.setup>,
+    level: "trace" | "thread" = "trace",
+  ) => {
     const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
       expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
@@ -462,7 +493,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Simulate selecting an evaluator via flow callback
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -472,7 +505,9 @@ describe("OnlineEvaluationDrawer", () => {
       await waitFor(() => {
         // Now all fields should be visible
         expect(screen.getByText("Name")).toBeInTheDocument();
-        expect(screen.getByPlaceholderText("Enter evaluation name")).toBeInTheDocument();
+        expect(
+          screen.getByPlaceholderText("Enter evaluation name"),
+        ).toBeInTheDocument();
         expect(screen.getByText(/Sampling/)).toBeInTheDocument();
         expect(screen.getByText(/Preconditions/)).toBeInTheDocument();
       });
@@ -515,7 +550,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
-        expect(screen.getByText("Create Online Evaluation")).toBeInTheDocument();
+        expect(
+          screen.getByText("Create Online Evaluation"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -535,7 +572,8 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalled();
-        const lastCall = mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
+        const lastCall =
+          mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
         expect(lastCall).toContain("drawer.open=evaluatorList");
       });
     });
@@ -598,7 +636,9 @@ describe("OnlineEvaluationDrawer", () => {
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
       await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+        const nameInput = screen.getByPlaceholderText(
+          "Enter evaluation name",
+        ) as HTMLInputElement;
         expect(nameInput.value).toBe("PII Check");
       });
     });
@@ -626,7 +666,9 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("shows Remove Selection link when evaluator is selected", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
 
@@ -635,13 +677,19 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
       // Go back to online drawer
       mockQuery = { "drawer.open": "onlineEvaluation" };
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
       await vi.advanceTimersByTimeAsync(100);
 
       // Now Remove Selection link should be visible
@@ -652,19 +700,27 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("clears evaluator selection when clicking Remove Selection", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
 
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
       // Go back to online drawer
       mockQuery = { "drawer.open": "onlineEvaluation" };
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
       await vi.advanceTimersByTimeAsync(100);
 
       // Verify evaluator is selected
@@ -681,7 +737,9 @@ describe("OnlineEvaluationDrawer", () => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
         expect(screen.queryByText("PII Check")).not.toBeInTheDocument();
         // Remove Selection link should be gone
-        expect(screen.queryByText("(Remove Selection)")).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("(Remove Selection)"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -689,17 +747,25 @@ describe("OnlineEvaluationDrawer", () => {
   describe("Name field behavior", () => {
     it("allows typing in name field after selecting evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
       // After selecting evaluator, the editor opens. Go back to online drawer.
       mockQuery = { "drawer.open": "onlineEvaluation" };
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
       await vi.advanceTimersByTimeAsync(100);
 
       const nameInput = screen.getByPlaceholderText("Enter evaluation name");
@@ -711,11 +777,15 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("does not override custom name when changing evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select first evaluator (name gets pre-filled)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
@@ -723,7 +793,11 @@ describe("OnlineEvaluationDrawer", () => {
 
       // After selecting evaluator, the editor opens. Go back to online drawer.
       mockQuery = { "drawer.open": "onlineEvaluation" };
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
       await vi.advanceTimersByTimeAsync(100);
 
       // Change to custom name
@@ -733,7 +807,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select another evaluator via edit flow
       await user.click(screen.getByText("PII Check"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -749,7 +825,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       await selectLevel(user, "trace");
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -761,7 +839,9 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("shows helper text explaining sampling in edit mode", async () => {
       // Use edit mode where the evaluator is already loaded
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for data to load
       await waitFor(() => {
@@ -801,7 +881,9 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("Create button is disabled when name is empty", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
 
@@ -817,11 +899,17 @@ describe("OnlineEvaluationDrawer", () => {
 
       // After selecting evaluator, the editor opens. Go back to online drawer.
       mockQuery = { "drawer.open": "onlineEvaluation" };
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
       await vi.advanceTimersByTimeAsync(100);
 
       // Wait for the name to be auto-filled
-      const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+      const nameInput = screen.getByPlaceholderText(
+        "Enter evaluation name",
+      ) as HTMLInputElement;
       await waitFor(() => {
         expect(nameInput.value).toBe("PII Check");
       });
@@ -872,7 +960,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -889,23 +979,29 @@ describe("OnlineEvaluationDrawer", () => {
           checkType: "presidio/pii_detection",
           evaluatorId: "evaluator-1",
           sample: 1.0,
-        })
+        }),
       );
     });
 
     it("calls onSave callback after successful create", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnSave = vi.fn();
-      render(<OnlineEvaluationDrawer open={true} onSave={mockOnSave} />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} onSave={mockOnSave} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
-      await waitFor(() => expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled());
+      await waitFor(() =>
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled(),
+      );
 
       await user.click(screen.getByText("Create Online Evaluation"));
 
@@ -914,16 +1010,22 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("clears state after successful save so new drawer starts fresh", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { unmount } = render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+      const { unmount } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       // Set up a complete evaluation
       await selectLevel(user, "trace");
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
-      await waitFor(() => expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled());
+      await waitFor(() =>
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled(),
+      );
 
       // Save the evaluation
       await user.click(screen.getByText("Create Online Evaluation"));
@@ -944,14 +1046,18 @@ describe("OnlineEvaluationDrawer", () => {
         // The evaluator section is hidden until level is selected
         expect(screen.queryByText("Select Evaluator")).not.toBeInTheDocument();
         // The name field is also hidden
-        expect(screen.queryByPlaceholderText("Enter evaluation name")).not.toBeInTheDocument();
+        expect(
+          screen.queryByPlaceholderText("Enter evaluation name"),
+        ).not.toBeInTheDocument();
       });
     });
   });
 
   describe("Edit mode", () => {
     it("shows Edit Online Evaluation header in edit mode", async () => {
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("Edit Online Evaluation")).toBeInTheDocument();
@@ -959,7 +1065,9 @@ describe("OnlineEvaluationDrawer", () => {
     });
 
     it("shows Save Changes button instead of Create", async () => {
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("Save Changes")).toBeInTheDocument();
@@ -968,22 +1076,30 @@ describe("OnlineEvaluationDrawer", () => {
     });
 
     it("loads existing monitor data", async () => {
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+        const nameInput = screen.getByPlaceholderText(
+          "Enter evaluation name",
+        ) as HTMLInputElement;
         expect(nameInput.value).toBe("My PII Monitor");
       });
 
       await waitFor(() => {
         // Sample rate from mock is 0.5
-        const samplingInput = screen.getByDisplayValue("0.5") as HTMLInputElement;
+        const samplingInput = screen.getByDisplayValue(
+          "0.5",
+        ) as HTMLInputElement;
         expect(samplingInput).toBeInTheDocument();
       });
     });
 
     it("loads linked evaluator", async () => {
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("PII Check")).toBeInTheDocument();
@@ -992,7 +1108,9 @@ describe("OnlineEvaluationDrawer", () => {
 
     it("calls update mutation in edit mode", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for data to load
       await waitFor(() => {
@@ -1009,7 +1127,7 @@ describe("OnlineEvaluationDrawer", () => {
         expect.objectContaining({
           id: "monitor-1",
           projectId: "test-project-id",
-        })
+        }),
       );
     });
 
@@ -1018,7 +1136,9 @@ describe("OnlineEvaluationDrawer", () => {
       const originalLevel = mockMonitor.level;
       mockMonitor.level = "thread";
 
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for data to load
       await waitFor(() => {
@@ -1028,7 +1148,9 @@ describe("OnlineEvaluationDrawer", () => {
       // Thread level should be selected (check via data-state attribute)
       await waitFor(() => {
         // Find the Thread Level label and check it's in checked state
-        const threadLevelLabel = screen.getByText("Thread Level").closest("label");
+        const threadLevelLabel = screen
+          .getByText("Thread Level")
+          .closest("label");
         expect(threadLevelLabel).toHaveAttribute("data-state", "checked");
       });
 
@@ -1041,7 +1163,9 @@ describe("OnlineEvaluationDrawer", () => {
     it("calls onClose when clicking Cancel", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnClose = vi.fn();
-      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
@@ -1055,7 +1179,9 @@ describe("OnlineEvaluationDrawer", () => {
     it("does not render when open is false", () => {
       render(<OnlineEvaluationDrawer open={false} />, { wrapper: Wrapper });
 
-      expect(screen.queryByText("New Online Evaluation")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("New Online Evaluation"),
+      ).not.toBeInTheDocument();
     });
 
     it("shows confirmation dialog when closing with unsaved changes", async () => {
@@ -1065,7 +1191,9 @@ describe("OnlineEvaluationDrawer", () => {
       // Mock window.confirm
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, {
+        wrapper: Wrapper,
+      });
 
       // Make changes to trigger unsaved state
       await selectLevel(user, "trace");
@@ -1074,7 +1202,7 @@ describe("OnlineEvaluationDrawer", () => {
       await user.click(screen.getByText("Cancel"));
 
       expect(confirmSpy).toHaveBeenCalledWith(
-        "You have unsaved changes. Are you sure you want to close?"
+        "You have unsaved changes. Are you sure you want to close?",
       );
       // Since we returned false, onClose should NOT have been called
       expect(mockOnClose).not.toHaveBeenCalled();
@@ -1092,7 +1220,9 @@ describe("OnlineEvaluationDrawer", () => {
       // Mock window.confirm to verify it's NOT called
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for effects to run and initial values to be set
       await waitFor(() => {
@@ -1117,7 +1247,9 @@ describe("OnlineEvaluationDrawer", () => {
       // Mock window.confirm to return true (user confirms)
       const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
-      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} onClose={mockOnClose} />, {
+        wrapper: Wrapper,
+      });
 
       // Make changes to trigger unsaved state
       await selectLevel(user, "trace");
@@ -1136,16 +1268,17 @@ describe("OnlineEvaluationDrawer", () => {
   describe("Reset on reopen", () => {
     it("resets form when drawer reopens in create mode after true close", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      const { rerender } = render(
-        <OnlineEvaluationDrawer open={true} />,
-        { wrapper: Wrapper }
-      );
+      const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
+        wrapper: Wrapper,
+      });
 
       await selectLevel(user, "trace");
 
       // Select evaluator and enter name
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1154,7 +1287,11 @@ describe("OnlineEvaluationDrawer", () => {
       });
 
       // Close drawer
-      rerender(<Wrapper><OnlineEvaluationDrawer open={false} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={false} />
+        </Wrapper>,
+      );
 
       // Clear callbacks and drawer state (simulates a true close via Cancel/X button
       // which calls handleClose() to clear the persisted state)
@@ -1162,7 +1299,11 @@ describe("OnlineEvaluationDrawer", () => {
       clearOnlineEvaluationDrawerState();
 
       // Reopen drawer
-      rerender(<Wrapper><OnlineEvaluationDrawer open={true} /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <OnlineEvaluationDrawer open={true} />
+        </Wrapper>,
+      );
 
       // Should be reset - level is null, so evaluator section is hidden
       await waitFor(() => {
@@ -1183,7 +1324,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // First, select an evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1192,7 +1335,9 @@ describe("OnlineEvaluationDrawer", () => {
       });
 
       // Change the name to something custom
-      const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+      const nameInput = screen.getByPlaceholderText(
+        "Enter evaluation name",
+      ) as HTMLInputElement;
       await user.clear(nameInput);
       await user.type(nameInput, "My Custom Monitor Name");
 
@@ -1224,7 +1369,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select first evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1233,13 +1380,17 @@ describe("OnlineEvaluationDrawer", () => {
       });
 
       // Clear name to ensure it gets updated
-      const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+      const nameInput = screen.getByPlaceholderText(
+        "Enter evaluation name",
+      ) as HTMLInputElement;
       await user.clear(nameInput);
 
       // Click selection box to select a different evaluator (caret indicates clickable)
       const selectionBox = screen.getByText("PII Check").closest("button");
       await user.click(selectionBox!);
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select the second evaluator
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
@@ -1278,7 +1429,9 @@ describe("OnlineEvaluationDrawer", () => {
       // OnlineEvaluationDrawer should update
       await waitFor(() => {
         expect(screen.getByText("Exact Match")).toBeInTheDocument();
-        const nameInput = screen.getByPlaceholderText("Enter evaluation name") as HTMLInputElement;
+        const nameInput = screen.getByPlaceholderText(
+          "Enter evaluation name",
+        ) as HTMLInputElement;
         expect(nameInput.value).toBe("Exact Match");
       });
     });
@@ -1299,7 +1452,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         const traceRadio = screen.getByRole("radio", { name: /trace level/i });
-        const threadRadio = screen.getByRole("radio", { name: /thread level/i });
+        const threadRadio = screen.getByRole("radio", {
+          name: /thread level/i,
+        });
         expect(traceRadio).not.toBeChecked();
         expect(threadRadio).not.toBeChecked();
       });
@@ -1309,7 +1464,9 @@ describe("OnlineEvaluationDrawer", () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(/evaluate each trace individually/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/evaluate each trace individually/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -1317,7 +1474,9 @@ describe("OnlineEvaluationDrawer", () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText(/evaluate all traces in a conversation thread/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/evaluate all traces in a conversation thread/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -1362,7 +1521,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select evaluator
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1376,13 +1537,15 @@ describe("OnlineEvaluationDrawer", () => {
       expect(mockCreateMutate).toHaveBeenCalledWith(
         expect.objectContaining({
           mappings: expect.any(Object),
-        })
+        }),
       );
     });
 
     it("includes mappings data in update mutation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, { wrapper: Wrapper });
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
 
       // Wait for data to load (edit mode loads existing monitor with level already set)
       await waitFor(() => {
@@ -1398,7 +1561,7 @@ describe("OnlineEvaluationDrawer", () => {
       expect(mockUpdateMutate).toHaveBeenCalledWith(
         expect.objectContaining({
           mappings: expect.any(Object),
-        })
+        }),
       );
     });
   });
@@ -1446,7 +1609,9 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Select evaluator at trace level
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1492,18 +1657,13 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     vi.useRealTimers();
   });
 
-  // Helper to determine which drawer should be open based on URL
-  const isOnlineEvalOpen = () =>
-    mockQuery["drawer.open"] === "onlineEvaluationDrawer" ||
-    mockQuery["drawer.open"] === undefined ||
-    !mockQuery["drawer.open"];
-  const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
-  const isEvaluatorEditorOpen = () => mockQuery["drawer.open"] === "evaluatorEditor";
-
   /**
    * Helper to select evaluation level in integration tests
    */
-  const selectLevelInIntegration = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+  const selectLevelInIntegration = async (
+    user: ReturnType<typeof userEvent.setup>,
+    level: "trace" | "thread" = "trace",
+  ) => {
     const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
       expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
@@ -1521,7 +1681,7 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     const { rerender } = render(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 1: Select level first (progressive disclosure)
@@ -1534,7 +1694,9 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
 
     // Step 3: Click "Select Evaluator" and select via flow callback
     await user.click(screen.getByText("Select Evaluator"));
-    await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+    await waitFor(() =>
+      expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+    );
 
     // Select PII Check evaluator
     getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
@@ -1542,15 +1704,18 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     // Step 4: Wait for navigation to evaluator editor (Issue 1 fix)
     await vi.advanceTimersByTimeAsync(200);
 
-    await waitFor(() => {
-      expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-    }, { timeout: 500 });
+    await waitFor(
+      () => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      },
+      { timeout: 500 },
+    );
 
     // Step 4: Re-render to pick up the new URL state
     rerender(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 5: Find a mapping input in the evaluator editor
@@ -1571,19 +1736,24 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     // Step 7: Now click on the empty mapping input to open dropdown
     const textboxes = screen.getAllByRole("textbox");
     // Find the mapping input (not the name input) - look for one with placeholder
-    const mappingInput = textboxes.find(tb =>
-      tb.getAttribute("placeholder")?.includes("source") ||
-      tb.getAttribute("placeholder")?.includes("Required") ||
-      tb.getAttribute("placeholder") === ""
-    ) ?? textboxes[1]; // Skip the name input (first one)
+    const mappingInput =
+      textboxes.find(
+        (tb) =>
+          tb.getAttribute("placeholder")?.includes("source") ||
+          tb.getAttribute("placeholder")?.includes("Required") ||
+          tb.getAttribute("placeholder") === "",
+      ) ?? textboxes[1]; // Skip the name input (first one)
 
     await user.click(mappingInput!);
 
     // Step 8: Should show trace fields in dropdown
-    await waitFor(() => {
-      const fieldOptions = screen.queryAllByTestId(/^field-option-/);
-      expect(fieldOptions.length).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        const fieldOptions = screen.queryAllByTestId(/^field-option-/);
+        expect(fieldOptions.length).toBeGreaterThan(0);
+      },
+      { timeout: 3000 },
+    );
 
     // Step 9: Click on "metadata" (has children)
     await waitFor(() => {
@@ -1593,7 +1763,9 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
 
     // Step 10: Should show metadata badge AND nested children
     await waitFor(() => {
-      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("metadata");
+      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+        "metadata",
+      );
     });
 
     await waitFor(() => {
@@ -1609,7 +1781,9 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       // Should have at least one mapping tag (we cleared one, so should have 1 remaining + the new one)
       expect(sourceTags.length).toBeGreaterThan(0);
       // One of them should show "metadata.thread_id"
-      const hasMetadataMapping = sourceTags.some(tag => tag.textContent?.includes("metadata.thread_id"));
+      const hasMetadataMapping = sourceTags.some((tag) =>
+        tag.textContent?.includes("metadata.thread_id"),
+      );
       expect(hasMetadataMapping).toBe(true);
     });
   });
@@ -1623,7 +1797,7 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     const { rerender } = render(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Select level first (progressive disclosure)
@@ -1634,20 +1808,25 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
       expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
     });
     await user.click(screen.getByText("Select Evaluator"));
-    await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+    await waitFor(() =>
+      expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+    );
 
     getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
     await vi.advanceTimersByTimeAsync(200);
 
-    await waitFor(() => {
-      expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-    }, { timeout: 500 });
+    await waitFor(
+      () => {
+        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+      },
+      { timeout: 500 },
+    );
 
     rerender(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     await waitFor(() => {
@@ -1662,24 +1841,31 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     await vi.advanceTimersByTimeAsync(100);
 
     const textboxes = screen.getAllByRole("textbox");
-    const mappingInput = textboxes.find(tb =>
-      tb.getAttribute("placeholder")?.includes("source") ||
-      tb.getAttribute("placeholder")?.includes("Required") ||
-      tb.getAttribute("placeholder") === ""
-    ) ?? textboxes[1]; // Skip the name input
+    const mappingInput =
+      textboxes.find(
+        (tb) =>
+          tb.getAttribute("placeholder")?.includes("source") ||
+          tb.getAttribute("placeholder")?.includes("Required") ||
+          tb.getAttribute("placeholder") === "",
+      ) ?? textboxes[1]; // Skip the name input
 
     await user.click(mappingInput!);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
 
     // Click on "spans"
     await user.click(screen.getByTestId("field-option-spans"));
 
     // Should show spans badge AND nested children
     await waitFor(() => {
-      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+        "spans",
+      );
     });
 
     await waitFor(() => {
@@ -1694,7 +1880,9 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     await waitFor(() => {
       const sourceTags = screen.getAllByTestId("source-mapping-tag");
       expect(sourceTags.length).toBeGreaterThan(0);
-      const hasSpansOutputMapping = sourceTags.some(tag => tag.textContent?.includes("spans.output"));
+      const hasSpansOutputMapping = sourceTags.some((tag) =>
+        tag.textContent?.includes("spans.output"),
+      );
       expect(hasSpansOutputMapping).toBe(true);
     });
   });
@@ -1721,18 +1909,13 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
     vi.useRealTimers();
   });
 
-  // Helper functions for drawer state
-  const isOnlineEvalOpen = () =>
-    mockQuery["drawer.open"] === "onlineEvaluationDrawer" ||
-    mockQuery["drawer.open"] === undefined ||
-    !mockQuery["drawer.open"];
-  const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
-  const isEvaluatorEditorOpen = () => mockQuery["drawer.open"] === "evaluatorEditor";
-
   /**
    * Helper to select evaluation level in issue fix tests
    */
-  const selectLevelInIssueTests = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+  const selectLevelInIssueTests = async (
+    user: ReturnType<typeof userEvent.setup>,
+    level: "trace" | "thread" = "trace",
+  ) => {
     const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
       expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
@@ -1758,7 +1941,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
           <EvaluatorListDrawer open={isEvaluatorListOpen()} />
           <EvaluatorEditorDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -1780,7 +1963,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
           <EvaluatorListDrawer open={isEvaluatorListOpen()} />
           <EvaluatorEditorDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select PII Check evaluator
@@ -1795,9 +1978,12 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // EXPECTED: Evaluator editor should open (drawer.open should be "evaluatorEditor")
       // This is the fix - always open editor, not just when pending mappings
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+        },
+        { timeout: 1000 },
+      );
     });
   });
 
@@ -1818,7 +2004,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <OnlineEvaluationDrawer open={true} />
           <EvaluatorListDrawer open={false} />
           <EvaluatorEditorDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -1826,16 +2012,21 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // First, select an evaluator via flow callback
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
       // Wait for evaluator to be selected and editor to open (Issue 1 fix)
       await vi.advanceTimersByTimeAsync(200);
 
       // The editor should have opened
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+        },
+        { timeout: 500 },
+      );
 
       // Simulate closing the editor (user goes back to online drawer)
       mockQuery = { "drawer.open": "onlineEvaluationDrawer" };
@@ -1846,7 +2037,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <OnlineEvaluationDrawer open={true} />
           <EvaluatorListDrawer open={false} />
           <EvaluatorEditorDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Online drawer should still show with PII Check selected
@@ -1860,9 +2051,12 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await user.click(evaluatorBox);
 
       // EXPECTED: Should open evaluatorEditor directly (not evaluatorList)
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+        },
+        { timeout: 1000 },
+      );
     });
   });
 
@@ -1886,7 +2080,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           <OnlineEvaluationDrawer open={isOnlineEvalOpen()} />
           <EvaluatorListDrawer open={isEvaluatorListOpen()} />
           <EvaluatorEditorDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -1922,9 +2116,12 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await vi.advanceTimersByTimeAsync(200);
 
       // EXPECTED: OnlineEvaluationDrawer should now show the new evaluator selected
-      await waitFor(() => {
-        expect(screen.getByText("My New Evaluator")).toBeInTheDocument();
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText("My New Evaluator")).toBeInTheDocument();
+        },
+        { timeout: 1000 },
+      );
     });
   });
 
@@ -1947,7 +2144,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -1960,7 +2157,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Select an evaluator (this should open the editor with mappings)
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select PII Check which has required "input" field
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
@@ -1969,22 +2168,28 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await vi.advanceTimersByTimeAsync(200);
 
       // Verify the editor opened (URL changed)
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
+        },
+        { timeout: 500 },
+      );
 
       // Rerender to pick up the new URL state
       rerender(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // EXPECTED: Should see "Variables" section in the editor
       // This section shows the mapping inputs for evaluator required fields
-      await waitFor(() => {
-        expect(screen.getByText("Variables")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText("Variables")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       // EXPECTED: Should see mapping inputs for required fields (like "input")
       // These should be VariableMappingInput components with trace sources
@@ -2019,7 +2224,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -2030,7 +2235,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select Answer Relevance (has required input/output)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -2041,18 +2248,25 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
       });
 
       // EXPECTED: Should see auto-inferred mappings (badge showing "input" or "trace.input")
-      await waitFor(() => {
-        const mappingBadges = screen.queryAllByTestId("source-mapping-tag");
-        // Should have at least one auto-inferred mapping
-        expect(mappingBadges.length).toBeGreaterThan(0);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const mappingBadges = screen.queryAllByTestId("source-mapping-tag");
+          // Should have at least one auto-inferred mapping
+          expect(mappingBadges.length).toBeGreaterThan(0);
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
@@ -2071,7 +2285,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select level first (progressive disclosure)
@@ -2082,7 +2296,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
@@ -2092,7 +2308,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
@@ -2107,11 +2327,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await vi.advanceTimersByTimeAsync(100);
 
       // EXPECTED: Should return to online evaluation drawer (not close everything)
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+        },
+        { timeout: 1000 },
+      );
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("New Online Evaluation")).toBeInTheDocument();
@@ -2134,7 +2361,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select thread level first (progressive disclosure)
@@ -2145,7 +2372,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
 
@@ -2155,7 +2384,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
@@ -2175,7 +2408,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // EXPECTED: Should show nested options (input, output, etc.)
       await waitFor(() => {
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("traces");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "traces",
+        );
         expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
         expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
       });
@@ -2200,7 +2435,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2212,7 +2447,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // First select evaluator at trace level
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
 
@@ -2222,18 +2459,29 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Go back (via Cancel which should use goBack)
       await user.click(screen.getByText("Cancel"));
 
       await vi.advanceTimersByTimeAsync(100);
 
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+        },
+        { timeout: 1000 },
+      );
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Switch to thread level - should NOT auto-open editor anymore
       const threadRadio = screen.getByLabelText(/thread level/i);
@@ -2253,7 +2501,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
@@ -2268,8 +2520,8 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Click on a mapping input
       const textboxes = screen.getAllByRole("textbox");
-      const mappingInput = textboxes.find(
-        (input) => input.getAttribute("placeholder")?.includes("Select")
+      const mappingInput = textboxes.find((input) =>
+        input.getAttribute("placeholder")?.includes("Select"),
       );
       if (mappingInput) {
         await user.click(mappingInput);
@@ -2278,11 +2530,17 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       // EXPECTED: Should see thread-specific sources (thread_id, traces)
       // NOT trace-specific sources (metadata, spans at top level)
       await waitFor(() => {
-        expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-thread_id"),
+        ).toBeInTheDocument();
         expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
         // Should NOT see trace-specific sources at top level
-        expect(screen.queryByTestId("field-option-metadata")).not.toBeInTheDocument();
-        expect(screen.queryByTestId("field-option-spans")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-metadata"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-spans"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -2302,7 +2560,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2313,7 +2571,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
 
@@ -2323,11 +2583,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
-      await waitFor(() => {
-        expect(screen.getByText("Variables")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.getByText("Variables")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       // Click on a mapping input
       const textboxes = screen.getAllByRole("textbox");
@@ -2340,7 +2607,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       // EXPECTED: Should NOT see "threads" option at trace level
-      expect(screen.queryByTestId("field-option-threads")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("field-option-threads"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -2362,7 +2631,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2373,7 +2642,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select Exact Match (requires expected_output which can't be auto-inferred)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
@@ -2384,18 +2655,27 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
       });
 
       // EXPECTED: Should see a red validation message about missing mappings
-      await waitFor(() => {
-        const validationMessage = screen.getByTestId("pending-mappings-error");
-        expect(validationMessage).toBeInTheDocument();
-        expect(validationMessage).toHaveTextContent(/required|mapping/i);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const validationMessage = screen.getByTestId(
+            "pending-mappings-error",
+          );
+          expect(validationMessage).toBeInTheDocument();
+          expect(validationMessage).toHaveTextContent(/required|mapping/i);
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
@@ -2416,7 +2696,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2427,7 +2707,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select Exact Match (requires expected_output which can't be auto-inferred)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
@@ -2438,7 +2720,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render
       await waitFor(() => {
@@ -2455,14 +2741,20 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EXPECTED: Should see warning about pending mappings
       await waitFor(() => {
         // Look for the warning banner
         expect(screen.getByText(/need.*mapping/i)).toBeInTheDocument();
         // Should have a "Configure" button
-        expect(screen.getByRole("button", { name: /configure/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /configure/i }),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -2489,7 +2781,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2501,7 +2793,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select Answer Relevance (requires input, output - should auto-map)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!); // Answer Relevance
@@ -2513,7 +2807,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render with mappings
       await waitFor(() => {
@@ -2522,17 +2820,20 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // EXPECTED: The mappings should be auto-filled with trace.input and trace.output
       // Auto-mapped values are displayed as Tags with data-testid="source-mapping-tag"
-      await waitFor(() => {
-        // Look for source mapping tags that show "input" or "output"
-        const sourceTags = screen.getAllByTestId("source-mapping-tag");
-        expect(sourceTags.length).toBeGreaterThan(0);
+      await waitFor(
+        () => {
+          // Look for source mapping tags that show "input" or "output"
+          const sourceTags = screen.getAllByTestId("source-mapping-tag");
+          expect(sourceTags.length).toBeGreaterThan(0);
 
-        // At least one should show "input" (auto-mapped input field)
-        const hasInputMapping = sourceTags.some(
-          (tag) => tag.textContent?.includes("input")
-        );
-        expect(hasInputMapping).toBe(true);
-      }, { timeout: 3000 });
+          // At least one should show "input" (auto-mapped input field)
+          const hasInputMapping = sourceTags.some((tag) =>
+            tag.textContent?.includes("input"),
+          );
+          expect(hasInputMapping).toBe(true);
+        },
+        { timeout: 3000 },
+      );
     });
 
     it("auto-infers input/output mappings for evaluators with only optional fields (llm_boolean)", async () => {
@@ -2543,7 +2844,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2555,7 +2856,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select LLM Boolean Judge (has requiredFields: [], optionalFields: ["input", "output", "contexts"])
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[3]!); // LLM Boolean Judge
@@ -2567,7 +2870,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render with mappings
       await waitFor(() => {
@@ -2575,20 +2882,23 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       });
 
       // EXPECTED: Even though these are optional fields, input/output should be auto-mapped
-      await waitFor(() => {
-        const sourceTags = screen.getAllByTestId("source-mapping-tag");
-        expect(sourceTags.length).toBeGreaterThan(0);
+      await waitFor(
+        () => {
+          const sourceTags = screen.getAllByTestId("source-mapping-tag");
+          expect(sourceTags.length).toBeGreaterThan(0);
 
-        // Should have both input and output auto-mapped
-        const hasInputMapping = sourceTags.some(
-          (tag) => tag.textContent?.includes("input")
-        );
-        const hasOutputMapping = sourceTags.some(
-          (tag) => tag.textContent?.includes("output")
-        );
-        expect(hasInputMapping).toBe(true);
-        expect(hasOutputMapping).toBe(true);
-      }, { timeout: 3000 });
+          // Should have both input and output auto-mapped
+          const hasInputMapping = sourceTags.some((tag) =>
+            tag.textContent?.includes("input"),
+          );
+          const hasOutputMapping = sourceTags.some((tag) =>
+            tag.textContent?.includes("output"),
+          );
+          expect(hasInputMapping).toBe(true);
+          expect(hasOutputMapping).toBe(true);
+        },
+        { timeout: 3000 },
+      );
     });
 
     it("auto-maps input to traces when selecting thread level", async () => {
@@ -2599,7 +2909,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2611,7 +2921,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // First select an evaluator at trace level
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[3]!); // LLM Boolean Judge
 
@@ -2622,7 +2934,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await user.click(screen.getByText("Cancel"));
 
@@ -2632,7 +2948,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Now switch to Thread level - should NOT auto-open editor anymore
       const threadRadio = screen.getByLabelText(/Thread/i);
@@ -2652,16 +2972,23 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EXPECTED: The input field should be auto-mapped to "traces"
-      await waitFor(() => {
-        const sourceTags = screen.getAllByTestId("source-mapping-tag");
-        const hasTracesMapping = sourceTags.some(
-          (tag) => tag.textContent?.includes("traces")
-        );
-        expect(hasTracesMapping).toBe(true);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const sourceTags = screen.getAllByTestId("source-mapping-tag");
+          const hasTracesMapping = sourceTags.some((tag) =>
+            tag.textContent?.includes("traces"),
+          );
+          expect(hasTracesMapping).toBe(true);
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
@@ -2683,7 +3010,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2695,7 +3022,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select an evaluator
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -2706,7 +3035,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render - button says "Select Evaluator" when selecting for first time
       await waitFor(() => {
@@ -2719,11 +3052,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await vi.advanceTimersByTimeAsync(500);
 
       // EXPECTED: Should return to online evaluation drawer
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+        },
+        { timeout: 3000 },
+      );
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Should see the online evaluation drawer with selected evaluator
       await waitFor(() => {
@@ -2739,7 +3079,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2751,7 +3091,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select an evaluator for the FIRST time
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -2762,7 +3104,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // FIRST TIME SELECTION: Button should say "Select Evaluator"
       await waitFor(() => {
@@ -2779,14 +3125,20 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Now click on the already-selected evaluator to edit it
       await waitFor(() => {
         expect(screen.getByText("Answer Relevance")).toBeInTheDocument();
       });
 
-      const evaluatorBox = screen.getByRole("button", { name: /Answer Relevance/i });
+      const evaluatorBox = screen.getByRole("button", {
+        name: /Answer Relevance/i,
+      });
       await user.click(evaluatorBox);
 
       await vi.advanceTimersByTimeAsync(200);
@@ -2795,12 +3147,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EDITING EXISTING SELECTION: Button should say "Save Changes"
       await waitFor(() => {
         expect(screen.getByText("Save Changes")).toBeInTheDocument();
-        expect(screen.queryByText(/^Select Evaluator$/)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/^Select Evaluator$/),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -2812,7 +3170,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2838,10 +3196,10 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       mockQuery = { "drawer.open": "onlineEvaluation" };
 
-      const { rerender } = render(
+      render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2874,7 +3232,10 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       // Now simulate the evaluator being saved - call the onSave callback
       // This should navigate back to onlineEvaluation drawer
       const onSave = getFlowCallbacks("evaluatorEditor")?.onSave;
-      const result = onSave?.({ id: "new-evaluator-id", name: "New Evaluator" });
+      const result = onSave?.({
+        id: "new-evaluator-id",
+        name: "New Evaluator",
+      });
 
       // The callback should return true (handled navigation)
       expect(result).toBe(true);
@@ -2904,7 +3265,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2916,7 +3277,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select an evaluator
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -2927,7 +3290,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render
       await waitFor(() => {
@@ -2940,11 +3307,18 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await vi.advanceTimersByTimeAsync(100);
 
       // EXPECTED: Should return to online evaluation drawer (not close everything)
-      await waitFor(() => {
-        expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
+        },
+        { timeout: 3000 },
+      );
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Should see the online evaluation drawer
       await waitFor(() => {
@@ -2971,7 +3345,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -2983,7 +3357,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select Exact Match (requires expected_output which needs manual mapping)
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[1]!);
@@ -2994,7 +3370,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor to render with mappings
       await waitFor(() => {
@@ -3003,8 +3383,8 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Find the expected_output mapping input and fill it
       const textboxes = screen.getAllByRole("textbox");
-      const mappingInputs = textboxes.filter(
-        (input) => input.getAttribute("placeholder")?.includes("Select")
+      const mappingInputs = textboxes.filter((input) =>
+        input.getAttribute("placeholder")?.includes("Select"),
       );
 
       // Click on a mapping input to open dropdown
@@ -3030,7 +3410,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Click on the selected evaluator to edit again
       await waitFor(() => {
@@ -3046,17 +3430,24 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EXPECTED: The mapping we set should still be there
       // Mappings are displayed as Tags with data-testid="source-mapping-tag"
-      await waitFor(() => {
-        const sourceTags = screen.getAllByTestId("source-mapping-tag");
-        const hasOutputMapping = sourceTags.some(
-          (tag) => tag.textContent?.includes("output")
-        );
-        expect(hasOutputMapping).toBe(true);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const sourceTags = screen.getAllByTestId("source-mapping-tag");
+          const hasOutputMapping = sourceTags.some((tag) =>
+            tag.textContent?.includes("output"),
+          );
+          expect(hasOutputMapping).toBe(true);
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
@@ -3078,7 +3469,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select Thread level first (progressive disclosure)
@@ -3090,7 +3481,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Open evaluator list
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Select an evaluator
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -3101,7 +3494,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Wait for editor with mappings
       await waitFor(() => {
@@ -3110,8 +3507,8 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Find mapping input and select "traces"
       const textboxes = screen.getAllByRole("textbox");
-      const mappingInput = textboxes.find(
-        (input) => input.getAttribute("placeholder")?.includes("Select")
+      const mappingInput = textboxes.find((input) =>
+        input.getAttribute("placeholder")?.includes("Select"),
       );
 
       if (mappingInput) {
@@ -3127,13 +3524,16 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // EXPECTED: The pending-mappings-error should NOT be visible
       // (or should not include the field we just mapped)
-      await waitFor(() => {
-        const errorMessage = screen.queryByTestId("pending-mappings-error");
-        // Either no error, or error doesn't mention "input" field we just mapped
-        if (errorMessage) {
-          expect(errorMessage.textContent).not.toContain("input");
-        }
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const errorMessage = screen.queryByTestId("pending-mappings-error");
+          // Either no error, or error doesn't mention "input" field we just mapped
+          if (errorMessage) {
+            expect(errorMessage.textContent).not.toContain("input");
+          }
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
@@ -3169,7 +3569,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -3181,7 +3581,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Select PII Check evaluator (has only optional fields: input, output)
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
@@ -3192,7 +3594,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Clear all mappings
       await waitFor(() => {
@@ -3214,7 +3620,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EXPECTED: Create button should be disabled because no mappings
       await waitFor(() => {
@@ -3231,7 +3641,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -3243,7 +3653,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Select PII Check evaluator (has only optional fields)
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
@@ -3254,7 +3666,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Go back to online evaluation drawer (with auto-mapped values)
       await user.click(screen.getByText("Cancel"));
@@ -3265,7 +3681,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // EXPECTED: Create button should be enabled because input/output are auto-mapped
       await waitFor(() => {
@@ -3284,7 +3704,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -3296,7 +3716,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Select an evaluator first
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
 
@@ -3307,7 +3729,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Go back to online evaluation drawer
       await user.click(screen.getByText("Cancel"));
@@ -3318,7 +3744,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Now switch to Thread level
       const threadRadio = screen.getByLabelText(/Thread/i);
@@ -3340,7 +3770,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       const { rerender } = render(
         <Wrapper>
           <CurrentDrawer />
-        </Wrapper>
+        </Wrapper>,
       );
 
       // Select trace level first (progressive disclosure)
@@ -3352,7 +3782,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Select an evaluator at trace level (should auto-map input/output)
       await user.click(screen.getByText("Select Evaluator"));
-      await waitFor(() => expect(getFlowCallbacks("evaluatorList")).toBeDefined());
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
 
       // Use Answer Relevance which has input/output required fields
       getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[2]!);
@@ -3363,7 +3795,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Go back to online evaluation drawer
       await user.click(screen.getByText("Cancel"));
@@ -3374,7 +3810,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("onlineEvaluation");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       // Now switch to Thread level
       const threadRadio = screen.getByLabelText(/Thread/i);
@@ -3391,7 +3831,11 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockQuery["drawer.open"]).toBe("evaluatorEditor");
       });
 
-      rerender(<Wrapper><CurrentDrawer /></Wrapper>);
+      rerender(
+        <Wrapper>
+          <CurrentDrawer />
+        </Wrapper>,
+      );
 
       await waitFor(() => {
         expect(screen.getByText("Variables")).toBeInTheDocument();
@@ -3406,8 +3850,8 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Click on a mapping input
       const textboxes = screen.getAllByRole("textbox");
-      const mappingInput = textboxes.find(
-        (input) => input.getAttribute("placeholder")?.includes("Select")
+      const mappingInput = textboxes.find((input) =>
+        input.getAttribute("placeholder")?.includes("Select"),
       );
       if (mappingInput) {
         await user.click(mappingInput);
@@ -3433,7 +3877,10 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
     /**
      * Helper to select evaluation level in thread timeout tests
      */
-    const selectLevelInTimeoutTests = async (user: ReturnType<typeof userEvent.setup>, level: "trace" | "thread" = "trace") => {
+    const selectLevelInTimeoutTests = async (
+      user: ReturnType<typeof userEvent.setup>,
+      level: "trace" | "thread" = "trace",
+    ) => {
       const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
       await waitFor(() => {
         expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
@@ -3463,7 +3910,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Should NOT see the thread idle timeout dropdown
       await waitFor(() => {
-        expect(screen.queryByText(/Conversation Idle Time/i)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/Conversation Idle Time/i),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -3516,7 +3965,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Check dropdown has correct options
       const dropdown = screen.getByRole("combobox") as HTMLSelectElement;
-      const options = Array.from(dropdown.options).map(opt => opt.text);
+      const options = Array.from(dropdown.options).map((opt) => opt.text);
 
       expect(options).toContain("Disabled - evaluate on every trace");
       expect(options).toContain("1 minute");
@@ -3619,7 +4068,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockCreateMutate).toHaveBeenCalledWith(
           expect.objectContaining({
             threadIdleTimeout: 600,
-          })
+          }),
         );
       });
     });
@@ -3656,7 +4105,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
         expect(mockCreateMutate).toHaveBeenCalledWith(
           expect.objectContaining({
             threadIdleTimeout: null,
-          })
+          }),
         );
       });
     });
@@ -3689,7 +4138,9 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
 
       // Dropdown should now be hidden
       await waitFor(() => {
-        expect(screen.queryByText(/Conversation Idle Time/i)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/Conversation Idle Time/i),
+        ).not.toBeInTheDocument();
       });
     });
   });

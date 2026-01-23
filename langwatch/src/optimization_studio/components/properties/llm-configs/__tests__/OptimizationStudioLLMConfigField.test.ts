@@ -118,14 +118,18 @@ describe("normalizeToSnakeCase", () => {
       const input = { model: DEFAULT_MODEL, frequencyPenalty: 0.5 };
       const result = normalizeToSnakeCase(input);
       expect(result.frequency_penalty).toBe(0.5);
-      expect((result as Record<string, unknown>).frequencyPenalty).toBeUndefined();
+      expect(
+        (result as Record<string, unknown>).frequencyPenalty,
+      ).toBeUndefined();
     });
 
     it("converts presencePenalty to presence_penalty", () => {
       const input = { model: DEFAULT_MODEL, presencePenalty: 0.3 };
       const result = normalizeToSnakeCase(input);
       expect(result.presence_penalty).toBe(0.3);
-      expect((result as Record<string, unknown>).presencePenalty).toBeUndefined();
+      expect(
+        (result as Record<string, unknown>).presencePenalty,
+      ).toBeUndefined();
     });
 
     it("converts topK to top_k", () => {
@@ -146,7 +150,9 @@ describe("normalizeToSnakeCase", () => {
       const input = { model: DEFAULT_MODEL, repetitionPenalty: 1.1 };
       const result = normalizeToSnakeCase(input);
       expect(result.repetition_penalty).toBe(1.1);
-      expect((result as Record<string, unknown>).repetitionPenalty).toBeUndefined();
+      expect(
+        (result as Record<string, unknown>).repetitionPenalty,
+      ).toBeUndefined();
     });
 
     // Note: reasoning passes through unchanged (no camelCase variant exists)

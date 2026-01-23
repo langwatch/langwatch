@@ -77,11 +77,10 @@ export async function runEvaluationJob(
 
   // Use evaluator settings if available, otherwise fall back to monitor parameters
   // This supports both new monitors (with evaluatorId) and legacy monitors (with inline parameters)
-  const settings =
-    check.evaluator && check.evaluator.config
-      ? (check.evaluator.config as Record<string, any>).settings ??
-        check.parameters
-      : check.parameters;
+  const settings = check.evaluator?.config
+    ? ((check.evaluator.config as Record<string, any>).settings ??
+      check.parameters)
+    : check.parameters;
 
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
@@ -372,7 +371,9 @@ export const runEvaluationForTrace = async ({
 
   // Determine if this is a thread-level evaluation
   // Use explicit level if provided, otherwise fall back to mapping detection for backward compatibility
-  const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
+  const isThreadLevel = level
+    ? level === "thread"
+    : hasThreadMappings(mappings);
   const evaluation_thread_id =
     isThreadLevel && trace.metadata?.thread_id
       ? trace.metadata.thread_id

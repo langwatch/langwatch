@@ -88,7 +88,7 @@ describe("Monitor-Evaluator Integration", () => {
           sample: 1.0,
           executionMode: EvaluationExecutionMode.ON_MESSAGE,
           evaluatorId: "evaluator_nonexistent",
-        })
+        }),
       ).rejects.toThrow("Evaluator not found");
     });
 
@@ -116,7 +116,7 @@ describe("Monitor-Evaluator Integration", () => {
           sample: 1.0,
           executionMode: EvaluationExecutionMode.ON_MESSAGE,
           evaluatorId: otherProjectEvaluator.id,
-        })
+        }),
       ).rejects.toThrow("Evaluator not found");
 
       // Clean up - include projectId for multi-tenancy protection
@@ -222,7 +222,7 @@ describe("Monitor-Evaluator Integration", () => {
       expect(monitorWithEvaluator).toBeDefined();
       expect(monitorWithEvaluator?.evaluator).toBeDefined();
       expect(monitorWithEvaluator?.evaluator?.id).toBe(
-        monitorWithEvaluator?.evaluatorId
+        monitorWithEvaluator?.evaluatorId,
       );
     });
   });

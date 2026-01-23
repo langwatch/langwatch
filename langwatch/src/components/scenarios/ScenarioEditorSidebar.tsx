@@ -1,11 +1,4 @@
-import {
-  Card,
-  HStack,
-  Icon,
-  List,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, HStack, Icon, List, Text, VStack } from "@chakra-ui/react";
 import {
   Check,
   CircleDot,

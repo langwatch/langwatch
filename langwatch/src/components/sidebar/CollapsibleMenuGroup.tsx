@@ -86,7 +86,10 @@ export const CollapsibleMenuGroup = ({
                 width={`${ICON_SIZE}px`}
                 height={`${ICON_SIZE}px`}
               >
-                <Icon size={ICON_SIZE} color="var(--chakra-colors-nav-fg-muted)" />
+                <Icon
+                  size={ICON_SIZE}
+                  color="var(--chakra-colors-nav-fg-muted)"
+                />
               </Box>
               {showLabel && (
                 <>
@@ -100,9 +103,15 @@ export const CollapsibleMenuGroup = ({
                   </Text>
                   <Spacer />
                   {isExpanded ? (
-                    <ChevronDown size={14} color="var(--chakra-colors-nav-fg-muted)" />
+                    <ChevronDown
+                      size={14}
+                      color="var(--chakra-colors-nav-fg-muted)"
+                    />
                   ) : (
-                    <ChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
+                    <ChevronRight
+                      size={14}
+                      color="var(--chakra-colors-nav-fg-muted)"
+                    />
                   )}
                 </>
               )}
@@ -112,7 +121,13 @@ export const CollapsibleMenuGroup = ({
 
         {/* Child items */}
         <Collapsible.Content>
-          <VStack width="full" gap={0.5} align="start" paddingLeft={4} paddingTop={0.5}>
+          <VStack
+            width="full"
+            gap={0.5}
+            align="start"
+            paddingLeft={4}
+            paddingTop={0.5}
+          >
             {children.map((child) => (
               <CollapsibleMenuChildItem
                 key={child.href}

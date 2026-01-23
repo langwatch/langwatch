@@ -1,7 +1,9 @@
+import { generate } from "@langwatch/ksuid";
 import { CostReferenceType, CostType } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
@@ -10,7 +12,6 @@ import {
   runEvaluation,
 } from "../../../../../server/background/workers/evaluationsWorker";
 import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
-import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -22,13 +23,12 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
+import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import { createLogger } from "../../../../../utils/logger";
 import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
 } from "../../../dataset/evaluate";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:evaluations:evaluate");
 
@@ -112,7 +112,9 @@ export async function handleEvaluatorCall(
 
     if (storedEvaluator != null) {
       checkType = storedEvaluator.checkType;
-      evaluatorSettings = storedEvaluator.parameters as Record<string, unknown> | undefined;
+      evaluatorSettings = storedEvaluator.parameters as
+        | Record<string, unknown>
+        | undefined;
       evaluatorName = storedEvaluator.name;
     } else {
       checkType = evaluatorSlug;
@@ -183,15 +185,16 @@ export async function handleEvaluatorCall(
   let settings:
     | z.infer<NonNullable<typeof evaluatorSettingSchema>>
     | undefined =
-    (evaluatorSettings ?? storedEvaluator?.parameters) as z.infer<
+    ((evaluatorSettings ?? storedEvaluator?.parameters) as z.infer<
       NonNullable<typeof evaluatorSettingSchema>
-    > ?? {};
+    >) ?? {};
 
   try {
     settings = evaluatorSettingSchema?.parse({
       ...getEvaluatorDefaultSettings(evaluatorDefinition),
       // Use evaluatorSettings from saved Evaluator, or fall back to storedEvaluator (Monitor) parameters
-      ...(evaluatorSettings ?? (storedEvaluator ? (storedEvaluator.parameters as object) : {})),
+      ...(evaluatorSettings ??
+        (storedEvaluator ? (storedEvaluator.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
@@ -331,7 +334,9 @@ export async function handleEvaluatorCall(
         details: "details" in result ? result.details : undefined,
         error:
           result.status === "error"
-            ? ("details" in result ? result.details : undefined)
+            ? "details" in result
+              ? result.details
+              : undefined
             : undefined,
       });
     } catch (eventError) {

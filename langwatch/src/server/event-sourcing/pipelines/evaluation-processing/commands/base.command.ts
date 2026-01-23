@@ -36,14 +36,14 @@ export function createEvaluationCommandHandler<
   TEvent extends EvaluationProcessingEvent,
   TEventData,
 >(
-  config: EvaluationCommandConfig<TCommandData, TEventData>
+  config: EvaluationCommandConfig<TCommandData, TEventData>,
 ): CommandHandler<Command<TCommandData>, EvaluationProcessingEvent>["handle"] {
   const logger = createLogger(
-    `langwatch:evaluation-processing:${config.loggerName}`
+    `langwatch:evaluation-processing:${config.loggerName}`,
   );
 
   return async (
-    command: Command<TCommandData>
+    command: Command<TCommandData>,
   ): Promise<EvaluationProcessingEvent[]> => {
     const { tenantId: tenantIdStr, data: commandData } = command;
     const tenantId = createTenantId(tenantIdStr);
@@ -55,7 +55,7 @@ export function createEvaluationCommandHandler<
         evaluationId,
         ...config.getLogContext(commandData),
       },
-      config.handleLogMessage
+      config.handleLogMessage,
     );
 
     const event = EventUtils.createEvent<TEvent>(
@@ -64,7 +64,7 @@ export function createEvaluationCommandHandler<
       tenantId,
       config.eventType as TEvent["type"],
       config.eventVersion as TEvent["version"],
-      config.mapToEventData(commandData) as TEvent["data"]
+      config.mapToEventData(commandData) as TEvent["data"],
     );
 
     logger.debug(
@@ -74,7 +74,7 @@ export function createEvaluationCommandHandler<
         eventId: event.id,
         eventType: event.type,
       },
-      config.emitLogMessage
+      config.emitLogMessage,
     );
 
     return [event];

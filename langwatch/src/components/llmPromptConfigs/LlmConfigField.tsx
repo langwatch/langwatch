@@ -59,10 +59,7 @@ export function LLMConfigField({
           </HStack>
         </Popover.Trigger>
 
-        <LLMConfigPopover
-          values={llmConfig}
-          onChange={onChange}
-        />
+        <LLMConfigPopover values={llmConfig} onChange={onChange} />
       </Popover.Root>
       {(requiresCustomKey || isModelDisabled) && showProviderKeyMessage && (
         <AddModelProviderKey

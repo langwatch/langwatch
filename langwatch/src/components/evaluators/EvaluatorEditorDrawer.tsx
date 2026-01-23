@@ -20,7 +20,14 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import { getComplexProps, getDrawerStack, getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
+import {
+  getComplexProps,
+  getDrawerStack,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -29,7 +36,6 @@ import {
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
-import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 /**
@@ -53,7 +59,10 @@ export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   /** Called when evaluator is saved. Return true to indicate navigation was handled. */
-  onSave?: (evaluator: { id: string; name: string }) => boolean | void | Promise<void>;
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+  }) => boolean | void | Promise<void>;
   /** Evaluator type (e.g., "langevals/exact_match") */
   evaluatorType?: string;
   /** If provided, loads an existing evaluator for editing */
@@ -104,8 +113,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 
   // Get custom save button text from props or complexProps
   const saveButtonText =
-    props.saveButtonText ??
-    (complexProps.saveButtonText as string | undefined);
+    props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -198,7 +206,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       // Get fresh callback from flow callbacks (might have been set after component rendered)
       const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
       // If onSave returns true, it handled navigation - don't do default navigation
-      const handledNavigation = freshOnSave?.({ id: evaluator.id, name: evaluator.name });
+      const handledNavigation = freshOnSave?.({
+        id: evaluator.id,
+        name: evaluator.name,
+      });
       if (handledNavigation) return;
       // Default: go back if there's a stack, otherwise close
       if (getDrawerStack().length > 1) {
@@ -219,7 +230,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       // Get fresh callback from flow callbacks (might have been set after component rendered)
       const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
       // If onSave returns true, it handled navigation - don't do default navigation
-      const handledNavigation = freshOnSave?.({ id: evaluator.id, name: evaluator.name });
+      const handledNavigation = freshOnSave?.({
+        id: evaluator.id,
+        name: evaluator.name,
+      });
       if (handledNavigation) return;
       // Default: go back if there's a stack, otherwise close
       if (getDrawerStack().length > 1) {
@@ -401,7 +415,8 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               loading={isSaving}
               data-testid="save-evaluator-button"
             >
-              {saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator")}
+              {saveButtonText ??
+                (evaluatorId ? "Save Changes" : "Create Evaluator")}
             </Button>
           </HStack>
         </Drawer.Footer>
@@ -473,7 +488,11 @@ function EvaluatorMappingsSection({
 
     // Special case: if ALL fields are empty and there are no required fields,
     // highlight the first field to indicate something is needed
-    if (!validation.hasAnyMapping && validation.missingRequiredFields.length === 0 && allFields.length > 0) {
+    if (
+      !validation.hasAnyMapping &&
+      validation.missingRequiredFields.length === 0 &&
+      allFields.length > 0
+    ) {
       missing.add(allFields[0]!);
     }
 
@@ -574,7 +593,8 @@ function EvaluatorMappingsSection({
           fontSize="sm"
           marginTop={3}
         >
-          Please map all required fields: {Array.from(missingMappingIds).join(", ")}
+          Please map all required fields:{" "}
+          {Array.from(missingMappingIds).join(", ")}
         </Text>
       )}
     </Box>

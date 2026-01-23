@@ -63,10 +63,10 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
           identifier: o.identifier,
           type: o.type as LlmConfigOutputType,
           json_schema: o.json_schema as { type: string } | undefined,
-        }))
+        })),
       );
     },
-    [outputsFieldArray]
+    [outputsFieldArray],
   );
 
   return (

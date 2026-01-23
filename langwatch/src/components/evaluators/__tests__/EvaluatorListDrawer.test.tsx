@@ -160,7 +160,9 @@ describe("EvaluatorListDrawer", () => {
       await waitFor(() => {
         // Shows evaluator type display names
         expect(screen.getByText("Exact Match Evaluator")).toBeInTheDocument();
-        expect(screen.getByText("LLM-as-a-Judge Boolean Evaluator")).toBeInTheDocument();
+        expect(
+          screen.getByText("LLM-as-a-Judge Boolean Evaluator"),
+        ).toBeInTheDocument();
         // One workflow evaluator shows "Workflow"
         expect(screen.getByText("Workflow")).toBeInTheDocument();
       });

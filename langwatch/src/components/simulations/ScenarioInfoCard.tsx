@@ -13,8 +13,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { useColorModeValue } from "../ui/color-mode";
 import { LuBookOpen, LuCircleCheck, LuExternalLink } from "react-icons/lu";
+import { useColorModeValue } from "../ui/color-mode";
 
 const MotionBox = motion(Box);
 
@@ -27,7 +27,7 @@ const ScenarioInfoCard: React.FC = () => {
     `radial-gradient(ellipse 70% 60% at 60% 95%, rgba(50,130,110,0.35) 0%, transparent 85%),
      radial-gradient(ellipse 60% 80% at 20% 30%, rgba(130,100,50,0.35) 0%, transparent 85%),
      radial-gradient(ellipse 50% 60% at 60% 20%, rgba(90,80,130,0.35) 0%, transparent 85%),
-     radial-gradient(ellipse 80% 100% at 50% 80%, rgba(30,30,35,0.85) 0%, transparent 90%)`
+     radial-gradient(ellipse 80% 100% at 50% 80%, rgba(30,30,35,0.85) 0%, transparent 90%)`,
   );
 
   return (
@@ -46,122 +46,117 @@ const ScenarioInfoCard: React.FC = () => {
         background: bgGradient,
       }}
     >
-    <VStack align="start" gap={3} mb={0}>
-      <HStack gap={2}>
-        <Badge
-          size="md"
-          colorPalette="orange"
-          variant="subtle"
-          borderRadius="2xl"
-        >
-          New
-        </Badge>
-        <Heading size="lg" fontWeight="bold" textAlign="left">
-          Scenario: Agentic Simulations
-        </Heading>
-      </HStack>
-      <Text fontSize="md" color="fg" textAlign="left">
-        <b>Scenario</b> is the most advanced and flexible agent testing
-        framework. It lets you simulate users, complex flows, test edge cases,
-        and guarantee agent quality. No dataset required.
-      </Text>
-    </VStack>
-    <Separator my={2} />
-    <VStack align="start" gap={3}>
-      <Text fontWeight="semibold">What can you do with Scenario?</Text>
-      <List.Root as="ul" listStyleType={"none"} pl={2} color="fg.muted">
-        <List.Item>
-          <HStack gap={2}>
-            <Icon as={LuCircleCheck} color="green.fg" />{" "}
-            <span>Simulate real user conversations and edge cases</span>
-          </HStack>
-        </List.Item>
-        <List.Item>
-          <HStack gap={2}>
-            <Icon as={LuCircleCheck} color="green.fg" />{" "}
-            <span>Test your agent end-to-end, not just in isolation</span>
-          </HStack>
-        </List.Item>
-        <List.Item>
-          <HStack gap={2}>
-            <Icon as={LuCircleCheck} color="green.fg" />{" "}
-            <span>Combine with evals for deep, multi-turn control</span>
-          </HStack>
-        </List.Item>
-        <List.Item>
-          <HStack gap={2}>
-            <Icon as={LuCircleCheck} color="green.fg" />{" "}
-            <span>
-              Integrate with any agent framework by implementing a single{" "}
-              <code>call()</code> method
-            </span>
-          </HStack>
-        </List.Item>
-        <List.Item>
-          <HStack gap={2}>
-            <Icon as={LuCircleCheck} color="green.fg" />{" "}
-            <span>No dataset required, write scenarios as code</span>
-          </HStack>
-        </List.Item>
-      </List.Root>
-    </VStack>
-    <Separator my={2} />
-    <VStack align="start" gap={2}>
-      <Text fontWeight="semibold">Why use Scenario?</Text>
-      <List.Root as="ul" pl={7} color="fg.muted">
-        <List.Item>
-          Catch regressions <b>before users do</b>
-        </List.Item>
-        <List.Item>
-          Safely refactor prompts, tools, or agent structure
-        </List.Item>
-        <List.Item>Boost confidence in production releases</List.Item>
-        <List.Item>
-          Works with <b>Python</b>, <b>TypeScript</b>, and soon: <b>Go</b>
-        </List.Item>
-      </List.Root>
-    </VStack>
-    <VStack align="stretch" w="full" mt={6} gap={2}>
-      <ChakraLink
-        href="https://scenario.langwatch.ai/"
-        target="_blank"
-        rel="noopener noreferrer"
-        w="full"
-        _hover={{ textDecoration: "none" }}
-      >
-        <Button
-          colorPalette="orange"
-          color="orange.fg"
-          variant="surface"
-          fontWeight="normal"
-          borderRadius="md"
-          px={3}
-          py={6}
+      <VStack align="start" gap={3} mb={0}>
+        <HStack gap={2}>
+          <Badge
+            size="md"
+            colorPalette="orange"
+            variant="subtle"
+            borderRadius="2xl"
+          >
+            New
+          </Badge>
+          <Heading size="lg" fontWeight="bold" textAlign="left">
+            Scenario: Agentic Simulations
+          </Heading>
+        </HStack>
+        <Text fontSize="md" color="fg" textAlign="left">
+          <b>Scenario</b> is the most advanced and flexible agent testing
+          framework. It lets you simulate users, complex flows, test edge cases,
+          and guarantee agent quality. No dataset required.
+        </Text>
+      </VStack>
+      <Separator my={2} />
+      <VStack align="start" gap={3}>
+        <Text fontWeight="semibold">What can you do with Scenario?</Text>
+        <List.Root as="ul" listStyleType={"none"} pl={2} color="fg.muted">
+          <List.Item>
+            <HStack gap={2}>
+              <Icon as={LuCircleCheck} color="green.fg" />{" "}
+              <span>Simulate real user conversations and edge cases</span>
+            </HStack>
+          </List.Item>
+          <List.Item>
+            <HStack gap={2}>
+              <Icon as={LuCircleCheck} color="green.fg" />{" "}
+              <span>Test your agent end-to-end, not just in isolation</span>
+            </HStack>
+          </List.Item>
+          <List.Item>
+            <HStack gap={2}>
+              <Icon as={LuCircleCheck} color="green.fg" />{" "}
+              <span>Combine with evals for deep, multi-turn control</span>
+            </HStack>
+          </List.Item>
+          <List.Item>
+            <HStack gap={2}>
+              <Icon as={LuCircleCheck} color="green.fg" />{" "}
+              <span>
+                Integrate with any agent framework by implementing a single{" "}
+                <code>call()</code> method
+              </span>
+            </HStack>
+          </List.Item>
+          <List.Item>
+            <HStack gap={2}>
+              <Icon as={LuCircleCheck} color="green.fg" />{" "}
+              <span>No dataset required, write scenarios as code</span>
+            </HStack>
+          </List.Item>
+        </List.Root>
+      </VStack>
+      <Separator my={2} />
+      <VStack align="start" gap={2}>
+        <Text fontWeight="semibold">Why use Scenario?</Text>
+        <List.Root as="ul" pl={7} color="fg.muted">
+          <List.Item>
+            Catch regressions <b>before users do</b>
+          </List.Item>
+          <List.Item>
+            Safely refactor prompts, tools, or agent structure
+          </List.Item>
+          <List.Item>Boost confidence in production releases</List.Item>
+          <List.Item>
+            Works with <b>Python</b>, <b>TypeScript</b>, and soon: <b>Go</b>
+          </List.Item>
+        </List.Root>
+      </VStack>
+      <VStack align="stretch" w="full" mt={6} gap={2}>
+        <ChakraLink
+          href="https://scenario.langwatch.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
           w="full"
-          aria-label="Learn more about Scenario (opens in a new tab)"
-          display="flex"
-          alignItems="center"
-          gap={2}
+          _hover={{ textDecoration: "none" }}
         >
-          <Icon as={LuBookOpen} boxSize={4} color="orange.fg" />
-          <Box as="span" flex={1} textAlign="left">
-            Read the Scenario docs, and get started!
-          </Box>
-          <Icon as={LuExternalLink} boxSize={4} color="fg.subtle" />
-        </Button>
-      </ChakraLink>
-    </VStack>
-    <VStack align="center" w="full" mt={5} mb={0} gap={4}>
-      <Text
-        fontSize="lg"
-        color="fg"
-        fontWeight="semibold"
-        textAlign="center"
-      >
-        Your simulations will appear here once you start running Scenario
-      </Text>
-      <Spinner borderWidth="3px" animationDuration="0.8s" opacity={0.6} />
-    </VStack>
+          <Button
+            colorPalette="orange"
+            color="orange.fg"
+            variant="surface"
+            fontWeight="normal"
+            borderRadius="md"
+            px={3}
+            py={6}
+            w="full"
+            aria-label="Learn more about Scenario (opens in a new tab)"
+            display="flex"
+            alignItems="center"
+            gap={2}
+          >
+            <Icon as={LuBookOpen} boxSize={4} color="orange.fg" />
+            <Box as="span" flex={1} textAlign="left">
+              Read the Scenario docs, and get started!
+            </Box>
+            <Icon as={LuExternalLink} boxSize={4} color="fg.subtle" />
+          </Button>
+        </ChakraLink>
+      </VStack>
+      <VStack align="center" w="full" mt={5} mb={0} gap={4}>
+        <Text fontSize="lg" color="fg" fontWeight="semibold" textAlign="center">
+          Your simulations will appear here once you start running Scenario
+        </Text>
+        <Spinner borderWidth="3px" animationDuration="0.8s" opacity={0.6} />
+      </VStack>
     </MotionBox>
   );
 };

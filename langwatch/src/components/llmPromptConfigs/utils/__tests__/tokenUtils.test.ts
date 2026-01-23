@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import type { ModelMetadataForFrontend } from "~/hooks/useModelProvidersSettings";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { parameterRegistry } from "../../parameterRegistry";
 import {
   buildModelChangeValues,
@@ -33,17 +33,26 @@ describe("buildModelChangeValues", () => {
     });
 
     it("sets topP to registry default (1)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
+        string,
+        unknown
+      >;
       expect(result.topP).toBe(1);
     });
 
     it("sets frequencyPenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
+        string,
+        unknown
+      >;
       expect(result.frequencyPenalty).toBe(0);
     });
 
     it("sets presencePenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<
+        string,
+        unknown
+      >;
       expect(result.presencePenalty).toBe(0);
     });
 
@@ -95,20 +104,36 @@ describe("buildModelChangeValues", () => {
 
   describe("when model metadata is provided", () => {
     it("calculates maxTokens from maxCompletionTokens", () => {
-      const metadata = { maxCompletionTokens: 16384 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const metadata = {
+        maxCompletionTokens: 16384,
+      } as ModelMetadataForFrontend;
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        metadata,
+      );
       expect(result.maxTokens).toBe(4096); // 16384 * 0.25 = 4096
     });
 
     it("caps maxTokens at registry default for large models", () => {
-      const metadata = { maxCompletionTokens: 100000 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const metadata = {
+        maxCompletionTokens: 100000,
+      } as ModelMetadataForFrontend;
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        metadata,
+      );
       expect(result.maxTokens).toBe(4096); // 100000 * 0.25 = 25000, capped at 4096
     });
 
     it("uses contextLength when maxCompletionTokens not available", () => {
       const metadata = { contextLength: 8192 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        metadata,
+      );
       expect(result.maxTokens).toBe(2048); // 8192 * 0.25 = 2048
     });
   });
@@ -211,13 +236,17 @@ describe("calculateSensibleDefaults", () => {
 
   describe("when called with model metadata", () => {
     it("calculates maxTokens from maxCompletionTokens", () => {
-      const metadata = { maxCompletionTokens: 16384 } as ModelMetadataForFrontend;
+      const metadata = {
+        maxCompletionTokens: 16384,
+      } as ModelMetadataForFrontend;
       const defaults = calculateSensibleDefaults(metadata);
       expect(defaults.maxTokens).toBe(4096); // min(4096, 16384 * 0.25)
     });
 
     it("uses smaller value when model max is less than registry default", () => {
-      const metadata = { maxCompletionTokens: 4000 } as ModelMetadataForFrontend;
+      const metadata = {
+        maxCompletionTokens: 4000,
+      } as ModelMetadataForFrontend;
       const defaults = calculateSensibleDefaults(metadata);
       expect(defaults.maxTokens).toBe(1000); // min(4096, 4000 * 0.25)
     });

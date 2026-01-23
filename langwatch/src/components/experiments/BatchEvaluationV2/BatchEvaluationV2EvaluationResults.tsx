@@ -502,12 +502,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         defaultValue={Object.keys(resultsByEvaluator)[0]}
         colorPalette="blue"
       >
-        <HStack
-          top={1}
-          right={2}
-          borderBottom="1px solid"
-          borderColor="border"
-        >
+        <HStack top={1} right={2} borderBottom="1px solid" borderColor="border">
           <Tabs.List minWidth={0}>
             {Object.entries(resultsByEvaluator).map(([key, results]) => (
               <Tabs.Trigger

@@ -11,7 +11,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { VariableMappingInput, type AvailableSource } from "~/components/variables";
+import {
+  type AvailableSource,
+  VariableMappingInput,
+} from "~/components/variables";
 import { TRACE_MAPPINGS } from "~/server/tracer/tracesMapping";
 
 // Import the actual function we want to test
@@ -37,47 +40,49 @@ const SPANS_CHILDREN = [
  * It should provide nested children for metadata and spans fields.
  */
 const getTraceAvailableSources = (): AvailableSource[] => {
-  return [{
-    id: "trace",
-    name: "Trace",
-    type: "dataset",
-    fields: Object.entries(TRACE_MAPPINGS).map(([key, config]) => {
-      const hasKeys = "keys" in config && typeof config.keys === "function";
+  return [
+    {
+      id: "trace",
+      name: "Trace",
+      type: "dataset",
+      fields: Object.entries(TRACE_MAPPINGS).map(([key, config]) => {
+        const hasKeys = "keys" in config && typeof config.keys === "function";
 
-      // Provide static children for known nested fields
-      if (key === "metadata") {
+        // Provide static children for known nested fields
+        if (key === "metadata") {
+          return {
+            name: key,
+            type: "dict" as const,
+            children: METADATA_CHILDREN,
+            isComplete: true,
+          };
+        }
+
+        if (key === "spans") {
+          return {
+            name: key,
+            type: "list" as const,
+            children: SPANS_CHILDREN,
+            isComplete: true,
+          };
+        }
+
+        // Other fields with keys() function - mark as complete
+        if (hasKeys) {
+          return {
+            name: key,
+            type: "dict" as const,
+            isComplete: true,
+          };
+        }
+
         return {
           name: key,
-          type: "dict" as const,
-          children: METADATA_CHILDREN,
-          isComplete: true,
+          type: "str" as const,
         };
-      }
-
-      if (key === "spans") {
-        return {
-          name: key,
-          type: "list" as const,
-          children: SPANS_CHILDREN,
-          isComplete: true,
-        };
-      }
-
-      // Other fields with keys() function - mark as complete
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    }),
-  }];
+      }),
+    },
+  ];
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -93,13 +98,13 @@ describe("Trace mapping nested fields", () => {
     it("includes all TRACE_MAPPINGS keys as fields", () => {
       const sources = getTraceAvailableSources();
       expect(sources).toHaveLength(1);
-      
+
       const traceSource = sources[0]!;
       expect(traceSource.id).toBe("trace");
       expect(traceSource.name).toBe("Trace");
-      
+
       // Should have fields for all TRACE_MAPPINGS keys
-      const fieldNames = traceSource.fields.map(f => f.name);
+      const fieldNames = traceSource.fields.map((f) => f.name);
       expect(fieldNames).toContain("input");
       expect(fieldNames).toContain("output");
       expect(fieldNames).toContain("metadata");
@@ -108,13 +113,15 @@ describe("Trace mapping nested fields", () => {
 
     it("metadata field has children for common metadata keys", () => {
       const sources = getTraceAvailableSources();
-      const metadataField = sources[0]!.fields.find(f => f.name === "metadata");
-      
+      const metadataField = sources[0]!.fields.find(
+        (f) => f.name === "metadata",
+      );
+
       expect(metadataField).toBeDefined();
       expect(metadataField!.children).toBeDefined();
       expect(metadataField!.children!.length).toBeGreaterThan(0);
-      
-      const childNames = metadataField!.children!.map(c => c.name);
+
+      const childNames = metadataField!.children!.map((c) => c.name);
       expect(childNames).toContain("thread_id");
       expect(childNames).toContain("user_id");
       expect(childNames).toContain("customer_id");
@@ -122,13 +129,13 @@ describe("Trace mapping nested fields", () => {
 
     it("spans field has children for span subfields", () => {
       const sources = getTraceAvailableSources();
-      const spansField = sources[0]!.fields.find(f => f.name === "spans");
-      
+      const spansField = sources[0]!.fields.find((f) => f.name === "spans");
+
       expect(spansField).toBeDefined();
       expect(spansField!.children).toBeDefined();
       expect(spansField!.children!.length).toBeGreaterThan(0);
-      
-      const childNames = spansField!.children!.map(c => c.name);
+
+      const childNames = spansField!.children!.map((c) => c.name);
       expect(childNames).toContain("input");
       expect(childNames).toContain("output");
     });
@@ -138,11 +145,10 @@ describe("Trace mapping nested fields", () => {
     it("shows trace fields in dropdown when clicked", async () => {
       const user = userEvent.setup();
       const sources = getTraceAvailableSources();
-      
-      render(
-        <VariableMappingInput availableSources={sources} />,
-        { wrapper: Wrapper }
-      );
+
+      render(<VariableMappingInput availableSources={sources} />, {
+        wrapper: Wrapper,
+      });
 
       const input = screen.getByRole("textbox");
       await user.click(input);
@@ -159,11 +165,10 @@ describe("Trace mapping nested fields", () => {
     it("shows metadata nested children when metadata is selected", async () => {
       const user = userEvent.setup();
       const sources = getTraceAvailableSources();
-      
-      render(
-        <VariableMappingInput availableSources={sources} />,
-        { wrapper: Wrapper }
-      );
+
+      render(<VariableMappingInput availableSources={sources} />, {
+        wrapper: Wrapper,
+      });
 
       const input = screen.getByRole("textbox");
       await user.click(input);
@@ -178,24 +183,29 @@ describe("Trace mapping nested fields", () => {
 
       // EXPECTED: metadata badge appears AND nested children are shown
       await waitFor(() => {
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("metadata");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "metadata",
+        );
       });
 
       await waitFor(() => {
-        expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-thread_id"),
+        ).toBeInTheDocument();
         expect(screen.getByTestId("field-option-user_id")).toBeInTheDocument();
-        expect(screen.getByTestId("field-option-customer_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-customer_id"),
+        ).toBeInTheDocument();
       });
     });
 
     it("shows spans nested children when spans is selected", async () => {
       const user = userEvent.setup();
       const sources = getTraceAvailableSources();
-      
-      render(
-        <VariableMappingInput availableSources={sources} />,
-        { wrapper: Wrapper }
-      );
+
+      render(<VariableMappingInput availableSources={sources} />, {
+        wrapper: Wrapper,
+      });
 
       const input = screen.getByRole("textbox");
       await user.click(input);
@@ -210,7 +220,9 @@ describe("Trace mapping nested fields", () => {
 
       // EXPECTED: spans badge appears AND nested children are shown
       await waitFor(() => {
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
       });
 
       await waitFor(() => {
@@ -223,13 +235,13 @@ describe("Trace mapping nested fields", () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
       const sources = getTraceAvailableSources();
-      
+
       render(
-        <VariableMappingInput 
-          availableSources={sources} 
+        <VariableMappingInput
+          availableSources={sources}
           onMappingChange={onMappingChange}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const input = screen.getByRole("textbox");
@@ -243,7 +255,9 @@ describe("Trace mapping nested fields", () => {
 
       // Select thread_id
       await waitFor(() => {
-        expect(screen.getByTestId("field-option-thread_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-thread_id"),
+        ).toBeInTheDocument();
       });
       await user.click(screen.getByTestId("field-option-thread_id"));
 
@@ -265,13 +279,13 @@ describe("Trace mapping nested fields", () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
       const sources = getTraceAvailableSources();
-      
+
       render(
-        <VariableMappingInput 
-          availableSources={sources} 
+        <VariableMappingInput
+          availableSources={sources}
           onMappingChange={onMappingChange}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       const input = screen.getByRole("textbox");

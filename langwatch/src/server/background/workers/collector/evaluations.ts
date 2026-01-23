@@ -1,5 +1,5 @@
-import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "node:crypto";
+import { EvaluationExecutionMode } from "@prisma/client";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
@@ -100,8 +100,11 @@ export const scheduleEvaluations = async (
       );
       if (preconditionsMet) {
         // Check if this is a thread-level evaluation with idle timeout
-        const hasThreadIdleTimeout = check.threadIdleTimeout !== null && check.threadIdleTimeout > 0;
-        const threadId = trace.thread_id ?? (trace.metadata as { thread_id?: string } | undefined)?.thread_id;
+        const hasThreadIdleTimeout =
+          check.threadIdleTimeout !== null && check.threadIdleTimeout > 0;
+        const threadId =
+          trace.thread_id ??
+          (trace.metadata as { thread_id?: string } | undefined)?.thread_id;
 
         traceChecksSchedulings.push(
           scheduleEvaluation({
@@ -114,10 +117,13 @@ export const scheduleEvaluations = async (
             trace: trace,
             // Thread-based debouncing: use thread ID + monitor ID as job key
             // and delay by threadIdleTimeout seconds
-            threadDebounce: hasThreadIdleTimeout && threadId ? {
-              threadId,
-              timeoutSeconds: check.threadIdleTimeout!,
-            } : undefined,
+            threadDebounce:
+              hasThreadIdleTimeout && threadId
+                ? {
+                    threadId,
+                    timeoutSeconds: check.threadIdleTimeout!,
+                  }
+                : undefined,
           }),
         );
       }

@@ -1,10 +1,11 @@
 import { Box, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLink } from "lucide-react";
-import numeral from "numeral";
 import { useRouter } from "next/router";
+import numeral from "numeral";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
@@ -14,7 +15,6 @@ import {
 } from "../checks/EvaluationStatus";
 import { HoverableBigText } from "../HoverableBigText";
 import { Tooltip } from "../ui/tooltip";
-import { useDrawer } from "../../hooks/useDrawer";
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
@@ -58,15 +58,17 @@ export function EvaluationStatusItem({
     {
       enabled: !!check.evaluator_id && !!project?.id,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    }
+    },
   );
 
   const color = evaluationStatusColor(check);
 
   // Get the prompt from evaluator config if available
-  const evaluatorConfig = monitorQuery.data?.evaluator?.config as {
-    settings?: { prompt?: string };
-  } | undefined;
+  const evaluatorConfig = monitorQuery.data?.evaluator?.config as
+    | {
+        settings?: { prompt?: string };
+      }
+    | undefined;
   const customPrompt = evaluatorConfig?.settings?.prompt;
 
   const handleOpenMonitorConfig = () => {

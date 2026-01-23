@@ -12,8 +12,8 @@
  * at the boundaries, keeping the domain model stable and provider-agnostic.
  */
 
-import { getModelById } from "../modelProviders/registry";
 import { getProviderFromModel } from "../../utils/modelProviderHelpers";
+import { getModelById } from "../modelProviders/registry";
 
 /**
  * Provider-specific reasoning parameter names.
@@ -46,7 +46,7 @@ const PROVIDER_REASONING_FALLBACKS: Record<string, string> = {
  */
 export function mapReasoningToProvider(
   model: string,
-  reasoning: string | undefined
+  reasoning: string | undefined,
 ): Record<string, string> | undefined {
   // Return undefined if reasoning is not set or empty
   if (!reasoning) {
@@ -100,7 +100,7 @@ export interface ProviderReasoningFields {
  * // Returns: "high" (reasoning takes precedence)
  */
 export function normalizeReasoningFromProviderFields(
-  data: ProviderReasoningFields
+  data: ProviderReasoningFields,
 ): string | undefined {
   // Priority: reasoning > reasoning_effort > thinkingLevel > effort
   return (

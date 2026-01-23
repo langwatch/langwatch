@@ -84,7 +84,7 @@ export const evaluatorsRouter = createTRPCRouter({
 
         if (existingEvaluator) {
           throw new Error(
-            `An evaluator already exists for this workflow: "${existingEvaluator.name}"`
+            `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
           );
         }
       }

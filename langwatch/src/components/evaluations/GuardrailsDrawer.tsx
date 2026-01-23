@@ -12,10 +12,7 @@ import type { Evaluator } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import {
-  setFlowCallbacks,
-  useDrawer,
-} from "~/hooks/useDrawer";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { RenderCode } from "../code/RenderCode";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -50,10 +47,10 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
 
   // Initialize from persisted state or defaults
   const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
-    () => guardrailsDrawerState?.selectedEvaluator ?? null
+    () => guardrailsDrawerState?.selectedEvaluator ?? null,
   );
   const [activeLanguage, setActiveLanguage] = useState(
-    () => guardrailsDrawerState?.activeLanguage ?? "python-async"
+    () => guardrailsDrawerState?.activeLanguage ?? "python-async",
   );
 
   // Track previous open state to reset form when drawer opens fresh (no persisted state)
@@ -87,7 +84,10 @@ export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
       onSelect: (evaluator: Evaluator) => {
         setSelectedEvaluator(evaluator);
         // Also update persisted state immediately
-        guardrailsDrawerState = { selectedEvaluator: evaluator, activeLanguage };
+        guardrailsDrawerState = {
+          selectedEvaluator: evaluator,
+          activeLanguage,
+        };
         // Navigate back to guardrails drawer after selection
         goBack();
       },
@@ -287,7 +287,8 @@ EOF
                   </Box>
 
                   <Text fontSize="sm" color="gray.600">
-                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
+                    Set the <code>LANGWATCH_API_KEY</code> environment variable
+                    with your API key.{" "}
                     <Link
                       href={apiKeyLink}
                       color="blue.500"

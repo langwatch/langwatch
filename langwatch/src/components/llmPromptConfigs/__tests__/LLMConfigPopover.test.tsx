@@ -207,7 +207,9 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByTestId("parameter-row-temperature")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-temperature"),
+        ).toBeInTheDocument();
       });
 
       it("shows Top P parameter", () => {
@@ -221,21 +223,27 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-max_tokens"),
+        ).toBeInTheDocument();
       });
 
       it("shows Frequency Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByTestId("parameter-row-frequency_penalty")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-frequency_penalty"),
+        ).toBeInTheDocument();
       });
 
       it("shows Presence Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByTestId("parameter-row-presence_penalty")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-presence_penalty"),
+        ).toBeInTheDocument();
       });
 
       it("does not show Reasoning parameter", () => {
@@ -255,7 +263,9 @@ describe("LLMConfigPopover", () => {
         });
 
         // Should find "Reasoning Effort" (label from reasoningConfig.parameterName mapping)
-        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(
+          0,
+        );
       });
 
       it("shows reasoning parameter row", () => {
@@ -263,14 +273,18 @@ describe("LLMConfigPopover", () => {
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         // Parameter row uses unified 'reasoning' key
-        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-reasoning"),
+        ).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
-        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("parameter-row-max_tokens"),
+        ).toBeInTheDocument();
       });
 
       it("does not show Temperature parameter", () => {

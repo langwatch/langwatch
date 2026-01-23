@@ -11,14 +11,17 @@ import qs from "qs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { GuardrailsDrawer, clearGuardrailsDrawerState } from "../GuardrailsDrawer";
-import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
 import { CurrentDrawer } from "~/components/CurrentDrawer";
+import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
 import {
   clearDrawerStack,
   clearFlowCallbacks,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
+import {
+  clearGuardrailsDrawerState,
+  GuardrailsDrawer,
+} from "../GuardrailsDrawer";
 
 // Mock evaluator data
 const mockEvaluators = [
@@ -69,9 +72,10 @@ const mockPush = vi.fn((url: string) => {
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    asPath: Object.keys(mockQuery).length > 0
-      ? "/test?" + qs.stringify(mockQuery)
-      : "/test",
+    asPath:
+      Object.keys(mockQuery).length > 0
+        ? "/test?" + qs.stringify(mockQuery)
+        : "/test",
     push: mockPush,
     replace: mockPush,
   }),
@@ -147,7 +151,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     const { rerender } = render(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 1: GuardrailsDrawer should be visible
@@ -168,7 +172,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     rerender(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 5: EvaluatorListDrawer should be visible with evaluators
@@ -183,15 +187,18 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
 
     // Step 7: EXPECTED BEHAVIOR - Should return to guardrails drawer
     // ACTUAL BUG - Nothing happens, drawer stays on evaluatorList
-    await waitFor(() => {
-      expect(mockQuery["drawer.open"]).toBe("guardrails");
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(mockQuery["drawer.open"]).toBe("guardrails");
+      },
+      { timeout: 2000 },
+    );
 
     // Step 8: Re-render to show GuardrailsDrawer with selection
     rerender(
       <Wrapper>
         <CurrentDrawer />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 9: GuardrailsDrawer should show the selected evaluator
@@ -230,8 +237,11 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Helper to determine which drawer should be open based on URL
-    const isGuardrailsOpen = () => mockQuery["drawer.open"] === "guardrailsDrawer" || mockQuery["drawer.open"] === undefined;
-    const isEvaluatorListOpen = () => mockQuery["drawer.open"] === "evaluatorList";
+    const isGuardrailsOpen = () =>
+      mockQuery["drawer.open"] === "guardrailsDrawer" ||
+      mockQuery["drawer.open"] === undefined;
+    const isEvaluatorListOpen = () =>
+      mockQuery["drawer.open"] === "evaluatorList";
 
     // Start with guardrails drawer open
     mockQuery = { "drawer.open": "guardrailsDrawer" };
@@ -241,7 +251,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
       <Wrapper>
         <GuardrailsDrawer open={isGuardrailsOpen()} />
         <EvaluatorListDrawer open={isEvaluatorListOpen()} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 1: GuardrailsDrawer is open, shows Select Evaluator
@@ -263,7 +273,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
       <Wrapper>
         <GuardrailsDrawer open={isGuardrailsOpen()} />
         <EvaluatorListDrawer open={isEvaluatorListOpen()} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 5: EvaluatorListDrawer should now be visible with evaluators
@@ -285,7 +295,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
       <Wrapper>
         <GuardrailsDrawer open={isGuardrailsOpen()} />
         <EvaluatorListDrawer open={isEvaluatorListOpen()} />
-      </Wrapper>
+      </Wrapper>,
     );
 
     // Step 9: CRITICAL - GuardrailsDrawer should show the selected evaluator
@@ -343,7 +353,9 @@ describe("GuardrailsDrawer", () => {
       render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByText("Select an evaluator to use as a guardrail")).toBeInTheDocument();
+        expect(
+          screen.getByText("Select an evaluator to use as a guardrail"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -370,7 +382,8 @@ describe("GuardrailsDrawer", () => {
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalled();
-        const lastCall = mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
+        const lastCall =
+          mockPush.mock.calls[mockPush.mock.calls.length - 1]?.[0];
         expect(lastCall).toContain("drawer.open=evaluatorList");
       });
     });
@@ -607,7 +620,9 @@ describe("GuardrailsDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnClose = vi.fn();
 
-      render(<GuardrailsDrawer open={true} onClose={mockOnClose} />, { wrapper: Wrapper });
+      render(<GuardrailsDrawer open={true} onClose={mockOnClose} />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("Close")).toBeInTheDocument();
@@ -632,10 +647,7 @@ describe("GuardrailsDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       // Render GuardrailsDrawer
-      render(
-        <GuardrailsDrawer open={true} />,
-        { wrapper: Wrapper }
-      );
+      render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
 
       await waitFor(() => {
         expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
@@ -669,10 +681,9 @@ describe("GuardrailsDrawer", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnSelect = vi.fn();
 
-      render(
-        <EvaluatorListDrawer open={true} onSelect={mockOnSelect} />,
-        { wrapper: Wrapper }
-      );
+      render(<EvaluatorListDrawer open={true} onSelect={mockOnSelect} />, {
+        wrapper: Wrapper,
+      });
 
       await waitFor(() => {
         expect(screen.getByText("Choose Evaluator")).toBeInTheDocument();
@@ -688,7 +699,7 @@ describe("GuardrailsDrawer", () => {
           id: "evaluator-1",
           name: "PII Check",
           slug: "pii-check-abc12",
-        })
+        }),
       );
     });
   });

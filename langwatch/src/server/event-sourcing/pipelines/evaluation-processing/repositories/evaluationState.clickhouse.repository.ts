@@ -21,7 +21,7 @@ import type { EvaluationStateRepository } from "./evaluationState.repository";
 const TABLE_NAME = "evaluation_states" as const;
 
 const logger = createLogger(
-  "langwatch:evaluation-processing:evaluation-state-repository"
+  "langwatch:evaluation-processing:evaluation-state-repository",
 );
 
 /**
@@ -80,7 +80,7 @@ export class EvaluationStateRepositoryClickHouse<
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
 
   private mapClickHouseRecordToProjectionData(
-    record: ClickHouseEvaluationStateRecord
+    record: ClickHouseEvaluationStateRecord,
   ): EvaluationStateData {
     return {
       EvaluationId: record.EvaluationId,
@@ -106,7 +106,7 @@ export class EvaluationStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
-    lastProcessedEventId: string
+    lastProcessedEventId: string,
   ): ClickHouseEvaluationStateRecord {
     return {
       Id: projectionId,
@@ -138,11 +138,11 @@ export class EvaluationStateRepositoryClickHouse<
 
   async getProjection(
     aggregateId: string,
-    context: ProjectionStoreReadContext
+    context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
     EventUtils.validateTenantId(
       context,
-      "EvaluationStateRepositoryClickHouse.getProjection"
+      "EvaluationStateRepositoryClickHouse.getProjection",
     );
 
     const evaluationId = String(aggregateId);
@@ -209,7 +209,7 @@ export class EvaluationStateRepositoryClickHouse<
           tenantId: context.tenantId,
           error: errorMessage,
         },
-        "Failed to get projection from ClickHouse"
+        "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
         "getProjection",
@@ -217,25 +217,25 @@ export class EvaluationStateRepositoryClickHouse<
         `Failed to get projection for evaluation ${evaluationId}: ${errorMessage}`,
         ErrorCategory.CRITICAL,
         { evaluationId },
-        error
+        error,
       );
     }
   }
 
   async storeProjection(
     projection: ProjectionType,
-    context: ProjectionStoreWriteContext
+    context: ProjectionStoreWriteContext,
   ): Promise<void> {
     EventUtils.validateTenantId(
       context,
-      "EvaluationStateRepositoryClickHouse.storeProjection"
+      "EvaluationStateRepositoryClickHouse.storeProjection",
     );
 
     if (!EventUtils.isValidProjection(projection)) {
       throw new ValidationError(
         "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
         "projection",
-        projection
+        projection,
       );
     }
 
@@ -244,7 +244,7 @@ export class EvaluationStateRepositoryClickHouse<
         "storeProjection",
         `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
         projection.tenantId,
-        { contextTenantId: context.tenantId }
+        { contextTenantId: context.tenantId },
       );
     }
 
@@ -255,7 +255,7 @@ export class EvaluationStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
-        projection.id // Use projection ID as lastProcessedEventId for now
+        projection.id, // Use projection ID as lastProcessedEventId for now
       );
 
       await this.clickHouseClient.insert({
@@ -270,7 +270,7 @@ export class EvaluationStateRepositoryClickHouse<
           evaluationId,
           projectionId: projection.id,
         },
-        "Stored evaluation state projection to ClickHouse"
+        "Stored evaluation state projection to ClickHouse",
       );
     } catch (error) {
       const errorMessage =
@@ -282,7 +282,7 @@ export class EvaluationStateRepositoryClickHouse<
           projectionId: projection.id,
           error: errorMessage,
         },
-        "Failed to store projection in ClickHouse"
+        "Failed to store projection in ClickHouse",
       );
       throw new StoreError(
         "storeProjection",
@@ -293,7 +293,7 @@ export class EvaluationStateRepositoryClickHouse<
           projectionId: projection.id,
           evaluationId: String(projection.aggregateId),
         },
-        error
+        error,
       );
     }
   }

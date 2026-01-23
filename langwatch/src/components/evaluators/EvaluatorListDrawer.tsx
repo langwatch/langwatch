@@ -13,7 +13,11 @@ import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Plus, Workflow } from "lucide-react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -40,7 +44,7 @@ export type EvaluatorListDrawerProps = {
  */
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer, goBack, canGoBack } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
 
@@ -215,7 +219,9 @@ const getEvaluatorDisplayName = (evaluatorType: string): string => {
     AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
-  return evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name;
+  return (
+    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
+  );
 };
 
 function EvaluatorCard({

@@ -167,7 +167,10 @@ describe("dslToFormFormat", () => {
 
     // Unified reasoning parameter (normalizes from any provider-specific field)
     it("normalizes reasoning_effort to reasoning", () => {
-      const dslConfig: LLMConfig = { model: "test", reasoning_effort: "medium" };
+      const dslConfig: LLMConfig = {
+        model: "test",
+        reasoning_effort: "medium",
+      };
       const result = LLMConfigFormatUtils.dslToFormFormat(dslConfig);
       expect(result.reasoning).toBe("medium");
     });

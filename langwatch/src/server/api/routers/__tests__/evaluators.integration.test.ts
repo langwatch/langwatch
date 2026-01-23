@@ -139,7 +139,7 @@ describe("Evaluators Endpoints", () => {
           type: "workflow",
           config: {},
           workflowId,
-        })
+        }),
       ).rejects.toThrow(/already exists for this workflow/);
     });
   });

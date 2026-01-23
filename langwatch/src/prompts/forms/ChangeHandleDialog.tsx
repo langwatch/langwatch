@@ -145,12 +145,7 @@ export function ChangeHandleDialog({
           <Dialog.Body>
             <VStack width="full" gap={4}>
               {currentHandle && (
-                <Text
-                  color="red.fg"
-                  fontSize="12px"
-                  fontWeight="medium"
-                  mb={2}
-                >
+                <Text color="red.fg" fontSize="12px" fontWeight="medium" mb={2}>
                   ⚠ Warning: Changing the prompt identifier or scope may break
                   any existing integrations, API calls, or workflows that use
                   &quot;

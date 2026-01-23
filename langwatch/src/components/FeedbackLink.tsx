@@ -35,12 +35,7 @@ export function FeedbackLink() {
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
-      <Button
-        variant="plain"
-        onClick={onOpen}
-        fontWeight="normal"
-        color="fg"
-      >
+      <Button variant="plain" onClick={onOpen} fontWeight="normal" color="fg">
         Give Feedback
       </Button>
     </>

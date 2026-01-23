@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseLLMError } from "../formatLLMError";
 
 describe("parseLLMError", () => {
@@ -33,8 +33,7 @@ describe("parseLLMError", () => {
   });
 
   it("parses RateLimitError", () => {
-    const raw =
-      "litellm.RateLimitError: OpenAIException - Rate limit exceeded";
+    const raw = "litellm.RateLimitError: OpenAIException - Rate limit exceeded";
 
     expect(parseLLMError(raw)).toEqual({
       type: "rate_limit",

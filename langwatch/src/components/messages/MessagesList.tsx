@@ -57,7 +57,7 @@ export function MessagesList() {
   navigationFooter.useUpdateTotalHits(traceGroups);
 
   const isRefreshing = useMinimumSpinDuration(
-    traceGroups.isLoading || traceGroups.isRefetching
+    traceGroups.isLoading || traceGroups.isRefetching,
   );
 
   const traceIds =

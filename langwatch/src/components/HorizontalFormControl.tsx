@@ -95,7 +95,15 @@ export function HorizontalFormControl({
           </Field.HelperText>
         </VStack>
         {direction === "horizontal" && <Spacer />}
-        <Box minWidth={direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]}>{children}</Box>
+        <Box
+          minWidth={
+            direction === "vertical"
+              ? "full"
+              : ["full", "full", inputWidth ?? "50%"]
+          }
+        >
+          {children}
+        </Box>
         <FormErrorDisplay error={error} />
       </HStack>
     </Field.Root>

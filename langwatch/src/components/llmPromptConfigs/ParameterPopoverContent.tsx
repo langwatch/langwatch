@@ -6,10 +6,8 @@
  */
 
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-
-import { Slider } from "../ui/slider";
-
 import { Popover } from "../ui/popover";
+import { Slider } from "../ui/slider";
 import { useSliderControl } from "./hooks/useSliderControl";
 import type {
   ParameterConfig,

@@ -1,7 +1,7 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
+import { DEFAULT_MODEL } from "../../utils/constants";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
-import { DEFAULT_MODEL } from "../../utils/constants";
 
 export const entryNode = () => ({
   id: "entry",

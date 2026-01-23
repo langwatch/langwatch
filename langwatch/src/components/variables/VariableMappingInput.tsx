@@ -144,33 +144,11 @@ const isFieldComplete = (field: NestedField): boolean => {
 /**
  * Find a field by name in a list of fields
  */
-const findFieldByName = (fields: NestedField[], name: string): NestedField | undefined => {
-  return fields.find((f) => f.name === name);
-};
-
-/**
- * Navigate to a nested field given a path
- */
-const getFieldAtPath = (
+const findFieldByName = (
   fields: NestedField[],
-  path: string[],
-): { field: NestedField; remainingPath: string[] } | null => {
-  if (path.length === 0) return null;
-
-  const [first, ...rest] = path;
-  const field = findFieldByName(fields, first!);
-  if (!field) return null;
-
-  if (rest.length === 0) {
-    return { field, remainingPath: [] };
-  }
-
-  const children = getFieldChildren(field);
-  if (children.length === 0) {
-    return { field, remainingPath: rest };
-  }
-
-  return getFieldAtPath(children, rest);
+  name: string,
+): NestedField | undefined => {
+  return fields.find((f) => f.name === name);
 };
 
 // ============================================================================
@@ -248,27 +226,58 @@ export const VariableMappingInput = ({
   const currentDropdownContext = useMemo(() => {
     // If we have an in-progress path, show children of the last selected field
     if (inProgressPath) {
-      const source = availableSources.find((s) => s.id === inProgressPath.sourceId);
-      if (!source) return { fields: [], source: null, depth: 0, parentFieldName: null, isParentComplete: false };
+      const source = availableSources.find(
+        (s) => s.id === inProgressPath.sourceId,
+      );
+      if (!source)
+        return {
+          fields: [],
+          source: null,
+          depth: 0,
+          parentFieldName: null,
+          isParentComplete: false,
+        };
 
       let currentFields = source.fields;
       let parentField: NestedField | undefined;
       for (const segment of inProgressPath.path) {
         const field = findFieldByName(currentFields, segment);
-        if (!field) return { fields: [], source, depth: inProgressPath.path.length, parentFieldName: null, isParentComplete: false };
+        if (!field)
+          return {
+            fields: [],
+            source,
+            depth: inProgressPath.path.length,
+            parentFieldName: null,
+            isParentComplete: false,
+          };
         parentField = field;
         currentFields = getFieldChildren(field);
       }
 
       // Check if the parent (last segment in path) is complete
-      const isParentComplete = parentField ? isFieldComplete(parentField) : false;
-      const parentFieldName = inProgressPath.path[inProgressPath.path.length - 1] ?? null;
+      const isParentComplete = parentField
+        ? isFieldComplete(parentField)
+        : false;
+      const parentFieldName =
+        inProgressPath.path[inProgressPath.path.length - 1] ?? null;
 
-      return { fields: currentFields, source, depth: inProgressPath.path.length, parentFieldName, isParentComplete };
+      return {
+        fields: currentFields,
+        source,
+        depth: inProgressPath.path.length,
+        parentFieldName,
+        isParentComplete,
+      };
     }
 
     // Otherwise show top-level fields from all sources
-    return { fields: null, source: null, depth: 0, parentFieldName: null, isParentComplete: false };
+    return {
+      fields: null,
+      source: null,
+      depth: 0,
+      parentFieldName: null,
+      isParentComplete: false,
+    };
   }, [availableSources, inProgressPath]);
 
   // Get display value for the input (only for value mappings now)
@@ -284,12 +293,16 @@ export const VariableMappingInput = ({
     // If we're in nested selection mode, filter the nested fields
     if (currentDropdownContext.fields && currentDropdownContext.source) {
       const filtered = currentDropdownContext.fields.filter((field) =>
-        (field.label ?? field.name).toLowerCase().includes(searchQuery.toLowerCase()),
+        (field.label ?? field.name)
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()),
       );
-      return [{
-        ...currentDropdownContext.source,
-        fields: filtered,
-      }];
+      return [
+        {
+          ...currentDropdownContext.source,
+          fields: filtered,
+        },
+      ];
     }
 
     // Otherwise filter top-level fields from all sources
@@ -297,7 +310,9 @@ export const VariableMappingInput = ({
       .map((source) => ({
         ...source,
         fields: source.fields.filter((field) =>
-          (field.label ?? field.name).toLowerCase().includes(searchQuery.toLowerCase()),
+          (field.label ?? field.name)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()),
         ),
       }))
       .filter((source) => source.fields.length > 0);
@@ -353,7 +368,11 @@ export const VariableMappingInput = ({
         setInProgressPath({ ...inProgressPath, path: newPath });
       }
       setSearchQuery("");
-    } else if (isSourceMapping && localMapping && localMapping.path.length > 1) {
+    } else if (
+      isSourceMapping &&
+      localMapping &&
+      localMapping.path.length > 1
+    ) {
       // Remove last segment from completed mapping
       const newPath = localMapping.path.slice(0, -1);
       const newMapping: FieldMapping = {
@@ -366,7 +385,13 @@ export const VariableMappingInput = ({
     } else {
       handleClearMapping();
     }
-  }, [inProgressPath, isSourceMapping, localMapping, onMappingChange, handleClearMapping]);
+  }, [
+    inProgressPath,
+    isSourceMapping,
+    localMapping,
+    onMappingChange,
+    handleClearMapping,
+  ]);
 
   // Handle input change - updates search query
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -556,11 +581,13 @@ export const VariableMappingInput = ({
     const spaceAbove = rect.top - DROPDOWN_GAP;
 
     // If not enough space below but more space above, flip to top
-    const shouldFlipToTop = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+    const shouldFlipToTop =
+      spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
 
     if (shouldFlipToTop) {
       // Position above the input - measure actual dropdown height
-      const actualDropdownHeight = dropdownRef.current?.offsetHeight ?? DROPDOWN_MAX_HEIGHT;
+      const actualDropdownHeight =
+        dropdownRef.current?.offsetHeight ?? DROPDOWN_MAX_HEIGHT;
       const dropdownHeight = Math.min(actualDropdownHeight, spaceAbove);
       setDropdownPosition({
         top: rect.top - dropdownHeight - DROPDOWN_GAP,
@@ -651,8 +678,10 @@ export const VariableMappingInput = ({
           )}
 
           {/* In-progress path badges (when building nested selection) */}
-          {inProgressPath && inProgressPath.path.map((segment, index) => {
-            const source = availableSources.find((s) => s.id === inProgressPath.sourceId);
+          {inProgressPath?.path.map((segment, index) => {
+            const source = availableSources.find(
+              (s) => s.id === inProgressPath.sourceId,
+            );
             return (
               <HStack key={`${segment}-${index}`} gap={0}>
                 <Tag.Root
@@ -687,7 +716,10 @@ export const VariableMappingInput = ({
                   </Tag.EndElement>
                 </Tag.Root>
                 {index < inProgressPath.path.length - 1 && (
-                  <ChevronRight size={12} color="var(--chakra-colors-gray-400)" />
+                  <ChevronRight
+                    size={12}
+                    color="var(--chakra-colors-gray-400)"
+                  />
                 )}
               </HStack>
             );
@@ -774,33 +806,40 @@ export const VariableMappingInput = ({
                 )}
 
                 {/* "Use all X" option when parent is complete */}
-                {currentDropdownContext.isParentComplete && currentDropdownContext.parentFieldName && (
-                  <HStack
-                    paddingX={3}
-                    paddingY={2}
-                    gap={2}
-                    cursor="pointer"
-                    borderRadius="4px"
-                    background={highlightedIndex === -1 ? "blue.50" : "transparent"}
-                    _hover={{ background: "blue.50" }}
-                    onClick={handleSelectCurrentPath}
-                    onMouseMove={() => {
-                      if (isKeyboardNav || highlightedIndex !== -1) {
-                        setIsKeyboardNav(false);
-                        setHighlightedIndex(-1);
+                {currentDropdownContext.isParentComplete &&
+                  currentDropdownContext.parentFieldName && (
+                    <HStack
+                      paddingX={3}
+                      paddingY={2}
+                      gap={2}
+                      cursor="pointer"
+                      borderRadius="4px"
+                      background={
+                        highlightedIndex === -1 ? "blue.50" : "transparent"
                       }
-                    }}
-                    data-testid="use-all-option"
-                    borderBottom="1px solid"
-                    borderColor="gray.100"
-                    marginBottom={1}
-                  >
-                    <Check size={12} color="var(--chakra-colors-green-500)" />
-                    <Text fontSize="13px" fontWeight="medium" color="green.600">
-                      Use all {currentDropdownContext.parentFieldName}
-                    </Text>
-                  </HStack>
-                )}
+                      _hover={{ background: "blue.50" }}
+                      onClick={handleSelectCurrentPath}
+                      onMouseMove={() => {
+                        if (isKeyboardNav || highlightedIndex !== -1) {
+                          setIsKeyboardNav(false);
+                          setHighlightedIndex(-1);
+                        }
+                      }}
+                      data-testid="use-all-option"
+                      borderBottom="1px solid"
+                      borderColor="gray.100"
+                      marginBottom={1}
+                    >
+                      <Check size={12} color="var(--chakra-colors-green-500)" />
+                      <Text
+                        fontSize="13px"
+                        fontWeight="medium"
+                        color="green.600"
+                      >
+                        Use all {currentDropdownContext.parentFieldName}
+                      </Text>
+                    </HStack>
+                  )}
 
                 {filteredSources.map((source) => (
                   <Box key={source.id}>
@@ -867,7 +906,10 @@ export const VariableMappingInput = ({
                             {field.label ?? field.name}
                           </Text>
                           {fieldHasChildren ? (
-                            <ChevronRight size={14} color="var(--chakra-colors-gray-400)" />
+                            <ChevronRight
+                              size={14}
+                              color="var(--chakra-colors-gray-400)"
+                            />
                           ) : (
                             <VariableTypeBadge type={field.type} size="xs" />
                           )}

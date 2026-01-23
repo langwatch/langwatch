@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { generateEvaluatorSlug, isValidEvaluatorSlug } from "../evaluatorSlug";
 
 describe("generateEvaluatorSlug", () => {
@@ -52,13 +52,13 @@ describe("generateEvaluatorSlug", () => {
 
   it("should throw error for empty name", () => {
     expect(() => generateEvaluatorSlug("")).toThrow(
-      "Evaluator name cannot be empty"
+      "Evaluator name cannot be empty",
     );
   });
 
   it("should throw error for whitespace-only name", () => {
     expect(() => generateEvaluatorSlug("   ")).toThrow(
-      "Evaluator name cannot be empty"
+      "Evaluator name cannot be empty",
     );
   });
 
