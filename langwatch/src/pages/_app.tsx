@@ -419,9 +419,9 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
           },
           // Main content area - darkest in dark mode
-          surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          surface: { value: { _light: "white", _dark: "{colors.gray.800}" } },
           // Cards and panels - same as surface (darkest)
-          panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          panel: { value: { _light: "white", _dark: "{colors.gray.800}" } },
           // Muted background for hover states, selections
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
