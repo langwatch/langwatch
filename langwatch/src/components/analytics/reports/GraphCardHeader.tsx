@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2, Bell } from "lucide-react";
@@ -77,6 +77,29 @@ export function GraphCardHeader({
   // Check if this is a saved graph (has valid database ID)
   const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
 
+  // Generate fallback title from graph series if name is missing
+  const displayName = useMemo(() => {
+    if (name && name.trim()) {
+      return name;
+    }
+    
+    // Try to generate a title from the graph data
+    if (graph && typeof graph === "object" && "series" in graph) {
+      const graphInput = graph as CustomGraphInput;
+      if (graphInput.series && graphInput.series.length > 0) {
+        const seriesNames = graphInput.series
+          .map((s) => s.name)
+          .filter(Boolean)
+          .join(", ");
+        if (seriesNames) {
+          return seriesNames.replace(/,([^,]*)$/, " and$1");
+        }
+      }
+    }
+    
+    return "Untitled Graph";
+  }, [name, graph]);
+
   return (
     <HStack
       {...dragAttributes}
@@ -86,9 +109,9 @@ export function GraphCardHeader({
       cursor={isDragging ? "grabbing" : "grab"}
     >
       <BarChart2 color="orange" />
-      <Text marginLeft={2} fontSize="md" fontWeight="bold">
-        {name}
-      </Text>
+      <Heading size="sm" marginLeft={2}>
+        {displayName}
+      </Heading>
       <Spacer />
 
       {isSavedGraph && (
