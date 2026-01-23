@@ -15,12 +15,12 @@ These skills use `context: fork` to spawn agents in isolated contexts:
 | `/review` | uncle-bob-reviewer | SOLID/Clean Code review |
 | `/sherpa` | repo-sherpa | Documentation, DX, meta-layer |
 
-### Orchestration Skills
+### Orchestration Skills (Opt-In)
 
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| `orchestrator` | Auto (on "implement", "fix", "add feature") | Manages implement/verify/review loop |
-| `/implement` | Manual (`/implement #123`) | Entry point for GitHub issues |
+| `/orchestrate` | Manual (`/orchestrate <requirements>`) | Manages plan/code/review loop |
+| `/implement` | Manual (`/implement #123`) | Entry point for GitHub issues (invokes `/orchestrate`) |
 
 ## The context:fork + agent Pattern
 

@@ -57,10 +57,10 @@ specs/               # BDD feature specs
 
 ## Orchestration Model
 
-Implementation tasks use an orchestrator pattern. See:
-- `.claude/skills/orchestrator/` - Auto-activates on implementation requests
-- `.claude/skills/implement/` - Manual trigger: `/implement #123`
+Implementation tasks use an opt-in orchestrator pattern:
+- `/orchestrate` - Explicit orchestration mode for any requirements
+- `/implement #123` - Entry point for GitHub issues (invokes `/orchestrate`)
 - `.claude/agents/coder.md` - Implementation agent
 - `.claude/agents/uncle-bob-reviewer.md` - Review agent
 
-The main thread acts as orchestrator only - it holds requirements in todos and delegates code work to agents.
+The orchestrator holds requirements in todos and delegates code work to agents via `/plan` → `/code` → `/review` loop.

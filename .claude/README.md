@@ -10,7 +10,7 @@ User Request
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  MAIN THREAD (Orchestrator)                                         │
-│  - Holds requirements in TodoWrite                                  │
+│  - Holds requirements                                               │
 │  - Delegates code work to agents                                    │
 │  - Verifies outcomes                                                │
 │  - Does NOT read/write code directly                                │
@@ -37,8 +37,8 @@ User Request
 │   ├── repo-sherpa.md
 │   └── uncle-bob-reviewer.md
 ├── skills/         # Skills (entry points that invoke agents)
-│   ├── orchestrator/   # Auto-activates on implementation requests
-│   ├── implement/      # Manual: /implement #123
+│   ├── orchestrate/    # Manual: /orchestrate <requirements>
+│   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
 │   ├── review/         # Delegates to uncle-bob-reviewer
 │   └── sherpa/         # Delegates to repo-sherpa
@@ -98,68 +98,69 @@ Returns summary to main thread
 
 When implementing features, the main thread becomes an **orchestrator** that manages the loop:
 
-### Activation
+### Activation (Opt-In)
 
-1. **Automatic**: User says "implement", "fix", "add feature" → `orchestrator` skill activates
-2. **Manual**: User runs `/implement #123` → `implement` skill activates
+Orchestration mode is explicit - use one of:
+1. `/orchestrate <requirements>` - Direct entry with any requirements
+2. `/implement #123` - Entry point for GitHub issues (invokes `/orchestrate`)
 
 ### The Loop
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ 1. CAPTURE REQUIREMENTS                                 │
-│    - Fetch GitHub issue (gh issue view)                 │
-│    - Read feature file (specs/features/*.feature)       │
-│    - Extract acceptance criteria → TodoWrite            │
+│ 1. PLAN                                                 │
+│    - Check for feature file in specs/features/         │
+│    - If missing → /plan to create one                   │
+│    - Read feature file for acceptance criteria          │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │ 2. IMPLEMENT                                            │
-│    Skill(skill: "code", args: "feature file + task")    │
-│    Coder implements, runs tests, returns summary        │
+│    - /code with feature file and requirements           │
+│    - Coder implements with TDD, returns summary         │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 3. VERIFY CODER OUTPUT                                  │
-│    Check summary against todo criteria                  │
-│    - Missing? → /code again with feedback               │
-│    - All met? → Continue                                │
+│ 3. VERIFY                                               │
+│    - Check summary against acceptance criteria          │
+│    - Incomplete? → /code again with feedback            │
+│    - Max 3 iterations, then escalate                    │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 4. REVIEW (Mandatory)                                   │
-│    Skill(skill: "review", args: "review recent changes")│
-│    Uncle Bob reviews for SOLID, TDD, clean code         │
+│ 4. REVIEW                                               │
+│    - /review for quality gate                           │
+│    - Issues? → /code with reviewer feedback             │
+│    - Approved? → Complete                               │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 5. VERIFY REVIEW                                        │
-│    - Issues found? → /code with reviewer feedback       │
-│    - Approved? → Mark todo complete                     │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 6. COMPLETE                                             │
+│ 5. COMPLETE                                             │
 │    - Report summary to user                             │
-│    - Max 3 iterations per task (escalate if failing)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Orchestrator Rules
+### Orchestrator Boundaries
 
-The main thread as orchestrator:
-- **DOES**: Hold requirements, delegate work, verify outcomes
-- **DOES NOT**: Read source code, write code, run tests directly
+The orchestrator delegates, it doesn't implement:
+- `/plan` creates feature files
+- `/code` writes code and runs tests
+- `/review` checks quality
+
+The orchestrator reads only feature files and planning docs, not source code.
 
 ## Role Hierarchy
 
 ```
 ORCHESTRATOR (main thread)
+│
+├── /plan  ──────► PLAN AGENT
+│                  - Feature file creation
+│                  - Acceptance criteria
 │
 ├── /code  ──────► CODER AGENT
 │                  - Implementation work
@@ -189,13 +190,14 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 
 ## Quick Reference
 
-| Command | Triggers | Agent | Purpose |
-|---------|----------|-------|---------|
-| `/implement #123` | Manual | (orchestrator mode) | Start implementation workflow |
-| `/plan <feature>` | Manual/Orchestrator | Plan (built-in) | Create feature file (required before /code) |
-| `/code <task>` | Manual/Orchestrator | coder | Implement with TDD |
-| `/review <focus>` | Manual/Orchestrator | uncle-bob-reviewer | Quality review |
-| `/sherpa <question>` | Manual | repo-sherpa | Docs/DX/meta-layer |
+| Command | Agent | Purpose |
+|---------|-------|---------|
+| `/orchestrate <req>` | (orchestrator mode) | Enter orchestration mode with requirements |
+| `/implement #123` | (orchestrator mode) | Fetch issue → invoke `/orchestrate` |
+| `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
+| `/code <task>` | coder | Implement with TDD |
+| `/review <focus>` | uncle-bob-reviewer | Quality review |
+| `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
 ## Token-Conscious Principle
 
