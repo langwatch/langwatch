@@ -345,9 +345,9 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
   };
 
   const getTargetColor = () => {
-    if (target.type === "prompt") return "green.solid";
-    if (target.type === "agent") return "cyan.solid";
-    return "gray.solid";
+    if (target.type === "prompt") return "green.emphasized";
+    if (target.type === "agent") return "cyan.emphasized";
+    return "gray.emphasized";
   };
 
   return (

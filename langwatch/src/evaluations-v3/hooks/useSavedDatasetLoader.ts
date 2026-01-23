@@ -45,10 +45,13 @@ export const useSavedDatasetRecords = (
       (record: { id: string; entry: unknown }) => ({
         id: record.id,
         ...Object.fromEntries(
-          (dataset.columns as DatasetColumn[]).map((col) => [
-            col.name,
-            String((record.entry as Record<string, unknown>)?.[col.name] ?? ""),
-          ]),
+          (dataset.columns as DatasetColumn[]).map((col) => {
+            const value = (record.entry as Record<string, unknown>)?.[col.name];
+            if (value === null || value === undefined) return [col.name, ""];
+            if (typeof value === "string") return [col.name, value];
+            // Properly stringify objects/arrays instead of [object Object]
+            return [col.name, JSON.stringify(value)];
+          }),
         ),
       }),
     );
@@ -147,10 +150,13 @@ export const useDatasetSelectionLoader = ({
       ).map((record: { id: string; entry: unknown }) => ({
         id: record.id,
         ...Object.fromEntries(
-          columnTypes.map((col) => [
-            col.name,
-            (record.entry as Record<string, unknown>)?.[col.name] ?? "",
-          ]),
+          columnTypes.map((col) => {
+            const value = (record.entry as Record<string, unknown>)?.[col.name];
+            if (value === null || value === undefined) return [col.name, ""];
+            if (typeof value === "string") return [col.name, value];
+            // Properly stringify objects/arrays instead of [object Object]
+            return [col.name, JSON.stringify(value)];
+          }),
         ),
       }));
 

@@ -408,7 +408,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const column = dataset.columns.find((c) => c.id === columnId);
       if (!column) return "";
       const value = record[column.name];
-      return typeof value === "string" ? value : String(value ?? "");
+      if (typeof value === "string") return value;
+      if (value === null || value === undefined) return "";
+      // Properly stringify objects/arrays instead of [object Object]
+      return JSON.stringify(value);
     }
 
     return "";

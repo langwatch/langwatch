@@ -59,6 +59,9 @@ const rowHeightOptions: ToggleOption[] = [
   },
 ];
 
+// Max rows for expanded mode
+const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+
 // =============================================================================
 // Concurrency Popover Component
 // =============================================================================
@@ -181,13 +184,21 @@ export function TableSettingsMenu({
     concurrency,
     setConcurrency,
     experimentSlug,
+    getRowCount,
+    activeDatasetId,
   } = useEvaluationsV3Store((state) => ({
     rowHeightMode: state.ui.rowHeightMode,
     setRowHeightMode: state.setRowHeightMode,
     concurrency: state.ui.concurrency,
     setConcurrency: state.setConcurrency,
     experimentSlug: state.experimentSlug,
+    getRowCount: state.getRowCount,
+    activeDatasetId: state.activeDatasetId,
   }));
+
+  // Get current row count to determine if expanded mode should be disabled
+  const rowCount = getRowCount(activeDatasetId);
+  const isExpandedDisabled = rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
 
   const { project } = useOrganizationTeamProject();
   const cicdDialog = useDisclosure();
@@ -238,11 +249,14 @@ export function TableSettingsMenu({
               <HStack gap={2}>
                 {rowHeightOptions.map((option) => {
                   const isActive = rowHeightMode === option.value;
-                  return (
+                  const isDisabled =
+                    option.value === "expanded" && isExpandedDisabled;
+
+                  const button = (
                     <Button
                       key={option.value}
                       variant={isActive ? "surface" : "ghost"}
-                      onClick={() => setRowHeightMode(option.value)}
+                      onClick={() => !isDisabled && setRowHeightMode(option.value)}
                       display="flex"
                       flexDirection="column"
                       alignItems="center"
@@ -252,11 +266,29 @@ export function TableSettingsMenu({
                       height="auto"
                       minWidth="80px"
                       fontSize="12px"
+                      disabled={isDisabled}
+                      opacity={isDisabled ? 0.5 : 1}
+                      cursor={isDisabled ? "not-allowed" : "pointer"}
                     >
                       {option.icon}
                       <Text>{option.label}</Text>
                     </Button>
                   );
+
+                  if (isDisabled) {
+                    return (
+                      <Tooltip
+                        key={option.value}
+                        content={`Expanded mode is disabled for datasets with more than ${MAX_ROWS_FOR_EXPANDED_MODE} rows for performance reasons`}
+                        positioning={{ placement: "top" }}
+                        openDelay={100}
+                      >
+                        <Box>{button}</Box>
+                      </Tooltip>
+                    );
+                  }
+
+                  return button;
                 })}
               </HStack>
             </VStack>

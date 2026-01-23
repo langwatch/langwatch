@@ -15,7 +15,10 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 const MAX_DISPLAY_CHARS = 5000;
 
 // Max height in pixels for compact mode before showing fade
-const COMPACT_MAX_HEIGHT = 100;
+const COMPACT_MAX_HEIGHT = 180;
+
+// Default max height in pixels for expanded cells (before drag customization)
+const EXPANDED_DEFAULT_MAX_HEIGHT = 400;
 
 // Column types that should be formatted as JSON
 const JSON_LIKE_TYPES: DatasetColumnType[] = [
@@ -107,12 +110,19 @@ export function EditableCell({
   const cellRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Reset edit value when entering edit mode
+  // Reset edit value when entering edit mode, formatting JSON if applicable
   useEffect(() => {
     if (isEditing) {
-      setEditValue(value);
+      // For JSON-like types, format the value for easier editing
+      const isJsonType = dataType && JSON_LIKE_TYPES.includes(dataType);
+      if (isJsonType) {
+        const { formatted } = tryFormatAsJson(value);
+        setEditValue(formatted);
+      } else {
+        setEditValue(value);
+      }
     }
-  }, [isEditing, value]);
+  }, [isEditing, value, dataType]);
 
   // Track the calculated textarea height
   const [textareaHeight, setTextareaHeight] = useState<number | undefined>(
@@ -247,9 +257,12 @@ export function EditableCell({
   const showClamped =
     rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
 
-  // Calculate the effective max height for expanded cells with custom height
+  // Calculate the effective max height for expanded cells
+  // Use custom height if set (from dragging), otherwise use default expanded height
   const expandedMaxHeight =
-    customHeight !== null ? `${customHeight}px` : undefined;
+    customHeight !== null
+      ? `${customHeight}px`
+      : `${EXPANDED_DEFAULT_MAX_HEIGHT}px`;
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
@@ -361,17 +374,16 @@ export function EditableCell({
           maxHeight={
             showClamped
               ? `${COMPACT_MAX_HEIGHT}px`
-              : rowHeightMode === "compact" &&
-                  isCellExpanded &&
-                  expandedMaxHeight
+              : rowHeightMode === "compact" && isCellExpanded
                 ? expandedMaxHeight
                 : undefined
           }
           overflow={
-            showClamped ||
-            (rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight)
+            showClamped
               ? "hidden"
-              : undefined
+              : rowHeightMode === "compact" && isCellExpanded
+                ? "auto"
+                : undefined
           }
         >
           {displayValue.text}

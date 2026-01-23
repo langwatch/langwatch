@@ -253,4 +253,131 @@ describe("TableSettingsMenu", () => {
       expect(button).toBeDisabled();
     });
   });
+
+  describe("expanded mode restriction", () => {
+    it("disables Expanded option when dataset has more than 100 rows", async () => {
+      // Add a dataset with more than 100 rows
+      useEvaluationsV3Store.setState({
+        activeDatasetId: "large-dataset",
+        datasets: [
+          {
+            id: "large-dataset",
+            name: "Large Dataset",
+            type: "inline",
+            columns: [{ id: "col1", name: "input", type: "string" }],
+            inline: {
+              columns: [{ id: "col1", name: "input", type: "string" }],
+              // Create 150 rows
+              records: {
+                col1: Array.from({ length: 150 }, (_, i) => `row ${i + 1}`),
+              },
+            },
+          },
+        ],
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsMenu />, { wrapper: Wrapper });
+
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText("Compact")).toBeInTheDocument();
+      });
+
+      // Find the button containing "Expanded" text
+      const expandedText = await screen.findByText("Expanded");
+      const expandedButton = expandedText.closest("button");
+
+      // Button should be disabled
+      expect(expandedButton).toBeDisabled();
+    });
+
+    it("does not change to expanded mode when clicking disabled Expanded option", async () => {
+      // Add a dataset with more than 100 rows
+      useEvaluationsV3Store.setState({
+        activeDatasetId: "large-dataset",
+        datasets: [
+          {
+            id: "large-dataset",
+            name: "Large Dataset",
+            type: "inline",
+            columns: [{ id: "col1", name: "input", type: "string" }],
+            inline: {
+              columns: [{ id: "col1", name: "input", type: "string" }],
+              records: {
+                col1: Array.from({ length: 150 }, (_, i) => `row ${i + 1}`),
+              },
+            },
+          },
+        ],
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsMenu />, { wrapper: Wrapper });
+
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
+      await user.click(button);
+
+      const expandedText = await screen.findByText("Expanded");
+      const expandedButton = expandedText.closest("button");
+
+      // Try to click the disabled button
+      await user.click(expandedButton!);
+
+      // Mode should still be compact
+      const store = useEvaluationsV3Store.getState();
+      expect(store.ui.rowHeightMode).toBe("compact");
+    });
+
+    it("allows Expanded option when dataset has 100 or fewer rows", async () => {
+      // Add a dataset with exactly 100 rows
+      useEvaluationsV3Store.setState({
+        activeDatasetId: "medium-dataset",
+        datasets: [
+          {
+            id: "medium-dataset",
+            name: "Medium Dataset",
+            type: "inline",
+            columns: [{ id: "col1", name: "input", type: "string" }],
+            inline: {
+              columns: [{ id: "col1", name: "input", type: "string" }],
+              records: {
+                col1: Array.from({ length: 100 }, (_, i) => `row ${i + 1}`),
+              },
+            },
+          },
+        ],
+      });
+
+      const user = userEvent.setup();
+      render(<TableSettingsMenu />, { wrapper: Wrapper });
+
+      const button = screen.getByRole("button", {
+        name: /workbench settings/i,
+      });
+      await user.click(button);
+
+      await waitFor(() => {
+        expect(screen.getByText("Compact")).toBeInTheDocument();
+      });
+
+      // Find the button containing "Expanded" text
+      const expandedText = await screen.findByText("Expanded");
+      const expandedButton = expandedText.closest("button");
+
+      // Button should NOT be disabled
+      expect(expandedButton).not.toBeDisabled();
+
+      // Click should work
+      await user.click(expandedButton!);
+      const store = useEvaluationsV3Store.getState();
+      expect(store.ui.rowHeightMode).toBe("expanded");
+    });
+  });
 });

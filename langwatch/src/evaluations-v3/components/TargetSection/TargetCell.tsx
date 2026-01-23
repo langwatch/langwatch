@@ -552,7 +552,7 @@ export function TargetCellContent({
             top={`${expandedPosition.top - 8}px`}
             left={`${expandedPosition.left - 8}px`}
             width={`${Math.max(expandedPosition.width + 16, 250)}px`}
-            maxHeight="calc(100vh - 32px)"
+            maxHeight="min(600px, calc(100vh - 32px))"
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
@@ -561,13 +561,22 @@ export function TargetCellContent({
             display="flex"
             flexDirection="column"
             p={3}
+            overflow="hidden"
             css={{
               animation: "scale-in 0.15s ease-out",
             }}
           >
-            <VStack align="stretch" gap={2} height="100%" position="relative">
+            <VStack
+              align="stretch"
+              gap={2}
+              height="100%"
+              position="relative"
+              overflow="hidden"
+            >
               {renderActionButtons(true)}
-              {renderOutput(true)}
+              <Box flex={1} minHeight={0} overflowY="auto">
+                {renderOutput(true)}
+              </Box>
               {renderEvaluatorChips(true)}
             </VStack>
           </Box>
