@@ -1,4 +1,4 @@
-@integration
+@wip @integration
 Feature: License tRPC Router
   As a LangWatch administrator
   I want API endpoints to manage licenses

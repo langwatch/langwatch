@@ -1,4 +1,4 @@
-@e2e
+@wip @e2e
 Feature: License Lifecycle End-to-End
   As a LangWatch self-hosted administrator
   I want to manage the complete license lifecycle

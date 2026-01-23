@@ -1,4 +1,4 @@
-@integration
+@wip @integration
 Feature: Message/Trace Limit Enforcement with License
   As a LangWatch self-hosted deployment with a license
   I want the monthly message limit to be enforced

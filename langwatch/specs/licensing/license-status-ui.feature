@@ -1,4 +1,4 @@
-@unit
+@wip @unit
 Feature: License Status UI Component
   As a LangWatch administrator
   I want to view and manage my license in the settings UI

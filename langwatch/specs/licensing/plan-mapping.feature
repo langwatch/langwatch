@@ -1,4 +1,4 @@
-@unit
+@wip @unit
 Feature: License to PlanInfo Mapping
   As a LangWatch system
   I want to convert license data to PlanInfo structure

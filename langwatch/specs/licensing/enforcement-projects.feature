@@ -1,4 +1,4 @@
-@integration
+@wip @integration
 Feature: Project Limit Enforcement with License
   As a LangWatch self-hosted deployment with a license
   I want the project creation limit to be enforced

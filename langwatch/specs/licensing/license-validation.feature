@@ -1,4 +1,4 @@
-@unit
+@wip @unit
 Feature: RSA License Validation
   As a LangWatch self-hosted administrator
   I want to validate RSA-signed licenses

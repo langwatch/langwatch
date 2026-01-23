@@ -1,4 +1,4 @@
-@integration
+@wip @integration
 Feature: Member Limit Enforcement with License
   As a LangWatch self-hosted deployment with a license
   I want the member invite limit to be enforced

@@ -1,4 +1,4 @@
-@integration
+@wip @integration
 Feature: SubscriptionHandler License Integration
   As a LangWatch self-hosted deployment
   I want SubscriptionHandler to use license-based limits
