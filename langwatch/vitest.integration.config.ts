@@ -3,6 +3,10 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // Global setup runs once before all tests - starts shared containers
+    globalSetup: [
+      "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
+    ],
     setupFiles: [
       "./test-setup.ts",
       "./src/server/event-sourcing/__tests__/integration/setup.ts",

@@ -43,9 +43,54 @@ function isUsingServiceContainers(): boolean {
 }
 
 /**
+ * Path to the file where globalSetup writes container connection info.
+ */
+const CONTAINER_INFO_FILE = path.join(
+  os.tmpdir(),
+  "langwatch-test-containers.json",
+);
+
+/**
+ * Checks if containers were started by globalSetup.
+ * When globalSetup starts containers, it writes connection URLs to a temp file.
+ */
+function isUsingGlobalSetupContainers(): boolean {
+  return !!(
+    process.env.TEST_CLICKHOUSE_URL &&
+    process.env.TEST_REDIS_URL
+  );
+}
+
+/**
+ * Loads container info from the file written by globalSetup.
+ * Sets environment variables so subsequent calls to isUsingGlobalSetupContainers() return true.
+ */
+export function loadGlobalSetupContainerInfo(): { clickHouseUrl: string; redisUrl: string } | null {
+  try {
+    if (!fs.existsSync(CONTAINER_INFO_FILE)) {
+      return null;
+    }
+    const content = fs.readFileSync(CONTAINER_INFO_FILE, "utf-8");
+    const info = JSON.parse(content) as { clickHouseUrl: string; redisUrl: string };
+
+    // Set env vars so isUsingGlobalSetupContainers() returns true
+    process.env.TEST_CLICKHOUSE_URL = info.clickHouseUrl;
+    process.env.TEST_REDIS_URL = info.redisUrl;
+
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Starts testcontainers for ClickHouse and Redis.
  * Should be called before running integration tests.
- * In CI (GitHub Actions), uses service containers instead.
+ *
+ * Priority:
+ * 1. CI service containers (GitHub Actions)
+ * 2. Global setup containers (started by globalSetup.ts, shared across workers)
+ * 3. Local testcontainers (fallback, starts new containers per worker)
  */
 export async function startTestContainers(): Promise<{
   clickHouseClient: ClickHouseClient;
@@ -89,7 +134,36 @@ export async function startTestContainers(): Promise<{
     };
   }
 
-  // Otherwise, use testcontainers (local development)
+  // If using global setup containers (shared across workers), connect to them
+  if (isUsingGlobalSetupContainers()) {
+    const clickHouseUrl = process.env.TEST_CLICKHOUSE_URL!;
+    const redisUrl = process.env.TEST_REDIS_URL!;
+
+    if (!redisConnection) {
+      redisConnection = new IORedis(redisUrl, {
+        maxRetriesPerRequest: 0,
+        offlineQueue: true,
+      });
+    }
+
+    // Don't run migrations - globalSetup already did that
+    // Create client with the database in the URL path
+    const urlWithDatabase = new URL(clickHouseUrl);
+    urlWithDatabase.pathname = `/${TEST_DATABASE}`;
+
+    if (!clickHouseClient) {
+      clickHouseClient = createClient({ url: urlWithDatabase });
+    }
+
+    return {
+      clickHouseClient,
+      redisConnection,
+      clickHouseUrl,
+      redisUrl,
+    };
+  }
+
+  // Otherwise, use testcontainers (local development, fallback)
   // Start ClickHouse container with labels for cleanup tracking and storage policy config
   if (!clickHouseContainer) {
     const storagePolicyConfigPath = createStoragePolicyConfigFile();
@@ -102,7 +176,7 @@ export async function startTestContainers(): Promise<{
           target: "/etc/clickhouse-server/config.d/storage.xml",
         },
       ])
-      .withStartupTimeout(15000)
+      .withStartupTimeout(120000) // 2 minutes for container startup
       .start();
   }
 
@@ -153,7 +227,9 @@ export async function startTestContainers(): Promise<{
 /**
  * Stops testcontainers and cleans up connections.
  * Should be called after integration tests complete.
- * In CI, only closes connections (doesn't stop service containers).
+ *
+ * Note: Only closes connections - doesn't stop containers if they were started
+ * by globalSetup (those are stopped by globalSetup's teardown) or CI service containers.
  */
 export async function stopTestContainers(): Promise<void> {
   const errors: Error[] = [];
@@ -178,8 +254,8 @@ export async function stopTestContainers(): Promise<void> {
     redisConnection = null;
   }
 
-  // Only stop containers if we started them (not in CI)
-  if (!isUsingServiceContainers()) {
+  // Only stop containers if we started them locally (not in CI or globalSetup)
+  if (!isUsingServiceContainers() && !isUsingGlobalSetupContainers()) {
     // Stop ClickHouse container
     if (clickHouseContainer) {
       try {

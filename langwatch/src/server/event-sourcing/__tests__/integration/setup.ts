@@ -1,22 +1,27 @@
 import { afterAll, beforeAll } from "vitest";
 import {
   cleanupTestData,
+  loadGlobalSetupContainerInfo,
   startTestContainers,
   stopTestContainers,
 } from "./testContainers";
 
 /**
  * Global setup for integration tests.
- * Starts testcontainers before all tests and ensures clean state.
+ * Loads container info from globalSetup (if available) and connects.
  */
 export async function setup(): Promise<void> {
+  // First, try to load container info from globalSetup's temp file
+  // This sets env vars that startTestContainers() will use
+  loadGlobalSetupContainerInfo();
+
   try {
     await startTestContainers();
   } catch (error) {
     throw error;
   }
-  // Clean up any leftover data from previous test runs
-  await cleanupTestData();
+  // Don't clean up all data here - each test uses unique tenant IDs
+  // and cleans up its own data in afterEach
 }
 
 /**
