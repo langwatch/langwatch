@@ -13,12 +13,7 @@ interface ApiKeyManagementSectionProps {
   project: Project;
 }
 
-/**
- * ApiKeyManagementSection Component
- *
- * Displays the project API key and provides functionality to regenerate it.
- * Regenerating the key will immediately invalidate the old key.
- */
+
 export function ApiKeyManagementSection({
   project,
 }: ApiKeyManagementSectionProps) {
@@ -31,6 +26,7 @@ export function ApiKeyManagementSection({
     onSuccess: (data) => {
       setNewApiKey(data.apiKey);
       setShowNewKey(true);
+      setShowConfirmDialog(false);
       void apiContext.organization.getAll.invalidate();
 
       toaster.create({
@@ -53,7 +49,6 @@ export function ApiKeyManagementSection({
 
   const handleRegenerateKey = () => {
     regenerateApiKey.mutate({ projectId: project.id });
-    setShowConfirmDialog(false);
   };
 
   return (
@@ -81,7 +76,7 @@ export function ApiKeyManagementSection({
           />
 
           {showNewKey && (
-            <Alert.Root status="danger" borderRadius="md">
+            <Alert.Root status="error" borderRadius="md">
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Title>New API Key Generated</Alert.Title>
@@ -121,7 +116,7 @@ export function ApiKeyManagementSection({
                 This will invalidate your current API key immediately. Any
                 applications or services using the old key will stop working.
               </Text>
-              <Alert.Root status="danger" borderRadius="md">
+              <Alert.Root status="error" borderRadius="md">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Title>This action cannot be undone</Alert.Title>
