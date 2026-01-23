@@ -63,6 +63,8 @@ const user = { id: "1", role: "guest" }
 
 ## Workflow
 
+See `specs/README.md` for detailed BDD guidance.
+
 1. **Spec first**: Write a `.feature` file in `specs/`. Use tags: `@e2e`, `@integration`, `@unit` only.
 2. **Challenge**: LLM/reviewer challenges missing edge cases before implementation.
 3. **Examples drive E2E**: Working examples in `examples/` are wrapped by E2E tests.
