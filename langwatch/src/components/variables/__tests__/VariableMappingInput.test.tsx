@@ -77,7 +77,7 @@ describe("VariableMappingInput", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
       renderComponent({ mapping });
       // Should show a tag with just the field name (no source name prefix)
@@ -172,7 +172,7 @@ describe("VariableMappingInput", () => {
       expect(onMappingChange).toHaveBeenCalledWith({
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       });
     });
 
@@ -278,7 +278,7 @@ describe("VariableMappingInput", () => {
         expect(onMappingChange).toHaveBeenCalledWith({
           type: "source",
           sourceId: "dataset-1",
-          field: "input",
+          path: ["input"],
         });
       });
     });
@@ -303,7 +303,7 @@ describe("VariableMappingInput", () => {
         expect(onMappingChange).toHaveBeenCalledWith({
           type: "source",
           sourceId: "dataset-1",
-          field: "expected_output",
+          path: ["expected_output"],
         });
       });
     });
@@ -330,7 +330,7 @@ describe("VariableMappingInput", () => {
         expect(onMappingChange).toHaveBeenCalledWith({
           type: "source",
           sourceId: "dataset-1",
-          field: "input",
+          path: ["input"],
         });
       });
     });
@@ -437,7 +437,7 @@ describe("VariableMappingInput", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
       renderComponent({ mapping, onMappingChange });
 
@@ -457,7 +457,7 @@ describe("VariableMappingInput", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
       renderComponent({ mapping, onMappingChange });
 
@@ -478,7 +478,7 @@ describe("VariableMappingInput", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
       renderComponent({ mapping, onMappingChange });
 
@@ -501,7 +501,7 @@ describe("VariableMappingInput", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
       renderComponent({ mapping, onMappingChange });
 
@@ -566,7 +566,7 @@ describe("VariableMappingInput", () => {
       const newMapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       };
 
       rerender(
@@ -620,7 +620,7 @@ describe("VariableMappingInput", () => {
       expect(onMappingChange).toHaveBeenCalledWith({
         type: "source",
         sourceId: "dataset-1",
-        field: "input",
+        path: ["input"],
       });
 
       // Simulate parent re-rendering with new prop (as would happen when store updates)
@@ -638,6 +638,654 @@ describe("VariableMappingInput", () => {
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
         expect(screen.getByText("input")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("nested fields", () => {
+    const nestedSources: AvailableSource[] = [
+      {
+        id: "trace",
+        name: "Trace",
+        type: "dataset",
+        fields: [
+          { name: "input", type: "str" },
+          { name: "output", type: "str" },
+          {
+            name: "metadata",
+            type: "dict",
+            children: [
+              { name: "customer_id", type: "str" },
+              { name: "session_id", type: "str" },
+            ],
+          },
+          {
+            name: "spans",
+            type: "list",
+            children: [
+              {
+                name: "gpt-4",
+                type: "dict",
+                label: "gpt-4",
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "str" },
+                ],
+              },
+              {
+                name: "embeddings",
+                type: "dict",
+                label: "embeddings",
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "list" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const renderNestedComponent = (
+      props: Partial<Parameters<typeof VariableMappingInput>[0]> = {},
+    ) => {
+      return render(
+        <ChakraProvider value={defaultSystem}>
+          <VariableMappingInput availableSources={nestedSources} {...props} />
+        </ChakraProvider>,
+      );
+    };
+
+    it("shows chevron for fields with children", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      await waitFor(() => {
+        // metadata has children, should show chevron
+        const metadataOption = screen.getByTestId("field-option-metadata");
+        expect(metadataOption).toBeInTheDocument();
+        // Check for chevron icon (SVG)
+        expect(metadataOption.querySelector("svg")).toBeInTheDocument();
+      });
+    });
+
+    it("shows nested fields when clicking a field with children", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Wait for dropdown to open
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-metadata")).toBeInTheDocument();
+      });
+
+      // Click on metadata to drill down
+      await user.click(screen.getByTestId("field-option-metadata"));
+
+      // Should now show metadata's children
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("field-option-customer_id"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-session_id"),
+        ).toBeInTheDocument();
+      });
+
+      // Should show breadcrumb with path and in-progress tag
+      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+        "metadata",
+      );
+    });
+
+    it("creates path array with multiple segments for nested selection", async () => {
+      const user = userEvent.setup();
+      const onMappingChange = vi.fn();
+      renderNestedComponent({ onMappingChange });
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Wait for dropdown
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-metadata")).toBeInTheDocument();
+      });
+
+      // Click metadata
+      await user.click(screen.getByTestId("field-option-metadata"));
+
+      // Wait for nested fields
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("field-option-customer_id"),
+        ).toBeInTheDocument();
+      });
+
+      // Click customer_id
+      await user.click(screen.getByTestId("field-option-customer_id"));
+
+      // Should call onMappingChange with path array
+      await waitFor(() => {
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "trace",
+          path: ["metadata", "customer_id"],
+        });
+      });
+    });
+
+    it("supports three levels of nesting", async () => {
+      const user = userEvent.setup();
+      const onMappingChange = vi.fn();
+      renderNestedComponent({ onMappingChange });
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Click spans
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-spans"));
+
+      // Click gpt-4
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-gpt-4"));
+
+      // Click output
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-output"));
+
+      // Should have three-segment path
+      await waitFor(() => {
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "trace",
+          path: ["spans", "gpt-4", "output"],
+        });
+      });
+    });
+
+    it("shows in-progress path badges during nested selection", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Click spans
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-spans"));
+
+      // Should show spans badge (the tag contains "spans" text)
+      await waitFor(() => {
+        expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
+      });
+
+      // Click gpt-4
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-gpt-4"));
+
+      // Should show both spans and gpt-4 badges
+      await waitFor(() => {
+        expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
+        expect(screen.getByTestId("path-segment-tag-1")).toBeInTheDocument();
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
+        expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent(
+          "gpt-4",
+        );
+      });
+    });
+
+    it("allows clicking badge to go back to that level", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Navigate to spans -> gpt-4
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-spans"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-gpt-4"));
+
+      // Should be at gpt-4 level, showing input/output
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+      });
+
+      // Click the X on the gpt-4 badge to go back to spans level
+      // The close trigger is a button inside the tag
+      const gpt4Badge = screen.getByTestId("path-segment-tag-1");
+      const closeButton = gpt4Badge.querySelector("button");
+      expect(closeButton).toBeInTheDocument();
+      await user.click(closeButton!);
+
+      // Should now show spans children (gpt-4, embeddings)
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-embeddings"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("allows selecting simple field without nesting", async () => {
+      const user = userEvent.setup();
+      const onMappingChange = vi.fn();
+      renderNestedComponent({ onMappingChange });
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Click input (simple field, no children)
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-input"));
+
+      // Should call onMappingChange with single-segment path
+      await waitFor(() => {
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "trace",
+          path: ["input"],
+        });
+      });
+    });
+
+    it("displays nested mapping path with dots in tag", () => {
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "trace",
+        path: ["metadata", "customer_id"],
+      };
+      renderNestedComponent({ mapping });
+
+      // Should show the path joined with dots
+      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+      expect(screen.getByText("metadata.customer_id")).toBeInTheDocument();
+    });
+
+    it("clears nested selection on Escape", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Navigate to spans
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-spans"));
+
+      // Should show spans badge
+      await waitFor(() => {
+        expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
+      });
+
+      // Press Escape
+      fireEvent.keyDown(input, { key: "Escape" });
+
+      // Badge should be gone, dropdown should be closed
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("path-segment-tag-0"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-spans"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("goes back one level with Backspace when search is empty", async () => {
+      const user = userEvent.setup();
+      renderNestedComponent();
+
+      const input = screen.getByRole("textbox");
+      await user.click(input);
+
+      // Navigate to spans -> gpt-4
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-spans"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId("field-option-gpt-4"));
+
+      // Should be at gpt-4 level
+      await waitFor(() => {
+        expect(screen.getByTestId("path-segment-tag-1")).toBeInTheDocument();
+      });
+
+      // Press Backspace
+      fireEvent.keyDown(input, { key: "Backspace" });
+
+      // Should go back to spans level
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("path-segment-tag-1"),
+        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
+        expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+      });
+    });
+
+    describe("selecting field with children marks it complete AND opens nested dropdown", () => {
+      /**
+       * This test verifies the UX flow where:
+       * 1. User clicks on a field with children (e.g., "spans")
+       * 2. The field is added to the path as a badge
+       * 3. A NEW dropdown immediately opens showing the nested children
+       * 4. User can then select a child, which adds another badge
+       * 5. This continues until user selects a leaf field (no children)
+       *
+       * This is the "cascading selection" UX pattern.
+       */
+      it("after selecting a field with children, shows badge AND immediately shows nested options dropdown", async () => {
+        const user = userEvent.setup();
+        renderNestedComponent();
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Wait for dropdown to open with top-level fields
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+        });
+
+        // Click on "spans" which has children
+        await user.click(screen.getByTestId("field-option-spans"));
+
+        // EXPECTED BEHAVIOR:
+        // 1. "spans" badge should appear in the input
+        await waitFor(() => {
+          expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
+        });
+
+        // 2. Dropdown should STILL be open (or immediately reopen) showing nested children
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+          expect(
+            screen.getByTestId("field-option-embeddings"),
+          ).toBeInTheDocument();
+        });
+
+        // 3. The original top-level options should NOT be visible anymore
+        expect(
+          screen.queryByTestId("field-option-input"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-output"),
+        ).not.toBeInTheDocument();
+      });
+
+      it("continues cascading through multiple levels until reaching a leaf field", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+        renderNestedComponent({ onMappingChange });
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select spans (has children)
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-spans")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-spans"));
+
+        // Should show spans badge and nested options
+        await waitFor(() => {
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
+          expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
+        });
+
+        // Select gpt-4 (has children: input, output)
+        await user.click(screen.getByTestId("field-option-gpt-4"));
+
+        // Should show both badges and nested options
+        await waitFor(() => {
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
+          expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent(
+            "gpt-4",
+          );
+          expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+          expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
+        });
+
+        // Select output (leaf field, no children)
+        await user.click(screen.getByTestId("field-option-output"));
+
+        // NOW the mapping should be finalized and dropdown should close
+        await waitFor(() => {
+          expect(onMappingChange).toHaveBeenCalledWith({
+            type: "source",
+            sourceId: "trace",
+            path: ["spans", "gpt-4", "output"],
+          });
+        });
+
+        // Dropdown should be closed
+        await waitFor(() => {
+          expect(
+            screen.queryByTestId("field-option-input"),
+          ).not.toBeInTheDocument();
+        });
+
+        // Final mapping should be displayed as a single tag
+        expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+        expect(screen.getByText("spans.gpt-4.output")).toBeInTheDocument();
+      });
+
+      it("selecting a simple field (no children) closes dropdown immediately", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+        renderNestedComponent({ onMappingChange });
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select "input" which has NO children
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-input"));
+
+        // Should immediately finalize and close
+        await waitFor(() => {
+          expect(onMappingChange).toHaveBeenCalledWith({
+            type: "source",
+            sourceId: "trace",
+            path: ["input"],
+          });
+        });
+
+        // Dropdown should be closed
+        await waitFor(() => {
+          expect(
+            screen.queryByTestId("field-option-output"),
+          ).not.toBeInTheDocument();
+        });
+
+        // Should show the mapping tag
+        expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+        expect(screen.getByText("input")).toBeInTheDocument();
+      });
+
+      it("selecting a field with children marked as isComplete sets the mapping immediately while showing children", async () => {
+        // This tests the case where a field like "traces" in thread-level mappings
+        // can be selected as a valid value (the whole array) while also allowing
+        // the user to drill down to nested fields like "traces.input"
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+
+        // Create a source with a field that has children but is also complete
+        const sourcesWithCompleteParent: AvailableSource[] = [
+          {
+            id: "thread",
+            name: "Thread",
+            type: "dataset",
+            fields: [
+              {
+                name: "traces",
+                type: "list",
+                isComplete: true, // Can select "traces" itself
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "str" },
+                ],
+              },
+              { name: "thread_id", type: "str" },
+            ],
+          },
+        ];
+
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <VariableMappingInput
+              availableSources={sourcesWithCompleteParent}
+              onMappingChange={onMappingChange}
+            />
+          </ChakraProvider>,
+        );
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select "traces" which has children but is also isComplete: true
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-traces"));
+
+        // Should IMMEDIATELY set the mapping (because isComplete: true)
+        await waitFor(() => {
+          expect(onMappingChange).toHaveBeenCalledWith({
+            type: "source",
+            sourceId: "thread",
+            path: ["traces"],
+          });
+        });
+
+        // But should ALSO show nested children (dropdown stays open)
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
+          expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
+        });
+
+        // The "traces" should be shown as a path segment (indicating it's selected)
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "traces",
+        );
+      });
+
+      it("shows 'Use all X' option when in nested view with complete parent", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+
+        const sourcesWithCompleteParent: AvailableSource[] = [
+          {
+            id: "thread",
+            name: "Thread",
+            type: "dataset",
+            fields: [
+              {
+                name: "traces",
+                type: "list",
+                isComplete: true,
+                children: [
+                  { name: "input", type: "str" },
+                  { name: "output", type: "str" },
+                ],
+              },
+            ],
+          },
+        ];
+
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <VariableMappingInput
+              availableSources={sourcesWithCompleteParent}
+              onMappingChange={onMappingChange}
+            />
+          </ChakraProvider>,
+        );
+
+        const input = screen.getByRole("textbox");
+        await user.click(input);
+
+        // Select "traces" to enter nested view
+        await waitFor(() => {
+          expect(screen.getByTestId("field-option-traces")).toBeInTheDocument();
+        });
+        await user.click(screen.getByTestId("field-option-traces"));
+
+        // Should show "Use all traces" option at the top
+        await waitFor(() => {
+          expect(screen.getByTestId("use-all-option")).toBeInTheDocument();
+          expect(screen.getByText("Use all traces")).toBeInTheDocument();
+        });
+
+        // Click "Use all traces" to close dropdown and keep current selection
+        onMappingChange.mockClear();
+        await user.click(screen.getByTestId("use-all-option"));
+
+        // Should close dropdown
+        await waitFor(() => {
+          expect(
+            screen.queryByTestId("use-all-option"),
+          ).not.toBeInTheDocument();
+        });
+
+        // Mapping should be set to just ["traces"]
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "thread",
+          path: ["traces"],
+        });
+
+        // Should show the mapping tag
+        expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+        expect(screen.getByText("traces")).toBeInTheDocument();
       });
     });
   });

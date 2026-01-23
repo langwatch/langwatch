@@ -18,7 +18,10 @@ const getImportedModelCosts = () => {
   > = {};
 
   for (const [modelId, model] of Object.entries(models)) {
-    if (model.pricing?.inputCostPerToken != null || model.pricing?.outputCostPerToken != null) {
+    if (
+      model.pricing?.inputCostPerToken != null ||
+      model.pricing?.outputCostPerToken != null
+    ) {
       tokenModels[modelId] = {
         regex:
           "^" +
@@ -58,16 +61,17 @@ const getImportedModelCosts = () => {
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
-    (model) => model.inputCostPerToken != null || model.outputCostPerToken != null
+    (model) =>
+      model.inputCostPerToken != null || model.outputCostPerToken != null,
   );
 
   // Exclude some vendors (openrouter is already excluded as we're using their API)
   const relevantModels = paidModels.filter(
-    (model) => !model.model.includes("openrouter/")
+    (model) => !model.model.includes("openrouter/"),
   );
 
   return Object.fromEntries(
-    relevantModels.map((model) => [model.model, model])
+    relevantModels.map((model) => [model.model, model]),
   );
 };
 
@@ -104,7 +108,7 @@ export const getLLMModelCosts = async ({
           outputCostPerToken: record.outputCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
-        }) as MaybeStoredLLMModelCost
+        }) as MaybeStoredLLMModelCost,
     )
     .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
     .concat(
@@ -114,7 +118,7 @@ export const getLLMModelCosts = async ({
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
-      }))
+      })),
     );
 
   return data;

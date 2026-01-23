@@ -17,17 +17,17 @@ const scenarioSchema = z.object({
   situation: z
     .string()
     .describe(
-      "The context and setup: user persona, emotional state, background, and what they're trying to accomplish"
+      "The context and setup: user persona, emotional state, background, and what they're trying to accomplish",
     ),
   criteria: z
     .array(z.string())
     .describe(
-      "3-6 specific, observable success criteria that can be judged from the conversation"
+      "3-6 specific, observable success criteria that can be judged from the conversation",
     ),
   labels: z
     .array(z.string())
     .describe(
-      "1-3 short labels for categorization (e.g., 'billing', 'escalation', 'edge-case')"
+      "1-3 short labels for categorization (e.g., 'billing', 'escalation', 'edge-case')",
     ),
 });
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to access this endpoint." },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     logger.error({ error }, "Invalid request body");
     return NextResponse.json(
       { error: "Invalid request body" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -99,12 +99,12 @@ export async function POST(req: NextRequest) {
   const hasPermission = await hasProjectPermission(
     { prisma, session },
     projectId,
-    "scenarios:manage"
+    "scenarios:manage",
   );
   if (!hasPermission) {
     return NextResponse.json(
       { error: "You do not have permission to access this endpoint." },
-      { status: 403 }
+      { status: 403 },
     );
   }
 

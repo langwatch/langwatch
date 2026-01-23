@@ -36,7 +36,7 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
 let mockConcurrency = 10;
 vi.mock("../useEvaluationsV3Store", () => ({
   useEvaluationsV3Store: (
-    selector: (state: { ui: { concurrency: number } }) => unknown
+    selector: (state: { ui: { concurrency: number } }) => unknown,
   ) => selector({ ui: { concurrency: mockConcurrency } }),
 }));
 

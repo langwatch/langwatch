@@ -31,7 +31,7 @@ export function DatasetSuperHeader({
   return (
     <SuperHeader
       colSpan={colSpan}
-      color="blue.solid"
+      color="blue.emphasized"
       icon={<Database size={14} />}
       paddingLeft="52px"
     >

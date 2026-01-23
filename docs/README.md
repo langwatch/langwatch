@@ -1,15 +1,24 @@
 # Documentation
 
-## Directories
+## Foundational
 
-- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging)
+Cross-cutting principles that apply everywhere:
+
+- **CODING_STANDARDS.md** - Clean code, SOLID, readability
+- **TESTING_PHILOSOPHY.md** - Test hierarchy, BDD workflow
+
+## Language & Framework Specific
+
 - **best_practices/** - TypeScript, React, Git conventions
 - **design/** - UI design system
+
+## Architecture
+
+- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging)
 
 ## Also See
 
 - `CLAUDE.md` (root) - Project overview, common mistakes
-- `TESTING.md` (root) - Test hierarchy and BDD workflow
 
 ## Writing Docs
 

@@ -14,7 +14,11 @@ export const extractCheckKeys = (
 
   const recurse = (obj: Record<string, any>) => {
     for (const key of Object.keys(obj)) {
-      if (key.startsWith("check_") || key.startsWith("eval_")) {
+      if (
+        key.startsWith("check_") ||
+        key.startsWith("eval_") ||
+        key.startsWith("evaluation_")
+      ) {
         keys.push(key);
       }
       if (typeof obj[key] === "object" && !Array.isArray(obj[key])) {

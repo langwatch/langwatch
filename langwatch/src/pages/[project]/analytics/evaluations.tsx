@@ -207,7 +207,7 @@ function EvaluationsContent() {
   );
 
   return (
-    <GraphsLayout title="Evaluations">
+    <GraphsLayout title="Online Evaluations">
       {checks.data && checks.data?.length === 0 && (
         <Alert.Root
           colorPalette="warning"
@@ -217,7 +217,7 @@ function EvaluationsContent() {
         >
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>No Evaluations yet</Alert.Title>
+            <Alert.Title>No online evaluations yet</Alert.Title>
             <Alert.Description>
               <Text as="span">
                 The evaluation results will be displayed here. Setup evaluations

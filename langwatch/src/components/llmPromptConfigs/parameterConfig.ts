@@ -15,8 +15,8 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
 import {
-  parameterRegistry,
   type ParameterDefinition,
+  parameterRegistry,
 } from "./parameterRegistry";
 
 // ============================================================================
@@ -70,9 +70,9 @@ export function toInternalKey(camelCaseKey: string): string {
  * @deprecated Use SliderParameterDefinition from parameterRegistry.ts
  */
 export type {
-  SliderParameterDefinition as SliderParameterConfig,
-  SelectParameterDefinition as SelectParameterConfig,
   ParameterDefinition as ParameterConfig,
+  SelectParameterDefinition as SelectParameterConfig,
+  SliderParameterDefinition as SliderParameterConfig,
 } from "./parameterRegistry";
 
 // ============================================================================
@@ -86,7 +86,10 @@ export type {
  * @deprecated Use parameterRegistry.getConfig(name) instead
  */
 export const PARAMETER_CONFIG: Record<string, ParameterDefinition> =
-  parameterRegistry.buildParameterConfig() as Record<string, ParameterDefinition>;
+  parameterRegistry.buildParameterConfig() as Record<
+    string,
+    ParameterDefinition
+  >;
 
 // ============================================================================
 // Default Parameters (derived from registry)

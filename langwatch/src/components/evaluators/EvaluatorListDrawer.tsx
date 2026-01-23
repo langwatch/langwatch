@@ -10,13 +10,24 @@ import {
 } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle, Plus, Workflow } from "lucide-react";
+import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
+import { useState } from "react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
+import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";
+import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 export type EvaluatorListDrawerProps = {
   open?: boolean;
@@ -39,12 +50,18 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const complexProps = getComplexProps();
   const utils = api.useContext();
 
+  // Get flow callbacks for this drawer (set by parent drawer like OnlineEvaluationDrawer)
+  const flowCallbacks = getFlowCallbacks("evaluatorList");
+
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
     props.onSelect ??
+    flowCallbacks?.onSelect ??
     (complexProps.onSelect as EvaluatorListDrawerProps["onSelect"]);
   const onCreateNew =
-    props.onCreateNew ?? (() => openDrawer("evaluatorCategorySelector"));
+    props.onCreateNew ??
+    flowCallbacks?.onCreateNew ??
+    (() => openDrawer("evaluatorCategorySelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
@@ -59,8 +76,14 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   });
 
   const handleSelectEvaluator = (evaluator: Evaluator) => {
+    // IMPORTANT: Only call the callback - do NOT navigate here!
+    // Navigation (goBack/closeDrawer) is the CALLER'S responsibility.
+    // Different callers have different navigation needs:
+    // - OnlineEvaluationDrawer: opens evaluatorEditor with mappings config (no goBack here)
+    // - EvaluationsV3: adds to workbench and closes drawer (caller calls closeDrawer)
+    // - Other flows: may have different requirements
+    // If you add goBack() here, you WILL break existing flows.
     onSelect?.(evaluator);
-    onClose();
   };
 
   const handleEditEvaluator = (evaluator: Evaluator) => {
@@ -80,6 +103,15 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         projectId: project?.id ?? "",
       });
     }
+  };
+
+  // State for API usage dialog
+  const [apiDialogEvaluator, setApiDialogEvaluator] = useState<Evaluator | null>(
+    null,
+  );
+
+  const handleUseFromApi = (evaluator: Evaluator) => {
+    setApiDialogEvaluator(evaluator);
   };
 
   return (
@@ -134,6 +166,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                     onClick={() => handleSelectEvaluator(evaluator)}
                     onEdit={() => handleEditEvaluator(evaluator)}
                     onDelete={() => handleDeleteEvaluator(evaluator)}
+                    onUseFromApi={() => handleUseFromApi(evaluator)}
                   />
                 ))
               )}
@@ -146,6 +179,13 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           </Button>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* API Usage Dialog */}
+      <EvaluatorApiUsageDialog
+        evaluator={apiDialogEvaluator}
+        open={!!apiDialogEvaluator}
+        onClose={() => setApiDialogEvaluator(null)}
+      />
     </Drawer.Root>
   );
 }
@@ -184,16 +224,24 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 // Evaluator Card Component
 // ============================================================================
 
-const evaluatorTypeLabels: Record<string, string> = {
-  evaluator: "Built-in",
-  workflow: "Workflow",
-};
-
 type EvaluatorCardProps = {
   evaluator: Evaluator;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onUseFromApi: () => void;
+};
+
+const getEvaluatorDisplayName = (evaluatorType: string): string => {
+  if (!evaluatorType) return "";
+
+  const evaluatorDefinition =
+    AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+  if (!evaluatorDefinition) return evaluatorType;
+
+  return (
+    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
+  );
 };
 
 function EvaluatorCard({
@@ -201,10 +249,14 @@ function EvaluatorCard({
   onClick,
   onEdit,
   onDelete,
+  onUseFromApi,
 }: EvaluatorCardProps) {
-  const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType ?? "";
+  const displayName =
+    evaluator.type === "workflow"
+      ? "Workflow"
+      : getEvaluatorDisplayName(evaluatorType);
 
   return (
     <Box
@@ -235,14 +287,12 @@ function EvaluatorCard({
             {evaluator.name}
           </Text>
           <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-            <span>{typeLabel}</span>
-            {evaluatorType && (
+            {displayName && (
               <>
+                <span>{displayName}</span>
                 <span style={{ margin: "0 4px" }}>{" • "}</span>
-                <span>{evaluatorType}</span>
               </>
             )}
-            <span style={{ margin: "0 4px" }}>{" • "}</span>
             <span>
               Updated{" "}
               {formatDistanceToNow(new Date(evaluator.updatedAt), {
@@ -274,6 +324,17 @@ function EvaluatorCard({
             >
               <LuPencil size={14} />
               Edit
+            </Menu.Item>
+            <Menu.Item
+              value="use-from-api"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUseFromApi();
+              }}
+              data-testid={`evaluator-use-api-${evaluator.id}`}
+            >
+              <Code size={14} />
+              Use via API
             </Menu.Item>
             <Menu.Item
               value="delete"

@@ -400,7 +400,7 @@ describe("VariablesSection", () => {
     it("displays mapping value when mapped", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       const mappings: Record<string, FieldMapping> = {
-        question: { type: "source", sourceId: "dataset-1", field: "input" },
+        question: { type: "source", sourceId: "dataset-1", path: ["input"] },
       };
       renderComponent({
         variables,

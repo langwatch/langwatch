@@ -34,6 +34,7 @@ import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
@@ -102,6 +103,10 @@ export function MessagesTable({
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
+
+  const isRefreshing = useMinimumSpinDuration(
+    traceGroups.isLoading || traceGroups.isRefetching,
+  );
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -984,7 +989,7 @@ export function MessagesTable({
           >
             <LuRefreshCw
               className={
-                traceGroups.isLoading || traceGroups.isRefetching
+                isRefreshing
                   ? "refresh-icon animation-spinning"
                   : "refresh-icon"
               }

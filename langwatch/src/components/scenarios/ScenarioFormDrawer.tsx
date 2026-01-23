@@ -30,7 +30,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
-  const [formInstance, setFormInstance] = useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const [formInstance, setFormInstance] =
+    useState<UseFormReturn<ScenarioFormData> | null>(null);
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,

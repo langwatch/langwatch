@@ -14,6 +14,7 @@ import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   type WizardState,
   workbenchStateSchema,
@@ -26,6 +27,7 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
@@ -40,11 +42,17 @@ import type {
   ESBatchEvaluation,
 } from "../../experiments/types";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  type createInnerTRPCContext,
+  createTRPCRouter,
+  protectedProcedure,
+} from "../trpc";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
+
+type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -203,7 +211,8 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
       const isNewExperiment = !input.experimentId;
-      const experimentId = input.experimentId ?? generate("eval").toString();
+      const experimentId =
+        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
       // For new experiments, use the ID as the slug (guaranteed unique)
       // For existing experiments, keep the same slug to avoid breaking URLs
@@ -473,13 +482,29 @@ export const experimentsRouter = createTRPCRouter({
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
 
-      // Get total count for pagination
-      const totalHits = await prisma.experiment.count({
-        where: { projectId: input.projectId },
-      });
+      const baseWhereClause: Prisma.ExperimentWhereInput = {
+        projectId: input.projectId,
+      };
 
-      const experiments = await prisma.experiment.findMany({
-        where: { projectId: input.projectId },
+      // Helper to check if an experiment is a real_time evaluation (old wizard)
+      const isRealTimeEvaluation = (workbenchState: JsonValue | null) => {
+        if (!workbenchState || typeof workbenchState !== "object") return false;
+        return (workbenchState as Record<string, unknown>).task === "real_time";
+      };
+
+      // Get total count for pagination (excluding real_time evaluations)
+      const allExperimentsCount = await prisma.experiment.findMany({
+        where: baseWhereClause,
+        select: { workbenchState: true },
+      });
+      const totalHits = allExperimentsCount.filter(
+        (e) => !isRealTimeEvaluation(e.workbenchState),
+      ).length;
+
+      // Fetch all experiments and filter/paginate in JS
+      // (Prisma JSON path filtering is unreliable for nested fields)
+      const allExperiments = await prisma.experiment.findMany({
+        where: baseWhereClause,
         include: {
           workflow: {
             include: {
@@ -490,9 +515,12 @@ export const experimentsRouter = createTRPCRouter({
         orderBy: {
           updatedAt: "desc",
         },
-        skip: pageOffset,
-        take: pageSize,
       });
+
+      // Filter out real_time evaluations and apply pagination
+      const experiments = allExperiments
+        .filter((e) => !isRealTimeEvaluation(e.workbenchState))
+        .slice(pageOffset, pageOffset + pageSize);
 
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (
@@ -608,14 +636,14 @@ export const experimentsRouter = createTRPCRouter({
 
       const versionIds = dspySteps.hits.hits
         .map((hit) => {
-          return hit._source!.workflow_version_id!;
+          return hit._source?.workflow_version_id;
         })
         .filter(Boolean);
 
       const versionsMap = await getVersionMap(input.projectId, versionIds);
 
       const result: DSPyRunsSummary[] = (
-        dspySteps.aggregations!.runs as any
+        dspySteps.aggregations?.runs as any
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
@@ -664,7 +692,7 @@ export const experimentsRouter = createTRPCRouter({
                 (a, b) => a.timestamps.created_at - b.timestamps.created_at,
               ),
             created_at: Math.min(
-              ...steps.map((hit) => hit._source!.timestamps.created_at),
+              ...steps.map((hit) => hit._source?.timestamps.created_at ?? 0),
             ),
           };
         })
@@ -763,7 +791,7 @@ export const experimentsRouter = createTRPCRouter({
       let batchEvaluationRun: SearchResponse<
         ESBatchEvaluation,
         Record<string, AggregationsAggregate>
-      >;
+      > | null = null;
       let attempts = 0;
       while (attempts < 3) {
         batchEvaluationRun = await client.search<ESBatchEvaluation>({
@@ -782,7 +810,7 @@ export const experimentsRouter = createTRPCRouter({
         }
       }
 
-      const result = batchEvaluationRun!.hits.hits[0]?._source;
+      const result = batchEvaluationRun?.hits.hits[0]?._source;
       if (!result) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -968,6 +996,18 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
+      // Handle V3 experiments (no workflow, state stored in workbenchState)
+      if (experiment.type === ExperimentType.EVALUATIONS_V3) {
+        return await copyEvaluationsV3Experiment({
+          ctx,
+          experiment,
+          targetProjectId: input.projectId,
+          sourceProjectId: input.sourceProjectId,
+          copyDatasets: input.copyDatasets,
+        });
+      }
+
+      // V2 experiments require a workflow
       if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -1312,7 +1352,7 @@ const getExperimentBatchEvaluationRuns = async (
 
   const versionIds = batchEvaluationRuns.hits.hits
     .map((hit) => {
-      return hit._source!.workflow_version_id!;
+      return hit._source?.workflow_version_id;
     })
     .filter(Boolean);
 
@@ -1321,7 +1361,7 @@ const getExperimentBatchEvaluationRuns = async (
   const runs = batchEvaluationRuns.hits.hits.map((hit) => {
     const source = hit._source!;
 
-    const runAgg = (batchEvaluationRuns.aggregations!.runs as any).buckets.find(
+    const runAgg = (batchEvaluationRuns.aggregations?.runs as any).buckets.find(
       (bucket: any) => bucket.key === source.run_id,
     );
 
@@ -1383,11 +1423,131 @@ const getExperimentBatchEvaluationRuns = async (
       if (!(run.experiment_id in acc)) {
         acc[run.experiment_id] = [];
       }
-      acc[run.experiment_id]!.push(run);
+      acc[run.experiment_id]?.push(run);
       return acc;
     },
     {} as Record<string, (typeof runs)[number][]>,
   );
 
   return runsByExperimentId;
+};
+
+/**
+ * Copies an EVALUATIONS_V3 experiment to another project.
+ * V3 experiments store their state in workbenchState (no workflow).
+ * Optionally copies saved datasets and updates references.
+ */
+const copyEvaluationsV3Experiment = async ({
+  ctx,
+  experiment,
+  targetProjectId,
+  sourceProjectId,
+  copyDatasets,
+}: {
+  ctx: TRPCContext;
+  experiment: {
+    id: string;
+    name: string | null;
+    slug: string;
+    type: ExperimentType;
+    workbenchState: JsonValue;
+  };
+  targetProjectId: string;
+  sourceProjectId: string;
+  copyDatasets?: boolean;
+}) => {
+  // Deep clone the workbenchState
+  const workbenchState = JSON.parse(
+    JSON.stringify(experiment.workbenchState ?? {}),
+  ) as Record<string, unknown>;
+
+  // Clear execution results (don't copy them to new project)
+  delete workbenchState.results;
+
+  // Process datasets if copyDatasets is enabled
+  if (copyDatasets && Array.isArray(workbenchState.datasets)) {
+    const datasetService = DatasetService.create(ctx.prisma);
+    const datasetIdMap: Record<string, string> = {};
+
+    // Copy saved datasets and build ID mapping
+    for (const dataset of workbenchState.datasets as Array<{
+      id: string;
+      type: string;
+      datasetId?: string;
+    }>) {
+      if (dataset.type === "saved" && dataset.datasetId) {
+        try {
+          const newDataset = await datasetService.copyDataset({
+            sourceDatasetId: dataset.datasetId,
+            sourceProjectId,
+            targetProjectId,
+          });
+          datasetIdMap[dataset.datasetId] = newDataset.id;
+        } catch {
+          // If dataset copy fails (e.g., not found), keep original reference
+          continue;
+        }
+      }
+    }
+
+    // Update dataset references in workbenchState
+    for (const dataset of workbenchState.datasets as Array<{
+      id: string;
+      type: string;
+      datasetId?: string;
+    }>) {
+      if (
+        dataset.type === "saved" &&
+        dataset.datasetId &&
+        datasetIdMap[dataset.datasetId]
+      ) {
+        dataset.datasetId = datasetIdMap[dataset.datasetId];
+      }
+    }
+  }
+
+  // Generate unique slug for the new experiment
+  const experimentName = experiment.name ?? experiment.slug;
+  const baseSlug = slugify(experimentName);
+
+  const MAX_ATTEMPTS = 100;
+  let newSlug = baseSlug;
+  let index = 2;
+  let attempts = 0;
+
+  while (attempts < MAX_ATTEMPTS) {
+    const existingExperiment = await ctx.prisma.experiment.findFirst({
+      where: {
+        projectId: targetProjectId,
+        slug: newSlug,
+      },
+    });
+
+    if (!existingExperiment) {
+      break;
+    }
+
+    newSlug = `${baseSlug}-${index}`;
+    index++;
+    attempts++;
+  }
+
+  // Fallback to random suffix if we hit the limit
+  if (attempts >= MAX_ATTEMPTS) {
+    newSlug = `${baseSlug}-${nanoid(8)}`;
+  }
+
+  // Create the new experiment
+  const newExperiment = await ctx.prisma.experiment.create({
+    data: {
+      id: generate("eval").toString(),
+      name: experimentName,
+      slug: newSlug,
+      projectId: targetProjectId,
+      type: ExperimentType.EVALUATIONS_V3,
+      workbenchState: workbenchState as Prisma.InputJsonValue,
+    },
+  });
+
+  return { experiment: newExperiment, workflow: null };
 };

@@ -587,189 +587,181 @@ describe("PipelineBuilder", () => {
     });
   });
 
-  describe(
-    "withEventHandler() Registration Contract",
-    () => {
-      it("stores event handler definition in internal Map with exact name key when called with unique name", () => {
-        const eventStore = createMockEventStore<TestEvent>();
+  describe("withEventHandler() Registration Contract", () => {
+    it("stores event handler definition in internal Map with exact name key when called with unique name", () => {
+      const eventStore = createMockEventStore<TestEvent>();
 
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler(
-            "my-handler",
-            createTestEventHandlerClass<TestEvent>(),
-          );
-
-        expect(() => {
-          builder.build();
-        }).not.toThrow();
-      });
-
-      it(
-        "stores handler definition with handler reference matching provided handler",
-        async () => {
-          vi.useRealTimers(); // Use real timers for async operations
-          const eventStore = createMockEventStore<TestEvent>();
-          const factory = createMockQueueProcessorFactory();
-          const handleSpy = vi.fn().mockResolvedValue(void 0);
-          const HandlerClass = createTestEventHandlerClass<TestEvent>({
-            handleImpl: handleSpy,
-          });
-
-          const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
-          const event = createTestEventForBuilder("aggregate-1", tenantId);
-
-          // Configure mock to return the event when getEvents is called
-          // This is needed because BatchEventProcessor fetches events from the store
-          eventStore.getEvents = vi.fn().mockResolvedValue([event]);
-
-          const builder = new PipelineBuilder<TestEvent>({
-            eventStore,
-            queueProcessorFactory: factory,
-            distributedLock: createMockDistributedLock(),
-          })
-            .withName("test-pipeline")
-            .withAggregateType("trace")
-            .withEventHandler("test-handler", HandlerClass);
-
-          const pipeline = builder.build();
-
-          await pipeline.service.storeEvents([event], { tenantId });
-
-          expect(handleSpy).toHaveBeenCalled();
-          const callArgs = handleSpy.mock.calls[0];
-          expect(callArgs).toBeDefined();
-          if (callArgs?.[0]) {
-            expect(callArgs[0]).toMatchObject({
-              aggregateId: "aggregate-1",
-              tenantId,
-            });
-          }
-        },
-        { timeout: 10000 },
-      );
-
-      it("stores handler definition with options object matching provided options", () => {
-        const eventStore = createMockEventStore<TestEvent>();
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler(
-            "test-handler",
-            createTestEventHandlerClass<TestEvent>(),
-            {
-              eventTypes: [EVENT_TYPES[0]],
-            },
-          );
-
-        expect(() => {
-          builder.build();
-        }).not.toThrow();
-      });
-
-      it("stores handler definition with empty options object when options not provided", () => {
-        const eventStore = createMockEventStore<TestEvent>();
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler(
-            "test-handler",
-            createTestEventHandlerClass<TestEvent>(),
-          );
-
-        expect(() => {
-          builder.build();
-        }).not.toThrow();
-      });
-
-      it("throws Error with message containing handler name when duplicate handler name registered", () => {
-        const eventStore = createMockEventStore<TestEvent>();
-        const HandlerClass = createTestEventHandlerClass<TestEvent>();
-
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler("duplicate-name", HandlerClass);
-
-        expect(() => {
-          builder.withEventHandler("duplicate-name", HandlerClass);
-        }).toThrow(
-          'Event handler with name "duplicate-name" already exists. Handler names must be unique within a pipeline.',
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler(
+          "my-handler",
+          createTestEventHandlerClass<TestEvent>(),
         );
+
+      expect(() => {
+        builder.build();
+      }).not.toThrow();
+    });
+
+    it("stores handler definition with handler reference matching provided handler", async () => {
+      vi.useRealTimers(); // Use real timers for async operations
+      const eventStore = createMockEventStore<TestEvent>();
+      const factory = createMockQueueProcessorFactory();
+      const handleSpy = vi.fn().mockResolvedValue(void 0);
+      const HandlerClass = createTestEventHandlerClass<TestEvent>({
+        handleImpl: handleSpy,
       });
 
-      it("allows registering multiple handlers with different names in sequence", () => {
-        const eventStore = createMockEventStore<TestEvent>();
-        const HandlerClass1 = createTestEventHandlerClass<TestEvent>();
-        const HandlerClass2 = createTestEventHandlerClass<TestEvent>();
+      const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
+      const event = createTestEventForBuilder("aggregate-1", tenantId);
 
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler("handler-1", HandlerClass1)
-          .withEventHandler("handler-2", HandlerClass2);
+      // Configure mock to return the event when getEvents is called
+      // This is needed because BatchEventProcessor fetches events from the store
+      eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-        expect(() => {
-          builder.build();
-        }).not.toThrow();
-      });
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler("test-handler", HandlerClass);
 
-      it("preserves previously registered handlers when new handler added", async () => {
-        vi.useRealTimers(); // Use real timers for async operations
-        const eventStore = createMockEventStore<TestEvent>();
-        const factory = createMockQueueProcessorFactory();
-        const handleSpy1 = vi.fn().mockResolvedValue(void 0);
-        const handleSpy2 = vi.fn().mockResolvedValue(void 0);
-        const HandlerClass1 = createTestEventHandlerClass<TestEvent>({
-          handleImpl: handleSpy1,
+      const pipeline = builder.build();
+
+      await pipeline.service.storeEvents([event], { tenantId });
+
+      expect(handleSpy).toHaveBeenCalled();
+      const callArgs = handleSpy.mock.calls[0];
+      expect(callArgs).toBeDefined();
+      if (callArgs?.[0]) {
+        expect(callArgs[0]).toMatchObject({
+          aggregateId: "aggregate-1",
+          tenantId,
         });
-        const HandlerClass2 = createTestEventHandlerClass<TestEvent>({
-          handleImpl: handleSpy2,
-        });
+      }
+    }, 10000);
 
-        const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
-        const event = createTestEventForBuilder("aggregate-1", tenantId);
+    it("stores handler definition with options object matching provided options", () => {
+      const eventStore = createMockEventStore<TestEvent>();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler(
+          "test-handler",
+          createTestEventHandlerClass<TestEvent>(),
+          {
+            eventTypes: [EVENT_TYPES[0]],
+          },
+        );
 
-        // Configure mock to return the event when getEvents is called
-        // This is needed because BatchEventProcessor fetches events from the store
-        eventStore.getEvents = vi.fn().mockResolvedValue([event]);
+      expect(() => {
+        builder.build();
+      }).not.toThrow();
+    });
 
-        const builder = new PipelineBuilder<TestEvent>({
-          eventStore,
-          queueProcessorFactory: factory,
-          distributedLock: createMockDistributedLock(),
-        })
-          .withName("test-pipeline")
-          .withAggregateType("trace")
-          .withEventHandler("handler-1", HandlerClass1)
-          .withEventHandler("handler-2", HandlerClass2);
+    it("stores handler definition with empty options object when options not provided", () => {
+      const eventStore = createMockEventStore<TestEvent>();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler(
+          "test-handler",
+          createTestEventHandlerClass<TestEvent>(),
+        );
 
-        const pipeline = builder.build();
+      expect(() => {
+        builder.build();
+      }).not.toThrow();
+    });
 
-        await pipeline.service.storeEvents([event], { tenantId });
+    it("throws Error with message containing handler name when duplicate handler name registered", () => {
+      const eventStore = createMockEventStore<TestEvent>();
+      const HandlerClass = createTestEventHandlerClass<TestEvent>();
 
-        expect(handleSpy1).toHaveBeenCalled();
-        expect(handleSpy2).toHaveBeenCalled();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler("duplicate-name", HandlerClass);
+
+      expect(() => {
+        builder.withEventHandler("duplicate-name", HandlerClass);
+      }).toThrow(
+        'Event handler with name "duplicate-name" already exists. Handler names must be unique within a pipeline.',
+      );
+    });
+
+    it("allows registering multiple handlers with different names in sequence", () => {
+      const eventStore = createMockEventStore<TestEvent>();
+      const HandlerClass1 = createTestEventHandlerClass<TestEvent>();
+      const HandlerClass2 = createTestEventHandlerClass<TestEvent>();
+
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler("handler-1", HandlerClass1)
+        .withEventHandler("handler-2", HandlerClass2);
+
+      expect(() => {
+        builder.build();
+      }).not.toThrow();
+    });
+
+    it("preserves previously registered handlers when new handler added", async () => {
+      vi.useRealTimers(); // Use real timers for async operations
+      const eventStore = createMockEventStore<TestEvent>();
+      const factory = createMockQueueProcessorFactory();
+      const handleSpy1 = vi.fn().mockResolvedValue(void 0);
+      const handleSpy2 = vi.fn().mockResolvedValue(void 0);
+      const HandlerClass1 = createTestEventHandlerClass<TestEvent>({
+        handleImpl: handleSpy1,
       });
-    },
-    { timeout: 10000 },
-  );
+      const HandlerClass2 = createTestEventHandlerClass<TestEvent>({
+        handleImpl: handleSpy2,
+      });
+
+      const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
+      const event = createTestEventForBuilder("aggregate-1", tenantId);
+
+      // Configure mock to return the event when getEvents is called
+      // This is needed because BatchEventProcessor fetches events from the store
+      eventStore.getEvents = vi.fn().mockResolvedValue([event]);
+
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withEventHandler("handler-1", HandlerClass1)
+        .withEventHandler("handler-2", HandlerClass2);
+
+      const pipeline = builder.build();
+
+      await pipeline.service.storeEvents([event], { tenantId });
+
+      expect(handleSpy1).toHaveBeenCalled();
+      expect(handleSpy2).toHaveBeenCalled();
+    });
+  });
 
   describe("withCommand() Registration Contract", () => {
     it("stores handler registration in internal array when called with CommandHandlerClass", () => {

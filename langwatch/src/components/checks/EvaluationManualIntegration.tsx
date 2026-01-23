@@ -73,9 +73,13 @@ export function EvaluationManualIntegration({
     }
 
     if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`);
+      dataFields.push(
+        `"contexts": ["retrieved snippet 1", "retrieved snippet 2"]`,
+      );
     } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
-      dataFields.push(`"contexts": ["retrieved snippet 1", "retrieved snippet 2"]  # optional`);
+      dataFields.push(
+        `"contexts": ["retrieved snippet 1", "retrieved snippet 2"]  # optional`,
+      );
     }
 
     if (evaluatorDefinition.requiredFields.includes("expected_output")) {
@@ -90,9 +94,10 @@ export function EvaluationManualIntegration({
       dataFields.push(`"conversation": conversation_history  # optional`);
     }
 
-    const dataParam = dataFields.length > 0
-      ? `\n        data={\n            ${dataFields.join(",\n            ")}\n        },`
-      : `\n        data={},`;
+    const dataParam =
+      dataFields.length > 0
+        ? `\n        data={\n            ${dataFields.join(",\n            ")}\n        },`
+        : `\n        data={},`;
 
     const settingsParams = storeSettingsOnCode
       ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
@@ -170,9 +175,13 @@ ${
     }
 
     if (evaluatorDefinition.requiredFields.includes("contexts")) {
-      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"]`);
+      dataFields.push(
+        `contexts: ["retrieved snippet 1", "retrieved snippet 2"]`,
+      );
     } else if (evaluatorDefinition.optionalFields.includes("contexts")) {
-      dataFields.push(`contexts: ["retrieved snippet 1", "retrieved snippet 2"] /* optional */`);
+      dataFields.push(
+        `contexts: ["retrieved snippet 1", "retrieved snippet 2"] /* optional */`,
+      );
     }
 
     if (evaluatorDefinition.requiredFields.includes("expected_output")) {
@@ -187,9 +196,10 @@ ${
       dataFields.push(`conversation: conversationHistory /* optional */`);
     }
 
-    const dataParam = dataFields.length > 0
-      ? `\n        data: {\n          ${dataFields.join(",\n          ")}\n        },`
-      : `\n        data: {},`;
+    const dataParam =
+      dataFields.length > 0
+        ? `\n        data: {\n          ${dataFields.join(",\n          ")}\n        },`
+        : `\n        data: {},`;
 
     const settingsParams = storeSettingsOnCode
       ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)

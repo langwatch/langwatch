@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import type React from "react";
+import React from "react";
 import type { Event } from "../lib/types";
 import { JsonViewer } from "./JsonViewer";
 

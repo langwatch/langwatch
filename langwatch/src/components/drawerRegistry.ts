@@ -25,10 +25,14 @@ import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
+// Online Evaluations (Monitors) drawers
+import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
+import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
@@ -71,12 +75,15 @@ export const drawers = {
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
   evaluatorEditor: EvaluatorEditorDrawer,
-  // Workflow selector specifically for evaluators (same component, different context)
-  workflowSelectorForEvaluator: WorkflowSelectorDrawer,
+  // Workflow selector specifically for evaluators (creates evaluator, not agent)
+  workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios
   scenarioEditor: ScenarioFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  // Online Evaluations (Monitors)
+  onlineEvaluation: OnlineEvaluationDrawer,
+  guardrails: GuardrailsDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

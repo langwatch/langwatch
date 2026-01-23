@@ -1,8 +1,9 @@
+import { generate } from "@langwatch/ksuid";
 import { CostReferenceType, CostType } from "@prisma/client";
-import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
@@ -22,6 +23,7 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
+import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import { createLogger } from "../../../../../utils/logger";
 import {
   getEvaluatorDataForParams,
@@ -70,21 +72,66 @@ export async function handleEvaluatorCall(
     .filter(Boolean)
     .join("/");
   let checkType: string;
+  let evaluatorSettings: Record<string, unknown> | undefined;
+  let evaluatorName: string | undefined;
 
-  const storedEvaluator = await prisma.monitor.findUnique({
-    where: {
-      projectId_slug: {
+  // Check if using the new evaluators/slug format
+  if (evaluatorSlug.startsWith("evaluators/")) {
+    const slug = evaluatorSlug.replace("evaluators/", "");
+    const savedEvaluator = await prisma.evaluator.findFirst({
+      where: {
         projectId: project.id,
-        slug: evaluatorSlug,
+        slug,
+        archivedAt: null,
       },
-    },
-  });
+    });
 
-  if (storedEvaluator != null) {
-    checkType = storedEvaluator.checkType;
+    if (savedEvaluator) {
+      const config = savedEvaluator.config as {
+        evaluatorType?: string;
+        settings?: Record<string, unknown>;
+      } | null;
+      checkType = config?.evaluatorType ?? evaluatorSlug;
+      evaluatorSettings = config?.settings;
+      evaluatorName = savedEvaluator.name;
+    } else {
+      return res.status(404).json({
+        error: `Evaluator not found with slug: ${slug}`,
+      });
+    }
   } else {
-    checkType = evaluatorSlug;
+    // Legacy: Look up by Monitor slug or treat as direct checkType
+    const storedEvaluator = await prisma.monitor.findUnique({
+      where: {
+        projectId_slug: {
+          projectId: project.id,
+          slug: evaluatorSlug,
+        },
+      },
+    });
+
+    if (storedEvaluator != null) {
+      checkType = storedEvaluator.checkType;
+      evaluatorSettings = storedEvaluator.parameters as
+        | Record<string, unknown>
+        | undefined;
+      evaluatorName = storedEvaluator.name;
+    } else {
+      checkType = evaluatorSlug;
+    }
   }
+
+  // For backward compatibility, keep storedEvaluator reference for enabled check
+  const storedEvaluator = !evaluatorSlug.startsWith("evaluators/")
+    ? await prisma.monitor.findUnique({
+        where: {
+          projectId_slug: {
+            projectId: project.id,
+            slug: evaluatorSlug,
+          },
+        },
+      })
+    : null;
 
   const evaluatorDefinition = await getEvaluatorIncludingCustom(
     project.id,
@@ -138,14 +185,16 @@ export async function handleEvaluatorCall(
   let settings:
     | z.infer<NonNullable<typeof evaluatorSettingSchema>>
     | undefined =
-    (storedEvaluator?.parameters as z.infer<
+    ((evaluatorSettings ?? storedEvaluator?.parameters) as z.infer<
       NonNullable<typeof evaluatorSettingSchema>
     >) ?? {};
 
   try {
     settings = evaluatorSettingSchema?.parse({
       ...getEvaluatorDefaultSettings(evaluatorDefinition),
-      ...(storedEvaluator ? (storedEvaluator.parameters as object) : {}),
+      // Use evaluatorSettings from saved Evaluator, or fall back to storedEvaluator (Monitor) parameters
+      ...(evaluatorSettings ??
+        (storedEvaluator ? (storedEvaluator.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
@@ -197,6 +246,17 @@ export async function handleEvaluatorCall(
 
   let result: SingleEvaluationResult;
 
+  // Generate evaluationId for event sourcing tracking
+  // evaluationId must be unique per execution (not per evaluator definition)
+  // to avoid collapsing all executions into one aggregate stream
+  const evaluationId =
+    params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
+  // evaluatorId identifies which evaluator definition is being used
+  const evaluatorId =
+    storedEvaluator?.id ??
+    params.evaluator_id ??
+    evaluationNameAutoslug(params.name ?? checkType);
+
   const runEval = () =>
     runEvaluation({
       projectId: project.id,
@@ -204,6 +264,31 @@ export async function handleEvaluatorCall(
       data,
       settings,
     });
+
+  // Emit evaluation started event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // should proceed even if event tracking fails. Errors are captured for monitoring.
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.startEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        evaluatorId,
+        evaluatorType: checkType,
+        evaluatorName: storedEvaluator?.name ?? params.name ?? undefined,
+        traceId: params.trace_id ?? undefined,
+        isGuardrail: isGuardrail ?? undefined,
+      });
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "started" },
+      });
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation started event",
+      );
+    }
+  }
 
   try {
     result = await runEval();
@@ -234,15 +319,46 @@ export async function handleEvaluatorCall(
     };
   }
 
+  // Emit evaluation completed event
+  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+  // result should be returned even if event tracking fails. Errors are captured for monitoring.
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.completeEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        status: result.status,
+        score: "score" in result ? result.score : undefined,
+        passed: "passed" in result ? result.passed : undefined,
+        label: "label" in result ? result.label : undefined,
+        details: "details" in result ? result.details : undefined,
+        error:
+          result.status === "error"
+            ? "details" in result
+              ? result.details
+              : undefined
+            : undefined,
+      });
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: { projectId: project.id, evaluationId, event: "completed" },
+      });
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation completed event",
+      );
+    }
+  }
+
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
-        id: `cost_${nanoid()}`,
+        id: generate(KSUID_RESOURCES.COST).toString(),
         projectId: project.id,
         costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-        costName: storedEvaluator?.name ?? checkType,
+        costName: evaluatorName ?? storedEvaluator?.name ?? checkType,
         referenceType: CostReferenceType.CHECK,
-        referenceId: storedEvaluator?.id ?? checkType,
+        referenceId: evaluatorName ?? storedEvaluator?.id ?? checkType,
         amount: result.cost.amount,
         currency: result.cost.currency,
         extraInfo: {
@@ -274,12 +390,8 @@ export async function handleEvaluatorCall(
   if (params.trace_id) {
     await updateEvaluationStatusInES({
       check: {
-        evaluation_id:
-          storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`,
-        evaluator_id:
-          storedEvaluator?.id ??
-          params.evaluator_id ??
-          evaluationNameAutoslug(params.name ?? checkType),
+        evaluation_id: evaluationId,
+        evaluator_id: evaluatorId,
         type: checkType as EvaluatorTypes,
         name: storedEvaluator?.name ?? params.name ?? checkType,
       },

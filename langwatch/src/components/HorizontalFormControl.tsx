@@ -23,6 +23,7 @@ export interface HorizontalFormControlProps extends SystemStyleObject {
   size?: "sm" | "md";
   error?: FieldErrors<any>[0] | ReactNode;
   align?: "start" | "end";
+  labelProps?: SystemStyleObject;
 }
 
 export function HorizontalFormControl({
@@ -37,6 +38,7 @@ export function HorizontalFormControl({
   direction = "horizontal",
   size = "md",
   error,
+  labelProps,
   ...props
 }: PropsWithChildren<HorizontalFormControlProps>) {
   return (
@@ -77,6 +79,7 @@ export function HorizontalFormControl({
               paddingLeft: 2,
               width: "full",
             })}
+            {...labelProps}
           >
             <HStack gap={2} width="full">
               {label}
@@ -92,7 +95,15 @@ export function HorizontalFormControl({
           </Field.HelperText>
         </VStack>
         {direction === "horizontal" && <Spacer />}
-        <Box minWidth={["full", "full", inputWidth ?? "50%"]}>{children}</Box>
+        <Box
+          minWidth={
+            direction === "vertical"
+              ? "full"
+              : ["full", "full", inputWidth ?? "50%"]
+          }
+        >
+          {children}
+        </Box>
         <FormErrorDisplay error={error} />
       </HStack>
     </Field.Root>

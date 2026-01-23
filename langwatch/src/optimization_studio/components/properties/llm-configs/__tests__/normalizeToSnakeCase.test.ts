@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { normalizeToSnakeCase } from "../normalizeToSnakeCase";
 import type { LLMConfig } from "../../../../types/dsl";
+import { normalizeToSnakeCase } from "../normalizeToSnakeCase";
 
 const BASE_CONFIG = { model: DEFAULT_MODEL };
 const CAMEL_CASE_PARAMS = {

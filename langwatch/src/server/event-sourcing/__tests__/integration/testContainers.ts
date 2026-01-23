@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   ClickHouseContainer,
@@ -8,9 +11,6 @@ import {
   type StartedRedisContainer,
 } from "@testcontainers/redis";
 import IORedis, { type Redis } from "ioredis";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
 import { migrateUp } from "~/server/clickhouse/goose";
 import { createLogger } from "~/utils/logger";
 
@@ -277,7 +277,9 @@ function createStoragePolicyConfigFile(): string {
  *
  * @param connectionUrl - The ClickHouse connection URL (without database)
  */
-async function initializeClickHouseSchema(connectionUrl: string): Promise<void> {
+async function initializeClickHouseSchema(
+  connectionUrl: string,
+): Promise<void> {
   await migrateUp({
     connectionUrl,
     verbose: true,

@@ -15,11 +15,22 @@ import {
 vi.mock("../../modelProviders/registry", () => ({
   getModelById: vi.fn((modelId: string) => {
     // Return mock model data based on modelId
-    const models: Record<string, { reasoningConfig?: { parameterName: string } }> = {
-      "openai/gpt-5": { reasoningConfig: { parameterName: "reasoning_effort" } },
-      "gemini/gemini-3-flash": { reasoningConfig: { parameterName: "thinkingLevel" } },
-      "anthropic/claude-opus-4": { reasoningConfig: { parameterName: "effort" } },
-      "custom/model-with-custom-param": { reasoningConfig: { parameterName: "custom_reasoning" } },
+    const models: Record<
+      string,
+      { reasoningConfig?: { parameterName: string } }
+    > = {
+      "openai/gpt-5": {
+        reasoningConfig: { parameterName: "reasoning_effort" },
+      },
+      "gemini/gemini-3-flash": {
+        reasoningConfig: { parameterName: "thinkingLevel" },
+      },
+      "anthropic/claude-opus-4": {
+        reasoningConfig: { parameterName: "effort" },
+      },
+      "custom/model-with-custom-param": {
+        reasoningConfig: { parameterName: "custom_reasoning" },
+      },
       "openai/gpt-4.1": {}, // No reasoning config
     };
     return models[modelId];
@@ -48,12 +59,18 @@ describe("reasoningBoundary", () => {
       });
 
       it("maps reasoning to effort for Anthropic models", () => {
-        const result = mapReasoningToProvider("anthropic/claude-opus-4", "medium");
+        const result = mapReasoningToProvider(
+          "anthropic/claude-opus-4",
+          "medium",
+        );
         expect(result).toEqual({ effort: "medium" });
       });
 
       it("uses model's custom parameterName when available", () => {
-        const result = mapReasoningToProvider("custom/model-with-custom-param", "high");
+        const result = mapReasoningToProvider(
+          "custom/model-with-custom-param",
+          "high",
+        );
         expect(result).toEqual({ custom_reasoning: "high" });
       });
     });
@@ -70,7 +87,10 @@ describe("reasoningBoundary", () => {
       });
 
       it("falls back to effort for unknown Anthropic models", () => {
-        const result = mapReasoningToProvider("anthropic/unknown-model", "medium");
+        const result = mapReasoningToProvider(
+          "anthropic/unknown-model",
+          "medium",
+        );
         expect(result).toEqual({ effort: "medium" });
       });
 
@@ -96,7 +116,9 @@ describe("reasoningBoundary", () => {
   describe("normalizeReasoningFromProviderFields", () => {
     describe("when reasoning field is set", () => {
       it("returns reasoning when it is set", () => {
-        const result = normalizeReasoningFromProviderFields({ reasoning: "high" });
+        const result = normalizeReasoningFromProviderFields({
+          reasoning: "high",
+        });
         expect(result).toBe("high");
       });
 

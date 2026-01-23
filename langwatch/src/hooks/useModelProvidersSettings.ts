@@ -1,5 +1,5 @@
-import { api } from "../utils/api";
 import type { ModelMetadataForFrontend } from "../server/api/routers/modelProviders";
+import { api } from "../utils/api";
 
 export type { ModelMetadataForFrontend };
 
@@ -34,9 +34,7 @@ export function useModelMetadata(params: {
     projectId: params.projectId,
   });
 
-  const metadata = params.modelId
-    ? modelMetadata?.[params.modelId]
-    : undefined;
+  const metadata = params.modelId ? modelMetadata?.[params.modelId] : undefined;
 
   return {
     metadata,

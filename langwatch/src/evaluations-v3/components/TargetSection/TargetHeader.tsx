@@ -194,7 +194,7 @@ export const TargetHeader = memo(function TargetHeader({
   };
 
   const getTargetColor = () => {
-    return target.type === "prompt" ? "green.fg" : "cyan.fg";
+    return target.type === "prompt" ? "green.emphasized" : "cyan.emphasized";
   };
 
   const editLabel = target.type === "prompt" ? "Edit Prompt" : "Edit Agent";

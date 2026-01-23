@@ -44,6 +44,20 @@ export const evaluatorsRouter = createTRPCRouter({
     }),
 
   /**
+   * Gets a single evaluator by slug
+   */
+  getBySlug: protectedProcedure
+    .input(z.object({ slug: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const evaluatorService = EvaluatorService.create(ctx.prisma);
+      return await evaluatorService.getBySlug({
+        slug: input.slug,
+        projectId: input.projectId,
+      });
+    }),
+
+  /**
    * Creates a new evaluator
    */
   create: protectedProcedure
@@ -58,6 +72,23 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      // If workflowId is provided, check if an evaluator already exists for this workflow
+      if (input.workflowId) {
+        const existingEvaluator = await ctx.prisma.evaluator.findFirst({
+          where: {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+            archivedAt: null,
+          },
+        });
+
+        if (existingEvaluator) {
+          throw new Error(
+            `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
+          );
+        }
+      }
+
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.create({
         id: `evaluator_${nanoid()}`,

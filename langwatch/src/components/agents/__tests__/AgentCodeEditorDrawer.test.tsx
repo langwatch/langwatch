@@ -234,7 +234,7 @@ describe("AgentCodeEditorDrawer", () => {
       input: {
         type: "source",
         sourceId: "dataset-1",
-        field: "question",
+        path: ["question"],
       },
     };
 

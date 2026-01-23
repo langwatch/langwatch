@@ -11,8 +11,8 @@ import type { ReasoningConfig } from "../../../server/modelProviders/llmModels.t
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
-  getParameterConfigWithModelOverrides,
   getParameterConfig,
+  getParameterConfigWithModelOverrides,
   getParameterDefault,
   isReasoningParameter,
   PARAM_NAME_MAPPING,
@@ -273,7 +273,10 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
+        reasoningConfig,
+      );
 
       expect(config?.label).toBe("Reasoning Effort");
     });
@@ -286,7 +289,10 @@ describe("Parameter Config", () => {
         defaultValue: "low",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
+        reasoningConfig,
+      );
 
       expect(config?.label).toBe("Thinking Level");
     });
@@ -299,7 +305,10 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
+        reasoningConfig,
+      );
 
       expect(config?.label).toBe("Effort");
     });
@@ -312,7 +321,10 @@ describe("Parameter Config", () => {
         defaultValue: "low",
         canDisable: false,
       };
-      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
+        reasoningConfig,
+      );
 
       expect(config?.label).toBe("Reasoning");
     });
@@ -325,7 +337,10 @@ describe("Parameter Config", () => {
         defaultValue: "none",
         canDisable: true,
       };
-      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
+        reasoningConfig,
+      );
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {

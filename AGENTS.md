@@ -26,8 +26,9 @@ specs/               # BDD feature specs
 
 ## Key References
 
-- `TESTING.md` - test hierarchy, BDD workflow
-- `docs/best_practices/` - coding conventions
+- `docs/CODING_STANDARDS.md` - clean code, SOLID principles
+- `docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
+- `docs/best_practices/` - language/framework conventions
 - `docs/adr/` - Architecture Decision Records
 
 ## General
@@ -44,6 +45,7 @@ specs/               # BDD feature specs
 | Implementing code before writing tests | Follow Outside-In TDD: Write failing tests first, then implement minimal code to pass, then refactor |
 | Writing tests in the incorrect order | Outside-In TDD: examples drive E2E tests => then integration tests => then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
+| `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
 
 ## TypeScript
 

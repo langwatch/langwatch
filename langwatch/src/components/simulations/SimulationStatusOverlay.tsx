@@ -58,7 +58,10 @@ export function SimulationStatusOverlay({
   `;
 
   const passGradient = useColorModeValue(passGradientLight, passGradientDark);
-  const cancelledGradient = useColorModeValue(cancelledGradientLight, cancelledGradientDark);
+  const cancelledGradient = useColorModeValue(
+    cancelledGradientLight,
+    cancelledGradientDark,
+  );
   const failGradient = useColorModeValue(failGradientLight, failGradientDark);
 
   const bgGradient = isPass

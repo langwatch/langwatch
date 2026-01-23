@@ -91,7 +91,9 @@ const ExecutionMetadata = ({
 
       {hasTiming && (
         <>
-          {executionState.cost !== undefined && <Text color="fg.subtle">·</Text>}
+          {executionState.cost !== undefined && (
+            <Text color="fg.subtle">·</Text>
+          )}
           <SpanDuration
             span={{
               error:

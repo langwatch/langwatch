@@ -10,8 +10,16 @@ export const getStatusColor = (
   if (status === "error")
     return { bg: "red.subtle", color: "red.fg", borderColor: "red.emphasized" };
   if (status === "warning" || value < 0.8)
-    return { bg: "yellow.subtle", color: "yellow.fg", borderColor: "yellow.emphasized" };
-  return { bg: "green.subtle", color: "green.fg", borderColor: "green.emphasized" };
+    return {
+      bg: "yellow.subtle",
+      color: "yellow.fg",
+      borderColor: "yellow.emphasized",
+    };
+  return {
+    bg: "green.subtle",
+    color: "green.fg",
+    borderColor: "green.emphasized",
+  };
 };
 
 export const getStatusIcon = (status: StatusType, value: number): ReactNode => {

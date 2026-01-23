@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Workflow,
 } from "lucide-react";
+import { LuPercent } from "react-icons/lu";
 
 export type FeatureKey =
   | "home"
@@ -32,7 +33,8 @@ export type FeatureKey =
   | "datasets"
   | "annotations"
   | "settings"
-  | "agents";
+  | "agents"
+  | "evaluators";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -109,6 +111,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Bot,
     color: "cyan.500",
     label: "Agents",
+  },
+  evaluators: {
+    icon: LuPercent,
+    color: "orange.500",
+    label: "Evaluators",
   },
 };
 

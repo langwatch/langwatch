@@ -102,7 +102,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           maxWidth="1000px"
           width="100%"
           position="relative"
-          background={highlighted ? "blue.subtle" : hover ? "bg.muted" : "bg.panel"}
+          background={
+            highlighted ? "blue.subtle" : hover ? "bg.muted" : "bg.panel"
+          }
           paddingLeft={10}
           paddingRight={10}
           paddingY={4}

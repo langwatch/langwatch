@@ -124,7 +124,8 @@ export function PromptPlaygroundBrowser() {
                     bottom: 0,
                     width: "10px",
                     height: "50px",
-                    background: "linear-gradient(to right, transparent, var(--chakra-colors-bg-panel))",
+                    background:
+                      "linear-gradient(to right, transparent, var(--chakra-colors-bg-panel))",
                     zIndex: 10,
                     pointerEvents: "none",
                   }}

@@ -1,9 +1,8 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
-
-import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
 // @ts-ignore - JSON import
 import * as llmModelsRaw from "./llmModels.json";
+import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
 
 const llmModels = llmModelsRaw as unknown as LLMModelRegistry;
 
@@ -55,7 +54,7 @@ export const getModelById = (modelId: string): LLMModelEntry | undefined => {
  * Returns null if model not found
  */
 export const getModelMetadata = (
-  modelId: string
+  modelId: string,
 ): {
   supportedParameters: string[];
   contextLength: number;
@@ -84,7 +83,7 @@ export const getModelMetadata = (
  */
 export const getProviderModelOptions = (
   provider: string,
-  mode: "chat" | "embedding"
+  mode: "chat" | "embedding",
 ) => {
   return Object.entries(llmModels.models)
     .filter(([_, model]) => model.provider === provider && model.mode === mode)
@@ -97,11 +96,9 @@ export const getProviderModelOptions = (
 /**
  * Get all models for a provider
  */
-export const getModelsForProvider = (
-  provider: string
-): LLMModelEntry[] => {
+export const getModelsForProvider = (provider: string): LLMModelEntry[] => {
   return Object.values(llmModels.models).filter(
-    (model) => model.provider === provider
+    (model) => model.provider === provider,
   );
 };
 
@@ -110,7 +107,7 @@ export const getModelsForProvider = (
  */
 export const getAllProviders = (): string[] => {
   const providers = new Set(
-    Object.values(llmModels.models).map((model) => model.provider)
+    Object.values(llmModels.models).map((model) => model.provider),
   );
   return Array.from(providers).sort();
 };
@@ -269,7 +266,7 @@ export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
     Object.entries(llmModels.models).map(([id, model]) => [
       id,
       { mode: model.mode },
-    ])
+    ]),
   );
 
 // ============================================================================

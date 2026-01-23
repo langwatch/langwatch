@@ -4,7 +4,7 @@
 |-------------|------------------|
 | Writing E2E tests mixed with unit tests | Keep E2E tests isolated in `tests/e2e/` directory with `@pytest.mark.e2e`. E2E tests verify real API behavior with external services, while examples serve as user demonstrations. |
 | Repeating happy paths in integration/unit tests | Do not duplicate E2E/example coverage in integrations or units. Focus integration tests on edge/error cases, and unit tests on pure logic. |
-| Failing to follow [TESTING.md](../TESTING.md) hierarchy | Always start with a `.feature` file, drive from E2E tests in `tests/e2e/`, then add integration tests in `tests/` and unit tests as outlined. Examples in `examples/` serve as user demonstrations. |
+| Failing to follow [TESTING_PHILOSOPHY.md](../docs/TESTING_PHILOSOPHY.md) hierarchy | Always start with a `.feature` file, drive from E2E tests in `tests/e2e/`, then add integration tests in `tests/` and unit tests as outlined. Examples in `examples/` serve as user demonstrations. |
 | Using `pip` or `python` directly for installing, running, or testing | Always use [`uv`](https://github.com/astral-sh/uv) for all dependency installation, package management, and test running. Do not use `pip` commands or `python -m pip`, prefer `uv` equivalents throughout documentation, scripts, and workflows. |
 
 ## Testing Structure

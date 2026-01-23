@@ -1,5 +1,5 @@
+import crypto from "node:crypto";
 import { EvaluationExecutionMode } from "@prisma/client";
-import crypto from "crypto";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
@@ -21,7 +21,7 @@ export const evaluationNameAutoslug = (name: string) => {
     lower: true,
     strict: true,
   }).replace(/[^a-z0-9]/g, "_");
-  return `custom_eval_${autoslug}`;
+  return `customeval_${autoslug}`;
 };
 
 export const mapEvaluations = (
@@ -99,6 +99,13 @@ export const scheduleEvaluations = async (
         preconditions,
       );
       if (preconditionsMet) {
+        // Check if this is a thread-level evaluation with idle timeout
+        const hasThreadIdleTimeout =
+          check.threadIdleTimeout !== null && check.threadIdleTimeout > 0;
+        const threadId =
+          trace.thread_id ??
+          (trace.metadata as { thread_id?: string } | undefined)?.thread_id;
+
         traceChecksSchedulings.push(
           scheduleEvaluation({
             check: {
@@ -108,6 +115,15 @@ export const scheduleEvaluations = async (
               name: check.name,
             },
             trace: trace,
+            // Thread-based debouncing: use thread ID + monitor ID as job key
+            // and delay by threadIdleTimeout seconds
+            threadDebounce:
+              hasThreadIdleTimeout && threadId
+                ? {
+                    threadId,
+                    timeoutSeconds: check.threadIdleTimeout!,
+                  }
+                : undefined,
           }),
         );
       }

@@ -109,12 +109,7 @@ export function DatasetTabs({
       overflow="auto"
       width="full"
     >
-      <Text
-        fontWeight="semibold"
-        fontSize="sm"
-        color="fg"
-        paddingRight={2}
-      >
+      <Text fontWeight="semibold" fontSize="sm" color="fg" paddingRight={2}>
         Datasets
       </Text>
 

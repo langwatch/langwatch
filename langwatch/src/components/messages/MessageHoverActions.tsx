@@ -134,14 +134,10 @@ export const MessageHoverActions = ({
         onClick={() => {
           if (!trace) return;
           if (drawerOpen("traceDetails")) {
-            openDrawer(
-              "traceDetails",
-              {
-                traceId: trace.trace_id,
-                selectedTab: "traceDetails",
-              },
-              { replace: true },
-            );
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+              selectedTab: "traceDetails",
+            });
           } else {
             openDrawer("traceDetails", {
               traceId: trace.trace_id,

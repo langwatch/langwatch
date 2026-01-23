@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import Router, { useRouter } from "next/router";
 import qs from "qs";
 import {
   type DrawerCallbacks,
@@ -96,6 +96,45 @@ let drawerStack: DrawerStackEntry[] = [];
 export const getDrawerStack = () => drawerStack;
 export const clearDrawerStack = () => {
   drawerStack = [];
+};
+
+/**
+ * Navigate to a drawer from module-level code (e.g., flow callbacks).
+ * This is useful when the callback is captured from a component that may not be mounted.
+ *
+ * @param drawer - The drawer to navigate to
+ * @param options - Navigation options
+ */
+export const navigateToDrawer = (
+  drawer: DrawerType,
+  options: { resetStack?: boolean } = {},
+) => {
+  // Reset stack if requested
+  if (options.resetStack) {
+    drawerStack = [{ drawer, params: {} }];
+  } else {
+    drawerStack.push({ drawer, params: {} });
+  }
+
+  // Clear complex props since we're navigating fresh
+  complexProps = {};
+
+  // Build the URL and navigate
+  const currentQuery = Router.query;
+  const newQuery = {
+    ...Object.fromEntries(
+      Object.entries(currentQuery).filter(
+        ([key]) => !key.startsWith("drawer."),
+      ),
+    ),
+    "drawer.open": drawer,
+  };
+
+  void Router.push(
+    "?" + qs.stringify(newQuery, { allowDots: true, arrayFormat: "comma" }),
+    undefined,
+    { shallow: true },
+  );
 };
 
 // ============================================================================
@@ -209,13 +248,16 @@ export const useDrawer = () => {
   const openDrawer = <T extends DrawerType>(
     drawer: T,
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
-    { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
+    {
+      replace,
+      resetStack,
+      replaceCurrentInStack,
+    }: {
+      replace?: boolean;
+      resetStack?: boolean;
+      replaceCurrentInStack?: boolean;
+    } = {},
   ) => {
-    // Guard: Skip if this drawer is already open
-    if (currentDrawer === drawer) {
-      return;
-    }
-
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
     const allParams = { ...drawerProps, ...urlParams } as Record<
@@ -223,12 +265,28 @@ export const useDrawer = () => {
       unknown
     >;
 
+    // If the same drawer is already open, just update the URL params without modifying the stack
+    if (currentDrawer === drawer) {
+      updateDrawerUrl(drawer, allParams, { replace: true });
+      return;
+    }
+
     // Manage drawer stack for navigation history
     if (resetStack || !currentDrawer) {
       // Reset stack - fresh start with no back navigation
       drawerStack = [{ drawer, params: allParams }];
+    } else if (replaceCurrentInStack && drawerStack.length > 0) {
+      // Replace the current entry in the stack (useful for flow callbacks)
+      // This makes "back" skip the replaced drawer
+      drawerStack.pop();
+      drawerStack.push({ drawer, params: allParams });
     } else {
       // A drawer is already open - navigating forward, push to stack
+      // If stack is empty but currentDrawer exists (e.g., opened via direct URL),
+      // add currentDrawer to stack first so we can go back to it
+      if (drawerStack.length === 0 && currentDrawer) {
+        drawerStack.push({ drawer: currentDrawer, params: {} });
+      }
       drawerStack.push({ drawer, params: allParams });
     }
 

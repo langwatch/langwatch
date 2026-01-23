@@ -26,7 +26,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
   const selectedIndex = themeOptions.findIndex((o) => o.value === theme);
   const pillShadow = useColorModeValue(
     "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
-    "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)"
+    "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
   );
 
   if (!isDarkModeEnabled) return null;

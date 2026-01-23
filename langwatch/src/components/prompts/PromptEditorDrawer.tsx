@@ -371,7 +371,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             const mapping: FieldMapping = {
               type: "source",
               sourceId: matchingField.sourceId,
-              field: matchingField.name,
+              path: [matchingField.name],
             };
             // Update local state
             setInputMappings((prev) => ({
@@ -835,7 +835,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         onInputMappingsChange(identifier, {
           type: "source",
           sourceId,
-          field: fieldName,
+          path: [fieldName],
         });
       }
     },

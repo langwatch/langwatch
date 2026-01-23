@@ -2,6 +2,10 @@ import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
+import type {
+  LLMModelEntry,
+  ReasoningConfig,
+} from "../../modelProviders/llmModels.types";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   getAllModels,
@@ -9,11 +13,7 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "../../modelProviders/registry";
-import type { LLMModelEntry, ReasoningConfig } from "../../modelProviders/llmModels.types";
-import {
-  checkProjectPermission,
-  hasProjectPermission,
-} from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   validateKeyWithCustomUrl,
@@ -226,9 +226,12 @@ export const getProjectModelProviders = async (
 
       // Keep if has custom models or embeddings (not default)
       const customModels = modelProvider.customModels as string[] | null;
-      const customEmbeddings = modelProvider.customEmbeddingsModels as string[] | null;
+      const customEmbeddings = modelProvider.customEmbeddingsModels as
+        | string[]
+        | null;
       const hasCustomModels = customModels && customModels.length > 0;
-      const hasCustomEmbeddings = customEmbeddings && customEmbeddings.length > 0;
+      const hasCustomEmbeddings =
+        customEmbeddings && customEmbeddings.length > 0;
 
       return hasCustomModels || hasCustomEmbeddings;
     })
@@ -294,7 +297,7 @@ export const getModelMetadataForFrontend = (): Record<
         pricing: model.pricing,
         reasoningConfig: model.reasoningConfig,
       },
-    ])
+    ]),
   );
 };
 
@@ -303,7 +306,10 @@ export const getProjectModelProvidersForFrontend = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const modelProvidersData = await getProjectModelProviders(projectId, includeKeys);
+  const modelProvidersData = await getProjectModelProviders(
+    projectId,
+    includeKeys,
+  );
 
   // Mask only API keys, keep URLs visible
   const maskedProviders = { ...modelProvidersData };

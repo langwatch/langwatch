@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { z } from "zod";
@@ -20,7 +20,14 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import { getComplexProps, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
+import {
+  getComplexProps,
+  getDrawerStack,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -51,7 +58,11 @@ export type EvaluatorMappingsConfig = {
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (evaluator: { id: string; name: string }) => void;
+  /** Called when evaluator is saved. Return true to indicate navigation was handled. */
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+  }) => boolean | void | Promise<void>;
   /** Evaluator type (e.g., "langevals/exact_match") */
   evaluatorType?: string;
   /** If provided, loads an existing evaluator for editing */
@@ -64,6 +75,11 @@ export type EvaluatorEditorDrawerProps = {
    * The caller is responsible for providing sources, current mappings, and missing field IDs.
    */
   mappingsConfig?: EvaluatorMappingsConfig;
+  /**
+   * Optional custom text for the save button.
+   * Useful for flows like Online Evaluation where we're "selecting" rather than "saving".
+   */
+  saveButtonText?: string;
 };
 
 /**
@@ -78,8 +94,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
+  const flowCallbacks = getFlowCallbacks("evaluatorEditor");
   const onSave =
     props.onSave ??
+    flowCallbacks?.onSave ??
     (complexProps.onSave as EvaluatorEditorDrawerProps["onSave"]);
 
   // Get evaluatorId from props, URL params, or complexProps
@@ -92,6 +110,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+
+  // Get custom save button text from props or complexProps
+  const saveButtonText =
+    props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -171,11 +193,30 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   }, [form]);
 
   // Mutations
+  // IMPORTANT: Navigation after save is the CALLER'S responsibility!
+  // If onSave callback is provided, it should handle navigation (return true to skip default).
+  // Default behavior (goBack/onClose) is only for simple cases without custom callbacks.
+  // Different callers have different needs:
+  // - OnlineEvaluationDrawer: custom navigation back to online evaluation drawer
+  // - EvaluationsV3: closes drawer after adding to workbench
+  // - /evaluators page: should set up onSave callback to closeDrawer
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
-      onSave?.({ id: evaluator.id, name: evaluator.name });
-      onClose();
+      // Get fresh callback from flow callbacks (might have been set after component rendered)
+      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+      // If onSave returns true, it handled navigation - don't do default navigation
+      const handledNavigation = freshOnSave?.({
+        id: evaluator.id,
+        name: evaluator.name,
+      });
+      if (handledNavigation) return;
+      // Default: go back if there's a stack, otherwise close
+      if (getDrawerStack().length > 1) {
+        goBack();
+      } else {
+        onClose();
+      }
     },
   });
 
@@ -186,8 +227,20 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         id: evaluator.id,
         projectId: project?.id ?? "",
       });
-      onSave?.({ id: evaluator.id, name: evaluator.name });
-      onClose();
+      // Get fresh callback from flow callbacks (might have been set after component rendered)
+      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+      // If onSave returns true, it handled navigation - don't do default navigation
+      const handledNavigation = freshOnSave?.({
+        id: evaluator.id,
+        name: evaluator.name,
+      });
+      if (handledNavigation) return;
+      // Default: go back if there's a stack, otherwise close
+      if (getDrawerStack().length > 1) {
+        goBack();
+      } else {
+        onClose();
+      }
     },
   });
 
@@ -239,7 +292,13 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         return;
       }
     }
-    onClose();
+    // If there's a previous drawer in the stack, go back to it
+    // Otherwise, close everything
+    if (canGoBack) {
+      goBack();
+    } else {
+      onClose();
+    }
   };
 
   const hasSettings =
@@ -336,6 +395,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                         availableSources={mappingsConfig.availableSources}
                         initialMappings={mappingsConfig.initialMappings}
                         onMappingChange={mappingsConfig.onMappingChange}
+                        scrollToMissingOnMount={true}
                       />
                     </Box>
                   )}
@@ -355,7 +415,8 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               loading={isSaving}
               data-testid="save-evaluator-button"
             >
-              {evaluatorId ? "Save Changes" : "Create Evaluator"}
+              {saveButtonText ??
+                (evaluatorId ? "Save Changes" : "Create Evaluator")}
             </Button>
           </HStack>
         </Drawer.Footer>
@@ -383,6 +444,8 @@ type EvaluatorMappingsSectionProps = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  /** Whether to scroll to the first missing mapping on mount */
+  scrollToMissingOnMount?: boolean;
 };
 
 /**
@@ -395,60 +458,78 @@ function EvaluatorMappingsSection({
   availableSources,
   initialMappings,
   onMappingChange,
+  scrollToMissingOnMount = false,
 }: EvaluatorMappingsSectionProps) {
   // Local state for mappings - source of truth for UI
   const [localMappings, setLocalMappings] =
     useState<Record<string, UIFieldMapping>>(initialMappings);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledRef = useRef(false);
 
   // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
   useEffect(() => {
     setLocalMappings(initialMappings);
   }, [initialMappings]);
 
-  // Compute missingMappingIds REACTIVELY from local state
-  // Uses same logic as getEvaluatorMissingMappings in mappingValidation.ts
+  // Compute missingMappingIds REACTIVELY from local state using shared validation
   const missingMappingIds = useMemo(() => {
     const requiredFields = evaluatorDef?.requiredFields ?? [];
     const optionalFields = evaluatorDef?.optionalFields ?? [];
     const allFields = [...requiredFields, ...optionalFields];
 
-    const missing = new Set<string>();
+    // Use the same shared validation logic as OnlineEvaluationDrawer
+    const validation = validateEvaluatorMappingsWithFields(
+      requiredFields,
+      optionalFields,
+      localMappings,
+    );
 
-    // Check if ANY field has a valid mapping
-    let hasAnyMapping = false;
-    for (const field of allFields) {
-      const mapping = localMappings[field];
-      if (
-        mapping &&
-        (mapping.type === "value" ||
-          (mapping.type === "source" && mapping.field))
-      ) {
-        hasAnyMapping = true;
-        break;
-      }
-    }
-
-    // Required fields that are missing
-    for (const field of requiredFields) {
-      const mapping = localMappings[field];
-      // A mapping is missing if undefined or if it's a source mapping with no field selected
-      if (!mapping || (mapping.type === "source" && !mapping.field)) {
-        missing.add(field);
-      }
-    }
+    const missing = new Set<string>(validation.missingRequiredFields);
 
     // Special case: if ALL fields are empty and there are no required fields,
     // highlight the first field to indicate something is needed
-    if (!hasAnyMapping && requiredFields.length === 0 && allFields.length > 0) {
+    if (
+      !validation.hasAnyMapping &&
+      validation.missingRequiredFields.length === 0 &&
+      allFields.length > 0
+    ) {
       missing.add(allFields[0]!);
     }
 
     return missing;
-  }, [
-    evaluatorDef?.requiredFields,
-    evaluatorDef?.optionalFields,
-    localMappings,
-  ]);
+  }, [evaluatorDef, localMappings]);
+
+  // Scroll to first missing mapping on mount
+  useEffect(() => {
+    if (
+      scrollToMissingOnMount &&
+      !hasScrolledRef.current &&
+      missingMappingIds.size > 0 &&
+      containerRef.current
+    ) {
+      // Small delay to ensure DOM is rendered
+      const timer = setTimeout(() => {
+        const firstMissingId = Array.from(missingMappingIds)[0];
+        const missingElement = containerRef.current?.querySelector(
+          `[data-testid="missing-mapping-input"], [data-variable-id="${firstMissingId}"]`,
+        );
+        if (missingElement) {
+          missingElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        } else {
+          // Fallback: scroll to the container itself (mappings section)
+          containerRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+        hasScrolledRef.current = true;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollToMissingOnMount, missingMappingIds]);
 
   // Handler that updates local state AND persists to store
   const handleMappingChange = useCallback(
@@ -491,17 +572,31 @@ function EvaluatorMappingsSection({
   }
 
   return (
-    <VariablesSection
-      title="Variables"
-      variables={variables}
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op - evaluator inputs are read-only
-      onChange={() => {}}
-      showMappings={true}
-      availableSources={availableSources}
-      mappings={localMappings}
-      onMappingChange={handleMappingChange}
-      readOnly={true} // Can't add/remove evaluator inputs
-      missingMappingIds={missingMappingIds}
-    />
+    <Box ref={containerRef}>
+      <VariablesSection
+        title="Variables"
+        variables={variables}
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op - evaluator inputs are read-only
+        onChange={() => {}}
+        showMappings={true}
+        availableSources={availableSources}
+        mappings={localMappings}
+        onMappingChange={handleMappingChange}
+        readOnly={true} // Can't add/remove evaluator inputs
+        missingMappingIds={missingMappingIds}
+      />
+      {/* Red validation message for pending mappings */}
+      {missingMappingIds.size > 0 && (
+        <Text
+          data-testid="pending-mappings-error"
+          color="red.500"
+          fontSize="sm"
+          marginTop={3}
+        >
+          Please map all required fields:{" "}
+          {Array.from(missingMappingIds).join(", ")}
+        </Text>
+      )}
+    </Box>
   );
 }

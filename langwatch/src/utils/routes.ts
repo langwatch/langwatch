@@ -39,9 +39,9 @@ export const projectRoutes = {
     title: "Editing Evaluation",
     parent: "evaluations",
   },
-  evaluations_v3: {
-    path: "/[project]/evaluations/v3/[slug]",
-    title: "Evaluation Workbench",
+  experiments_workbench: {
+    path: "/[project]/experiments/workbench/[slug]",
+    title: "Experiments Workbench",
     parent: "evaluations",
   },
   evaluations_wizard: {
@@ -145,6 +145,10 @@ export const projectRoutes = {
     path: "/[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]",
     title: "Simulation Run",
     parent: "simulations",
+  },
+  evaluators: {
+    path: "/[project]/evaluators",
+    title: "Evaluators",
   },
 } as const;
 

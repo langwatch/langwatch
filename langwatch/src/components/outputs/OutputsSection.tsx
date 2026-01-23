@@ -210,11 +210,7 @@ export const OutputsSection = ({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color="fg.muted"
-        >
+        <Text fontSize="sm" fontWeight="medium" color="fg.muted">
           {title}
         </Text>
         <Spacer />

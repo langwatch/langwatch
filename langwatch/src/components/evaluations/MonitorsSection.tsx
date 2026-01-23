@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -22,9 +23,11 @@ import {
   LuPencil,
   LuPlay,
   LuTrash,
+  LuTrendingUp,
 } from "react-icons/lu";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
@@ -52,6 +55,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
+  const { openDrawer } = useDrawer();
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     { projectId: project?.id ?? "" },
@@ -72,7 +76,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
       void monitors.refetch();
       void experiments.refetch();
       toaster.create({
-        title: "Successfully deleted monitor",
+        title: "Successfully deleted online evaluation",
         type: "success",
         meta: {
           closable: true,
@@ -103,18 +107,25 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
               {monitors.data?.length} Active
             </Badge>
           </HStack>
-          <IconButton
-            aria-label={isCollapsed ? "Expand section" : "Collapse section"}
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? (
-              <LuChevronDown size={16} />
-            ) : (
-              <LuChevronUp size={16} />
-            )}
-          </IconButton>
+          <HStack gap={2}>
+            <Link href={`/${project?.slug}/analytics/evaluations`}>
+              <Button size="sm" variant="outline" textDecoration="none">
+                <LuTrendingUp /> View analytics
+              </Button>
+            </Link>
+            <IconButton
+              aria-label={isCollapsed ? "Expand section" : "Collapse section"}
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? (
+                <LuChevronDown size={16} />
+              ) : (
+                <LuChevronUp size={16} />
+              )}
+            </IconButton>
+          </HStack>
         </HStack>
 
         {!isCollapsed && (
@@ -153,12 +164,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           onClick={() => {
                             if (!project) return;
 
-                            console.log(
-                              "experimentsSlugMap",
-                              experimentsSlugMap,
-                            );
-                            console.log("monitor", monitor);
-
+                            // Monitors with experimentId are part of the old wizard flow
                             if (
                               monitor.experimentId &&
                               experimentsSlugMap[monitor.experimentId]
@@ -169,9 +175,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 }`,
                               );
                             } else {
-                              void router.push(
-                                `/${project.slug}/evaluations/${monitor.id}/edit`,
-                              );
+                              // Open the OnlineEvaluationDrawer for editing
+                              openDrawer("onlineEvaluation", {
+                                monitorId: monitor.id,
+                              });
                             }
                           }}
                         >

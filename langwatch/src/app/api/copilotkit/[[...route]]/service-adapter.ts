@@ -343,12 +343,14 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
             temperature: formValues.version.configData.llm.temperature,
             max_tokens: formValues.version.configData.llm.maxTokens,
             top_p: formValues.version.configData.llm.topP,
-            frequency_penalty: formValues.version.configData.llm.frequencyPenalty,
+            frequency_penalty:
+              formValues.version.configData.llm.frequencyPenalty,
             presence_penalty: formValues.version.configData.llm.presencePenalty,
             seed: formValues.version.configData.llm.seed,
             top_k: formValues.version.configData.llm.topK,
             min_p: formValues.version.configData.llm.minP,
-            repetition_penalty: formValues.version.configData.llm.repetitionPenalty,
+            repetition_penalty:
+              formValues.version.configData.llm.repetitionPenalty,
             // Map unified 'reasoning' to provider-specific parameter at runtime boundary
             ...mapReasoningToProvider(
               formValues.version.configData.llm.model,

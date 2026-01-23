@@ -434,8 +434,7 @@ const MermaidRenderer = ({
           activationBorderColor: "#3b82f6",
         };
 
-        const themeVariables =
-          colorMode === "dark" ? darkTheme : lightTheme;
+        const themeVariables = colorMode === "dark" ? darkTheme : lightTheme;
 
         // Initialize mermaid with configuration
         mermaid.initialize({

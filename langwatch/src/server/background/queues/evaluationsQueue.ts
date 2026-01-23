@@ -1,10 +1,17 @@
 import type { ConnectionOptions } from "bullmq";
-import type { EvaluationJob } from "~/server/background/types";
+import {
+  type EvaluationJob,
+  getEvaluationId,
+  getEvaluatorId,
+} from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
+import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
+import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { evaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
@@ -35,14 +42,44 @@ export const evaluationsQueue = new QueueWithFallback<
   },
 });
 
+/**
+ * Thread debounce configuration for thread-level evaluations.
+ * When set, the evaluation will be debounced per thread - each new message
+ * in a thread resets the timer, and the evaluation only runs after the
+ * thread has been idle for timeoutSeconds.
+ */
+export type ThreadDebounceConfig = {
+  threadId: string;
+  timeoutSeconds: number;
+};
+
+/**
+ * Generate a job ID for thread-based debouncing.
+ * Uses threadId + checkId so all messages in a thread share the same job.
+ */
+const threadCheckIndexId = ({
+  threadId,
+  checkId,
+  projectId,
+}: {
+  threadId: string;
+  checkId: string;
+  projectId: string;
+}): string => {
+  return `thread_${projectId}_${threadId}_${checkId}`;
+};
+
 export const scheduleEvaluation = async ({
   check,
   trace,
   delay,
+  threadDebounce,
 }: {
   check: EvaluationJob["check"];
   trace: EvaluationJob["trace"];
   delay?: number;
+  /** Thread-based debouncing configuration. When set, delays evaluation until thread is idle. */
+  threadDebounce?: ThreadDebounceConfig;
 }) => {
   await updateEvaluationStatusInES({
     check,
@@ -50,47 +87,150 @@ export const scheduleEvaluation = async ({
     status: "scheduled",
   });
 
-  const jobId = traceCheckIndexId({
-    traceId: trace.trace_id,
-    checkId: check.evaluator_id,
-    projectId: trace.project_id,
-  });
+  // Emit evaluation scheduled event to event sourcing pipeline
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: trace.project_id },
+      select: { featureEventSourcingEvaluationIngestion: true },
+    });
+    if (project?.featureEventSourcingEvaluationIngestion) {
+      await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
+        tenantId: trace.project_id,
+        evaluationId: getEvaluationId(check),
+        evaluatorId: getEvaluatorId(check),
+        evaluatorType: check.type,
+        evaluatorName: check.name,
+        traceId: trace.trace_id,
+        isGuardrail: false,
+      });
+    }
+  } catch (error) {
+    captureException(error, {
+      extra: {
+        projectId: trace.project_id,
+        evaluationId: getEvaluationId(check),
+        event: "scheduled",
+      },
+    });
+    logger.warn(
+      { error, check, trace },
+      "Failed to check feature flag or emit evaluation scheduled event",
+    );
+  }
+
+  // For thread debouncing, use thread-based job ID; otherwise use trace-based
+  const jobId = threadDebounce
+    ? threadCheckIndexId({
+        threadId: threadDebounce.threadId,
+        checkId: check.evaluator_id,
+        projectId: trace.project_id,
+      })
+    : traceCheckIndexId({
+        traceId: trace.trace_id,
+        checkId: check.evaluator_id,
+        projectId: trace.project_id,
+      });
+
+  // Calculate delay: for thread debouncing use the configured timeout, otherwise default 30s
+  const effectiveDelay = threadDebounce
+    ? threadDebounce.timeoutSeconds * 1000
+    : (delay ?? 30_000);
+
   const currentJob = await evaluationsQueue.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
-    if (state == "failed" || state == "completed") {
+
+    if (threadDebounce && (state === "waiting" || state === "delayed")) {
+      // Thread debouncing: remove existing job and reschedule with fresh delay
+      // This "resets the timer" when a new message arrives in the thread
+      const previousJobData = currentJob.data as EvaluationJob;
+      logger.info(
+        {
+          check,
+          trace,
+          threadId: threadDebounce.threadId,
+          state,
+          previousTraceId: previousJobData?.trace?.trace_id,
+        },
+        "thread debounce: resetting timer for thread evaluation",
+      );
+
+      // Update the previous trace's evaluation status to "skipped" since it's being superseded
+      if (
+        previousJobData?.trace &&
+        previousJobData.trace.trace_id !== trace.trace_id
+      ) {
+        try {
+          await updateEvaluationStatusInES({
+            check: previousJobData.check,
+            trace: previousJobData.trace,
+            status: "skipped",
+            details: "Superseded by newer message in thread",
+          });
+        } catch (error) {
+          logger.warn(
+            { error, previousTraceId: previousJobData.trace.trace_id },
+            "Failed to update previous trace evaluation status to skipped",
+          );
+        }
+      }
+
+      try {
+        await currentJob.remove();
+      } catch {
+        // Job might have been processed in the meantime, ignore
+      }
+      // Fall through to schedule new job
+    } else if (state === "failed" || state === "completed") {
       logger.info({ check, trace, state }, "retrying");
       await currentJob.retry(state);
+      return;
+    } else {
+      // Job exists and is not in a state we should replace (active, etc.)
+      logger.info({ check, trace, state }, "job already exists, skipping");
+      return;
     }
-  } else {
-    logger.info({ check, trace }, "scheduling");
-    await evaluationsQueue.add(
-      check.type,
-      {
-        // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
-        check: {
-          evaluation_id: check.evaluation_id,
-          evaluator_id: check.evaluator_id,
-          type: check.type,
-          name: check.name,
-        },
-        // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
-        trace: {
-          trace_id: trace.trace_id,
-          project_id: trace.project_id,
-          thread_id: trace.thread_id,
-          user_id: trace.user_id,
-          customer_id: trace.customer_id,
-          labels: trace.labels,
-        },
-      },
-      {
-        jobId,
-        // Add a little delay to wait for the spans to be fully collected
-        delay: delay ?? 30_000,
-      },
-    );
   }
+
+  logger.info(
+    {
+      check,
+      trace,
+      delay: effectiveDelay,
+      ...(threadDebounce && {
+        threadDebounce: true,
+        threadId: threadDebounce.threadId,
+      }),
+    },
+    "scheduling",
+  );
+  await evaluationsQueue.add(
+    check.type,
+    {
+      // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
+      check: {
+        evaluation_id: check.evaluation_id,
+        evaluator_id: check.evaluator_id,
+        type: check.type,
+        name: check.name,
+      },
+      // Recreating the trace object to avoid passing the whole trace object and making the queue heavy, we pass only the keys we need
+      trace: {
+        trace_id: trace.trace_id,
+        project_id: trace.project_id,
+        thread_id: trace.thread_id,
+        user_id: trace.user_id,
+        customer_id: trace.customer_id,
+        labels: trace.labels,
+      },
+    },
+    {
+      jobId,
+      delay: effectiveDelay,
+    },
+  );
 };
 
 export const updateEvaluationStatusInES = async ({
@@ -121,8 +261,8 @@ export const updateEvaluationStatusInES = async ({
   inputs?: Record<string, any>;
 }) => {
   const evaluation: ElasticSearchEvaluation = {
-    evaluation_id: check.evaluation_id ?? (check as any).id,
-    evaluator_id: check.evaluator_id ?? (check as any).id,
+    evaluation_id: getEvaluationId(check),
+    evaluator_id: getEvaluatorId(check),
     thread_id: trace.thread_id,
     user_id: trace.user_id,
     customer_id: trace.customer_id,
@@ -200,4 +340,64 @@ export const updateEvaluationStatusInES = async ({
     },
     refresh: true,
   });
+
+  // Emit evaluation events to event sourcing pipeline based on status
+  // Skip "scheduled" status here since it's handled in scheduleEvaluation()
+  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
+  // should not abort the evaluation flow. Errors are captured for monitoring.
+  if (status !== "scheduled") {
+    try {
+      const project = await prisma.project.findUnique({
+        where: { id: trace.project_id },
+        select: { featureEventSourcingEvaluationIngestion: true },
+      });
+      if (project?.featureEventSourcingEvaluationIngestion) {
+        const evaluationId = getEvaluationId(check);
+        if (status === "in_progress") {
+          // Emit started event
+          await evaluationProcessingPipeline.commands.startEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            evaluatorId: getEvaluatorId(check),
+            evaluatorType: check.type,
+            evaluatorName: check.name,
+            traceId: trace.trace_id,
+            isGuardrail: is_guardrail,
+          });
+        } else if (
+          status === "processed" ||
+          status === "error" ||
+          status === "skipped"
+        ) {
+          // Emit completed event
+          await evaluationProcessingPipeline.commands.completeEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            status,
+            score,
+            passed,
+            label,
+            details,
+            error: error
+              ? error instanceof Error
+                ? error.message
+                : String(error)
+              : undefined,
+          });
+        }
+      }
+    } catch (eventError) {
+      captureException(eventError, {
+        extra: {
+          projectId: trace.project_id,
+          evaluationId: getEvaluationId(check),
+          event: status,
+        },
+      });
+      logger.warn(
+        { error: eventError, check, trace, status },
+        "Failed to check feature flag or emit evaluation event",
+      );
+    }
+  }
 };

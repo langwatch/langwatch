@@ -8,13 +8,17 @@ import type {
   TrackEventRESTParamsValidator,
 } from "../tracer/types";
 
+export type EvaluationJobCheck = {
+  evaluation_id: string;
+  evaluator_id: string;
+  type: EvaluatorTypes;
+  name: string;
+  /** @deprecated Legacy field - use evaluation_id/evaluator_id instead. Kept for backwards compatibility with old queue jobs. */
+  id?: string;
+};
+
 export type EvaluationJob = {
-  check: {
-    evaluation_id: string;
-    evaluator_id: string;
-    type: EvaluatorTypes;
-    name: string;
-  };
+  check: EvaluationJobCheck;
   trace: {
     trace_id: string;
     project_id: string;
@@ -24,6 +28,36 @@ export type EvaluationJob = {
     labels?: string[] | undefined;
   };
 };
+
+/**
+ * Extracts the evaluation ID from a check object.
+ * Handles both new format (evaluation_id) and legacy format (id).
+ * @throws Error if no valid ID is found (surfaces data quality issues)
+ */
+export function getEvaluationId(check: EvaluationJobCheck): string {
+  const id = check.evaluation_id ?? check.id;
+  if (!id) {
+    throw new Error(
+      `Missing evaluation ID in check object: ${JSON.stringify(check)}`,
+    );
+  }
+  return id;
+}
+
+/**
+ * Extracts the evaluator ID from a check object.
+ * Handles both new format (evaluator_id) and legacy format (id).
+ * @throws Error if no valid ID is found (surfaces data quality issues)
+ */
+export function getEvaluatorId(check: EvaluationJobCheck): string {
+  const id = check.evaluator_id ?? check.id;
+  if (!id) {
+    throw new Error(
+      `Missing evaluator ID in check object: ${JSON.stringify(check)}`,
+    );
+  }
+  return id;
+}
 
 export type TopicClusteringJob = {
   project_id: string;
