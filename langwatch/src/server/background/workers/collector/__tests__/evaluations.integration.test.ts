@@ -1,5 +1,5 @@
 /**
- * Unit tests for evaluations scheduling with thread debouncing.
+ * Integration tests for evaluations scheduling with thread debouncing.
  *
  * These tests verify that:
  * 1. threadIdleTimeout is correctly read from monitor configuration
