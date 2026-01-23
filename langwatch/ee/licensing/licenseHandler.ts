@@ -129,38 +129,20 @@ export class LicenseHandler {
       where: { id: organizationId },
       select: {
         license: true,
-        _count: {
-          select: { members: true },
-        },
+        _count: { select: { members: true } },
       },
     });
 
     if (!organization?.license) {
-      return {
-        hasLicense: false,
-        valid: false,
-      };
+      return { hasLicense: false, valid: false };
     }
 
-    // Parse license to get metadata (needed even if invalid)
-    const signedLicense = parseLicenseKey(organization.license);
-
-    if (!signedLicense) {
-      // License exists but is corrupted/unreadable
-      return {
-        hasLicense: true,
-        valid: false,
-        corrupted: true,
-      };
-    }
-
-    // Use validateLicense for validity check (DRY - avoids duplicate verifySignature/isExpired)
+    const memberCount = organization._count.members;
     const validationResult = validateLicense(organization.license, this.publicKey);
 
-    // Return metadata regardless of validity - UI needs this for "license expired" messages
-    const { data: licenseData } = signedLicense;
-
+    // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {
+      const { licenseData } = validationResult;
       return {
         hasLicense: true,
         valid: true,
@@ -168,11 +150,18 @@ export class LicenseHandler {
         planName: licenseData.plan.name,
         expiresAt: licenseData.expiresAt,
         organizationName: licenseData.organizationName,
-        currentMembers: organization._count.members,
+        currentMembers: memberCount,
         maxMembers: licenseData.plan.maxMembers,
       };
     }
 
+    // For invalid licenses, parse separately to get metadata for UI display
+    const signedLicense = parseLicenseKey(organization.license);
+    if (!signedLicense) {
+      return { hasLicense: true, valid: false, corrupted: true };
+    }
+
+    const { data: licenseData } = signedLicense;
     return {
       hasLicense: true,
       valid: false,
@@ -180,7 +169,7 @@ export class LicenseHandler {
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,
       organizationName: licenseData.organizationName,
-      currentMembers: organization._count.members,
+      currentMembers: memberCount,
       maxMembers: licenseData.plan.maxMembers,
     };
   }

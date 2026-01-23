@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { LicenseStatus } from "../../../ee/licensing";
-import { formatLicenseDate } from "./useLicenseStatus";
+import { deriveIsExpired, formatLicenseDate } from "./useLicenseStatus";
 
 interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
@@ -22,7 +22,7 @@ export function LicenseDetailsCard({
 }: LicenseDetailsCardProps) {
   const isCorrupted = "corrupted" in status && status.corrupted;
   const isValid = status.valid;
-  const isExpired = !isValid && !isCorrupted;
+  const isExpired = deriveIsExpired(status);
 
   if (isCorrupted) {
     return (
