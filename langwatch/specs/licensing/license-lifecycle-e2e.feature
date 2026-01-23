@@ -23,13 +23,13 @@ Feature: License Lifecycle End-to-End
       | maxMembers          | 5      |
       | maxProjects         | 5      |
       | maxMessagesPerMonth | 50000  |
-      | expiresAt           | 2025-12-31 |
+      | expiresAt           | 2099-12-31 |
     When I paste the license key into the textarea
     And I click "Activate License"
     Then I see a success toast "License activated"
     And I see the license status shows "PRO"
     And I see "Members: 3 / 5"
-    And I see "Expires: December 31, 2025"
+    And I see "Expires: December 31, 2099"
 
     # Step 3: Verify enforcement is active
     When I navigate to the team settings

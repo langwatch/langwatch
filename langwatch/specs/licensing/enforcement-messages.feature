@@ -109,6 +109,8 @@ Feature: Message/Trace Limit Enforcement with License
 
   Scenario: Aggregates traces across all organization projects
     Given the organization has a license with maxMessagesPerMonth 10000
+    And a project "project-abc" exists in the team
+    And a project "project-def" exists in the team
     And project "project-789" has 4000 traces this month
     And project "project-abc" has 3000 traces this month
     And project "project-def" has 4000 traces this month

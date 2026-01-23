@@ -31,9 +31,9 @@ Feature: License tRPC Router
       | maxMembers     | 10    |
 
   Scenario: Gets license status with expiration date
-    Given the organization has a valid license expiring "2025-12-31"
+    Given the organization has a valid license expiring "2099-12-31"
     When I call license.getStatus with organizationId "org-456"
-    Then the response expiresAt is "2025-12-31"
+    Then the response expiresAt is "2099-12-31"
 
   Scenario: Requires organization:view permission
     Given I am a member but not admin of organization "org-456"

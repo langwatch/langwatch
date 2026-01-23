@@ -181,7 +181,8 @@ export class LicenseHandler {
    * to unlimited mode (when enforcement is disabled) or FREE_PLAN
    * (when enforcement is enabled).
    *
-   * @returns { removed: true } if license was removed, { removed: false } if org not found
+   * @returns { removed: true } when complete
+   * @throws OrganizationNotFoundError if organization does not exist
    */
   async removeLicense(organizationId: string): Promise<RemoveLicenseResult> {
     const org = await this.prisma.organization.findUnique({

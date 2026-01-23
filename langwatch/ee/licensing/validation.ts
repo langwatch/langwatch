@@ -63,6 +63,9 @@ export function verifySignature(
  */
 export function isExpired(expiresAt: string, now: Date = new Date()): boolean {
   const expirationDate = new Date(expiresAt);
+  if (Number.isNaN(expirationDate.getTime())) {
+    return true; // Treat invalid dates as expired for security
+  }
   return now >= expirationDate;
 }
 

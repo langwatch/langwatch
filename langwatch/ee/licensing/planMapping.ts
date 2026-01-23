@@ -13,8 +13,8 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
   return {
     type: plan.type,
     name: plan.name,
-    free: false, // Licensed plans are never free
-    overrideAddingLimitations: false, // Licenses don't override limits
+    free: false, // Paid license = not a free tier
+    overrideAddingLimitations: false, // Enforce limits, don't bypass
     maxMembers: plan.maxMembers,
     maxProjects: plan.maxProjects,
     maxMessagesPerMonth: plan.maxMessagesPerMonth,
