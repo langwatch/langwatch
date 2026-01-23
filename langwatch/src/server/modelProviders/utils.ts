@@ -11,7 +11,7 @@ import { ProjectRepository } from "../repositories/project.repository";
  * Default ProjectRepository instance for backwards compatibility.
  * New code should pass a ProjectRepository instance explicitly.
  */
-const defaultProjectRepository = new ProjectRepository(prisma);
+const defaultProjectRepository = ProjectRepository.create(prisma);
 
 export const getVercelAIModel = async (
   projectId: string,

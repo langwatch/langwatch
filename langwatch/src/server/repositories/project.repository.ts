@@ -42,6 +42,10 @@ export interface ProjectConfig {
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  static create(prisma: PrismaClient): ProjectRepository {
+    return new ProjectRepository(prisma);
+  }
+
   /**
    * Gets project configuration with resolved defaults.
    * Returns null if project not found.
