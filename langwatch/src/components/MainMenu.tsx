@@ -89,15 +89,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
-            >
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color={{ _light: "gray.500", _dark: "gray.50" }} paddingX={2} paddingTop={3} paddingBottom={1}>
               {showExpanded ? "Observe" : <>&nbsp;</>}
             </Text>
 
@@ -118,15 +110,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
-            >
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color={{ _light: "gray.500", _dark: "gray.50" }} paddingX={2} paddingTop={3} paddingBottom={1}>
               {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
             </Text>
 
@@ -197,15 +181,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text
-              fontSize="11px"
-              fontWeight="medium"
-              textTransform="uppercase"
-              color="gray.500"
-              paddingX={2}
-              paddingTop={3}
-              paddingBottom={1}
-            >
+            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color={{ _light: "gray.500", _dark: "gray.50" }} paddingX={2} paddingTop={3} paddingBottom={1}>
               {showExpanded ? "Library" : <div>&nbsp;</div>}
             </Text>
 
