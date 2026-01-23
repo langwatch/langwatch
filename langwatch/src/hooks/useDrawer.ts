@@ -1,5 +1,4 @@
-import Router from "next/router";
-import { useRouter } from "next/router";
+import Router, { useRouter } from "next/router";
 import qs from "qs";
 import {
   type DrawerCallbacks,
@@ -249,7 +248,15 @@ export const useDrawer = () => {
   const openDrawer = <T extends DrawerType>(
     drawer: T,
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
-    { replace, resetStack, replaceCurrentInStack }: { replace?: boolean; resetStack?: boolean; replaceCurrentInStack?: boolean } = {},
+    {
+      replace,
+      resetStack,
+      replaceCurrentInStack,
+    }: {
+      replace?: boolean;
+      resetStack?: boolean;
+      replaceCurrentInStack?: boolean;
+    } = {},
   ) => {
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};

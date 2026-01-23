@@ -8,12 +8,20 @@
  */
 import { EvaluationExecutionMode } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { prisma } from "../../../../db";
-import { scheduleEvaluations } from "../evaluations";
-import type { EvaluationJob } from "../../../types";
 import type { PreconditionTrace } from "../../../../evaluations/preconditions";
 import type { Span } from "../../../../tracer/types";
+import type { EvaluationJob } from "../../../types";
+import { scheduleEvaluations } from "../evaluations";
 
 // Mock the scheduleEvaluation function to capture calls
 const mockScheduleEvaluation = vi.fn().mockResolvedValue(undefined);
@@ -32,7 +40,9 @@ describe("scheduleEvaluations - thread idle timeout", () => {
   afterEach(async () => {
     // Clean up monitors created in tests
     for (const monitorId of testMonitorIds) {
-      await prisma.monitor.delete({ where: { id: monitorId, projectId } }).catch(() => {});
+      await prisma.monitor
+        .delete({ where: { id: monitorId, projectId } })
+        .catch(() => {});
     }
     testMonitorIds.length = 0;
   });
@@ -42,7 +52,9 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     await prisma.monitor.deleteMany({ where: { projectId } }).catch(() => {});
   });
 
-  const createTestTrace = (threadId?: string): EvaluationJob["trace"] & PreconditionTrace => ({
+  const createTestTrace = (
+    threadId?: string,
+  ): EvaluationJob["trace"] & PreconditionTrace => ({
     trace_id: `trace-${nanoid()}`,
     project_id: projectId,
     thread_id: threadId,
@@ -88,7 +100,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
           threadId,
           timeoutSeconds: 300,
         },
-      })
+      }),
     );
   });
 
@@ -121,7 +133,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     expect(mockScheduleEvaluation).toHaveBeenCalledWith(
       expect.objectContaining({
         threadDebounce: undefined,
-      })
+      }),
     );
   });
 
@@ -154,7 +166,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
     expect(mockScheduleEvaluation).toHaveBeenCalledWith(
       expect.objectContaining({
         threadDebounce: undefined,
-      })
+      }),
     );
   });
 
@@ -200,12 +212,12 @@ describe("scheduleEvaluations - thread idle timeout", () => {
           threadId,
           timeoutSeconds: 600,
         },
-      })
+      }),
     );
   });
 
   it("uses different timeout values correctly", async () => {
-    // Create monitors with different timeout values
+    // Create monitors with different timeout values (same check type to avoid evaluator-specific issues)
     const monitors = await Promise.all([
       prisma.monitor.create({
         data: {
@@ -228,7 +240,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
           projectId,
           name: "30 Minute Monitor",
           slug: `monitor-1800-${nanoid()}`,
-          checkType: "langevals/exact_match",
+          checkType: "presidio/pii_detection", // Same type as first monitor
           executionMode: EvaluationExecutionMode.ON_MESSAGE,
           enabled: true,
           preconditions: [],
@@ -238,7 +250,7 @@ describe("scheduleEvaluations - thread idle timeout", () => {
         },
       }),
     ]);
-    testMonitorIds.push(...monitors.map(m => m.id));
+    testMonitorIds.push(...monitors.map((m) => m.id));
 
     const threadId = `thread-${nanoid()}`;
     const trace = createTestTrace(threadId);
@@ -250,7 +262,9 @@ describe("scheduleEvaluations - thread idle timeout", () => {
 
     // Check that both monitors were scheduled with their respective timeouts
     const calls = mockScheduleEvaluation.mock.calls;
-    const timeouts = calls.map((call: any[]) => call[0].threadDebounce?.timeoutSeconds).sort();
+    const timeouts = calls
+      .map((call: any[]) => call[0].threadDebounce?.timeoutSeconds)
+      .sort((a: number, b: number) => a - b);
     expect(timeouts).toEqual([60, 1800]);
   });
 });

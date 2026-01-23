@@ -21,7 +21,11 @@ import { api } from "~/utils/api";
 export type WorkflowSelectorForEvaluatorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (evaluator: { id: string; name: string; workflowId: string }) => void;
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+    workflowId: string;
+  }) => void;
   /** Name for the new evaluator (optional, prompts if not provided) */
   evaluatorName?: string;
 };
@@ -70,7 +74,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
     return new Set(
       evaluatorsQuery.data
         .filter((e) => e.workflowId)
-        .map((e) => e.workflowId as string)
+        .map((e) => e.workflowId as string),
     );
   }, [evaluatorsQuery.data]);
 
@@ -125,9 +129,16 @@ export function WorkflowSelectorForEvaluatorDrawer(
       config: {},
       workflowId: selectedWorkflowId,
     });
-  }, [project?.id, selectedWorkflowId, evaluatorName, createMutation, workflowsWithEvaluator]);
+  }, [
+    project?.id,
+    selectedWorkflowId,
+    evaluatorName,
+    createMutation,
+    workflowsWithEvaluator,
+  ]);
 
-  const isValid = selectedWorkflowId &&
+  const isValid =
+    selectedWorkflowId &&
     evaluatorName.trim().length > 0 &&
     !workflowsWithEvaluator.has(selectedWorkflowId);
 
@@ -227,7 +238,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
                     name={workflow.name}
                     updatedAt={workflow.updatedAt}
                     isSelected={selectedWorkflowId === workflow.id}
-                    hasExistingEvaluator={workflowsWithEvaluator.has(workflow.id)}
+                    hasExistingEvaluator={workflowsWithEvaluator.has(
+                      workflow.id,
+                    )}
                     onClick={() =>
                       handleSelectWorkflow(workflow.id, workflow.name)
                     }
@@ -297,11 +310,19 @@ function WorkflowCard({
       data-testid={`workflow-card-${name}`}
     >
       <HStack gap={3}>
-        <Box color={isDisabled ? "fg.muted" : isSelected ? "green.600" : "green.500"}>
+        <Box
+          color={
+            isDisabled ? "fg.muted" : isSelected ? "green.600" : "green.500"
+          }
+        >
           <Workflow size={20} />
         </Box>
         <VStack align="start" gap={0} flex={1}>
-          <Text fontWeight="medium" fontSize="sm" color={isDisabled ? "fg.muted" : undefined}>
+          <Text
+            fontWeight="medium"
+            fontSize="sm"
+            color={isDisabled ? "fg.muted" : undefined}
+          >
             {name}
           </Text>
           <Text fontSize="xs" color="fg.muted">

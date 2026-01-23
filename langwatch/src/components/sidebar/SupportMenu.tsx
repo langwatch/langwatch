@@ -76,7 +76,10 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
               showLabel={showLabel}
               rightElement={
                 showLabel ? (
-                  <LuChevronRight size={14} color="var(--chakra-colors-nav-fg-muted)" />
+                  <LuChevronRight
+                    size={14}
+                    color="var(--chakra-colors-nav-fg-muted)"
+                  />
                 ) : undefined
               }
             />

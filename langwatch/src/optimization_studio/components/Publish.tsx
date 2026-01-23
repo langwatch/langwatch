@@ -446,7 +446,6 @@ function PublishModalContent({
   toggleSaveAsEvaluator: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
 
   const { workflowId, getWorkflow, workflow_type } = useWorkflowStore(
     ({ workflow_id: workflowId, getWorkflow, workflow_type }) => ({

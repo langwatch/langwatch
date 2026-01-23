@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
 import { nanoid } from "nanoid";
@@ -23,7 +24,6 @@ import {
   waitForResult,
 } from "../../utils/testUtils";
 import handler from "./collector";
-import { generate } from "@langwatch/ksuid";
 
 const sampleSpan: LLMSpan = {
   type: "llm",

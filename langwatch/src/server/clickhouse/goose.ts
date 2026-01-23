@@ -1,6 +1,6 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger";
 
@@ -57,7 +57,7 @@ export class MigrationError extends Error {
   constructor(
     message: string,
     public readonly phase: "preflight" | "bootstrap" | "verify" | "migrate",
-    public readonly cause?: Error
+    public readonly cause?: Error,
   ) {
     super(message);
     this.name = "MigrationError";
@@ -66,7 +66,7 @@ export class MigrationError extends Error {
 
 async function withClient<T>(
   url: string,
-  fn: (client: ClickHouseClient) => Promise<T>
+  fn: (client: ClickHouseClient) => Promise<T>,
 ): Promise<T> {
   const client = createClient({ url });
   try {
@@ -80,7 +80,7 @@ function validateIdentifier(name: string, label: string): void {
   if (!VALID_DB_NAME.test(name)) {
     throw new MigrationError(
       `Invalid ${label}: "${name}". Must start with letter/underscore, contain only alphanumeric/underscore.`,
-      "preflight"
+      "preflight",
     );
   }
 }
@@ -92,19 +92,22 @@ function validateNumericEnvVar(name: string, defaultVal: number): number {
   if (Number.isNaN(num) || num < 0) {
     throw new MigrationError(
       `${name} must be a non-negative integer, got: "${val}"`,
-      "preflight"
+      "preflight",
     );
   }
   return num;
 }
 
-function parseConnectionUrl(connectionUrl?: string, databaseOverride?: string): ClickHouseConfig {
+function parseConnectionUrl(
+  connectionUrl?: string,
+  databaseOverride?: string,
+): ClickHouseConfig {
   const url = connectionUrl ?? process.env.CLICKHOUSE_URL;
 
   if (!url) {
     throw new MigrationError(
       "CLICKHOUSE_URL environment variable is not set",
-      "preflight"
+      "preflight",
     );
   }
 
@@ -114,7 +117,7 @@ function parseConnectionUrl(connectionUrl?: string, databaseOverride?: string): 
   } catch {
     throw new MigrationError(
       `Invalid CLICKHOUSE_URL: "${url}". Must be a valid URL.`,
-      "preflight"
+      "preflight",
     );
   }
 
@@ -123,7 +126,7 @@ function parseConnectionUrl(connectionUrl?: string, databaseOverride?: string): 
   if (!database) {
     throw new MigrationError(
       "Database name must be specified in CLICKHOUSE_URL path (e.g., http://host:8123/langwatch) or via database option",
-      "preflight"
+      "preflight",
     );
   }
   validateIdentifier(database, "database name");
@@ -165,7 +168,7 @@ function checkGooseBinary(): void {
   if (result.status !== 0) {
     throw new MigrationError(
       "Goose binary not found. Install from https://github.com/pressly/goose",
-      "preflight"
+      "preflight",
     );
   }
 }
@@ -190,7 +193,7 @@ async function preflight(config: ClickHouseConfig): Promise<void> {
     throw new MigrationError(
       `Cannot connect to ClickHouse at ${config.serverUrl}: ${error instanceof Error ? error.message : String(error)}`,
       "preflight",
-      error instanceof Error ? error : undefined
+      error instanceof Error ? error : undefined,
     );
   }
 
@@ -204,7 +207,7 @@ interface DatabaseInfo {
 async function verifyDatabaseEngine(
   client: ClickHouseClient,
   database: string,
-  clusterName: string | undefined
+  clusterName: string | undefined,
 ): Promise<void> {
   const result = await client.query({
     query: `SELECT engine FROM system.databases WHERE name = {database:String}`,
@@ -222,13 +225,16 @@ async function verifyDatabaseEngine(
   if (clusterName && !actualEngine.startsWith("Replicated")) {
     throw new MigrationError(
       `Database "${database}" exists with engine "${actualEngine}", but CLICKHOUSE_CLUSTER is set which requires Replicated engine. Manual intervention required: DROP DATABASE ${database}`,
-      "verify"
+      "verify",
     );
   }
 
   // Warn if DB is replicated but env var not set (works but may be misconfigured)
   if (!clusterName && actualEngine.startsWith("Replicated")) {
-    logger.warn({ database, actualEngine }, "Database is Replicated but CLICKHOUSE_CLUSTER is not set");
+    logger.warn(
+      { database, actualEngine },
+      "Database is Replicated but CLICKHOUSE_CLUSTER is not set",
+    );
   }
 
   logger.debug({ database, engine: actualEngine }, "Database engine verified");
@@ -237,7 +243,7 @@ async function verifyDatabaseEngine(
 async function executeBootstrapSQL(
   client: ClickHouseClient,
   sql: string,
-  verbose?: boolean
+  verbose?: boolean,
 ): Promise<void> {
   if (verbose) {
     logger.info({ sql }, "Executing bootstrap SQL");
@@ -248,11 +254,11 @@ async function executeBootstrapSQL(
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
 async function bootstrapDatabase(
   config: ClickHouseConfig,
-  verbose?: boolean
+  verbose?: boolean,
 ): Promise<void> {
   logger.info(
     { database: config.database, clusterName: config.clusterName },
-    "Bootstrapping ClickHouse database"
+    "Bootstrapping ClickHouse database",
   );
 
   // Use a single client for all bootstrap operations to ensure we hit the same node
@@ -265,12 +271,14 @@ async function bootstrapDatabase(
     const databaseEngine = config.clusterName
       ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
       : "";
-    const onCluster = config.clusterName ? `ON CLUSTER ${config.clusterName}` : "";
+    const onCluster = config.clusterName
+      ? `ON CLUSTER ${config.clusterName}`
+      : "";
 
     await executeBootstrapSQL(
       client,
       `CREATE DATABASE IF NOT EXISTS ${config.database} ${onCluster} ${databaseEngine}`,
-      verbose
+      verbose,
     );
 
     // Verify database was created (Replicated databases require Keeper)
@@ -286,7 +294,7 @@ async function bootstrapDatabase(
         config.clusterName
           ? `Failed to create Replicated database "${config.database}". ClickHouse Keeper may not be configured. Either configure Keeper or unset CLICKHOUSE_CLUSTER for local development.`
           : `Failed to create database "${config.database}".`,
-        "bootstrap"
+        "bootstrap",
       );
     }
 
@@ -309,7 +317,7 @@ async function bootstrapDatabase(
       ) ENGINE = ${engine}
       ORDER BY date
       SETTINGS index_granularity = 8192`,
-      verbose
+      verbose,
     );
 
     // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
@@ -320,7 +328,7 @@ async function bootstrapDatabase(
       `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
        SELECT 0, 1
        WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
-      verbose
+      verbose,
     );
   });
 
@@ -357,7 +365,7 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
 
   // Filter out undefined values
   return Object.fromEntries(
-    Object.entries(vars).filter(([, v]) => v !== undefined)
+    Object.entries(vars).filter(([, v]) => v !== undefined),
   ) as NodeJS.ProcessEnv;
 }
 
@@ -367,14 +375,14 @@ function logConfig(config: ClickHouseConfig): void {
       database: config.database,
       clusterName: config.clusterName,
     },
-    "ClickHouse migration configuration"
+    "ClickHouse migration configuration",
   );
 }
 
 function executeGoose(
   command: string,
   config: ClickHouseConfig,
-  options: GooseOptions = {}
+  options: GooseOptions = {},
 ): string {
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars(config);
@@ -383,7 +391,10 @@ function executeGoose(
     logConfig(config);
     logger.info({ migrationsDir, __dirname }, "Goose migrations directory");
     // Log connection string with password masked
-    const maskedConnStr = config.gooseConnectionString.replace(/:([^:@]+)@/, ':***@');
+    const maskedConnStr = config.gooseConnectionString.replace(
+      /:([^:@]+)@/,
+      ":***@",
+    );
     logger.info({ connectionString: maskedConnStr }, "Goose connection string");
   }
 
@@ -419,20 +430,25 @@ function executeGoose(
 
   // In verbose mode, print the output
   if (options.verbose) {
-    logger.info({ gooseOutput: output, exitCode: result.status }, "Goose output");
+    logger.info(
+      { gooseOutput: output, exitCode: result.status },
+      "Goose output",
+    );
   }
 
   if (result.status !== 0) {
     // "no next version found" means all migrations are already applied - not an error
-    if (output.includes("no next version found") ||
-        output.includes("no migrations to run")) {
+    if (
+      output.includes("no next version found") ||
+      output.includes("no migrations to run")
+    ) {
       logger.info("All migrations are already applied");
       return output;
     }
 
     throw new MigrationError(
       `Goose migration failed:\n${output || "Unknown error"}`,
-      "migrate"
+      "migrate",
     );
   }
 
@@ -469,7 +485,9 @@ export async function migrateDown(options: GooseOptions = {}): Promise<string> {
   return result;
 }
 
-export async function migrateReset(options: GooseOptions = {}): Promise<string> {
+export async function migrateReset(
+  options: GooseOptions = {},
+): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
 
   logger.info("Resetting all ClickHouse migrations...");
@@ -483,25 +501,25 @@ export async function migrateReset(options: GooseOptions = {}): Promise<string> 
 }
 
 export async function getMigrateVersion(
-  options: GooseOptions = {}
+  options: GooseOptions = {},
 ): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("version", config, options);
 }
 
 export async function getMigrateStatus(
-  options: GooseOptions = {}
+  options: GooseOptions = {},
 ): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
   return executeGoose("status", config, options);
 }
 
 export async function runMigrationsIfConfigured(
-  options: GooseOptions = {}
+  options: GooseOptions = {},
 ): Promise<void> {
   if (process.env.ENABLE_CLICKHOUSE !== "true") {
     logger.info(
-      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations."
+      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",
     );
     return;
   }
@@ -509,7 +527,7 @@ export async function runMigrationsIfConfigured(
   const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrlStr) {
     logger.info(
-      "CLICKHOUSE_URL not configured, skipping ClickHouse migrations."
+      "CLICKHOUSE_URL not configured, skipping ClickHouse migrations.",
     );
     return;
   }
@@ -523,7 +541,7 @@ export async function runMigrationsIfConfigured(
     if (error instanceof MigrationError) {
       logger.error(
         { phase: error.phase, cause: error.cause?.message },
-        `ClickHouse migration failed in ${error.phase} phase: ${error.message}`
+        `ClickHouse migration failed in ${error.phase} phase: ${error.message}`,
       );
     } else {
       logger.error({ error }, "Failed to run ClickHouse migrations");

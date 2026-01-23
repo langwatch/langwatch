@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { EventSchema } from "../../../library/domain/types";
 import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
-  EVALUATION_COMPLETED_EVENT_TYPE,
 } from "./constants";
 
 /**
@@ -101,7 +101,7 @@ export type EvaluationProcessingEvent =
 
 // Re-export type guards for backwards compatibility
 export {
+  isEvaluationCompletedEvent,
   isEvaluationScheduledEvent,
   isEvaluationStartedEvent,
-  isEvaluationCompletedEvent,
 } from "./typeGuards";

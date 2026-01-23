@@ -184,8 +184,7 @@ export const useAutosaveEvaluationsV3 = () => {
             const [path] = key;
             if (!Array.isArray(path)) return false;
             return (
-              path[0] === "experiments" &&
-              path[1] === "getEvaluationsV3BySlug"
+              path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug"
             );
           },
         });

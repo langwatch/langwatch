@@ -105,7 +105,7 @@ export function MessagesTable({
   navigationFooter.useUpdateTotalHits(traceGroups);
 
   const isRefreshing = useMinimumSpinDuration(
-    traceGroups.isLoading || traceGroups.isRefetching
+    traceGroups.isLoading || traceGroups.isRefetching,
   );
 
   const topics = api.topics.getAll.useQuery(

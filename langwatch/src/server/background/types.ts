@@ -38,7 +38,7 @@ export function getEvaluationId(check: EvaluationJobCheck): string {
   const id = check.evaluation_id ?? check.id;
   if (!id) {
     throw new Error(
-      `Missing evaluation ID in check object: ${JSON.stringify(check)}`
+      `Missing evaluation ID in check object: ${JSON.stringify(check)}`,
     );
   }
   return id;
@@ -53,7 +53,7 @@ export function getEvaluatorId(check: EvaluationJobCheck): string {
   const id = check.evaluator_id ?? check.id;
   if (!id) {
     throw new Error(
-      `Missing evaluator ID in check object: ${JSON.stringify(check)}`
+      `Missing evaluator ID in check object: ${JSON.stringify(check)}`,
     );
   }
   return id;

@@ -381,12 +381,12 @@ export function OptimizeModalContent({
                 name="params.llm"
                 render={({ field }) => (
                   <OptimizationStudioLLMConfigField
-                      showProviderKeyMessage={false}
-                      llmConfig={llmConfig ?? default_llm}
-                      onChange={(llmConfig) => {
-                        field.onChange(llmConfig);
-                      }}
-                    />
+                    showProviderKeyMessage={false}
+                    llmConfig={llmConfig ?? default_llm}
+                    onChange={(llmConfig) => {
+                      field.onChange(llmConfig);
+                    }}
+                  />
                 )}
               />
             </VStack>
@@ -397,9 +397,7 @@ export function OptimizeModalContent({
             <GridItem>
               <VStack align="start" gap={2}>
                 <HStack>
-                  <SmallLabel>
-                    Number of Candidate Prompts
-                  </SmallLabel>
+                  <SmallLabel>Number of Candidate Prompts</SmallLabel>
                   <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
                     <Info size={16} />
                   </Tooltip>
@@ -417,9 +415,7 @@ export function OptimizeModalContent({
             <GridItem>
               <VStack align="start" width="full" gap={2}>
                 <HStack>
-                  <SmallLabel>
-                    Max Bootstrapped Demos
-                  </SmallLabel>
+                  <SmallLabel>Max Bootstrapped Demos</SmallLabel>
                   <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
                     <Info size={16} />
                   </Tooltip>

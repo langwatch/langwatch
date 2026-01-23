@@ -10,8 +10,8 @@ import { Search, Settings } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
-import { allLitellmModels } from "../server/modelProviders/registry";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import {

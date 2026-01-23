@@ -7,13 +7,14 @@ import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
   ExperimentType,
-  Prisma,
+  type Prisma,
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   type WizardState,
   workbenchStateSchema,
@@ -26,6 +27,7 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
@@ -39,10 +41,9 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import { DatasetService } from "../../datasets/dataset.service";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
-  createInnerTRPCContext,
+  type createInnerTRPCContext,
   createTRPCRouter,
   protectedProcedure,
 } from "../trpc";
@@ -50,7 +51,6 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
@@ -211,7 +211,8 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
       const isNewExperiment = !input.experimentId;
-      const experimentId = input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
+      const experimentId =
+        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
       // For new experiments, use the ID as the slug (guaranteed unique)
       // For existing experiments, keep the same slug to avoid breaking URLs
@@ -634,10 +635,8 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const versionIds = dspySteps.hits.hits
-        .map((hit) => {
-          return hit._source?.workflow_version_id!;
-        })
-        .filter(Boolean);
+        .map((hit) => hit._source?.workflow_version_id)
+        .filter((id): id is string => Boolean(id));
 
       const versionsMap = await getVersionMap(input.projectId, versionIds);
 
@@ -1350,10 +1349,8 @@ const getExperimentBatchEvaluationRuns = async (
   });
 
   const versionIds = batchEvaluationRuns.hits.hits
-    .map((hit) => {
-      return hit._source?.workflow_version_id!;
-    })
-    .filter(Boolean);
+    .map((hit) => hit._source?.workflow_version_id)
+    .filter((id): id is string => Boolean(id));
 
   const versionsMap = await getVersionMap(projectId, versionIds);
 

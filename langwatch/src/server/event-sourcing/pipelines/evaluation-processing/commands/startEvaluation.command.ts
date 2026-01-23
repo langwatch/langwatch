@@ -1,11 +1,15 @@
-import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
+import type {
+  Command,
+  CommandHandler,
+  CommandHandlerResult,
+} from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { StartEvaluationCommandData } from "../schemas/commands";
 import { startEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  START_EVALUATION_COMMAND_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_VERSION_LATEST,
+  START_EVALUATION_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
   EvaluationProcessingEvent,
@@ -14,8 +18,8 @@ import type {
 } from "../schemas/events";
 import {
   createEvaluationCommandHandler,
-  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
+  makeJobIdWithSuffix,
 } from "./base.command";
 
 const config: EvaluationCommandConfig<
@@ -54,7 +58,7 @@ export class StartEvaluationCommand
   static readonly schema = defineCommandSchema(
     START_EVALUATION_COMMAND_TYPE,
     startEvaluationCommandDataSchema,
-    "Command to start an evaluation"
+    "Command to start an evaluation",
   );
 
   private readonly handleCommand = createEvaluationCommandHandler<
@@ -64,7 +68,7 @@ export class StartEvaluationCommand
   >(config);
 
   handle(
-    command: Command<StartEvaluationCommandData>
+    command: Command<StartEvaluationCommandData>,
   ): CommandHandlerResult<EvaluationProcessingEvent> {
     return this.handleCommand(command);
   }
@@ -74,7 +78,7 @@ export class StartEvaluationCommand
   }
 
   static getSpanAttributes(
-    payload: StartEvaluationCommandData
+    payload: StartEvaluationCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,

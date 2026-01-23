@@ -111,7 +111,9 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   });
 
   const selectedItem = selectOptions.find((option) => option.value === model);
-  const selectedIcon = selectedItem?.icon ?? modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
+  const selectedIcon =
+    selectedItem?.icon ??
+    modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
   const isUnknown = !selectedItem;
 
   const selectValueText = (

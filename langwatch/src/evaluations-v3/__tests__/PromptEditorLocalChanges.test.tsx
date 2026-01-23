@@ -182,7 +182,10 @@ vi.mock("~/utils/api", () => ({
                 defaultParameters: null,
                 supportsImageInput: false,
                 supportsAudioInput: false,
-                pricing: { inputCostPerToken: 0.00003, outputCostPerToken: 0.00006 },
+                pricing: {
+                  inputCostPerToken: 0.00003,
+                  outputCostPerToken: 0.00006,
+                },
               },
             },
           },

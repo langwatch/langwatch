@@ -76,7 +76,11 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     borderRadius="md"
     borderWidth={1}
     borderColor="border"
-    _hover={{ textDecoration: "none", bg: "bg.muted", borderColor: "border.emphasized" }}
+    _hover={{
+      textDecoration: "none",
+      bg: "bg.muted",
+      borderColor: "border.emphasized",
+    }}
     transition="all 0.2s"
     onClick={onClick}
     aria-label={guide.label + " (opens in a new tab)"}

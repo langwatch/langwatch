@@ -49,9 +49,17 @@ export function EvaluatorSelectionBox({
               <CheckCircle size={20} />
             </Box>
             <VStack width="full" align="start" lineHeight={1} textAlign="left">
-              <Text fontWeight="medium" lineClamp={1}>{selectedEvaluator.name}</Text>
+              <Text fontWeight="medium" lineClamp={1}>
+                {selectedEvaluator.name}
+              </Text>
               {showSlug && selectedEvaluator.slug && (
-                <Text fontSize="xs" color="gray.500" fontFamily="mono" fontWeight="normal" lineClamp={1}>
+                <Text
+                  fontSize="xs"
+                  color="gray.500"
+                  fontFamily="mono"
+                  fontWeight="normal"
+                  lineClamp={1}
+                >
                   {selectedEvaluator.slug}
                 </Text>
               )}

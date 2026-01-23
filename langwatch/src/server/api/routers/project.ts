@@ -1,11 +1,12 @@
 import {
+  Prisma,
   type PrismaClient,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { customAlphabet, nanoid } from "nanoid";
+import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import {
@@ -30,6 +31,8 @@ import {
 } from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
+import { auditLog } from "../../auditLog";
+import { generateApiKey } from "../../utils/apiKeyGenerator";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -233,6 +236,52 @@ export const projectRouter = createTRPCRouter({
       }
 
       return project;
+    }),
+  regenerateApiKey: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      // Generate new API key
+      const newApiKey = generateApiKey();
+
+      try {
+        // Update the project with new API key
+        // Note: updatedAt is handled automatically by Prisma @updatedAt
+        const project = await prisma.project.update({
+          where: { id: input.projectId },
+          data: {
+            apiKey: newApiKey,
+          },
+          select: {
+            apiKey: true,
+            id: true,
+            slug: true,
+          },
+        });
+
+        // Audit log the security-critical action
+        await auditLog({
+          action: "project.apiKey.regenerated",
+          userId: ctx.session.user.id,
+          projectId: input.projectId,
+        });
+
+        return { apiKey: project.apiKey };
+      } catch (error) {
+        // Prisma throws P2025 when no record is found
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found",
+          });
+        }
+        throw error;
+      }
     }),
   update: protectedProcedure
     .input(
@@ -597,13 +646,6 @@ export const projectRouter = createTRPCRouter({
       }
     }),
 });
-
-const generateApiKey = (): string => {
-  const alphabet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const randomPart = customAlphabet(alphabet, 48)();
-  return `sk-lw-${randomPart}`;
-};
 
 async function checkCapturedDataVisibilityPermission({
   ctx,

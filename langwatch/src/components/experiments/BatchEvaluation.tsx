@@ -337,11 +337,7 @@ export default function BatchEvaluation({
         <VStack align="start" minWidth="0">
           {evaluations.isLoading ? (
             <Box>
-              <Table.Root
-                variant="line"
-                borderWidth="1px"
-                borderColor="border"
-              >
+              <Table.Root variant="line" borderWidth="1px" borderColor="border">
                 <Table.Body>
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Table.Row key={i}>

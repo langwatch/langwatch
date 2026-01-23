@@ -404,11 +404,7 @@ export function PromptsList({
                 overflow="hidden"
                 position="relative"
               >
-                <Text
-                  whiteSpace="pre-wrap"
-                  lineClamp={4}
-                  color="fg"
-                >
+                <Text whiteSpace="pre-wrap" lineClamp={4} color="fg">
                   {config.prompt.trim() === "" ? "<empty>" : config.prompt}
                 </Text>
               </Box>

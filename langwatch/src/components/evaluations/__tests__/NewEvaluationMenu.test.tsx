@@ -10,8 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { NewEvaluationMenu } from "../NewEvaluationMenu";
 import { clearDrawerStack, clearFlowCallbacks } from "~/hooks/useDrawer";
+import { NewEvaluationMenu } from "../NewEvaluationMenu";
 
 // Router mock with mutable query state
 let mockQuery: Record<string, string> = {};
@@ -28,9 +28,10 @@ const mockPush = vi.fn((url: string) => {
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    asPath: Object.keys(mockQuery).length > 0
-      ? "/test?" + new URLSearchParams(mockQuery).toString()
-      : "/test",
+    asPath:
+      Object.keys(mockQuery).length > 0
+        ? "/test?" + new URLSearchParams(mockQuery).toString()
+        : "/test",
     push: mockPush,
     replace: mockPush,
   }),
@@ -65,15 +66,20 @@ vi.mock("~/utils/api", () => ({
     })),
     experiments: {
       saveEvaluationsV3: {
-        useMutation: vi.fn((options: { onSuccess?: (data: { slug: string }) => void; onError?: () => void }) => {
-          mockOnSuccess = options?.onSuccess ?? null;
-          return {
-            mutate: (data: unknown) => {
-              mockMutateCallback?.(data);
-            },
-            isPending: mockIsPending,
-          };
-        }),
+        useMutation: vi.fn(
+          (options: {
+            onSuccess?: (data: { slug: string }) => void;
+            onError?: () => void;
+          }) => {
+            mockOnSuccess = options?.onSuccess ?? null;
+            return {
+              mutate: (data: unknown) => {
+                mockMutateCallback?.(data);
+              },
+              isPending: mockIsPending,
+            };
+          },
+        ),
       },
     },
   },
@@ -153,7 +159,9 @@ describe("NewEvaluationMenu", () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText(/compare prompts and agents performance/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/compare prompts and agents performance/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -169,7 +177,9 @@ describe("NewEvaluationMenu", () => {
       await openMenu();
 
       await waitFor(() => {
-        expect(screen.getByText(/block dangerous requests/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/block dangerous requests/i),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -195,7 +205,9 @@ describe("NewEvaluationMenu", () => {
       await waitFor(() => {
         expect(mutateData).not.toBeNull();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        expect((mutateData as any).state.experimentSlug).toBe("swift-bright-fox");
+        expect((mutateData as any).state.experimentSlug).toBe(
+          "swift-bright-fox",
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         expect((mutateData as any).projectId).toBe("test-project-id");
       });
@@ -222,7 +234,9 @@ describe("NewEvaluationMenu", () => {
 
       // Wait for the mutation to complete and redirect
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith("/test-project/experiments/workbench/swift-bright-fox");
+        expect(mockPush).toHaveBeenCalledWith(
+          "/test-project/experiments/workbench/swift-bright-fox",
+        );
       });
     });
 
@@ -236,7 +250,9 @@ describe("NewEvaluationMenu", () => {
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
-      await waitFor(() => expect(screen.getByText("Create Experiment")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Create Experiment"));
 
       await waitFor(() => {
@@ -246,7 +262,9 @@ describe("NewEvaluationMenu", () => {
         expect((mutateData as any).state.name).toBe("swift-bright-fox");
         // The slug should also be the human-readable ID
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        expect((mutateData as any).state.experimentSlug).toBe("swift-bright-fox");
+        expect((mutateData as any).state.experimentSlug).toBe(
+          "swift-bright-fox",
+        );
       });
     });
 
@@ -262,7 +280,9 @@ describe("NewEvaluationMenu", () => {
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
       await user.click(screen.getByText("New Evaluation"));
-      await waitFor(() => expect(screen.getByText("Create Experiment")).toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
       await user.click(screen.getByText("Create Experiment"));
 
       // Wait for the mutation to complete

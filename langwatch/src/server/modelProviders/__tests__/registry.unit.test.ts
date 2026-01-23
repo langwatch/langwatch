@@ -2,16 +2,16 @@
  * Unit tests for model registry functions
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  allLitellmModels,
   getAllModels,
+  getAllProviders,
   getModelById,
   getModelMetadata,
-  getProviderModelOptions,
   getModelsForProvider,
-  getAllProviders,
+  getProviderModelOptions,
   getRegistryMetadata,
-  allLitellmModels,
   modelProviders,
 } from "../registry";
 
@@ -167,7 +167,7 @@ describe("Backward Compatibility", () => {
 
     it("includes OpenAI models with full ID", () => {
       const openaiModels = Object.keys(allLitellmModels).filter((k) =>
-        k.startsWith("openai/")
+        k.startsWith("openai/"),
       );
       expect(openaiModels.length).toBeGreaterThan(0);
     });
@@ -184,7 +184,7 @@ describe("Model Provider Definitions", () => {
   });
 
   it("each provider has required fields", () => {
-    for (const [key, provider] of Object.entries(modelProviders)) {
+    for (const [_key, provider] of Object.entries(modelProviders)) {
       expect(provider).toHaveProperty("name");
       expect(provider).toHaveProperty("apiKey");
       expect(provider).toHaveProperty("keysSchema");
@@ -197,7 +197,7 @@ describe("Model Pricing", () => {
   it("models have valid pricing", () => {
     const models = getAllModels();
     const modelWithPricing = Object.values(models).find(
-      (m) => m.pricing.inputCostPerToken > 0
+      (m) => m.pricing.inputCostPerToken > 0,
     );
 
     expect(modelWithPricing).toBeDefined();
@@ -207,7 +207,7 @@ describe("Model Pricing", () => {
   it("some models have cache pricing", () => {
     const models = getAllModels();
     const modelWithCache = Object.values(models).find(
-      (m) => m.pricing.inputCacheReadPerToken !== undefined
+      (m) => m.pricing.inputCacheReadPerToken !== undefined,
     );
 
     expect(modelWithCache).toBeDefined();
@@ -218,7 +218,7 @@ describe("Model Parameters", () => {
   it("models have supportedParameters array", () => {
     const models = getAllModels();
     const modelWithParams = Object.values(models).find(
-      (m) => m.supportedParameters.length > 0
+      (m) => m.supportedParameters.length > 0,
     );
 
     expect(modelWithParams).toBeDefined();
@@ -228,7 +228,7 @@ describe("Model Parameters", () => {
   it("some models support reasoning parameter", () => {
     const models = getAllModels();
     const reasoningModel = Object.values(models).find((m) =>
-      m.supportedParameters.includes("reasoning")
+      m.supportedParameters.includes("reasoning"),
     );
 
     expect(reasoningModel).toBeDefined();
@@ -237,7 +237,7 @@ describe("Model Parameters", () => {
   it("traditional models support temperature", () => {
     const models = getAllModels();
     const tempModel = Object.values(models).find((m) =>
-      m.supportedParameters.includes("temperature")
+      m.supportedParameters.includes("temperature"),
     );
 
     expect(tempModel).toBeDefined();

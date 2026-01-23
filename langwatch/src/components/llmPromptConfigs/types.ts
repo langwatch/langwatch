@@ -28,4 +28,3 @@ export type LLMConfigValues = {
   | { max_tokens?: number; maxTokens?: never }
   | { maxTokens?: number; max_tokens?: never }
 );
-

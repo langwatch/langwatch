@@ -300,11 +300,11 @@ describe("VariableMappingInput", () => {
       fireEvent.keyDown(input, { key: "Enter" });
 
       await waitFor(() => {
-      expect(onMappingChange).toHaveBeenCalledWith({
-        type: "source",
-        sourceId: "dataset-1",
-        path: ["expected_output"],
-      });
+        expect(onMappingChange).toHaveBeenCalledWith({
+          type: "source",
+          sourceId: "dataset-1",
+          path: ["expected_output"],
+        });
       });
     });
 
@@ -730,12 +730,18 @@ describe("VariableMappingInput", () => {
 
       // Should now show metadata's children
       await waitFor(() => {
-        expect(screen.getByTestId("field-option-customer_id")).toBeInTheDocument();
-        expect(screen.getByTestId("field-option-session_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-customer_id"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-session_id"),
+        ).toBeInTheDocument();
       });
 
       // Should show breadcrumb with path and in-progress tag
-      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("metadata");
+      expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+        "metadata",
+      );
     });
 
     it("creates path array with multiple segments for nested selection", async () => {
@@ -756,7 +762,9 @@ describe("VariableMappingInput", () => {
 
       // Wait for nested fields
       await waitFor(() => {
-        expect(screen.getByTestId("field-option-customer_id")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-customer_id"),
+        ).toBeInTheDocument();
       });
 
       // Click customer_id
@@ -824,7 +832,9 @@ describe("VariableMappingInput", () => {
       // Should show spans badge (the tag contains "spans" text)
       await waitFor(() => {
         expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
       });
 
       // Click gpt-4
@@ -837,8 +847,12 @@ describe("VariableMappingInput", () => {
       await waitFor(() => {
         expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
         expect(screen.getByTestId("path-segment-tag-1")).toBeInTheDocument();
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
-        expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent("gpt-4");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
+        expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent(
+          "gpt-4",
+        );
       });
     });
 
@@ -875,7 +889,9 @@ describe("VariableMappingInput", () => {
       // Should now show spans children (gpt-4, embeddings)
       await waitFor(() => {
         expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
-        expect(screen.getByTestId("field-option-embeddings")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("field-option-embeddings"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -932,7 +948,9 @@ describe("VariableMappingInput", () => {
       // Should show spans badge
       await waitFor(() => {
         expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "spans",
+        );
       });
 
       // Press Escape
@@ -940,8 +958,12 @@ describe("VariableMappingInput", () => {
 
       // Badge should be gone, dropdown should be closed
       await waitFor(() => {
-        expect(screen.queryByTestId("path-segment-tag-0")).not.toBeInTheDocument();
-        expect(screen.queryByTestId("field-option-spans")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("path-segment-tag-0"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-spans"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -973,7 +995,9 @@ describe("VariableMappingInput", () => {
 
       // Should go back to spans level
       await waitFor(() => {
-        expect(screen.queryByTestId("path-segment-tag-1")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("path-segment-tag-1"),
+        ).not.toBeInTheDocument();
         expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
         expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
       });
@@ -1009,18 +1033,26 @@ describe("VariableMappingInput", () => {
         // 1. "spans" badge should appear in the input
         await waitFor(() => {
           expect(screen.getByTestId("path-segment-tag-0")).toBeInTheDocument();
-          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
         });
 
         // 2. Dropdown should STILL be open (or immediately reopen) showing nested children
         await waitFor(() => {
           expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
-          expect(screen.getByTestId("field-option-embeddings")).toBeInTheDocument();
+          expect(
+            screen.getByTestId("field-option-embeddings"),
+          ).toBeInTheDocument();
         });
 
         // 3. The original top-level options should NOT be visible anymore
-        expect(screen.queryByTestId("field-option-input")).not.toBeInTheDocument();
-        expect(screen.queryByTestId("field-option-output")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-input"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("field-option-output"),
+        ).not.toBeInTheDocument();
       });
 
       it("continues cascading through multiple levels until reaching a leaf field", async () => {
@@ -1039,7 +1071,9 @@ describe("VariableMappingInput", () => {
 
         // Should show spans badge and nested options
         await waitFor(() => {
-          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
           expect(screen.getByTestId("field-option-gpt-4")).toBeInTheDocument();
         });
 
@@ -1048,8 +1082,12 @@ describe("VariableMappingInput", () => {
 
         // Should show both badges and nested options
         await waitFor(() => {
-          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("spans");
-          expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent("gpt-4");
+          expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+            "spans",
+          );
+          expect(screen.getByTestId("path-segment-tag-1")).toHaveTextContent(
+            "gpt-4",
+          );
           expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
           expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
         });
@@ -1068,7 +1106,9 @@ describe("VariableMappingInput", () => {
 
         // Dropdown should be closed
         await waitFor(() => {
-          expect(screen.queryByTestId("field-option-input")).not.toBeInTheDocument();
+          expect(
+            screen.queryByTestId("field-option-input"),
+          ).not.toBeInTheDocument();
         });
 
         // Final mapping should be displayed as a single tag
@@ -1101,7 +1141,9 @@ describe("VariableMappingInput", () => {
 
         // Dropdown should be closed
         await waitFor(() => {
-          expect(screen.queryByTestId("field-option-output")).not.toBeInTheDocument();
+          expect(
+            screen.queryByTestId("field-option-output"),
+          ).not.toBeInTheDocument();
         });
 
         // Should show the mapping tag
@@ -1171,7 +1213,9 @@ describe("VariableMappingInput", () => {
         });
 
         // The "traces" should be shown as a path segment (indicating it's selected)
-        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent("traces");
+        expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
+          "traces",
+        );
       });
 
       it("shows 'Use all X' option when in nested view with complete parent", async () => {
@@ -1227,7 +1271,9 @@ describe("VariableMappingInput", () => {
 
         // Should close dropdown
         await waitFor(() => {
-          expect(screen.queryByTestId("use-all-option")).not.toBeInTheDocument();
+          expect(
+            screen.queryByTestId("use-all-option"),
+          ).not.toBeInTheDocument();
         });
 
         // Mapping should be set to just ["traces"]

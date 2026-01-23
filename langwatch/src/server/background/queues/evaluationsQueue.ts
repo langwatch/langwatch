@@ -1,12 +1,16 @@
 import type { ConnectionOptions } from "bullmq";
-import { type EvaluationJob, getEvaluationId, getEvaluatorId } from "~/server/background/types";
+import {
+  type EvaluationJob,
+  getEvaluationId,
+  getEvaluatorId,
+} from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
-import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { prisma } from "../../db";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { evaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
@@ -104,7 +108,11 @@ export const scheduleEvaluation = async ({
     }
   } catch (error) {
     captureException(error, {
-      extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: "scheduled" },
+      extra: {
+        projectId: trace.project_id,
+        evaluationId: getEvaluationId(check),
+        event: "scheduled",
+      },
     });
     logger.warn(
       { error, check, trace },
@@ -139,12 +147,21 @@ export const scheduleEvaluation = async ({
       // This "resets the timer" when a new message arrives in the thread
       const previousJobData = currentJob.data as EvaluationJob;
       logger.info(
-        { check, trace, threadId: threadDebounce.threadId, state, previousTraceId: previousJobData?.trace?.trace_id },
-        "thread debounce: resetting timer for thread evaluation"
+        {
+          check,
+          trace,
+          threadId: threadDebounce.threadId,
+          state,
+          previousTraceId: previousJobData?.trace?.trace_id,
+        },
+        "thread debounce: resetting timer for thread evaluation",
       );
 
       // Update the previous trace's evaluation status to "skipped" since it's being superseded
-      if (previousJobData?.trace && previousJobData.trace.trace_id !== trace.trace_id) {
+      if (
+        previousJobData?.trace &&
+        previousJobData.trace.trace_id !== trace.trace_id
+      ) {
         try {
           await updateEvaluationStatusInES({
             check: previousJobData.check,
@@ -155,7 +172,7 @@ export const scheduleEvaluation = async ({
         } catch (error) {
           logger.warn(
             { error, previousTraceId: previousJobData.trace.trace_id },
-            "Failed to update previous trace evaluation status to skipped"
+            "Failed to update previous trace evaluation status to skipped",
           );
         }
       }
@@ -182,9 +199,12 @@ export const scheduleEvaluation = async ({
       check,
       trace,
       delay: effectiveDelay,
-      ...(threadDebounce && { threadDebounce: true, threadId: threadDebounce.threadId }),
+      ...(threadDebounce && {
+        threadDebounce: true,
+        threadId: threadDebounce.threadId,
+      }),
     },
-    "scheduling"
+    "scheduling",
   );
   await evaluationsQueue.add(
     check.type,
@@ -359,14 +379,20 @@ export const updateEvaluationStatusInES = async ({
             label,
             details,
             error: error
-              ? (error instanceof Error ? error.message : String(error))
+              ? error instanceof Error
+                ? error.message
+                : String(error)
               : undefined,
           });
         }
       }
     } catch (eventError) {
       captureException(eventError, {
-        extra: { projectId: trace.project_id, evaluationId: getEvaluationId(check), event: status },
+        extra: {
+          projectId: trace.project_id,
+          evaluationId: getEvaluationId(check),
+          event: status,
+        },
       });
       logger.warn(
         { error: eventError, check, trace, status },

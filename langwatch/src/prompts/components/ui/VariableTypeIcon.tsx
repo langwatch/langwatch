@@ -21,7 +21,11 @@ export const VariableTypeIcon = ({
   type: string;
   size?: number;
 }) => {
-  const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };
+  const iconProps = {
+    size,
+    strokeWidth: 2.5,
+    color: "var(--chakra-colors-gray-500)",
+  };
 
   switch (type) {
     case "str":

@@ -7,8 +7,8 @@ import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
-import { useColorMode } from "../ui/color-mode";
 import { CopyIcon } from "../icons/Copy";
+import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 

@@ -1,14 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  extractProviderFromModel,
+  formHasContent,
+  type GeneratedScenario,
   usePromptHistory,
   useScenarioGeneration,
-  formHasContent,
-  extractProviderFromModel,
-  type GeneratedScenario,
 } from "../ScenarioAIGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +160,9 @@ describe("useScenarioGeneration", () => {
       }
     });
 
-    expect(thrownError?.message).toBe("Invalid response: missing scenario data");
+    expect(thrownError?.message).toBe(
+      "Invalid response: missing scenario data",
+    );
   });
 
   it("sends correct payload to API", async () => {

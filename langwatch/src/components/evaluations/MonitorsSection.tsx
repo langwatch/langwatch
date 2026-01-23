@@ -170,7 +170,8 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               experimentsSlugMap[monitor.experimentId]
                             ) {
                               void router.push(
-                                `/${project.slug}/evaluations/wizard/${experimentsSlugMap[monitor.experimentId]
+                                `/${project.slug}/evaluations/wizard/${
+                                  experimentsSlugMap[monitor.experimentId]
                                 }`,
                               );
                             } else {
@@ -237,8 +238,9 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 onSuccess: () => {
                                   void monitors.refetch();
                                   toaster.create({
-                                    title: `Monitor ${monitor.enabled ? "disabled" : "enabled"
-                                      }`,
+                                    title: `Monitor ${
+                                      monitor.enabled ? "disabled" : "enabled"
+                                    }`,
                                     type: "info",
                                     meta: { closable: true },
                                   });

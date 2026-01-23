@@ -10,10 +10,15 @@ import {
 } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle, Plus, Workflow } from "lucide-react";
+import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
+import { useState } from "react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -22,6 +27,7 @@ import {
 import { api } from "~/utils/api";
 import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";
+import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 export type EvaluatorListDrawerProps = {
   open?: boolean;
@@ -40,7 +46,7 @@ export type EvaluatorListDrawerProps = {
  */
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer, goBack, canGoBack } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
 
@@ -99,6 +105,15 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     }
   };
 
+  // State for API usage dialog
+  const [apiDialogEvaluator, setApiDialogEvaluator] = useState<Evaluator | null>(
+    null,
+  );
+
+  const handleUseFromApi = (evaluator: Evaluator) => {
+    setApiDialogEvaluator(evaluator);
+  };
+
   return (
     <Drawer.Root
       open={isOpen}
@@ -151,6 +166,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                     onClick={() => handleSelectEvaluator(evaluator)}
                     onEdit={() => handleEditEvaluator(evaluator)}
                     onDelete={() => handleDeleteEvaluator(evaluator)}
+                    onUseFromApi={() => handleUseFromApi(evaluator)}
                   />
                 ))
               )}
@@ -163,6 +179,13 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           </Button>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* API Usage Dialog */}
+      <EvaluatorApiUsageDialog
+        evaluator={apiDialogEvaluator}
+        open={!!apiDialogEvaluator}
+        onClose={() => setApiDialogEvaluator(null)}
+      />
     </Drawer.Root>
   );
 }
@@ -206,6 +229,7 @@ type EvaluatorCardProps = {
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onUseFromApi: () => void;
 };
 
 const getEvaluatorDisplayName = (evaluatorType: string): string => {
@@ -215,7 +239,9 @@ const getEvaluatorDisplayName = (evaluatorType: string): string => {
     AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
-  return evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name;
+  return (
+    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
+  );
 };
 
 function EvaluatorCard({
@@ -223,6 +249,7 @@ function EvaluatorCard({
   onClick,
   onEdit,
   onDelete,
+  onUseFromApi,
 }: EvaluatorCardProps) {
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType ?? "";
@@ -297,6 +324,17 @@ function EvaluatorCard({
             >
               <LuPencil size={14} />
               Edit
+            </Menu.Item>
+            <Menu.Item
+              value="use-from-api"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUseFromApi();
+              }}
+              data-testid={`evaluator-use-api-${evaluator.id}`}
+            >
+              <Code size={14} />
+              Use via API
             </Menu.Item>
             <Menu.Item
               value="delete"

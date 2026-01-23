@@ -16,10 +16,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import { createLogger } from "../../utils/logger";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "../ModelSelector";
+import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
 
@@ -65,7 +62,7 @@ export function useScenarioGeneration(projectId: string | undefined) {
   const generate = useCallback(
     async (
       prompt: string,
-      currentScenario: GeneratedScenario | null
+      currentScenario: GeneratedScenario | null,
     ): Promise<GeneratedScenario> => {
       setStatus("generating");
 
@@ -92,7 +89,7 @@ export function useScenarioGeneration(projectId: string | undefined) {
         throw error;
       }
     },
-    [projectId]
+    [projectId],
   );
 
   return { generate, status };
@@ -140,7 +137,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,
-    "chat"
+    "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
   const providerName = extractProviderFromModel(defaultModel);
@@ -148,10 +145,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const hasExistingContent = form !== null && formHasContent(form);
 
   const canGenerate = Boolean(
-    input.trim() &&
-      status !== "generating" &&
-      !isDefaultModelDisabled &&
-      form
+    input.trim() && status !== "generating" && !isDefaultModelDisabled && form,
   );
 
   const handleGenerate = useCallback(async () => {
@@ -160,7 +154,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     // Warn if form has content and no history (first generation)
     if (hasExistingContent && !hasHistory) {
       const confirmed = window.confirm(
-        "This will replace the current scenario content. Continue?"
+        "This will replace the current scenario content. Continue?",
       );
       if (!confirmed) return;
     }
@@ -196,7 +190,15 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         meta: { closable: true },
       });
     }
-  }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);
+  }, [
+    input,
+    project?.id,
+    form,
+    hasExistingContent,
+    hasHistory,
+    generate,
+    addPrompt,
+  ]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -207,7 +209,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         void handleGenerate();
       }
     },
-    [canGenerate, handleGenerate]
+    [canGenerate, handleGenerate],
   );
 
   // "Prompt" view - initial state with CTA

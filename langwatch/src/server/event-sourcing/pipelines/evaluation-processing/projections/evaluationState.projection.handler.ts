@@ -5,16 +5,16 @@ import type {
   ProjectionHandler,
 } from "../../../library";
 import { evaluationStateRepository } from "../repositories";
+import { EVALUATION_STATE_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
+  isEvaluationCompletedEvent,
   isEvaluationScheduledEvent,
   isEvaluationStartedEvent,
-  isEvaluationCompletedEvent,
 } from "../schemas/events";
-import { EVALUATION_STATE_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 
 const logger = createLogger(
-  "langwatch:evaluation-processing:evaluation-state-projection"
+  "langwatch:evaluation-processing:evaluation-state-projection",
 );
 
 /**
@@ -69,7 +69,7 @@ export class EvaluationStateProjectionHandler
     stream: EventStream<
       EvaluationProcessingEvent["tenantId"],
       EvaluationProcessingEvent
-    >
+    >,
   ): EvaluationState {
     const events = stream.getEvents();
     const aggregateId = stream.getAggregateId();
@@ -106,7 +106,7 @@ export class EvaluationStateProjectionHandler
 
         logger.debug(
           { evaluationId, evaluatorType, traceId },
-          "Processing EvaluationScheduledEvent"
+          "Processing EvaluationScheduledEvent",
         );
       } else if (isEvaluationStartedEvent(event)) {
         // Merge metadata fields individually to allow backfilling from start event
@@ -131,7 +131,7 @@ export class EvaluationStateProjectionHandler
 
         logger.debug(
           { evaluationId, evaluatorType },
-          "Processing EvaluationStartedEvent"
+          "Processing EvaluationStartedEvent",
         );
       } else if (isEvaluationCompletedEvent(event)) {
         status = event.data.status;
@@ -144,7 +144,7 @@ export class EvaluationStateProjectionHandler
 
         logger.debug(
           { evaluationId, status, score, passed },
-          "Processing EvaluationCompletedEvent"
+          "Processing EvaluationCompletedEvent",
         );
       }
     }
@@ -159,7 +159,7 @@ export class EvaluationStateProjectionHandler
         status,
         eventCount: events.length,
       },
-      "Computed evaluation state from events"
+      "Computed evaluation state from events",
     );
 
     return {

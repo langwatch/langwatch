@@ -447,7 +447,10 @@ describe("Evaluations V3 Endpoints", () => {
             id: `record_1_${Date.now()}`,
             datasetId: sourceDataset.id,
             projectId,
-            entry: { question: "What is AI?", answer: "Artificial Intelligence" },
+            entry: {
+              question: "What is AI?",
+              answer: "Artificial Intelligence",
+            },
           },
           {
             id: `record_2_${Date.now()}`,
@@ -605,9 +608,7 @@ describe("Evaluations V3 Endpoints", () => {
 
       expect(firstCopy.experiment.slug).not.toBe(secondCopy.experiment.slug);
       // Second copy should have -2 suffix
-      expect(secondCopy.experiment.slug).toBe(
-        `${firstCopy.experiment.slug}-2`,
-      );
+      expect(secondCopy.experiment.slug).toBe(`${firstCopy.experiment.slug}-2`);
     });
 
     it("clears execution results when copying", async () => {

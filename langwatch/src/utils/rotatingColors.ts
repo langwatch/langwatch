@@ -25,7 +25,6 @@ const tones = (color: string) => [
   },
 ];
 
-
 export const rotatingColors = {
   colors: [
     {

@@ -38,7 +38,8 @@ export const MainMenu = React.memo(function MainMenu({
   );
 
   // Feature flag: show collapsible navigation for @langwatch.ai users
-  const showScenariosOnThePlatform = session?.user?.email?.endsWith("@langwatch.ai");
+  const showScenariosOnThePlatform =
+    session?.user?.email?.endsWith("@langwatch.ai");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -88,7 +89,15 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+            <Text
+              fontSize="11px"
+              fontWeight="medium"
+              textTransform="uppercase"
+              color="gray.500"
+              paddingX={2}
+              paddingTop={3}
+              paddingBottom={1}
+            >
               {showExpanded ? "Observe" : <>&nbsp;</>}
             </Text>
 
@@ -109,7 +118,15 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+            <Text
+              fontSize="11px"
+              fontWeight="medium"
+              textTransform="uppercase"
+              color="gray.500"
+              paddingX={2}
+              paddingTop={3}
+              paddingBottom={1}
+            >
               {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
             </Text>
 
@@ -125,9 +142,9 @@ export const MainMenu = React.memo(function MainMenu({
                     label: projectRoutes.scenarios.title,
                     href: project
                       ? projectRoutes.scenarios.path.replace(
-                        "[project]",
-                        project.slug,
-                      )
+                          "[project]",
+                          project.slug,
+                        )
                       : "/auth/signin",
                     isActive: router.pathname.includes(
                       "/simulations/scenarios",
@@ -138,9 +155,9 @@ export const MainMenu = React.memo(function MainMenu({
                     label: projectRoutes.simulation_runs.title,
                     href: project
                       ? projectRoutes.simulation_runs.path.replace(
-                        "[project]",
-                        project.slug,
-                      )
+                          "[project]",
+                          project.slug,
+                        )
                       : "/auth/signin",
                     isActive:
                       router.pathname.includes("/simulations") &&
@@ -180,7 +197,15 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            <Text fontSize="11px" fontWeight="medium" textTransform="uppercase" color="gray.500" paddingX={2} paddingTop={3} paddingBottom={1}>
+            <Text
+              fontSize="11px"
+              fontWeight="medium"
+              textTransform="uppercase"
+              color="gray.500"
+              paddingX={2}
+              paddingTop={3}
+              paddingBottom={1}
+            >
               {showExpanded ? "Library" : <div>&nbsp;</div>}
             </Text>
 
@@ -236,15 +261,15 @@ export const MainMenu = React.memo(function MainMenu({
               OrganizationRoleGroup.ORGANIZATION_VIEW,
             ) ||
               isPublicRoute) && (
-                <PageMenuLink
-                  path={projectRoutes.settings.path}
-                  icon={featureIcons.settings.icon}
-                  label={projectRoutes.settings.title}
-                  project={project}
-                  isActive={router.pathname.includes("/settings")}
-                  showLabel={showExpanded}
-                />
-              )}
+              <PageMenuLink
+                path={projectRoutes.settings.path}
+                icon={featureIcons.settings.icon}
+                label={projectRoutes.settings.title}
+                project={project}
+                isActive={router.pathname.includes("/settings")}
+                showLabel={showExpanded}
+              />
+            )}
             <SupportMenu showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>

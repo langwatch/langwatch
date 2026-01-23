@@ -1,11 +1,15 @@
-import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
+import type {
+  Command,
+  CommandHandler,
+  CommandHandlerResult,
+} from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { ScheduleEvaluationCommandData } from "../schemas/commands";
 import { scheduleEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  SCHEDULE_EVALUATION_COMMAND_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
+  SCHEDULE_EVALUATION_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
   EvaluationProcessingEvent,
@@ -14,8 +18,8 @@ import type {
 } from "../schemas/events";
 import {
   createEvaluationCommandHandler,
-  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
+  makeJobIdWithSuffix,
 } from "./base.command";
 
 const config: EvaluationCommandConfig<
@@ -54,7 +58,7 @@ export class ScheduleEvaluationCommand
   static readonly schema = defineCommandSchema(
     SCHEDULE_EVALUATION_COMMAND_TYPE,
     scheduleEvaluationCommandDataSchema,
-    "Command to schedule an evaluation"
+    "Command to schedule an evaluation",
   );
 
   private readonly handleCommand = createEvaluationCommandHandler<
@@ -64,7 +68,7 @@ export class ScheduleEvaluationCommand
   >(config);
 
   handle(
-    command: Command<ScheduleEvaluationCommandData>
+    command: Command<ScheduleEvaluationCommandData>,
   ): CommandHandlerResult<EvaluationProcessingEvent> {
     return this.handleCommand(command);
   }
@@ -74,7 +78,7 @@ export class ScheduleEvaluationCommand
   }
 
   static getSpanAttributes(
-    payload: ScheduleEvaluationCommandData
+    payload: ScheduleEvaluationCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,

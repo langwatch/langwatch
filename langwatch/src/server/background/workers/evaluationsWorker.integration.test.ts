@@ -1,23 +1,16 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import type { EvaluationJob } from "~/server/background/types";
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX } from "../../elasticsearch";
 import type { ElasticSearchTrace } from "../../tracer/types";
-import {
-  updateEvaluationStatusInES,
-} from "../queues/evaluationsQueue";
+import { updateEvaluationStatusInES } from "../queues/evaluationsQueue";
 
 const getTraceCheck = async (
   traceId: string,
   checkId: string,
-  projectId: string
+  projectId: string,
 ) => {
   const client = await esClient({ test: true });
   return await client.search<ElasticSearchTrace>({
@@ -58,12 +51,16 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
   const testEvaluatorIds: string[] = [];
 
   afterAll(async () => {
-    // Clean up test data
+    // Clean up test data - ignore errors if records don't exist
     for (const monitorId of testMonitorIds) {
-      await prisma.monitor.delete({ where: { id: monitorId, projectId } }).catch(() => {});
+      await prisma.monitor
+        .delete({ where: { id: monitorId, projectId } })
+        .catch(() => undefined);
     }
     for (const evaluatorId of testEvaluatorIds) {
-      await prisma.evaluator.delete({ where: { id: evaluatorId, projectId } }).catch(() => {});
+      await prisma.evaluator
+        .delete({ where: { id: evaluatorId, projectId } })
+        .catch(() => undefined);
     }
   });
 
@@ -117,11 +114,10 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
     });
 
     // Verify the settings resolution logic
-    const resolvedSettings =
-      monitorWithEvaluator?.evaluator && monitorWithEvaluator.evaluator.config
-        ? (monitorWithEvaluator.evaluator.config as Record<string, any>)
-            .settings ?? monitorWithEvaluator.parameters
-        : monitorWithEvaluator?.parameters;
+    const resolvedSettings = monitorWithEvaluator?.evaluator?.config
+      ? ((monitorWithEvaluator.evaluator.config as Record<string, any>)
+          .settings ?? monitorWithEvaluator.parameters)
+      : monitorWithEvaluator?.parameters;
 
     expect(resolvedSettings).toEqual(evaluatorSettings);
     expect(resolvedSettings).not.toEqual(monitorParameters);
@@ -157,11 +153,10 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
     expect(monitorWithEvaluator?.evaluator).toBeNull();
 
     // Verify the settings resolution logic falls back to parameters
-    const resolvedSettings =
-      monitorWithEvaluator?.evaluator && monitorWithEvaluator.evaluator.config
-        ? (monitorWithEvaluator.evaluator.config as Record<string, any>)
-            .settings ?? monitorWithEvaluator.parameters
-        : monitorWithEvaluator?.parameters;
+    const resolvedSettings = monitorWithEvaluator?.evaluator?.config
+      ? ((monitorWithEvaluator.evaluator.config as Record<string, any>)
+          .settings ?? monitorWithEvaluator.parameters)
+      : monitorWithEvaluator?.parameters;
 
     expect(resolvedSettings).toEqual(monitorParameters);
   });
@@ -209,11 +204,10 @@ describe("runEvaluationJob - evaluator settings resolution", () => {
     });
 
     // Verify settings resolution falls back to parameters when no settings in config
-    const resolvedSettings =
-      monitorWithEvaluator?.evaluator && monitorWithEvaluator.evaluator.config
-        ? (monitorWithEvaluator.evaluator.config as Record<string, any>)
-            .settings ?? monitorWithEvaluator.parameters
-        : monitorWithEvaluator?.parameters;
+    const resolvedSettings = monitorWithEvaluator?.evaluator?.config
+      ? ((monitorWithEvaluator.evaluator.config as Record<string, any>)
+          .settings ?? monitorWithEvaluator.parameters)
+      : monitorWithEvaluator?.parameters;
 
     expect(resolvedSettings).toEqual(monitorParameters);
   });
@@ -261,12 +255,12 @@ describe("updateEvaluationStatusInES", () => {
     const response = await getTraceCheck(
       traceId,
       check.evaluator_id,
-      projectId
+      projectId,
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
@@ -305,12 +299,12 @@ describe("updateEvaluationStatusInES", () => {
     const response = await getTraceCheck(
       traceId,
       check.evaluator_id,
-      projectId
+      projectId,
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
@@ -346,7 +340,13 @@ describe("updateEvaluationStatusInES", () => {
  */
 describe.skip("Check Queue Integration Tests (requires Redis)", () => {
   it.todo("should schedule a trace check and update status to scheduled in ES");
-  it.todo("should process a trace check successfully and update status to processed in ES");
-  it.todo("should process a trace check that failed and update status to processed in ES");
-  it.todo("should error out when a trace check throws an exception and update status to error in ES");
+  it.todo(
+    "should process a trace check successfully and update status to processed in ES",
+  );
+  it.todo(
+    "should process a trace check that failed and update status to processed in ES",
+  );
+  it.todo(
+    "should error out when a trace check throws an exception and update status to error in ES",
+  );
 });

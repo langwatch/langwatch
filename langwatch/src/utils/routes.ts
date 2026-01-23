@@ -149,7 +149,7 @@ export const projectRoutes = {
   evaluators: {
     path: "/[project]/evaluators",
     title: "Evaluators",
-  }
+  },
 } as const;
 
 export type Route = {

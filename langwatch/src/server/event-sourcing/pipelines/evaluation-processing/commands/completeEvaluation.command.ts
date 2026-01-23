@@ -1,4 +1,8 @@
-import type { Command, CommandHandler, CommandHandlerResult } from "../../../library";
+import type {
+  Command,
+  CommandHandler,
+  CommandHandlerResult,
+} from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { CompleteEvaluationCommandData } from "../schemas/commands";
 import { completeEvaluationCommandDataSchema } from "../schemas/commands";
@@ -8,14 +12,14 @@ import {
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
-  EvaluationProcessingEvent,
   EvaluationCompletedEvent,
   EvaluationCompletedEventData,
+  EvaluationProcessingEvent,
 } from "../schemas/events";
 import {
   createEvaluationCommandHandler,
-  makeJobIdWithSuffix,
   type EvaluationCommandConfig,
+  makeJobIdWithSuffix,
 } from "./base.command";
 
 const config: EvaluationCommandConfig<
@@ -55,7 +59,7 @@ export class CompleteEvaluationCommand
   static readonly schema = defineCommandSchema(
     COMPLETE_EVALUATION_COMMAND_TYPE,
     completeEvaluationCommandDataSchema,
-    "Command to complete an evaluation"
+    "Command to complete an evaluation",
   );
 
   private readonly handleCommand = createEvaluationCommandHandler<
@@ -65,7 +69,7 @@ export class CompleteEvaluationCommand
   >(config);
 
   handle(
-    command: Command<CompleteEvaluationCommandData>
+    command: Command<CompleteEvaluationCommandData>,
   ): CommandHandlerResult<EvaluationProcessingEvent> {
     return this.handleCommand(command);
   }
@@ -75,7 +79,7 @@ export class CompleteEvaluationCommand
   }
 
   static getSpanAttributes(
-    payload: CompleteEvaluationCommandData
+    payload: CompleteEvaluationCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.evaluation.id": payload.evaluationId,

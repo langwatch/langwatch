@@ -460,7 +460,9 @@ export function extractPreviousSequenceNumber(error: unknown): number | null {
  * This error occurs when events haven't yet become visible in ClickHouse
  * due to replication lag, even though a checkpoint was created for them.
  */
-export function isNoEventsFoundError(error: unknown): error is NoEventsFoundError {
+export function isNoEventsFoundError(
+  error: unknown,
+): error is NoEventsFoundError {
   return error instanceof NoEventsFoundError;
 }
 
