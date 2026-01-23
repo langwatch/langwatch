@@ -1,6 +1,5 @@
 import crypto from "crypto";
-import type { PlanInfo } from "~/server/subscriptionHandler";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { LICENSE_ERRORS, PUBLIC_KEY } from "./constants";
 import { mapToPlanInfo } from "./planMapping";
 import { SignedLicenseSchema } from "./types";
 import type { SignedLicense, ValidationResult } from "./types";
@@ -24,6 +23,7 @@ export function parseLicenseKey(licenseKey: string): SignedLicense | null {
 
     return result.success ? result.data : null;
   } catch {
+    // Invalid base64, JSON parse, or schema validation - all indicate an invalid license
     return null;
   }
 }
@@ -84,17 +84,17 @@ export function validateLicense(
   // Step 1: Parse
   const signedLicense = parseLicenseKey(licenseKey);
   if (!signedLicense) {
-    return { valid: false, error: "Invalid license format" };
+    return { valid: false, error: LICENSE_ERRORS.INVALID_FORMAT };
   }
 
   // Step 2: Verify signature
   if (!verifySignature(signedLicense, publicKey)) {
-    return { valid: false, error: "Invalid signature" };
+    return { valid: false, error: LICENSE_ERRORS.INVALID_SIGNATURE };
   }
 
   // Step 3: Check expiration
   if (isExpired(signedLicense.data.expiresAt)) {
-    return { valid: false, error: "License expired" };
+    return { valid: false, error: LICENSE_ERRORS.EXPIRED };
   }
 
   // Success!
@@ -103,20 +103,5 @@ export function validateLicense(
     licenseData: signedLicense.data,
     planInfo: mapToPlanInfo(signedLicense.data),
   };
-}
-
-/**
- * Extracts the plan from a license key, falling back to FREE_PLAN on failure.
- *
- * @param licenseKey - Base64-encoded license string
- * @param publicKey - RSA public key (defaults to production key)
- * @returns PlanInfo from the license, or FREE_PLAN if invalid/expired
- */
-export function getPlanFromLicense(
-  licenseKey: string,
-  publicKey: string = PUBLIC_KEY,
-): PlanInfo {
-  const result = validateLicense(licenseKey, publicKey);
-  return result.valid ? result.planInfo : FREE_PLAN;
 }
 

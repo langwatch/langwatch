@@ -10,13 +10,14 @@ Feature: License Lifecycle End-to-End
 
   Scenario: Complete license activation and enforcement flow
     Given a fresh LangWatch self-hosted deployment
+    And LICENSE_ENFORCEMENT_ENABLED is "true"
     And an organization "Acme Corp" exists with 3 members and 2 projects
     And I am logged in as an admin of the organization
 
-    # Step 1: Verify unlimited mode without license
+    # Step 1: Verify no-license state
     When I navigate to the license settings page
     Then I see "No license installed"
-    And I see "Running in unlimited mode"
+    And I see "Running without a license. Some feature may be limited."
 
     # Step 2: Upload a valid license
     Given I have a valid PRO license with:
@@ -45,9 +46,10 @@ Feature: License Lifecycle End-to-End
     Then I see an info toast "License removed"
     And I see "No license installed"
 
-    # Step 5: Verify unlimited mode restored
-    When I try to invite 3 new members
-    Then the invites are created successfully
+    # Step 5: Verify falls back to FREE tier limits (maxMembers: 2)
+    # Organization already has 3 members, so it exceeds FREE tier limit
+    When I try to invite a new member
+    Then the invite fails because member limit is exceeded
 
   # ============================================================================
   # Invalid License Handling

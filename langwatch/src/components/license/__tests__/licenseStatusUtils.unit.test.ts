@@ -123,7 +123,8 @@ describe("formatLicenseDate", () => {
   });
 
   it("formats full ISO datetime string", () => {
-    expect(formatLicenseDate("2025-06-15T00:00:00Z")).toBe("June 15, 2025");
+    // Use mid-day UTC to avoid timezone boundary issues
+    expect(formatLicenseDate("2025-06-15T12:00:00Z")).toBe("June 15, 2025");
   });
 
   it("returns original string for invalid date", () => {

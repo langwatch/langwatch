@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { LicenseError } from "./constants";
 
 /** Plan limits embedded within a license */
 export const LicensePlanLimitsSchema = z.object({
@@ -45,7 +46,7 @@ export type ValidationResult =
     }
   | {
       valid: false;
-      error: "Invalid license format" | "Invalid signature" | "License expired";
+      error: LicenseError;
     };
 
 /** License status for API responses - discriminated union for type safety */
@@ -94,14 +95,11 @@ export type StoreLicenseResult =
     }
   | {
       success: false;
-      error:
-        | "Invalid license format"
-        | "Invalid signature"
-        | "License expired"
-        | "Organization not found";
+      error: LicenseError;
     };
 
 /** Result of removing a license */
 export type RemoveLicenseResult = {
-  removed: boolean;
+  /** Always true on success. Throws OrganizationNotFoundError if org doesn't exist. */
+  removed: true;
 };

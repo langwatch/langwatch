@@ -1,6 +1,8 @@
 /**
  * Test RSA key pair for license signing and verification.
  * These keys are ONLY for testing - never use in production.
+ *
+ * gitleaks:allow -- test-only key fixtures, not real secrets
  */
 
 // 2048-bit RSA private key for signing test licenses
@@ -44,6 +46,7 @@ iQIDAQAB
 -----END PUBLIC KEY-----`;
 
 // A different key pair for "wrong key" signature tests
+// gitleaks:allow
 export const WRONG_PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----
 MIIEogIBAAKCAQEAq4utbj0BDQlwUcQ2gNar8vT0JYj24i6xoIGLBmwkY/D9vxU4
 FbFdiLPddiv+Mv5KAPVvNXbLy8zkbsK74BT7ye7Od2bJILMiZGMRKj7t1lx3Clth

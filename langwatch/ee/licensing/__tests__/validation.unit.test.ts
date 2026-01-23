@@ -15,7 +15,7 @@ import {
   INVALID_JSON_BASE64,
   GARBAGE_DATA,
 } from "./fixtures/testLicenses";
-import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
+import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
 
 describe("parseLicenseKey", () => {
   it("parses valid base64-encoded license key", () => {
@@ -66,7 +66,8 @@ describe("verifySignature", () => {
     const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
 
     expect(signedLicense).not.toBeNull();
-    const result = verifySignature(signedLicense!, TEST_PUBLIC_KEY);
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
 
     expect(result).toBe(true);
   });
@@ -75,36 +76,28 @@ describe("verifySignature", () => {
     const signedLicense = parseLicenseKey(TAMPERED_LICENSE_KEY);
 
     expect(signedLicense).not.toBeNull();
-    const result = verifySignature(signedLicense!, TEST_PUBLIC_KEY);
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
 
     expect(result).toBe(false);
   });
 
-  it("rejects license with wrong signature (different key)", () => {
+  it("rejects license verified with different public key", () => {
     const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
 
     expect(signedLicense).not.toBeNull();
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, WRONG_PUBLIC_KEY);
 
-    // Use a different public key (the production placeholder won't match)
-    const wrongKey = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890abcdef
------END PUBLIC KEY-----`;
-
-    // This should either return false or throw (depending on key validity)
-    try {
-      const result = verifySignature(signedLicense!, wrongKey);
-      expect(result).toBe(false);
-    } catch {
-      // Invalid key format also means verification fails
-      expect(true).toBe(true);
-    }
+    expect(result).toBe(false);
   });
 
   it("rejects license with empty signature", () => {
     const signedLicense = parseLicenseKey(EMPTY_SIGNATURE_KEY);
 
     expect(signedLicense).not.toBeNull();
-    const result = verifySignature(signedLicense!, TEST_PUBLIC_KEY);
+    if (!signedLicense) throw new Error("Expected signedLicense to be defined");
+    const result = verifySignature(signedLicense, TEST_PUBLIC_KEY);
 
     expect(result).toBe(false);
   });
@@ -143,6 +136,12 @@ describe("isExpired", () => {
     const result = isExpired(expiresAt, now);
 
     expect(result).toBe(false);
+  });
+
+  it("returns true for invalid date string (security fallback)", () => {
+    const result = isExpired("not-a-valid-date");
+
+    expect(result).toBe(true);
   });
 });
 
@@ -183,36 +182,96 @@ describe("validateLicense", () => {
     }
   });
 
-  it("extracts all license fields correctly", () => {
-    const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+  describe("extracts license fields correctly", () => {
+    it("extracts licenseId", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
 
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.licenseData.licenseId).toBe(BASE_LICENSE.licenseId);
-      expect(result.licenseData.organizationName).toBe(
-        BASE_LICENSE.organizationName
-      );
-      expect(result.licenseData.email).toBe(BASE_LICENSE.email);
-      expect(result.licenseData.plan.type).toBe(BASE_LICENSE.plan.type);
-      expect(result.licenseData.plan.maxMembers).toBe(
-        BASE_LICENSE.plan.maxMembers
-      );
-      expect(result.licenseData.plan.maxProjects).toBe(
-        BASE_LICENSE.plan.maxProjects
-      );
-      expect(result.licenseData.plan.maxMessagesPerMonth).toBe(
-        BASE_LICENSE.plan.maxMessagesPerMonth
-      );
-      expect(result.licenseData.plan.evaluationsCredit).toBe(
-        BASE_LICENSE.plan.evaluationsCredit
-      );
-      expect(result.licenseData.plan.maxWorkflows).toBe(
-        BASE_LICENSE.plan.maxWorkflows
-      );
-      expect(result.licenseData.plan.canPublish).toBe(
-        BASE_LICENSE.plan.canPublish
-      );
-    }
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.licenseId).toBe(BASE_LICENSE.licenseId);
+      }
+    });
+
+    it("extracts organizationName", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.organizationName).toBe(BASE_LICENSE.organizationName);
+      }
+    });
+
+    it("extracts email", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.email).toBe(BASE_LICENSE.email);
+      }
+    });
+
+    it("extracts plan.type", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.type).toBe(BASE_LICENSE.plan.type);
+      }
+    });
+
+    it("extracts plan.maxMembers", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
+      }
+    });
+
+    it("extracts plan.maxProjects", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxProjects).toBe(BASE_LICENSE.plan.maxProjects);
+      }
+    });
+
+    it("extracts plan.maxMessagesPerMonth", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxMessagesPerMonth).toBe(BASE_LICENSE.plan.maxMessagesPerMonth);
+      }
+    });
+
+    it("extracts plan.evaluationsCredit", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
+      }
+    });
+
+    it("extracts plan.maxWorkflows", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.maxWorkflows).toBe(BASE_LICENSE.plan.maxWorkflows);
+      }
+    });
+
+    it("extracts plan.canPublish", () => {
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
+      }
+    });
   });
 });
 

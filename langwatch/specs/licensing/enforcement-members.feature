@@ -30,16 +30,18 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited)
+  # No License (Unlimited when enforcement disabled)
   # ============================================================================
 
-  Scenario: No license allows unlimited members
-    Given the organization has no license
+  Scenario: No license allows unlimited members when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
-  Scenario: No license with 100 existing members still allows invites
-    Given the organization has no license
+  Scenario: No license with 100 existing members still allows invites when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
     And the organization has 100 existing members
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully

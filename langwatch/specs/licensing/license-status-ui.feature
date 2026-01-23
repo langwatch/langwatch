@@ -16,7 +16,7 @@ Feature: License Status UI Component
     Given the organization has no license
     When the component renders
     Then I see text "No license installed"
-    And I see text "Running in unlimited mode"
+    And I see text "Running without a license. Some feature may be limited."
 
   Scenario: Shows license input textarea when no license
     Given the organization has no license

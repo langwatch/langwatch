@@ -10,7 +10,8 @@ export type {
 } from "./types";
 
 // Constants
-export { FREE_PLAN, PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
+export { FREE_PLAN, LICENSE_ERRORS, PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
+export type { LicenseError } from "./constants";
 
 // Validation
 export {

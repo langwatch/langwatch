@@ -20,6 +20,17 @@ interface LicenseHandlerConfig {
  * - No license stored = FREE_PLAN (restricted access)
  * - Valid license = license-based limits
  * - Invalid/expired license = FREE_PLAN (restricted fallback)
+ *
+ * ## Design Note (SRP)
+ *
+ * This class has ONE reason to change: how licenses are stored and retrieved for organizations.
+ * It intentionally delegates specialized concerns to focused modules:
+ * - `validation.ts` - cryptographic validation and parsing
+ * - `planMapping.ts` - license-to-plan transformation
+ * - `errors.ts` - domain error types
+ *
+ * If this class grows to handle additional concerns (e.g., license renewal notifications,
+ * usage tracking), consider extracting those into separate collaborators.
  */
 export class LicenseHandler {
   private prisma: PrismaClient;

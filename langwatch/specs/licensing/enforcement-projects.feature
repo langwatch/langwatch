@@ -33,11 +33,12 @@ Feature: Project Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited)
+  # No License (Unlimited when enforcement disabled)
   # ============================================================================
 
-  Scenario: No license allows unlimited projects
-    Given the organization has no license
+  Scenario: No license allows unlimited projects when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
     And the organization has 100 projects
     When I create a project named "New Project"
     Then the project is created successfully

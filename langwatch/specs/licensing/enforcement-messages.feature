@@ -33,20 +33,21 @@ Feature: Message/Trace Limit Enforcement with License
     Then exceeded is true
 
   Scenario: Returns correct count and limit values
-    Given the organization has a license with maxMessagesPerMonth 50000
+    Given the organization has a PRO license with maxMessagesPerMonth 50000
     And the organization has 25000 traces this month
     When I check the trace limit for team "team-456"
     Then the response includes:
       | count               | 25000  |
       | maxMessagesPerMonth | 50000  |
-      | planName            | <plan> |
+      | planName            | PRO    |
 
   # ============================================================================
-  # No License (Unlimited)
+  # No License (Unlimited when enforcement disabled)
   # ============================================================================
 
-  Scenario: No license allows unlimited traces
-    Given the organization has no license
+  Scenario: No license allows unlimited traces when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
     And the organization has 1000000 traces this month
     When I check the trace limit for team "team-456"
     Then exceeded is false

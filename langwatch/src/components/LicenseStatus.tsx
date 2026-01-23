@@ -67,7 +67,7 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
     if (removeSuccess) {
       toaster.create({
         title: "License removed",
-        description: "Your organization is now running in unlimited mode.",
+        description: "Your organization is now running without a license. Some feature may be limited.",
         type: "info",
       });
     }
