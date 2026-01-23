@@ -25,3 +25,6 @@ export { mapToPlanInfo } from "./planMapping";
 
 // License Handler
 export { LicenseHandler } from "./licenseHandler";
+
+// Errors
+export { OrganizationNotFoundError } from "./errors";

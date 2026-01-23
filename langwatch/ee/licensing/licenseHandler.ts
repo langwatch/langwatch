@@ -31,6 +31,14 @@ export class LicenseHandler {
   }
 
   /**
+   * Factory method for creating a LicenseHandler instance.
+   * Provides proper lifecycle management for production use.
+   */
+  static create(prisma: PrismaClient, publicKey?: string): LicenseHandler {
+    return new LicenseHandler({ prisma, publicKey });
+  }
+
+  /**
    * Gets the active plan for an organization based on its stored license.
    *
    * Returns:
@@ -138,9 +146,11 @@ export class LicenseHandler {
     const signedLicense = parseLicenseKey(organization.license);
 
     if (!signedLicense) {
+      // License exists but is corrupted/unreadable
       return {
         hasLicense: true,
         valid: false,
+        corrupted: true,
       };
     }
 
@@ -150,9 +160,22 @@ export class LicenseHandler {
     // Return metadata regardless of validity - UI needs this for "license expired" messages
     const { data: licenseData } = signedLicense;
 
+    if (validationResult.valid) {
+      return {
+        hasLicense: true,
+        valid: true,
+        plan: licenseData.plan.type,
+        planName: licenseData.plan.name,
+        expiresAt: licenseData.expiresAt,
+        organizationName: licenseData.organizationName,
+        currentMembers: organization._count.members,
+        maxMembers: licenseData.plan.maxMembers,
+      };
+    }
+
     return {
       hasLicense: true,
-      valid: validationResult.valid,
+      valid: false,
       plan: licenseData.plan.type,
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,

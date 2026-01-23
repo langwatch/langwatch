@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
-import { type LicenseStatus } from "../../../../ee/licensing";
+import { type LicenseStatus, OrganizationNotFoundError } from "../../../../ee/licensing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 
 export const licenseRouter = createTRPCRouter({
@@ -32,22 +32,29 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      const result = await getLicenseHandler().validateAndStoreLicense(
-        input.organizationId,
-        input.licenseKey
-      );
+      try {
+        const result = await getLicenseHandler().validateAndStoreLicense(
+          input.organizationId,
+          input.licenseKey
+        );
 
-      if (!result.success) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: result.error,
-        });
+        if (!result.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: result.error,
+          });
+        }
+
+        return {
+          success: true,
+          planInfo: result.planInfo,
+        };
+      } catch (error) {
+        if (error instanceof OrganizationNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
       }
-
-      return {
-        success: true,
-        planInfo: result.planInfo,
-      };
     }),
 
   /**
@@ -61,11 +68,18 @@ export const licenseRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      const result = await getLicenseHandler().removeLicense(input.organizationId);
+      try {
+        const result = await getLicenseHandler().removeLicense(input.organizationId);
 
-      return {
-        success: true,
-        removed: result.removed,
-      };
+        return {
+          success: true,
+          removed: result.removed,
+        };
+      } catch (error) {
+        if (error instanceof OrganizationNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
 });

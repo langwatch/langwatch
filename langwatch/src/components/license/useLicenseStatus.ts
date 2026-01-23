@@ -19,3 +19,19 @@ export function normalizeKeyForActivation(key: string): string | null {
   const trimmed = key.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
+
+/**
+ * Formats an ISO date string for display.
+ * Returns the original string if parsing fails.
+ */
+export function formatLicenseDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (isNaN(date.getTime())) {
+    return isoDate;
+  }
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}

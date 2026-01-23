@@ -38,10 +38,7 @@ let licenseHandler: LicenseHandler | null = null;
  */
 export function getLicenseHandler(): LicenseHandler {
   if (!licenseHandler) {
-    licenseHandler = new LicenseHandler({
-      prisma,
-      publicKey: PUBLIC_KEY,
-    });
+    licenseHandler = LicenseHandler.create(prisma, PUBLIC_KEY);
   }
   return licenseHandler;
 }
@@ -54,10 +51,11 @@ export abstract class SubscriptionHandler {
       email?: string | null;
       name?: string | null;
     },
+    handler: LicenseHandler = getLicenseHandler(),
   ): Promise<PlanInfo> {
     // When license enforcement is enabled, delegate to LicenseHandler
     if (env.LICENSE_ENFORCEMENT_ENABLED) {
-      return getLicenseHandler().getActivePlan(organizationId);
+      return handler.getActivePlan(organizationId);
     }
 
     // Default: return unlimited plan (backward compatible)

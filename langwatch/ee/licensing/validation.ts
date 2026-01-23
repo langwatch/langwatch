@@ -1,6 +1,5 @@
 import crypto from "crypto";
-import type { PlanInfo } from "~/server/subscriptionHandler";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { PUBLIC_KEY } from "./constants";
 import { mapToPlanInfo } from "./planMapping";
 import { SignedLicenseSchema } from "./types";
 import type { SignedLicense, ValidationResult } from "./types";
@@ -102,20 +101,3 @@ export function validateLicense(
   };
 }
 
-/**
- * Gets plan info from a license key, returning FREE_PLAN for invalid/expired licenses.
- *
- * @param licenseKey - Base64-encoded license string
- * @param publicKey - RSA public key (defaults to production key)
- * @returns PlanInfo from license, or FREE_PLAN if invalid/expired
- */
-export function getPlanFromLicense(
-  licenseKey: string,
-  publicKey: string = PUBLIC_KEY,
-): PlanInfo {
-  const result = validateLicense(licenseKey, publicKey);
-  if (result.valid) {
-    return result.planInfo;
-  }
-  return FREE_PLAN;
-}

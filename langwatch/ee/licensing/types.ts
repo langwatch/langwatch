@@ -48,17 +48,43 @@ export type ValidationResult =
       error: "Invalid license format" | "Invalid signature" | "License expired";
     };
 
-/** License status for API responses */
-export interface LicenseStatus {
-  hasLicense: boolean;
-  valid: boolean;
-  plan?: string;
-  planName?: string;
-  expiresAt?: string;
-  organizationName?: string;
-  currentMembers?: number;
-  maxMembers?: number;
-}
+/** License status for API responses - discriminated union for type safety */
+type NoLicenseStatus = {
+  hasLicense: false;
+  valid: false;
+};
+
+/** License exists but is corrupted/unreadable - no metadata can be extracted */
+type UnreadableLicenseStatus = {
+  hasLicense: true;
+  valid: false;
+  corrupted: true;
+};
+
+type InvalidLicenseStatus = {
+  hasLicense: true;
+  valid: false;
+  corrupted?: false;
+  plan: string;
+  planName: string;
+  expiresAt: string;
+  organizationName: string;
+  currentMembers: number;
+  maxMembers: number;
+};
+
+type ValidLicenseStatus = {
+  hasLicense: true;
+  valid: true;
+  plan: string;
+  planName: string;
+  expiresAt: string;
+  organizationName: string;
+  currentMembers: number;
+  maxMembers: number;
+};
+
+export type LicenseStatus = NoLicenseStatus | UnreadableLicenseStatus | InvalidLicenseStatus | ValidLicenseStatus;
 
 /** Result of storing a license */
 export type StoreLicenseResult =

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveIsExpired, normalizeKeyForActivation } from "../useLicenseStatus";
+import { deriveIsExpired, formatLicenseDate, normalizeKeyForActivation } from "../useLicenseStatus";
 
 /**
  * Pure unit tests for license status logic.
@@ -10,8 +10,22 @@ import { deriveIsExpired, normalizeKeyForActivation } from "../useLicenseStatus"
  */
 
 describe("deriveIsExpired", () => {
-  it("returns true when license exists but is invalid", () => {
-    const status = { hasLicense: true, valid: false } as const;
+  it("returns true when license exists but is invalid (expired)", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2023-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(deriveIsExpired(status)).toBe(true);
+  });
+
+  it("returns true when license is corrupted", () => {
+    const status = { hasLicense: true, valid: false, corrupted: true } as const;
     expect(deriveIsExpired(status)).toBe(true);
   });
 
@@ -55,5 +69,19 @@ describe("normalizeKeyForActivation", () => {
 
   it("returns key unchanged when no trimming needed", () => {
     expect(normalizeKeyForActivation("abc123")).toBe("abc123");
+  });
+});
+
+describe("formatLicenseDate", () => {
+  it("formats ISO date string to human-readable format", () => {
+    expect(formatLicenseDate("2025-12-31")).toBe("December 31, 2025");
+  });
+
+  it("formats full ISO datetime string", () => {
+    expect(formatLicenseDate("2025-06-15T00:00:00Z")).toBe("June 15, 2025");
+  });
+
+  it("returns original string for invalid date", () => {
+    expect(formatLicenseDate("not-a-date")).toBe("not-a-date");
   });
 });
