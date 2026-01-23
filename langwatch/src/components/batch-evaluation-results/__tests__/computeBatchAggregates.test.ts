@@ -275,4 +275,154 @@ describe("computeBatchTargetAggregates", () => {
       );
     });
   });
+
+  describe("pass rate computation", () => {
+    it("returns null passRate when all evaluator results have passed: null", () => {
+      // This is the key case: evaluators like response_length only produce scores
+      // and have passed: null for all results. We should NOT show 0% pass rate.
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Answer" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 11,
+                  passed: null, // NO pass/fail - just a score
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Another" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 7,
+                  passed: null, // NO pass/fail - just a score
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // response_length evaluator should have null passRate (not 0!)
+      expect(result.evaluators).toHaveLength(1);
+      expect(result.evaluators[0]?.evaluatorId).toBe("response_length");
+      expect(result.evaluators[0]?.passRate).toBeNull();
+      // Overall pass rate should also be null
+      expect(result.overallPassRate).toBeNull();
+      // But score should still be computed
+      expect(result.evaluators[0]?.averageScore).toBeCloseTo(9, 1);
+    });
+
+    it("computes passRate only from results with explicit true/false", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Answer" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "exact_match",
+                  evaluatorName: "exact_match",
+                  status: "processed",
+                  score: 1,
+                  passed: true, // Has explicit pass
+                },
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 11,
+                  passed: null, // No pass/fail
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Wrong" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "exact_match",
+                  evaluatorName: "exact_match",
+                  status: "processed",
+                  score: 0,
+                  passed: false, // Has explicit fail
+                },
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 5,
+                  passed: null, // No pass/fail
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // exact_match should have 50% pass rate (1/2)
+      const exactMatch = result.evaluators.find(
+        (e) => e.evaluatorId === "exact_match",
+      );
+      expect(exactMatch?.passRate).toBe(50);
+
+      // response_length should have null pass rate
+      const responseLength = result.evaluators.find(
+        (e) => e.evaluatorId === "response_length",
+      );
+      expect(responseLength?.passRate).toBeNull();
+
+      // Overall pass rate should only count exact_match (1 pass, 1 fail = 50%)
+      expect(result.overallPassRate).toBe(50);
+    });
+  });
 });
