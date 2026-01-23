@@ -19,6 +19,7 @@ import { prefetchScenarioData } from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
 import { SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
+import { ScenarioFailureHandler } from "./scenario-failure-handler";
 
 const logger = createLogger("langwatch:scenarios:processor");
 
@@ -229,11 +230,36 @@ export function startScenarioProcessor(): Worker<
     );
   });
 
-  worker.on("completed", (job) => {
+  worker.on("completed", async (job, result) => {
     logger.info(
-      { jobId: job.id, scenarioId: job.data.scenarioId },
+      { jobId: job.id, scenarioId: job.data.scenarioId, success: result?.success },
       "Scenario job completed",
     );
+
+    // If job failed, ensure failure events are emitted to Elasticsearch
+    // so the frontend can show the error instead of timing out
+    if (result && !result.success) {
+      try {
+        const handler = ScenarioFailureHandler.create();
+        await handler.ensureFailureEventsEmitted({
+          projectId: job.data.projectId,
+          scenarioId: job.data.scenarioId,
+          setId: job.data.setId,
+          batchRunId: job.data.batchRunId,
+          error: result.error,
+        });
+        logger.info(
+          { jobId: job.id, scenarioId: job.data.scenarioId },
+          "Failure events emitted",
+        );
+      } catch (error) {
+        // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
+        logger.error(
+          { jobId: job.id, scenarioId: job.data.scenarioId, error },
+          "Failed to emit failure events",
+        );
+      }
+    }
   });
 
   logger.info("Scenario processor started");
