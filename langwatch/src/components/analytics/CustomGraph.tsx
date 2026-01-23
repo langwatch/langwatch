@@ -40,6 +40,7 @@ import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import { useRouter } from "next/router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
+import { availableFilters } from "~/server/filters/registry";
 import {
   useColorModeValue,
   useColorRawValue,
@@ -231,8 +232,15 @@ const CustomGraph_ = React.memo(
           // Use sentiment filter (urlKey: "sentiment")
           filterParams.sentiment = params.groupKey;
         } else {
-          // For other groupBy fields, try to use as-is
-          filterParams[input.groupBy] = params.groupKey;
+          // Look up the filter in the registry to get the correct urlKey
+          const filter = availableFilters[input.groupBy as FilterField];
+          if (filter) {
+            // Use the filter's urlKey for the query parameter
+            filterParams[filter.urlKey] = params.groupKey;
+          } else {
+            // Fallback: use groupBy as-is if not found in registry
+            filterParams[input.groupBy] = params.groupKey;
+          }
         }
 
         // Navigate to messages page with filter
@@ -648,9 +656,9 @@ const CustomGraph_ = React.memo(
               onClick={(data: any, index: number) => {
                 if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
                   const entry = pieData[index]!;
-                  const { groupKey } = getSeries(seriesByKey, entry.key);
-                  // Extract evaluator ID from the series key or groupByKey
-                  const evaluatorId = input.groupByKey || input.series[0]?.key;
+                  const { series, groupKey } = getSeries(seriesByKey, entry.key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
                     evaluatorId,
@@ -757,11 +765,12 @@ const CustomGraph_ = React.memo(
             />
             <Bar
               dataKey="value"
-              onClick={(data: any) => {
-                if (handleDataPointClick && data && data.key) {
-                  const { groupKey } = getSeries(seriesByKey, data.key);
-                  const evaluatorId = input.groupByKey ||
-                    input.series[0]?.key;
+              onClick={(item: any) => {
+                if (handleDataPointClick && item && item.payload && item.payload.key) {
+                  const key = item.payload.key;
+                  const { series, groupKey } = getSeries(seriesByKey, key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
 
                   handleDataPointClick({
                     evaluatorId,
@@ -871,8 +880,9 @@ const CustomGraph_ = React.memo(
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
-            const { groupKey } = getSeries(seriesByKey, aggKey);
-            const evaluatorId = input.groupByKey || input.series[0]?.key;
+            const { series, groupKey } = getSeries(seriesByKey, aggKey);
+            // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+            const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
 
             return (
               <React.Fragment key={aggKey}>
@@ -900,7 +910,7 @@ const CustomGraph_ = React.memo(
                       : undefined
                   }
                   onClick={(data: any) => {
-                    if (onDataPointClick && data && evaluatorId) {
+                    if (onDataPointClick && data) {
                       // Extract date from data - check multiple possible locations
                       let date: string | undefined;
                       if (["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)) {

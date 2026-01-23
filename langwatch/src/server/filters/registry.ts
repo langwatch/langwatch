@@ -1505,6 +1505,10 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           });
         }
       }
+      // Guard against empty or all-invalid values: return match_all as safe no-op filter
+      if (rangeQueries.length === 0) {
+        return { match_all: {} };
+      }
       return {
         bool: {
           should: rangeQueries,

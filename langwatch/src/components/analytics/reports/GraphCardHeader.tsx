@@ -2,7 +2,7 @@ import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2, Bell } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -54,29 +54,6 @@ export function GraphCardHeader({
 }: GraphCardHeaderProps) {
   const { openDrawer } = useDrawer();
 
-  // Create form instance from graph data for the alert drawer
-  const form = useForm<CustomGraphFormData>({
-    defaultValues: graph
-      ? {
-          ...customGraphInputToFormData(graph as CustomGraphInput),
-          title: name,
-        }
-      : undefined,
-  });
-
-  const hasFilters = useMemo(
-    () =>
-      !!(
-        filters &&
-        typeof filters === "object" &&
-        Object.keys(filters).length > 0
-      ),
-    [filters],
-  );
-
-  // Check if this is a saved graph (has valid database ID)
-  const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
-
   // Generate fallback title from graph series if name is missing
   const displayName = useMemo(() => {
     if (name && name.trim()) {
@@ -99,6 +76,36 @@ export function GraphCardHeader({
     
     return "Untitled Graph";
   }, [name, graph]);
+
+  // Create form instance from graph data for the alert drawer
+  const form = useForm<CustomGraphFormData>({
+    defaultValues: graph
+      ? {
+          ...customGraphInputToFormData(graph as CustomGraphInput),
+          title: displayName,
+        }
+      : undefined,
+  });
+
+  // Update form title when displayName changes to keep drawer in sync
+  useEffect(() => {
+    if (graph) {
+      form.setValue("title", displayName);
+    }
+  }, [displayName, form, graph]);
+
+  const hasFilters = useMemo(
+    () =>
+      !!(
+        filters &&
+        typeof filters === "object" &&
+        Object.keys(filters).length > 0
+      ),
+    [filters],
+  );
+
+  // Check if this is a saved graph (has valid database ID)
+  const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
 
   return (
     <HStack
