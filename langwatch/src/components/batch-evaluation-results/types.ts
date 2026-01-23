@@ -166,6 +166,11 @@ export const transformBatchEvaluationData = (
   // For API evaluations without targets/predicted: derive a virtual target
   let targetColumns: BatchTargetColumn[] = [];
 
+  // Check if there are row-level errors without any target_id
+  const hasRowLevelErrorsWithoutTarget = dataset.some(
+    (entry) => entry.error && !entry.target_id,
+  );
+
   if (targets && targets.length > 0) {
     // V3 style with explicit targets
     targetColumns = targets.map((target) => ({
@@ -193,14 +198,39 @@ export const transformBatchEvaluationData = (
         }),
       );
     } else if (evaluations.length > 0) {
-      // API evaluations: no targets, no predicted - derive a virtual target
-      // The evaluator's input/output will be displayed in the target column
+      // API evaluations: no targets, no predicted - create one virtual target per evaluator
+      // Each evaluator's inputs (data=) will be displayed as the target output
+      const uniqueEvaluators = new Map<string, string>();
+      for (const evaluation of evaluations) {
+        if (!uniqueEvaluators.has(evaluation.evaluator)) {
+          uniqueEvaluators.set(
+            evaluation.evaluator,
+            evaluation.name ?? evaluation.evaluator,
+          );
+        }
+      }
+
+      // Create a virtual target for each evaluator
+      targetColumns = Array.from(uniqueEvaluators.entries()).map(
+        ([evaluatorId, evaluatorName]) => ({
+          id: `_eval_${evaluatorId}`,
+          name: evaluatorName,
+          type: "legacy" as const,
+          outputFields: detectEvaluatorOutputFieldsForEvaluator(
+            evaluations,
+            evaluatorId,
+          ),
+        }),
+      );
+    } else if (hasRowLevelErrorsWithoutTarget) {
+      // SDK evaluations with errors but no targets defined - create a virtual "Output" target
+      // This ensures errors are visible in the table
       targetColumns = [
         {
-          id: "_derived",
+          id: "_default",
           name: "Output",
-          type: "legacy" as const,
-          outputFields: detectEvaluatorOutputFields(evaluations),
+          type: "custom" as const,
+          outputFields: [],
         },
       ];
     }
@@ -272,10 +302,14 @@ export const transformBatchEvaluationData = (
       // Extract output for this target
       let output: Record<string, unknown> | null = null;
 
-      if (targetId === "_derived") {
-        // Derived target for API evaluations: extract output from evaluator inputs
+      if (targetId.startsWith("_eval_")) {
+        // Virtual evaluator target: extract output from this specific evaluator's inputs
+        const evaluatorId = targetId.slice(6); // Remove "_eval_" prefix
         const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
-        output = extractOutputFromEvaluatorInputs(rowEvaluations);
+        output = extractOutputFromEvaluatorInputsForEvaluator(
+          rowEvaluations,
+          evaluatorId,
+        );
       } else if (targetEntry?.predicted) {
         if (targets && targets.length > 0) {
           // V3: predicted is the output for this target
@@ -302,11 +336,22 @@ export const transformBatchEvaluationData = (
       }
 
       // Get evaluator results for this target
-      const targetEvaluations =
-        evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
-        (targets && targets.length > 0
-          ? []
-          : (evaluationsByIndexAndTarget.get(`${i}:`) ?? []));
+      let targetEvaluations: (typeof evaluations)[number][];
+
+      if (targetId.startsWith("_eval_")) {
+        // Virtual evaluator target: only include this specific evaluator
+        const evaluatorId = targetId.slice(6);
+        const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
+        targetEvaluations = rowEvaluations.filter(
+          (ev) => ev.evaluator === evaluatorId,
+        );
+      } else {
+        targetEvaluations =
+          evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
+          (targets && targets.length > 0
+            ? []
+            : (evaluationsByIndexAndTarget.get(`${i}:`) ?? []));
+      }
 
       const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map(
         (ev) => ({
@@ -377,58 +422,61 @@ const detectOutputFields = (
 };
 
 /**
- * Detect output fields from evaluator inputs for API evaluations
- * When there's no target, we use the evaluator's input/output fields
+ * Detect output fields from evaluator inputs for a specific evaluator
+ * Used when creating virtual targets per evaluator for API evaluations
  */
-const detectEvaluatorOutputFields = (
+const detectEvaluatorOutputFieldsForEvaluator = (
   evaluations: ESBatchEvaluation["evaluations"],
+  evaluatorId: string,
 ): string[] => {
   const fields = new Set<string>();
   for (const evaluation of evaluations) {
-    if (evaluation.inputs) {
-      // Common fields that represent the "output" we want to display
-      if ("output" in evaluation.inputs) fields.add("output");
-      if ("response" in evaluation.inputs) fields.add("response");
-      if ("generated" in evaluation.inputs) fields.add("generated");
-      if ("answer" in evaluation.inputs) fields.add("answer");
-      if ("prediction" in evaluation.inputs) fields.add("prediction");
+    if (evaluation.evaluator === evaluatorId && evaluation.inputs) {
+      // Add all input fields - we'll display the full data
+      for (const key of Object.keys(evaluation.inputs)) {
+        fields.add(key);
+      }
     }
   }
-  // Default to "output" if no fields found
+  // Default to "data" if no fields found
   if (fields.size === 0) {
-    fields.add("output");
+    fields.add("data");
   }
   return Array.from(fields);
 };
 
 /**
- * Extract output from evaluator inputs for API evaluations (derived target)
- * Looks for common output fields in evaluator inputs and returns them
+ * Extract output from evaluator inputs for a specific evaluator
+ * Returns all inputs as the "output" for display
  */
-const extractOutputFromEvaluatorInputs = (
+const extractOutputFromEvaluatorInputsForEvaluator = (
   evaluations: ESBatchEvaluation["evaluations"],
+  evaluatorId: string,
 ): Record<string, unknown> | null => {
-  // Try to find output from any evaluator's inputs
   for (const evaluation of evaluations) {
+    if (evaluation.evaluator !== evaluatorId) continue;
     if (!evaluation.inputs) continue;
 
     const inputs = evaluation.inputs;
+    const keys = Object.keys(inputs);
 
-    // Check for common output field names and return the first one found
-    if ("output" in inputs && inputs.output !== undefined) {
-      return { output: inputs.output };
+    // If there's only one key and it's a common output field, unwrap it
+    if (keys.length === 1) {
+      const key = keys[0]!;
+      if (
+        key === "output" ||
+        key === "response" ||
+        key === "generated" ||
+        key === "answer" ||
+        key === "prediction"
+      ) {
+        return { output: inputs[key] };
+      }
     }
-    if ("response" in inputs && inputs.response !== undefined) {
-      return { output: inputs.response };
-    }
-    if ("generated" in inputs && inputs.generated !== undefined) {
-      return { output: inputs.generated };
-    }
-    if ("answer" in inputs && inputs.answer !== undefined) {
-      return { output: inputs.answer };
-    }
-    if ("prediction" in inputs && inputs.prediction !== undefined) {
-      return { output: inputs.prediction };
+
+    // Otherwise return all inputs as-is (will be displayed as JSON)
+    if (keys.length > 0) {
+      return inputs as Record<string, unknown>;
     }
   }
 

@@ -1,5 +1,6 @@
 import { Skeleton, Text } from "@chakra-ui/react";
 import { Database } from "lucide-react";
+import React from "react";
 
 import type { DatasetReference } from "../types";
 import { DatasetTabs } from "./DatasetSection/DatasetTabs";
@@ -21,8 +22,9 @@ type DatasetSuperHeaderProps = {
 
 /**
  * Super header for the dataset columns section.
+ * Memoized to prevent unnecessary re-renders on scroll.
  */
-export function DatasetSuperHeader({
+export const DatasetSuperHeader = React.memo(function DatasetSuperHeader({
   colSpan,
   activeDataset,
   datasetHandlers,
@@ -56,4 +58,4 @@ export function DatasetSuperHeader({
       )}
     </SuperHeader>
   );
-}
+});

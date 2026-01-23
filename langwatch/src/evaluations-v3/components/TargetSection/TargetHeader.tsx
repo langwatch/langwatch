@@ -109,14 +109,37 @@ export const TargetHeader = memo(function TargetHeader({
   );
 
   // Count non-empty rows (empty rows are skipped during execution)
+  // Handles both inline and saved datasets, with fallback to persisted results
   const nonEmptyRowCount = useMemo(() => {
-    if (!activeDataset?.inline?.records) return 0;
-    const rows = transposeColumnsFirstToRowsFirstWithId(
-      activeDataset.inline.records,
-    );
-    return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row))
-      .length;
-  }, [activeDataset?.inline?.records]);
+    // For inline datasets, count non-empty rows
+    if (activeDataset?.type === "inline" && activeDataset.inline?.records) {
+      const rows = transposeColumnsFirstToRowsFirstWithId(
+        activeDataset.inline.records,
+      );
+      return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row))
+        .length;
+    }
+
+    // For saved datasets, use savedRecords count when available
+    if (activeDataset?.type === "saved" && activeDataset.savedRecords) {
+      return activeDataset.savedRecords.length;
+    }
+
+    // Fallback: If we have persisted results for this target, use that to infer row count
+    // This handles the page refresh scenario where savedRecords hasn't loaded yet
+    const targetOutputs = results.targetOutputs[target.id];
+    if (targetOutputs && targetOutputs.length > 0) {
+      return targetOutputs.length;
+    }
+
+    return 0;
+  }, [
+    activeDataset?.type,
+    activeDataset?.inline?.records,
+    activeDataset?.savedRecords,
+    results.targetOutputs,
+    target.id,
+  ]);
 
   // When THIS target is executing, use the count from executingCells
   // This ensures partial executions show correct progress (e.g., 0/1 for single cell)

@@ -249,6 +249,7 @@ export function BatchTargetCell({
               key={evalResult.evaluatorId}
               name={evalResult.evaluatorName}
               result={result}
+              inputs={evalResult.inputs}
             />
           );
         })}

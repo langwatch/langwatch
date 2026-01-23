@@ -128,6 +128,8 @@ export const computeBatchTargetAggregates = (
       errors: number;
       scoreSum: number;
       scoreCount: number;
+      // Count of results with explicit pass/fail (true/false, not null)
+      passFailCount: number;
     }
   >();
 
@@ -168,6 +170,7 @@ export const computeBatchTargetAggregates = (
           errors: 0,
           scoreSum: 0,
           scoreCount: 0,
+          passFailCount: 0,
         };
         evaluatorResultsMap.set(evalResult.evaluatorId, agg);
       }
@@ -178,9 +181,12 @@ export const computeBatchTargetAggregates = (
         agg.errors++;
       } else if (evalResult.passed === true) {
         agg.passed++;
+        agg.passFailCount++;
       } else if (evalResult.passed === false) {
         agg.failed++;
+        agg.passFailCount++;
       }
+      // Note: passed === null means no pass/fail determination - don't count towards passFailCount
 
       if (evalResult.score !== null && evalResult.score !== undefined) {
         agg.scoreSum += evalResult.score;
@@ -203,18 +209,20 @@ export const computeBatchTargetAggregates = (
     passed: agg.passed,
     failed: agg.failed,
     errors: agg.errors,
-    passRate: agg.total > 0 ? (agg.passed / agg.total) * 100 : null,
+    // Pass rate only counts results with explicit pass/fail (true/false), not score-only results
+    passRate:
+      agg.passFailCount > 0 ? (agg.passed / agg.passFailCount) * 100 : null,
     averageScore: agg.scoreCount > 0 ? agg.scoreSum / agg.scoreCount : null,
   }));
 
-  // Compute overall pass rate
-  const totalEvaluations = evaluatorAggregates.reduce(
-    (sum, e) => sum + e.total,
+  // Compute overall pass rate (only from evaluators with explicit pass/fail results)
+  const totalPassFail = evaluatorAggregates.reduce(
+    (sum, e) => sum + e.passed + e.failed,
     0,
   );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
   const overallPassRate =
-    totalEvaluations > 0 ? (totalPassed / totalEvaluations) * 100 : null;
+    totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 
   // Compute overall average score
   const scoresWithValues = evaluatorAggregates.filter(

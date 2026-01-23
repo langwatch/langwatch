@@ -4,7 +4,12 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TargetConfig } from "../../../types";
+import {
+  createInitialResults,
+  createInitialUIState,
+  type TargetConfig,
+} from "../../../types";
+import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../../TargetSection/TargetHeader";
 
 // Mock next/router
@@ -302,6 +307,103 @@ describe("TargetHeader", () => {
       await user.click(screen.getByText("Edit Agent"));
 
       expect(mockOnEdit).toHaveBeenCalledWith(agentTarget);
+    });
+  });
+
+  describe("Target Summary with saved datasets (page refresh scenario)", () => {
+    const targetWithResults: TargetConfig = {
+      id: "target-1",
+      name: "test-prompt",
+      type: "prompt",
+      promptId: "prompt-123",
+      promptVersionId: "version-456",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    beforeEach(() => {
+      // Reset the store before each test
+      useEvaluationsV3Store.setState({
+        name: "Test Evaluation",
+        datasets: [],
+        activeDatasetId: "saved-dataset-1",
+        evaluators: [
+          {
+            id: "evaluator-1",
+            dbEvaluatorId: "db-evaluator-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/llm_score",
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        targets: [targetWithResults],
+        results: createInitialResults(),
+        pendingSavedChanges: {},
+        ui: createInitialUIState(),
+      });
+    });
+
+    afterEach(() => {
+      // Reset store after test
+      useEvaluationsV3Store.getState().reset?.();
+    });
+
+    it("shows TargetSummary when results exist but savedRecords not yet loaded", () => {
+      // Simulate page refresh: results are persisted but savedRecords are not yet loaded
+      // This happens because savedRecords are loaded asynchronously from DB
+      useEvaluationsV3Store.setState({
+        datasets: [
+          {
+            id: "saved-dataset-1",
+            name: "Saved Dataset",
+            type: "saved",
+            datasetId: "db-dataset-1",
+            columns: [
+              { id: "input", name: "input", type: "string" },
+              { id: "expected", name: "expected", type: "string" },
+            ],
+            // savedRecords is undefined - not loaded yet!
+          },
+        ],
+        results: {
+          status: "idle",
+          targetOutputs: {
+            // Results ARE persisted from previous execution
+            "target-1": ["Output 1", "Output 2", "Output 3"],
+          },
+          targetMetadata: {
+            "target-1": [
+              { duration: 1000, cost: 0.001 },
+              { duration: 1200, cost: 0.002 },
+              { duration: 800, cost: 0.001 },
+            ],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "evaluator-1": [
+                { status: "passed", passed: true },
+                { status: "passed", passed: true },
+                { status: "failed", passed: false },
+              ],
+            },
+          },
+          errors: {},
+        },
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={targetWithResults}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      // The summary should still be visible, showing latency, pass rate, etc.
+      // Even though savedRecords hasn't loaded yet, we have results so we know the row count
+      expect(screen.getByTestId("target-summary")).toBeInTheDocument();
     });
   });
 });

@@ -113,7 +113,7 @@ describe("Saved datasets in workbench", () => {
       expect(rowCount).toBe(3);
     });
 
-    it("getSavedRecordValue returns correct value for saved dataset", () => {
+    it("getCellValue returns correct value for saved dataset", () => {
       const store = useEvaluationsV3Store.getState();
 
       const savedDataset: DatasetReference = {
@@ -144,6 +144,79 @@ describe("Saved datasets in workbench", () => {
         .getState()
         .getCellValue("saved_abc123", 1, "output");
       expect(value2).toBe("bar");
+    });
+
+    it("getCellValue returns JSON-stringified value for object/array values", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      const savedDataset: DatasetReference = {
+        id: "saved_json",
+        name: "JSON Dataset",
+        type: "saved",
+        datasetId: "json123",
+        columns: [
+          { id: "messages", name: "messages", type: "json" },
+          { id: "metadata", name: "metadata", type: "json" },
+        ],
+        savedRecords: [
+          {
+            id: "rec1",
+            messages: [
+              { role: "user", content: "hello" },
+              { role: "assistant", content: "hi there" },
+            ],
+            metadata: { key: "value", nested: { foo: "bar" } },
+          },
+        ],
+      };
+
+      store.addDataset(savedDataset);
+
+      // Get array value - should be JSON stringified, not [object Object]
+      const messagesValue = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_json", 0, "messages");
+      expect(messagesValue).toBe(
+        '[{"role":"user","content":"hello"},{"role":"assistant","content":"hi there"}]',
+      );
+      expect(messagesValue).not.toContain("[object Object]");
+
+      // Get object value - should be JSON stringified
+      const metadataValue = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_json", 0, "metadata");
+      expect(metadataValue).toBe('{"key":"value","nested":{"foo":"bar"}}');
+      expect(metadataValue).not.toContain("[object Object]");
+    });
+
+    it("getCellValue returns empty string for null/undefined values", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      const savedDataset: DatasetReference = {
+        id: "saved_nulls",
+        name: "Null Dataset",
+        type: "saved",
+        datasetId: "null123",
+        columns: [
+          { id: "nullable", name: "nullable", type: "string" },
+          { id: "missing", name: "missing", type: "string" },
+        ],
+        savedRecords: [{ id: "rec1", nullable: null }],
+      };
+
+      store.addDataset(savedDataset);
+
+      // Null value should return empty string
+      const nullValue = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_nulls", 0, "nullable");
+      expect(nullValue).toBe("");
+
+      // Missing/undefined value should return empty string
+      const missingValue = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_nulls", 0, "missing");
+      expect(missingValue).toBe("");
     });
   });
 

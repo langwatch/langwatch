@@ -8,7 +8,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -63,7 +62,7 @@ import {
 } from "../utils/fieldMappingConverters";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { type ColumnType, TableCell } from "./DatasetSection/TableCell";
+import { type ColumnType } from "./DatasetSection/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
@@ -73,9 +72,13 @@ import {
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
+import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
-// Types are imported from ../types (TableRowData, TableMeta)
-// Meta wrappers are imported from ./TableMetaWrappers
+// Drawer width for spacer columns (must match actual drawer width)
+const DRAWER_WIDTH = 456;
+
+// Max rows for expanded mode (disable virtualization above this)
+const MAX_ROWS_FOR_EXPANDED_MODE = 100;
 
 // ============================================================================
 // Main Component
@@ -139,6 +142,7 @@ export function EvaluationsV3Table({
         selectedCell: state.ui.selectedCell,
         columnWidths: state.ui.columnWidths,
         hiddenColumns: state.ui.hiddenColumns,
+        rowHeightMode: state.ui.rowHeightMode,
       },
       // Actions (stable references)
       setSelectedCell: state.setSelectedCell,
@@ -456,6 +460,121 @@ export function EvaluationsV3Table({
     [addTarget],
   );
 
+  // Handler for opening the add target flow (prompts/agents)
+  // Memoized to prevent TargetSuperHeader re-renders
+  const handleAddTarget = useCallback(() => {
+    // Clear any pending mappings from previous flows
+    pendingMappingsRef.current = {};
+
+    // Build available sources for variable mapping (for new prompts)
+    const availableSources = buildAvailableSources();
+
+    // Handler to open promptEditor for new prompts with proper props
+    const openNewPromptEditor = () => {
+      openDrawer(
+        "promptEditor",
+        {
+          // Pass available sources via complexProps
+          availableSources,
+          inputMappings: {},
+          onInputMappingsChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
+            if (mapping) {
+              pendingMappingsRef.current[identifier] = mapping;
+            } else {
+              delete pendingMappingsRef.current[identifier];
+            }
+          },
+        },
+        // Reset stack to prevent back button when creating new prompts
+        { resetStack: true },
+      );
+    };
+
+    // Set flow callbacks for the entire add-target flow
+    setFlowCallbacks("promptList", {
+      onSelect: handleSelectPrompt,
+      // Custom onCreateNew to open promptEditor with availableSources
+      onCreateNew: openNewPromptEditor,
+    });
+    setFlowCallbacks("promptEditor", {
+      // For new prompts: track mappings in pendingMappingsRef, then apply when saved
+      onInputMappingsChange: (
+        identifier: string,
+        mapping: UIFieldMapping | undefined,
+      ) => {
+        if (mapping) {
+          pendingMappingsRef.current[identifier] = mapping;
+        } else {
+          delete pendingMappingsRef.current[identifier];
+        }
+      },
+      onSave: (savedPrompt) => {
+        // Apply pending mappings when creating the target
+        const storeMappings: Record<string, FieldMapping> = {};
+        for (const [key, uiMapping] of Object.entries(
+          pendingMappingsRef.current,
+        )) {
+          storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
+        }
+
+        // Get current state for active dataset
+        const currentActiveDatasetId =
+          useEvaluationsV3Store.getState().activeDatasetId;
+
+        // Create target with pending mappings
+        const targetId = `target_${Date.now()}`;
+        const targetConfig: TargetConfig = {
+          id: targetId,
+          type: "prompt",
+          name: savedPrompt.name,
+          promptId: savedPrompt.id,
+          promptVersionId: savedPrompt.versionId,
+          promptVersionNumber: savedPrompt.version,
+          inputs: (
+            savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]
+          ).map((i) => ({
+            identifier: i.identifier,
+            type: i.type as Field["type"],
+          })),
+          outputs: (
+            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]
+          ).map((o) => ({
+            identifier: o.identifier,
+            type: o.type as Field["type"],
+          })),
+          mappings:
+            Object.keys(storeMappings).length > 0
+              ? { [currentActiveDatasetId]: storeMappings }
+              : {},
+        };
+        addTarget(targetConfig);
+
+        // Clear pending mappings
+        pendingMappingsRef.current = {};
+      },
+    });
+    setFlowCallbacks("agentList", {
+      onSelect: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("agentCodeEditor", {
+      onSave: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("workflowSelector", {
+      onSave: handleSelectSavedAgent,
+    });
+    openDrawer("targetTypeSelector");
+  }, [
+    buildAvailableSources,
+    openDrawer,
+    handleSelectPrompt,
+    handleSelectSavedAgent,
+    isDatasetSource,
+    addTarget,
+  ]);
+
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
     () => ({
@@ -579,29 +698,12 @@ export function EvaluationsV3Table({
   // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);
 
-  // Estimated row height for virtualization
-  const ROW_HEIGHT = 60;
-
-  // Stable callbacks for virtualizer to prevent infinite re-renders
-  const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
-  );
-  const estimateSize = useCallback(() => ROW_HEIGHT, []);
-
-  // Set up row virtualization with dynamic measurement
-  const rowVirtualizer = useVirtualizer({
-    count: displayRowCount,
-    getScrollElement,
-    estimateSize,
-    overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
-    enabled: !!scrollContainer, // Only enable when scroll container is available
-    // Enable dynamic measurement - measures actual row heights as they render
-    measureElement:
-      typeof window !== "undefined"
-        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
-        : undefined,
-  });
+  // Determine if we should use virtualization
+  // - Always use virtualization in compact mode (fixed 197px rows)
+  // - Disable virtualization in expanded mode for datasets <= 100 rows
+  const rowHeightMode = ui.rowHeightMode;
+  const shouldVirtualize =
+    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
 
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
@@ -953,7 +1055,6 @@ export function EvaluationsV3Table({
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
-  const DRAWER_WIDTH = 456;
   const MENU_PLUS_PADDING = 56 + 16;
 
   return (
@@ -1054,118 +1155,7 @@ export function EvaluationsV3Table({
             />
             <TargetSuperHeader
               colSpan={targetsColSpan}
-              onAddClick={() => {
-                // Clear any pending mappings from previous flows
-                pendingMappingsRef.current = {};
-
-                // Build available sources for variable mapping (for new prompts)
-                const availableSources = buildAvailableSources();
-
-                // Handler to open promptEditor for new prompts with proper props
-                const openNewPromptEditor = () => {
-                  openDrawer(
-                    "promptEditor",
-                    {
-                      // Pass available sources via complexProps
-                      availableSources,
-                      inputMappings: {},
-                      onInputMappingsChange: (
-                        identifier: string,
-                        mapping: UIFieldMapping | undefined,
-                      ) => {
-                        if (mapping) {
-                          pendingMappingsRef.current[identifier] = mapping;
-                        } else {
-                          delete pendingMappingsRef.current[identifier];
-                        }
-                      },
-                    },
-                    // Reset stack to prevent back button when creating new prompts
-                    { resetStack: true },
-                  );
-                };
-
-                // Set flow callbacks for the entire add-target flow
-                setFlowCallbacks("promptList", {
-                  onSelect: handleSelectPrompt,
-                  // Custom onCreateNew to open promptEditor with availableSources
-                  onCreateNew: openNewPromptEditor,
-                });
-                setFlowCallbacks("promptEditor", {
-                  // For new prompts: track mappings in pendingMappingsRef, then apply when saved
-                  onInputMappingsChange: (
-                    identifier: string,
-                    mapping: UIFieldMapping | undefined,
-                  ) => {
-                    if (mapping) {
-                      pendingMappingsRef.current[identifier] = mapping;
-                    } else {
-                      delete pendingMappingsRef.current[identifier];
-                    }
-                  },
-                  onSave: (savedPrompt) => {
-                    // Apply pending mappings when creating the target
-                    const storeMappings: Record<string, FieldMapping> = {};
-                    for (const [key, uiMapping] of Object.entries(
-                      pendingMappingsRef.current,
-                    )) {
-                      storeMappings[key] = convertFromUIMapping(
-                        uiMapping,
-                        isDatasetSource,
-                      );
-                    }
-
-                    // Get current state for active dataset
-                    const currentActiveDatasetId =
-                      useEvaluationsV3Store.getState().activeDatasetId;
-
-                    // Create target with pending mappings
-                    const targetId = `target_${Date.now()}`;
-                    const targetConfig: TargetConfig = {
-                      id: targetId,
-                      type: "prompt",
-                      name: savedPrompt.name,
-                      promptId: savedPrompt.id,
-                      promptVersionId: savedPrompt.versionId,
-                      promptVersionNumber: savedPrompt.version,
-                      inputs: (
-                        savedPrompt.inputs ?? [
-                          { identifier: "input", type: "str" },
-                        ]
-                      ).map((i) => ({
-                        identifier: i.identifier,
-                        type: i.type as Field["type"],
-                      })),
-                      outputs: (
-                        savedPrompt.outputs ?? [
-                          { identifier: "output", type: "str" },
-                        ]
-                      ).map((o) => ({
-                        identifier: o.identifier,
-                        type: o.type as Field["type"],
-                      })),
-                      mappings:
-                        Object.keys(storeMappings).length > 0
-                          ? { [currentActiveDatasetId]: storeMappings }
-                          : {},
-                    };
-                    addTarget(targetConfig);
-
-                    // Clear pending mappings
-                    pendingMappingsRef.current = {};
-                  },
-                });
-                setFlowCallbacks("agentList", {
-                  onSelect: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("agentCodeEditor", {
-                  onSave: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("workflowSelector", {
-                  onSave: handleSelectSavedAgent,
-                });
-                openDrawer("targetTypeSelector");
-              }}
+              onAddClick={handleAddTarget}
               showWarning={targets.length === 0}
               hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
@@ -1228,104 +1218,17 @@ export function EvaluationsV3Table({
           ))}
         </thead>
         <tbody>
-          {/* Virtualized rows for performance */}
-          {(() => {
-            const virtualRows = rowVirtualizer.getVirtualItems();
-            const totalSize = rowVirtualizer.getTotalSize();
-            const rows = table.getRowModel().rows;
-            const columnCount = table.getAllColumns().length + 1; // +1 for spacer
-
-            // Calculate padding to maintain scroll position (only when virtualizing)
-            const paddingTop =
-              virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
-            const paddingBottom =
-              virtualRows.length > 0
-                ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-                : 0;
-
-            // Test mode: render all rows without virtualization
-            if (disableVirtualization) {
-              return (
-                <>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      data-index={row.index}
-                      data-selected={
-                        selectedRows.has(row.index) ? "true" : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          cell={cell}
-                          rowIndex={row.index}
-                          activeDatasetId={activeDatasetId}
-                          isLoading={isLoadingExperiment || isLoadingDatasets}
-                        />
-                      ))}
-                      {/* Spacer column to match drawer width */}
-                      <td
-                        style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                      />
-                    </tr>
-                  ))}
-                </>
-              );
-            }
-
-            return (
-              <>
-                {/* Top padding row */}
-                {paddingTop > 0 && (
-                  <tr>
-                    <td
-                      style={{ height: `${paddingTop}px`, padding: 0 }}
-                      colSpan={columnCount}
-                    />
-                  </tr>
-                )}
-                {/* Render only virtualized rows - empty until container is measured */}
-                {virtualRows.map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  if (!row) return null;
-                  return (
-                    <tr
-                      key={row.id}
-                      data-index={virtualRow.index}
-                      ref={rowVirtualizer.measureElement}
-                      data-selected={
-                        selectedRows.has(row.index) ? "true" : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          cell={cell}
-                          rowIndex={row.index}
-                          activeDatasetId={activeDatasetId}
-                          isLoading={isLoadingExperiment || isLoadingDatasets}
-                        />
-                      ))}
-                      {/* Spacer column to match drawer width */}
-                      <td
-                        style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                      />
-                    </tr>
-                  );
-                })}
-                {/* Bottom padding row */}
-                {paddingBottom > 0 && (
-                  <tr>
-                    <td
-                      style={{ height: `${paddingBottom}px`, padding: 0 }}
-                      colSpan={columnCount}
-                    />
-                  </tr>
-                )}
-              </>
-            );
-          })()}
+          <VirtualizedTableBody
+            rows={table.getRowModel().rows}
+            scrollContainer={scrollContainer}
+            columnCount={table.getAllColumns().length + 1}
+            selectedRows={selectedRows}
+            activeDatasetId={activeDatasetId}
+            isLoading={isLoadingExperiment || isLoadingDatasets}
+            shouldVirtualize={shouldVirtualize}
+            disableVirtualization={disableVirtualization}
+            displayRowCount={displayRowCount}
+          />
         </tbody>
       </table>
 
