@@ -54,3 +54,13 @@ specs/               # BDD feature specs
 | Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
+
+## Orchestration Model
+
+Implementation tasks use an opt-in orchestrator pattern:
+- `/orchestrate` - Explicit orchestration mode for any requirements
+- `/implement #123` - Entry point for GitHub issues (invokes `/orchestrate`)
+- `.claude/agents/coder.md` - Implementation agent
+- `.claude/agents/uncle-bob-reviewer.md` - Review agent
+
+The orchestrator holds requirements in todos and delegates code work to agents via `/plan` → `/code` → `/review` loop.

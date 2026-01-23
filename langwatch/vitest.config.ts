@@ -1,25 +1,13 @@
 import { config } from "dotenv";
-import os from "os";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 config();
 
-const getMaxWorkers = (): number | undefined => {
-  if (process.env.VITEST_MAX_WORKERS) {
-    return parseInt(process.env.VITEST_MAX_WORKERS, 10);
-  }
-  if (process.env.VITEST_CPU_PERCENT) {
-    const percent = parseInt(process.env.VITEST_CPU_PERCENT, 10) / 100;
-    return Math.max(1, Math.floor(os.cpus().length * percent));
-  }
-  return undefined;
-};
-
 export default defineConfig({
   test: {
     watch: false,
-    maxWorkers: getMaxWorkers(),
+    maxWorkers: 2, // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
