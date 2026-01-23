@@ -1,5 +1,57 @@
-.PHONY: start sync-all-openapi quickstart user-delete-dry-run user-delete es-delete-dry-run es-delete
+.PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
+.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart
 
+# =============================================================================
+# DOCKER DEV ENVIRONMENT (compose.dev.yml)
+# =============================================================================
+# All services run in Docker with resource limits.
+# App is volume-mounted for hot reload.
+
+COMPOSE = docker compose -f compose.dev.yml
+
+# Minimal: postgres + redis + app (no opensearch)
+dev:
+	$(COMPOSE) up
+
+# + opensearch (for traces/search features)
+dev-search:
+	$(COMPOSE) --profile search up
+
+# + NLP service + langevals (for evaluations)
+dev-nlp:
+	$(COMPOSE) --profile nlp up
+
+# + scenario worker + bullboard + NLP (no opensearch needed)
+dev-scenarios:
+	$(COMPOSE) --profile scenarios up
+
+# + AI test server (for HTTP agent testing)
+dev-test:
+	$(COMPOSE) --profile test up
+
+# Everything
+dev-full:
+	$(COMPOSE) --profile full up
+
+# Stop all services
+down:
+	$(COMPOSE) --profile full down
+
+# Tail logs
+logs:
+	$(COMPOSE) --profile full logs -f
+
+# Show running services
+ps:
+	$(COMPOSE) --profile full ps
+
+# Remove volumes (reset all data)
+clean:
+	$(COMPOSE) --profile full down -v
+
+# =============================================================================
+# LEGACY COMMANDS (run services locally, not in Docker)
+# =============================================================================
 
 install:
 	cd langwatch && pnpm install
@@ -21,12 +73,9 @@ start/postgres:
 tsc-watch:
 	cd langwatch && pnpm tsc-watch
 
+# Interactive profile chooser
 quickstart:
-	@echo "Starting Langwatch..."
-	@docker compose up redis postgres -d
-	make install
-	make start
-	open http://localhost:5560
+	@./scripts/dev.sh
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec
