@@ -1,5 +1,4 @@
 import { api } from "~/utils/api";
-import { toaster } from "../ui/toaster";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -13,39 +12,11 @@ export function useLicenseActions({
   onRemoveSuccess,
 }: UseLicenseActionsOptions) {
   const uploadMutation = api.license.upload.useMutation({
-    onSuccess: () => {
-      toaster.create({
-        title: "License activated",
-        description: "Your license has been successfully activated.",
-        type: "success",
-      });
-      onUploadSuccess();
-    },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to activate license",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onSuccess: onUploadSuccess,
   });
 
   const removeMutation = api.license.remove.useMutation({
-    onSuccess: () => {
-      toaster.create({
-        title: "License removed",
-        description: "Your organization is now running in unlimited mode.",
-        type: "info",
-      });
-      onRemoveSuccess();
-    },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to remove license",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onSuccess: onRemoveSuccess,
   });
 
   const upload = (licenseKey: string) => {
@@ -61,5 +32,11 @@ export function useLicenseActions({
     remove,
     isUploading: uploadMutation.isLoading,
     isRemoving: removeMutation.isLoading,
+    uploadError: uploadMutation.error,
+    removeError: removeMutation.error,
+    isUploadSuccess: uploadMutation.isSuccess,
+    isRemoveSuccess: removeMutation.isSuccess,
+    resetUpload: uploadMutation.reset,
+    resetRemove: removeMutation.reset,
   };
 }
