@@ -12,11 +12,15 @@ export function useLicenseActions({
   onRemoveSuccess,
 }: UseLicenseActionsOptions) {
   const uploadMutation = api.license.upload.useMutation({
-    onSuccess: onUploadSuccess,
+    onSuccess: () => {
+      onUploadSuccess();
+    },
   });
 
   const removeMutation = api.license.remove.useMutation({
-    onSuccess: onRemoveSuccess,
+    onSuccess: () => {
+      onRemoveSuccess();
+    },
   });
 
   const upload = (licenseKey: string) => {
@@ -32,11 +36,9 @@ export function useLicenseActions({
     remove,
     isUploading: uploadMutation.isLoading,
     isRemoving: removeMutation.isLoading,
+    uploadSuccess: uploadMutation.isSuccess,
     uploadError: uploadMutation.error,
+    removeSuccess: removeMutation.isSuccess,
     removeError: removeMutation.error,
-    isUploadSuccess: uploadMutation.isSuccess,
-    isRemoveSuccess: removeMutation.isSuccess,
-    resetUpload: uploadMutation.reset,
-    resetRemove: removeMutation.reset,
   };
 }

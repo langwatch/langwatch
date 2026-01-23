@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { LicenseStatus } from "../../../ee/licensing";
-import { deriveIsExpired, formatLicenseDate } from "./useLicenseStatus";
+import { deriveIsExpired, formatLicenseDate, hasLicenseMetadata } from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
@@ -74,8 +74,9 @@ export function LicenseDetailsCard({
     );
   }
 
-  // TypeScript now knows status has all metadata fields
-  const statusWithMetadata = status as Extract<LicenseStatus, { hasLicense: true; plan: string }>;
+  if (!hasLicenseMetadata(status)) {
+    return null;
+  }
 
   return (
     <Box
@@ -93,7 +94,7 @@ export function LicenseDetailsCard({
             paddingX={2}
             paddingY={1}
           >
-            {isValid ? statusWithMetadata.plan : isExpired ? "Expired" : "Invalid"}
+            {isValid ? status.plan : isExpired ? "Expired" : "Invalid"}
           </Badge>
         </HStack>
 
@@ -103,7 +104,7 @@ export function LicenseDetailsCard({
               Plan:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {statusWithMetadata.planName}
+              {status.planName}
             </Text>
           </HStack>
 
@@ -112,7 +113,7 @@ export function LicenseDetailsCard({
               Licensed to:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {statusWithMetadata.organizationName}
+              {status.organizationName}
             </Text>
           </HStack>
 
@@ -121,7 +122,7 @@ export function LicenseDetailsCard({
               Members:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {statusWithMetadata.currentMembers} / {statusWithMetadata.maxMembers}
+              {status.currentMembers} / {status.maxMembers}
             </Text>
           </HStack>
 
@@ -134,7 +135,7 @@ export function LicenseDetailsCard({
               fontWeight="medium"
               color={isExpired ? "red.500" : undefined}
             >
-              {formatLicenseDate(statusWithMetadata.expiresAt)}
+              {formatLicenseDate(status.expiresAt)}
             </Text>
           </HStack>
         </VStack>

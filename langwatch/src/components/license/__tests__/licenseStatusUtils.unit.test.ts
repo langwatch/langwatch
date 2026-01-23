@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { deriveIsExpired, formatLicenseDate, normalizeKeyForActivation } from "../useLicenseStatus";
+import {
+  deriveIsExpired,
+  formatLicenseDate,
+  hasLicenseMetadata,
+  normalizeKeyForActivation,
+} from "../licenseStatusUtils";
 
 /**
- * Pure unit tests for license status logic.
+ * Pure unit tests for license status utilities.
  * No mocks needed - these are pure functions.
- *
- * The hook itself is orchestration code (wiring tRPC, state, toasts).
- * Orchestration is tested via integration tests, not unit tests.
  */
 
 describe("deriveIsExpired", () => {
@@ -25,7 +27,11 @@ describe("deriveIsExpired", () => {
   });
 
   it("returns true when license is corrupted", () => {
-    const status = { hasLicense: true, valid: false, corrupted: true } as const;
+    const status = {
+      hasLicense: true,
+      valid: false,
+      corrupted: true,
+    } as const;
     expect(deriveIsExpired(status)).toBe(true);
   });
 
@@ -69,6 +75,45 @@ describe("normalizeKeyForActivation", () => {
 
   it("returns key unchanged when no trimming needed", () => {
     expect(normalizeKeyForActivation("abc123")).toBe("abc123");
+  });
+});
+
+describe("hasLicenseMetadata", () => {
+  it("returns true for valid license with metadata", () => {
+    const status = {
+      hasLicense: true,
+      valid: true,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2025-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(hasLicenseMetadata(status)).toBe(true);
+  });
+
+  it("returns true for invalid license with metadata (expired)", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      plan: "team",
+      planName: "Team",
+      expiresAt: "2023-12-31",
+      organizationName: "Test Org",
+      currentMembers: 5,
+      maxMembers: 10,
+    } as const;
+    expect(hasLicenseMetadata(status)).toBe(true);
+  });
+
+  it("returns false for corrupted license without metadata", () => {
+    const status = {
+      hasLicense: true,
+      valid: false,
+      corrupted: true,
+    } as const;
+    expect(hasLicenseMetadata(status)).toBe(false);
   });
 });
 

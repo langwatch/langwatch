@@ -4,7 +4,7 @@ import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
 import { NoLicenseCard } from "./license/NoLicenseCard";
 import { useLicenseActions } from "./license/useLicenseActions";
-import { normalizeKeyForActivation } from "./license/useLicenseStatus";
+import { normalizeKeyForActivation } from "./license/licenseStatusUtils";
 import { toaster } from "./ui/toaster";
 
 interface LicenseStatusProps {
@@ -28,12 +28,10 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
     remove,
     isUploading,
     isRemoving,
+    uploadSuccess,
     uploadError,
+    removeSuccess,
     removeError,
-    isUploadSuccess,
-    isRemoveSuccess,
-    resetUpload,
-    resetRemove,
   } = useLicenseActions({
     organizationId,
     onUploadSuccess: () => {
@@ -46,15 +44,14 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
   });
 
   useEffect(() => {
-    if (isUploadSuccess) {
+    if (uploadSuccess) {
       toaster.create({
         title: "License activated",
         description: "Your license has been successfully activated.",
         type: "success",
       });
-      resetUpload();
     }
-  }, [isUploadSuccess, resetUpload]);
+  }, [uploadSuccess]);
 
   useEffect(() => {
     if (uploadError) {
@@ -63,20 +60,18 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
         description: uploadError.message,
         type: "error",
       });
-      resetUpload();
     }
-  }, [uploadError, resetUpload]);
+  }, [uploadError]);
 
   useEffect(() => {
-    if (isRemoveSuccess) {
+    if (removeSuccess) {
       toaster.create({
         title: "License removed",
         description: "Your organization is now running in unlimited mode.",
         type: "info",
       });
-      resetRemove();
     }
-  }, [isRemoveSuccess, resetRemove]);
+  }, [removeSuccess]);
 
   useEffect(() => {
     if (removeError) {
@@ -85,9 +80,8 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
         description: removeError.message,
         type: "error",
       });
-      resetRemove();
     }
-  }, [removeError, resetRemove]);
+  }, [removeError]);
 
   const handleActivate = () => {
     const normalizedKey = normalizeKeyForActivation(licenseKey);
