@@ -177,7 +177,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
+        color={isUnknown ? "fg.muted" : undefined}
       >
         {selectedItem?.label ?? model}
       </Box>
@@ -221,8 +221,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       <Select.Trigger
         className="fix-hidden-inputs"
         width={size === "full" ? "100%" : "auto"}
-        background="bg"
-        borderRadius="lg"
+        background={{ _light: "white", _dark: "bg.panel" }}
         padding={0}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
@@ -231,17 +230,14 @@ export const ModelSelector = React.memo(function ModelSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content zIndex="1600">
+      <Select.Content zIndex="1600" padding={0}>
         <Field.Root asChild>
-          <Box position="sticky" top={0} zIndex="1">
+          <Box position="sticky" top={0} zIndex="1" padding={2} bg={{ _light: "white", _dark: "bg.panel" }}>
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
-              background="white"
-              width="calc(100%)"
-              paddingY={1}
-              borderBottom="1px solid"
-              borderColor="border"
+              background={{ _light: "white", _dark: "bg.panel" }}
+              width="full"
             >
               <Input
                 variant={"plain" as any}
@@ -286,25 +282,36 @@ export const ModelSelector = React.memo(function ModelSelector({
         {showConfigureAction && (
           <Box
             position="sticky"
-            bottom={0}
-            bg="white"
+            bottom="0"
+            bg={{ _light: "white", _dark: "bg.panel" }}
             borderTop="1px solid"
             borderColor="border"
             zIndex="1"
           >
-            <Button width="full" fontWeight="500" color="fg.muted" paddingY={5} justifyContent="flex-start" variant="ghost" colorPalette="gray" size="sm" borderRadius="none" asChild>
-              <Link
-                href="/settings/model-providers"
-                isExternal
-                _hover={{ textDecoration: "none" }}
-                onClick={(e) => e.stopPropagation()}
+            <Link
+              href="/settings/model-providers"
+              isExternal
+              _hover={{ textDecoration: "none" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <HStack
+                width="full"
+                padding={2}
+                borderRadius="md"
+                border="1px solid"
+                borderColor="border"
+                cursor="pointer"
+                color="fg.muted"
+                _hover={{ bg: { _light: "gray.50", _dark: "bg.muted" }, color: "fg" }}
+                transition="all 0.15s"
+                gap={2}
               >
                 <LuSettings2 />
                 <Text fontSize={size === "sm" ? 12 : 14}>
                   Configure available models
                 </Text>
-              </Link>
-            </Button>
+              </HStack>
+            </Link>
           </Box>
         )}
       </Select.Content>

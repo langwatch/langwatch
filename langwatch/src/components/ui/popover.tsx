@@ -17,8 +17,10 @@ export const PopoverContent = React.forwardRef<
       <ChakraPopover.Positioner>
         <ChakraPopover.Content
           borderRadius="lg"
-          background="bg.panel/75"
+          background="bg.panel"
           backdropFilter="blur(8px)"
+          borderWidth="1px"
+          borderColor="border"
           ref={ref}
           {...rest}
         />

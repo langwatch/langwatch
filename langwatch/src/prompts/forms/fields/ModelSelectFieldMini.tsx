@@ -85,6 +85,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 borderRadius="md"
                 border="1px solid"
                 borderColor="border"
+                bg={{ _light: "white", _dark: "bg.panel" }}
                 cursor="pointer"
                 _hover={{ bg: "bg.subtle" }}
                 transition="background 0.15s"
