@@ -27,7 +27,8 @@ export function GenerateApiSnippetButton({
         size="sm"
         variant="outline"
         backgroundColor={{ _light: "white", _dark: "transparent" }}
-        color="blue.fg"
+        color="blue.solid"
+        borderColor="blue.solid"
         onClick={onClick}
       >
         <UnplugIcon />
