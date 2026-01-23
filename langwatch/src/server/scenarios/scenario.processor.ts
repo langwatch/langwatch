@@ -100,6 +100,7 @@ async function spawnScenarioChildProcess(
         ...process.env,
         LANGWATCH_API_KEY: telemetry.apiKey,
         LANGWATCH_ENDPOINT: telemetry.endpoint,
+        SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
         ...(otelResourceAttrs && { OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs }),
       },
       stdio: ["pipe", "pipe", "pipe"],

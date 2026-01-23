@@ -160,6 +160,35 @@ describe("PromptAdapterFactory", () => {
     }
   });
 
+  it("returns failure when prompt has no model configured", async () => {
+    // Given: prompt exists but has no model
+    const promptWithoutModel = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: undefined,
+      temperature: 0.7,
+      maxTokens: 100,
+    };
+    const factory = createFactory({
+      promptLookup: { getPromptByIdOrHandle: async () => promptWithoutModel },
+    });
+
+    // When: creating adapter
+    const result = await factory.create({
+      projectId: "proj_123",
+      target: { type: "prompt", referenceId: "prompt_123" },
+      modelParams: defaultParams,
+      nlpServiceUrl: "http://localhost",
+    });
+
+    // Then: returns failure with clear error message
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Prompt prompt_123 does not have a model configured");
+    }
+  });
+
   it("returns failure when model params cannot be prepared", async () => {
     // Given: model params provider fails
     const factory = createFactory({

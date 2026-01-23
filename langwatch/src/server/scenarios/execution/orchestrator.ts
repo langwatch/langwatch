@@ -6,7 +6,6 @@
  */
 
 import { createLogger } from "~/utils/logger";
-import { SCENARIO_DEFAULTS } from "../scenario.constants";
 import type {
   ExecutionInput,
   OrchestratorDependencies,
@@ -36,7 +35,7 @@ export class ScenarioExecutionOrchestrator {
 
       const modelParams = await this.prepareModelParams(
         context.projectId,
-        project.defaultModel ?? SCENARIO_DEFAULTS.MODEL,
+        project.defaultModel,
       );
       if (!modelParams) {
         return this.failure(`Failed to prepare model params`);

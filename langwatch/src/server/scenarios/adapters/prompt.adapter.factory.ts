@@ -4,7 +4,6 @@
 
 import type { LiteLLMParams, PromptConfigData } from "../execution/types";
 import { SerializedPromptConfigAdapter } from "../execution/serialized.adapters";
-import { SCENARIO_DEFAULTS } from "../scenario.constants";
 import type {
   AdapterCreationContext,
   AdapterResult,
@@ -56,7 +55,14 @@ export class PromptAdapterFactory implements TargetAdapterFactory {
       };
     }
 
-    const promptModel = prompt.model ?? SCENARIO_DEFAULTS.MODEL;
+    if (!prompt.model) {
+      return {
+        success: false,
+        error: `Prompt ${target.referenceId} does not have a model configured`,
+      };
+    }
+
+    const promptModel = prompt.model;
     const promptParams = await this.modelParamsProvider.prepare(
       projectId,
       promptModel,

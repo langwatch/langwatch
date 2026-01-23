@@ -76,10 +76,12 @@ export function useRunScenario({
             meta: { closable: true },
           });
         }
-      } catch {
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "An unexpected error occurred";
         toaster.create({
           title: "Failed to start scenario",
-          description: "An error occurred while starting the scenario run.",
+          description: message,
           type: "error",
           meta: { closable: true },
         });
