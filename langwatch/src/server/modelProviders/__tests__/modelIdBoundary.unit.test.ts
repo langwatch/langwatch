@@ -20,9 +20,9 @@ describe("translateModelIdForLitellm", () => {
       expect(result).toBe("anthropic/claude-sonnet-4-5");
     });
 
-    it("translates anthropic/claude-3.5-haiku to anthropic/claude-3-5-haiku", () => {
+    it("translates anthropic/claude-3.5-haiku to anthropic/claude-3-5-haiku-20241022", () => {
       const result = translateModelIdForLitellm("anthropic/claude-3.5-haiku");
-      expect(result).toBe("anthropic/claude-3-5-haiku");
+      expect(result).toBe("anthropic/claude-3-5-haiku-20241022");
     });
 
     it("translates anthropic/claude-3.7-sonnet to anthropic/claude-3-7-sonnet", () => {
