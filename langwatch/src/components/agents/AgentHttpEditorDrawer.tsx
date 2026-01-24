@@ -10,12 +10,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import type { AvailableSource, FieldMapping } from "~/components/variables";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  VariablesSection,
+} from "~/components/variables";
+import { extractVariablesFromBodyTemplate } from "~/evaluations-v3/utils/httpAgentUtils";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -123,12 +128,13 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const _flowCallbacks = getFlowCallbacks("agentHttpEditor");
+  const flowCallbacksForSave = getFlowCallbacks("agentHttpEditor");
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ??
+    flowCallbacksForSave?.onSave ??
     (complexProps.onSave as AgentHttpEditorDrawerProps["onSave"]);
   const agentId =
     props.agentId ??
@@ -137,9 +143,51 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Props from drawer params or direct props (for Evaluations V3)
-  const _availableSources =
+  const availableSources =
     props.availableSources ??
     (complexProps.availableSources as AvailableSource[] | undefined);
+
+  const initialInputMappings =
+    props.inputMappings ??
+    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
+
+  const flowCallbacks = getFlowCallbacks("agentHttpEditor");
+  const onInputMappingsChange =
+    props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange;
+
+  // Local state for mappings (allows fast UI updates while persisting to store)
+  const [localMappings, setLocalMappings] = useState<Record<string, FieldMapping>>(
+    initialInputMappings ?? {}
+  );
+
+  // Sync local mappings when initial mappings change (e.g., when drawer reopens)
+  useEffect(() => {
+    if (initialInputMappings) {
+      setLocalMappings(initialInputMappings);
+    }
+  }, [initialInputMappings]);
+
+  // Handle mapping change - update local state and persist
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      setLocalMappings((prev) => {
+        const next = { ...prev };
+        if (mapping) {
+          next[identifier] = mapping;
+        } else {
+          delete next[identifier];
+        }
+        return next;
+      });
+      onInputMappingsChange?.(identifier, mapping);
+    },
+    [onInputMappingsChange]
+  );
+
+  // Note: variables are computed in a useMemo below after bodyTemplate state is defined
+
+  // Check if we should show the mappings tab (only when availableSources is provided)
+  const showMappingsTab = availableSources && availableSources.length > 0;
 
   // Form state
   const [name, setName] = useState("");
@@ -150,7 +198,31 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
   const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState("body");
+  // Default to mappings tab when in evaluations context (has availableSources)
+  const [activeTab, setActiveTab] = useState(showMappingsTab ? "mappings" : "body");
+
+  // Extract variables from body template for mappings
+  const variables = useMemo(() => {
+    return extractVariablesFromBodyTemplate(bodyTemplate).map((name) => ({
+      identifier: name,
+      type: "str" as const,
+    }));
+  }, [bodyTemplate]);
+
+  // Calculate missing mapping IDs for validation
+  // A variable is missing if it's in the body template but has no mapping
+  const missingMappingIds = useMemo(() => {
+    if (!showMappingsTab) {
+      return new Set<string>();
+    }
+    const missing = new Set<string>();
+    for (const variable of variables) {
+      if (!localMappings[variable.identifier]) {
+        missing.add(variable.identifier);
+      }
+    }
+    return missing;
+  }, [showMappingsTab, variables, localMappings]);
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -449,6 +521,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   borderBottomWidth="1px"
                   borderColor="border"
                 >
+                  {showMappingsTab && (
+                    <Tabs.Trigger value="mappings">Mappings</Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="body">Body</Tabs.Trigger>
                   <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
                   <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
@@ -490,6 +565,45 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                     </Field.Root>
                   </VStack>
                 </Tabs.Content>
+
+                {/* Mappings Tab - only shown when availableSources is provided */}
+                {showMappingsTab && (
+                  <Tabs.Content
+                    value="mappings"
+                    flex={1}
+                    overflowY="auto"
+                    paddingX={6}
+                    paddingY={4}
+                  >
+                    <VStack gap={4} align="stretch">
+                      <Text fontSize="sm" color="fg.muted">
+                        Map the variables in your body template to data from your
+                        evaluation dataset.
+                      </Text>
+                      {variables.length > 0 ? (
+                        <VariablesSection
+                          title="Input Variables"
+                          variables={variables}
+                          onChange={() => {}} // Variables are derived from body template
+                          showMappings={true}
+                          availableSources={availableSources}
+                          mappings={localMappings}
+                          onMappingChange={handleMappingChange}
+                          readOnly={true} // Variables come from body template
+                          missingMappingIds={missingMappingIds}
+                        />
+                      ) : (
+                        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+                          No variables found in body template. Add variables like{" "}
+                          <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
+                            {"{{variableName}}"}
+                          </Text>{" "}
+                          to your request body to map them to dataset columns.
+                        </Text>
+                      )}
+                    </VStack>
+                  </Tabs.Content>
+                )}
 
                 {/* Auth Tab */}
                 <Tabs.Content

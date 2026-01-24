@@ -197,9 +197,50 @@ class HttpConfig(BaseModel):
 
 
 class Http(BaseComponent):
-    """HTTP node component for making external API calls."""
+    """HTTP node component for making external API calls.
 
+    Supports two formats for backward compatibility:
+    1. Nested format: http_config: { url, method, body_template, ... }
+    2. Flat format: url, method, bodyTemplate, ... (from TypeScript DSL adapter)
+
+    The flat format uses camelCase to match TypeScript conventions.
+    """
+
+    # Nested format (legacy/Python-native)
     http_config: Optional[HttpConfig] = None
+
+    # Flat format fields (from TypeScript DSL adapter, camelCase)
+    url: Optional[str] = None
+    method: Optional[Literal["GET", "POST", "PUT", "DELETE", "PATCH"]] = None
+    bodyTemplate: Optional[str] = None  # camelCase from TypeScript
+    outputPath: Optional[str] = None  # camelCase from TypeScript
+    auth: Optional[HttpAuthConfig] = None
+    headers: Optional[List[Dict[str, str]]] = None  # TypeScript sends array of {key, value}
+    timeoutMs: Optional[int] = None  # camelCase from TypeScript
+
+    def get_http_config(self) -> Optional[HttpConfig]:
+        """Get HTTP config, preferring nested format if available."""
+        if self.http_config:
+            return self.http_config
+
+        # Build from flat fields if available
+        if self.url:
+            # Convert headers from array format [{key, value}] to dict format
+            headers_dict = None
+            if self.headers:
+                headers_dict = {h.get("key", ""): h.get("value", "") for h in self.headers if h.get("key")}
+
+            return HttpConfig(
+                url=self.url,
+                method=self.method or "POST",
+                body_template=self.bodyTemplate,
+                output_path=self.outputPath,
+                auth=self.auth,
+                headers=headers_dict,
+                timeout_ms=self.timeoutMs,
+            )
+
+        return None
 
 
 class End(BaseComponent):

@@ -595,6 +595,9 @@ export function EvaluationsV3Table({
     setFlowCallbacks("agentCodeEditor", {
       onSave: handleSelectSavedAgent,
     });
+    setFlowCallbacks("agentHttpEditor", {
+      onSave: handleSelectSavedAgent,
+    });
     setFlowCallbacks("workflowSelector", {
       onSave: handleSelectSavedAgent,
     });

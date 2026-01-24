@@ -16,6 +16,7 @@ import {
   LuCode,
   LuCopy,
   LuFileText,
+  LuGlobe,
   LuPencil,
   LuPlay,
   LuSquare,
@@ -211,9 +212,14 @@ export const TargetHeader = memo(function TargetHeader({
   // Determine icon based on target type
   const getTargetIcon = () => {
     if (target.type === "prompt") {
-      return <LuFileText size={12} />;
+      return <LuFileText size={12} data-testid="icon-file" />;
     }
-    return <LuCode size={12} />;
+    // HTTP agents get a Globe icon
+    if (target.type === "agent" && target.agentType === "http") {
+      return <LuGlobe size={12} data-testid="icon-globe" />;
+    }
+    // Other agents (code, workflow, signature) get Code icon
+    return <LuCode size={12} data-testid="icon-code" />;
   };
 
   const getTargetColor = () => {

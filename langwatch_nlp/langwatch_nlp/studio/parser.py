@@ -300,12 +300,18 @@ def parse_component(
         case "http":
             from langwatch_nlp.studio.types.dsl import Http
 
-            if not isinstance(node.data, Http) or not node.data.http_config:
+            if not isinstance(node.data, Http):
+                raise ValueError(
+                    f"HTTP node {node.data.name} has invalid data type"
+                )
+
+            # Support both nested (http_config) and flat (url, bodyTemplate, etc.) formats
+            http_config = node.data.get_http_config()
+            if not http_config:
                 raise ValueError(
                     f"HTTP config not specified for HTTP node {node.data.name}"
                 )
 
-            http_config = node.data.http_config
             params = {
                 "url": http_config.url,
                 "method": http_config.method,

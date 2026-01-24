@@ -1,4 +1,4 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
   type AvailableSource,
@@ -237,23 +237,6 @@ export const TargetVariablesPanel = ({
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* Warning for missing mappings */}
-      {missingMappings.length > 0 && !readOnly && (
-        <Box
-          background="orange.subtle"
-          border="1px solid"
-          borderColor="orange.muted"
-          borderRadius="md"
-          padding={3}
-        >
-          <Text fontSize="sm" color="orange.fg">
-            ⚠️ {missingMappings.length} input
-            {missingMappings.length === 1 ? "" : "s"} not mapped:{" "}
-            {missingMappings.map((m) => m.identifier).join(", ")}
-          </Text>
-        </Box>
-      )}
-
       {/* Variables section with mappings */}
       <VariablesSection
         variables={variables}

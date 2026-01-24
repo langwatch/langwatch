@@ -104,6 +104,11 @@ export function TargetCellContent({
     width: 0,
   });
 
+  // State for expanded error view
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
+  const [isErrorOverflowing, setIsErrorOverflowing] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+
   // Check if content overflows
   useEffect(() => {
     if (outputRef.current) {
@@ -112,6 +117,14 @@ export function TargetCellContent({
       setIsOverflowing(isContentOverflowing);
     }
   }, [output]);
+
+  // Check if error overflows (2 lines ~ 40px)
+  useEffect(() => {
+    if (errorRef.current) {
+      const isContentOverflowing = errorRef.current.scrollHeight > 40;
+      setIsErrorOverflowing(isContentOverflowing);
+    }
+  }, [error]);
 
   // Handler to open trace drawer (also closes expanded view)
   const handleViewTrace = useCallback(() => {
@@ -140,6 +153,27 @@ export function TargetCellContent({
   // Handler to close expanded output
   const handleCloseExpanded = useCallback(() => {
     setIsOutputExpanded(false);
+  }, []);
+
+  // Handler to expand error
+  const handleExpandError = useCallback(() => {
+    if (cellRef.current) {
+      const td = cellRef.current.closest("td");
+      if (td) {
+        const rect = td.getBoundingClientRect();
+        setExpandedPosition({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    }
+    setIsErrorExpanded(true);
+  }, []);
+
+  // Handler to close expanded error
+  const handleCloseError = useCallback(() => {
+    setIsErrorExpanded(false);
   }, []);
 
   // Calculate which evaluators have missing mappings for this target
@@ -255,22 +289,66 @@ export function TargetCellContent({
 
     // Error state - show error message
     if (error) {
+      if (expanded) {
+        // Expanded view - full error, scrollable, selectable
+        return (
+          <HStack
+            gap={2}
+            p={2}
+            bg="red.subtle"
+            borderRadius="md"
+            color="red.fg"
+            fontSize="13px"
+            align="start"
+          >
+            <Box flexShrink={0} paddingTop={0.5}>
+              <LuCircleAlert size={16} />
+            </Box>
+            <Text userSelect="text" whiteSpace="pre-wrap" wordBreak="break-word">
+              {error}
+            </Text>
+          </HStack>
+        );
+      }
+
+      // Collapsed view - truncated, clickable when overflowing
       return (
-        <HStack
-          gap={2}
-          p={2}
-          bg="red.subtle"
-          borderRadius="md"
-          color="red.fg"
-          fontSize="13px"
-        >
-          <Box flexShrink={0}>
-            <LuCircleAlert size={16} />
-          </Box>
-          <Text lineClamp={expanded ? undefined : 2}>
-            {parseLLMError(error).message}
-          </Text>
-        </HStack>
+        <Box position="relative">
+          <HStack
+            ref={errorRef}
+            gap={2}
+            p={2}
+            bg="red.subtle"
+            borderRadius="md"
+            color="red.fg"
+            fontSize="13px"
+            align="start"
+            cursor={isErrorOverflowing ? "pointer" : undefined}
+            onClick={isErrorOverflowing ? handleExpandError : undefined}
+          >
+            <Box flexShrink={0} paddingTop={0.5}>
+              <LuCircleAlert size={16} />
+            </Box>
+            <Text lineClamp={2} userSelect="text">
+              {parseLLMError(error).message}
+            </Text>
+          </HStack>
+          {/* Click hint when truncated */}
+          {isErrorOverflowing && (
+            <Text
+              position="absolute"
+              bottom={1}
+              right={2}
+              fontSize="11px"
+              color="red.fg"
+              opacity={0.7}
+              cursor="pointer"
+              onClick={handleExpandError}
+            >
+              Click to expand
+            </Text>
+          )}
+        </Box>
       );
     }
 
@@ -583,6 +661,44 @@ export function TargetCellContent({
               </Box>
               {renderEvaluatorChips(true)}
             </VStack>
+          </Box>
+        </Portal>
+      )}
+
+      {/* Expanded error overlay */}
+      {isErrorExpanded && error && (
+        <Portal>
+          {/* Invisible backdrop to catch clicks outside */}
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={1000}
+            onClick={handleCloseError}
+            data-testid="expanded-error-backdrop"
+          />
+          {/* Expanded error - overlaps original with negative offset */}
+          <Box
+            position="fixed"
+            top={`${expandedPosition.top - 8}px`}
+            left={`${expandedPosition.left - 8}px`}
+            width={`${Math.max(expandedPosition.width + 16, 350)}px`}
+            maxHeight="min(400px, calc(100vh - 32px))"
+            bg="bg.panel/75"
+            backdropFilter="blur(8px)"
+            borderRadius="md"
+            boxShadow="0 0 0 2px var(--chakra-colors-red-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
+            zIndex={1001}
+            display="flex"
+            flexDirection="column"
+            p={3}
+            overflow="hidden"
+            css={{
+              animation: "scale-in 0.15s ease-out",
+            }}
+          >
+            <Box flex={1} minHeight={0} overflowY="auto">
+              {renderOutput(true)}
+            </Box>
           </Box>
         </Portal>
       )}

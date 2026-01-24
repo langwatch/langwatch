@@ -70,6 +70,8 @@ export type VariablesSectionProps = {
 
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
   missingMappingIds?: Set<string>;
+  /** Whether to show the validation error message for missing mappings (defaults to true when missingMappingIds is provided) */
+  showMissingMappingsError?: boolean;
 
   /** Set of variable identifiers that cannot be removed (locked variables) */
   lockedVariables?: Set<string>;
@@ -99,6 +101,7 @@ export const VariablesSection = ({
   showAddButton,
   title = "Variables",
   missingMappingIds = new Set(),
+  showMissingMappingsError = true,
   lockedVariables = new Set(),
   variableInfo = {},
   disabledMappings = new Set(),
@@ -247,6 +250,18 @@ export const VariablesSection = ({
             );
           })}
         </VStack>
+      )}
+
+      {/* Validation error for missing mappings */}
+      {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
+        <Text
+          data-testid="missing-mappings-error"
+          color="red.500"
+          fontSize="sm"
+        >
+          Please map all required fields:{" "}
+          {Array.from(missingMappingIds).join(", ")}
+        </Text>
       )}
     </VStack>
   );

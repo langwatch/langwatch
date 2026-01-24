@@ -129,6 +129,47 @@ describe("findMatchingColumn", () => {
     expect(findMatchingColumn("OUTPUT", columns)).toBe("Output");
   });
 
+  it("matches camelCase field to snake_case column", () => {
+    const columns = [
+      createTestColumn("thread_id"),
+      createTestColumn("user_name"),
+    ];
+    expect(findMatchingColumn("threadId", columns)).toBe("thread_id");
+    expect(findMatchingColumn("userName", columns)).toBe("user_name");
+  });
+
+  it("matches snake_case field to camelCase column", () => {
+    const columns = [
+      createTestColumn("threadId"),
+      createTestColumn("userName"),
+    ];
+    expect(findMatchingColumn("thread_id", columns)).toBe("threadId");
+    expect(findMatchingColumn("user_name", columns)).toBe("userName");
+  });
+
+  it("matches complex camelCase to snake_case variations", () => {
+    const columns = [
+      createTestColumn("my_variable_name"),
+      createTestColumn("another_test_value"),
+    ];
+    expect(findMatchingColumn("myVariableName", columns)).toBe(
+      "my_variable_name",
+    );
+    expect(findMatchingColumn("anotherTestValue", columns)).toBe(
+      "another_test_value",
+    );
+  });
+
+  it("exact match takes priority over camelCase/snake_case normalization", () => {
+    // If both "threadId" and "thread_id" exist, exact match wins
+    const columns = [
+      createTestColumn("threadId"),
+      createTestColumn("thread_id"),
+    ];
+    expect(findMatchingColumn("threadId", columns)).toBe("threadId");
+    expect(findMatchingColumn("thread_id", columns)).toBe("thread_id");
+  });
+
   it("exact match takes priority over semantic match", () => {
     // If both "input" and "question" exist, "input" should match "input" exactly
     const columns = [createTestColumn("input"), createTestColumn("question")];

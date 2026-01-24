@@ -224,6 +224,68 @@ class TestHttpNodeRecognition:
         assert "HttpNode" in code
         assert "https://api.example.com/v1/chat" in code
 
+    @pytest.mark.integration
+    def test_parser_recognizes_flat_format_from_typescript(self):
+        """Parser recognizes HTTP node with flat format (from TypeScript DSL adapter).
+
+        Bug 4: TypeScript sends flat structure with camelCase:
+          { url, method, bodyTemplate, outputPath, ... }
+
+        Python previously expected nested structure:
+          { http_config: { url, method, body_template, output_path, ... } }
+
+        This test verifies the flat format is now supported.
+        """
+        # This is the format TypeScript sends (flat, camelCase)
+        node = HttpNodeDSL(
+            id="http_node_flat",
+            data=Http(
+                name="FlatHttpAgent",
+                # Flat format fields (from TypeScript DSL adapter)
+                url="https://api.example.com/v1/chat",
+                method="POST",
+                bodyTemplate='{"message": "{{input}}"}',
+                outputPath="$.response.content",
+                headers=[{"key": "X-Custom", "value": "test-value"}],
+                timeoutMs=5000,
+                # Note: http_config is NOT set - this is the flat format
+            ),
+        )
+
+        # Should not raise "HTTP config not specified" error
+        import_code, class_name, params = parse_component(node, None, False)
+
+        assert "HttpNode" in import_code
+        assert class_name == "HttpNode"
+        assert params["url"] == "https://api.example.com/v1/chat"
+        assert params["method"] == "POST"
+        assert params["body_template"] == '{"message": "{{input}}"}'
+        assert params["output_path"] == "$.response.content"
+        assert params["timeout_ms"] == 5000
+        # Headers should be converted from array format to dict format
+        assert params["headers"] == {"X-Custom": "test-value"}
+
+    @pytest.mark.integration
+    def test_parser_recognizes_flat_format_with_bearer_auth(self):
+        """Parser includes auth params for flat format with bearer auth."""
+        node = HttpNodeDSL(
+            id="http_node_flat_auth",
+            data=Http(
+                name="FlatAuthHttpAgent",
+                url="https://api.example.com/v1/chat",
+                method="POST",
+                auth=HttpAuthConfigDSL(
+                    type="bearer",
+                    token="sk-test-flat-token",  # noqa: S106 (test fake token)
+                ),
+            ),
+        )
+
+        _, _, params = parse_component(node, None, False)
+
+        assert params["auth_type"] == "bearer"
+        assert params["auth_token"] == "sk-test-flat-token"  # noqa: S105 (test fake token)
+
 
 class TestHttpNodeRequest:
     """HTTP node makes request with configured method and URL"""
