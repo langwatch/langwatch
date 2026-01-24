@@ -2,6 +2,31 @@
 
 LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines.
 
+## Before You Implement Anything
+
+**Check `specs/` first.** Feature files ARE the requirements.
+
+```
+ls specs/                    # Find relevant subdirectory
+cat specs/foo/bar.feature    # Read the scenarios
+```
+
+If no feature file exists for your task, create one before writing code. If you are lost or have been implementing without checking specs, run `/refocus`.
+
+## Development Environment
+
+From repo root (requires Docker):
+
+```bash
+make dev              # Minimal: postgres + redis + app
+make dev-scenarios    # + workers + scenario-worker + bullboard + ai-server + nlp
+make dev-full         # Everything including opensearch
+make quickstart       # Interactive profile chooser
+make down             # Stop all services
+```
+
+See `docs/adr/004-docker-dev-environment.md` for architecture decisions.
+
 ## Commands
 
 Inside langwatch/
@@ -35,14 +60,13 @@ specs/               # BDD feature specs
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
+| Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | Zod only, use `infer` |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Duplicating a type definition in Zod for types that will also be used on the backend | Shared types that require validation should be defined in Zod only and use infer to get the typescript type to avoid duplication and getting them out of sync |
-| Implementing code before writing tests | Follow Outside-In TDD: Write failing tests first, then implement minimal code to pass, then refactor |
 | Writing tests in the incorrect order | Outside-In TDD: examples drive E2E tests => then integration tests => then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
@@ -55,12 +79,26 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 
+## Database
+
+| Common Mistake | Correct Behavior |
+|----------------|------------------|
+| Modifying deployed migrations | Never edit migrations that have been deployed - they are immutable history. Create a new migration instead. (New migrations not yet in production can be fixed before merging) |
+| Hardcoding schema names in migrations | Use unqualified table names (e.g., `"Monitor"` not `"langwatch_db"."Monitor"`) - Prisma uses the schema from connection string |
+
 ## Orchestration Model
 
-Implementation tasks use an opt-in orchestrator pattern:
-- `/orchestrate` - Explicit orchestration mode for any requirements
-- `/implement #123` - Entry point for GitHub issues (invokes `/orchestrate`)
-- `.claude/agents/coder.md` - Implementation agent
-- `.claude/agents/uncle-bob-reviewer.md` - Review agent
+Implementation tasks use `/orchestrate` to manage the plan → code → review loop:
 
-The orchestrator holds requirements in todos and delegates code work to agents via `/plan` → `/code` → `/review` loop.
+- `/orchestrate <requirements>` - Enter orchestration mode
+- `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
+
+The orchestrator:
+1. **Creates a task checklist** using TaskCreate to map acceptance criteria
+2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer agent)
+3. Tracks progress via task status updates
+4. Does NOT read or write code directly
+
+Agents: `.claude/agents/coder.md`, `.claude/agents/uncle-bob-reviewer.md`, `.claude/agents/repo-sherpa.md`
+
+See `.claude/README.md` for full orchestration documentation.

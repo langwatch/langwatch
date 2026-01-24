@@ -158,7 +158,7 @@ The orchestrator reads only feature files and planning docs, not source code.
 ```
 ORCHESTRATOR (main thread)
 │
-├── /plan  ──────► PLAN AGENT
+├── /plan  ──────► (self-contained skill)
 │                  - Feature file creation
 │                  - Acceptance criteria
 │
