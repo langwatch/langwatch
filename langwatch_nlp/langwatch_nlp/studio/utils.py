@@ -264,7 +264,8 @@ def get_provider_from_model(model: str | None) -> str:
 MODEL_ALIASES: Dict[str, str] = {
     "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
     "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
-    "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022"
+    "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
+    "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620"
 }
 
 # Providers that need dot-to-dash translation for their model IDs.
