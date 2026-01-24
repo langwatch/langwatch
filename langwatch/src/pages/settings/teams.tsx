@@ -1,11 +1,8 @@
 import {
-  Button,
-  Card,
   Heading,
   HStack,
   Spacer,
   Table,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { Archive, MoreVertical, Plus } from "lucide-react";
@@ -16,6 +13,7 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
@@ -42,6 +40,7 @@ export default withPermissionGuard("team:view", {
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   const { hasPermission, project } = useOrganizationTeamProject();
   const hasTeamManagePermission = hasPermission("team:manage");
+  const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
   const archiveTeam = api.team.archiveById.useMutation({
     onSuccess: () => {
@@ -87,12 +86,12 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             showArrow
           >
             {hasTeamManagePermission ? (
-              <Link href={`/settings/teams/new`} asChild>
-                <PageLayout.HeaderButton>
-                  <Plus size={20} />
-                  Add new team
-                </PageLayout.HeaderButton>
-              </Link>
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("createTeam")}
+              >
+                <Plus size={20} />
+                Add new team
+              </PageLayout.HeaderButton>
             ) : (
               <PageLayout.HeaderButton disabled>
                 <Plus size={20} />
