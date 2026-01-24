@@ -278,7 +278,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           <Box
             padding={2}
             position="sticky"
-            bottom="-1px"
+            bottom={-1}
             bg="white"
             borderTop="1px solid"
             borderColor="border"
