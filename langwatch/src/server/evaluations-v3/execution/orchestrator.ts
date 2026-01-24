@@ -116,6 +116,8 @@ export const generateCells = (
         // Skip target execution, use pre-computed output
         skipTarget: scope.targetOutput !== undefined,
         precomputedTargetOutput: scope.targetOutput,
+        // Reuse existing trace ID to append evaluator span to the same trace
+        traceId: scope.traceId,
       });
     }
     return cells;
@@ -216,7 +218,8 @@ export async function* executeCell(
     const targetNodes = new Set([cell.targetId]);
 
     // Generate OTEL-compliant trace ID for this cell execution
-    const traceId = generateOtelTraceId();
+    // Reuse existing traceId if provided (for evaluator reruns to append to existing trace)
+    const traceId = cell.traceId ?? generateOtelTraceId();
 
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;

@@ -29,6 +29,8 @@ export type ExecutionScope =
       evaluatorId: string;
       /** Pre-computed target output to use instead of re-running target */
       targetOutput?: unknown;
+      /** Existing trace ID to reuse for evaluator execution */
+      traceId?: string;
     };
 
 /**
@@ -91,6 +93,7 @@ export const executionRequestSchema = z.object({
       rowIndex: z.number(),
       evaluatorId: z.string(),
       targetOutput: z.unknown().optional(),
+      traceId: z.string().optional(),
     }),
   ]),
   concurrency: z.number().min(1).max(24).optional(),
@@ -168,6 +171,8 @@ export type ExecutionCell = {
   skipTarget?: boolean;
   /** Pre-computed target output when re-running only evaluator(s) */
   precomputedTargetOutput?: unknown;
+  /** Existing trace ID to reuse (for evaluator reruns) */
+  traceId?: string;
 };
 
 /**

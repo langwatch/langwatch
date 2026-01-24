@@ -424,6 +424,7 @@ const buildEvaluatorNodes = (
       cell,
       index,
       settings,
+      evaluator.dbEvaluatorId, // Pass dbEvaluatorId to use evaluators/{id} path
     );
     evaluatorNodes.push(node);
   });
@@ -434,6 +435,7 @@ const buildEvaluatorNodes = (
 /**
  * Builds a single evaluator node.
  * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
+ * @param dbEvaluatorId - Database evaluator ID for using evaluators/{id} path
  */
 export const buildEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -442,6 +444,7 @@ export const buildEvaluatorNode = (
   cell: ExecutionCell,
   index: number,
   settings: Record<string, unknown> = {},
+  dbEvaluatorId?: string,
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef =
@@ -463,6 +466,13 @@ export const buildEvaluatorNode = (
     value,
   }));
 
+  // Use evaluators/{dbEvaluatorId} path when available so langwatch_nlp
+  // calls LangWatch API which fetches settings from DB
+  // Otherwise fall back to direct evaluator type (e.g., langevals/exact_match)
+  const evaluatorPath = dbEvaluatorId
+    ? (`evaluators/${dbEvaluatorId}` as const)
+    : evaluator.evaluatorType;
+
   return {
     id: nodeId,
     type: "evaluator",
@@ -476,7 +486,7 @@ export const buildEvaluatorNode = (
         { identifier: "score", type: "float" },
         { identifier: "label", type: "str" },
       ],
-      evaluator: evaluator.evaluatorType,
+      evaluator: evaluatorPath,
       parameters,
     },
   };

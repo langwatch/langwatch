@@ -332,10 +332,11 @@ function CodeImplementation() {
   return (
     <Card.Root width="full" height="full" position="sticky" top={6}>
       <Card.Body width="full" height="full" paddingTop={0}>
-        {availableEvaluators[checkType] && (
+        {!checkType.startsWith("evaluators/") &&
+          availableEvaluators[checkType as Exclude<typeof checkType, `evaluators/${string}`>] && (
           <EvaluationManualIntegration
-            evaluatorDefinition={availableEvaluators[checkType]!}
-            checkType={checkType}
+            evaluatorDefinition={availableEvaluators[checkType as Exclude<typeof checkType, `evaluators/${string}`>]!}
+            checkType={checkType as Exclude<typeof checkType, `evaluators/${string}`>}
             name={name ?? "Untitled"}
             executionMode={
               executionMethod === "realtime_guardrail"

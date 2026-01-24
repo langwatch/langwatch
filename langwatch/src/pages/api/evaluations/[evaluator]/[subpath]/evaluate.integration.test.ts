@@ -1,8 +1,8 @@
-import type { Monitor, Project } from "@prisma/client";
+import type { Evaluator, Monitor, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { prisma } from "../../../../../server/db";
 import { getTestProject } from "../../../../../utils/testUtils";
@@ -125,5 +125,163 @@ describe("Guardrail API Endpoint", () => {
       status: "processed",
     });
     expect(res?.statusCode).toBe(200);
+  });
+});
+
+describe("Evaluator API with evaluators/{id} path", () => {
+  let project: Project;
+  let evaluator: Evaluator;
+
+  beforeAll(async () => {
+    project = await getTestProject("evaluators-id-path");
+    // Clean up any existing test evaluators
+    await prisma.evaluator.deleteMany({
+      where: { projectId: project.id },
+    });
+    // Create an evaluator in the database
+    evaluator = await prisma.evaluator.create({
+      data: {
+        projectId: project.id,
+        name: "Test Exact Match Evaluator",
+        slug: "test-exact-match-evaluator",
+        type: "evaluator",
+        config: {
+          evaluatorType: "langevals/exact_match" satisfies EvaluatorTypes,
+          settings: {},
+        },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.evaluator.delete({
+      where: { id: evaluator.id, projectId: project.id },
+    });
+  });
+
+  test("runs evaluator by ID using evaluators/{id} path", async () => {
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      headers: {
+        "X-Auth-Token": project.apiKey,
+      },
+      body: {
+        data: {
+          output: "hello world",
+          expected_output: "hello world",
+        },
+      },
+      query: {
+        evaluator: "evaluators",
+        subpath: evaluator.id,
+      },
+    });
+
+    await handler(req, res);
+
+    const data = (res as any)._getJSONData();
+    expect(res.statusCode).toBe(200);
+    expect(data).toMatchObject({
+      status: "processed",
+      passed: true,
+    });
+  });
+
+  test("runs evaluator by slug using evaluators/{slug} path", async () => {
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      headers: {
+        "X-Auth-Token": project.apiKey,
+      },
+      body: {
+        data: {
+          output: "hello world",
+          expected_output: "hello world",
+        },
+      },
+      query: {
+        evaluator: "evaluators",
+        subpath: evaluator.slug!,
+      },
+    });
+
+    await handler(req, res);
+
+    const data = (res as any)._getJSONData();
+    expect(res.statusCode).toBe(200);
+    expect(data).toMatchObject({
+      status: "processed",
+      passed: true,
+    });
+  });
+
+  test("uses settings from database evaluator", async () => {
+    // Create evaluator with specific settings
+    const evaluatorWithSettings = await prisma.evaluator.create({
+      data: {
+        projectId: project.id,
+        name: "Exact Match with Settings",
+        slug: "exact-match-with-settings",
+        type: "evaluator",
+        config: {
+          evaluatorType: "langevals/exact_match" satisfies EvaluatorTypes,
+          settings: {}, // exact_match doesn't have settings, but this tests the flow
+        },
+      },
+    });
+
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      headers: {
+        "X-Auth-Token": project.apiKey,
+      },
+      body: {
+        data: {
+          output: "test output",
+          expected_output: "different output",
+        },
+      },
+      query: {
+        evaluator: "evaluators",
+        subpath: evaluatorWithSettings.id,
+      },
+    });
+
+    await handler(req, res);
+
+    const data = (res as any)._getJSONData();
+    expect(res.statusCode).toBe(200);
+    expect(data).toMatchObject({
+      status: "processed",
+      passed: false, // output != expected_output
+    });
+
+    await prisma.evaluator.delete({
+      where: { id: evaluatorWithSettings.id, projectId: project.id },
+    });
+  });
+
+  test("returns 404 for non-existent evaluator", async () => {
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      headers: {
+        "X-Auth-Token": project.apiKey,
+      },
+      body: {
+        data: {
+          output: "test",
+        },
+      },
+      query: {
+        evaluator: "evaluators",
+        subpath: "non-existent-id",
+      },
+    });
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(404);
+    const data = (res as any)._getJSONData();
+    expect(data.error).toContain("Evaluator not found");
   });
 });
