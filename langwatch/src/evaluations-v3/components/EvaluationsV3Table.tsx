@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
 import {
   type ColumnDef,
@@ -1204,9 +1204,14 @@ export function EvaluationsV3Table({
                     minWidth: DRAWER_WIDTH + 280,
                   }}
                 >
-                  <Text fontSize="xs" color="fg.subtle" fontStyle="italic">
+                  <Link
+                    fontSize="xs"
+                    color="fg.subtle"
+                    fontStyle="italic"
+                    onClick={handleAddTarget}
+                  >
                     Click "+ Add" above to get started
-                  </Text>
+                  </Link>
                 </th>
               ) : (
                 // Spacer column to match drawer width
