@@ -163,7 +163,10 @@ const createTargetNode = (
   activeDatasetId: string,
   index: number,
 ): Node<Code> | Node<HttpComponentConfig> => {
-  if (target.agentType === "http" && target.httpConfig) {
+  if (target.agentType === "http") {
+    if (!target.httpConfig) {
+      throw new Error(`HTTP target "${target.name}" is missing httpConfig`);
+    }
     return createHttpNode(target, activeDatasetId, index);
   }
   // Default to code node for backward compatibility (code, signature, workflow, or undefined agentType)

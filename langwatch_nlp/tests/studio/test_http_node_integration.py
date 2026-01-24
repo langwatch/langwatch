@@ -96,16 +96,16 @@ class TestHttpNodeRecognition:
                     method="POST",
                     auth=HttpAuthConfigDSL(
                         type="bearer",
-                        token="sk-test-12345",
+                        token="sk-test-12345",  # noqa: S106 (test fake token)
                     ),
                 ),
             ),
         )
 
-        import_code, class_name, params = parse_component(node, None, False)
+        _, _, params = parse_component(node, None, False)
 
         assert params["auth_type"] == "bearer"
-        assert params["auth_token"] == "sk-test-12345"
+        assert params["auth_token"] == "sk-test-12345"  # noqa: S105 (test fake token)
 
     @pytest.mark.integration
     def test_parser_includes_auth_params_for_api_key(self):
@@ -120,17 +120,17 @@ class TestHttpNodeRecognition:
                     auth=HttpAuthConfigDSL(
                         type="api_key",
                         header="X-API-Key",
-                        value="my-secret-key",
+                        value="my-secret-key",  # noqa: S106 (test fake key)
                     ),
                 ),
             ),
         )
 
-        import_code, class_name, params = parse_component(node, None, False)
+        _, _, params = parse_component(node, None, False)
 
         assert params["auth_type"] == "api_key"
         assert params["auth_header"] == "X-API-Key"
-        assert params["auth_value"] == "my-secret-key"
+        assert params["auth_value"] == "my-secret-key"  # noqa: S105 (test fake key)
 
     @pytest.mark.integration
     def test_workflow_with_http_node_parses_successfully(self):
@@ -218,7 +218,7 @@ class TestHttpNodeRecognition:
         )
 
         # Should not raise any errors
-        class_name, code, inputs = parse_workflow(workflow, format=True)
+        class_name, code, _ = parse_workflow(workflow, format=True)
 
         assert class_name == "WorkflowModule"
         assert "HttpNode" in code
@@ -362,14 +362,14 @@ class TestHttpNodeBearerAuth:
             method="POST",
             auth=HttpAuthConfig(
                 type="bearer",
-                token="sk-test-12345",
+                token="sk-test-12345",  # noqa: S106 (test fake token)
             ),
         )
         result = await execute_http_node(config, {})
 
         assert result.success is True
         request = httpx_mock.get_requests()[0]
-        assert request.headers["Authorization"] == "Bearer sk-test-12345"
+        assert request.headers["Authorization"] == "Bearer sk-test-12345"  # noqa: S105
 
 
 class TestHttpNodeApiKeyAuth:
@@ -386,14 +386,14 @@ class TestHttpNodeApiKeyAuth:
             auth=HttpAuthConfig(
                 type="api_key",
                 header="X-API-Key",
-                value="my-secret-key",
+                value="my-secret-key",  # noqa: S106 (test fake key)
             ),
         )
         result = await execute_http_node(config, {})
 
         assert result.success is True
         request = httpx_mock.get_requests()[0]
-        assert request.headers["X-API-Key"] == "my-secret-key"
+        assert request.headers["X-API-Key"] == "my-secret-key"  # noqa: S105
 
 
 class TestHttpNodeCustomHeaders:

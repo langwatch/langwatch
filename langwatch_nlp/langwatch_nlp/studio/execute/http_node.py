@@ -56,15 +56,20 @@ class HttpNodeResult:
 
 
 def interpolate_template(template: str, inputs: Dict[str, Any]) -> str:
-    """Replace {{variable}} placeholders with input values."""
+    """Replace {{variable}} placeholders with input values.
+
+    String values are JSON-escaped to ensure valid JSON output.
+    """
+    import json
 
     def replace_placeholder(match: re.Match[str]) -> str:
         var_name = match.group(1).strip()
         value = inputs.get(var_name, "")
         if isinstance(value, str):
-            return value
-        # For non-string values, convert to string representation
-        return str(value)
+            # JSON-encode then strip outer quotes for embedding in template
+            return json.dumps(value)[1:-1]
+        # For non-string values, use JSON representation
+        return json.dumps(value)
 
     pattern = r"\{\{([^}]+)\}\}"
     return re.sub(pattern, replace_placeholder, template)
@@ -102,8 +107,46 @@ def build_headers(config: HttpNodeConfig) -> Dict[str, str]:
             headers["Authorization"] = f"Bearer {config.auth.token}"
         elif config.auth.type == "api_key" and config.auth.header and config.auth.value:
             headers[config.auth.header] = config.auth.value
+        elif config.auth.type == "basic" and config.auth.username and config.auth.password:
+            import base64
+            credentials = base64.b64encode(
+                f"{config.auth.username}:{config.auth.password}".encode()
+            ).decode()
+            headers["Authorization"] = f"Basic {credentials}"
 
     return headers
+
+
+def _is_blocked_url(url: str) -> bool:
+    """Check if URL targets localhost or internal networks."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url.lower())
+    hostname = parsed.hostname or ""
+
+    blocked_hosts = [
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "::1",
+        "[::1]",
+    ]
+
+    # Block localhost and loopback
+    if hostname in blocked_hosts:
+        return True
+
+    # Block internal network ranges (basic check)
+    if hostname.startswith("10.") or hostname.startswith("192.168."):
+        return True
+    if hostname.startswith("172.") and len(hostname) > 4:
+        # 172.16.0.0 - 172.31.255.255
+        parts = hostname.split(".")
+        if len(parts) >= 2 and parts[1].isdigit():
+            second_octet = int(parts[1])
+            if 16 <= second_octet <= 31:
+                return True
+
+    return False
 
 
 async def execute_http_node(
@@ -119,6 +162,13 @@ async def execute_http_node(
     Returns:
         HttpNodeResult with success status, output or error
     """
+    # Validate URL - block localhost and internal networks
+    if _is_blocked_url(config.url):
+        return HttpNodeResult(
+            success=False,
+            error="Blocked URL: requests to localhost and internal networks are not allowed",
+        )
+
     # Build request body
     body: Optional[str] = None
     if config.body_template:
