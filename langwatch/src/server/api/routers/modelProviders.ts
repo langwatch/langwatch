@@ -10,9 +10,11 @@ import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   getAllModels,
+  getParameterConstraints,
   getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
+  type ParameterConstraints,
 } from "../../modelProviders/registry";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -37,6 +39,8 @@ export type ModelMetadataForFrontend = {
   pricing: LLMModelEntry["pricing"];
   /** Reasoning/thinking configuration for reasoning models */
   reasoningConfig?: ReasoningConfig;
+  /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
+  parameterConstraints?: ParameterConstraints;
 };
 
 export const modelProviderRouter = createTRPCRouter({
@@ -297,6 +301,7 @@ export const getModelMetadataForFrontend = (): Record<
         supportsAudioInput: model.supportsAudioInput,
         pricing: model.pricing,
         reasoningConfig: model.reasoningConfig,
+        parameterConstraints: getParameterConstraints(model.id),
       },
     ]),
   );

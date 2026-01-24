@@ -26,8 +26,10 @@ export type ParameterPopoverContentProps = {
   value: number | string | undefined;
   /** Callback when value changes */
   onChange: (value: number | string) => void;
-  /** Optional max override for sliders (e.g. model's maxCompletionTokens) */
+  /** Optional max override for sliders (e.g. model's maxCompletionTokens or provider constraints) */
   maxOverride?: number;
+  /** Optional min override for sliders (e.g. provider constraints) */
+  minOverride?: number;
   /** Whether to render in a portal (default: true). Set false for nested popovers. */
   portalled?: boolean;
 };
@@ -41,6 +43,7 @@ type SliderControlProps = {
   value: number | undefined;
   onChange: (value: number) => void;
   maxOverride?: number;
+  minOverride?: number;
 };
 
 function SliderControl({
@@ -48,15 +51,17 @@ function SliderControl({
   value,
   onChange,
   maxOverride,
+  minOverride,
 }: SliderControlProps) {
   const {
+    effectiveMin,
     effectiveMax,
     boundedValue,
     inputValue,
     handleInputChange,
     handleInputBlur,
     handleKeyDown,
-  } = useSliderControl({ config, value, onChange, maxOverride });
+  } = useSliderControl({ config, value, onChange, maxOverride, minOverride });
 
   return (
     <HStack gap={3} width="full">
@@ -69,7 +74,7 @@ function SliderControl({
         onChange={handleInputChange}
         onBlur={handleInputBlur}
         onKeyDown={handleKeyDown}
-        min={config.min}
+        min={effectiveMin}
         max={effectiveMax}
         step={config.step}
         borderColor="blue.200"
@@ -81,7 +86,7 @@ function SliderControl({
       <Slider.Root
         flex={1}
         size="sm"
-        min={config.min}
+        min={effectiveMin}
         max={effectiveMax}
         step={config.step}
         value={[boundedValue]}
@@ -141,6 +146,7 @@ export function ParameterPopoverContent({
   value,
   onChange,
   maxOverride,
+  minOverride,
   portalled = true,
 }: ParameterPopoverContentProps) {
   return (
@@ -158,6 +164,7 @@ export function ParameterPopoverContent({
             value={typeof value === "number" ? value : undefined}
             onChange={onChange}
             maxOverride={maxOverride}
+            minOverride={minOverride}
           />
         ) : (
           <SelectControl

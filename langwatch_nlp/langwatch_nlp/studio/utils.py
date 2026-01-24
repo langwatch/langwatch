@@ -168,6 +168,71 @@ class ClientReadableValueError(ValueError):
 # Minimum max_tokens required by DSPy for reasoning models
 REASONING_MODEL_MIN_MAX_TOKENS = 16000
 
+# ============================================================================
+# Provider Parameter Constraints
+# ============================================================================
+# Mirrors registry.ts modelProviders.parameterConstraints
+# These constraints are provider-level limits that override global defaults.
+
+PROVIDER_PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Dict[str, float]]] = {
+    "anthropic": {
+        "temperature": {"min": 0, "max": 1},
+    },
+}
+
+
+def get_provider_from_model_id(model_id: str | None) -> str | None:
+    """
+    Extract provider from model ID.
+
+    Args:
+        model_id: Full model ID (e.g., "anthropic/claude-sonnet-4")
+
+    Returns:
+        Provider name (e.g., "anthropic") or None if not found
+    """
+    if not model_id or "/" not in model_id:
+        return None
+    return model_id.split("/")[0]
+
+
+def clamp_to_provider_constraints(
+    value: float,
+    param_name: str,
+    model_id: str | None,
+) -> float:
+    """
+    Clamps a parameter value to provider-specific constraints.
+
+    This is a pure function for defense-in-depth validation.
+    Even if the UI allows out-of-range values, this ensures
+    the API receives valid values.
+
+    Args:
+        value: The parameter value to clamp
+        param_name: Parameter name (e.g., "temperature")
+        model_id: Full model ID (e.g., "anthropic/claude-sonnet-4")
+
+    Returns:
+        The clamped value within provider constraints, or original value
+        if no constraints exist for this provider/parameter.
+    """
+    provider = get_provider_from_model_id(model_id)
+    if not provider:
+        return value
+
+    constraints = PROVIDER_PARAMETER_CONSTRAINTS.get(provider, {})
+    param_constraints = constraints.get(param_name, {})
+
+    if not param_constraints:
+        return value
+
+    min_val = param_constraints.get("min", float("-inf"))
+    max_val = param_constraints.get("max", float("inf"))
+
+    return max(min_val, min(value, max_val))
+
+
 # Translation map from provider-specific parameter names to LiteLLM's expected parameter.
 # LiteLLM expects 'reasoning_effort' for all providers - it handles the internal
 # transformation to provider-specific formats (e.g., Anthropic's output_config).
@@ -326,8 +391,11 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     - max_tokens: at least 16000
 
     For non-reasoning models:
-    - temperature: config value or 0
-    - max_tokens: config value or 2048
+    - temperature: config value or default, clamped to provider constraints
+    - max_tokens: config value or 4096
+
+    Provider constraints (e.g., Anthropic temperature max 1.0) are applied
+    as defense-in-depth validation.
     """
     if is_reasoning_model(llm_config.model):
         return {
@@ -337,10 +405,20 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
                 REASONING_MODEL_MIN_MAX_TOKENS,
             ),
         }
+
+    # Get temperature with default, then clamp to provider constraints
+    raw_temperature = (
+        llm_config.temperature if llm_config.temperature is not None else 1
+    )
+    clamped_temperature = clamp_to_provider_constraints(
+        raw_temperature, "temperature", llm_config.model
+    )
+
     return {
         # Use explicit None check to allow temperature=0 as a valid value
         # Default to 1 to match UI default (parameterRegistry temperature.default = 1)
-        "temperature": llm_config.temperature if llm_config.temperature is not None else 1,
+        # Then clamp to provider constraints (e.g., Anthropic max 1.0)
+        "temperature": clamped_temperature,
         # Default to 4096 to match UI default (parameterRegistry max_tokens.default = 4096)
         "max_tokens": llm_config.max_tokens if llm_config.max_tokens is not None else 4096,
     }

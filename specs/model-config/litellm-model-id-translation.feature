@@ -34,10 +34,11 @@ Feature: LiteLLM Model ID Translation
     Then the result should be "anthropic/claude-sonnet-4-5"
 
   @unit
-  Scenario: Translates Anthropic Claude 3.5 Haiku model ID
+  Scenario: Translates Anthropic Claude 3.5 Haiku model ID with alias expansion
     Given a model ID "anthropic/claude-3.5-haiku"
     When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-5-haiku"
+    Then the result should be "anthropic/claude-3-5-haiku-20241022"
+    # LiteLLM requires the full dated version for Claude 3.5 Haiku
 
   @unit
   Scenario: Translates Anthropic Claude 3.7 Sonnet model ID

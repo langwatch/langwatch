@@ -21,11 +21,15 @@ export interface UseSliderControlParams {
   value: number | undefined;
   /** Callback when value changes */
   onChange: (value: number) => void;
-  /** Optional max override (e.g., model's maxCompletionTokens) */
+  /** Optional max override (e.g., model's maxCompletionTokens or provider constraints) */
   maxOverride?: number;
+  /** Optional min override (e.g., provider constraints) */
+  minOverride?: number;
 }
 
 export interface UseSliderControlReturn {
+  /** The effective min value (either from config or override) */
+  effectiveMin: number;
   /** The effective max value (either from config or override) */
   effectiveMax: number;
   /** The bounded value clamped within min/max */
@@ -51,10 +55,20 @@ export function useSliderControl({
   value,
   onChange,
   maxOverride,
+  minOverride,
 }: UseSliderControlParams): UseSliderControlReturn {
-  // Calculate effective max - use model override for dynamic params
+  // Calculate effective min - use override if provided (e.g., provider constraints)
+  const effectiveMin = minOverride ?? config.min;
+
+  // Calculate effective max - use model override for dynamic params or provider constraints
+  // For dynamic max params (like max_tokens), always use the override
+  // For other params, use override if it's more restrictive than config.max
   const effectiveMax =
-    config.dynamicMax && maxOverride ? maxOverride : config.max;
+    config.dynamicMax && maxOverride
+      ? maxOverride
+      : maxOverride !== undefined
+        ? Math.min(maxOverride, config.max)
+        : config.max;
 
   // Smart default: for dynamic max params (like max_tokens), use ~25% of the model's max
   // This provides a sensible starting point while leaving room for adjustment
@@ -70,7 +84,7 @@ export function useSliderControl({
 
   // Ensure current value is within bounds
   const boundedValue = Math.min(
-    Math.max(currentValue, config.min),
+    Math.max(currentValue, effectiveMin),
     effectiveMax,
   );
 
@@ -89,8 +103,8 @@ export function useSliderControl({
   const handleInputBlur = () => {
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
-      // Clamp to bounds
-      const clamped = Math.min(Math.max(parsed, config.min), effectiveMax);
+      // Clamp to bounds (use effective min/max which include provider constraints)
+      const clamped = Math.min(Math.max(parsed, effectiveMin), effectiveMax);
       // Round to step precision
       const rounded = Math.round(clamped / config.step) * config.step;
       // Fix floating point precision
@@ -115,6 +129,7 @@ export function useSliderControl({
   };
 
   return {
+    effectiveMin,
     effectiveMax,
     boundedValue,
     inputValue,

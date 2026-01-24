@@ -12,6 +12,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 from langwatch_nlp.studio.types.dsl import LLMConfig
 from langwatch_nlp.studio.utils import (
+    clamp_to_provider_constraints,
+    get_provider_from_model_id,
     node_llm_config_to_dspy_lm,
     translate_model_id_for_litellm,
 )
@@ -443,9 +445,9 @@ class TestTranslateModelIdForLitellm:
         assert result == "anthropic/claude-sonnet-4-5"
 
     def test_translates_anthropic_claude_3_5_haiku(self):
-        """Translates anthropic/claude-3.5-haiku to anthropic/claude-3-5-haiku."""
+        """Translates anthropic/claude-3.5-haiku to anthropic/claude-3-5-haiku-20241022 (alias expansion)."""
         result = translate_model_id_for_litellm("anthropic/claude-3.5-haiku")
-        assert result == "anthropic/claude-3-5-haiku"
+        assert result == "anthropic/claude-3-5-haiku-20241022"
 
     def test_translates_anthropic_claude_3_7_sonnet(self):
         """Translates anthropic/claude-3.7-sonnet to anthropic/claude-3-7-sonnet."""
@@ -569,4 +571,180 @@ class TestModelIdTranslationInDspyLm:
 
         mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
-        assert call_kwargs.get("model") == "anthropic/claude-3-5-haiku"
+        assert call_kwargs.get("model") == "anthropic/claude-3-5-haiku-20241022"
+
+
+class TestGetProviderFromModelId:
+    """Tests for extracting provider from model ID."""
+
+    def test_extracts_anthropic_provider(self):
+        """Extracts 'anthropic' from anthropic/claude-sonnet-4."""
+        result = get_provider_from_model_id("anthropic/claude-sonnet-4")
+        assert result == "anthropic"
+
+    def test_extracts_openai_provider(self):
+        """Extracts 'openai' from openai/gpt-4.1."""
+        result = get_provider_from_model_id("openai/gpt-4.1")
+        assert result == "openai"
+
+    def test_returns_none_for_model_without_slash(self):
+        """Returns None for standalone-model (no provider prefix)."""
+        result = get_provider_from_model_id("standalone-model")
+        assert result is None
+
+    def test_returns_none_for_empty_string(self):
+        """Returns None for empty string."""
+        result = get_provider_from_model_id("")
+        assert result is None
+
+    def test_returns_none_for_none(self):
+        """Returns None for None input."""
+        result = get_provider_from_model_id(None)
+        assert result is None
+
+
+class TestClampToProviderConstraints:
+    """Tests for clamping parameter values to provider constraints."""
+
+    def test_clamps_temperature_above_anthropic_max(self):
+        """Clamps temperature 1.5 to 1.0 for Anthropic."""
+        result = clamp_to_provider_constraints(
+            value=1.5,
+            param_name="temperature",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 1.0
+
+    def test_clamps_temperature_below_anthropic_min(self):
+        """Clamps temperature -0.5 to 0 for Anthropic."""
+        result = clamp_to_provider_constraints(
+            value=-0.5,
+            param_name="temperature",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 0
+
+    def test_preserves_temperature_within_anthropic_range(self):
+        """Preserves temperature 0.7 for Anthropic (within 0-1 range)."""
+        result = clamp_to_provider_constraints(
+            value=0.7,
+            param_name="temperature",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 0.7
+
+    def test_preserves_anthropic_min_boundary(self):
+        """Preserves temperature 0 for Anthropic (at min boundary)."""
+        result = clamp_to_provider_constraints(
+            value=0,
+            param_name="temperature",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 0
+
+    def test_preserves_anthropic_max_boundary(self):
+        """Preserves temperature 1.0 for Anthropic (at max boundary)."""
+        result = clamp_to_provider_constraints(
+            value=1.0,
+            param_name="temperature",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 1.0
+
+    def test_openai_no_constraints_preserves_value(self):
+        """Preserves temperature 1.8 for OpenAI (no constraints defined)."""
+        result = clamp_to_provider_constraints(
+            value=1.8,
+            param_name="temperature",
+            model_id="openai/gpt-4.1",
+        )
+        assert result == 1.8
+
+    def test_unknown_provider_preserves_value(self):
+        """Preserves value for unknown provider."""
+        result = clamp_to_provider_constraints(
+            value=2.5,
+            param_name="temperature",
+            model_id="unknown/some-model",
+        )
+        assert result == 2.5
+
+    def test_model_without_provider_preserves_value(self):
+        """Preserves value for model without provider prefix."""
+        result = clamp_to_provider_constraints(
+            value=1.5,
+            param_name="temperature",
+            model_id="standalone-model",
+        )
+        assert result == 1.5
+
+    def test_none_model_id_preserves_value(self):
+        """Preserves value when model_id is None."""
+        result = clamp_to_provider_constraints(
+            value=1.5,
+            param_name="temperature",
+            model_id=None,
+        )
+        assert result == 1.5
+
+    def test_unknown_param_preserves_value(self):
+        """Preserves value for unknown parameter name."""
+        result = clamp_to_provider_constraints(
+            value=5.0,
+            param_name="unknown_param",
+            model_id="anthropic/claude-sonnet-4",
+        )
+        assert result == 5.0
+
+
+class TestAnthropicTemperatureClampingInDspyLm:
+    """Tests that Anthropic temperature clamping is applied in node_llm_config_to_dspy_lm."""
+
+    @pytest.fixture
+    def mock_dspy_lm(self):
+        """Mock dspy.LM to capture arguments without actual initialization."""
+        with patch("langwatch_nlp.studio.utils.dspy.LM") as mock:
+            mock.return_value = MagicMock()
+            yield mock
+
+    def test_anthropic_temperature_clamped_to_1(self, mock_dspy_lm):
+        """Given Anthropic model with temperature=1.5, dspy.LM receives temperature=1.0."""
+        config = LLMConfig(
+            model="anthropic/claude-sonnet-4",
+            temperature=1.5,
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0
+
+    def test_anthropic_temperature_within_range_preserved(self, mock_dspy_lm):
+        """Given Anthropic model with temperature=0.7, dspy.LM receives temperature=0.7."""
+        config = LLMConfig(
+            model="anthropic/claude-sonnet-4",
+            temperature=0.7,
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 0.7
+
+    def test_openai_temperature_not_clamped(self, mock_dspy_lm):
+        """Given OpenAI model with temperature=1.8, dspy.LM receives temperature=1.8."""
+        config = LLMConfig(
+            model="openai/gpt-4o",
+            temperature=1.8,
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.8

@@ -28,8 +28,10 @@ export type ParameterFieldProps = {
   value: number | string | undefined;
   /** Callback when value changes */
   onChange: (value: number | string) => void;
-  /** Optional max override for sliders (e.g. model's maxCompletionTokens) */
+  /** Optional max override for sliders (e.g. model's maxCompletionTokens or provider constraints) */
   maxOverride?: number;
+  /** Optional min override for sliders (e.g. provider constraints) */
+  minOverride?: number;
   /** Whether the field is disabled */
   disabled?: boolean;
 };
@@ -43,6 +45,7 @@ type SliderFieldProps = {
   value: number | undefined;
   onChange: (value: number) => void;
   maxOverride?: number;
+  minOverride?: number;
   disabled?: boolean;
 };
 
@@ -51,16 +54,18 @@ function SliderField({
   value,
   onChange,
   maxOverride,
+  minOverride,
   disabled,
 }: SliderFieldProps) {
   const {
+    effectiveMin,
     effectiveMax,
     boundedValue,
     inputValue,
     handleInputChange,
     handleInputBlur,
     handleKeyDown,
-  } = useSliderControl({ config, value, onChange, maxOverride });
+  } = useSliderControl({ config, value, onChange, maxOverride, minOverride });
 
   return (
     <VStack gap={1} align="stretch" width="full">
@@ -77,7 +82,7 @@ function SliderField({
           onChange={handleInputChange}
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
-          min={config.min}
+          min={effectiveMin}
           max={effectiveMax}
           step={config.step}
           disabled={disabled}
@@ -85,7 +90,7 @@ function SliderField({
       </HStack>
       <Slider.Root
         size="sm"
-        min={config.min}
+        min={effectiveMin}
         max={effectiveMax}
         step={config.step}
         value={[boundedValue]}
@@ -153,6 +158,7 @@ export function ParameterField({
   value,
   onChange,
   maxOverride,
+  minOverride,
   disabled,
 }: ParameterFieldProps) {
   if (config.type === "slider") {
@@ -162,6 +168,7 @@ export function ParameterField({
         value={typeof value === "number" ? value : undefined}
         onChange={onChange}
         maxOverride={maxOverride}
+        minOverride={minOverride}
         disabled={disabled}
       />
     );
