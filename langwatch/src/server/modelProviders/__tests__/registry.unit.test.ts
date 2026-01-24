@@ -10,6 +10,7 @@ import {
   getModelById,
   getModelMetadata,
   getModelsForProvider,
+  getParameterConstraints,
   getProviderModelOptions,
   getRegistryMetadata,
   modelProviders,
@@ -171,6 +172,17 @@ describe("Backward Compatibility", () => {
       );
       expect(openaiModels.length).toBeGreaterThan(0);
     });
+
+    it("excludes models with variant suffixes", () => {
+      const modelIds = Object.keys(allLitellmModels);
+      const variantModels = modelIds.filter((id) => id.includes(":"));
+      expect(variantModels).toHaveLength(0);
+    });
+
+    it("includes standard models without suffixes", () => {
+      expect(allLitellmModels["anthropic/claude-3.5-sonnet"]).toBeDefined();
+      expect(allLitellmModels["openai/gpt-4o"]).toBeDefined();
+    });
   });
 });
 
@@ -259,5 +271,62 @@ describe("Multimodal Support", () => {
 
     expect(audioModel).toBeDefined();
     expect(audioModel?.supportsAudioInput).toBe(true);
+  });
+});
+
+describe("Parameter Constraints", () => {
+  describe("getParameterConstraints", () => {
+    it("returns constraints for Anthropic models", () => {
+      const constraints = getParameterConstraints("anthropic/claude-sonnet-4");
+
+      expect(constraints).toBeDefined();
+      expect(constraints?.temperature).toEqual({ min: 0, max: 1 });
+    });
+
+    it("returns undefined for OpenAI models (no constraints defined)", () => {
+      const constraints = getParameterConstraints("openai/gpt-4.1");
+
+      expect(constraints).toBeUndefined();
+    });
+
+    it("returns undefined for unknown provider", () => {
+      const constraints = getParameterConstraints("unknown-provider/model");
+
+      expect(constraints).toBeUndefined();
+    });
+
+    it("returns undefined for model ID without provider prefix", () => {
+      const constraints = getParameterConstraints("standalone-model");
+
+      expect(constraints).toBeUndefined();
+    });
+
+    it("returns undefined for empty model ID", () => {
+      const constraints = getParameterConstraints("");
+
+      expect(constraints).toBeUndefined();
+    });
+
+    it("extracts provider correctly from model ID with slashes", () => {
+      // Model IDs like "anthropic/claude-3.5-sonnet" should extract "anthropic"
+      const constraints = getParameterConstraints(
+        "anthropic/claude-3.5-sonnet",
+      );
+
+      expect(constraints).toBeDefined();
+      expect(constraints?.temperature?.max).toBe(1);
+    });
+  });
+
+  describe("Anthropic provider constraints", () => {
+    it("has temperature constraint defined", () => {
+      expect(modelProviders.anthropic.parameterConstraints).toBeDefined();
+      expect(
+        modelProviders.anthropic.parameterConstraints?.temperature,
+      ).toEqual({
+        min: 0,
+        max: 1,
+      });
+    });
   });
 });

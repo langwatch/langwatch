@@ -6,12 +6,15 @@ import type {
   LLMModelEntry,
   ReasoningConfig,
 } from "../../modelProviders/llmModels.types";
+import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   getAllModels,
+  getParameterConstraints,
   getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
+  type ParameterConstraints,
 } from "../../modelProviders/registry";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -36,6 +39,8 @@ export type ModelMetadataForFrontend = {
   pricing: LLMModelEntry["pricing"];
   /** Reasoning/thinking configuration for reasoning models */
   reasoningConfig?: ReasoningConfig;
+  /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
+  parameterConstraints?: ParameterConstraints;
 };
 
 export const modelProviderRouter = createTRPCRouter({
@@ -296,6 +301,7 @@ export const getModelMetadataForFrontend = (): Record<
         supportsAudioInput: model.supportsAudioInput,
         pricing: model.pricing,
         reasoningConfig: model.reasoningConfig,
+        parameterConstraints: getParameterConstraints(model.id),
       },
     ]),
   );
@@ -422,7 +428,13 @@ export const prepareLitellmParams = async ({
 }) => {
   const params: Record<string, string> = {};
 
-  params.model = model.replace("custom/", "openai/");
+  // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
+  // Custom models use OpenAI-compatible API format, so we replace the prefix.
+  // LiteLLM routes "openai/" prefixed models through its OpenAI-compatible handler.
+  params.model = translateModelIdForLitellm(model).replace(
+    "custom/",
+    "openai/",
+  );
 
   const apiKey = getModelOrDefaultApiKey(modelProvider);
   if (apiKey && modelProvider.provider !== "vertex_ai") {

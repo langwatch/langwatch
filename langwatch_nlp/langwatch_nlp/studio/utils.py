@@ -168,13 +168,87 @@ class ClientReadableValueError(ValueError):
 # Minimum max_tokens required by DSPy for reasoning models
 REASONING_MODEL_MIN_MAX_TOKENS = 16000
 
-# Provider-specific reasoning parameter names
-# Used as fallback for mapping the unified 'reasoning' field to provider-specific parameters
+# ============================================================================
+# Provider Parameter Constraints
+# ============================================================================
+# Mirrors registry.ts modelProviders.parameterConstraints
+# These constraints are provider-level limits that override global defaults.
+
+PROVIDER_PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Dict[str, float]]] = {
+    "anthropic": {
+        "temperature": {"min": 0, "max": 1},
+    },
+}
+
+
+def get_provider_from_model_id(model_id: str | None) -> str | None:
+    """
+    Extract provider from model ID.
+
+    Args:
+        model_id: Full model ID (e.g., "anthropic/claude-sonnet-4")
+
+    Returns:
+        Provider name (e.g., "anthropic") or None if not found
+    """
+    if not model_id or "/" not in model_id:
+        return None
+    return model_id.split("/")[0]
+
+
+def clamp_to_provider_constraints(
+    value: float,
+    param_name: str,
+    model_id: str | None,
+) -> float:
+    """
+    Clamps a parameter value to provider-specific constraints.
+
+    This is a pure function for defense-in-depth validation.
+    Even if the UI allows out-of-range values, this ensures
+    the API receives valid values.
+
+    Args:
+        value: The parameter value to clamp
+        param_name: Parameter name (e.g., "temperature")
+        model_id: Full model ID (e.g., "anthropic/claude-sonnet-4")
+
+    Returns:
+        The clamped value within provider constraints, or original value
+        if no constraints exist for this provider/parameter.
+    """
+    provider = get_provider_from_model_id(model_id)
+    if not provider:
+        return value
+
+    constraints = PROVIDER_PARAMETER_CONSTRAINTS.get(provider, {})
+    param_constraints = constraints.get(param_name, {})
+
+    if not param_constraints:
+        return value
+
+    min_val = param_constraints.get("min", float("-inf"))
+    max_val = param_constraints.get("max", float("inf"))
+
+    return max(min_val, min(value, max_val))
+
+
+# Translation map from provider-specific parameter names to LiteLLM's expected parameter.
+# LiteLLM expects 'reasoning_effort' for all providers - it handles the internal
+# transformation to provider-specific formats (e.g., Anthropic's output_config).
+LITELLM_PARAMETER_TRANSLATION: Dict[str, str] = {
+    "effort": "reasoning_effort",
+    "thinkingLevel": "reasoning_effort",
+    "reasoning_effort": "reasoning_effort",
+}
+
+# Provider-specific reasoning parameter fallbacks.
+# All providers now use 'reasoning_effort' because LiteLLM expects it.
 PROVIDER_REASONING_FALLBACKS: Dict[str, str] = {
     "openai": "reasoning_effort",
-    "google": "thinkingLevel",
-    "anthropic": "effort",
-    "gemini": "thinkingLevel",  # Alias for google
+    "google": "reasoning_effort",
+    "anthropic": "reasoning_effort",
+    "gemini": "reasoning_effort",
 }
 
 
@@ -185,28 +259,92 @@ def get_provider_from_model(model: str | None) -> str:
     return model.split("/")[0].lower() if "/" in model else ""
 
 
+# Model aliases that need expansion to their full dated versions.
+# LiteLLM requires the full dated version for certain models.
+MODEL_ALIASES: Dict[str, str] = {
+    "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
+    "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
+    "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
+    "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620"
+}
+
+# Providers that need dot-to-dash translation for their model IDs.
+# Anthropic models use dots in llmModels.json but LiteLLM expects dashes.
+PROVIDERS_NEEDING_TRANSLATION = {"anthropic", "custom"}
+
+
+def translate_model_id_for_litellm(model_id: str | None) -> str | None:
+    """
+    Translates a model ID for use with LiteLLM.
+
+    First checks for exact alias matches that need expansion to dated versions.
+    Then converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
+    Other providers (OpenAI, Gemini, etc.) are returned unchanged.
+
+    Args:
+        model_id: The model ID from llmModels.json (e.g., "anthropic/claude-opus-4.5")
+
+    Returns:
+        The translated model ID for LiteLLM (e.g., "anthropic/claude-opus-4-5")
+    """
+    if not model_id:
+        return model_id
+
+    # First, check for exact alias matches that need expansion
+    if model_id in MODEL_ALIASES:
+        return MODEL_ALIASES[model_id]
+
+    provider = get_provider_from_model(model_id)
+
+    # Only translate providers that need it
+    # Models without a provider prefix are treated as needing translation
+    # (they could be Anthropic models referenced without the prefix)
+    needs_translation = provider == "" or provider in PROVIDERS_NEEDING_TRANSLATION
+
+    if not needs_translation:
+        return model_id
+
+    # Replace dots with dashes in the entire model ID
+    return model_id.replace(".", "-")
+
+
+def translate_to_litellm_param(param_name: str) -> str:
+    """
+    Translates a parameter name to LiteLLM's expected format.
+
+    Args:
+        param_name: The parameter name (may be provider-specific like 'effort' or 'thinkingLevel')
+
+    Returns:
+        The translated parameter name for LiteLLM (always 'reasoning_effort' for known params)
+    """
+    return LITELLM_PARAMETER_TRANSLATION.get(param_name, param_name)
+
+
 def map_reasoning_to_provider(model: str | None, reasoning: str | None) -> Dict[str, str]:
     """
-    Maps the unified 'reasoning' field to the provider-specific parameter.
+    Maps the unified 'reasoning' field to LiteLLM's expected parameter.
 
-    This is the boundary layer function that converts the canonical 'reasoning'
-    field to the appropriate provider-specific parameter (reasoning_effort,
-    thinkingLevel, effort) when making API calls.
+    IMPORTANT: LiteLLM expects 'reasoning_effort' for ALL providers. This function
+    always returns reasoning_effort regardless of the provider.
+
+    LiteLLM internally transforms reasoning_effort to provider-specific formats:
+    - Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header
+    - Gemini: reasoning_effort -> thinking_level or thinking with budget
+    - OpenAI: reasoning_effort -> passed as-is
 
     Args:
         model: The model identifier (e.g., "openai/gpt-5", "gemini/gemini-3-flash")
         reasoning: The unified reasoning value
 
     Returns:
-        Dict with provider-specific key and value, or empty dict if reasoning is not set
+        Dict with { reasoning_effort: value }, or empty dict if reasoning is not set
     """
     if not reasoning:
         return {}
 
-    provider = get_provider_from_model(model)
-    param_key = PROVIDER_REASONING_FALLBACKS.get(provider, "reasoning_effort")
-
-    return {param_key: reasoning}
+    # Always use reasoning_effort for LiteLLM - it handles provider-specific transforms
+    return {"reasoning_effort": reasoning}
 
 
 def normalize_reasoning_from_provider_fields(llm_config: LLMConfig) -> str | None:
@@ -254,8 +392,11 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     - max_tokens: at least 16000
 
     For non-reasoning models:
-    - temperature: config value or 0
-    - max_tokens: config value or 2048
+    - temperature: config value or default, clamped to provider constraints
+    - max_tokens: config value or 4096
+
+    Provider constraints (e.g., Anthropic temperature max 1.0) are applied
+    as defense-in-depth validation.
     """
     if is_reasoning_model(llm_config.model):
         return {
@@ -265,10 +406,20 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
                 REASONING_MODEL_MIN_MAX_TOKENS,
             ),
         }
+
+    # Get temperature with default, then clamp to provider constraints
+    raw_temperature = (
+        llm_config.temperature if llm_config.temperature is not None else 1
+    )
+    clamped_temperature = clamp_to_provider_constraints(
+        raw_temperature, "temperature", llm_config.model
+    )
+
     return {
         # Use explicit None check to allow temperature=0 as a valid value
         # Default to 1 to match UI default (parameterRegistry temperature.default = 1)
-        "temperature": llm_config.temperature if llm_config.temperature is not None else 1,
+        # Then clamp to provider constraints (e.g., Anthropic max 1.0)
+        "temperature": clamped_temperature,
         # Default to 4096 to match UI default (parameterRegistry max_tokens.default = 4096)
         "max_tokens": llm_config.max_tokens if llm_config.max_tokens is not None else 4096,
     }
@@ -294,6 +445,11 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
     }
+
+    # Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
+    if llm_params.get("model"):
+        llm_params["model"] = translate_model_id_for_litellm(llm_params["model"])
+
     if (
         "azure/" in (llm_params["model"] or "")
         and "api_version" not in llm_params

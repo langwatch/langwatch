@@ -200,6 +200,21 @@ export function LLMConfigPopover({
 
             const value = getParamValue(values, paramName);
 
+            // Get provider-level parameter constraints
+            const paramConstraints =
+              currentModelMetadata?.parameterConstraints?.[paramName];
+
+            // Determine effective max override:
+            // - For max_tokens: use model's maxCompletionTokens
+            // - For other params: use provider constraints if available
+            const maxOverride =
+              paramName === "max_tokens"
+                ? maxTokenLimit
+                : paramConstraints?.max;
+
+            // Determine effective min override from provider constraints
+            const minOverride = paramConstraints?.min;
+
             return (
               <ParameterRow
                 key={paramName}
@@ -207,9 +222,8 @@ export function LLMConfigPopover({
                 config={config}
                 value={value}
                 onChange={(newValue) => handleParamChange(paramName, newValue)}
-                maxOverride={
-                  paramName === "max_tokens" ? maxTokenLimit : undefined
-                }
+                maxOverride={maxOverride}
+                minOverride={minOverride}
                 isOpen={openParameter === paramName}
                 onOpenChange={(open) =>
                   setOpenParameter(open ? paramName : null)

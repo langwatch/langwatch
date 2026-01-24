@@ -25,8 +25,10 @@ export type ParameterRowProps = {
   value: number | string | undefined;
   /** Callback when value changes */
   onChange: (value: number | string) => void;
-  /** Optional max override for sliders (e.g. model's maxCompletionTokens) */
+  /** Optional max override for sliders (e.g. model's maxCompletionTokens or provider constraints) */
   maxOverride?: number;
+  /** Optional min override for sliders (e.g. provider constraints) */
+  minOverride?: number;
   /** Whether the field is disabled */
   disabled?: boolean;
   /** Controlled open state */
@@ -74,6 +76,7 @@ export function ParameterRow({
   value,
   onChange,
   maxOverride,
+  minOverride,
   disabled,
   isOpen,
   onOpenChange,
@@ -125,6 +128,7 @@ export function ParameterRow({
         value={value}
         onChange={onChange}
         maxOverride={maxOverride}
+        minOverride={minOverride}
         portalled={false}
       />
     </Popover.Root>
