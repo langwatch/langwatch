@@ -88,7 +88,7 @@ specs/               # BDD feature specs
 
 ## Orchestration Model
 
-Implementation tasks use `/orchestrate` to manage the plan → code → review loop:
+Implementation tasks use `/orchestrate` to manage the plan → code → review → e2e loop:
 
 - `/orchestrate <requirements>` - Enter orchestration mode
 - `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
@@ -96,9 +96,42 @@ Implementation tasks use `/orchestrate` to manage the plan → code → review l
 The orchestrator:
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
 2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer agent)
-3. Tracks progress via task status updates
-4. Does NOT read or write code directly
-
-Agents: `.claude/agents/coder.md`, `.claude/agents/uncle-bob-reviewer.md`, `.claude/agents/repo-sherpa.md`
+3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)
+4. Tracks progress via task status updates
+5. Does NOT read or write code directly
 
 See `.claude/README.md` for full orchestration documentation.
+
+## E2E Testing Workflow
+
+After code is implemented and reviewed, features with `@e2e` scenarios go through E2E verification:
+
+```
+/e2e specs/scenarios/my-feature.feature
+    │
+    ├── playwright-test-planner (Opus)
+    │   - Explores live app at localhost:5570
+    │   - Creates test plan in agentic-e2e-tests/plans/
+    │
+    ├── playwright-test-generator (Sonnet)
+    │   - Generates Playwright tests from plan
+    │   - Saves to agentic-e2e-tests/tests/
+    │
+    ├── playwright-test-healer (Sonnet)
+    │   - Runs tests, fixes failures
+    │   - Iterates until passing
+    │
+    └── test-reviewer (Opus)
+        - Reviews test quality
+        - Checks pyramid placement
+```
+
+**Run E2E tests manually:**
+```bash
+cd agentic-e2e-tests
+docker compose up -d        # Start infrastructure
+cd ../langwatch && PORT=5570 pnpm dev  # Start app
+cd ../agentic-e2e-tests && pnpm test   # Run tests
+```
+
+See `agentic-e2e-tests/README.md` for detailed setup and conventions.
