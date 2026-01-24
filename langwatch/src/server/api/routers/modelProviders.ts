@@ -6,6 +6,7 @@ import type {
   LLMModelEntry,
   ReasoningConfig,
 } from "../../modelProviders/llmModels.types";
+import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   getAllModels,
@@ -422,7 +423,12 @@ export const prepareLitellmParams = async ({
 }) => {
   const params: Record<string, string> = {};
 
-  params.model = model.replace("custom/", "openai/");
+  // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
+  // Then handle custom/ prefix replacement
+  params.model = translateModelIdForLitellm(model).replace(
+    "custom/",
+    "openai/",
+  );
 
   const apiKey = getModelOrDefaultApiKey(modelProvider);
   if (apiKey && modelProvider.provider !== "vertex_ai") {

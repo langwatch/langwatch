@@ -2,19 +2,27 @@
  * Unit tests for reasoning boundary layer functions.
  *
  * These functions handle the mapping between the unified 'reasoning' field
- * and provider-specific parameters (reasoning_effort, thinkingLevel, effort)
- * at the boundary when calling LLM APIs.
+ * and provider-specific parameters at the boundary when calling LLM APIs.
+ *
+ * IMPORTANT: LiteLLM expects 'reasoning_effort' for ALL providers and transforms
+ * it internally to provider-specific parameters:
+ * - Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header
+ * - Gemini: reasoning_effort -> thinking_level or thinking with budget
+ * - OpenAI: reasoning_effort -> passed as-is
  */
 import { describe, expect, it, vi } from "vitest";
 import {
   mapReasoningToProvider,
   normalizeReasoningFromProviderFields,
+  LITELLM_PARAMETER_TRANSLATION,
 } from "../reasoningBoundary";
 
 // Mock the model registry
 vi.mock("../../modelProviders/registry", () => ({
   getModelById: vi.fn((modelId: string) => {
     // Return mock model data based on modelId
+    // Note: Model registry still uses provider-specific names for UI clarity
+    // Translation to reasoning_effort happens in mapReasoningToProvider
     const models: Record<
       string,
       { reasoningConfig?: { parameterName: string } }
@@ -26,6 +34,12 @@ vi.mock("../../modelProviders/registry", () => ({
         reasoningConfig: { parameterName: "thinkingLevel" },
       },
       "anthropic/claude-opus-4": {
+        reasoningConfig: { parameterName: "effort" },
+      },
+      "gemini/gemini-2.5-pro": {
+        reasoningConfig: { parameterName: "thinkingLevel" },
+      },
+      "anthropic/claude-opus-4.5": {
         reasoningConfig: { parameterName: "effort" },
       },
       "custom/model-with-custom-param": {
@@ -46,27 +60,57 @@ vi.mock("../../../utils/modelProviderHelpers", () => ({
 }));
 
 describe("reasoningBoundary", () => {
+  describe("LITELLM_PARAMETER_TRANSLATION", () => {
+    it("maps effort to reasoning_effort", () => {
+      expect(LITELLM_PARAMETER_TRANSLATION["effort"]).toBe("reasoning_effort");
+    });
+
+    it("maps thinkingLevel to reasoning_effort", () => {
+      expect(LITELLM_PARAMETER_TRANSLATION["thinkingLevel"]).toBe("reasoning_effort");
+    });
+
+    it("maps reasoning_effort to reasoning_effort (passthrough)", () => {
+      expect(LITELLM_PARAMETER_TRANSLATION["reasoning_effort"]).toBe("reasoning_effort");
+    });
+  });
+
   describe("mapReasoningToProvider", () => {
-    describe("when model has reasoningConfig.parameterName", () => {
+    // LiteLLM expects reasoning_effort for ALL providers
+    // The function translates provider-specific names from model registry to reasoning_effort
+
+    describe("uses reasoning_effort for all providers (LiteLLM requirement)", () => {
       it("maps reasoning to reasoning_effort for OpenAI models", () => {
         const result = mapReasoningToProvider("openai/gpt-5", "high");
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 
-      it("maps reasoning to thinkingLevel for Gemini models", () => {
+      it("maps reasoning to reasoning_effort for Gemini models", () => {
+        // Model registry returns thinkingLevel, but function translates to reasoning_effort
         const result = mapReasoningToProvider("gemini/gemini-3-flash", "low");
-        expect(result).toEqual({ thinkingLevel: "low" });
+        expect(result).toEqual({ reasoning_effort: "low" });
       });
 
-      it("maps reasoning to effort for Anthropic models", () => {
+      it("maps reasoning to reasoning_effort for Anthropic models", () => {
+        // Model registry returns effort, but function translates to reasoning_effort
         const result = mapReasoningToProvider(
           "anthropic/claude-opus-4",
           "medium",
         );
-        expect(result).toEqual({ effort: "medium" });
+        expect(result).toEqual({ reasoning_effort: "medium" });
       });
 
-      it("uses model's custom parameterName when available", () => {
+      it("maps reasoning to reasoning_effort for Gemini 2.5 models", () => {
+        const result = mapReasoningToProvider("gemini/gemini-2.5-pro", "medium");
+        expect(result).toEqual({ reasoning_effort: "medium" });
+      });
+
+      it("maps reasoning to reasoning_effort for Anthropic Claude Opus 4.5", () => {
+        const result = mapReasoningToProvider("anthropic/claude-opus-4.5", "high");
+        expect(result).toEqual({ reasoning_effort: "high" });
+      });
+
+      it("passes through custom_reasoning unchanged (not in translation map)", () => {
+        // Custom parameters that are not in LITELLM_PARAMETER_TRANSLATION are passed through
         const result = mapReasoningToProvider(
           "custom/model-with-custom-param",
           "high",
@@ -81,17 +125,19 @@ describe("reasoningBoundary", () => {
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 
-      it("falls back to thinkingLevel for unknown Gemini models", () => {
+      it("falls back to reasoning_effort for unknown Gemini models", () => {
+        // Previously returned thinkingLevel, now returns reasoning_effort
         const result = mapReasoningToProvider("gemini/unknown-model", "low");
-        expect(result).toEqual({ thinkingLevel: "low" });
+        expect(result).toEqual({ reasoning_effort: "low" });
       });
 
-      it("falls back to effort for unknown Anthropic models", () => {
+      it("falls back to reasoning_effort for unknown Anthropic models", () => {
+        // Previously returned effort, now returns reasoning_effort
         const result = mapReasoningToProvider(
           "anthropic/unknown-model",
           "medium",
         );
-        expect(result).toEqual({ effort: "medium" });
+        expect(result).toEqual({ reasoning_effort: "medium" });
       });
 
       it("defaults to reasoning_effort for completely unknown providers", () => {

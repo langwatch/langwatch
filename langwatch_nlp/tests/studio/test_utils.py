@@ -11,7 +11,10 @@ and max_tokens >= 16000"
 import pytest
 from unittest.mock import patch, MagicMock
 from langwatch_nlp.studio.types.dsl import LLMConfig
-from langwatch_nlp.studio.utils import node_llm_config_to_dspy_lm
+from langwatch_nlp.studio.utils import (
+    node_llm_config_to_dspy_lm,
+    translate_model_id_for_litellm,
+)
 
 
 class TestReasoningModelConfig:
@@ -170,8 +173,8 @@ class TestReasoningModelConfig:
         call_kwargs = mock_dspy_lm.call_args.kwargs
         assert call_kwargs.get("reasoning_effort") == "high"
 
-    def test_thinkingLevel_passed_to_dspy_lm(self, mock_dspy_lm):
-        """Given thinkingLevel='high' (Gemini), it should be passed to dspy.LM."""
+    def test_thinkingLevel_translated_to_reasoning_effort(self, mock_dspy_lm):
+        """Given thinkingLevel='high' (Gemini), it should be translated to reasoning_effort for LiteLLM."""
         config = LLMConfig(
             model="google/gemini-pro",
             thinkingLevel="high",
@@ -182,10 +185,12 @@ class TestReasoningModelConfig:
 
         mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
-        assert call_kwargs.get("thinkingLevel") == "high"
+        # LiteLLM expects reasoning_effort for all providers
+        assert call_kwargs.get("reasoning_effort") == "high"
+        assert "thinkingLevel" not in call_kwargs
 
-    def test_effort_passed_to_dspy_lm(self, mock_dspy_lm):
-        """Given effort='high' (Anthropic), it should be passed to dspy.LM."""
+    def test_effort_translated_to_reasoning_effort(self, mock_dspy_lm):
+        """Given effort='high' (Anthropic), it should be translated to reasoning_effort for LiteLLM."""
         config = LLMConfig(
             model="anthropic/claude-3",
             effort="high",
@@ -196,7 +201,9 @@ class TestReasoningModelConfig:
 
         mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
-        assert call_kwargs.get("effort") == "high"
+        # LiteLLM expects reasoning_effort for all providers
+        assert call_kwargs.get("reasoning_effort") == "high"
+        assert "effort" not in call_kwargs
 
     def test_unified_reasoning_maps_to_provider_specific_param(self, mock_dspy_lm):
         """Given unified 'reasoning' field (canonical), it should map to provider-specific param."""
@@ -225,6 +232,85 @@ class TestReasoningModelConfig:
         node_llm_config_to_dspy_lm(config)
         call_kwargs = mock_dspy_lm.call_args.kwargs
         assert call_kwargs.get("reasoning_effort") == "low"
+
+
+class TestLiteLLMReasoningParameterUnification:
+    """Tests for LiteLLM reasoning parameter unification.
+
+    LiteLLM expects 'reasoning_effort' for ALL providers and transforms internally:
+    - Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header
+    - Gemini: reasoning_effort -> thinking_level or thinking with budget
+    - OpenAI: reasoning_effort -> passed as-is
+
+    This test class verifies that all provider-specific params are translated to
+    reasoning_effort at the boundary before calling LiteLLM.
+    """
+
+    @pytest.fixture
+    def mock_dspy_lm(self):
+        """Mock dspy.LM to capture arguments without actual initialization."""
+        with patch("langwatch_nlp.studio.utils.dspy.LM") as mock:
+            mock.return_value = MagicMock()
+            yield mock
+
+    def test_anthropic_reasoning_uses_reasoning_effort(self, mock_dspy_lm):
+        """Given Anthropic model with reasoning='high', dspy.LM receives reasoning_effort='high'."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5",
+            reasoning="high",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("reasoning_effort") == "high"
+        assert "effort" not in call_kwargs
+
+    def test_gemini_reasoning_uses_reasoning_effort(self, mock_dspy_lm):
+        """Given Gemini model with reasoning='medium', dspy.LM receives reasoning_effort='medium'."""
+        config = LLMConfig(
+            model="gemini/gemini-2.5-pro",
+            reasoning="medium",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("reasoning_effort") == "medium"
+        assert "thinkingLevel" not in call_kwargs
+
+    def test_openai_reasoning_uses_reasoning_effort(self, mock_dspy_lm):
+        """Given OpenAI model with reasoning='low', dspy.LM receives reasoning_effort='low'."""
+        config = LLMConfig(
+            model="openai/gpt-5",
+            reasoning="low",
+            max_tokens=16000,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("reasoning_effort") == "low"
+
+    def test_no_reasoning_param_when_not_set(self, mock_dspy_lm):
+        """Given no reasoning value, no reasoning param should be passed."""
+        config = LLMConfig(
+            model="openai/gpt-4o",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert "reasoning_effort" not in call_kwargs
+        assert "effort" not in call_kwargs
+        assert "thinkingLevel" not in call_kwargs
 
 
 class TestSamplingParametersPassthrough:
@@ -337,3 +423,140 @@ class TestSamplingParametersPassthrough:
         assert call_kwargs.get("frequency_penalty") == 0.5
         assert call_kwargs.get("presence_penalty") == 0.3
         assert call_kwargs.get("seed") == 42
+
+
+class TestTranslateModelIdForLitellm:
+    """Tests for model ID translation at the LiteLLM boundary.
+
+    LiteLLM expects model IDs with dashes but llmModels.json uses dots.
+    This tests the runtime dot-to-dash conversion.
+    """
+
+    def test_translates_anthropic_claude_opus_4_5(self):
+        """Translates anthropic/claude-opus-4.5 to anthropic/claude-opus-4-5."""
+        result = translate_model_id_for_litellm("anthropic/claude-opus-4.5")
+        assert result == "anthropic/claude-opus-4-5"
+
+    def test_translates_anthropic_claude_sonnet_4_5(self):
+        """Translates anthropic/claude-sonnet-4.5 to anthropic/claude-sonnet-4-5."""
+        result = translate_model_id_for_litellm("anthropic/claude-sonnet-4.5")
+        assert result == "anthropic/claude-sonnet-4-5"
+
+    def test_translates_anthropic_claude_3_5_haiku(self):
+        """Translates anthropic/claude-3.5-haiku to anthropic/claude-3-5-haiku."""
+        result = translate_model_id_for_litellm("anthropic/claude-3.5-haiku")
+        assert result == "anthropic/claude-3-5-haiku"
+
+    def test_translates_anthropic_claude_3_7_sonnet(self):
+        """Translates anthropic/claude-3.7-sonnet to anthropic/claude-3-7-sonnet."""
+        result = translate_model_id_for_litellm("anthropic/claude-3.7-sonnet")
+        assert result == "anthropic/claude-3-7-sonnet"
+
+    def test_translates_anthropic_claude_3_5_sonnet(self):
+        """Translates anthropic/claude-3.5-sonnet to anthropic/claude-3-5-sonnet."""
+        result = translate_model_id_for_litellm("anthropic/claude-3.5-sonnet")
+        assert result == "anthropic/claude-3-5-sonnet"
+
+    def test_preserves_openai_gpt_5(self):
+        """Preserves openai/gpt-5 unchanged."""
+        result = translate_model_id_for_litellm("openai/gpt-5")
+        assert result == "openai/gpt-5"
+
+    def test_preserves_gemini_2_5_pro(self):
+        """Preserves gemini/gemini-2.5-pro unchanged (Gemini uses dots intentionally)."""
+        result = translate_model_id_for_litellm("gemini/gemini-2.5-pro")
+        assert result == "gemini/gemini-2.5-pro"
+
+    def test_preserves_anthropic_without_dots(self):
+        """Preserves anthropic/claude-3-opus unchanged (no dots to convert)."""
+        result = translate_model_id_for_litellm("anthropic/claude-3-opus")
+        assert result == "anthropic/claude-3-opus"
+
+    def test_converts_multiple_dots(self):
+        """Converts all dots in anthropic/claude-opus-4.5.1 to dashes."""
+        result = translate_model_id_for_litellm("anthropic/claude-opus-4.5.1")
+        assert result == "anthropic/claude-opus-4-5-1"
+
+    def test_translates_custom_prefix(self):
+        """Translates custom/claude-opus-4.5 to custom/claude-opus-4-5."""
+        result = translate_model_id_for_litellm("custom/claude-opus-4.5")
+        assert result == "custom/claude-opus-4-5"
+
+    def test_handles_empty_string(self):
+        """Handles empty string input."""
+        result = translate_model_id_for_litellm("")
+        assert result == ""
+
+    def test_handles_none_input(self):
+        """Handles None input."""
+        result = translate_model_id_for_litellm(None)
+        assert result is None
+
+    def test_handles_model_without_prefix(self):
+        """Handles model without provider prefix."""
+        result = translate_model_id_for_litellm("claude-3.5-sonnet")
+        assert result == "claude-3-5-sonnet"
+
+
+class TestModelIdTranslationInDspyLm:
+    """Tests that model ID translation is applied in node_llm_config_to_dspy_lm."""
+
+    @pytest.fixture
+    def mock_dspy_lm(self):
+        """Mock dspy.LM to capture arguments without actual initialization."""
+        with patch("langwatch_nlp.studio.utils.dspy.LM") as mock:
+            mock.return_value = MagicMock()
+            yield mock
+
+    def test_anthropic_model_id_translated_in_dspy_lm(self, mock_dspy_lm):
+        """Given anthropic/claude-opus-4.5, dspy.LM receives anthropic/claude-opus-4-5."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("model") == "anthropic/claude-opus-4-5"
+
+    def test_openai_model_id_preserved_in_dspy_lm(self, mock_dspy_lm):
+        """Given openai/gpt-5, dspy.LM receives openai/gpt-5 (unchanged)."""
+        config = LLMConfig(
+            model="openai/gpt-5",
+            max_tokens=16000,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("model") == "openai/gpt-5"
+
+    def test_gemini_model_id_preserved_in_dspy_lm(self, mock_dspy_lm):
+        """Given gemini/gemini-2.5-pro, dspy.LM receives gemini/gemini-2.5-pro (unchanged)."""
+        config = LLMConfig(
+            model="gemini/gemini-2.5-pro",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("model") == "gemini/gemini-2.5-pro"
+
+    def test_litellm_params_model_translated(self, mock_dspy_lm):
+        """Given litellm_params with anthropic model, the model is translated."""
+        config = LLMConfig(
+            model="anthropic/claude-3.5-haiku",
+            litellm_params={"model": "anthropic/claude-3.5-haiku", "api_key": "test"},
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("model") == "anthropic/claude-3-5-haiku"

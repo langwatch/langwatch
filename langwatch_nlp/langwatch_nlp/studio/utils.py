@@ -168,13 +168,22 @@ class ClientReadableValueError(ValueError):
 # Minimum max_tokens required by DSPy for reasoning models
 REASONING_MODEL_MIN_MAX_TOKENS = 16000
 
-# Provider-specific reasoning parameter names
-# Used as fallback for mapping the unified 'reasoning' field to provider-specific parameters
+# Translation map from provider-specific parameter names to LiteLLM's expected parameter.
+# LiteLLM expects 'reasoning_effort' for all providers - it handles the internal
+# transformation to provider-specific formats (e.g., Anthropic's output_config).
+LITELLM_PARAMETER_TRANSLATION: Dict[str, str] = {
+    "effort": "reasoning_effort",
+    "thinkingLevel": "reasoning_effort",
+    "reasoning_effort": "reasoning_effort",
+}
+
+# Provider-specific reasoning parameter fallbacks.
+# All providers now use 'reasoning_effort' because LiteLLM expects it.
 PROVIDER_REASONING_FALLBACKS: Dict[str, str] = {
     "openai": "reasoning_effort",
-    "google": "thinkingLevel",
-    "anthropic": "effort",
-    "gemini": "thinkingLevel",  # Alias for google
+    "google": "reasoning_effort",
+    "anthropic": "reasoning_effort",
+    "gemini": "reasoning_effort",
 }
 
 
@@ -185,28 +194,78 @@ def get_provider_from_model(model: str | None) -> str:
     return model.split("/")[0].lower() if "/" in model else ""
 
 
+# Providers that need dot-to-dash translation for their model IDs.
+# Anthropic models use dots in llmModels.json but LiteLLM expects dashes.
+PROVIDERS_NEEDING_TRANSLATION = {"anthropic", "custom"}
+
+
+def translate_model_id_for_litellm(model_id: str | None) -> str | None:
+    """
+    Translates a model ID for use with LiteLLM.
+
+    Converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
+    Other providers (OpenAI, Gemini, etc.) are returned unchanged.
+
+    Args:
+        model_id: The model ID from llmModels.json (e.g., "anthropic/claude-opus-4.5")
+
+    Returns:
+        The translated model ID for LiteLLM (e.g., "anthropic/claude-opus-4-5")
+    """
+    if not model_id:
+        return model_id
+
+    provider = get_provider_from_model(model_id)
+
+    # Only translate providers that need it
+    # Models without a provider prefix are treated as needing translation
+    # (they could be Anthropic models referenced without the prefix)
+    needs_translation = provider == "" or provider in PROVIDERS_NEEDING_TRANSLATION
+
+    if not needs_translation:
+        return model_id
+
+    # Replace dots with dashes in the entire model ID
+    return model_id.replace(".", "-")
+
+
+def translate_to_litellm_param(param_name: str) -> str:
+    """
+    Translates a parameter name to LiteLLM's expected format.
+
+    Args:
+        param_name: The parameter name (may be provider-specific like 'effort' or 'thinkingLevel')
+
+    Returns:
+        The translated parameter name for LiteLLM (always 'reasoning_effort' for known params)
+    """
+    return LITELLM_PARAMETER_TRANSLATION.get(param_name, param_name)
+
+
 def map_reasoning_to_provider(model: str | None, reasoning: str | None) -> Dict[str, str]:
     """
-    Maps the unified 'reasoning' field to the provider-specific parameter.
+    Maps the unified 'reasoning' field to LiteLLM's expected parameter.
 
-    This is the boundary layer function that converts the canonical 'reasoning'
-    field to the appropriate provider-specific parameter (reasoning_effort,
-    thinkingLevel, effort) when making API calls.
+    IMPORTANT: LiteLLM expects 'reasoning_effort' for ALL providers. This function
+    always returns reasoning_effort regardless of the provider.
+
+    LiteLLM internally transforms reasoning_effort to provider-specific formats:
+    - Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header
+    - Gemini: reasoning_effort -> thinking_level or thinking with budget
+    - OpenAI: reasoning_effort -> passed as-is
 
     Args:
         model: The model identifier (e.g., "openai/gpt-5", "gemini/gemini-3-flash")
         reasoning: The unified reasoning value
 
     Returns:
-        Dict with provider-specific key and value, or empty dict if reasoning is not set
+        Dict with { reasoning_effort: value }, or empty dict if reasoning is not set
     """
     if not reasoning:
         return {}
 
-    provider = get_provider_from_model(model)
-    param_key = PROVIDER_REASONING_FALLBACKS.get(provider, "reasoning_effort")
-
-    return {param_key: reasoning}
+    # Always use reasoning_effort for LiteLLM - it handles provider-specific transforms
+    return {"reasoning_effort": reasoning}
 
 
 def normalize_reasoning_from_provider_fields(llm_config: LLMConfig) -> str | None:
@@ -294,6 +353,11 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
     }
+
+    # Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
+    if llm_params.get("model"):
+        llm_params["model"] = translate_model_id_for_litellm(llm_params["model"])
+
     if (
         "azure/" in (llm_params["model"] or "")
         and "api_version" not in llm_params

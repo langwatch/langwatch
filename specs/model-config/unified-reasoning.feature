@@ -14,16 +14,18 @@ Feature: Unified Reasoning Parameter
     Then the result should be { reasoning_effort: "high" }
 
   @unit
-  Scenario: Maps reasoning to thinkingLevel for Gemini models
+  Scenario: Maps reasoning to reasoning_effort for Gemini models
     Given a prompt config with model "gemini/gemini-3-flash" and reasoning "low"
     When mapping reasoning to provider parameters
-    Then the result should be { thinkingLevel: "low" }
+    Then the result should be { reasoning_effort: "low" }
+    # LiteLLM expects reasoning_effort and transforms internally
 
   @unit
-  Scenario: Maps reasoning to effort for Anthropic models
+  Scenario: Maps reasoning to reasoning_effort for Anthropic models
     Given a prompt config with model "anthropic/claude-opus-4" and reasoning "medium"
     When mapping reasoning to provider parameters
-    Then the result should be { effort: "medium" }
+    Then the result should be { reasoning_effort: "medium" }
+    # LiteLLM expects reasoning_effort and transforms internally
 
   @unit
   Scenario: Uses model reasoningConfig.parameterName when available
