@@ -297,6 +297,38 @@ def parse_component(
                     "CustomNode",
                     params,
                 )
+        case "http":
+            from langwatch_nlp.studio.types.dsl import Http
+
+            if not isinstance(node.data, Http) or not node.data.http_config:
+                raise ValueError(
+                    f"HTTP config not specified for HTTP node {node.data.name}"
+                )
+
+            http_config = node.data.http_config
+            params = {
+                "url": http_config.url,
+                "method": http_config.method,
+                "body_template": http_config.body_template,
+                "output_path": http_config.output_path,
+                "headers": http_config.headers,
+                "timeout_ms": http_config.timeout_ms,
+            }
+
+            # Add auth params if configured
+            if http_config.auth:
+                params["auth_type"] = http_config.auth.type
+                params["auth_token"] = http_config.auth.token
+                params["auth_header"] = http_config.auth.header
+                params["auth_value"] = http_config.auth.value
+                params["auth_username"] = http_config.auth.username
+                params["auth_password"] = http_config.auth.password
+
+            return (
+                "from langwatch_nlp.studio.dspy.http_node import HttpNode",
+                "HttpNode",
+                params,
+            )
         case "entry":
             return "", "None", {}
         case "end":

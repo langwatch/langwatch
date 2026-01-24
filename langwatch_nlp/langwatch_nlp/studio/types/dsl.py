@@ -53,6 +53,7 @@ class ComponentType(str, Enum):
     retriever = "retriever"
     prompting_technique = "prompting_technique"
     evaluator = "evaluator"
+    http = "http"
 
 
 class Timestamps(BaseModel):
@@ -169,6 +170,38 @@ class Retriever(BaseComponent):
     pass
 
 
+class HttpAuthConfig(BaseModel):
+    """Authentication configuration for HTTP node."""
+
+    type: Literal["bearer", "api_key", "basic"]
+    # For bearer auth
+    token: Optional[str] = None
+    # For api_key auth
+    header: Optional[str] = None
+    value: Optional[str] = None
+    # For basic auth
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class HttpConfig(BaseModel):
+    """HTTP request configuration."""
+
+    url: str
+    method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"] = "POST"
+    body_template: Optional[str] = None
+    output_path: Optional[str] = None
+    auth: Optional[HttpAuthConfig] = None
+    headers: Optional[Dict[str, str]] = None
+    timeout_ms: Optional[int] = None
+
+
+class Http(BaseComponent):
+    """HTTP node component for making external API calls."""
+
+    http_config: Optional[HttpConfig] = None
+
+
 class End(BaseComponent):
     pass
 
@@ -179,7 +212,7 @@ class Evaluator(BaseComponent):
 
 
 Component = Union[
-    BaseComponent, Entry, Signature, PromptingTechnique, Code, Evaluator, End
+    BaseComponent, Entry, Signature, PromptingTechnique, Code, Evaluator, End, Http
 ]
 
 
@@ -228,6 +261,11 @@ class EndNode(BaseNode):
     data: End
 
 
+class HttpNode(BaseNode):
+    type: Literal["http"] = "http"
+    data: Http
+
+
 Node = Union[
     SignatureNode,
     PromptingTechniqueNode,
@@ -237,6 +275,7 @@ Node = Union[
     RetrieverNode,
     EvaluatorNode,
     EndNode,
+    HttpNode,
 ]
 
 

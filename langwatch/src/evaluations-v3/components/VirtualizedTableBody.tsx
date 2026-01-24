@@ -7,11 +7,9 @@
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import React, { useCallback } from "react";
+import { DRAWER_WIDTH } from "../constants";
 import type { TableRowData } from "../types";
 import { TableCell } from "./DatasetSection/TableCell";
-
-// Drawer width for spacer columns (must match actual drawer width)
-const DRAWER_WIDTH = 456;
 // Fixed row height for compact mode
 const COMPACT_ROW_HEIGHT = 160;
 

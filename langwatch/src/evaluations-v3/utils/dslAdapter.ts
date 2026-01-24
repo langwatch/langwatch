@@ -18,6 +18,7 @@ import type {
   Entry,
   Evaluator,
   Field,
+  HttpComponentConfig,
   Signature,
   Workflow,
 } from "~/optimization_studio/types/dsl";
@@ -56,7 +57,9 @@ export const stateToWorkflow = (
 
   const entryNode = createEntryNode(activeDataset);
 
-  const targetNodes: Array<Node<Signature> | Node<Code>> = [];
+  const targetNodes: Array<
+    Node<Signature> | Node<Code> | Node<HttpComponentConfig>
+  > = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
   // Create target nodes
@@ -67,8 +70,8 @@ export const stateToWorkflow = (
       return;
     }
 
-    // For agent targets, check the underlying agent type
-    const targetNode = createCodeNode(target, datasetId, targetIndex);
+    // For agent targets, dispatch based on agent type
+    const targetNode = createTargetNode(target, datasetId, targetIndex);
     targetNodes.push(targetNode);
 
     // Create evaluator nodes for ALL evaluators (they apply to all targets)
@@ -152,6 +155,22 @@ const columnTypeToFieldType = (
 };
 
 /**
+ * Dispatch to the correct node creation function based on agent type.
+ * HTTP agents get HTTP nodes, all others get code nodes (for backward compatibility).
+ */
+const createTargetNode = (
+  target: TargetConfig,
+  activeDatasetId: string,
+  index: number,
+): Node<Code> | Node<HttpComponentConfig> => {
+  if (target.agentType === "http" && target.httpConfig) {
+    return createHttpNode(target, activeDatasetId, index);
+  }
+  // Default to code node for backward compatibility (code, signature, workflow, or undefined agentType)
+  return createCodeNode(target, activeDatasetId, index);
+};
+
+/**
  * Create a code node from a target config.
  * Uses the `parameters` array structure expected by the DSL.
  * Sets default values on inputs that have value mappings.
@@ -183,6 +202,50 @@ const createCodeNode = (
       inputs,
       outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
+    },
+    position: { x: 300, y: index * 200 },
+  };
+};
+
+/**
+ * Create an HTTP node from an HTTP agent target config.
+ * Includes all HTTP configuration (url, method, headers, auth, bodyTemplate, outputPath, timeoutMs).
+ * Sets default values on inputs that have value mappings.
+ */
+const createHttpNode = (
+  target: TargetConfig,
+  activeDatasetId: string,
+  index: number,
+): Node<HttpComponentConfig> => {
+  const httpConfig = target.httpConfig!;
+
+  // Get mappings for the active dataset
+  const datasetMappings = target.mappings[activeDatasetId] ?? {};
+
+  // Apply value mappings as default values on inputs
+  const inputs: Field[] = (target.inputs ?? []).map((input) => {
+    const mapping = datasetMappings[input.identifier];
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    return input;
+  });
+
+  return {
+    id: target.id,
+    type: "http",
+    data: {
+      name: target.name,
+      inputs,
+      outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
+      // HTTP-specific config
+      url: httpConfig.url,
+      method: httpConfig.method,
+      headers: httpConfig.headers,
+      auth: httpConfig.auth,
+      bodyTemplate: httpConfig.bodyTemplate,
+      outputPath: httpConfig.outputPath,
+      timeoutMs: httpConfig.timeoutMs,
     },
     position: { x: 300, y: index * 200 },
   };

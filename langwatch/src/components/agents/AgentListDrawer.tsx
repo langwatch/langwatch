@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, Code, MessageSquare, Plus, Workflow } from "lucide-react";
+import { Bot, Code, Globe, MessageSquare, Plus, Workflow } from "lucide-react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
@@ -162,12 +162,14 @@ const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
   code: Code,
   workflow: Workflow,
+  http: Globe,
 };
 
 const agentTypeLabels: Record<string, string> = {
   signature: "Prompt",
   code: "Code",
   workflow: "Workflow",
+  http: "HTTP",
 };
 
 type AgentCardProps = {
