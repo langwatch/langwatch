@@ -88,6 +88,7 @@ export const TableCell = ({
     position: isSelected ? ("relative" as const) : undefined,
     zIndex: isSelected ? 5 : undefined,
     userSelect: "none" as const,
+    height: "100%",
   };
 
   // Show skeleton when loading (except checkbox column)

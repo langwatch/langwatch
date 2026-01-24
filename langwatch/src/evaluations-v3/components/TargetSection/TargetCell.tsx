@@ -526,6 +526,7 @@ export function TargetCellContent({
       <Box
         ref={cellRef}
         position="relative"
+        height="100%"
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
         <VStack align="stretch" gap={2}>

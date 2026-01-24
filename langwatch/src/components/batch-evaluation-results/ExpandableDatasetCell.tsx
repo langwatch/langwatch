@@ -10,16 +10,13 @@ import { useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
+import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
 
 // Max height for collapsed output - used in CSS
 const CELL_MAX_HEIGHT = 180;
-
-// Approximate chars that fit in the cell before overflow (rough heuristic)
-// This avoids needing useEffect for overflow detection which causes flicker
-const OVERFLOW_CHAR_THRESHOLD = 150;
 
 type ExpandableDatasetCellProps = {
   /** The value to display */
@@ -53,11 +50,9 @@ export function ExpandableDatasetCell({
 
   const rawContent = stringify(value);
 
-  // Use a simple heuristic to determine if content likely overflows
+  // Use a heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
-  const hasNewlines = rawContent.includes("\n");
-  const isLikelyOverflowing =
-    rawContent.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
+  const isLikelyOverflowing = isTextLikelyOverflowing(rawContent);
 
   // Handler to expand
   const handleExpand = useCallback(() => {

@@ -21,16 +21,6 @@ import {
 } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 
-/**
- * Type for the config stored in DB Evaluator.config field.
- * The DB stores evaluatorType and settings - inputs are derived from
- * the evaluator definition at runtime, not stored in DB.
- */
-type EvaluatorDbConfig = {
-  evaluatorType?: EvaluatorTypes;
-  settings?: Record<string, unknown>;
-};
-
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { Field } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
@@ -79,6 +69,21 @@ const DRAWER_WIDTH = 456;
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+
+// Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
+const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
+const DATASET_COL_DEFAULT_PCT = 16;
+const TARGET_COL_DEFAULT_PCT = 20;
+
+/**
+ * Type for the config stored in DB Evaluator.config field.
+ * The DB stores evaluatorType and settings - inputs are derived from
+ * the evaluator definition at runtime, not stored in DB.
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: EvaluatorTypes;
+  settings?: Record<string, unknown>;
+};
 
 // ============================================================================
 // Main Component
@@ -699,7 +704,7 @@ export function EvaluationsV3Table({
   const displayRowCount = Math.max(rowCount + 1, 3);
 
   // Determine if we should use virtualization
-  // - Always use virtualization in compact mode (fixed 197px rows)
+  // - Always use virtualization in compact mode (fixed 160px rows)
   // - Disable virtualization in expanded mode for datasets <= 100 rows
   const rowHeightMode = ui.rowHeightMode;
   const shouldVirtualize =
@@ -932,10 +937,12 @@ export function EvaluationsV3Table({
             tableMeta={info.table.options.meta as TableMeta | undefined}
           />
         ),
-        size: 40,
+        size: CHECKBOX_WIDTH_PX, // Checkbox uses fixed pixels
+        enableResizing: false, // Checkbox column shouldn't be resizable
         meta: {
           columnType: "checkbox" as ColumnType,
           columnId: "__checkbox__",
+          isFixedWidth: true, // Mark as fixed pixel width
         },
       }),
     );
@@ -954,7 +961,8 @@ export function EvaluationsV3Table({
             </HStack>
           ),
           cell: (info) => info.getValue(),
-          size: 200,
+          size: DATASET_COL_DEFAULT_PCT, // Percentage value
+          minSize: 8, // Minimum 8%
           meta: {
             columnType: "dataset" as ColumnType,
             columnId: column.id,
@@ -987,8 +995,8 @@ export function EvaluationsV3Table({
               />
             );
           },
-          size: 280,
-          minSize: 200,
+          size: TARGET_COL_DEFAULT_PCT, // Percentage value
+          minSize: 10, // Minimum 10%
           meta: {
             columnType: "target" as ColumnType,
             columnId: `target.${targetId}`,
@@ -1006,31 +1014,138 @@ export function EvaluationsV3Table({
     columnHelper,
   ]);
 
-  // Column sizing state - initialize from store
+  // Column sizing state - stores percentage values (e.g., 16 means 16%)
+  // Initialize from store, which also stores percentages
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
     () => ui.columnWidths,
   );
 
+  // Track the table container width for converting pixel deltas to percentages
+  const [containerWidth, setContainerWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200,
+  );
+
+  // Update container width on resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (tableRef.current?.parentElement) {
+        setContainerWidth(tableRef.current.parentElement.clientWidth);
+      } else {
+        setContainerWidth(window.innerWidth);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Sync column sizing changes to store (debounced to avoid excessive updates)
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleColumnSizingChange = useCallback(
-    (
-      updater:
-        | ColumnSizingState
-        | ((prev: ColumnSizingState) => ColumnSizingState),
-    ) => {
-      setColumnSizing((prev) => {
-        const newSizing =
-          typeof updater === "function" ? updater(prev) : updater;
-        // Debounce sync to store
-        if (syncTimeoutRef.current) {
-          clearTimeout(syncTimeoutRef.current);
-        }
-        syncTimeoutRef.current = setTimeout(() => {
-          setColumnWidths(newSizing);
-        }, 100);
-        return newSizing;
-      });
+
+  // Track which column is being resized
+  const resizingColumnRef = useRef<string | null>(null);
+  const resizeStartXRef = useRef<number>(0);
+  const resizeStartWidthRef = useRef<number>(0);
+
+  // Custom resize handler - converts pixel movements to percentage changes
+  // This gives us fine-grained control over resize sensitivity
+  const createResizeHandler = useCallback(
+    (columnId: string, columnType: string) => {
+      return (event: React.MouseEvent | React.TouchEvent) => {
+        event.preventDefault();
+
+        const startX =
+          "touches" in event ? event.touches[0]!.clientX : event.clientX;
+
+        // Get current width percentage
+        const currentPct =
+          columnSizing[columnId] ??
+          (columnType === "dataset"
+            ? DATASET_COL_DEFAULT_PCT
+            : TARGET_COL_DEFAULT_PCT);
+
+        resizingColumnRef.current = columnId;
+        resizeStartXRef.current = startX;
+        resizeStartWidthRef.current = currentPct;
+
+        const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+          const currentX =
+            "touches" in moveEvent
+              ? moveEvent.touches[0]!.clientX
+              : moveEvent.clientX;
+
+          const deltaX = currentX - resizeStartXRef.current;
+
+          // Convert pixel delta to percentage delta based on container width
+          // This ensures consistent resize feel regardless of screen size
+          const deltaPct = (deltaX / containerWidth) * 100;
+
+          // Calculate new width percentage
+          const newPct = Math.max(5, resizeStartWidthRef.current + deltaPct);
+
+          // Update column sizing state
+          setColumnSizing((prev) => ({
+            ...prev,
+            [columnId]: newPct,
+          }));
+        };
+
+        const handleEnd = () => {
+          resizingColumnRef.current = null;
+
+          // Sync to store after resize ends - use setState callback to get current value
+          if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+          }
+          syncTimeoutRef.current = setTimeout(() => {
+            setColumnSizing((current) => {
+              setColumnWidths(current);
+              return current;
+            });
+          }, 100);
+
+          document.removeEventListener("mousemove", handleMove);
+          document.removeEventListener("mouseup", handleEnd);
+          document.removeEventListener("touchmove", handleMove);
+          document.removeEventListener("touchend", handleEnd);
+        };
+
+        document.addEventListener("mousemove", handleMove);
+        document.addEventListener("mouseup", handleEnd);
+        document.addEventListener("touchmove", handleMove);
+        document.addEventListener("touchend", handleEnd);
+      };
+    },
+    [columnSizing, containerWidth, setColumnWidths],
+  );
+
+  // Check if a column is currently being resized
+  const isColumnResizing = useCallback(
+    (columnId: string) => resizingColumnRef.current === columnId,
+    [],
+  );
+
+  // Double-click handler to reset column to default width
+  const handleResizeDoubleClick = useCallback(
+    (columnId: string, columnType: string) => {
+      const defaultPct =
+        columnType === "dataset" ? DATASET_COL_DEFAULT_PCT : TARGET_COL_DEFAULT_PCT;
+
+      setColumnSizing((prev) => ({
+        ...prev,
+        [columnId]: defaultPct,
+      }));
+
+      // Sync to store
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      syncTimeoutRef.current = setTimeout(() => {
+        setColumnSizing((current) => {
+          setColumnWidths(current);
+          return current;
+        });
+      }, 100);
     },
     [setColumnWidths],
   );
@@ -1039,23 +1154,65 @@ export function EvaluationsV3Table({
     data: rowData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    columnResizeMode: "onChange",
-    enableColumnResizing: true,
+    // Disable TanStack's built-in resize - we use our own custom handler
+    // for better control over percentage-based resizing
+    enableColumnResizing: false,
     state: {
       columnSizing,
     },
-    onColumnSizingChange: handleColumnSizingChange,
     meta: tableMeta,
   });
 
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
   // +1 for the spacer column that's always present
-  const targetsColSpan = targets.length + 1;
+  const targetsColSpan = targets.length + 2;
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
   const MENU_PLUS_PADDING = 56 + 16;
+
+  // Calculate total percentage for all resizable columns
+  // This allows the table to grow beyond 100% when needed
+  const totalColumnPercentage = useMemo(() => {
+    let total = 0;
+
+    // Sum dataset column percentages
+    for (const col of datasetColumns) {
+      const colId = `dataset_${col.id}`;
+      total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
+    }
+
+    // Sum target column percentages
+    for (const target of targets) {
+      total += columnSizing[target.id] ?? TARGET_COL_DEFAULT_PCT;
+    }
+
+    return total;
+  }, [datasetColumns, targets, columnSizing]);
+
+  // Get column width as CSS string
+  // Converts stored percentage values to CSS percentage strings
+  const getColumnWidth = useCallback(
+    (columnId: string, columnType: string, isFixedWidth?: boolean): string => {
+      // Checkbox is always fixed pixels
+      if (columnId === "select" || isFixedWidth) {
+        return `${CHECKBOX_WIDTH_PX}px`;
+      }
+
+      // Get stored percentage or use default
+      const storedPct = columnSizing[columnId];
+      if (storedPct) {
+        return `${storedPct}%`;
+      }
+
+      // Use default percentages based on column type
+      if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
+      if (columnType === "target") return `${TARGET_COL_DEFAULT_PCT}%`;
+      return "auto";
+    },
+    [columnSizing],
+  );
 
   return (
     <Box
@@ -1063,7 +1220,11 @@ export function EvaluationsV3Table({
       minHeight="full"
       css={{
         "& table": {
-          width: "100%",
+          // Table width = max(100%, sum of column percentages) + fixed widths (checkbox + drawer)
+          // This allows columns to exceed 100% and trigger horizontal scroll
+          width: `calc(max(100%, ${totalColumnPercentage}%) + ${CHECKBOX_WIDTH_PX}px + ${DRAWER_WIDTH}px)`,
+          minWidth: "100%",
+          tableLayout: "fixed",
           borderCollapse: "separate",
           borderSpacing: "0",
         },
@@ -1145,6 +1306,30 @@ export function EvaluationsV3Table({
       }}
     >
       <table ref={tableRef}>
+        {/* Define column widths with colgroup for table-layout: fixed */}
+        <colgroup>
+          {table.getAllColumns().map((column) => {
+            const meta = column.columnDef.meta as
+              | { columnType?: string; isFixedWidth?: boolean }
+              | undefined;
+            const columnType = meta?.columnType ?? "unknown";
+            const isFixedWidth = meta?.isFixedWidth ?? false;
+            return (
+              <col
+                key={column.id}
+                style={{
+                  width: getColumnWidth(column.id, columnType, isFixedWidth),
+                  // Prevent checkbox column from growing beyond 40px
+                  ...(isFixedWidth && { maxWidth: `${CHECKBOX_WIDTH_PX}px` }),
+                }}
+              />
+            );
+          })}
+          {/* Filler column - absorbs remaining space when total % < 100% */}
+          <col style={{ width: "auto" }} />
+          {/* Spacer column for drawer */}
+          <col style={{ width: DRAWER_WIDTH }} />
+        </colgroup>
         <thead>
           <tr>
             <DatasetSuperHeader
@@ -1169,11 +1354,18 @@ export function EvaluationsV3Table({
                 const targetId = isTargetColumn
                   ? header.id.replace("target.", "")
                   : undefined;
+                const meta = header.column.columnDef.meta as
+                  | { columnType?: string; isFixedWidth?: boolean }
+                  | undefined;
+                const columnType = meta?.columnType ?? "unknown";
+                const isFixedWidth = meta?.isFixedWidth ?? false;
 
                 return (
                   <th
                     key={header.id}
-                    style={{ width: header.getSize() }}
+                    style={{
+                      width: getColumnWidth(header.id, columnType, isFixedWidth),
+                    }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}
                   >
@@ -1183,13 +1375,17 @@ export function EvaluationsV3Table({
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
-                    {/* Resize handle */}
-                    {header.column.getCanResize() && (
+                    {/* Resize handle - custom handler for percentage-based resizing */}
+                    {/* Double-click resets to default width */}
+                    {!isFixedWidth && header.id !== "select" && (
                       <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
+                        onMouseDown={createResizeHandler(header.id, columnType)}
+                        onTouchStart={createResizeHandler(header.id, columnType)}
+                        onDoubleClick={() =>
+                          handleResizeDoubleClick(header.id, columnType)
+                        }
                         className={`resizer ${
-                          header.column.getIsResizing() ? "isResizing" : ""
+                          isColumnResizing(header.id) ? "isResizing" : ""
                         }`}
                       />
                     )}
@@ -1197,11 +1393,11 @@ export function EvaluationsV3Table({
                 );
               })}
               {targets.length === 0 ? (
-                // Spacer column to match drawer width + default target column width
+                // Filler + Spacer combined when no targets
                 <th
+                  colSpan={2}
                   style={{
-                    width: DRAWER_WIDTH + 280,
-                    minWidth: DRAWER_WIDTH + 280,
+                    width: `calc(${DRAWER_WIDTH}px + ${TARGET_COL_DEFAULT_PCT}%)`,
                   }}
                 >
                   <Link
@@ -1214,10 +1410,12 @@ export function EvaluationsV3Table({
                   </Link>
                 </th>
               ) : (
-                // Spacer column to match drawer width
-                <th
-                  style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                ></th>
+                <>
+                  {/* Filler column - absorbs remaining space */}
+                  <th style={{ width: "auto" }}></th>
+                  {/* Spacer column to match drawer width */}
+                  <th style={{ width: DRAWER_WIDTH }}></th>
+                </>
               )}
             </tr>
           ))}
@@ -1226,7 +1424,7 @@ export function EvaluationsV3Table({
           <VirtualizedTableBody
             rows={table.getRowModel().rows}
             scrollContainer={scrollContainer}
-            columnCount={table.getAllColumns().length + 1}
+            columnCount={table.getAllColumns().length + 2}
             selectedRows={selectedRows}
             activeDatasetId={activeDatasetId}
             isLoading={isLoadingExperiment || isLoadingDatasets}

@@ -104,6 +104,8 @@ export function EvaluatorChip({
           fontSize="11px"
           fontWeight="medium"
           borderColor={hasMissingMappings ? "orange.solid" : undefined}
+          minWidth={0}
+          maxWidth="100%"
           css={{
             "& .chevron-icon": {
               display: "none",
@@ -113,7 +115,7 @@ export function EvaluatorChip({
             },
           }}
         >
-          <HStack gap={1.5}>
+          <HStack gap={1.5} minWidth={0}>
             {/* Status indicator - spinning for running, static for others */}
             {status === "running" ? (
               <Box flexShrink={0}>
@@ -122,7 +124,15 @@ export function EvaluatorChip({
             ) : (
               <Circle size="10px" bg={statusColor} flexShrink={0} />
             )}
-            <Text>{evaluator.name}</Text>
+            <Text
+              css={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {evaluator.name}
+            </Text>
             {/* Inline result (score, label, or error icon) */}
             {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}

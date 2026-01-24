@@ -13,7 +13,7 @@ import { TableCell } from "./DatasetSection/TableCell";
 // Drawer width for spacer columns (must match actual drawer width)
 const DRAWER_WIDTH = 456;
 // Fixed row height for compact mode
-const COMPACT_ROW_HEIGHT = 197;
+const COMPACT_ROW_HEIGHT = 160;
 
 type VirtualizedTableBodyProps = {
   rows: Row<TableRowData>[];
@@ -79,6 +79,8 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
                 isLoading={isLoading}
               />
             ))}
+            {/* Filler column - absorbs remaining space */}
+            <td style={{ width: "auto" }} />
             {/* Spacer column to match drawer width */}
             <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
           </tr>
@@ -128,6 +130,8 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
                 isLoading={isLoading}
               />
             ))}
+            {/* Filler column - absorbs remaining space */}
+            <td style={{ width: "auto" }} />
             {/* Spacer column to match drawer width */}
             <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
           </tr>
