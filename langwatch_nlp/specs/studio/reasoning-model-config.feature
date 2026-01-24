@@ -113,3 +113,48 @@ Feature: Reasoning Model LLM Configuration
     When parsing a workflow with this config
     Then the generated dspy.LM should include reasoning_effort="high"
     # Note: Old data with provider-specific fields continues to work
+
+  # Auto-correct max_tokens for models with reasoning enabled (non-OpenAI)
+  # When effort/reasoning/thinkingLevel is set, LiteLLM may auto-enable extended thinking
+  # with budget_tokens that can exceed max_tokens. We enforce min 16000 to prevent this.
+
+  @unit
+  Scenario: Auto-correct max_tokens for Anthropic model with effort enabled
+    Given an LLM config with model "anthropic/claude-opus-4.5"
+    And effort is "high"
+    And max_tokens is 4096
+    When creating a DSPy LM instance
+    Then max_tokens should be 16000
+    And temperature should be preserved (not forced to 1.0)
+
+  @unit
+  Scenario: Auto-correct max_tokens for model with unified reasoning field
+    Given an LLM config with model "anthropic/claude-opus-4.5"
+    And reasoning is "high"
+    And max_tokens is 4096
+    When creating a DSPy LM instance
+    Then max_tokens should be 16000
+
+  @unit
+  Scenario: Auto-correct max_tokens for Gemini model with thinkingLevel enabled
+    Given an LLM config with model "google/gemini-2.5-pro"
+    And thinkingLevel is "high"
+    And max_tokens is 4096
+    When creating a DSPy LM instance
+    Then max_tokens should be 16000
+
+  @unit
+  Scenario: Non-reasoning Anthropic model preserves user max_tokens
+    Given an LLM config with model "anthropic/claude-sonnet-4"
+    And effort is undefined
+    And max_tokens is 4096
+    When creating a DSPy LM instance
+    Then max_tokens should be 4096
+
+  @unit
+  Scenario: Model with high max_tokens and reasoning preserves value
+    Given an LLM config with model "anthropic/claude-opus-4.5"
+    And effort is "high"
+    And max_tokens is 32000
+    When creating a DSPy LM instance
+    Then max_tokens should be 32000
