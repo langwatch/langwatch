@@ -6,10 +6,25 @@
  *
  * Example: "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5"
  *
+ * Additionally, some models require alias expansion to their full dated versions.
+ * Example: "anthropic/claude-sonnet-4" -> "anthropic/claude-sonnet-4-20250514"
+ *
  * IMPORTANT: This logic is duplicated in Python (langwatch_nlp/studio/utils.py).
  * Changes here MUST be mirrored there.
  * @see langwatch_nlp/langwatch_nlp/studio/utils.py#translate_model_id_for_litellm
  */
+
+/**
+ * Model aliases that need expansion to their full dated versions.
+ * LiteLLM requires the full dated version for certain models.
+ */
+const MODEL_ALIASES: Record<string, string> = {
+  "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
+  "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
+  "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
+  // "anthropic/claude-3.7-sonnet": "anthropic/claude-3-7-sonnet-20250514",
+  // "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20250514",
+};
 
 /**
  * Providers that need dot-to-dash translation for their model IDs.
@@ -33,7 +48,8 @@ function getProvider(modelId: string): string {
 /**
  * Translates a model ID for use with LiteLLM.
  *
- * Converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
+ * First checks for exact alias matches that need expansion to dated versions.
+ * Then converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
  * Other providers (OpenAI, Gemini, etc.) are returned unchanged.
  *
  * @param modelId - The model ID from llmModels.json (e.g., "anthropic/claude-opus-4.5")
@@ -42,6 +58,11 @@ function getProvider(modelId: string): string {
 export function translateModelIdForLitellm(modelId: string): string {
   if (!modelId) {
     return modelId;
+  }
+
+  // First, check for exact alias matches that need expansion
+  if (MODEL_ALIASES[modelId]) {
+    return MODEL_ALIASES[modelId];
   }
 
   const provider = getProvider(modelId);

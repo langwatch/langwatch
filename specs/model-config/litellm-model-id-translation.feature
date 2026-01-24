@@ -85,6 +85,24 @@ Feature: LiteLLM Model ID Translation
     Then the result should be "custom/claude-opus-4-5"
     # Translation applies regardless of prefix
 
+  # Unit Tests: Model Alias Mapping
+  # Some models require alias expansion to their full dated versions
+  # Example: "anthropic/claude-sonnet-4" → "anthropic/claude-sonnet-4-20250514"
+
+  @unit
+  Scenario: Translates claude-sonnet-4 alias to full dated version
+    Given a model ID "anthropic/claude-sonnet-4"
+    When calling translateModelIdForLitellm
+    Then the result should be "anthropic/claude-sonnet-4-20250514"
+    # LiteLLM requires the full dated version for Claude 4 models
+
+  @unit
+  Scenario: Translates claude-opus-4 alias to full dated version
+    Given a model ID "anthropic/claude-opus-4"
+    When calling translateModelIdForLitellm
+    Then the result should be "anthropic/claude-opus-4-20250514"
+    # LiteLLM requires the full dated version for Claude 4 models
+
   # Unit Tests: Boundary Integration
 
   @unit

@@ -497,6 +497,16 @@ class TestTranslateModelIdForLitellm:
         result = translate_model_id_for_litellm("claude-3.5-sonnet")
         assert result == "claude-3-5-sonnet"
 
+    def test_translates_claude_sonnet_4_alias(self):
+        """Translates anthropic/claude-sonnet-4 to anthropic/claude-sonnet-4-20250514."""
+        result = translate_model_id_for_litellm("anthropic/claude-sonnet-4")
+        assert result == "anthropic/claude-sonnet-4-20250514"
+
+    def test_translates_claude_opus_4_alias(self):
+        """Translates anthropic/claude-opus-4 to anthropic/claude-opus-4-20250514."""
+        result = translate_model_id_for_litellm("anthropic/claude-opus-4")
+        assert result == "anthropic/claude-opus-4-20250514"
+
 
 class TestModelIdTranslationInDspyLm:
     """Tests that model ID translation is applied in node_llm_config_to_dspy_lm."""

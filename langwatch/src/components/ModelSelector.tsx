@@ -11,7 +11,10 @@ import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { allLitellmModels } from "../server/modelProviders/registry";
+import {
+  allLitellmModels,
+  hasVariantSuffix,
+} from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import {
@@ -330,10 +333,12 @@ const getCustomModels = (
     if (!providerConfig) continue;
 
     if (providerConfig.enabled && providerConfig.models && mode === "chat") {
-      providerConfig.models.forEach((model: string) => {
-        models.push(`${provider}/${model}`);
-        customProviders.push(provider);
-      });
+      providerConfig.models
+        .filter((model: string) => !hasVariantSuffix(model))
+        .forEach((model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        });
     }
 
     if (
@@ -341,10 +346,12 @@ const getCustomModels = (
       providerConfig.embeddingsModels &&
       mode === "embedding"
     ) {
-      providerConfig.embeddingsModels.forEach((model: string) => {
-        models.push(`${provider}/${model}`);
-        customProviders.push(provider);
-      });
+      providerConfig.embeddingsModels
+        .filter((model: string) => !hasVariantSuffix(model))
+        .forEach((model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        });
     }
   }
 

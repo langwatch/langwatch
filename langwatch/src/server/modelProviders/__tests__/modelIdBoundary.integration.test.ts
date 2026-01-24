@@ -1,9 +1,8 @@
 /**
- * External API integration tests for model ID translation at the LiteLLM boundary.
+ * Integration tests for model ID translation at the LiteLLM boundary.
  *
- * These tests verify that the dot-to-dash translation works end-to-end
- * with actual Anthropic API calls. The tests are conditionally skipped
- * when ANTHROPIC_API_KEY is not available.
+ * These tests verify that translated model IDs work with actual Anthropic API calls.
+ * Skipped when ANTHROPIC_API_KEY is not available.
  *
  * @see specs/model-config/litellm-model-id-translation.feature
  */
@@ -13,31 +12,21 @@ import { translateModelIdForLitellm } from "../modelIdBoundary";
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 
-/**
- * Anthropic API response types for messages endpoint
- */
-interface AnthropicTextBlock {
-  type: "text";
-  text: string;
-}
-
 interface AnthropicMessagesResponse {
   id: string;
   type: "message";
   role: "assistant";
-  content: AnthropicTextBlock[];
+  content: Array<{ type: "text"; text: string }>;
   model: string;
   stop_reason: string;
 }
 
-/**
- * Makes a direct API call to Anthropic's messages endpoint.
- * This simulates what LiteLLM does under the hood.
- */
-async function callAnthropicApi(
-  model: string,
-  prompt: string,
-): Promise<AnthropicMessagesResponse> {
+function stripProviderPrefix(modelId: string): string {
+  const slashIndex = modelId.indexOf("/");
+  return slashIndex === -1 ? modelId : modelId.slice(slashIndex + 1);
+}
+
+async function callAnthropicApi(model: string): Promise<AnthropicMessagesResponse> {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -48,7 +37,7 @@ async function callAnthropicApi(
     body: JSON.stringify({
       model,
       max_tokens: 10,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: "Say hi" }],
     }),
   });
 
@@ -60,78 +49,26 @@ async function callAnthropicApi(
   return (await response.json()) as AnthropicMessagesResponse;
 }
 
-describe("Model ID Boundary - External API", () => {
-  describe("Anthropic API call with translated model ID", () => {
-    if (!apiKey) {
-      it.skip("requires ANTHROPIC_API_KEY environment variable", () => {
-        // Test skipped - no API key available
-        // In CI, this test runs when ANTHROPIC_API_KEY secret is configured
-      });
-      return;
-    }
+describe("Model ID Boundary - Anthropic API", () => {
+  describe.skipIf(!apiKey)("alias expansion", () => {
+    it("accepts claude-sonnet-4 translated to claude-sonnet-4-20250514", async () => {
+      const translated = translateModelIdForLitellm("anthropic/claude-sonnet-4");
+      const modelName = stripProviderPrefix(translated);
 
-    it("succeeds with translated model ID for claude-3.5-haiku", async () => {
-      // Given: A model ID that requires translation
-      const modelId = "anthropic/claude-3.5-haiku";
+      const response = await callAnthropicApi(modelName);
 
-      // When: We translate the model ID for LiteLLM
-      const translatedModelId = translateModelIdForLitellm(modelId);
-
-      // Then: The translated ID uses dashes (dot-to-dash conversion)
-      expect(translatedModelId).toBe("anthropic/claude-3-5-haiku");
-
-      // And: We can successfully call the Anthropic API with the translated model pattern
-      // Note: Anthropic's API requires the full model name with version suffix (e.g., "-latest")
-      // LiteLLM internally handles this, but for direct API calls we use the full name.
-      // The key verification is that the dot-to-dash translation pattern is correct.
-      const anthropicModelName = "claude-3-5-haiku-latest";
-      const response = await callAnthropicApi(
-        anthropicModelName,
-        "Say hello in exactly one word",
-      );
-
-      // Then: The API call succeeds (no "model not found" error)
-      expect(response.content).toBeDefined();
-      expect(response.content.length).toBeGreaterThan(0);
-
-      // And: The response contains text
-      const textContent = response.content.find(
-        (block) => block.type === "text",
-      );
-      expect(textContent).toBeDefined();
-      expect(textContent?.type).toBe("text");
-      expect(textContent?.text.length).toBeGreaterThan(0);
-
-      // Verify the response model uses dash notation (not dots)
-      expect(response.model).toContain("claude-3-5-haiku");
-      expect(response.model).not.toContain("claude-3.5-haiku");
+      expect(response.model).toContain("claude-sonnet-4");
     });
+  });
 
-    it("translates and validates model IDs for various Anthropic models", async () => {
-      // Test that various Anthropic model IDs are translated correctly
-      const testCases = [
-        {
-          input: "anthropic/claude-opus-4.5",
-          expected: "anthropic/claude-opus-4-5",
-        },
-        {
-          input: "anthropic/claude-sonnet-4.5",
-          expected: "anthropic/claude-sonnet-4-5",
-        },
-        {
-          input: "anthropic/claude-3.5-haiku",
-          expected: "anthropic/claude-3-5-haiku",
-        },
-        {
-          input: "anthropic/claude-3.7-sonnet",
-          expected: "anthropic/claude-3-7-sonnet",
-        },
-      ];
+  describe.skipIf(!apiKey)("dot-to-dash conversion", () => {
+    it("accepts claude-3.5-haiku translated to claude-3-5-haiku-latest", async () => {
+      const translated = translateModelIdForLitellm("anthropic/claude-3.5-haiku");
+      const modelName = stripProviderPrefix(translated) + "-latest";
 
-      for (const { input, expected } of testCases) {
-        const result = translateModelIdForLitellm(input);
-        expect(result).toBe(expected);
-      }
+      const response = await callAnthropicApi(modelName);
+
+      expect(response.model).toContain("claude-3-5-haiku");
     });
   });
 });

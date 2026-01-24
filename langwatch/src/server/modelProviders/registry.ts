@@ -258,15 +258,23 @@ export const modelProviders = {
 // ============================================================================
 
 /**
+ * Checks if a model ID has a variant suffix (e.g., :free, :thinking, :extended).
+ * These are LiteLLM routing variants that should be filtered from UI selectors.
+ */
+export function hasVariantSuffix(modelId: string): boolean {
+  return modelId.includes(":");
+}
+
+/**
  * Legacy export for backward compatibility
  * Maps to the new registry format
+ * Excludes models with variant suffixes (:free, :thinking, etc.)
  */
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
   Object.fromEntries(
-    Object.entries(llmModels.models).map(([id, model]) => [
-      id,
-      { mode: model.mode },
-    ]),
+    Object.entries(llmModels.models)
+      .filter(([id]) => !hasVariantSuffix(id))
+      .map(([id, model]) => [id, { mode: model.mode }]),
   );
 
 // ============================================================================

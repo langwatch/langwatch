@@ -424,7 +424,8 @@ export const prepareLitellmParams = async ({
   const params: Record<string, string> = {};
 
   // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
-  // Then handle custom/ prefix replacement
+  // Custom models use OpenAI-compatible API format, so we replace the prefix.
+  // LiteLLM routes "openai/" prefixed models through its OpenAI-compatible handler.
   params.model = translateModelIdForLitellm(model).replace(
     "custom/",
     "openai/",

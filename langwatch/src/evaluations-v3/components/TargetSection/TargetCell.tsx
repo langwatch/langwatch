@@ -19,6 +19,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { parseLLMError } from "~/utils/formatLLMError";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
@@ -266,7 +267,9 @@ export function TargetCellContent({
           <Box flexShrink={0}>
             <LuCircleAlert size={16} />
           </Box>
-          <Text lineClamp={expanded ? undefined : 2}>{error}</Text>
+          <Text lineClamp={expanded ? undefined : 2}>
+            {parseLLMError(error).message}
+          </Text>
         </HStack>
       );
     }

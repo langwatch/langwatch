@@ -171,6 +171,17 @@ describe("Backward Compatibility", () => {
       );
       expect(openaiModels.length).toBeGreaterThan(0);
     });
+
+    it("excludes models with variant suffixes", () => {
+      const modelIds = Object.keys(allLitellmModels);
+      const variantModels = modelIds.filter((id) => id.includes(":"));
+      expect(variantModels).toHaveLength(0);
+    });
+
+    it("includes standard models without suffixes", () => {
+      expect(allLitellmModels["anthropic/claude-3.5-sonnet"]).toBeDefined();
+      expect(allLitellmModels["openai/gpt-4o"]).toBeDefined();
+    });
   });
 });
 

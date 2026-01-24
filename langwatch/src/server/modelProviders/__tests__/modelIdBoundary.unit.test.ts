@@ -82,6 +82,18 @@ describe("translateModelIdForLitellm", () => {
     });
   });
 
+  describe("Model alias expansion", () => {
+    it("translates anthropic/claude-sonnet-4 to anthropic/claude-sonnet-4-20250514", () => {
+      const result = translateModelIdForLitellm("anthropic/claude-sonnet-4");
+      expect(result).toBe("anthropic/claude-sonnet-4-20250514");
+    });
+
+    it("translates anthropic/claude-opus-4 to anthropic/claude-opus-4-20250514", () => {
+      const result = translateModelIdForLitellm("anthropic/claude-opus-4");
+      expect(result).toBe("anthropic/claude-opus-4-20250514");
+    });
+  });
+
   describe("Edge cases", () => {
     it("handles empty string", () => {
       const result = translateModelIdForLitellm("");

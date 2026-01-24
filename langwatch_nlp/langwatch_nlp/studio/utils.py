@@ -194,6 +194,14 @@ def get_provider_from_model(model: str | None) -> str:
     return model.split("/")[0].lower() if "/" in model else ""
 
 
+# Model aliases that need expansion to their full dated versions.
+# LiteLLM requires the full dated version for certain models.
+MODEL_ALIASES: Dict[str, str] = {
+    "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
+    "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
+    "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022"
+}
+
 # Providers that need dot-to-dash translation for their model IDs.
 # Anthropic models use dots in llmModels.json but LiteLLM expects dashes.
 PROVIDERS_NEEDING_TRANSLATION = {"anthropic", "custom"}
@@ -203,7 +211,8 @@ def translate_model_id_for_litellm(model_id: str | None) -> str | None:
     """
     Translates a model ID for use with LiteLLM.
 
-    Converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
+    First checks for exact alias matches that need expansion to dated versions.
+    Then converts dots to dashes in model IDs for providers that need it (Anthropic, custom).
     Other providers (OpenAI, Gemini, etc.) are returned unchanged.
 
     Args:
@@ -214,6 +223,10 @@ def translate_model_id_for_litellm(model_id: str | None) -> str | None:
     """
     if not model_id:
         return model_id
+
+    # First, check for exact alias matches that need expansion
+    if model_id in MODEL_ALIASES:
+        return MODEL_ALIASES[model_id]
 
     provider = get_provider_from_model(model_id)
 

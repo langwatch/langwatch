@@ -24,6 +24,7 @@ import {
   getStatusLabel,
   parseEvaluationResult,
 } from "~/utils/evaluationResults";
+import { parseLLMError } from "~/utils/formatLLMError";
 import type { EvaluatorConfig } from "../../types";
 
 // Pulsing animation for alert icon
@@ -213,7 +214,7 @@ export function EvaluatorChip({
                       maxHeight="200px"
                       overflow="auto"
                     >
-                      {details}
+                      {parseLLMError(details).message}
                     </Text>
                   </Box>
                 )}
