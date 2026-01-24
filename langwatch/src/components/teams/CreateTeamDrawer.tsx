@@ -3,7 +3,8 @@ import { TeamUserRole } from "@prisma/client";
 import type React from "react";
 import { useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { useDrawer } from "../../hooks/useDrawer";
+import { TOAST_DURATION_MS } from "../../constants/ui";
+import { useDrawerCloseCallback } from "../../hooks/useDrawerCloseCallback";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
@@ -11,8 +12,6 @@ import { TeamForm, type TeamFormData } from "../settings/TeamForm";
 import { teamRolesOptions } from "../settings/TeamUserRoleField";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
-
-const TOAST_DURATION_MS = 5000;
 
 const TOAST_MESSAGES = {
   success: {
@@ -34,7 +33,7 @@ export function CreateTeamDrawer({
 }): React.ReactElement | null {
   const { organization } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
-  const { closeDrawer } = useDrawer();
+  const handleClose = useDrawerCloseCallback(onClose);
   const queryClient = api.useContext();
 
   const form = useForm<TeamFormData>({
@@ -54,14 +53,6 @@ export function CreateTeamDrawer({
   });
 
   const createTeam = api.team.createTeamWithMembers.useMutation();
-
-  const handleClose = useCallback(() => {
-    if (onClose) {
-      onClose();
-    } else {
-      closeDrawer();
-    }
-  }, [onClose, closeDrawer]);
 
   const onSubmit: SubmitHandler<TeamFormData> = useCallback(
     (data: TeamFormData) => {

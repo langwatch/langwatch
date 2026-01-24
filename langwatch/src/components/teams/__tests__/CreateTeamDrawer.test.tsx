@@ -351,18 +351,12 @@ describe("CreateTeamDrawer", () => {
 
       const rowsBefore = screen.getAllByRole("row").length;
 
-      // Find delete buttons - they are red buttons with Trash icon, no text
-      // These are buttons that have colorPalette="red" and contain only an SVG
-      const allButtons = screen.getAllByRole("button");
-      const deleteButtons = allButtons.filter((btn) => {
-        const hasSvg = btn.querySelector("svg") !== null;
-        const hasNoText =
-          !btn.textContent || btn.textContent.trim().length === 0;
-        const isNotDisabled = !(btn as HTMLButtonElement).disabled;
-        return hasSvg && hasNoText && isNotDisabled;
-      });
+      // Find delete buttons using accessible name
+      const deleteButtons = screen
+        .getAllByRole("button", { name: /remove member/i })
+        .filter((btn) => !(btn as HTMLButtonElement).disabled);
 
-      // Click the first enabled delete button (removes the second member)
+      // Click the last enabled delete button (removes the second member)
       expect(deleteButtons.length).toBeGreaterThan(0);
       await user.click(deleteButtons[deleteButtons.length - 1]!);
 
@@ -384,13 +378,9 @@ describe("CreateTeamDrawer", () => {
       // Initially only one member (current user)
       const rowsBefore = screen.getAllByRole("row").length;
 
-      // Find all buttons with SVG and no text (delete buttons)
-      const allButtons = screen.getAllByRole("button");
-      const deleteButtons = allButtons.filter((btn) => {
-        const hasSvg = btn.querySelector("svg") !== null;
-        const hasNoText =
-          !btn.textContent || btn.textContent.trim().length === 0;
-        return hasSvg && hasNoText;
+      // Find delete buttons using accessible name
+      const deleteButtons = screen.getAllByRole("button", {
+        name: /remove member/i,
       });
 
       // Click the delete button (should be disabled or do nothing)
@@ -559,13 +549,9 @@ describe("CreateTeamDrawer", () => {
       // Get current member count
       const rowsBefore = screen.getAllByRole("row").length;
 
-      // Find and try to click all delete buttons
-      const allButtons = screen.getAllByRole("button");
-      const deleteButtons = allButtons.filter((btn) => {
-        const hasSvg = btn.querySelector("svg") !== null;
-        const hasNoText =
-          !btn.textContent || btn.textContent.trim().length === 0;
-        return hasSvg && hasNoText;
+      // Find delete buttons using accessible name
+      const deleteButtons = screen.getAllByRole("button", {
+        name: /remove member/i,
       });
 
       // Try to click delete button on the single member

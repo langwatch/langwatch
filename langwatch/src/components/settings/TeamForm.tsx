@@ -52,12 +52,14 @@ export const TeamForm = ({
   form,
   onSubmit,
   isLoading,
+  hideProjects = false,
 }: {
   organizationId: string;
   team?: TeamWithProjectsAndMembersAndUsers;
   form: UseFormReturn<TeamFormData, any, TeamFormData>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;
+  hideProjects?: boolean;
 }) => {
   const { register, control, handleSubmit, getFieldState } = form;
   const members = useFieldArray({
@@ -108,17 +110,7 @@ export const TeamForm = ({
             </HorizontalFormControl>
           )}
         </VStack>
-        <HStack width="full" marginTop={2}>
-          <Heading>Members</Heading>
-          <Spacer />
-          {team && (
-            <Link href={`/settings/members`} asChild>
-              <Button variant="outline" size="sm">
-                Manage organization members
-              </Button>
-            </Link>
-          )}
-        </HStack>
+        <MembersHeader />
         <Table.Root variant="line" width="full">
           <Table.Header>
             <Table.Row>
@@ -215,6 +207,7 @@ export const TeamForm = ({
                       colorPalette="red"
                       disabled={members.fields.length === 1}
                       onClick={() => members.remove(index)}
+                      aria-label="Remove member"
                     >
                       <Trash size={18} />
                     </Button>
@@ -253,7 +246,7 @@ export const TeamForm = ({
             </Button>
           </HStack>
         )}
-        {team && (
+        {team && !hideProjects && (
           <>
             <TeamFormProjects team={team} />
             <Table.Root variant="line" width="full" size="md">
@@ -271,6 +264,15 @@ export const TeamForm = ({
     </form>
   );
 };
+
+function MembersHeader(): React.ReactElement {
+  return (
+    <HStack width="full" marginTop={2}>
+      <Heading>Members</Heading>
+      <Spacer />
+    </HStack>
+  );
+}
 
 function TeamFormProjects({
   team,
