@@ -11,6 +11,7 @@ Cross-cutting principles that apply everywhere:
 
 - **best_practices/** - TypeScript, React, Git conventions
 - **design/** - UI design system
+- **TESTING.md** - Test hierarchy, workflow, E2E patterns
 
 ## Architecture
 

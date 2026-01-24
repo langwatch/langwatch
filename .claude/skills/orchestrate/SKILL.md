@@ -64,9 +64,23 @@ Be aware of context size. When context grows large, ask the user if they'd like 
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. Complete
+### 5. E2E Verification (Conditional)
+- Check if feature file has `@e2e` tagged scenarios
+- If yes:
+  - Mark e2e task as `in_progress`
+  - Invoke `/e2e` with the feature file path
+  - E2E workflow: explores app → generates tests → runs until passing
+  - If tests fail due to **test issues** → healer fixes them
+  - If tests fail due to **app bugs** (behavior doesn't match spec):
+    - Invoke `/code` with the failing scenario and expected vs actual behavior
+    - After fix, re-run `/e2e` to verify
+    - Max 2 iterations, then escalate to user
+  - If all pass → mark task as `completed`
+- If no `@e2e` scenarios → skip to Complete
+
+### 6. Complete
 - Verify all tasks are completed
-- Report summary to user
+- Report summary to user (include E2E test status if applicable)
 
 ## Boundaries
 
@@ -74,5 +88,6 @@ You delegate, you don't implement:
 - `/plan` creates feature files
 - `/code` writes code and runs tests
 - `/review` checks quality
+- `/e2e` generates and verifies E2E tests
 
 Read only feature files and planning docs, not source code.

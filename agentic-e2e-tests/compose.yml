@@ -1,0 +1,107 @@
+# Test environment with isolated ports
+# Infrastructure services only - run Next.js app locally
+#
+# Usage (from agentic-e2e-tests/ directory):
+#   docker compose up -d
+#   cd ../langwatch && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
+#   cd ../agentic-e2e-tests && pnpm test
+#   docker compose down
+#
+# The Next.js app runs on the host at localhost:5570 (set via PORT=5570)
+
+services:
+  # Note: The app service is commented out - run Next.js locally for faster iteration
+  # Uncomment and use `build: .` if you need a fully containerized test environment
+  #
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     NODE_OPTIONS: "--max-old-space-size=4096"
+  #     ...
+
+  langwatch_nlp:
+    image: langwatch/langwatch_nlp:latest
+    ports:
+      - "5563:5561"  # Test port (dev uses 5561)
+    restart: always
+    environment:
+      - LANGWATCH_ENDPOINT=http://host.docker.internal:5570
+
+  langevals:
+    image: langwatch/langevals:latest
+    ports:
+      - "5564:5562"  # Test port (dev uses 5562)
+    restart: always
+    environment:
+      - DISABLE_EVALUATORS_PRELOAD=true
+
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+    ports:
+      - "5433:5432"  # Test port (dev uses 5432)
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisma -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6380:6379"  # Test port (dev uses 6379)
+    volumes:
+      - test-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    image: langwatch/opensearch-lite:latest
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
+      - "bootstrap.memory_lock=false"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=test-password-for-e2e
+      - "node.store.allow_mmap=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9201:9200"  # Test port (dev uses 9200)
+      - "9601:9600"
+    volumes:
+      - test-opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "1.0"
+    restart: always
+
+volumes:
+  test-db-data:
+  test-redis-data:
+  test-opensearch-data:

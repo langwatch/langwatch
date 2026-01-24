@@ -58,6 +58,18 @@ Here's how to propose a change:
 5. Make sure your code lints.
 6. Issue that pull request!
 
+### E2E Testing
+
+If your changes affect the UI, please ensure e2e tests pass:
+
+```bash
+cd agentic-e2e-tests
+docker compose up -d --wait
+pnpm install && pnpm test
+```
+
+See `agentic-e2e-tests/README.md` for details on writing new tests.
+
 ## Commit Messages and PR Titles
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org) specification for our commit messages and PR titles. This helps us automate versioning and generate changelogs.

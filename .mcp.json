@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "playwright-test": {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "playwright",
+        "run-test-mcp-server",
+        "--config",
+        "agentic-e2e-tests/playwright.config.ts"
+      ]
+    }
+  }
+}
