@@ -103,7 +103,7 @@ describe("buildModelChangeValues", () => {
   });
 
   describe("when model metadata is provided", () => {
-    it("calculates maxTokens from maxCompletionTokens", () => {
+    it("sets maxTokens to model maximum", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
@@ -112,19 +112,31 @@ describe("buildModelChangeValues", () => {
         undefined,
         metadata,
       );
-      expect(result.maxTokens).toBe(4096); // 16384 * 0.25 = 4096
+      expect(result.maxTokens).toBe(16384);
     });
 
-    it("caps maxTokens at registry default for large models", () => {
+    it("sets max_tokens (snake_case) to model maximum for compatibility", () => {
       const metadata = {
-        maxCompletionTokens: 100000,
+        maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
       const result = buildModelChangeValues(
         "openai/gpt-4.1",
         undefined,
         metadata,
       );
-      expect(result.maxTokens).toBe(4096); // 100000 * 0.25 = 25000, capped at 4096
+      expect(result.max_tokens).toBe(16384);
+    });
+
+    it("sets maxTokens to model maximum for large models", () => {
+      const metadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const result = buildModelChangeValues(
+        "openai/gpt-5.2",
+        undefined,
+        metadata,
+      );
+      expect(result.maxTokens).toBe(128000);
     });
 
     it("uses contextLength when maxCompletionTokens not available", () => {
@@ -134,7 +146,126 @@ describe("buildModelChangeValues", () => {
         undefined,
         metadata,
       );
-      expect(result.maxTokens).toBe(2048); // 8192 * 0.25 = 2048
+      expect(result.maxTokens).toBe(8192);
+    });
+  });
+
+  describe("when switching models with previous values", () => {
+    it("keeps maxTokens at max when previous was at max and switching to larger model", () => {
+      const previousMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const newMetadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-4.1", maxTokens: 32768 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-5.2",
+        undefined,
+        newMetadata,
+        previousValues,
+        previousMetadata,
+      );
+
+      expect(result.maxTokens).toBe(128000);
+    });
+
+    it("keeps maxTokens at max when previous was at max and switching to smaller model", () => {
+      const previousMetadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const newMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        newMetadata,
+        previousValues,
+        previousMetadata,
+      );
+
+      expect(result.maxTokens).toBe(32768);
+    });
+
+    it("preserves user-customized maxTokens when switching to larger model", () => {
+      const previousMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const newMetadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-4.1", maxTokens: 8000 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-5.2",
+        undefined,
+        newMetadata,
+        previousValues,
+        previousMetadata,
+      );
+
+      expect(result.maxTokens).toBe(8000);
+    });
+
+    it("caps user-customized maxTokens when switching to smaller model", () => {
+      const previousMetadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const newMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-5.2", maxTokens: 50000 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        newMetadata,
+        previousValues,
+        previousMetadata,
+      );
+
+      expect(result.maxTokens).toBe(32768);
+    });
+
+    it("handles max_tokens snake_case in previous values", () => {
+      const previousMetadata = {
+        maxCompletionTokens: 128000,
+      } as ModelMetadataForFrontend;
+      const newMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-5.2", max_tokens: 128000 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        newMetadata,
+        previousValues,
+        previousMetadata,
+      );
+
+      expect(result.maxTokens).toBe(32768);
+    });
+
+    it("assumes previous was at max when no previous metadata available", () => {
+      const newMetadata = {
+        maxCompletionTokens: 32768,
+      } as ModelMetadataForFrontend;
+      const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
+
+      const result = buildModelChangeValues(
+        "openai/gpt-4.1",
+        undefined,
+        newMetadata,
+        previousValues,
+        undefined,
+      );
+
+      expect(result.maxTokens).toBe(32768);
     });
   });
 });
@@ -235,26 +366,26 @@ describe("calculateSensibleDefaults", () => {
   });
 
   describe("when called with model metadata", () => {
-    it("calculates maxTokens from maxCompletionTokens", () => {
+    it("sets maxTokens to model maximum", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
       const defaults = calculateSensibleDefaults(metadata);
-      expect(defaults.maxTokens).toBe(4096); // min(4096, 16384 * 0.25)
+      expect(defaults.maxTokens).toBe(16384);
     });
 
-    it("uses smaller value when model max is less than registry default", () => {
+    it("sets maxTokens to model maximum for large models", () => {
       const metadata = {
-        maxCompletionTokens: 4000,
+        maxCompletionTokens: 128000,
       } as ModelMetadataForFrontend;
       const defaults = calculateSensibleDefaults(metadata);
-      expect(defaults.maxTokens).toBe(1000); // min(4096, 4000 * 0.25)
+      expect(defaults.maxTokens).toBe(128000);
     });
 
     it("uses contextLength when maxCompletionTokens not available", () => {
       const metadata = { contextLength: 32000 } as ModelMetadataForFrontend;
       const defaults = calculateSensibleDefaults(metadata);
-      expect(defaults.maxTokens).toBe(4096); // min(4096, 32000 * 0.25)
+      expect(defaults.maxTokens).toBe(32000);
     });
   });
 });

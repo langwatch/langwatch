@@ -180,7 +180,13 @@ export function LLMConfigPopover({
             onChange={(model) => {
               const newModelMetadata = modelMetadata?.[model];
               onChange(
-                buildModelChangeValues(model, undefined, newModelMetadata),
+                buildModelChangeValues(
+                  model,
+                  undefined,
+                  newModelMetadata,
+                  values,
+                  currentModelMetadata,
+                ),
               );
             }}
             mode="chat"

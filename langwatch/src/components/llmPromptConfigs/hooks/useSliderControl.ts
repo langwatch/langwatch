@@ -7,7 +7,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { DYNAMIC_MAX_DEFAULT_PROPORTION } from "../constants";
 import type { SliderParameterConfig } from "../parameterConfig";
 
 // ============================================================================
@@ -70,15 +69,10 @@ export function useSliderControl({
         ? Math.min(maxOverride, config.max)
         : config.max;
 
-  // Smart default: for dynamic max params (like max_tokens), use ~25% of the model's max
-  // This provides a sensible starting point while leaving room for adjustment
+  // For dynamic max params (like max_tokens), default to the model's max
+  // For other params, use the config default
   const sensibleDefault =
-    config.dynamicMax && maxOverride
-      ? Math.min(
-          config.default,
-          Math.floor(maxOverride * DYNAMIC_MAX_DEFAULT_PROPORTION),
-        )
-      : config.default;
+    config.dynamicMax && maxOverride ? maxOverride : config.default;
 
   const currentValue = value ?? sensibleDefault;
 
