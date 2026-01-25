@@ -2066,7 +2066,20 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // Step 1: Transpose (like the API route does)
       let datasetRows = transposeColumnsFirstToRowsFirstWithId(inlineRecords);
 
-      // Step 2: Parse JSON columns (like the API route does)
+      // Step 2: Normalize column IDs to column names (like the API route does)
+      // This is the key step - the orchestrator expects column NAMES as keys
+      const idToName = Object.fromEntries(
+        datasetColumns.map((c) => [c.id, c.name]),
+      );
+      datasetRows = datasetRows.map((row) => {
+        const normalized: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(row)) {
+          normalized[idToName[key] ?? key] = value;
+        }
+        return normalized;
+      });
+
+      // Step 3: Parse JSON columns (like the API route does)
       const jsonColumns = new Set(
         datasetColumns
           .filter((c) =>
@@ -2074,16 +2087,16 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
               c.type,
             ),
           )
-          .map((c) => c.id),
+          .map((c) => c.name), // Use name since we normalized above
       );
       if (jsonColumns.size > 0) {
         datasetRows = datasetRows.map((row) => {
           const parsedRow = { ...row };
-          for (const colId of jsonColumns) {
-            const value = parsedRow[colId];
+          for (const colName of jsonColumns) {
+            const value = parsedRow[colName];
             if (typeof value === "string" && value.trim()) {
               try {
-                parsedRow[colId] = JSON.parse(value);
+                parsedRow[colName] = JSON.parse(value);
               } catch {
                 // Keep original string if not valid JSON
               }
@@ -2093,11 +2106,11 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         });
       }
 
-      // Verify the parsing worked
-      expect(datasetRows[0]?.messages_2).toEqual([
+      // Verify the parsing worked - now using column NAMES as keys
+      expect(datasetRows[0]?.messages).toEqual([
         { role: "user", content: "hi" },
       ]);
-      expect(datasetRows[0]?.input_0).toBe(
+      expect(datasetRows[0]?.input).toBe(
         "How do I update my billing information?",
       );
 
