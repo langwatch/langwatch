@@ -26,6 +26,9 @@ export default defineConfig({
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
+    // Run test files sequentially to avoid BullMQ/Redis resource contention
+    // when multiple pipelines are created and destroyed in parallel
+    fileParallelism: false,
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The env-setup.ts file handles setting the correct URLs from globalSetup.
   },
