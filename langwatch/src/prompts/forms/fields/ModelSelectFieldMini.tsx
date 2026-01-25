@@ -77,7 +77,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
       render={({ field }) => {
         const llmErrors = formState.errors.version?.configData?.llm;
         return (
-          <Popover.Root positioning={{ placement: "bottom-start" }}>
+          <Popover.Root positioning={{ placement: "bottom-start" }} closeOnInteractOutside={false}>
             <Popover.Trigger asChild>
               <HStack
                 width="2/3"

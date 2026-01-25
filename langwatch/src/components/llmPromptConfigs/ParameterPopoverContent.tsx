@@ -5,7 +5,7 @@
  * Shows slider/input or select control with the parameter description.
  */
 
-import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { useSliderControl } from "./hooks/useSliderControl";
@@ -32,6 +32,8 @@ export type ParameterPopoverContentProps = {
   minOverride?: number;
   /** Whether to render in a portal (default: true). Set false for nested popovers. */
   portalled?: boolean;
+  /** Callback to close the popover (used by select controls) */
+  onClose?: () => void;
 };
 
 // ============================================================================
@@ -108,32 +110,49 @@ function SliderControl({
 }
 
 // ============================================================================
-// Select Control
+// Select Control (Button-based)
 // ============================================================================
 
 type SelectControlProps = {
   config: SelectParameterConfig;
   value: string | undefined;
   onChange: (value: string) => void;
+  onClose?: () => void;
 };
 
-function SelectControl({ config, value, onChange }: SelectControlProps) {
+function SelectControl({
+  config,
+  value,
+  onChange,
+  onClose,
+}: SelectControlProps) {
   const currentValue = value ?? config.default;
 
+  const handleSelect = (option: string) => {
+    onChange(option);
+    onClose?.();
+  };
+
   return (
-    <NativeSelect.Root size="sm" width="full">
-      <NativeSelect.Field
-        value={currentValue}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {config.options.map((option) => (
-          <option key={option} value={option}>
+    <VStack gap={1.5} width="full">
+      {config.options.map((option) => {
+        const isSelected = option === currentValue;
+        return (
+          <Button
+            key={option}
+            size="sm"
+            width="full"
+            variant={isSelected ? "solid" : "outline"}
+            colorPalette={isSelected ? "blue" : "gray"}
+            onClick={() => handleSelect(option)}
+            fontWeight="medium"
+            autoFocus={isSelected}
+          >
             {option.charAt(0).toUpperCase() + option.slice(1)}
-          </option>
-        ))}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
+          </Button>
+        );
+      })}
+    </VStack>
   );
 }
 
@@ -148,17 +167,33 @@ export function ParameterPopoverContent({
   maxOverride,
   minOverride,
   portalled = true,
+  onClose,
 }: ParameterPopoverContentProps) {
+  const isSlider = config.type === "slider";
+
   return (
     <Popover.Content
       zIndex={1402}
       portalled={portalled}
-      background="white/95"
+      background="bg/95"
       boxShadow="lg"
+      maxWidth="260px"
     >
-      <VStack padding={4} gap={3} align="stretch">
+      <VStack padding={3} gap={4} align="stretch">
+        {/* For select controls: show label/description on top */}
+        {!isSlider && (
+          <VStack gap={1} align="stretch">
+            <Text fontSize="sm" fontWeight="medium">
+              {config.label}
+            </Text>
+            <Text fontSize="xs" color="fg.muted" lineHeight="tall">
+              {config.helper}
+            </Text>
+          </VStack>
+        )}
+
         {/* Control Section */}
-        {config.type === "slider" ? (
+        {isSlider ? (
           <SliderControl
             config={config}
             value={typeof value === "number" ? value : undefined}
@@ -171,18 +206,21 @@ export function ParameterPopoverContent({
             config={config}
             value={typeof value === "string" ? value : undefined}
             onChange={onChange}
+            onClose={onClose}
           />
         )}
 
-        {/* Label */}
-        <Text fontSize="sm" fontWeight="medium">
-          {config.label}
-        </Text>
-
-        {/* Description */}
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          {config.helper}
-        </Text>
+        {/* For slider controls: show label/description below */}
+        {isSlider && (
+          <VStack gap={1} align="stretch">
+            <Text fontSize="sm" fontWeight="medium">
+              {config.label}
+            </Text>
+            <Text fontSize="xs" color="fg.muted" lineHeight="tall">
+              {config.helper}
+            </Text>
+          </VStack>
+        )}
       </VStack>
     </Popover.Content>
   );

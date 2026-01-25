@@ -89,7 +89,8 @@ export function ParameterRow({
     <Popover.Root
       open={isOpen}
       onOpenChange={({ open }) => onOpenChange(open)}
-      positioning={{ placement: "right-start" }}
+      positioning={{ placement: "bottom-end", offset: { mainAxis: 4, crossAxis: 130 } }}
+      closeOnInteractOutside={false}
     >
       <Popover.Trigger asChild disabled={disabled}>
         <HStack
@@ -103,6 +104,8 @@ export function ParameterRow({
           opacity={disabled ? 0.5 : 1}
           _hover={disabled ? {} : { bg: "bg.subtle" }}
           transition="background 0.15s"
+          background="bg"
+          color="fg.muted"
           data-testid={`parameter-row-${name}`}
         >
           <Box
@@ -111,14 +114,13 @@ export function ParameterRow({
             justifyContent="center"
             width="16px"
             height="16px"
-            color="fg.muted"
           >
             <IconComponent size={16} />
           </Box>
-          <Text fontSize="sm" fontWeight="medium" flex={1}>
+          <Text fontSize="13px" fontWeight="medium" flex={1}>
             {config.label}
           </Text>
-          <Text fontSize="sm" color="fg.muted">
+          <Text fontSize="13px" color="fg.muted">
             {displayValue}
           </Text>
         </HStack>
@@ -130,6 +132,7 @@ export function ParameterRow({
         maxOverride={maxOverride}
         minOverride={minOverride}
         portalled={false}
+        onClose={() => onOpenChange(false)}
       />
     </Popover.Root>
   );

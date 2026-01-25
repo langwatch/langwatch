@@ -7,6 +7,7 @@
 import { Button } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Clock } from "react-feather";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -59,12 +60,14 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
       <Button
         size="xs"
         variant="ghost"
-        onClick={handleClick}
         disabled={disabled || !hasRuns || isLoading}
         aria-label="View run history"
+        asChild
       >
-        <Clock size={14} />
-        History
+        <Link href={`/${project.slug}/experiments/${experimentSlug}`}>
+          <Clock size={14} />
+          History
+        </Link>
       </Button>
     </Tooltip>
   );

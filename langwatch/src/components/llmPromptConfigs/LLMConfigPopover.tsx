@@ -162,14 +162,15 @@ export function LLMConfigPopover({
 
   return (
     <Popover.Content minWidth="260px" maxWidth="100%" zIndex={1401}>
-      <VStack paddingY={3} paddingX={4} width="full" align="start" gap={3}>
+      <VStack paddingY={2} paddingX={2} width="full" align="start" gap={3}>
         {/* Model Selector */}
         <Box width="full">
           <Text
-            fontSize="sm"
+            fontSize="13px"
             fontWeight="medium"
-            color="fg.muted"
-            marginBottom={1}
+            color="fg.subtle"
+            paddingLeft={2}
+            paddingBottom={1}
           >
             Model
           </Text>
@@ -190,6 +191,15 @@ export function LLMConfigPopover({
 
         {/* Dynamic Parameters */}
         <VStack width="full" gap={1} align="stretch">
+          <Text
+            fontSize="13px"
+            fontWeight="medium"
+            color="fg.subtle"
+            paddingLeft={2}
+            paddingBottom={1}
+          >
+            Parameters
+          </Text>
           {displayParameters.map((paramName) => {
             // Get effective config (with dynamic options for reasoning)
             const config = getParameterConfigWithModelOverrides(
@@ -254,28 +264,25 @@ export function LLMConfigPopover({
 
         {/* Structured Outputs Section */}
         {showStructuredOutputs && onOutputsChange && (
-          <>
-            <HStack width="full" justify="space-between" paddingTop={2}>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+          <VStack width="full" gap={2}>
+            <HStack width="full" justify="space-between" paddingX={2} paddingBottom={isStructuredOutputsEnabled ? 0 : 2}>
+              <HStack width="full" align="start" gap={0} justify="space-between">
+                <Text fontSize="13px" fontWeight="medium" color="fg.subtle">
                   Structured Outputs
                 </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Define custom output fields and types
-                </Text>
-              </VStack>
-              <Switch
-                size="sm"
-                data-testid="structured-outputs-switch"
-                checked={isStructuredOutputsEnabled}
-                onCheckedChange={({ checked }) =>
-                  handleStructuredOutputsToggle(checked)
-                }
-              />
+                <Switch
+                  size="sm"
+                  data-testid="structured-outputs-switch"
+                  checked={isStructuredOutputsEnabled}
+                  onCheckedChange={({ checked }) =>
+                    handleStructuredOutputsToggle(checked)
+                  }
+                />
+              </HStack>
             </HStack>
 
             {isStructuredOutputsEnabled && outputs && (
-              <Box width="full">
+              <Box width="full" padding={2} paddingLeft={3} border="1px solid" borderColor="border" borderRadius="lg" background="bg">
                 <OutputsSection
                   outputs={outputs}
                   onChange={onOutputsChange}
@@ -283,7 +290,7 @@ export function LLMConfigPopover({
                 />
               </Box>
             )}
-          </>
+          </VStack>
         )}
       </VStack>
     </Popover.Content>
