@@ -2139,7 +2139,14 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       const state: EvaluationsV3State = {
         name: "Test",
-        datasets: [{ id: "test-data", name: "Test Data", type: "inline" }],
+        datasets: [
+          {
+            id: "test-data",
+            name: "Test Data",
+            type: "inline",
+            columns: datasetColumns,
+          },
+        ],
         activeDatasetId: "test-data",
         targets: [httpAgentTarget],
         evaluators: [],
@@ -2151,10 +2158,12 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // Import the HTTP agent service to create a mock agent
       const { AgentService } = await import("~/server/agents/agent.service");
       const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
       const agentService = AgentService.create(prisma);
 
       // Create a temporary HTTP agent for this test
       const agent = await agentService.create({
+        id: `agent_${nanoid()}`,
         projectId: project.id,
         name: "Test HTTP Agent",
         type: "http",
@@ -2197,7 +2206,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
           expect(targetResult.error).toBeUndefined();
 
           // Output should contain the echoed JSON from httpbin.org
-          expect(targetResult.output).toBeDefined();
+          expect(targetResult.output).not.toBeNull();
           const output = targetResult.output as Record<string, unknown>;
 
           // Verify messages is a proper array (not over-escaped)

@@ -11,7 +11,6 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryButton } from "../HistoryButton";
@@ -64,8 +63,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("HistoryButton", () => {
-  const user = userEvent.setup();
-
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -139,12 +136,9 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // Find buttons and get the one that's actually a button element
-    const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) =>
-      btn.textContent?.includes("History"),
-    );
-    expect(historyButton).toBeDisabled();
+    // Component is now a link element
+    const historyLink = screen.getByRole("link", { name: "View run history" });
+    expect(historyLink).toHaveAttribute("disabled");
   });
 
   it("shows enabled button when runs exist", async () => {
@@ -171,13 +165,9 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // The button should exist and not be disabled
-    const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) =>
-      btn.textContent?.includes("History"),
-    );
-    expect(historyButton).toBeDefined();
-    expect(historyButton).not.toHaveAttribute("disabled");
+    // Component is now a link element
+    const historyLink = screen.getByRole("link", { name: "View run history" });
+    expect(historyLink).not.toHaveAttribute("disabled");
   });
 
   it("navigates to experiment page using experimentSlug from store when clicked", async () => {
@@ -211,16 +201,10 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find(
-      (btn) =>
-        btn.textContent?.includes("History") && !btn.hasAttribute("disabled"),
-    )!;
-    expect(historyButton).toBeDefined();
-    await user.click(historyButton);
-
-    // Should use experimentSlug from store, not router query
-    expect(mockPush).toHaveBeenCalledWith(
+    // Component is now a link element - verify href instead of onClick navigation
+    const historyLink = screen.getByRole("link", { name: "View run history" });
+    expect(historyLink).toHaveAttribute(
+      "href",
       "/test-project/experiments/my-custom-slug",
     );
   });
@@ -249,10 +233,8 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) =>
-      btn.textContent?.includes("History"),
-    );
-    expect(historyButton).toBeDisabled();
+    // Component is now a link element
+    const historyLink = screen.getByRole("link", { name: "View run history" });
+    expect(historyLink).toHaveAttribute("disabled");
   });
 });

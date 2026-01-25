@@ -125,8 +125,7 @@ describe("VersionHistoryListPopover", () => {
       // Should show info toast (not success toast about "restored")
       expect(toaster.info).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "Loaded v2",
-          description: "Click 'Update' to save the restored version",
+          title: "Restored prompt to version 2",
         }),
       );
     });

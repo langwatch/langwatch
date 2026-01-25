@@ -57,7 +57,7 @@ describe("Monitor-Evaluator Integration", () => {
         evaluatorId: testEvaluatorId,
       });
 
-      expect(result.id).toMatch(/^eval_/);
+      expect(result.id).toMatch(/^monitor_/);
       expect(result.name).toBe("Monitor With Evaluator");
       expect(result.evaluatorId).toBe(testEvaluatorId);
     });
@@ -73,7 +73,7 @@ describe("Monitor-Evaluator Integration", () => {
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
       });
 
-      expect(result.id).toMatch(/^eval_/);
+      expect(result.id).toMatch(/^monitor_/);
       expect(result.evaluatorId).toBeNull();
     });
 

@@ -1,6 +1,9 @@
 import { useCallback } from "react";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
@@ -22,6 +25,7 @@ Add variables via double brackets like this: {{input}}
  */
 export function useCreateDraftPrompt() {
   const { project } = useOrganizationTeamProject();
+  const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
   /**
@@ -31,17 +35,19 @@ export function useCreateDraftPrompt() {
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {
-    const projectDefaultModel = project?.defaultModel;
+    const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+    const defaultModelMetadata = modelMetadata?.[defaultModel];
+    const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
     // Use unified defaults with project model override if available
     // Override system message with playground-specific onboarding prompt
     const defaultValues = buildDefaultFormValues({
       version: {
         configData: {
-          llm:
-            typeof projectDefaultModel === "string"
-              ? { model: projectDefaultModel }
-              : undefined,
+          llm: {
+            model: defaultModel,
+            maxTokens,
+          },
           // lodash merge merges arrays by index, so this updates the first message's content
           messages: [{ content: PLAYGROUND_DEFAULT_SYSTEM_PROMPT }],
         },
@@ -72,7 +78,7 @@ export function useCreateDraftPrompt() {
     }, 100);
 
     return { defaultValues };
-  }, [addTab, project?.defaultModel]);
+  }, [addTab, modelMetadata, project?.defaultModel]);
 
   return { createDraftPrompt };
 }

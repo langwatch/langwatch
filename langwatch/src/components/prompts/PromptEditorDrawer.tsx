@@ -27,6 +27,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
@@ -49,6 +50,8 @@ import {
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;
@@ -153,6 +156,7 @@ const extractLocalConfig = (
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
+  const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const flowCallbacks = getFlowCallbacks("promptEditor");
@@ -351,9 +355,23 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       savedFormValuesRef.current = serverValues;
       methods.reset(formValues);
       setIsFormInitialized(true);
-    } else if (!promptId) {
-      // New prompt - use defaults
-      const defaults = buildDefaultFormValues();
+    } else if (!promptId && modelMetadata) {
+      // New prompt - use defaults with model's max tokens
+      // Wait for modelMetadata to be loaded before initializing
+      const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+      const defaultModelMetadata = modelMetadata[defaultModel];
+      const maxTokens = getMaxTokenLimit(defaultModelMetadata);
+
+      const defaults = buildDefaultFormValues({
+        version: {
+          configData: {
+            llm: {
+              model: defaultModel,
+              maxTokens,
+            },
+          },
+        },
+      });
       setConfigValues(defaults);
       methods.reset(defaults);
       setIsFormInitialized(true);
@@ -400,6 +418,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     isFormInitialized,
     availableSources,
     _onMappingsChangeProp,
+    modelMetadata,
+    project?.defaultModel,
   ]);
 
   // Reset when drawer closes
