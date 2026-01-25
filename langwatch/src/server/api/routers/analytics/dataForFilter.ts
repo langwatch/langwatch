@@ -1,13 +1,11 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { getAnalyticsService } from "../../../analytics/analytics.service";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { esClient, TRACE_INDEX } from "../../../elasticsearch";
 import { availableFilters } from "../../../filters/registry";
 import { filterFieldsEnum } from "../../../filters/types";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
-import { generateTracesPivotQueryConditions } from "./common";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -22,46 +20,31 @@ export const dataForFilter = protectedProcedure
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 
-    if (availableFilters[field].requiresKey && !key) {
+    const filterConfig = availableFilters[field]!;
+
+    if (filterConfig.requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a key to be defined`,
       });
     }
 
-    if (availableFilters[field].requiresSubkey && !subkey) {
+    if (filterConfig.requiresSubkey && !subkey) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a subkey to be defined`,
       });
     }
 
-    const { pivotIndexConditions } = generateTracesPivotQueryConditions({
-      ...input,
-      filters: {
-        ...(input.filters["topics.topics"]
-          ? { "topics.topics": input.filters["topics.topics"] }
-          : {}),
-      },
-    });
-
-    const client = await esClient({ projectId: input.projectId });
-    const response = await client.search({
-      index: TRACE_INDEX.for(input.startDate),
-      body: {
-        size: 0,
-        query: pivotIndexConditions,
-        aggs: availableFilters[field].listMatch.aggregation(
-          input.query,
-          key,
-          subkey,
-        ) as Record<string, AggregationsAggregationContainer>,
-      },
-    });
-
-    const results = availableFilters[field].listMatch.extract(
-      (response.aggregations ?? {}) as any,
+    const analyticsService = getAnalyticsService();
+    return analyticsService.getDataForFilter(
+      input.projectId,
+      field,
+      input.startDate,
+      input.endDate,
+      input.filters,
+      key,
+      subkey,
+      input.query,
     );
-
-    return { options: results };
   });
