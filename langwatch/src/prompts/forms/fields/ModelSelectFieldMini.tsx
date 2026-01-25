@@ -80,7 +80,6 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
           <Popover.Root positioning={{ placement: "bottom-start" }} closeOnInteractOutside={false}>
             <Popover.Trigger asChild>
               <HStack
-                width="2/3"
                 paddingY={2}
                 paddingX={3}
                 borderRadius="md"
