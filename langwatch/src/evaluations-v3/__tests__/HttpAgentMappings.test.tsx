@@ -176,11 +176,44 @@ describe("HTTP agent target shows input mapping section", () => {
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
-    // Both inputs should be missing since no mappings provided
+    // HTTP agents require at least one mapping, none provided = invalid
     expect(result.isValid).toBe(false);
+    // Both fields are listed as missing but marked as NOT required (optional)
     expect(result.missingMappings.length).toBe(2);
     expect(result.missingMappings.map((m) => m.fieldId)).toContain("thread_id");
     expect(result.missingMappings.map((m) => m.fieldId)).toContain("input");
+    // HTTP agent fields are optional (not individually required)
+    expect(result.missingMappings.every((m) => !m.isRequired)).toBe(true);
+  });
+
+  it("is valid when at least one HTTP agent input is mapped", () => {
+    const target = createHttpAgentTarget(
+      "http-partial",
+      [
+        { identifier: "thread_id", type: "str" },
+        { identifier: "input", type: "str" },
+        { identifier: "messages", type: "str" },
+      ],
+      `{"thread_id": "{{thread_id}}", "input": "{{input}}", "messages": {{messages}}}`,
+      {
+        [DEFAULT_TEST_DATA_ID]: {
+          // Only input is mapped, thread_id and messages are not
+          input: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
+        },
+      },
+    );
+
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
+
+    // Valid because at least one field is mapped
+    expect(result.isValid).toBe(true);
+    // Two fields are still missing but that's OK for HTTP agents
+    expect(result.missingMappings.length).toBe(2);
   });
 
   it("accepts value mappings for HTTP agent inputs", () => {
@@ -417,12 +450,12 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
 });
 
 // ============================================================================
-// Integration: HTTP agent works the same as code agent for mappings
+// Integration: HTTP agent vs code agent validation differences
 // ============================================================================
 
-describe("HTTP agent mappings work the same as code agent", () => {
-  it("HTTP agent and code agent have consistent validation behavior", () => {
-    // HTTP agent target
+describe("HTTP agent has different validation than code agent", () => {
+  it("HTTP agent is valid with partial mappings, code agent requires all", () => {
+    // HTTP agent target with partial mappings (only 'input' mapped)
     const httpTarget = createHttpAgentTarget(
       "http-target",
       [
@@ -430,10 +463,20 @@ describe("HTTP agent mappings work the same as code agent", () => {
         { identifier: "context", type: "str" },
       ],
       `{"input": "{{input}}", "context": "{{context}}"}`,
-      {},
+      {
+        [DEFAULT_TEST_DATA_ID]: {
+          input: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
+          // context is NOT mapped
+        },
+      },
     );
 
-    // Code agent target with same inputs
+    // Code agent target with same partial mappings
     const codeTarget: TargetConfig = {
       id: "code-target",
       type: "agent",
@@ -444,14 +487,52 @@ describe("HTTP agent mappings work the same as code agent", () => {
         { identifier: "context", type: "str" },
       ],
       outputs: [{ identifier: "output", type: "str" }],
-      mappings: {},
+      mappings: {
+        [DEFAULT_TEST_DATA_ID]: {
+          input: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
+          // context is NOT mapped
+        },
+      },
     };
 
-    // Both should have the same validation result
     const httpResult = getTargetMissingMappings(httpTarget, DEFAULT_TEST_DATA_ID);
     const codeResult = getTargetMissingMappings(codeTarget, DEFAULT_TEST_DATA_ID);
 
-    expect(httpResult.isValid).toBe(codeResult.isValid);
-    expect(httpResult.missingMappings.length).toBe(codeResult.missingMappings.length);
+    // HTTP agent is valid (at least one mapping)
+    expect(httpResult.isValid).toBe(true);
+
+    // Code agent is invalid (all fields required)
+    expect(codeResult.isValid).toBe(false);
+  });
+
+  it("both are invalid with no mappings", () => {
+    const httpTarget = createHttpAgentTarget(
+      "http-target",
+      [{ identifier: "input", type: "str" }],
+      `{"input": "{{input}}"}`,
+      {},
+    );
+
+    const codeTarget: TargetConfig = {
+      id: "code-target",
+      type: "agent",
+      agentType: "code",
+      name: "Code Agent",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+    };
+
+    const httpResult = getTargetMissingMappings(httpTarget, DEFAULT_TEST_DATA_ID);
+    const codeResult = getTargetMissingMappings(codeTarget, DEFAULT_TEST_DATA_ID);
+
+    // Both invalid with no mappings
+    expect(httpResult.isValid).toBe(false);
+    expect(codeResult.isValid).toBe(false);
   });
 });

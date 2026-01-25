@@ -18,9 +18,9 @@ import { toaster } from "~/components/ui/toaster";
 import {
   type AvailableSource,
   type FieldMapping,
+  type Variable,
   VariablesSection,
 } from "~/components/variables";
-import { extractVariablesFromBodyTemplate } from "~/evaluations-v3/utils/httpAgentUtils";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -59,6 +59,15 @@ const DEFAULT_BODY_TEMPLATE = `{
   "messages": {{messages}}
 }`;
 const DEFAULT_OUTPUT_PATH = "$.choices[0].message.content";
+
+// Fixed variables that cannot be removed
+const FIXED_VARIABLES: Variable[] = [
+  { identifier: "threadId", type: "str" },
+  { identifier: "input", type: "str" },
+  { identifier: "messages", type: "chat_messages" },
+];
+
+const FIXED_VARIABLE_IDS = new Set(FIXED_VARIABLES.map((v) => v.identifier));
 
 // ============================================================================
 // Helpers
@@ -184,10 +193,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     [onInputMappingsChange]
   );
 
-  // Note: variables are computed in a useMemo below after bodyTemplate state is defined
-
-  // Check if we should show the mappings tab (only when availableSources is provided)
-  const showMappingsTab = availableSources && availableSources.length > 0;
+  // Check if we should show the variables tab (only when availableSources is provided)
+  const showVariablesTab = availableSources && availableSources.length > 0;
 
   // Form state
   const [name, setName] = useState("");
@@ -198,31 +205,44 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
   const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  // Default to mappings tab when in evaluations context (has availableSources)
-  const [activeTab, setActiveTab] = useState(showMappingsTab ? "mappings" : "body");
+  // Custom variables (in addition to fixed ones)
+  const [customVariables, setCustomVariables] = useState<Variable[]>([]);
+  // Default to variables tab when in evaluations context (has availableSources)
+  const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
-  // Extract variables from body template for mappings
+  // All variables = fixed + custom
   const variables = useMemo(() => {
-    return extractVariablesFromBodyTemplate(bodyTemplate).map((name) => ({
-      identifier: name,
-      type: "str" as const,
-    }));
-  }, [bodyTemplate]);
+    return [...FIXED_VARIABLES, ...customVariables];
+  }, [customVariables]);
 
-  // Calculate missing mapping IDs for validation
-  // A variable is missing if it's in the body template but has no mapping
+  // Handle variable changes (only affects custom variables)
+  const handleVariablesChange = useCallback((newVariables: Variable[]) => {
+    // Filter out fixed variables - only keep custom ones
+    const newCustomVariables = newVariables.filter(
+      (v) => !FIXED_VARIABLE_IDS.has(v.identifier)
+    );
+    setCustomVariables(newCustomVariables);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Validation: at least one variable should have a mapping
+  const hasAtLeastOneMapping = useMemo(() => {
+    return variables.some((v) => localMappings[v.identifier]);
+  }, [variables, localMappings]);
+
+  // For highlighting: show which variables are missing mappings (but only as info, not error)
+  // Since all are optional, we don't require all to be filled - just at least one
   const missingMappingIds = useMemo(() => {
-    if (!showMappingsTab) {
+    if (!showVariablesTab) {
       return new Set<string>();
     }
-    const missing = new Set<string>();
-    for (const variable of variables) {
-      if (!localMappings[variable.identifier]) {
-        missing.add(variable.identifier);
-      }
+    // If at least one mapping exists, don't highlight any as missing
+    if (hasAtLeastOneMapping) {
+      return new Set<string>();
     }
-    return missing;
-  }, [showMappingsTab, variables, localMappings]);
+    // If no mappings, highlight all as needing attention
+    return new Set(variables.map((v) => v.identifier));
+  }, [showVariablesTab, variables, hasAtLeastOneMapping]);
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -521,10 +541,10 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   borderBottomWidth="1px"
                   borderColor="border"
                 >
-                  {showMappingsTab && (
-                    <Tabs.Trigger value="mappings">Mappings</Tabs.Trigger>
-                  )}
                   <Tabs.Trigger value="body">Body</Tabs.Trigger>
+                  {showVariablesTab && (
+                    <Tabs.Trigger value="variables">Variables</Tabs.Trigger>
+                  )}
                   <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
                   <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
                   <Tabs.Trigger value="test">Test</Tabs.Trigger>
@@ -566,10 +586,10 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   </VStack>
                 </Tabs.Content>
 
-                {/* Mappings Tab - only shown when availableSources is provided */}
-                {showMappingsTab && (
+                {/* Variables Tab - only shown when availableSources is provided */}
+                {showVariablesTab && (
                   <Tabs.Content
-                    value="mappings"
+                    value="variables"
                     flex={1}
                     overflowY="auto"
                     paddingX={6}
@@ -577,28 +597,35 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   >
                     <VStack gap={4} align="stretch">
                       <Text fontSize="sm" color="fg.muted">
-                        Map the variables in your body template to data from your
-                        evaluation dataset.
+                        Define variables to use in your body template (e.g.,{" "}
+                        <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
+                          {"{{input}}"}
+                        </Text>
+                        ) and map them to your evaluation dataset. At least one variable
+                        must be mapped.
                       </Text>
-                      {variables.length > 0 ? (
-                        <VariablesSection
-                          title="Input Variables"
-                          variables={variables}
-                          onChange={() => {}} // Variables are derived from body template
-                          showMappings={true}
-                          availableSources={availableSources}
-                          mappings={localMappings}
-                          onMappingChange={handleMappingChange}
-                          readOnly={true} // Variables come from body template
-                          missingMappingIds={missingMappingIds}
-                        />
-                      ) : (
-                        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-                          No variables found in body template. Add variables like{" "}
-                          <Text as="span" fontFamily="mono" bg="bg.subtle" paddingX={1}>
-                            {"{{variableName}}"}
-                          </Text>{" "}
-                          to your request body to map them to dataset columns.
+                      <VariablesSection
+                        title="Input Variables"
+                        variables={variables}
+                        onChange={handleVariablesChange}
+                        showMappings={true}
+                        availableSources={availableSources}
+                        mappings={localMappings}
+                        onMappingChange={handleMappingChange}
+                        canAddRemove={true}
+                        readOnly={false}
+                        lockedVariables={FIXED_VARIABLE_IDS}
+                        missingMappingIds={missingMappingIds}
+                        showMissingMappingsError={false}
+                        optionalHighlighting={true}
+                      />
+                      {!hasAtLeastOneMapping && (
+                        <Text
+                          data-testid="at-least-one-mapping-error"
+                          color="red.500"
+                          fontSize="sm"
+                        >
+                          At least one variable must be mapped
                         </Text>
                       )}
                     </VStack>

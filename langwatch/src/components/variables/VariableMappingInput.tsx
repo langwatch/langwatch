@@ -98,6 +98,8 @@ type VariableMappingInputProps = {
   disabled?: boolean;
   /** Whether this mapping is missing and should be highlighted */
   isMissing?: boolean;
+  /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
+  optionalHighlighting?: boolean;
 };
 
 /** Represents a selectable option in the dropdown */
@@ -182,6 +184,7 @@ export const VariableMappingInput = ({
   placeholder = "Enter value or select source...",
   disabled = false,
   isMissing = false,
+  optionalHighlighting = false,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -734,7 +737,7 @@ export const VariableMappingInput = ({
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={
-              isMissing
+              isMissing && !optionalHighlighting
                 ? "Required"
                 : isSourceMapping
                   ? ""

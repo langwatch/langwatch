@@ -2039,4 +2039,258 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       }
     }, 120000);
   });
+
+  describe("column name vs ID mapping", () => {
+    it("correctly handles real payload format with chat_messages and input fields", async () => {
+      // This test uses the EXACT format from a real frontend request
+      // Including the transposeColumnsFirstToRowsFirstWithId and JSON parsing steps
+      const { transposeColumnsFirstToRowsFirstWithId } = await import(
+        "~/optimization_studio/utils/datasetUtils"
+      );
+
+      const datasetColumns = [
+        { id: "input_0", name: "input", type: "string" },
+        { id: "expected_output_1", name: "expected_output", type: "string" },
+        { id: "messages_2", name: "messages", type: "chat_messages" },
+        { id: "thread_id_3", name: "thread_id", type: "string" },
+      ];
+
+      // This is EXACTLY what the frontend sends - columns-first format with JSON strings
+      const inlineRecords = {
+        input_0: ["How do I update my billing information?"],
+        expected_output_1: ["You can update your billing..."],
+        messages_2: ['[{"role": "user", "content": "hi"}]'], // JSON string
+        thread_id_3: ["1"],
+      };
+
+      // Step 1: Transpose (like the API route does)
+      let datasetRows = transposeColumnsFirstToRowsFirstWithId(inlineRecords);
+
+      // Step 2: Parse JSON columns (like the API route does)
+      const jsonColumns = new Set(
+        datasetColumns
+          .filter((c) =>
+            ["chat_messages", "json", "list", "spans", "rag_contexts"].includes(
+              c.type,
+            ),
+          )
+          .map((c) => c.id),
+      );
+      if (jsonColumns.size > 0) {
+        datasetRows = datasetRows.map((row) => {
+          const parsedRow = { ...row };
+          for (const colId of jsonColumns) {
+            const value = parsedRow[colId];
+            if (typeof value === "string" && value.trim()) {
+              try {
+                parsedRow[colId] = JSON.parse(value);
+              } catch {
+                // Keep original string if not valid JSON
+              }
+            }
+          }
+          return parsedRow;
+        });
+      }
+
+      // Verify the parsing worked
+      expect(datasetRows[0]?.messages_2).toEqual([
+        { role: "user", content: "hi" },
+      ]);
+      expect(datasetRows[0]?.input_0).toBe(
+        "How do I update my billing information?",
+      );
+
+      // HTTP Agent target that maps both messages and input
+      const httpAgentTarget: TargetConfig = {
+        id: "target_http",
+        type: "agent",
+        name: "HTTP Agent",
+        agentType: "http",
+        inputs: [
+          { identifier: "messages", type: "chat_messages" as "str" },
+          { identifier: "input", type: "str" },
+        ],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {
+          "test-data": {
+            messages: {
+              type: "source",
+              source: "dataset",
+              sourceId: "test-data",
+              sourceField: "messages", // Uses column NAME, not ID
+            },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "test-data",
+              sourceField: "input", // Uses column NAME, not ID
+            },
+          },
+        },
+        httpConfig: {
+          url: "https://httpbin.org/post",
+          method: "POST",
+          bodyTemplate:
+            '{"messages": {{messages}}, "input": "{{input}}", "model": "test"}',
+          outputPath: "$.json",
+        },
+      };
+
+      const state: EvaluationsV3State = {
+        name: "Test",
+        datasets: [{ id: "test-data", name: "Test Data", type: "inline" }],
+        activeDatasetId: "test-data",
+        targets: [httpAgentTarget],
+        evaluators: [],
+        results: createInitialResults(),
+        pendingSavedChanges: {},
+        ui: createInitialUIState(),
+      };
+
+      // Import the HTTP agent service to create a mock agent
+      const { AgentService } = await import("~/server/agents/agent.service");
+      const { prisma } = await import("~/server/db");
+      const agentService = AgentService.create(prisma);
+
+      // Create a temporary HTTP agent for this test
+      const agent = await agentService.create({
+        projectId: project.id,
+        name: "Test HTTP Agent",
+        type: "http",
+        config: {
+          name: "HTTP",
+          description: "Test HTTP agent",
+          url: "https://httpbin.org/post",
+          method: "POST",
+          bodyTemplate:
+            '{"messages": {{messages}}, "input": "{{input}}", "model": "test"}',
+          outputPath: "$.json",
+        },
+      });
+
+      try {
+        // Update target to use the real agent ID
+        httpAgentTarget.dbAgentId = agent.id;
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "cell", rowIndex: 0, targetId: "target_http" },
+          state,
+          datasetRows: datasetRows.map((row) => ({
+            _datasetId: "test-data",
+            ...row,
+          })),
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map([[agent.id, agent]]),
+        };
+
+        const events = await collectEvents(input);
+
+        // Find target result
+        const targetResult = events.find((e) => e.type === "target_result");
+        expect(targetResult).toBeDefined();
+
+        if (targetResult?.type === "target_result") {
+          // Should NOT have any error
+          expect(targetResult.error).toBeUndefined();
+
+          // Output should contain the echoed JSON from httpbin.org
+          expect(targetResult.output).toBeDefined();
+          const output = targetResult.output as Record<string, unknown>;
+
+          // Verify messages is a proper array (not over-escaped)
+          expect(output.messages).toEqual([{ role: "user", content: "hi" }]);
+
+          // Verify input is the correct value (not empty)
+          expect(output.input).toBe("How do I update my billing information?");
+
+          // Verify model is there too
+          expect(output.model).toBe("test");
+        }
+
+        // Should complete
+        const doneEvent = events[events.length - 1];
+        expect(doneEvent?.type).toBe("done");
+      } finally {
+        // Clean up agent
+        await agentService.softDelete({ id: agent.id, projectId: project.id });
+      }
+    }, 60000);
+
+    it("resolves column names to column IDs when columns have different ids and names", async () => {
+      // This test catches the bug where mappings use column NAME (e.g., "question")
+      // but datasetEntry keys use column ID (e.g., "question_0")
+      // This is how the real app works - column IDs are auto-generated like "input_0"
+      const targetWithNameMapping: TargetConfig = {
+        id: "target-1",
+        type: "prompt",
+        name: "Test Target",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {
+          "dataset-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "question", // Uses column NAME, not ID!
+            },
+          },
+        },
+        localPromptConfig: createPromptConfig(),
+      };
+
+      const state = createTestState([targetWithNameMapping]);
+
+      // Dataset with column ID != column name (like the real app)
+      const datasetRows = [
+        { question_0: "Say hello", expected_output_1: "hello" }, // Keys use column ID
+      ];
+      const datasetColumns = [
+        { id: "question_0", name: "question", type: "string" }, // ID != name
+        { id: "expected_output_1", name: "expected_output", type: "string" },
+      ];
+
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: { type: "full" },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events = await collectEvents(input);
+
+      // Should NOT have errors about empty input
+      const errorEvents = events.filter((e) => e.type === "error");
+      for (const event of errorEvents) {
+        if (event.type === "error") {
+          // Should not have errors related to missing/empty input
+          expect(event.message).not.toContain("empty");
+          expect(event.message).not.toContain("undefined");
+        }
+      }
+
+      // Should have a target_result
+      const targetResults = events.filter((e) => e.type === "target_result");
+      expect(targetResults.length).toBeGreaterThanOrEqual(1);
+
+      // Target should have succeeded (or at least got the input)
+      const targetResult = targetResults[0];
+      if (targetResult?.type === "target_result") {
+        // If there's an error, it shouldn't be about missing input
+        if (targetResult.error) {
+          expect(targetResult.error).not.toContain("input");
+        }
+      }
+
+      // Should complete
+      const doneEvent = events[events.length - 1];
+      expect(doneEvent?.type).toBe("done");
+    }, 60000);
+  });
 });

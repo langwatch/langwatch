@@ -81,6 +81,41 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   let loadedAgents: Map<string, TypedAgent>;
   let loadedEvaluators: Map<string, Evaluator>;
 
+  const parseRows = (
+    rows: Array<Record<string, unknown>>,
+    jsonColumns: Set<string>,
+  ) => {
+    return rows.map((row) => {
+      const parsedRow = { ...row };
+      for (const colId of jsonColumns) {
+        const value = parsedRow[colId];
+        if (typeof value === "string" && value.trim()) {
+          try {
+            parsedRow[colId] = JSON.parse(value);
+          } catch {
+            // Keep original string if not valid JSON
+          }
+        }
+      }
+      return parsedRow;
+    });
+  };
+
+  const getJsonColumns = (
+    columns: Array<{ id: string; name: string; type: string }>,
+    idOrName: "id" | "name",
+  ) => {
+    return new Set(
+      columns
+        .filter((c) =>
+          ["chat_messages", "json", "list", "spans", "rag_contexts"].includes(
+            c.type,
+          ),
+        )
+        .map((c) => idOrName === "id" ? c.id : c.name),
+    );
+  };
+
   try {
     // Load dataset
     const dataset = request.dataset;
@@ -89,6 +124,11 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
       datasetRows = transposeColumnsFirstToRowsFirstWithId(
         dataset.inline.records,
       );
+      // Parse JSON-type columns (chat_messages, json, list, etc.)
+      const jsonColumns = getJsonColumns(datasetColumns, "id");
+      if (jsonColumns.size > 0) {
+        datasetRows = parseRows(datasetRows, jsonColumns);
+      }
     } else if (dataset.type === "saved" && dataset.datasetId) {
       const fullDataset = await getFullDataset({
         datasetId: dataset.datasetId,
@@ -99,15 +139,26 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         return c.json({ error: "Dataset not found" }, { status: 404 });
       }
       datasetColumns = dataset.columns;
+      const jsonColumns = getJsonColumns(datasetColumns, "name");
+      console.log("jsonColumns", jsonColumns);
       datasetRows = fullDataset.datasetRecords.map(
         (r) => r.entry as Record<string, unknown>,
       );
+      console.log('datasetRows', datasetRows);
+      datasetRows = parseRows(datasetRows, jsonColumns);
+      console.log('datasetRows parsed', datasetRows);
     } else {
       return c.json(
         { error: "Invalid dataset configuration" },
         { status: 400 },
       );
     }
+
+    console.log(
+      "\n================[DEBUG] datasetRows",
+      datasetRows,
+      "\n======================\n",
+    );
 
     // Load prompts for prompt targets
     loadedPrompts = new Map();

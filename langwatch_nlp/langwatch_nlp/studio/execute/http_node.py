@@ -56,23 +56,34 @@ class HttpNodeResult:
 
 
 def interpolate_template(template: str, inputs: Dict[str, Any]) -> str:
-    """Replace {{variable}} placeholders with input values.
+    """Replace {{variable}} placeholders with input values using Liquid templates.
 
-    String values are JSON-escaped to ensure valid JSON output.
+    For JSON body templates:
+    - String values are JSON-escaped (without outer quotes) so they can be safely
+      embedded inside JSON strings: {"foo": "{{input}}"} works with special chars
+    - Non-string values (arrays, dicts) are JSON stringified so they can be
+      embedded directly: {"foo": {{messages}}} works with arrays/objects
+
+    Examples:
+        input='hello "world"' + template='{"x": "{{input}}"}' → '{"x": "hello \\"world\\""}'
+        messages=[{"role": "user"}] + template='{"x": {{messages}}}' → '{"x": [{"role": "user"}]}'
     """
     import json
+    import liquid
+    from langwatch_nlp.studio.utils import SerializableWithStringFallback
+    str_inputs: Dict[str, str] = {}
+    for k, v in inputs.items():
+        if isinstance(v, str):
+            # JSON-encode then strip outer quotes for safe embedding in JSON strings
+            # This escapes quotes, newlines, etc.
+            str_inputs[k] = json.dumps(v)[1:-1]
+        else:
+            # For arrays/dicts, JSON stringify for direct embedding
+            str_inputs[k] = json.dumps(v, cls=SerializableWithStringFallback)
 
-    def replace_placeholder(match: re.Match[str]) -> str:
-        var_name = match.group(1).strip()
-        value = inputs.get(var_name, "")
-        if isinstance(value, str):
-            # JSON-encode then strip outer quotes for embedding in template
-            return json.dumps(value)[1:-1]
-        # For non-string values, use JSON representation
-        return json.dumps(value)
+    result = liquid.render(template, **str_inputs)
 
-    pattern = r"\{\{([^}]+)\}\}"
-    return re.sub(pattern, replace_placeholder, template)
+    return result
 
 
 def extract_with_jsonpath(data: Any, path: str) -> Any:
@@ -117,12 +128,63 @@ def build_headers(config: HttpNodeConfig) -> Dict[str, str]:
     return headers
 
 
+def _is_private_ip(ip: str) -> bool:
+    """Check if an IP address is private/internal."""
+    import ipaddress
+    try:
+        ip_obj = ipaddress.ip_address(ip)
+        # Private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+        # Loopback: 127.0.0.0/8
+        # Link-local: 169.254.0.0/16
+        return ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local
+    except ValueError:
+        return False
+
+
+def _is_metadata_endpoint(hostname: str) -> bool:
+    """Check if hostname is a cloud metadata endpoint.
+
+    These are ALWAYS blocked regardless of environment.
+    """
+    # Cloud metadata IPs and hostnames
+    metadata_hosts = [
+        "169.254.169.254",  # AWS, GCP, Azure metadata
+        "metadata.google.internal",  # GCP
+        "metadata.goog",  # GCP
+        "metadata",  # Generic
+    ]
+    return hostname.lower() in metadata_hosts
+
+
 def _is_blocked_url(url: str) -> bool:
-    """Check if URL targets localhost or internal networks."""
+    """Check if URL targets localhost or internal networks.
+
+    SSRF Protection:
+    - ALWAYS blocks cloud metadata endpoints (169.254.169.254, etc.)
+    - In production: blocks private IPs, localhost, internal networks
+    - In development: allows hosts listed in ALLOWED_PROXY_HOSTS env var
+
+    DNS rebinding protection: resolves hostname and checks the IP.
+    """
+    import os
+    import socket
     from urllib.parse import urlparse
+
     parsed = urlparse(url.lower())
     hostname = parsed.hostname or ""
 
+    # ALWAYS block metadata endpoints - no exceptions
+    if _is_metadata_endpoint(hostname):
+        return True
+
+    # Check if host is in allowed list (for development)
+    allowed_hosts_str = os.environ.get("ALLOWED_PROXY_HOSTS", "")
+    allowed_hosts = [h.strip().lower() for h in allowed_hosts_str.split(",") if h.strip()]
+
+    if hostname in allowed_hosts:
+        return False  # Explicitly allowed
+
+    # Block common localhost variants
     blocked_hosts = [
         "localhost",
         "127.0.0.1",
@@ -131,20 +193,22 @@ def _is_blocked_url(url: str) -> bool:
         "[::1]",
     ]
 
-    # Block localhost and loopback
     if hostname in blocked_hosts:
         return True
 
-    # Block internal network ranges (basic check)
-    if hostname.startswith("10.") or hostname.startswith("192.168."):
+    # Check if hostname looks like an IP address
+    if _is_private_ip(hostname):
         return True
-    if hostname.startswith("172.") and len(hostname) > 4:
-        # 172.16.0.0 - 172.31.255.255
-        parts = hostname.split(".")
-        if len(parts) >= 2 and parts[1].isdigit():
-            second_octet = int(parts[1])
-            if 16 <= second_octet <= 31:
+
+    # DNS rebinding protection: resolve hostname and check the IP
+    try:
+        resolved_ips = socket.gethostbyname_ex(hostname)[2]
+        for ip in resolved_ips:
+            if _is_private_ip(ip) or _is_metadata_endpoint(ip):
                 return True
+    except socket.gaierror:
+        # DNS resolution failed - let the actual request fail
+        pass
 
     return False
 
@@ -162,6 +226,10 @@ async def execute_http_node(
     Returns:
         HttpNodeResult with success status, output or error
     """
+    # DEBUG: Log inputs received by HTTP node
+    print(f"[DEBUG] execute_http_node - inputs: {inputs}")
+    print(f"[DEBUG] execute_http_node - config.body_template: {config.body_template}")
+
     # Validate URL - block localhost and internal networks
     if _is_blocked_url(config.url):
         return HttpNodeResult(
@@ -191,9 +259,13 @@ async def execute_http_node(
 
             # Check for non-2xx status
             if not (200 <= response.status_code < 300):
+                # Include request body in error for debugging
+                error_msg = f"HTTP request failed with status {response.status_code}: {response.text}"
+                if body:
+                    error_msg += f"\n\nRequest body sent:\n{body}"
                 return HttpNodeResult(
                     success=False,
-                    error=f"HTTP request failed with status {response.status_code}: {response.text}",
+                    error=error_msg,
                     status_code=response.status_code,
                 )
 

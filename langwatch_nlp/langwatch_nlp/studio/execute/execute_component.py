@@ -49,8 +49,14 @@ async def execute_component(event: ExecuteComponentPayload):
                     component_code=code, class_name=class_name
                 ) as Module:
                     instance = Module(**kwargs)
+                    # HTTP nodes need all inputs for template interpolation, bypass autoparse
+                    # which would filter to only defined fields and stringify arrays
+                    if node.type == "http":
+                        forward_inputs = event.inputs
+                    else:
+                        forward_inputs = autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
                     result = await dspy.asyncify(instance)(
-                        **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
+                        **forward_inputs
                     )
 
         cost = result.cost if hasattr(result, "cost") else None

@@ -87,13 +87,43 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
   });
 
   /**
+   * Creates a mock TypedAgent for HTTP targets.
+   */
+  const createMockHttpAgent = (httpConfig: HttpConfig): import("~/server/agents/agent.repository").TypedAgent => ({
+    id: "mock-agent-1",
+    projectId: project?.id ?? "test-project",
+    name: "Mock HTTP Agent",
+    type: "http",
+    config: {
+      name: "HTTP",
+      description: "HTTP API endpoint",
+      url: httpConfig.url,
+      method: httpConfig.method,
+      bodyTemplate: httpConfig.bodyTemplate,
+      outputPath: httpConfig.outputPath,
+      headers: httpConfig.headers,
+      auth: httpConfig.auth,
+    } as HttpComponentConfig,
+    workflowId: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  /**
    * Executes a workflow through the NLP backend.
    */
   const executeWorkflow = async (
     cell: ExecutionCell,
-    datasetColumns: Array<{ id: string; name: string; type: string }>
+    datasetColumns: Array<{ id: string; name: string; type: string }>,
+    httpConfig?: HttpConfig
   ): Promise<StudioServerEvent[]> => {
     const events: StudioServerEvent[] = [];
+
+    // Build loadedData with mock agent if httpConfig provided
+    const loadedData = httpConfig
+      ? { agent: createMockHttpAgent(httpConfig) }
+      : {};
 
     const { workflow, targetNodeId } = buildCellWorkflow(
       {
@@ -101,8 +131,33 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
         cell,
         datasetColumns,
       },
-      {}
+      loadedData
     );
+
+    // Build inputs based on target's declared inputs and their mappings
+    const inputs: Record<string, unknown> = {};
+    const datasetId = cell.datasetEntry._datasetId as string | undefined;
+    const targetMappings = datasetId
+      ? (cell.targetConfig.mappings[datasetId] ?? {})
+      : {};
+
+    for (const input of cell.targetConfig.inputs ?? []) {
+      const mapping = targetMappings[input.identifier];
+      if (!mapping) continue;
+
+      if (mapping.type === "source" && mapping.source === "dataset") {
+        // Get value from dataset entry using the mapped sourceField
+        const value =
+          cell.datasetEntry[mapping.sourceField] ??
+          cell.datasetEntry[mapping.sourceId ?? ""];
+        if (value !== undefined) {
+          inputs[input.identifier] = value;
+        }
+      } else if (mapping.type === "value") {
+        // Use the literal value from the mapping
+        inputs[input.identifier] = mapping.value;
+      }
+    }
 
     const rawEvent = {
       type: "execute_component" as const,
@@ -113,7 +168,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
           state: { execution: { status: "idle" as const } },
         },
         node_id: targetNodeId,
-        inputs: { input: cell.datasetEntry.question as string },
+        inputs,
       },
     };
 
@@ -146,9 +201,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "Hello" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       // BUG: Currently this fails with "Code node has no source content for component Httpagent"
       // The error indicates the Python parser is routing HTTP nodes to the code case
@@ -197,9 +254,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "Test message" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const successEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -247,9 +306,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
 
       const cell = createCell(target, { question: "Hello world" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const successEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -281,9 +342,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "deep value" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const successEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -315,9 +378,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "test" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const successEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -348,9 +413,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "test" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const successEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -366,6 +433,123 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
     }, 60000);
   });
 
+  describe("HTTP node chat_messages interpolation", () => {
+    it("interpolates chat_messages array into body template without escaping", async () => {
+      // This test reproduces the bug where messages come through empty
+      // Template: {"messages": {{messages}}, "model": "gpt-5-nano"}
+      // Expected: messages array is JSON stringified and placed directly
+      const httpConfig: HttpConfig = {
+        url: "https://httpbin.org/post",
+        method: "POST",
+        bodyTemplate: '{"messages": {{messages}}, "model": "test-model"}',
+        outputPath: "$.json",
+      };
+
+      const target = createHttpAgentTarget(httpConfig, {
+        inputs: [
+          { identifier: "messages", type: "chat_messages" as "str" }, // chat_messages type
+        ],
+        mappings: {
+          "dataset-1": {
+            messages: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "messages",
+            },
+          },
+        },
+      });
+
+      // The dataset entry contains a chat_messages column with JSON array
+      const cell = createCell(target, {
+        messages: [{ role: "user", content: "hi" }],
+      });
+
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "messages", name: "messages", type: "chat_messages" }],
+        httpConfig
+      );
+
+      // Find error or success event
+      const errorEvent = events.find(
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+          e.type === "component_state_change" &&
+          e.payload.component_id === "http-target-1" &&
+          e.payload.execution_state?.status === "error"
+      );
+
+      const successEvent = events.find(
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+          e.type === "component_state_change" &&
+          e.payload.component_id === "http-target-1" &&
+          e.payload.execution_state?.status === "success"
+      );
+
+      // Should NOT have "Invalid JSON" error (this is the bug)
+      if (errorEvent) {
+        expect(errorEvent.payload.execution_state?.error).not.toContain(
+          "Invalid JSON"
+        );
+      }
+
+      // Should succeed and have the messages in the output
+      expect(successEvent).toBeDefined();
+      expect(successEvent?.payload.execution_state?.outputs?.output).toMatchObject({
+        messages: [{ role: "user", content: "hi" }],
+        model: "test-model",
+      });
+    }, 60000);
+
+    it("interpolates string with special chars into quoted template position", async () => {
+      // Test that strings with quotes/newlines are properly escaped
+      const httpConfig: HttpConfig = {
+        url: "https://httpbin.org/post",
+        method: "POST",
+        bodyTemplate: '{"input": "{{input}}"}',
+        outputPath: "$.json",
+      };
+
+      const target = createHttpAgentTarget(httpConfig, {
+        inputs: [{ identifier: "input", type: "str" }],
+        mappings: {
+          "dataset-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "input",
+            },
+          },
+        },
+      });
+
+      // Input with special chars that need escaping
+      const cell = createCell(target, {
+        input: 'hello "world"\nline2',
+      });
+
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "input", name: "input", type: "string" }],
+        httpConfig
+      );
+
+      const successEvent = events.find(
+        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+          e.type === "component_state_change" &&
+          e.payload.component_id === "http-target-1" &&
+          e.payload.execution_state?.status === "success"
+      );
+
+      expect(successEvent).toBeDefined();
+      expect(successEvent?.payload.execution_state?.outputs?.output).toMatchObject({
+        input: 'hello "world"\nline2',
+      });
+    }, 60000);
+  });
+
   describe("HTTP node error handling", () => {
     it("returns error for connection failure", async () => {
       const httpConfig: HttpConfig = {
@@ -377,9 +561,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "test" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const errorEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
@@ -401,9 +587,11 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       const target = createHttpAgentTarget(httpConfig);
       const cell = createCell(target, { question: "test" });
 
-      const events = await executeWorkflow(cell, [
-        { id: "question", name: "question", type: "string" },
-      ]);
+      const events = await executeWorkflow(
+        cell,
+        [{ id: "question", name: "question", type: "string" }],
+        httpConfig
+      );
 
       const errorEvent = events.find(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>

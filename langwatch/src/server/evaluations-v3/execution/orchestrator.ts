@@ -255,7 +255,7 @@ export async function* executeCell(
             state: { execution: { status: "idle" as const } },
           },
           node_id: targetNodeId,
-          inputs: buildTargetInputs(cell),
+          inputs: buildTargetInputs(cell, datasetColumns),
         },
       };
 
@@ -338,6 +338,7 @@ export async function* executeCell(
             cell,
             evaluatorId,
             targetOutput,
+            datasetColumns,
           );
 
           // Create execute_component event for evaluator
@@ -417,10 +418,17 @@ const buildEvaluatorInputs = (
   cell: ExecutionCell,
   evaluatorId: string,
   targetOutput: Record<string, unknown>,
+  datasetColumns: Array<{ id: string; name: string; type: string }>,
 ): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return inputs;
+
+  // Helper to resolve column name to column ID
+  const getColumnId = (columnName: string): string => {
+    const column = datasetColumns.find((c) => c.name === columnName);
+    return column?.id ?? columnName;
+  };
 
   // Find the evaluator config
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
@@ -432,8 +440,9 @@ const buildEvaluatorInputs = (
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source") {
       if (mapping.source === "dataset") {
-        // From dataset entry
-        inputs[inputField] = cell.datasetEntry[mapping.sourceField];
+        // From dataset entry - use column ID, not name
+        const columnId = getColumnId(mapping.sourceField);
+        inputs[inputField] = cell.datasetEntry[columnId] ?? cell.datasetEntry[mapping.sourceField];
       } else if (
         mapping.source === "target" &&
         mapping.sourceId === cell.targetId
@@ -452,19 +461,33 @@ const buildEvaluatorInputs = (
 /**
  * Builds the input values for a target from the cell's dataset entry.
  */
-const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
+const buildTargetInputs = (
+  cell: ExecutionCell,
+  datasetColumns: Array<{ id: string; name: string; type: string }>,
+): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return inputs;
 
+  // Helper to resolve column name to column ID
+  // sourceField in mappings is the column name, but datasetEntry uses column ID as key
+  const getColumnId = (columnName: string): string => {
+    const column = datasetColumns.find((c) => c.name === columnName);
+    return column?.id ?? columnName;
+  };
+
   const mappings = cell.targetConfig.mappings[datasetId] ?? {};
+
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
-      inputs[inputField] = cell.datasetEntry[mapping.sourceField];
+      const columnId = getColumnId(mapping.sourceField);
+      inputs[inputField] = cell.datasetEntry[columnId] ?? cell.datasetEntry[mapping.sourceField];
     } else if (mapping.type === "value") {
       inputs[inputField] = mapping.value;
     }
   }
+
+  console.log('\n\n=====================input=============\n\n', mappings, inputs);
 
   return inputs;
 };

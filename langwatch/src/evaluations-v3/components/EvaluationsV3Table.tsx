@@ -849,11 +849,13 @@ export function EvaluationsV3Table({
   const targetIdsKey = targets.map((r) => r.id).join(",");
   const targetIds = useMemo(() => targets.map((r) => r.id), [targetIdsKey]);
 
-  // Similarly stabilize dataset column IDs
-  const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
+  // Similarly stabilize dataset columns - include type in key so icon updates when type changes
+  const datasetColumnsKey = datasetColumns
+    .map((c) => `${c.id}:${c.type}`)
+    .join(",");
   const stableDatasetColumns = useMemo(
     () => datasetColumns,
-    [datasetColumnIdsKey],
+    [datasetColumnsKey],
   );
 
   // Build table meta for passing dynamic data to headers/cells

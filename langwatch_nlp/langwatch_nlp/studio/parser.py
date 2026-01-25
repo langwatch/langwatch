@@ -298,37 +298,14 @@ def parse_component(
                     params,
                 )
         case "http":
-            from langwatch_nlp.studio.types.dsl import Http
+            # HTTP config is stored in parameters like other node types
+            params = parse_fields(node.data.parameters or [], autoparse=True)
 
-            if not isinstance(node.data, Http):
+            # Validate required fields
+            if not params.get("url"):
                 raise ValueError(
-                    f"HTTP node {node.data.name} has invalid data type"
+                    f"HTTP config 'url' not specified for HTTP node {node.data.name}"
                 )
-
-            # Support both nested (http_config) and flat (url, bodyTemplate, etc.) formats
-            http_config = node.data.get_http_config()
-            if not http_config:
-                raise ValueError(
-                    f"HTTP config not specified for HTTP node {node.data.name}"
-                )
-
-            params = {
-                "url": http_config.url,
-                "method": http_config.method,
-                "body_template": http_config.body_template,
-                "output_path": http_config.output_path,
-                "headers": http_config.headers,
-                "timeout_ms": http_config.timeout_ms,
-            }
-
-            # Add auth params if configured
-            if http_config.auth:
-                params["auth_type"] = http_config.auth.type
-                params["auth_token"] = http_config.auth.token
-                params["auth_header"] = http_config.auth.header
-                params["auth_value"] = http_config.auth.value
-                params["auth_username"] = http_config.auth.username
-                params["auth_password"] = http_config.auth.password
 
             return (
                 "from langwatch_nlp.studio.dspy.http_node import HttpNode",
