@@ -157,6 +157,7 @@ export class EventSourcingService<
 
     this.queueManager = new QueueProcessorManager<EventType>({
       aggregateType,
+      pipelineName: this.pipelineName,
       queueProcessorFactory,
       featureFlagService: this.featureFlagService,
     });
