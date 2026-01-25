@@ -54,6 +54,7 @@ export function CreateProjectDrawer({
           void queryClient.organization.getAll.invalidate();
           void queryClient.limits.getUsage.invalidate();
           void queryClient.team.getTeamsWithMembers.invalidate();
+          void queryClient.team.getTeamById.invalidate();
 
           trackEvent("project_created", {
             project_slug: result.projectSlug,
@@ -62,7 +63,7 @@ export function CreateProjectDrawer({
           });
 
           toaster.create({
-            title: "Project Created",
+            title: "Project created",
             description: `Successfully created ${result.projectSlug}`,
             type: "success",
             meta: { closable: true },

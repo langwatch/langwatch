@@ -34,6 +34,8 @@ import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
+import { CreateTeamDrawer } from "./teams/CreateTeamDrawer";
+import { EditTeamDrawer } from "./teams/EditTeamDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
@@ -81,6 +83,9 @@ export const drawers = {
   scenarioEditor: ScenarioFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  // Team management
+  createTeam: CreateTeamDrawer,
+  editTeam: EditTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

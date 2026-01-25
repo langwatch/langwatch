@@ -1,4 +1,4 @@
-import { TeamUserRole } from "@prisma/client";
+import { type Prisma, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -49,6 +49,37 @@ const teamMemberRoleSchema = z
   });
 
 export const teamRouter = createTRPCRouter({
+  getTeamById: protectedProcedure
+    .input(z.object({ teamId: z.string() }))
+    .use(checkTeamPermission("team:view"))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      const team = await prisma.team.findUnique({
+        where: {
+          id: input.teamId,
+        },
+        include: {
+          members: {
+            include: {
+              user: true,
+              assignedRole: true,
+            },
+          },
+          projects: {
+            where: {
+              archivedAt: null,
+            },
+          },
+        },
+      });
+
+      if (!team) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      }
+
+      return team;
+    }),
   getBySlug: protectedProcedure
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
     .use(
@@ -151,7 +182,7 @@ export const teamRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
-        const updateData: any = {
+        const updateData: Prisma.TeamUpdateInput = {
           name: input.name,
         };
 

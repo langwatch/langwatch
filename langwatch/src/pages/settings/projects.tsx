@@ -195,7 +195,7 @@ export function TeamProjectsList({
       {team.projects.length === 0 && (
         <Table.Row>
           <Table.Cell colSpan={2}>
-            <Text>No projects on this team</Text>
+            <Text>No projects yet</Text>
           </Table.Cell>
         </Table.Row>
       )}
