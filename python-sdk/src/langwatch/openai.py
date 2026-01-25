@@ -296,6 +296,9 @@ class OpenAICompletionTracer:
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
+                reasoning_tokens=safe_get(
+                    response, "usage", "completion_tokens_details", "reasoning_tokens"
+                ),
             ),
             timestamps=timestamps,
             **kwargs,
@@ -336,22 +339,31 @@ class OpenAICompletionTracer:
             if len(outputs) == 0
             else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
         )
-        params = SpanParams(
-            temperature=kwargs.get("temperature", 1.0),
-            stream=kwargs.get("stream", False),
-        )
-        functions = kwargs.get("functions", None)
-        if functions:
-            params["functions"] = functions
-        tools = kwargs.get("tools", None)
-        if tools:
-            params["tools"] = tools
-        tool_choice = kwargs.get("tool_choice", None)
-        if tool_choice:
-            params["tool_choice"] = tool_choice
-        response_format = kwargs.get("response_format", None)
-        if response_format:
-            params["response_format"] = response_format
+        span_params = SpanParams()
+        param_names = [
+            "frequency_penalty",
+            "logit_bias",
+            "logprobs",
+            "top_logprobs",
+            "max_tokens",
+            "n",
+            "presence_penalty",
+            "seed",
+            "stop",
+            "stream",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "parallel_tool_calls",
+            "functions",
+            "user",
+            "response_format",
+            "reasoning_effort",
+        ]
+        for param in param_names:
+            if kwargs.get(param) is not None:
+                span_params[param] = kwargs.get(param)
 
         vendor = (
             "azure"
@@ -367,7 +379,7 @@ class OpenAICompletionTracer:
             ),
             output=output,
             error=error,
-            params=params,
+            params=span_params,
             metrics=metrics,
             timestamps=timestamps,
         )
@@ -611,6 +623,9 @@ class OpenAIChatCompletionTracer:
                 SpanMetrics(
                     prompt_tokens=usage.prompt_tokens if usage else None,
                     completion_tokens=usage.completion_tokens if usage else None,
+                    reasoning_tokens=safe_get(
+                        usage, "completion_tokens_details", "reasoning_tokens"
+                    ),
                 )
                 if usage
                 else SpanMetrics()
@@ -643,6 +658,9 @@ class OpenAIChatCompletionTracer:
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
+                reasoning_tokens=safe_get(
+                    response, "usage", "completion_tokens_details", "reasoning_tokens"
+                ),
             ),
             timestamps=timestamps,
             **kwargs,
@@ -683,22 +701,31 @@ class OpenAIChatCompletionTracer:
             if len(outputs) == 0
             else outputs[0] if len(outputs) == 1 else {"type": "list", "value": outputs}
         )
-        params = SpanParams(
-            temperature=kwargs.get("temperature", 1.0),
-            stream=kwargs.get("stream", False),
-        )
-        functions = kwargs.get("functions", None)
-        if functions:
-            params["functions"] = functions
-        tools = kwargs.get("tools", None)
-        if tools:
-            params["tools"] = tools
-        tool_choice = kwargs.get("tool_choice", None)
-        if tool_choice:
-            params["tool_choice"] = tool_choice
-        response_format = kwargs.get("response_format", None)
-        if response_format:
-            params["response_format"] = response_format
+        span_params = SpanParams()
+        param_names = [
+            "frequency_penalty",
+            "logit_bias",
+            "logprobs",
+            "top_logprobs",
+            "max_tokens",
+            "n",
+            "presence_penalty",
+            "seed",
+            "stop",
+            "stream",
+            "temperature",
+            "top_p",
+            "tools",
+            "tool_choice",
+            "parallel_tool_calls",
+            "functions",
+            "user",
+            "response_format",
+            "reasoning_effort",
+        ]
+        for param in param_names:
+            if kwargs.get(param) is not None:
+                span_params[param] = kwargs.get(param)
 
         vendor = (
             "azure"
@@ -714,7 +741,7 @@ class OpenAIChatCompletionTracer:
             ),
             output=output,
             error=error,
-            params=params,
+            params=span_params,
             metrics=metrics,
             timestamps=timestamps,
         )

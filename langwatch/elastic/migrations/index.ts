@@ -21,6 +21,7 @@ import * as add_simulations_trace_id from "./202508311847_add_simulations_trace_
 import * as add_evaluation_thread_id_and_inputs from "./202510031800_add_evaluation_thread_id_and_inputs";
 import * as add_scenario_name_keyword from "./202512171410_add_scenario_name_keyword";
 import * as migrate_batch_evals_index from "./202601161600_migrate_batch_evals_index";
+import * as add_reasoning_tokens from "./202601251530_add_reasoning_tokens";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -46,6 +47,7 @@ export const migrations = {
     add_evaluation_thread_id_and_inputs,
   "202512171410_add_scenario_name_keyword": add_scenario_name_keyword,
   "202601161600_migrate_batch_evals_index": migrate_batch_evals_index,
+  "202601251530_add_reasoning_tokens": add_reasoning_tokens,
 };
 
 // Export the migrations object for use in other modules

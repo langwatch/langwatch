@@ -824,6 +824,7 @@ class DSPyTracer:
                 "functions",
                 "user",
                 "response_format",
+                "reasoning_effort",
             ]
             for param in params:
                 if all_kwargs.get(param):
@@ -853,12 +854,17 @@ class DSPyTracer:
                 and "prompt_tokens" in history["usage"]
                 and span
             ):
-                span.update(
-                    metrics={
-                        "completion_tokens": history["usage"]["completion_tokens"],
-                        "prompt_tokens": history["usage"]["prompt_tokens"],
-                    }
-                )
+                metrics = {
+                    "completion_tokens": history["usage"]["completion_tokens"],
+                    "prompt_tokens": history["usage"]["prompt_tokens"],
+                }
+                # Capture reasoning_tokens if available
+                completion_details = history["usage"].get("completion_tokens_details")
+                if completion_details is not None:
+                    reasoning_tokens = getattr(completion_details, "reasoning_tokens", None)
+                    if reasoning_tokens is not None:
+                        metrics["reasoning_tokens"] = reasoning_tokens
+                span.update(metrics=metrics)
 
             return result
 
@@ -898,12 +904,17 @@ class DSPyTracer:
                 and "completion_tokens" in result["usage"]
                 and "prompt_tokens" in result["usage"]
             ):
-                span.update(
-                    metrics={
-                        "completion_tokens": result["usage"]["completion_tokens"],
-                        "prompt_tokens": result["usage"]["prompt_tokens"],
-                    }
-                )
+                metrics = {
+                    "completion_tokens": result["usage"]["completion_tokens"],
+                    "prompt_tokens": result["usage"]["prompt_tokens"],
+                }
+                # Capture reasoning_tokens if available
+                completion_details = result["usage"].get("completion_tokens_details")
+                if completion_details is not None:
+                    reasoning_tokens = getattr(completion_details, "reasoning_tokens", None)
+                    if reasoning_tokens is not None:
+                        metrics["reasoning_tokens"] = reasoning_tokens
+                span.update(metrics=metrics)
 
             return result
 

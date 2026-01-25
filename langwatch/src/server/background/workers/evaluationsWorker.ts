@@ -450,7 +450,11 @@ export const runEvaluation = async ({
     (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
   );
 
-  const setupModelEnv = async (model: string, embeddings: boolean) => {
+  const setupModelEnv = async (
+    model: string,
+    embeddings: boolean,
+    settings?: Record<string, unknown>,
+  ) => {
     const modelProviders = await getProjectModelProviders(projectId);
     const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
@@ -482,6 +486,27 @@ export const runEvaluation = async ({
       ]),
     );
 
+    // Add generation params from settings (temperature, max_tokens, reasoning_effort, etc.)
+    // These will be injected by litellm_patch.py in langevals
+    const generationParams = [
+      "temperature",
+      "max_tokens",
+      "top_p",
+      "frequency_penalty",
+      "presence_penalty",
+      "seed",
+      "reasoning_effort",
+    ];
+    for (const param of generationParams) {
+      const value = settings?.[param];
+      if (value !== undefined && value !== null) {
+        const envKey = embeddings
+          ? `X_LITELLM_EMBEDDINGS_${param}`
+          : `X_LITELLM_${param}`;
+        env[envKey] = String(value);
+      }
+    }
+
     // TODO: adapt embeddings_model_to_langchain on langevals to also use litellm and not need this
     if (embeddings) {
       env = { ...env, ...prepareEnvKeys(modelProvider) };
@@ -498,7 +523,7 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.model, false)),
+      ...(await setupModelEnv(settings.model, false, settings)),
     };
   }
 
@@ -509,7 +534,7 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.embeddings_model, true)),
+      ...(await setupModelEnv(settings.embeddings_model, true, settings)),
     };
   }
 

@@ -29,6 +29,7 @@ export interface ChatMessage {
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
   name?: string | null;
+  reasoning_content?: string | null;
 }
 
 export type ChatRichContent =
@@ -132,6 +133,7 @@ export interface ErrorCapture {
 export interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
+  reasoning_tokens?: number | null;
   tokens_estimated?: boolean | null;
   cost?: number | null;
 }
@@ -154,6 +156,7 @@ export type ReservedSpanParams = {
   parallel_tool_calls?: boolean | null;
   functions?: Record<string, any>[] | null;
   user?: string | null;
+  reasoning_effort?: string | null;
 };
 
 export type SpanParams = ReservedSpanParams & Record<string, any>;
@@ -306,6 +309,7 @@ export type Trace = {
     total_time_ms?: number | null;
     prompt_tokens?: number | null;
     completion_tokens?: number | null;
+    reasoning_tokens?: number | null;
     total_cost?: number | null;
     tokens_estimated?: boolean | null;
   };
