@@ -131,8 +131,8 @@ describe("TargetVariablesPanel", () => {
   describe("missing mappings warning", () => {
     it("shows warning when inputs are not mapped", () => {
       renderComponent();
-      // context is not mapped
-      const warning = screen.getByText(/1 input not mapped/i);
+      // context is not mapped - shows validation error
+      const warning = screen.getByTestId("missing-mappings-error");
       expect(warning).toBeInTheDocument();
       // The warning text should contain "context"
       expect(warning.textContent).toContain("context");
@@ -161,12 +161,16 @@ describe("TargetVariablesPanel", () => {
       };
 
       renderComponent({ target: fullyMappedTarget });
-      expect(screen.queryByText(/input.*not mapped/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("missing-mappings-error"),
+      ).not.toBeInTheDocument();
     });
 
     it("hides warning in readOnly mode", () => {
       renderComponent({ readOnly: true });
-      expect(screen.queryByText(/input.*not mapped/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("missing-mappings-error"),
+      ).not.toBeInTheDocument();
     });
   });
 

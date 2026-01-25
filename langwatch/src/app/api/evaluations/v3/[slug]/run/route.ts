@@ -11,7 +11,6 @@
  * - SSE: Add "Accept: text/event-stream" header for real-time streaming
  */
 
-import type { Evaluator } from "@prisma/client";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -23,19 +22,13 @@ import {
   type EvaluationsV3State,
 } from "~/evaluations-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import { AgentService } from "~/server/agents/agent.service";
-import { getFullDataset } from "~/server/api/routers/datasetRecord";
 import { prisma } from "~/server/db";
+import { loadExecutionData } from "~/server/evaluations-v3/execution/dataLoader";
 import { runOrchestrator } from "~/server/evaluations-v3/execution/orchestrator";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
-import { EvaluatorService } from "~/server/evaluators/evaluator.service";
-import {
-  PromptService,
-  type VersionedPrompt,
-} from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -102,129 +95,6 @@ const loadExperiment = async (projectId: string, slug: string) => {
 };
 
 /**
- * Load execution data (dataset, prompts, agents) from workbenchState
- */
-const loadExecutionData = async (
-  projectId: string,
-  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
-) => {
-  const dataset = workbenchState.datasets[0];
-  if (!dataset) {
-    return { error: "No dataset configured", status: 400 as const };
-  }
-
-  let datasetRows: Array<Record<string, unknown>>;
-  let datasetColumns: Array<{ id: string; name: string; type: string }>;
-
-  // Load dataset
-  if (dataset.type === "inline" && dataset.inline) {
-    datasetColumns = dataset.inline.columns;
-    datasetRows = transposeColumnsFirstToRowsFirstWithId(
-      dataset.inline.records,
-    );
-  } else if (dataset.type === "saved" && dataset.datasetId) {
-    const fullDataset = await getFullDataset({
-      datasetId: dataset.datasetId,
-      projectId,
-      entrySelection: "all",
-    });
-    if (!fullDataset) {
-      return { error: "Dataset not found", status: 404 as const };
-    }
-    datasetColumns = dataset.columns;
-    datasetRows = fullDataset.datasetRecords.map(
-      (r) => r.entry as Record<string, unknown>,
-    );
-  } else {
-    return { error: "Invalid dataset configuration", status: 400 as const };
-  }
-
-  // Load prompts for prompt targets
-  const loadedPrompts = new Map<string, VersionedPrompt>();
-  const promptService = new PromptService(prisma);
-
-  for (const target of workbenchState.targets) {
-    if (target.type === "prompt" && target.promptId) {
-      try {
-        const prompt = await promptService.getPromptByIdOrHandle({
-          idOrHandle: target.promptId,
-          projectId,
-          version: target.promptVersionNumber ?? undefined,
-        });
-        if (prompt) {
-          loadedPrompts.set(target.promptId, prompt);
-        } else {
-          const versionInfo = target.promptVersionNumber
-            ? ` version ${target.promptVersionNumber}`
-            : "";
-          return {
-            error: `Prompt "${target.name}"${versionInfo} not found`,
-            status: 404 as const,
-          };
-        }
-      } catch (promptError) {
-        const versionInfo = target.promptVersionNumber
-          ? ` version ${target.promptVersionNumber}`
-          : "";
-        logger.error(
-          {
-            error: promptError,
-            promptId: target.promptId,
-            version: target.promptVersionNumber,
-          },
-          "Failed to load prompt for target",
-        );
-        return {
-          error: `Failed to load prompt "${target.name}"${versionInfo}: ${(promptError as Error).message}`,
-          status: 404 as const,
-        };
-      }
-    }
-  }
-
-  // Load agents for agent targets
-  const loadedAgents = new Map<string, TypedAgent>();
-  const agentService = AgentService.create(prisma);
-
-  for (const target of workbenchState.targets) {
-    if (target.type === "agent" && target.dbAgentId) {
-      const agent = await agentService.getById({
-        id: target.dbAgentId,
-        projectId,
-      });
-      if (agent) {
-        loadedAgents.set(target.dbAgentId, agent);
-      }
-    }
-  }
-
-  // Load evaluators from DB (settings are always fetched fresh)
-  const loadedEvaluators = new Map<string, Evaluator>();
-  const evaluatorService = EvaluatorService.create(prisma);
-
-  for (const evaluator of workbenchState.evaluators) {
-    if (evaluator.dbEvaluatorId) {
-      const dbEvaluator = await evaluatorService.getById({
-        id: evaluator.dbEvaluatorId,
-        projectId,
-      });
-      if (dbEvaluator) {
-        loadedEvaluators.set(evaluator.dbEvaluatorId, dbEvaluator);
-      }
-    }
-  }
-
-  return {
-    datasetRows,
-    datasetColumns,
-    loadedPrompts,
-    loadedAgents,
-    loadedEvaluators,
-    dataset,
-  };
-};
-
-/**
  * Build state object for orchestrator
  */
 const buildState = (
@@ -283,11 +153,27 @@ app.post("/:slug/run", async (c) => {
   }
   const { experiment, workbenchState } = loadResult;
 
-  // Load execution data
-  const dataResult = await loadExecutionData(project.id, workbenchState);
-  if ("error" in dataResult) {
-    return c.json({ error: dataResult.error }, { status: dataResult.status });
+  // Get dataset config
+  const dataset = workbenchState.datasets[0];
+  if (!dataset) {
+    return c.json({ error: "No dataset configured" }, { status: 400 });
   }
+
+  // Load execution data using shared loader
+  const dataResult = await loadExecutionData(
+    project.id,
+    dataset,
+    workbenchState.targets,
+    workbenchState.evaluators,
+  );
+
+  if ("error" in dataResult) {
+    return c.json(
+      { error: dataResult.error },
+      { status: dataResult.status as 400 | 404 },
+    );
+  }
+
   const {
     datasetRows,
     datasetColumns,

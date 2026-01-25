@@ -366,7 +366,7 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
     },
   };
 
-  it("HTTP agent editor drawer shows Mappings tab when availableSources provided", async () => {
+  it("HTTP agent editor drawer shows Variables tab when availableSources provided", async () => {
     render(
       <AgentHttpEditorDrawer
         open={true}
@@ -378,12 +378,12 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
     );
 
     await waitFor(() => {
-      // The Mappings tab should be visible when availableSources is provided
-      expect(screen.getByText("Mappings")).toBeInTheDocument();
+      // The Variables tab should be visible when availableSources is provided
+      expect(screen.getByText("Variables")).toBeInTheDocument();
     });
   });
 
-  it("HTTP agent editor drawer hides Mappings tab when no availableSources", async () => {
+  it("HTTP agent editor drawer hides Variables tab when no availableSources", async () => {
     render(
       <AgentHttpEditorDrawer open={true} onClose={vi.fn()} />,
       { wrapper: Wrapper }
@@ -394,11 +394,11 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
       expect(screen.getByText("Body")).toBeInTheDocument();
     });
 
-    // The Mappings tab should NOT be visible when no availableSources
-    expect(screen.queryByText("Mappings")).not.toBeInTheDocument();
+    // The Variables tab should NOT be visible when no availableSources
+    expect(screen.queryByText("Variables")).not.toBeInTheDocument();
   });
 
-  it("Mappings tab shows extracted variables from body template", async () => {
+  it("Variables tab shows extracted variables from body template", async () => {
     const user = userEvent.setup();
     render(
       <AgentHttpEditorDrawer
@@ -411,11 +411,11 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Mappings")).toBeInTheDocument();
+      expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
-    // Click on the Mappings tab
-    await user.click(screen.getByText("Mappings"));
+    // Click on the Variables tab
+    await user.click(screen.getByText("Variables"));
 
     // The default body template has {{input}}, {{threadId}}, and {{messages}}
     await waitFor(() => {

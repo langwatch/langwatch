@@ -61,7 +61,18 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      delete: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          isPending: false,
+        }),
+      },
     },
+    useContext: () => ({
+      agents: {
+        getAll: { invalidate: vi.fn() },
+      },
+    }),
   },
 }));
 

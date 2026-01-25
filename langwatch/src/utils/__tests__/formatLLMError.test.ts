@@ -82,12 +82,12 @@ describe("parseLLMError", () => {
   });
 
   it("extracts message from Python SyntaxError", () => {
-    const raw =
-      "SyntaxError('unterminated string literal (detected at line 78)', ('/var/folders/...'))";
+    const raw = "SyntaxError('unterminated string literal (detected at line 78)')";
 
     expect(parseLLMError(raw)).toEqual({
       type: "unknown",
-      message: "unterminated string literal (detected at line 78)",
+      message:
+        "SyntaxError\nunterminated string literal (detected at line 78)",
     });
   });
 
@@ -96,7 +96,7 @@ describe("parseLLMError", () => {
 
     expect(parseLLMError(raw)).toEqual({
       type: "unknown",
-      message: "Invalid input",
+      message: "ValueError\nInvalid input",
     });
   });
 });

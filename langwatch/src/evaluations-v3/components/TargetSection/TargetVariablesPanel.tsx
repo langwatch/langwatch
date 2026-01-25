@@ -249,6 +249,7 @@ export const TargetVariablesPanel = ({
         readOnly={readOnly}
         title="Input Variables"
         missingMappingIds={missingMappingIds}
+        showMissingMappingsError={!readOnly}
       />
 
       {/* Helper text */}

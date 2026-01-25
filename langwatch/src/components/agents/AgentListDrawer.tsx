@@ -260,13 +260,13 @@ function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
       width="full"
       _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
       transition="all 0.15s"
+      cursor="pointer"
+      onClick={onClick}
       data-testid={`agent-card-${agent.id}`}
     >
       <HStack gap={3}>
         {/* Clickable area for selection */}
         <Box
-          as="button"
-          onClick={onClick}
           display="flex"
           alignItems="center"
           gap={3}
