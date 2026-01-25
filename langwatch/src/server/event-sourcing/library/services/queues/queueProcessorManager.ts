@@ -11,6 +11,7 @@ import type {
   CommandSchemaType,
   CommandType,
   DeduplicationConfig,
+  DeduplicationStrategy,
 } from "../../index";
 import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { ProjectionDefinition } from "../../projection.types";
@@ -39,7 +40,7 @@ interface KillSwitchOptions {
 interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   delay?: number;
-  deduplication?: DeduplicationConfig<Payload>;
+  deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
   spanAttributes?: (
     payload: Payload,
@@ -112,6 +113,27 @@ async function isComponentDisabled(
 }
 
 /**
+ * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
+ *
+ * @param strategy - The deduplication strategy to resolve
+ * @param createDefaultId - Function to create the default deduplication ID (for "aggregate" strategy)
+ * @returns A DeduplicationConfig or undefined
+ */
+function resolveDeduplicationStrategy<Payload>(
+  strategy: DeduplicationStrategy<Payload> | undefined,
+  createDefaultId: (payload: Payload) => string,
+): DeduplicationConfig<Payload> | undefined {
+  if (strategy === "none" || strategy === null || strategy === undefined) {
+    return undefined;
+  }
+  if (strategy === "aggregate") {
+    return { makeId: createDefaultId };
+  }
+  // Custom DeduplicationConfig object
+  return strategy;
+}
+
+/**
  * Creates a command dispatcher that processes commands and stores resulting events.
  */
 function createCommandDispatcher<Payload, EventType extends Event>(
@@ -133,10 +155,20 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   featureFlagService?: FeatureFlagServiceInterface,
   killSwitchOptions?: KillSwitchOptions,
 ): EventSourcedQueueProcessor<Payload> {
+  // Create default deduplication ID for commands based on aggregate
+  const createDefaultCommandDeduplicationId = (payload: Payload): string => {
+    const tenantId = (payload as any).tenantId;
+    const aggregateId = getAggregateId(payload);
+    return `${String(tenantId)}:${aggregateType}:${String(aggregateId)}`;
+  };
+
   const processor = factory.create<Payload>({
     name: queueName,
     delay: options.delay,
-    deduplication: options.deduplication,
+    deduplication: resolveDeduplicationStrategy(
+      options.deduplication,
+      createDefaultCommandDeduplicationId,
+    ),
     spanAttributes: options.spanAttributes,
     options: options.concurrency
       ? { concurrency: options.concurrency }
@@ -361,9 +393,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         delay: handlerDef.options.delay,
-        deduplication: handlerDef.options.deduplication ?? {
-          makeId: this.createDefaultDeduplicationId.bind(this),
-        },
+        deduplication: resolveDeduplicationStrategy(
+          handlerDef.options.deduplication,
+          this.createDefaultDeduplicationId.bind(this),
+        ),
         options: handlerDef.options.concurrency
           ? { concurrency: handlerDef.options.concurrency }
           : void 0,
@@ -414,9 +447,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         delay: projectionDef.options?.delay,
-        deduplication: projectionDef.options?.deduplication ?? {
-          makeId: this.createDefaultDeduplicationId.bind(this),
-        },
+        deduplication: resolveDeduplicationStrategy(
+          projectionDef.options?.deduplication,
+          this.createDefaultDeduplicationId.bind(this),
+        ),
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,

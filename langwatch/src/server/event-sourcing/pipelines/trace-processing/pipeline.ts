@@ -21,6 +21,8 @@ export const traceProcessingPipelineDefinition =
     .withName("trace_processing")
     .withAggregateType("trace")
     .withProjection("traceSummary", TraceSummaryProjectionHandler, {
+      // Dedupe by aggregate to process only the latest event per trace
+      deduplication: "aggregate",
       // This reduces strain of computationally heavy trace summary projections being done
       // unnecessarily due to the burst-heavy nature of span collection.
       delay: 1500,

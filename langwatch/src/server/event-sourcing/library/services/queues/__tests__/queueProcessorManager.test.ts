@@ -145,7 +145,7 @@ describe("QueueProcessorManager", () => {
       );
     });
 
-    it("uses default deduplication ID when handler's deduplication not provided", () => {
+    it("uses no deduplication by default when handler's deduplication not provided", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -168,8 +168,48 @@ describe("QueueProcessorManager", () => {
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
+      // With the new opt-in strategy, no deduplication is used by default
+      expect(createCall?.deduplication).toBeUndefined();
+    });
+
+    it('uses aggregate deduplication when strategy is "aggregate"', () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const handlers = {
+        handler1: createMockEventHandlerDefinition("handler1", void 0, {
+          deduplication: "aggregate",
+        }),
+      };
+      const handleEventCallback = vi.fn();
+
+      manager.initializeHandlerQueues(handlers, handleEventCallback);
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
       expect(createCall?.deduplication).toBeDefined();
       expect(typeof createCall?.deduplication?.makeId).toBe("function");
+
+      // Verify the aggregate deduplication ID format
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+      const dedupId = createCall?.deduplication?.makeId?.(event);
+      expect(dedupId).toBe(
+        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+      );
     });
 
     it("passes handler options (delay, concurrency) to queue factory", () => {
@@ -261,7 +301,7 @@ describe("QueueProcessorManager", () => {
       );
     });
 
-    it("uses default deduplication ID for projections", () => {
+    it("uses no deduplication by default for projections", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -287,6 +327,43 @@ describe("QueueProcessorManager", () => {
       );
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
+      // With the new opt-in strategy, no deduplication is used by default
+      expect(createCall?.deduplication).toBeUndefined();
+    });
+
+    it('uses aggregate deduplication when strategy is "aggregate"', () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const projections = {
+        projection1: createMockProjectionDefinition(
+          "projection1",
+          void 0,
+          void 0,
+          {
+            deduplication: "aggregate",
+          },
+        ),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
+      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
       expect(createCall?.deduplication).toBeDefined();
       expect(typeof createCall?.deduplication?.makeId).toBe("function");
 
@@ -296,7 +373,7 @@ describe("QueueProcessorManager", () => {
         tenantId,
       );
       const dedupId = createCall?.deduplication?.makeId?.(event);
-      // Default format: ${tenantId}:${aggregateType}:${aggregateId}
+      // Aggregate format: ${tenantId}:${aggregateType}:${aggregateId}
       expect(dedupId).toBe(
         `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -351,7 +428,7 @@ describe("QueueProcessorManager", () => {
       expect(customDeduplicationId).toHaveBeenCalledWith(event);
     });
 
-    it("falls back to default deduplication when deduplication is not provided", () => {
+    it("uses no deduplication when deduplication options is an empty object", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -382,18 +459,45 @@ describe("QueueProcessorManager", () => {
       );
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
-      expect(createCall?.deduplication).toBeDefined();
+      // With opt-in strategy, empty options means no deduplication
+      expect(createCall?.deduplication).toBeUndefined();
+    });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+    it('uses no deduplication when strategy is explicitly "none"', () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
         aggregateType,
-        tenantId,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const projections = {
+        projection1: createMockProjectionDefinition(
+          "projection1",
+          void 0,
+          void 0,
+          {
+            deduplication: "none",
+          },
+        ),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
       );
-      const dedupId = createCall?.deduplication?.makeId?.(event);
-      // Default format: ${tenantId}:${aggregateType}:${aggregateId}
-      expect(dedupId).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
-      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
+      // Explicit "none" should result in no deduplication
+      expect(createCall?.deduplication).toBeUndefined();
     });
   });
 
