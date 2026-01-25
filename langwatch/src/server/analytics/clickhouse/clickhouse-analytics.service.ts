@@ -6,6 +6,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "../../clickhouse/client";
 import type { FilterField } from "../../filters/types";
 import type { TimeseriesInputType, SeriesInputType } from "../registry";
@@ -74,6 +75,7 @@ export interface FeedbacksResult {
 export class ClickHouseAnalyticsService {
   private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:analytics:clickhouse");
+  private readonly tracer = getLangWatchTracer("langwatch.analytics.clickhouse");
 
   constructor() {
     this.clickHouseClient = getClickHouseClient();
@@ -90,66 +92,76 @@ export class ClickHouseAnalyticsService {
    * Execute timeseries query
    */
   async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
-    if (!this.clickHouseClient) {
-      throw new Error("ClickHouse client not available");
-    }
+    return this.tracer.withActiveSpan(
+      "ClickHouseAnalyticsService.getTimeseries",
+      { attributes: { "tenant.id": input.projectId } },
+      async (span) => {
+        if (!this.clickHouseClient) {
+          throw new Error("ClickHouse client not available");
+        }
 
-    const { previousPeriodStartDate, startDate, endDate } =
-      currentVsPreviousDates(
-        input,
-        typeof input.timeScale === "number" ? input.timeScale : undefined,
-      );
+        const { previousPeriodStartDate, startDate, endDate } =
+          currentVsPreviousDates(
+            input,
+            typeof input.timeScale === "number" ? input.timeScale : undefined,
+          );
 
-    // Adjust timeScale to avoid too many buckets
-    let adjustedTimeScale = input.timeScale;
-    if (typeof input.timeScale === "number") {
-      const totalMinutes =
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60);
-      const estimatedBuckets = totalMinutes / input.timeScale;
-      if (estimatedBuckets > 1000) {
-        adjustedTimeScale = 24 * 60; // 1 day
-      }
-    }
+        // Adjust timeScale to avoid too many buckets
+        let adjustedTimeScale = input.timeScale;
+        if (typeof input.timeScale === "number") {
+          const totalMinutes =
+            (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+          const estimatedBuckets = totalMinutes / input.timeScale;
+          if (estimatedBuckets > 1000) {
+            adjustedTimeScale = 24 * 60; // 1 day
+          }
+        }
 
-    // Build the query
-    const { sql, params } = buildTimeseriesQuery({
-      projectId: input.projectId,
-      startDate,
-      endDate,
-      previousPeriodStartDate,
-      series: input.series,
-      filters: input.filters,
-      groupBy: input.groupBy,
-      groupByKey: input.groupByKey,
-      timeScale: adjustedTimeScale,
-      timeZone: input.timeZone,
-    });
+        // Build the query
+        const { sql, params } = buildTimeseriesQuery({
+          projectId: input.projectId,
+          startDate,
+          endDate,
+          previousPeriodStartDate,
+          series: input.series,
+          filters: input.filters,
+          groupBy: input.groupBy,
+          groupByKey: input.groupByKey,
+          timeScale: adjustedTimeScale,
+          timeZone: input.timeZone,
+        });
 
-    this.logger.debug({ sql, params }, "Executing timeseries query");
+        this.logger.debug({ sql, params }, "Executing timeseries query");
 
-    try {
-      const result = await this.clickHouseClient.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-      });
+        try {
+          const result = await this.clickHouseClient.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+          });
 
-      const rows = (await result.json()) as Array<Record<string, unknown>>;
+          const rows = (await result.json()) as Array<Record<string, unknown>>;
 
-      // Parse results into the expected format
-      return this.parseTimeseriesResults(
-        rows,
-        input.series,
-        input.groupBy,
-        input.timeScale,
-      );
-    } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : error, sql },
-        "Failed to execute timeseries query",
-      );
-      throw error;
-    }
+          // Parse results into the expected format
+          const parsedResult = this.parseTimeseriesResults(
+            rows,
+            input.series,
+            input.groupBy,
+            input.timeScale,
+          );
+
+          span.setAttribute("bucket.count", parsedResult.currentPeriod.length);
+
+          return parsedResult;
+        } catch (error) {
+          this.logger.error(
+            { error: error instanceof Error ? error.message : error, sql },
+            "Failed to execute timeseries query",
+          );
+          throw error;
+        }
+      },
+    );
   }
 
   /**
@@ -292,50 +304,58 @@ export class ClickHouseAnalyticsService {
     subkey?: string,
     searchQuery?: string,
   ): Promise<FilterDataResult> {
-    if (!this.clickHouseClient) {
-      throw new Error("ClickHouse client not available");
-    }
+    return this.tracer.withActiveSpan(
+      "ClickHouseAnalyticsService.getDataForFilter",
+      { attributes: { "tenant.id": projectId, "filter.field": field } },
+      async (span) => {
+        if (!this.clickHouseClient) {
+          throw new Error("ClickHouse client not available");
+        }
 
-    const { sql, params } = buildDataForFilterQuery(
-      projectId,
-      field,
-      new Date(startDate),
-      new Date(endDate),
-      key,
-      subkey,
-      searchQuery,
+        const { sql, params } = buildDataForFilterQuery(
+          projectId,
+          field,
+          new Date(startDate),
+          new Date(endDate),
+          key,
+          subkey,
+          searchQuery,
+        );
+
+        this.logger.debug({ sql, params }, "Executing dataForFilter query");
+
+        try {
+          const result = await this.clickHouseClient.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{
+            field: string;
+            label: string;
+            count: string | number;
+          }>;
+
+          span.setAttribute("result.count", rows.length);
+
+          return {
+            options: rows.map((row) => ({
+              field: row.field,
+              label: row.label,
+              count:
+                typeof row.count === "string" ? parseInt(row.count, 10) : row.count,
+            })),
+          };
+        } catch (error) {
+          this.logger.error(
+            { error: error instanceof Error ? error.message : error, sql },
+            "Failed to execute dataForFilter query",
+          );
+          throw error;
+        }
+      },
     );
-
-    this.logger.debug({ sql, params }, "Executing dataForFilter query");
-
-    try {
-      const result = await this.clickHouseClient.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-      });
-
-      const rows = (await result.json()) as Array<{
-        field: string;
-        label: string;
-        count: string | number;
-      }>;
-
-      return {
-        options: rows.map((row) => ({
-          field: row.field,
-          label: row.label,
-          count:
-            typeof row.count === "string" ? parseInt(row.count, 10) : row.count,
-        })),
-      };
-    } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : error, sql },
-        "Failed to execute dataForFilter query",
-      );
-      throw error;
-    }
   }
 
   /**
@@ -354,70 +374,78 @@ export class ClickHouseAnalyticsService {
       >
     >,
   ): Promise<TopDocumentsResult> {
-    if (!this.clickHouseClient) {
-      throw new Error("ClickHouse client not available");
-    }
+    return this.tracer.withActiveSpan(
+      "ClickHouseAnalyticsService.getTopUsedDocuments",
+      { attributes: { "tenant.id": projectId } },
+      async (span) => {
+        if (!this.clickHouseClient) {
+          throw new Error("ClickHouse client not available");
+        }
 
-    const { sql, params } = buildTopDocumentsQuery(
-      projectId,
-      new Date(startDate),
-      new Date(endDate),
-      filters,
+        const { sql, params } = buildTopDocumentsQuery(
+          projectId,
+          new Date(startDate),
+          new Date(endDate),
+          filters,
+        );
+
+        this.logger.debug({ sql, params }, "Executing topDocuments query");
+
+        try {
+          // The query has two parts separated by semicolon
+          const [topDocsSql, totalSql] = sql.split(";");
+
+          // Execute both queries
+          const [topDocsResult, totalResult] = await Promise.all([
+            this.clickHouseClient.query({
+              query: topDocsSql!,
+              query_params: params,
+              format: "JSONEachRow",
+            }),
+            this.clickHouseClient.query({
+              query: totalSql!,
+              query_params: params,
+              format: "JSONEachRow",
+            }),
+          ]);
+
+          const topDocs = (await topDocsResult.json()) as Array<{
+            documentId: string;
+            count: string | number;
+            traceId: string;
+            content?: string;
+          }>;
+
+          const totalRows = (await totalResult.json()) as Array<{
+            total: string | number;
+          }>;
+
+          const total = totalRows[0]?.total ?? 0;
+
+          span.setAttribute("document.count", topDocs.length);
+
+          return {
+            topDocuments: topDocs.map((doc) => ({
+              documentId: doc.documentId,
+              count:
+                typeof doc.count === "string"
+                  ? parseInt(doc.count, 10)
+                  : doc.count,
+              traceId: doc.traceId,
+              content: doc.content,
+            })),
+            totalUniqueDocuments:
+              typeof total === "string" ? parseInt(total, 10) : total,
+          };
+        } catch (error) {
+          this.logger.error(
+            { error: error instanceof Error ? error.message : error, sql },
+            "Failed to execute topDocuments query",
+          );
+          throw error;
+        }
+      },
     );
-
-    this.logger.debug({ sql, params }, "Executing topDocuments query");
-
-    try {
-      // The query has two parts separated by semicolon
-      const [topDocsSql, totalSql] = sql.split(";");
-
-      // Execute both queries
-      const [topDocsResult, totalResult] = await Promise.all([
-        this.clickHouseClient.query({
-          query: topDocsSql!,
-          query_params: params,
-          format: "JSONEachRow",
-        }),
-        this.clickHouseClient.query({
-          query: totalSql!,
-          query_params: params,
-          format: "JSONEachRow",
-        }),
-      ]);
-
-      const topDocs = (await topDocsResult.json()) as Array<{
-        documentId: string;
-        count: string | number;
-        traceId: string;
-        content?: string;
-      }>;
-
-      const totalRows = (await totalResult.json()) as Array<{
-        total: string | number;
-      }>;
-
-      const total = totalRows[0]?.total ?? 0;
-
-      return {
-        topDocuments: topDocs.map((doc) => ({
-          documentId: doc.documentId,
-          count:
-            typeof doc.count === "string"
-              ? parseInt(doc.count, 10)
-              : doc.count,
-          traceId: doc.traceId,
-          content: doc.content,
-        })),
-        totalUniqueDocuments:
-          typeof total === "string" ? parseInt(total, 10) : total,
-      };
-    } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : error, sql },
-        "Failed to execute topDocuments query",
-      );
-      throw error;
-    }
   }
 
   /**
@@ -436,76 +464,84 @@ export class ClickHouseAnalyticsService {
       >
     >,
   ): Promise<FeedbacksResult> {
-    if (!this.clickHouseClient) {
-      throw new Error("ClickHouse client not available");
-    }
-
-    const { sql, params } = buildFeedbacksQuery(
-      projectId,
-      new Date(startDate),
-      new Date(endDate),
-      filters,
-    );
-
-    this.logger.debug({ sql, params }, "Executing feedbacks query");
-
-    try {
-      const result = await this.clickHouseClient.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-      });
-
-      const rows = (await result.json()) as Array<{
-        trace_id: string;
-        event_id: string;
-        started_at: string | number;
-        event_type: string;
-        attributes: Record<string, string>;
-      }>;
-
-      // Convert to ElasticSearchEvent format
-      const events: ElasticSearchEvent[] = rows.map((row) => {
-        const startedAt =
-          typeof row.started_at === "string"
-            ? parseInt(row.started_at, 10)
-            : row.started_at;
-
-        // Parse attributes into metrics and event_details
-        const metrics: Array<{ key: string; value: number }> = [];
-        const eventDetails: Array<{ key: string; value: string }> = [];
-
-        for (const [key, value] of Object.entries(row.attributes)) {
-          if (key === "vote" || key === "score") {
-            metrics.push({ key, value: parseFloat(value) || 0 });
-          } else {
-            eventDetails.push({ key, value });
-          }
+    return this.tracer.withActiveSpan(
+      "ClickHouseAnalyticsService.getFeedbacks",
+      { attributes: { "tenant.id": projectId } },
+      async (span) => {
+        if (!this.clickHouseClient) {
+          throw new Error("ClickHouse client not available");
         }
 
-        return {
-          event_id: row.event_id,
-          event_type: row.event_type,
-          project_id: projectId,
-          trace_id: row.trace_id,
-          timestamps: {
-            started_at: startedAt,
-            inserted_at: startedAt,
-            updated_at: startedAt,
-          },
-          metrics,
-          event_details: eventDetails,
-        };
-      });
+        const { sql, params } = buildFeedbacksQuery(
+          projectId,
+          new Date(startDate),
+          new Date(endDate),
+          filters,
+        );
 
-      return { events };
-    } catch (error) {
-      this.logger.error(
-        { error: error instanceof Error ? error.message : error, sql },
-        "Failed to execute feedbacks query",
-      );
-      throw error;
-    }
+        this.logger.debug({ sql, params }, "Executing feedbacks query");
+
+        try {
+          const result = await this.clickHouseClient.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{
+            trace_id: string;
+            event_id: string;
+            started_at: string | number;
+            event_type: string;
+            attributes: Record<string, string>;
+          }>;
+
+          // Convert to ElasticSearchEvent format
+          const events: ElasticSearchEvent[] = rows.map((row) => {
+            const startedAt =
+              typeof row.started_at === "string"
+                ? parseInt(row.started_at, 10)
+                : row.started_at;
+
+            // Parse attributes into metrics and event_details
+            const metrics: Array<{ key: string; value: number }> = [];
+            const eventDetails: Array<{ key: string; value: string }> = [];
+
+            for (const [key, value] of Object.entries(row.attributes)) {
+              if (key === "vote" || key === "score") {
+                metrics.push({ key, value: parseFloat(value) || 0 });
+              } else {
+                eventDetails.push({ key, value });
+              }
+            }
+
+            return {
+              event_id: row.event_id,
+              event_type: row.event_type,
+              project_id: projectId,
+              trace_id: row.trace_id,
+              timestamps: {
+                started_at: startedAt,
+                inserted_at: startedAt,
+                updated_at: startedAt,
+              },
+              metrics,
+              event_details: eventDetails,
+            };
+          });
+
+          span.setAttribute("event.count", events.length);
+
+          return { events };
+        } catch (error) {
+          this.logger.error(
+            { error: error instanceof Error ? error.message : error, sql },
+            "Failed to execute feedbacks query",
+          );
+          throw error;
+        }
+      },
+    );
   }
 }
 
