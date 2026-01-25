@@ -101,6 +101,12 @@ export const fieldMappings: Record<string, FieldMapping> = {
     column: "SubTopicId",
     description: "Subtopic identifier",
   },
+  "metadata.prompt_ids": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.prompt_ids']",
+    description: "Prompt IDs array (stored as JSON string)",
+    mapValueType: "json_array",
+  },
 
   // ===== Performance Metrics =====
   "metrics.total_time_ms": {
@@ -194,8 +200,15 @@ export const fieldMappings: Record<string, FieldMapping> = {
   },
   "spans.contexts.document_id": {
     table: "stored_spans",
-    column: "SpanAttributes['langwatch.rag.document_ids']",
-    description: "RAG document IDs",
+    column: "SpanAttributes['langwatch.rag.contexts']",
+    description: "RAG document IDs (extracted via JSON from contexts)",
+    mapValueType: "json_array",
+    isArray: true,
+  },
+  "spans.contexts.content": {
+    table: "stored_spans",
+    column: "SpanAttributes['langwatch.rag.contexts']",
+    description: "RAG document content (extracted via JSON from contexts)",
     mapValueType: "json_array",
     isArray: true,
   },
