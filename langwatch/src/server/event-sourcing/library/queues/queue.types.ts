@@ -34,12 +34,11 @@ export interface DeduplicationConfig<Payload> {
 }
 
 /**
- * Deduplication strategy for event handlers and projections.
+ * Strategy for deduplicating queue jobs.
  *
- * - `"none"`: Explicit no deduplication - processes every event individually
- * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}` (useful for projections)
- * - `DeduplicationConfig<Payload>`: Custom deduplication configuration object
- * - `null` or `undefined`: No deduplication (default behavior)
+ * - `undefined`: No deduplication (default) - every event processed individually
+ * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}`
+ * - `DeduplicationConfig`: Custom makeId function and TTL
  *
  * @example
  * ```typescript
@@ -64,11 +63,8 @@ export interface DeduplicationConfig<Payload> {
  * ```
  */
 export type DeduplicationStrategy<Payload> =
-  | "none"
   | "aggregate"
-  | DeduplicationConfig<Payload>
-  | null
-  | undefined;
+  | DeduplicationConfig<Payload>;
 
 export interface EventSourcedQueueDefinition<Payload> {
   /**

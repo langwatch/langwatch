@@ -25,13 +25,7 @@ export interface EventHandlerOptions<
   delay?: number;
   /**
    * Optional: Deduplication strategy for this handler.
-   *
-   * - `"none"`: Explicit no deduplication - processes every event individually
-   * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}`
-   * - `DeduplicationConfig`: Custom deduplication configuration object
-   * - `null` or `undefined`: No deduplication (default behavior)
-   *
-   * @default undefined (no deduplication)
+   * @see DeduplicationStrategy for available options
    */
   deduplication?: DeduplicationStrategy<EventType>;
   /**

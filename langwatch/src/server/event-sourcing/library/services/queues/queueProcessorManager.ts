@@ -4,6 +4,7 @@ import type { QueueProcessorFactory } from "../../../runtime/queue";
 import type { Command, CommandHandler } from "../../commands/command";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { AggregateType } from "../../domain/aggregateType";
+import type { TenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
@@ -14,6 +15,14 @@ import type {
   DeduplicationStrategy,
 } from "../../index";
 import { createCommand, createTenantId, EventUtils } from "../../index";
+
+/**
+ * Constraint interface for payloads that support command processing.
+ * All command payloads must include a tenantId for tenant isolation.
+ */
+interface HasTenantId {
+  tenantId: TenantId | string;
+}
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
@@ -123,7 +132,7 @@ function resolveDeduplicationStrategy<Payload>(
   strategy: DeduplicationStrategy<Payload> | undefined,
   createDefaultId: (payload: Payload) => string,
 ): DeduplicationConfig<Payload> | undefined {
-  if (strategy === "none" || strategy === null || strategy === undefined) {
+  if (strategy === undefined) {
     return undefined;
   }
   if (strategy === "aggregate") {
@@ -136,7 +145,7 @@ function resolveDeduplicationStrategy<Payload>(
 /**
  * Creates a command dispatcher that processes commands and stores resulting events.
  */
-function createCommandDispatcher<Payload, EventType extends Event>(
+function createCommandDispatcher<Payload extends HasTenantId, EventType extends Event>(
   commandType: CommandType,
   commandSchema: CommandSchemaType<Payload, CommandType>,
   handler: CommandHandler<Command<Payload>, EventType>,
@@ -157,9 +166,8 @@ function createCommandDispatcher<Payload, EventType extends Event>(
 ): EventSourcedQueueProcessor<Payload> {
   // Create default deduplication ID for commands based on aggregate
   const createDefaultCommandDeduplicationId = (payload: Payload): string => {
-    const tenantId = (payload as any).tenantId;
     const aggregateId = getAggregateId(payload);
-    return `${String(tenantId)}:${aggregateType}:${String(aggregateId)}`;
+    return `${String(payload.tenantId)}:${aggregateType}:${String(aggregateId)}`;
   };
 
   const processor = factory.create<Payload>({
@@ -185,7 +193,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         );
       }
 
-      const tenantId = createTenantId((payload as any).tenantId);
+      const tenantId = createTenantId(String(payload.tenantId));
       const aggregateId = getAggregateId(payload);
 
       // Check kill switch - if enabled, skip command processing
