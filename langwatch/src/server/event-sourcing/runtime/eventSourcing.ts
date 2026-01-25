@@ -280,15 +280,56 @@ export class EventSourcing {
   }
 }
 
-export const eventSourcing = EventSourcing.getInstance();
+// Lazy singleton getter to avoid triggering env validation at module load time.
+// This allows importing the EventSourcing class in tests without needing all env vars.
+let _eventSourcingInstance: EventSourcing | null = null;
 
 /**
- * Register the defined pipelines
+ * Returns the singleton EventSourcing instance.
+ * Uses lazy initialization to avoid env validation at module load time.
  */
-export const traceProcessingPipeline = eventSourcing.register(
-  traceProcessingPipelineDefinition,
-);
+export function getEventSourcing(): EventSourcing {
+  if (!_eventSourcingInstance) {
+    _eventSourcingInstance = EventSourcing.getInstance();
+  }
+  return _eventSourcingInstance;
+}
 
-export const evaluationProcessingPipeline = eventSourcing.register(
-  evaluationProcessingPipelineDefinition,
-);
+// Lazy pipeline instances to avoid triggering env validation at module load time.
+// Using explicit any for storage, but the getter functions have proper return types.
+let _traceProcessingPipeline: ReturnType<
+  EventSourcing["register"]
+> | null = null;
+let _evaluationProcessingPipeline: ReturnType<
+  EventSourcing["register"]
+> | null = null;
+
+/**
+ * Returns the trace processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export function getTraceProcessingPipeline(): ReturnType<
+  EventSourcing["register"]
+> {
+  if (!_traceProcessingPipeline) {
+    _traceProcessingPipeline = getEventSourcing().register(
+      traceProcessingPipelineDefinition,
+    );
+  }
+  return _traceProcessingPipeline;
+}
+
+/**
+ * Returns the evaluation processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export function getEvaluationProcessingPipeline(): ReturnType<
+  EventSourcing["register"]
+> {
+  if (!_evaluationProcessingPipeline) {
+    _evaluationProcessingPipeline = getEventSourcing().register(
+      evaluationProcessingPipelineDefinition,
+    );
+  }
+  return _evaluationProcessingPipeline;
+}
