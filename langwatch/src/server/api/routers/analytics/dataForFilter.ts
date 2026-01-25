@@ -7,7 +7,7 @@ import { availableFilters } from "../../../filters/registry";
 import { type FilterField, filterFieldsEnum } from "../../../filters/types";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
-import { generateTracesPivotQueryConditions } from "./common";
+import { generateTracesPivotQueryConditions } from "../../../filters/generateTracesPivotQueryConditions";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -22,14 +22,16 @@ export const dataForFilter = protectedProcedure
   .query(async ({ input, ctx }) => {
     const { field, key, subkey } = input;
 
-    if (availableFilters[field].requiresKey && !key) {
+    const filterConfig = availableFilters[field]!;
+
+    if (filterConfig.requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a key to be defined`,
       });
     }
 
-    if (availableFilters[field].requiresSubkey && !subkey) {
+    if (filterConfig.requiresSubkey && !subkey) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: `Field ${field} requires a subkey to be defined`,
