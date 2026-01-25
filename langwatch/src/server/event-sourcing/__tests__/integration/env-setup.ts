@@ -34,10 +34,6 @@ try {
     // BUILD_TIME is used during Next.js build to skip env validation,
     // but for integration tests we need actual Redis connections
     delete process.env.BUILD_TIME;
-
-    console.log("[env-setup] Container URLs loaded from globalSetup");
-    console.log(`[env-setup] REDIS_URL: ${info.redisUrl}`);
-    console.log(`[env-setup] CLICKHOUSE_URL: ${info.clickHouseUrl}`);
   }
 } catch (error) {
   console.warn("[env-setup] Failed to load container info:", error);
