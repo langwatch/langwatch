@@ -128,7 +128,11 @@ const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
   },
 };
 
-describe("Log Steps API Endpoint", () => {
+// Skip when running with testcontainers only (requires PostgreSQL + Elasticsearch)
+// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
+const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+
+describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
   let project: Project;
 
   beforeAll(async () => {

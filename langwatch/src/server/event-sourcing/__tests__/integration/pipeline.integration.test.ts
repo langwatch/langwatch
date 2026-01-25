@@ -244,7 +244,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       ),
     );
 
-    // Wait for checkpoints for all aggregates
+    // Wait for checkpoints for all aggregates (use longer timeout for concurrent processing)
     await Promise.all(
       aggregateIds.map((aggregateId) =>
         waitForCheckpoint(
@@ -253,6 +253,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
           aggregateId,
           tenantIdString,
           1,
+          10000,
+          100,
+          pipeline.processorCheckpointStore,
         ),
       ),
     );

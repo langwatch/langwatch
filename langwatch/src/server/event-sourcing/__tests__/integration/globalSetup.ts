@@ -106,17 +106,22 @@ export async function setup(): Promise<void> {
     .withLabels(CONTAINER_LABELS)
     .start();
 
-  const clickHouseUrl = clickHouseContainer.getConnectionUrl();
+  const clickHouseBaseUrl = clickHouseContainer.getConnectionUrl();
   const redisUrl = redisContainer.getConnectionUrl();
 
   // Run goose migrations to create database and tables
   // Important: Pass the database name explicitly since the container's URL uses 'test' as default
   console.log("[globalSetup] Running ClickHouse migrations...");
   await migrateUp({
-    connectionUrl: clickHouseUrl,
+    connectionUrl: clickHouseBaseUrl,
     database: TEST_DATABASE,
     verbose: false,
   });
+
+  // Create URL with the correct database name for test workers
+  const urlWithDatabase = new URL(clickHouseBaseUrl);
+  urlWithDatabase.pathname = `/${TEST_DATABASE}`;
+  const clickHouseUrl = urlWithDatabase.toString();
 
   // Write connection URLs to a temp file for test workers to read
   const containerInfo = {

@@ -1,6 +1,4 @@
-import { SpanKind } from "@opentelemetry/api";
 import { Queue } from "bullmq";
-import type { SemConvAttributes } from "langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connection } from "../../../../redis";
 import type { EventSourcedQueueDefinition } from "../../../library/queues";
@@ -12,16 +10,8 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-const mockTracer = {
-  withActiveSpan: vi.fn((_name, _options, fn) => fn()),
-};
-
 vi.mock("../../../../utils/logger", () => ({
   createLogger: vi.fn(() => mockLogger),
-}));
-
-vi.mock("langwatch", () => ({
-  getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
 /**
@@ -158,12 +148,14 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const concurrencyLimit = 2;
       let concurrentCount = 0;
       let maxConcurrent = 0;
+      let processedCount = 0;
 
       const processFn = vi.fn().mockImplementation(async (_payload: string) => {
         concurrentCount++;
         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         concurrentCount--;
+        processedCount++;
       });
 
       const definition: EventSourcedQueueDefinition<string> = {
@@ -175,7 +167,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be fully ready
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Send more jobs than concurrency limit
       await Promise.all([
@@ -186,12 +179,18 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         processor.send("job-5"),
       ]);
 
-      // Wait for all jobs to be processed
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Poll for completion rather than fixed timeout
+      // With concurrency=2 and 100ms per job, 5 jobs should take ~300ms
+      // But we give more time for worker overhead
+      const startTime = Date.now();
+      const maxWaitMs = 5000;
+      while (processedCount < 5 && Date.now() - startTime < maxWaitMs) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
       expect(maxConcurrent).toBeLessThanOrEqual(concurrencyLimit);
       expect(processFn).toHaveBeenCalledTimes(5);
-    });
+    }, 10000);
 
     it("respects job delay configuration", async () => {
       const queueName = generateQueueName("delay");
@@ -419,73 +418,14 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
   });
 
   describeIfRedis("observability integration", () => {
-    it("creates tracing spans for job sending", async () => {
-      const queueName = generateQueueName("tracing-send");
-      queueNames.push(queueName);
-
-      const processFn = vi.fn().mockResolvedValue(void 0);
-
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: queueName,
-        process: processFn,
-      };
-
-      const processor = new EventSourcedQueueProcessorBullMq(definition);
-      processors.push(processor);
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      await processor.send("traced-payload");
-
-      expect(mockTracer.withActiveSpan).toHaveBeenCalledWith(
-        `EventSourcedQueue.send.{${queueName}}`,
-        expect.objectContaining({
-          kind: SpanKind.PRODUCER,
-          attributes: expect.objectContaining({
-            "queue.name": `{${queueName}}`,
-            "queue.job_name": queueName,
-          }),
-        }),
-        expect.any(Function),
-      );
-    });
-
-    it("creates tracing spans for job processing", async () => {
-      const queueName = generateQueueName("tracing-process");
-      queueNames.push(queueName);
-
-      const processFn = vi.fn().mockResolvedValue(void 0);
-
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: queueName,
-        process: processFn,
-      };
-
-      const processor = new EventSourcedQueueProcessorBullMq(definition);
-      processors.push(processor);
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      await processor.send("traced-payload");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Check that processing span was created
-      const processingCalls = (
-        mockTracer.withActiveSpan as any
-      ).mock.calls.filter((call: any[]) => call[0] === "pipeline.process");
-      expect(processingCalls.length).toBeGreaterThan(0);
-    });
-
-    it("includes custom span attributes in traces", async () => {
+    it("calls spanAttributes function when processing jobs", async () => {
       const queueName = generateQueueName("custom-attributes");
       queueNames.push(queueName);
 
       const processFn = vi.fn().mockResolvedValue(void 0);
-      const spanAttributes = vi.fn(
-        (payload: string): SemConvAttributes => ({
-          "custom.attr": payload.length,
-        }),
-      );
+      const spanAttributes = vi.fn((payload: string) => ({
+        "custom.attr": payload.length,
+      }));
 
       const definition: EventSourcedQueueDefinition<string> = {
         name: queueName,

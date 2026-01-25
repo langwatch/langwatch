@@ -11,6 +11,8 @@ export default defineConfig({
       "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
     ],
     setupFiles: [
+      // env-setup MUST run first to set REDIS_URL/CLICKHOUSE_URL before redis.ts is imported
+      "./src/server/event-sourcing/__tests__/integration/env-setup.ts",
       "./test-setup.ts",
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
     ],
@@ -24,9 +26,8 @@ export default defineConfig({
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
-    env: {
-      BUILD_TIME: "1",
-    },
+    // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
+    // The env-setup.ts file handles setting the correct URLs from globalSetup.
   },
   esbuild: {
     jsx: "automatic",

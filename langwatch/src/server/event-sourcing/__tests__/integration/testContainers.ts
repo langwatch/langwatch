@@ -57,7 +57,7 @@ const CONTAINER_INFO_FILE = path.join(
 function isUsingGlobalSetupContainers(): boolean {
   return !!(
     process.env.TEST_CLICKHOUSE_URL &&
-    process.env.TEST_REDIS_URL
+    process.env.REDIS_URL
   );
 }
 
@@ -74,8 +74,10 @@ export function loadGlobalSetupContainerInfo(): { clickHouseUrl: string; redisUr
     const info = JSON.parse(content) as { clickHouseUrl: string; redisUrl: string };
 
     // Set env vars so isUsingGlobalSetupContainers() returns true
+    // and so application code (redis.ts, etc.) can use them
     process.env.TEST_CLICKHOUSE_URL = info.clickHouseUrl;
-    process.env.TEST_REDIS_URL = info.redisUrl;
+    process.env.CLICKHOUSE_URL = info.clickHouseUrl;
+    process.env.REDIS_URL = info.redisUrl;
 
     return info;
   } catch {
@@ -137,7 +139,7 @@ export async function startTestContainers(): Promise<{
   // If using global setup containers (shared across workers), connect to them
   if (isUsingGlobalSetupContainers()) {
     const clickHouseUrl = process.env.TEST_CLICKHOUSE_URL!;
-    const redisUrl = process.env.TEST_REDIS_URL!;
+    const redisUrl = process.env.REDIS_URL!;
 
     if (!redisConnection) {
       redisConnection = new IORedis(redisUrl, {
@@ -147,12 +149,9 @@ export async function startTestContainers(): Promise<{
     }
 
     // Don't run migrations - globalSetup already did that
-    // Create client with the database in the URL path
-    const urlWithDatabase = new URL(clickHouseUrl);
-    urlWithDatabase.pathname = `/${TEST_DATABASE}`;
-
+    // globalSetup provides URL with correct database already in pathname
     if (!clickHouseClient) {
-      clickHouseClient = createClient({ url: urlWithDatabase });
+      clickHouseClient = createClient({ url: new URL(clickHouseUrl) });
     }
 
     return {
