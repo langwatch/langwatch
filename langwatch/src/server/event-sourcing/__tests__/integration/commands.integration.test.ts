@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   cleanupTestDataForTenant,
+  closePipelineGracefully,
   createTestPipeline,
   createTestTenantId,
+  generateTestAggregateId,
   getTenantIdString,
   waitForCheckpoint,
 } from "./testHelpers";
@@ -12,23 +14,23 @@ describe("Command Processing - Integration Tests", () => {
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline to stop all workers and queues
-    await pipeline.service.close();
-    // Wait a bit for all async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Gracefully close pipeline to ensure all BullMQ workers finish
+    await closePipelineGracefully(pipeline);
     // Then clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("validates command payload schema", async () => {
-    const aggregateId = "command-test-6";
+    const aggregateId = generateTestAggregateId("command-validate");
 
     // Try to send invalid command (missing required fields)
     await expect(
@@ -41,7 +43,7 @@ describe("Command Processing - Integration Tests", () => {
   });
 
   it("commands for same aggregate are processed sequentially with locks", async () => {
-    const aggregateId = "command-lock-test-1";
+    const aggregateId = generateTestAggregateId("command-lock");
 
     // Send multiple commands for the same aggregate concurrently
     const command1Promise = pipeline.commands.testCommand.send({
@@ -61,7 +63,7 @@ describe("Command Processing - Integration Tests", () => {
 
     // Wait for first checkpoint, then second (sequential processing)
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -71,7 +73,7 @@ describe("Command Processing - Integration Tests", () => {
       pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,

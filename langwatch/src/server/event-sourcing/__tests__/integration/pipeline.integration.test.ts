@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AggregateType } from "../../library";
 import {
   cleanupTestDataForTenant,
+  closePipelineGracefully,
   createTestPipeline,
   createTestTenantId,
+  generateTestAggregateId,
   getTenantIdString,
   verifyCheckpoint,
   verifyEventHandlerProcessed,
@@ -16,23 +18,23 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline first to stop all workers and queues
-    await pipeline.service.close();
-    // Wait a bit for all async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Gracefully close pipeline to ensure all BullMQ workers finish
+    await closePipelineGracefully(pipeline);
     // Then clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("processes complete flow: command → event → handler → projection", async () => {
-    const aggregateId = "test-aggregate-1";
+    const aggregateId = generateTestAggregateId();
 
     // Send command
     await pipeline.commands.testCommand.send({
@@ -44,7 +46,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Wait for handler and projection checkpoints
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -54,7 +56,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -96,7 +98,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
   });
 
   it("processes multiple events in sequential order per aggregate", async () => {
-    const aggregateId = "test-aggregate-2";
+    const aggregateId = generateTestAggregateId();
 
     // Send multiple commands
     await pipeline.commands.testCommand.send({
@@ -122,7 +124,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Wait for handler checkpoint at sequence 3
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -134,7 +136,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Wait for projection checkpoint at sequence 3 to ensure all events are processed
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -173,7 +175,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
   });
 
   it("maintains checkpoints across queue processing", async () => {
-    const aggregateId = "test-aggregate-3";
+    const aggregateId = generateTestAggregateId();
 
     // Send command
     await pipeline.commands.testCommand.send({
@@ -184,7 +186,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Wait for checkpoints with longer timeout for ClickHouse consistency
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -194,7 +196,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -206,7 +208,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Verify handler checkpoint
     const handlerCheckpoint = await verifyCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -216,7 +218,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
     // Verify projection checkpoint
     const projectionCheckpoint = await verifyCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -227,9 +229,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
 
   it("processes multiple aggregates concurrently", async () => {
     const aggregateIds = [
-      "test-aggregate-4",
-      "test-aggregate-5",
-      "test-aggregate-6",
+      generateTestAggregateId("concurrent-1"),
+      generateTestAggregateId("concurrent-2"),
+      generateTestAggregateId("concurrent-3"),
     ];
 
     // Send commands for multiple aggregates concurrently
@@ -248,7 +250,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     await Promise.all(
       aggregateIds.map((aggregateId) =>
         waitForCheckpoint(
-          "test_pipeline",
+          pipeline.pipelineName,
           "testHandler",
           aggregateId,
           tenantIdString,
@@ -279,7 +281,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
   });
 
   it("rebuilds projection from all events when new event arrives", async () => {
-    const aggregateId = "test-aggregate-7";
+    const aggregateId = generateTestAggregateId();
 
     // Send first command
     await pipeline.commands.testCommand.send({
@@ -290,7 +292,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     });
 
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -318,7 +320,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     });
 
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
@@ -344,7 +346,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     // When multiple events arrive rapidly for the same aggregate,
     // BullMQ may deduplicate them into a single job.
     // The batch processor should still process ALL events from the event store.
-    const aggregateId = "test-aggregate-dedup";
+    const aggregateId = generateTestAggregateId("dedup");
 
     // Send multiple commands rapidly without waiting
     // These will likely be deduplicated by BullMQ
@@ -375,7 +377,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     // Wait for all 3 events to be processed
     // The batch processor should process all events even if only one queue job triggers
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -386,7 +388,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     );
 
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,
