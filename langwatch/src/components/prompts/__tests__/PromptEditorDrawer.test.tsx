@@ -44,6 +44,19 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    modelMetadata: {
+      "openai/gpt-4o": {
+        name: "gpt-4o",
+        max_tokens: 128000,
+        max_output_tokens: 16384,
+      },
+    },
+    isLoading: false,
+  }),
+}));
+
 // Mock components with Prism dependency
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
   CodeEditor: () => null,
