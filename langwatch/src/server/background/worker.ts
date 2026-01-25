@@ -30,6 +30,9 @@ import type { EventSourcingJob } from "./types";
 
 import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
+import { getClickHouseClient } from "../clickhouse/client";
+import { initializeEventSourcing } from "../event-sourcing";
+import { connection as redis } from "../redis";
 
 const logger = createLogger("langwatch:workers");
 
@@ -50,6 +53,12 @@ export const start = (
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
+  // Initialize event sourcing with ClickHouse and Redis clients
+  initializeEventSourcing({
+    clickHouseClient: getClickHouseClient(),
+    redisConnection: redis,
+  });
+
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
