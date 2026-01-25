@@ -282,6 +282,7 @@ async function initializeClickHouseSchema(
 ): Promise<void> {
   await migrateUp({
     connectionUrl,
+    database: TEST_DATABASE,
     verbose: true,
   });
 }
