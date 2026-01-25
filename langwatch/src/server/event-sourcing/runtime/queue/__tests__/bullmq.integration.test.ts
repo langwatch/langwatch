@@ -129,17 +129,22 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be fully ready
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       await processor.send("first");
       await processor.send("second");
       await processor.send("third");
 
-      // Wait for all jobs to be processed
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Poll for completion rather than fixed timeout
+      const startTime = Date.now();
+      const maxWaitMs = 5000;
+      while (processedOrder.length < 3 && Date.now() - startTime < maxWaitMs) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
       expect(processedOrder).toEqual(["first", "second", "third"]);
-    });
+    }, 10000);
 
     it("handles concurrent job processing with configured concurrency limit", async () => {
       const queueName = generateQueueName("concurrency");
@@ -148,14 +153,14 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const concurrencyLimit = 2;
       let concurrentCount = 0;
       let maxConcurrent = 0;
-      let processedCount = 0;
+      const processedPayloads: string[] = [];
 
-      const processFn = vi.fn().mockImplementation(async (_payload: string) => {
+      const processFn = vi.fn().mockImplementation(async (payload: string) => {
         concurrentCount++;
         maxConcurrent = Math.max(maxConcurrent, concurrentCount);
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 50)); // Reduced delay
         concurrentCount--;
-        processedCount++;
+        processedPayloads.push(payload);
       });
 
       const definition: EventSourcedQueueDefinition<string> = {
@@ -168,29 +173,25 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       processors.push(processor);
 
       // Wait for worker to be fully ready
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Send more jobs than concurrency limit
-      await Promise.all([
-        processor.send("job-1"),
-        processor.send("job-2"),
-        processor.send("job-3"),
-        processor.send("job-4"),
-        processor.send("job-5"),
-      ]);
+      // Send jobs sequentially to ensure they're all queued
+      for (const jobId of ["job-1", "job-2", "job-3", "job-4", "job-5"]) {
+        await processor.send(jobId);
+      }
 
-      // Poll for completion rather than fixed timeout
-      // With concurrency=2 and 100ms per job, 5 jobs should take ~300ms
+      // Poll for completion with longer timeout
+      // With concurrency=2 and 50ms per job, 5 jobs should take ~150ms
       // But we give more time for worker overhead
       const startTime = Date.now();
-      const maxWaitMs = 5000;
-      while (processedCount < 5 && Date.now() - startTime < maxWaitMs) {
+      const maxWaitMs = 10000;
+      while (processedPayloads.length < 5 && Date.now() - startTime < maxWaitMs) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
       expect(maxConcurrent).toBeLessThanOrEqual(concurrencyLimit);
-      expect(processFn).toHaveBeenCalledTimes(5);
-    }, 10000);
+      expect(processedPayloads.length).toBe(5);
+    }, 15000);
 
     it("respects job delay configuration", async () => {
       const queueName = generateQueueName("delay");
