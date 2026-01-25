@@ -21,7 +21,8 @@ import {
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { TargetConfig } from "../types";
+import { DRAWER_WIDTH } from "../constants";
+import type { FieldMapping, TargetConfig } from "../types";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -29,8 +30,21 @@ import {
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
-// Drawer width constant - must match the one in EvaluationsV3Table
-const DRAWER_WIDTH = 456;
+/**
+ * Convert target mappings for a specific dataset to UI format.
+ * This is used when opening drawers to populate the input mappings.
+ */
+export const buildUIMappings = (
+  target: TargetConfig,
+  activeDatasetId: string,
+): Record<string, UIFieldMapping> => {
+  const datasetMappings = target.mappings[activeDatasetId] ?? {};
+  const uiMappings: Record<string, UIFieldMapping> = {};
+  for (const [key, mapping] of Object.entries(datasetMappings)) {
+    uiMappings[key] = convertToUIMapping(mapping as FieldMapping);
+  }
+  return uiMappings;
+};
 
 /**
  * Scroll the table container to position the target column right next to the drawer edge.
@@ -135,13 +149,7 @@ export const useOpenTargetEditor = () => {
       if (target.type === "prompt") {
         // Build available sources for variable mapping (active dataset only)
         const availableSources = buildAvailableSources();
-
-        // Convert target mappings for the active dataset to UI format
-        const datasetMappings = target.mappings[activeDatasetId] ?? {};
-        const uiMappings: Record<string, UIFieldMapping> = {};
-        for (const [key, mapping] of Object.entries(datasetMappings)) {
-          uiMappings[key] = convertToUIMapping(mapping);
-        }
+        const uiMappings = buildUIMappings(target, activeDatasetId);
 
         // Set flow callbacks for the prompt editor using the centralized helper
         // This ensures we never forget a required callback
@@ -197,17 +205,58 @@ export const useOpenTargetEditor = () => {
               const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
               window.open(workflowUrl, "_blank");
             }
+          } else if (agent?.type === "http") {
+            // HTTP agent - open HTTP editor drawer
+            const availableSources = buildAvailableSources();
+            const uiMappings = buildUIMappings(target, activeDatasetId);
+
+            // Set flow callbacks for the HTTP editor
+            setFlowCallbacks("agentHttpEditor", {
+              onInputMappingsChange: (
+                identifier: string,
+                mapping: UIFieldMapping | undefined,
+              ) => {
+                const currentActiveDatasetId =
+                  useEvaluationsV3Store.getState().activeDatasetId;
+                const currentDatasets =
+                  useEvaluationsV3Store.getState().datasets;
+                const checkIsDatasetSource = (sourceId: string) =>
+                  currentDatasets.some((d) => d.id === sourceId);
+
+                if (mapping) {
+                  setTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, checkIsDatasetSource),
+                  );
+                } else {
+                  removeTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                  );
+                }
+              },
+            });
+
+            openDrawer("agentHttpEditor", {
+              availableSources,
+              inputMappings: uiMappings,
+              urlParams: {
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
+              },
+            });
+
+            // Scroll to position the target column next to the drawer
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
+            });
           } else {
             // Code agent - open code editor drawer
-            // Build available sources for variable mapping (active dataset only)
             const availableSources = buildAvailableSources();
-
-            // Convert target mappings for the active dataset to UI format
-            const datasetMappings = target.mappings[activeDatasetId] ?? {};
-            const uiMappings: Record<string, UIFieldMapping> = {};
-            for (const [key, mapping] of Object.entries(datasetMappings)) {
-              uiMappings[key] = convertToUIMapping(mapping);
-            }
+            const uiMappings = buildUIMappings(target, activeDatasetId);
 
             // Set flow callbacks for the code editor
             setFlowCallbacks("agentCodeEditor", {

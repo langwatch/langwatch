@@ -297,6 +297,21 @@ def parse_component(
                     "CustomNode",
                     params,
                 )
+        case "http":
+            # HTTP config is stored in parameters like other node types
+            params = parse_fields(node.data.parameters or [], autoparse=True)
+
+            # Validate required fields
+            if not params.get("url"):
+                raise ValueError(
+                    f"HTTP config 'url' not specified for HTTP node {node.data.name}"
+                )
+
+            return (
+                "from langwatch_nlp.studio.dspy.http_node import HttpNode",
+                "HttpNode",
+                params,
+            )
         case "entry":
             return "", "None", {}
         case "end":

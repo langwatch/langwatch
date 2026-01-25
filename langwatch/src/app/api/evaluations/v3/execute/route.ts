@@ -1,5 +1,4 @@
 import { zValidator } from "@hono/zod-validator";
-import type { Evaluator } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { handle } from "hono/vercel";
@@ -11,26 +10,15 @@ import {
   createInitialUIState,
   type EvaluationsV3State,
 } from "~/evaluations-v3/types";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import {
-  AgentRepository,
-  type TypedAgent,
-} from "~/server/agents/agent.repository";
-import { AgentService } from "~/server/agents/agent.service";
 import { hasProjectPermission } from "~/server/api/rbac";
-import { getFullDataset } from "~/server/api/routers/datasetRecord";
 import { authOptions } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { loadExecutionData } from "~/server/evaluations-v3/execution/dataLoader";
 import {
   requestAbort,
   runOrchestrator,
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
-import { EvaluatorService } from "~/server/evaluators/evaluator.service";
-import {
-  PromptService,
-  type VersionedPrompt,
-} from "~/server/prompt-config/prompt.service";
 import { createLogger } from "~/utils/logger";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -74,120 +62,28 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
     );
   }
 
-  // Load required data
-  let datasetRows: Array<Record<string, unknown>>;
-  let datasetColumns: Array<{ id: string; name: string; type: string }>;
-  let loadedPrompts: Map<string, VersionedPrompt>;
-  let loadedAgents: Map<string, TypedAgent>;
-  let loadedEvaluators: Map<string, Evaluator>;
+  // Load all execution data using shared loader
+  const dataResult = await loadExecutionData(
+    projectId,
+    request.dataset,
+    request.targets,
+    request.evaluators,
+  );
 
-  try {
-    // Load dataset
-    const dataset = request.dataset;
-    if (dataset.type === "inline" && dataset.inline) {
-      datasetColumns = dataset.inline.columns;
-      datasetRows = transposeColumnsFirstToRowsFirstWithId(
-        dataset.inline.records,
-      );
-    } else if (dataset.type === "saved" && dataset.datasetId) {
-      const fullDataset = await getFullDataset({
-        datasetId: dataset.datasetId,
-        projectId,
-        entrySelection: "all",
-      });
-      if (!fullDataset) {
-        return c.json({ error: "Dataset not found" }, { status: 404 });
-      }
-      datasetColumns = dataset.columns;
-      datasetRows = fullDataset.datasetRecords.map(
-        (r) => r.entry as Record<string, unknown>,
-      );
-    } else {
-      return c.json(
-        { error: "Invalid dataset configuration" },
-        { status: 400 },
-      );
-    }
-
-    // Load prompts for prompt targets
-    loadedPrompts = new Map();
-    const promptService = new PromptService(prisma);
-    for (const target of request.targets) {
-      if (target.type === "prompt" && target.promptId) {
-        // Use promptVersionNumber (numeric version like 12) not promptVersionId (string ID)
-        try {
-          const prompt = await promptService.getPromptByIdOrHandle({
-            idOrHandle: target.promptId,
-            projectId,
-            version: target.promptVersionNumber ?? undefined,
-          });
-          if (prompt) {
-            loadedPrompts.set(target.promptId, prompt);
-          } else {
-            const versionInfo = target.promptVersionNumber
-              ? ` version ${target.promptVersionNumber}`
-              : "";
-            return c.json(
-              { error: `Prompt "${target.name}"${versionInfo} not found` },
-              { status: 404 },
-            );
-          }
-        } catch (promptError) {
-          const versionInfo = target.promptVersionNumber
-            ? ` version ${target.promptVersionNumber}`
-            : "";
-          logger.error(
-            {
-              error: promptError,
-              promptId: target.promptId,
-              version: target.promptVersionNumber,
-            },
-            "Failed to load prompt for target",
-          );
-          return c.json(
-            {
-              error: `Failed to load prompt "${target.name}"${versionInfo}: ${(promptError as Error).message}`,
-            },
-            { status: 404 },
-          );
-        }
-      }
-    }
-
-    // Load agents for agent targets
-    loadedAgents = new Map();
-    const agentService = AgentService.create(prisma);
-    for (const target of request.targets) {
-      if (target.type === "agent" && target.dbAgentId) {
-        const agent = await agentService.getById({
-          id: target.dbAgentId,
-          projectId,
-        });
-        if (agent) {
-          loadedAgents.set(target.dbAgentId, agent);
-        }
-      }
-    }
-
-    // Load evaluators from DB (settings are always fetched fresh from DB)
-    loadedEvaluators = new Map();
-    const evaluatorService = EvaluatorService.create(prisma);
-    for (const evaluator of request.evaluators) {
-      if (evaluator.dbEvaluatorId) {
-        const dbEvaluator = await evaluatorService.getById({
-          id: evaluator.dbEvaluatorId,
-          projectId,
-        });
-        if (dbEvaluator) {
-          loadedEvaluators.set(evaluator.dbEvaluatorId, dbEvaluator);
-        }
-      }
-    }
-  } catch (error) {
-    logger.error({ error, projectId }, "Failed to load execution data");
-    captureException(error, { extra: { projectId } });
-    return c.json({ error: (error as Error).message }, { status: 500 });
+  if ("error" in dataResult) {
+    return c.json(
+      { error: dataResult.error },
+      { status: dataResult.status as 400 | 404 },
+    );
   }
+
+  const {
+    datasetRows,
+    datasetColumns,
+    loadedPrompts,
+    loadedAgents,
+    loadedEvaluators,
+  } = dataResult;
 
   // Build state object from request
   const state: EvaluationsV3State = {
@@ -221,8 +117,8 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         state,
         datasetRows,
         datasetColumns,
-        loadedPrompts: loadedPrompts as any,
-        loadedAgents: loadedAgents as any,
+        loadedPrompts,
+        loadedAgents,
         loadedEvaluators,
         saveToEs: shouldSaveToEs,
         concurrency: request.concurrency,

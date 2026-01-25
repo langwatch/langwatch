@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { EvaluatorConfig } from "~/evaluations-v3/types";
+import type { EvaluatorConfig, TargetConfig } from "~/evaluations-v3/types";
+import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { ExecutionCell } from "../types";
-import { buildEvaluatorNode } from "../workflowBuilder";
+import { buildEvaluatorNode, buildHttpNodeFromAgent } from "../workflowBuilder";
 
 describe("buildEvaluatorNode", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({
@@ -161,5 +163,136 @@ describe("buildEvaluatorNode", () => {
       "score",
       "label",
     ]);
+  });
+});
+
+describe("buildHttpNodeFromAgent", () => {
+  const createHttpAgent = (): TypedAgent => ({
+    id: "http-agent-1",
+    projectId: "project-1",
+    name: "My HTTP Agent",
+    type: "http",
+    config: {
+      url: "https://api.example.com/chat",
+      method: "POST",
+      bodyTemplate: '{"input": "{{input}}", "thread_id": "{{threadId}}"}',
+      outputPath: "$.response.content",
+      headers: [{ key: "X-Custom", value: "test-value" }],
+      timeoutMs: 5000,
+    } as HttpComponentConfig,
+    workflowId: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const createTargetConfig = (): TargetConfig => ({
+    id: "target-1",
+    type: "agent",
+    name: "HTTP Agent Target",
+    inputs: [
+      { identifier: "input", type: "str" },
+      { identifier: "threadId", type: "str" },
+    ],
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {
+      "dataset-1": {
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
+        threadId: {
+          type: "value",
+          value: "test-thread-123",
+        },
+      },
+    },
+  });
+
+  const createCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-1",
+    targetConfig: createTargetConfig(),
+    evaluatorConfigs: [],
+    datasetEntry: {
+      _datasetId: "dataset-1",
+      question: "What is the capital of France?",
+    },
+  });
+
+  it("creates HTTP node with correct type", () => {
+    const agent = createHttpAgent();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+
+    expect(node.type).toBe("http");
+  });
+
+  it("extracts variables from body template as inputs", () => {
+    const agent = createHttpAgent();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+
+    // Should extract {{input}} and {{threadId}} from body template
+    const inputIdentifiers = node.data.inputs?.map((i) => i.identifier);
+    expect(inputIdentifiers).toContain("input");
+    expect(inputIdentifiers).toContain("threadId");
+  });
+
+  it("applies value mappings to inputs", () => {
+    const agent = createHttpAgent();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+
+    // threadId has a value mapping, should have that value
+    const threadIdInput = node.data.inputs?.find(
+      (i) => i.identifier === "threadId",
+    );
+    expect(threadIdInput?.value).toBe("test-thread-123");
+
+    // input has a source mapping, should have undefined value (comes from edge)
+    const inputInput = node.data.inputs?.find((i) => i.identifier === "input");
+    expect(inputInput?.value).toBeUndefined();
+  });
+
+  it("includes HTTP config in parameters array", () => {
+    const agent = createHttpAgent();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+
+    // HTTP config is stored in parameters (consistent with other node types)
+    const params = node.data.parameters ?? [];
+    const getParam = (id: string) => params.find((p) => p.identifier === id)?.value;
+
+    expect(getParam("url")).toBe("https://api.example.com/chat");
+    expect(getParam("method")).toBe("POST");
+    expect(getParam("body_template")).toBe(
+      '{"input": "{{input}}", "thread_id": "{{threadId}}"}',
+    );
+    expect(getParam("output_path")).toBe("$.response.content");
+    expect(getParam("timeout_ms")).toBe(5000);
+    expect(getParam("headers")).toEqual({ "X-Custom": "test-value" });
+  });
+
+  it("has single output named 'output'", () => {
+    const agent = createHttpAgent();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildHttpNodeFromAgent("target-1", agent, targetConfig, cell);
+
+    expect(node.data.outputs).toHaveLength(1);
+    expect(node.data.outputs?.[0]?.identifier).toBe("output");
+    expect(node.data.outputs?.[0]?.type).toBe("str");
   });
 });

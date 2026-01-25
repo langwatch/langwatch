@@ -412,6 +412,9 @@ export async function* executeCell(
 
 /**
  * Builds the input values for an evaluator from target output and dataset entry.
+ *
+ * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
+ * so we can use mapping.sourceField directly without ID-to-name translation.
  */
 const buildEvaluatorInputs = (
   cell: ExecutionCell,
@@ -432,7 +435,7 @@ const buildEvaluatorInputs = (
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source") {
       if (mapping.source === "dataset") {
-        // From dataset entry
+        // From dataset entry - uses column name as key
         inputs[inputField] = cell.datasetEntry[mapping.sourceField];
       } else if (
         mapping.source === "target" &&
@@ -451,15 +454,22 @@ const buildEvaluatorInputs = (
 
 /**
  * Builds the input values for a target from the cell's dataset entry.
+ *
+ * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
+ * so we can use mapping.sourceField directly without ID-to-name translation.
  */
-const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
+const buildTargetInputs = (
+  cell: ExecutionCell,
+): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return inputs;
 
   const mappings = cell.targetConfig.mappings[datasetId] ?? {};
+
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
+      // Dataset entries use column name as key
       inputs[inputField] = cell.datasetEntry[mapping.sourceField];
     } else if (mapping.type === "value") {
       inputs[inputField] = mapping.value;

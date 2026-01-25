@@ -70,6 +70,10 @@ export type VariablesSectionProps = {
 
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
   missingMappingIds?: Set<string>;
+  /** Whether to show the validation error message for missing mappings (defaults to true when missingMappingIds is provided) */
+  showMissingMappingsError?: boolean;
+  /** When true, highlighted fields show yellow background but not "Required" placeholder (for "at least one" validation) */
+  optionalHighlighting?: boolean;
 
   /** Set of variable identifiers that cannot be removed (locked variables) */
   lockedVariables?: Set<string>;
@@ -99,6 +103,8 @@ export const VariablesSection = ({
   showAddButton,
   title = "Variables",
   missingMappingIds = new Set(),
+  showMissingMappingsError = true,
+  optionalHighlighting = false,
   lockedVariables = new Set(),
   variableInfo = {},
   disabledMappings = new Set(),
@@ -222,6 +228,7 @@ export const VariablesSection = ({
                 readOnly={readOnly || isLocked}
                 isEditing={editingId === variable.identifier}
                 isMissing={missingMappingIds.has(variable.identifier)}
+                optionalHighlighting={optionalHighlighting}
                 onStartEdit={() =>
                   !isLocked && setEditingId(variable.identifier)
                 }
@@ -248,6 +255,18 @@ export const VariablesSection = ({
           })}
         </VStack>
       )}
+
+      {/* Validation error for missing mappings */}
+      {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
+        <Text
+          data-testid="missing-mappings-error"
+          color="red.500"
+          fontSize="sm"
+        >
+          Please map all required fields:{" "}
+          {Array.from(missingMappingIds).join(", ")}
+        </Text>
+      )}
     </VStack>
   );
 };
@@ -264,6 +283,7 @@ const INPUT_TYPE_OPTIONS = [
   { value: "image", label: TYPE_LABELS.image ?? "Image" },
   { value: "list", label: TYPE_LABELS.list ?? "List" },
   { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
+  { value: "chat_messages", label: TYPE_LABELS.chat_messages ?? "Messages" },
 ];
 
 type VariableRowProps = {
@@ -276,6 +296,8 @@ type VariableRowProps = {
   isEditing: boolean;
   /** Whether this field is missing a required mapping (for highlighting) */
   isMissing?: boolean;
+  /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
+  optionalHighlighting?: boolean;
   onStartEdit: () => void;
   onEndEdit: () => void;
   onUpdate: (updates: Partial<Variable>) => boolean;
@@ -298,6 +320,7 @@ const VariableRow = ({
   readOnly,
   isEditing,
   isMissing = false,
+  optionalHighlighting = false,
   onStartEdit,
   onEndEdit,
   onUpdate,
@@ -448,6 +471,7 @@ const VariableRow = ({
                 disabled={readOnly && !onMappingChange}
                 placeholder=""
                 isMissing={isMissing}
+                optionalHighlighting={optionalHighlighting}
               />
             </Box>
           ) : (

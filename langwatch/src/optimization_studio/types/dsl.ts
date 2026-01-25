@@ -204,7 +204,7 @@ export const nodeDatasetSchema = z.object({
   name: z.string().optional(),
   inline: z
     .object({
-      records: z.record(z.array(z.string())),
+      records: z.record(z.array(z.any())),
       columnTypes: z.array(
         z.object({
           id: z.string().optional(),

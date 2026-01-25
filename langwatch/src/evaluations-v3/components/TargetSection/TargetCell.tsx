@@ -104,6 +104,9 @@ export function TargetCellContent({
     width: 0,
   });
 
+  // State for expanded error view
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
+
   // Check if content overflows
   useEffect(() => {
     if (outputRef.current) {
@@ -112,6 +115,9 @@ export function TargetCellContent({
       setIsOverflowing(isContentOverflowing);
     }
   }, [output]);
+
+  // Check if error is likely to overflow 2 lines (~100 chars is a rough heuristic)
+  const isErrorOverflowing = (error?.length ?? 0) > 100;
 
   // Handler to open trace drawer (also closes expanded view)
   const handleViewTrace = useCallback(() => {
@@ -256,21 +262,27 @@ export function TargetCellContent({
     // Error state - show error message
     if (error) {
       return (
-        <HStack
-          gap={2}
-          p={2}
-          bg="red.subtle"
-          borderRadius="md"
-          color="red.fg"
-          fontSize="13px"
-        >
-          <Box flexShrink={0}>
-            <LuCircleAlert size={16} />
-          </Box>
-          <Text lineClamp={expanded ? undefined : 2}>
-            {parseLLMError(error).message}
-          </Text>
-        </HStack>
+        <Box position="relative">
+          <HStack
+            gap={2}
+            p={2}
+            bg="red.subtle"
+            borderRadius="md"
+            color="red.fg"
+            fontSize="13px"
+            align="start"
+            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
+            onClick={() => setIsErrorExpanded(true)}
+            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
+          >
+            <Box flexShrink={0} paddingTop={0.5}>
+              <LuCircleAlert size={16} />
+            </Box>
+            <Text lineClamp={expanded || isErrorExpanded ? undefined : 2} userSelect="text" whiteSpace="pre-wrap" wordBreak="break-word">
+              {parseLLMError(error).message}
+            </Text>
+          </HStack>
+        </Box>
       );
     }
 

@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { Field } from "~/optimization_studio/types/dsl";
+import {
+  httpAuthSchema,
+  httpHeaderSchema,
+  HTTP_METHODS,
+} from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
@@ -176,6 +181,28 @@ export type EvaluatorConfig = Omit<
 };
 
 /**
+ * Agent types for targets (matches database agent types).
+ * Used to determine which type of DSL node to generate.
+ */
+export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http"]);
+export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
+
+/**
+ * HTTP config schema for HTTP agent targets.
+ * Stored on the target so DSL adapter can access it without async DB calls.
+ */
+export const httpConfigSchema = z.object({
+  url: z.string(),
+  method: z.enum(HTTP_METHODS).default("POST"),
+  headers: z.array(httpHeaderSchema).optional(),
+  auth: httpAuthSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
+  timeoutMs: z.number().positive().optional(),
+});
+export type HttpConfig = z.infer<typeof httpConfigSchema>;
+
+/**
  * Zod schema for target config validation.
  *
  * Mappings are stored per-dataset:
@@ -204,6 +231,18 @@ export const targetConfigSchema = z.object({
   promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
   dbAgentId: z.string().optional(),
+  /**
+   * The specific agent type (code, signature, workflow, http).
+   * Used by DSL adapter to determine which node type to generate.
+   * Only set for agent targets (type === "agent").
+   */
+  agentType: agentTypeEnum.optional(),
+  /**
+   * HTTP configuration for HTTP agent targets.
+   * Stored on the target so DSL adapter can generate HTTP nodes synchronously.
+   * Only set when agentType === "http".
+   */
+  httpConfig: httpConfigSchema.optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping

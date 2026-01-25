@@ -30,10 +30,21 @@ export function parseLLMError(raw: string): ParsedLLMError {
   }
 
   // Try Python error format: ErrorType('message', ...)
-  const pythonMatch = raw.match(/^(\w+Error)\(['"](.+?)['"](?:,|\))/s);
+  const pythonMatch = raw.match(/^(\w+Error|Exception)\('([\s\S]+?)'\)/s);
   if (pythonMatch) {
-    const [, , message] = pythonMatch;
-    return { type: "unknown", message: message ?? raw };
+    const [, errorType, message] = pythonMatch;
+    let unescapedMessage = message;
+    try {
+      if (message) {
+        unescapedMessage = JSON.parse(
+          `"${message.replace(/"/g, '\\"').replace(/\\'/g, "'")}"`,
+        );
+      }
+    } catch {}
+    return {
+      type: "unknown",
+      message: unescapedMessage ? `${errorType}\n${unescapedMessage}` : raw,
+    };
   }
 
   return { type: "unknown", message: raw };

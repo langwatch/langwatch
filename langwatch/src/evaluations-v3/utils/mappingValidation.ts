@@ -127,14 +127,19 @@ export const getUsedFields = (target: TargetConfig): Set<string> => {
 /**
  * Check if a target has all required mappings for a dataset.
  *
- * A mapping is required if the field is BOTH:
- * 1. Used in the prompt (referenced via {{fieldName}})
- * 2. Listed in the inputs array (explicitly defined by user)
+ * Validation rules vary by target type:
  *
- * Fields that are only used but not listed ("Undefined variables") are NOT required -
- * the user may intentionally leave them undefined for pass-through.
+ * **Prompts:**
+ * - A mapping is required if the field is BOTH used (referenced via {{fieldName}}) AND in inputs
+ * - Fields only used but not listed ("Undefined variables") are NOT required
  *
- * For code targets, all inputs are required.
+ * **HTTP Agents:**
+ * - All fields are OPTIONAL (no individual field is required)
+ * - BUT at least ONE field must have a mapping
+ * - This allows flexibility in what data to send to the HTTP endpoint
+ *
+ * **Code/Other Agents:**
+ * - All inputs are required (must have mappings)
  *
  * @param target - The target to validate
  * @param datasetId - The dataset to validate against
@@ -154,8 +159,45 @@ export const getTargetMissingMappings = (
   const inputs = target.localPromptConfig?.inputs ?? target.inputs ?? [];
   const inputIds = new Set(inputs.map((i) => i.identifier));
 
-  // A field is required if it's BOTH used AND in the inputs list
-  // "Undefined variables" (used but not in inputs) don't require mappings
+  // HTTP agents have special validation: all optional, but at least one required
+  const isHttpAgent =
+    target.type === "agent" &&
+    "agentType" in target &&
+    target.agentType === "http";
+
+  if (isHttpAgent) {
+    // HTTP agents: all fields are optional, but at least one must be mapped
+    let hasAtLeastOneMapping = false;
+
+    for (const fieldId of usedFields) {
+      if (!inputIds.has(fieldId)) continue;
+
+      const hasMapping = datasetMappings[fieldId] !== undefined;
+      if (hasMapping) {
+        hasAtLeastOneMapping = true;
+      } else {
+        // Add to missing but mark as NOT required (optional)
+        missingMappings.push({
+          fieldId,
+          fieldName: fieldId,
+          isRequired: false, // HTTP agent fields are optional
+        });
+      }
+    }
+
+    // Valid if at least one field has a mapping (or there are no fields)
+    const totalFields = Array.from(usedFields).filter((f) =>
+      inputIds.has(f),
+    ).length;
+    const isValid = totalFields === 0 || hasAtLeastOneMapping;
+
+    return {
+      isValid,
+      missingMappings,
+    };
+  }
+
+  // Standard validation for prompts and code agents
   for (const fieldId of usedFields) {
     // Skip if not in inputs list - user hasn't defined this variable
     if (!inputIds.has(fieldId)) continue;

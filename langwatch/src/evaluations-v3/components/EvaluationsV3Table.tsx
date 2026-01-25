@@ -22,9 +22,14 @@ import {
 import { api } from "~/utils/api";
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field, HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import { DRAWER_WIDTH } from "../constants";
 import { useDatasetSync } from "../hooks/useDatasetSync";
+import {
+  buildInputsFromBodyTemplate,
+  convertHttpComponentConfig,
+} from "../utils/httpAgentUtils";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import {
@@ -63,9 +68,6 @@ import {
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
-
-// Drawer width for spacer columns (must match actual drawer width)
-const DRAWER_WIDTH = 456;
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_EXPANDED_MODE = 100;
@@ -253,20 +255,46 @@ export function EvaluationsV3Table({
     (savedAgent: TypedAgent) => {
       const config = savedAgent.config as Record<string, unknown>;
 
+      // Check if this is an HTTP agent by looking at savedAgent.type or config structure
+      const isHttpAgent =
+        savedAgent.type === "http" ||
+        (config.url !== undefined && config.bodyTemplate !== undefined);
+
       // Convert TypedAgent to TargetConfig format (agent type)
-      // Agent type and workflow ID are fetched at runtime via dbAgentId when needed
+      // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
+      // For code/workflow agents, use config.inputs directly
+      let targetInputs: Field[];
+      let httpConfig: TargetConfig["httpConfig"];
+
+      if (isHttpAgent) {
+        // HTTP agent: extract inputs from body template
+        const httpComponentConfig = config as HttpComponentConfig;
+        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
+        httpConfig = convertHttpComponentConfig(httpComponentConfig);
+
+        // Fall back to default input if bodyTemplate has no variables
+        if (targetInputs.length === 0) {
+          targetInputs = [{ identifier: "input", type: "str" }];
+        }
+      } else {
+        // Code/workflow agent: use config.inputs directly
+        targetInputs = (config.inputs as TargetConfig["inputs"]) ?? [
+          { identifier: "input", type: "str" },
+        ];
+      }
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
-        type: "agent", // This is a target of type "agent" (code/workflow)
+        type: "agent", // This is a target of type "agent" (code/workflow/http)
+        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
         name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: (config.inputs as TargetConfig["inputs"]) ?? [
-          { identifier: "input", type: "str" },
-        ],
+        inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
           { identifier: "output", type: "str" },
         ],
         mappings: {},
+        httpConfig, // Only set for HTTP agents
       };
       addTarget(targetConfig);
       closeDrawer();
@@ -567,6 +595,9 @@ export function EvaluationsV3Table({
     setFlowCallbacks("agentCodeEditor", {
       onSave: handleSelectSavedAgent,
     });
+    setFlowCallbacks("agentHttpEditor", {
+      onSave: handleSelectSavedAgent,
+    });
     setFlowCallbacks("workflowSelector", {
       onSave: handleSelectSavedAgent,
     });
@@ -818,11 +849,13 @@ export function EvaluationsV3Table({
   const targetIdsKey = targets.map((r) => r.id).join(",");
   const targetIds = useMemo(() => targets.map((r) => r.id), [targetIdsKey]);
 
-  // Similarly stabilize dataset column IDs
-  const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
+  // Similarly stabilize dataset columns - include type in key so icon updates when type changes
+  const datasetColumnsKey = datasetColumns
+    .map((c) => `${c.id}:${c.type}`)
+    .join(",");
   const stableDatasetColumns = useMemo(
     () => datasetColumns,
-    [datasetColumnIdsKey],
+    [datasetColumnsKey],
   );
 
   // Build table meta for passing dynamic data to headers/cells
