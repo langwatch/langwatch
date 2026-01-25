@@ -73,7 +73,7 @@ export const evaluationCompletedEventDataSchema = z.object({
   status: z.enum(["processed", "error", "skipped"]),
   score: z.number().optional(),
   passed: z.boolean().optional(),
-  label: z.string().optional(),
+  label: z.string().nullish(),
   details: z.string().optional(),
   error: z.string().optional(),
 });
