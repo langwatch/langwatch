@@ -33,6 +33,43 @@ export interface DeduplicationConfig<Payload> {
   replace?: boolean;
 }
 
+/**
+ * Deduplication strategy for event handlers and projections.
+ *
+ * - `"none"`: Explicit no deduplication - processes every event individually
+ * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}` (useful for projections)
+ * - `DeduplicationConfig<Payload>`: Custom deduplication configuration object
+ * - `null` or `undefined`: No deduplication (default behavior)
+ *
+ * @example
+ * ```typescript
+ * // No deduplication (default) - processes every event
+ * .withEventHandler("spanStorage", SpanStorageEventHandler, {
+ *   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+ * })
+ *
+ * // Dedupe by aggregate - only process latest event per aggregate
+ * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
+ *   deduplication: "aggregate",
+ *   delay: 1500,
+ * })
+ *
+ * // Custom deduplication
+ * .withProjection("analytics", AnalyticsProjectionHandler, {
+ *   deduplication: {
+ *     makeId: (event) => `${event.tenantId}:custom-key`,
+ *     ttlMs: 2000,
+ *   },
+ * })
+ * ```
+ */
+export type DeduplicationStrategy<Payload> =
+  | "none"
+  | "aggregate"
+  | DeduplicationConfig<Payload>
+  | null
+  | undefined;
+
 export interface EventSourcedQueueDefinition<Payload> {
   /**
    * Base name for the queue and job.

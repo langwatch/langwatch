@@ -1,7 +1,7 @@
 import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { Event, Projection } from "./domain/types";
 import type { KillSwitchOptions } from "./pipeline/types";
-import type { DeduplicationConfig } from "./queues";
+import type { DeduplicationStrategy } from "./queues";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**
@@ -14,22 +14,33 @@ export interface ProjectionOptions<EventType extends Event = Event> {
   delay?: number;
 
   /**
-   * Optional: Deduplication configuration.
-   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
-   * Default deduplication ID: `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
+   * Optional: Deduplication strategy for this projection.
+   *
+   * - `"none"`: Explicit no deduplication - processes every event individually
+   * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}` (most common for projections)
+   * - `DeduplicationConfig`: Custom deduplication configuration object
+   * - `null` or `undefined`: No deduplication (default behavior)
+   *
+   * @default undefined (no deduplication)
    *
    * @example
    * ```typescript
-   * // Debounce trace summary updates by deduplicating on aggregate
+   * // Use aggregate-based deduplication for projections
    * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
+   *   deduplication: "aggregate",
+   *   delay: 1500,
+   * })
+   *
+   * // Custom deduplication configuration
+   * .withProjection("analytics", AnalyticsProjectionHandler, {
    *   deduplication: {
-   *     makeId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
+   *     makeId: (event) => `${event.tenantId}:custom-key`,
    *     ttlMs: 1000,
    *   },
    * })
    * ```
    */
-  deduplication?: DeduplicationConfig<EventType>;
+  deduplication?: DeduplicationStrategy<EventType>;
 
   /**
    * Maximum batch size for processing. When set, events are accumulated
