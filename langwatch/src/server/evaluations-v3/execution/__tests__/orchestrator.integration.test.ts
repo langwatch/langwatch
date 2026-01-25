@@ -1,6 +1,7 @@
 import type { Project } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
 import type {
+  DatasetColumn,
   EvaluationsV3State,
   EvaluatorConfig,
   LocalPromptConfig,
@@ -2048,7 +2049,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         "~/optimization_studio/utils/datasetUtils"
       );
 
-      const datasetColumns = [
+      const datasetColumns: DatasetColumn[] = [
         { id: "input_0", name: "input", type: "string" },
         { id: "expected_output_1", name: "expected_output", type: "string" },
         { id: "messages_2", name: "messages", type: "chat_messages" },
@@ -2072,11 +2073,13 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         datasetColumns.map((c) => [c.id, c.name]),
       );
       datasetRows = datasetRows.map((row) => {
-        const normalized: Record<string, unknown> = {};
+        const normalized: Record<string, unknown> = { id: row.id };
         for (const [key, value] of Object.entries(row)) {
-          normalized[idToName[key] ?? key] = value;
+          if (key !== "id") {
+            normalized[idToName[key] ?? key] = value;
+          }
         }
-        return normalized;
+        return normalized as typeof row;
       });
 
       // Step 3: Parse JSON columns (like the API route does)
