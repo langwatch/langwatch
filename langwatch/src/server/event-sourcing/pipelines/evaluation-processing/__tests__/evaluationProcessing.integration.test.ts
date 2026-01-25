@@ -55,6 +55,13 @@ function generateTestEvaluatorId(): string {
 }
 
 /**
+ * Generates a unique pipeline name to avoid conflicts in parallel tests.
+ */
+function generateTestPipelineName(): string {
+  return `evaluation_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
  * Creates test payload for schedule evaluation command.
  */
 function createTestSchedulePayload(
@@ -144,7 +151,11 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
 > & {
   eventStore: EventStoreClickHouse;
   processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
+  pipelineName: string;
+  /** Wait for BullMQ workers to be ready before sending commands */
+  ready: () => Promise<void>;
 } {
+  const pipelineName = generateTestPipelineName();
   const clickHouseClient = getTestClickHouseClient();
   const redisConnection = getTestRedisConnection();
 
@@ -213,7 +224,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   // Build pipeline using the existing pipeline definition's handlers
   const pipeline = eventSourcing
     .registerPipeline<any>()
-    .withName("evaluation_processing")
+    .withName(pipelineName)
     .withAggregateType("evaluation" as AggregateType)
     .withCommand("scheduleEvaluation", ScheduleEvaluationCommand as any)
     .withCommand("startEvaluation", StartEvaluationCommand as any)
@@ -232,6 +243,9 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     ...pipeline,
     eventStore,
     processorCheckpointStore,
+    pipelineName,
+    // Wait for BullMQ workers to be ready before sending commands
+    ready: () => new Promise((resolve) => setTimeout(resolve, 200)),
   } as PipelineWithCommandHandlers<
     any,
     {
@@ -242,6 +256,8 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   > & {
     eventStore: EventStoreClickHouse;
     processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
+    pipelineName: string;
+    ready: () => Promise<void>;
   };
 }
 
@@ -264,6 +280,7 @@ async function waitForClickHouseConsistency(): Promise<void> {
  * Waits for evaluation state projection checkpoint.
  */
 async function waitForEvaluationCheckpoint(
+  pipelineName: string,
   aggregateId: string,
   tenantIdString: string,
   expectedSequenceNumber: number,
@@ -281,7 +298,7 @@ async function waitForEvaluationCheckpoint(
       const tenantId = createTenantId(tenantIdString);
       const checkpoint =
         await processorCheckpointStore.getCheckpointBySequenceNumber(
-          "evaluation_processing",
+          pipelineName,
           "evaluationState",
           "projection",
           tenantId,
@@ -320,17 +337,20 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createEvaluationTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline first to stop all workers and queues
+    // Gracefully close pipeline to ensure all BullMQ workers finish
     await pipeline.service.close();
-    // Wait for async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Wait for BullMQ workers to fully shut down and release Redis connections
+    // Using 1000ms to ensure all async operations complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     // Clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
@@ -371,6 +391,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -428,6 +449,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -479,6 +501,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -520,6 +543,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         1,
@@ -570,6 +594,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         2,
@@ -616,6 +641,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         2,
@@ -653,6 +679,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         1,
@@ -687,6 +714,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         2,
@@ -728,6 +756,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -779,6 +808,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -828,6 +858,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -891,6 +922,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
 
       // Wait for final checkpoint only
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         3,
@@ -923,6 +955,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         1,
@@ -984,18 +1017,21 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
       // Wait for all to be processed
       await Promise.all([
         waitForEvaluationCheckpoint(
+          pipeline.pipelineName,
           evaluation1Id,
           tenantIdString,
           1,
           pipeline.processorCheckpointStore,
         ),
         waitForEvaluationCheckpoint(
+          pipeline.pipelineName,
           evaluation2Id,
           tenantIdString,
           1,
           pipeline.processorCheckpointStore,
         ),
         waitForEvaluationCheckpoint(
+          pipeline.pipelineName,
           evaluation3Id,
           tenantIdString,
           1,
@@ -1043,6 +1079,7 @@ describe("Evaluation Processing Pipeline - Integration Tests", () => {
         }),
       );
       await waitForEvaluationCheckpoint(
+        pipeline.pipelineName,
         evaluationId,
         tenantIdString,
         1,
