@@ -100,10 +100,11 @@ describe("buildDefaultFormValues", () => {
       expect(defaults.version.configData.llm.temperature).toBeUndefined();
     });
 
-    it("sets maxTokens to 4096 by default", () => {
+    it("sets maxTokens to undefined by default (UI determines from model metadata)", () => {
       const defaults = buildDefaultFormValues();
 
-      expect(defaults.version.configData.llm.maxTokens).toBe(4096);
+      // maxTokens is undefined - the UI defaults to the model's max based on metadata
+      expect(defaults.version.configData.llm.maxTokens).toBeUndefined();
     });
   });
 });

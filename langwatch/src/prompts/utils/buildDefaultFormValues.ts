@@ -20,8 +20,8 @@ export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
         // Temperature is omitted - not all models support it (e.g., reasoning models)
         // The UI will apply model-appropriate defaults based on supportedParameters
         temperature: undefined,
-        // Sensible default for most models - the UI will adjust based on model's maxCompletionTokens
-        maxTokens: 4096,
+        // maxTokens is omitted - the UI will default to the model's max based on metadata
+        maxTokens: undefined,
       },
       messages: [
         { role: "system", content: "You are a helpful assistant." },
