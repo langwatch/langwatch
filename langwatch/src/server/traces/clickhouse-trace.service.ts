@@ -10,7 +10,7 @@ import type {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse-registry";
+import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Evaluation, Span, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
 import {

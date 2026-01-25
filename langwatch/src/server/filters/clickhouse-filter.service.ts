@@ -8,7 +8,8 @@ import {
   type ClickHouseFilterQueryParams,
   clickHouseFilters,
   type FilterOption,
-} from "./clickhouse-registry";
+  type SupportedClickHouseFilterDefinition,
+} from "./clickhouse";
 import type { FilterField } from "./types";
 
 /**
@@ -38,6 +39,24 @@ export class ClickHouseFilterService {
    */
   static create(prisma: PrismaClient = defaultPrisma): ClickHouseFilterService {
     return new ClickHouseFilterService(prisma);
+  }
+
+  /**
+   * Get filter definition if the filter is supported in ClickHouse.
+   * Returns null if the filter is not supported (will fall back to Elasticsearch).
+   */
+  private getFilterDefinition(
+    field: FilterField,
+  ): SupportedClickHouseFilterDefinition | null {
+    const filterDef = clickHouseFilters[field];
+    if (!filterDef || filterDef.tableName === null) {
+      this.logger.debug(
+        { field },
+        "Filter not supported in ClickHouse, will fall back to Elasticsearch",
+      );
+      return null;
+    }
+    return filterDef as SupportedClickHouseFilterDefinition;
   }
 
   /**
@@ -109,13 +128,9 @@ export class ClickHouseFilterService {
         }
 
         // Check if this filter is supported in ClickHouse
-        const filterDef = clickHouseFilters[field];
-        if (!filterDef || filterDef.tableName === null) {
+        const filterDef = this.getFilterDefinition(field);
+        if (!filterDef) {
           span.setAttribute("clickhouse.filter_supported", false);
-          this.logger.debug(
-            { projectId, field },
-            "Filter not supported in ClickHouse, will fall back to Elasticsearch",
-          );
           return null;
         }
 
