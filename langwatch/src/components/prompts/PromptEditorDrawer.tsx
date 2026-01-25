@@ -116,6 +116,15 @@ const extractLocalConfig = (
     model: formValues.version.configData.llm.model,
     temperature: formValues.version.configData.llm.temperature,
     maxTokens: formValues.version.configData.llm.maxTokens,
+    topP: formValues.version.configData.llm.topP,
+    frequencyPenalty: formValues.version.configData.llm.frequencyPenalty,
+    presencePenalty: formValues.version.configData.llm.presencePenalty,
+    seed: formValues.version.configData.llm.seed,
+    topK: formValues.version.configData.llm.topK,
+    minP: formValues.version.configData.llm.minP,
+    repetitionPenalty: formValues.version.configData.llm.repetitionPenalty,
+    reasoning: formValues.version.configData.llm.reasoning,
+    verbosity: formValues.version.configData.llm.verbosity,
     litellmParams: formValues.version.configData.llm.litellmParams,
   },
   messages: formValues.version.configData.messages.map((m) => ({
@@ -322,10 +331,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
               configData: {
                 ...serverValues.version.configData,
                 llm: {
-                  model: props.initialLocalConfig.llm.model,
-                  temperature: props.initialLocalConfig.llm.temperature,
-                  maxTokens: props.initialLocalConfig.llm.maxTokens,
-                  litellmParams: props.initialLocalConfig.llm.litellmParams,
+                  ...serverValues.version.configData.llm,
+                  ...props.initialLocalConfig.llm,
                 },
                 messages: props.initialLocalConfig.messages,
                 inputs: props.initialLocalConfig
