@@ -1,5 +1,6 @@
 import { Button, Skeleton, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import React from "react";
 
 import { LLMIcon } from "~/components/icons/LLMIcon";
 import { PulsingDot } from "./PulsingDot";
@@ -15,8 +16,9 @@ type TargetSuperHeaderProps = {
 
 /**
  * Super header for the targets (prompts/agents) columns section.
+ * Memoized to prevent unnecessary re-renders on scroll.
  */
-export function TargetSuperHeader({
+export const TargetSuperHeader = React.memo(function TargetSuperHeader({
   colSpan,
   onAddClick,
   showWarning,
@@ -54,4 +56,4 @@ export function TargetSuperHeader({
       )}
     </SuperHeader>
   );
-}
+});

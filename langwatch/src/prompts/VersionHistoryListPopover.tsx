@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback } from "react";
+import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
@@ -118,6 +119,7 @@ function VersionHistoryItem({
                 data-testid="discard-local-changes-button"
                 marginTop={1}
               >
+                <HistoryIcon size={14} />
                 Discard local changes
               </Button>
             )}
@@ -144,12 +146,14 @@ function VersionHistoryItem({
             positioning={{ placement: "top" }}
           >
             <Button
+              size="xs"
               data-testid={`restore-version-button-${data.version}`}
-              variant="ghost"
+              variant="outline"
               onClick={onRestore}
               loading={isLoading}
             >
-              <HistoryIcon size={24} />
+              Select this version
+              <LuChevronRight size={14} />
             </Button>
           </Tooltip>
         )}
@@ -358,8 +362,7 @@ export function VersionHistoryListPopover({
           await onRestoreSuccess?.(prompt);
           onClose();
           toaster.info({
-            title: `Loaded v${prompt.version}`,
-            description: "Click 'Update' to save the restored version",
+            title: `Restored prompt to version ${prompt.version}`,
             meta: {
               closable: true,
             },

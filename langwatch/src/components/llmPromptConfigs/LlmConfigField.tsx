@@ -37,7 +37,7 @@ export function LLMConfigField({
 
   return (
     <>
-      <Popover.Root positioning={{ placement: "bottom-start" }}>
+      <Popover.Root positioning={{ placement: "bottom-start" }} closeOnInteractOutside={false}>
         <Popover.Trigger asChild>
           <HStack
             width="full"

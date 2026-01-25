@@ -15,17 +15,17 @@ User Request
 │  - Verifies outcomes                                                │
 │  - Does NOT read/write code directly                                │
 └─────────────────────────────────────────────────────────────────────┘
-     │                                     │
-     │ Skill(skill: "code")                │ Skill(skill: "review")
-     ▼                                     ▼
-┌────────────────────────┐       ┌────────────────────────┐
-│  CODER AGENT           │       │  UNCLE-BOB-REVIEWER    │
-│  (context: fork)       │       │  (context: fork)       │
-│  - Reads requirements  │       │  - Reviews changes     │
-│  - Implements with TDD │       │  - SOLID/TDD checks    │
-│  - Runs tests          │       │  - Returns findings    │
-│  - Returns summary     │       │                        │
-└────────────────────────┘       └────────────────────────┘
+     │                         │                         │
+     │ /code                   │ /review                 │ /e2e
+     ▼                         ▼                         ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐
+│  CODER AGENT     │  │  UNCLE-BOB-      │  │  E2E WORKFLOW            │
+│  (context: fork) │  │  REVIEWER        │  │  (coordinates agents)    │
+│  - TDD workflow  │  │  (context: fork) │  │  - planner → generator   │
+│  - Returns       │  │  - SOLID/TDD     │  │  - healer → reviewer     │
+│    summary       │  │  - Returns       │  │  - Returns test status   │
+│                  │  │    findings      │  │                          │
+└──────────────────┘  └──────────────────┘  └──────────────────────────┘
 ```
 
 ## Directory Structure
@@ -35,13 +35,18 @@ User Request
 ├── agents/         # Agent definitions (personas with workflows)
 │   ├── coder.md
 │   ├── repo-sherpa.md
-│   └── uncle-bob-reviewer.md
+│   ├── uncle-bob-reviewer.md
+│   ├── playwright-test-planner.md    # E2E: explores app, creates plans
+│   ├── playwright-test-generator.md  # E2E: generates tests from plans
+│   ├── playwright-test-healer.md     # E2E: fixes failing tests
+│   └── test-reviewer.md              # E2E: reviews test quality
 ├── skills/         # Skills (entry points that invoke agents)
 │   ├── orchestrate/    # Manual: /orchestrate <requirements>
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
 │   ├── review/         # Delegates to uncle-bob-reviewer
-│   └── sherpa/         # Delegates to repo-sherpa
+│   ├── sherpa/         # Delegates to repo-sherpa
+│   └── e2e/            # Coordinates E2E test generation workflow
 └── commands/       # Slash commands (non-agent utilities)
 ```
 
@@ -56,8 +61,12 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 | `coder` | TDD implementation, self-verification | Opus |
 | `uncle-bob-reviewer` | SOLID/Clean Code review | Opus |
 | `repo-sherpa` | Documentation, DX, meta-layer | Opus |
+| `playwright-test-planner` | Explore live app, create test plans | Opus |
+| `playwright-test-generator` | Generate Playwright tests from plans | Sonnet |
+| `playwright-test-healer` | Debug and fix failing tests | Sonnet |
+| `test-reviewer` | Review test quality and pyramid placement | Opus |
 
-Agents are invoked **only through skills**, never directly.
+Agents are invoked **only through skills**, never directly (except E2E agents which are invoked via Task tool from the `/e2e` skill).
 
 ### Skills (.claude/skills/)
 
@@ -134,13 +143,28 @@ Orchestration mode is explicit - use one of:
 │ 4. REVIEW                                               │
 │    - /review for quality gate                           │
 │    - Issues? → /code with reviewer feedback             │
-│    - Approved? → Complete                               │
+│    - Approved? → Continue                               │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 5. COMPLETE                                             │
-│    - Report summary to user                             │
+│ 5. E2E VERIFICATION (if @e2e scenarios exist)           │
+│    - /e2e with feature file path                        │
+│    - Explores live app → generates tests → heals        │
+│    - All tests pass? → Complete                         │
+│    - App bug detected? → /code with fix details ──┐     │
+│    - Inconclusive? → escalate to user             │     │
+└───────────────────────────────────────────────────│─────┘
+                          │                         │
+                          │    ┌────────────────────┘
+                          │    │ (loop back to implement)
+                          │    ▼
+                          │  Step 2 → 3 → 4 → 5
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 6. COMPLETE                                             │
+│    - Report summary to user (code + tests)              │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -158,7 +182,7 @@ The orchestrator reads only feature files and planning docs, not source code.
 ```
 ORCHESTRATOR (main thread)
 │
-├── /plan  ──────► PLAN AGENT
+├── /plan  ──────► (self-contained skill)
 │                  - Feature file creation
 │                  - Acceptance criteria
 │
@@ -171,6 +195,17 @@ ORCHESTRATOR (main thread)
 │                  - Quality gate
 │                  - SOLID violations
 │                  - Clean code inspection
+│
+├── /e2e  ───────► E2E WORKFLOW (coordinates agents)
+│                  ├── playwright-test-planner
+│                  │   - Explore live app
+│                  │   - Create test plans
+│                  ├── playwright-test-generator
+│                  │   - Generate Playwright tests
+│                  ├── playwright-test-healer
+│                  │   - Fix failing tests
+│                  └── test-reviewer
+│                      - Review test quality
 │
 └── /sherpa ─────► REPO-SHERPA
                    - Documentation
@@ -197,6 +232,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
 | `/code <task>` | coder | Implement with TDD |
 | `/review <focus>` | uncle-bob-reviewer | Quality review |
+| `/e2e <feature>` | (coordinates e2e agents) | Generate and verify E2E tests |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
 ## Token-Conscious Principle

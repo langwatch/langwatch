@@ -6,7 +6,8 @@ import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
 from langwatch.utils.exceptions import better_raise_for_status
-from langwatch.utils.transformation import truncate_object_recursively
+from langwatch.utils.transformation import SerializableWithStringFallback, truncate_object_recursively
+from langwatch.utils.utils import safe_get
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
@@ -824,6 +825,7 @@ class DSPyTracer:
                 "functions",
                 "user",
                 "response_format",
+                "reasoning_effort",
             ]
             for param in params:
                 if all_kwargs.get(param):
@@ -842,23 +844,44 @@ class DSPyTracer:
 
             result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
 
-            if span:
-                span.update(output=result)
-
             history = self.history[-1] if len(self.history) > 0 else None
-            if (
-                history
-                and "usage" in history
-                and "completion_tokens" in history["usage"]
-                and "prompt_tokens" in history["usage"]
-                and span
-            ):
-                span.update(
-                    metrics={
-                        "completion_tokens": history["usage"]["completion_tokens"],
-                        "prompt_tokens": history["usage"]["prompt_tokens"],
-                    }
+
+            if span:
+                # Capture full message from history (includes reasoning_content) instead of just result
+                choices = safe_get(history, "response", "choices")
+
+                if choices and len(choices) > 0:
+                    messages_output = []
+                    for choice in choices:
+                        msg = safe_get(choice, "message")
+                        if msg is not None:
+                            # Convert Pydantic model to dict if needed
+                            if hasattr(msg, "model_dump"):
+                                msg = msg.model_dump(exclude_unset=True)
+                            elif hasattr(msg, "dict"):
+                                msg = msg.dict(exclude_unset=True)
+                            messages_output.append(msg)
+                    if messages_output:
+                        span.update(output=messages_output)
+                    else:
+                        span.update(output=result)
+                else:
+                    span.update(output=result)
+
+            completion_tokens = safe_get(history, "usage", "completion_tokens")
+            prompt_tokens = safe_get(history, "usage", "prompt_tokens")
+            if span and completion_tokens is not None and prompt_tokens is not None:
+                metrics = {
+                    "completion_tokens": completion_tokens,
+                    "prompt_tokens": prompt_tokens,
+                }
+                # Capture reasoning_tokens if available
+                reasoning_tokens = safe_get(
+                    history, "usage", "completion_tokens_details", "reasoning_tokens"
                 )
+                if reasoning_tokens is not None:
+                    metrics["reasoning_tokens"] = reasoning_tokens
+                span.update(metrics=metrics)
 
             return result
 
@@ -884,26 +907,36 @@ class DSPyTracer:
 
             result = self.__class__.__original_basic_request__(self, prompt, **kwargs)  # type: ignore
 
-            if (
-                span
-                and "choices" in result
-                and len(result["choices"]) == 1
-                and "message" in result["choices"][0]
-            ):
-                span.update(output=[result["choices"][0]["message"]])
+            # Capture full messages from choices (includes reasoning_content)
+            choices = safe_get(result, "choices")
+            if span and choices and len(choices) > 0:
+                messages_output = []
+                for choice in choices:
+                    msg = safe_get(choice, "message")
+                    if msg is not None:
+                        # Convert Pydantic model to dict if needed
+                        if hasattr(msg, "model_dump"):
+                            msg = msg.model_dump(exclude_unset=True)
+                        elif hasattr(msg, "dict"):
+                            msg = msg.dict(exclude_unset=True)
+                        messages_output.append(msg)
+                if messages_output:
+                    span.update(output=messages_output)
 
-            if (
-                span
-                and "usage" in result
-                and "completion_tokens" in result["usage"]
-                and "prompt_tokens" in result["usage"]
-            ):
-                span.update(
-                    metrics={
-                        "completion_tokens": result["usage"]["completion_tokens"],
-                        "prompt_tokens": result["usage"]["prompt_tokens"],
-                    }
+            completion_tokens = safe_get(result, "usage", "completion_tokens")
+            prompt_tokens = safe_get(result, "usage", "prompt_tokens")
+            if span and completion_tokens is not None and prompt_tokens is not None:
+                metrics = {
+                    "completion_tokens": completion_tokens,
+                    "prompt_tokens": prompt_tokens,
+                }
+                # Capture reasoning_tokens if available
+                reasoning_tokens = safe_get(
+                    result, "usage", "completion_tokens_details", "reasoning_tokens"
                 )
+                if reasoning_tokens is not None:
+                    metrics["reasoning_tokens"] = reasoning_tokens
+                span.update(metrics=metrics)
 
             return result
 

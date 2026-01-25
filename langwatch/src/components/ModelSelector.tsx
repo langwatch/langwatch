@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   createListCollection,
   Field,
   HStack,
@@ -11,7 +12,10 @@ import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { allLitellmModels } from "../server/modelProviders/registry";
+import {
+  allLitellmModels,
+  hasVariantSuffix,
+} from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import {
@@ -21,6 +25,7 @@ import {
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
+import { LuSettings2 } from "react-icons/lu";
 
 export type ModelOption = {
   label: string;
@@ -216,8 +221,11 @@ export const ModelSelector = React.memo(function ModelSelector({
       <Select.Trigger
         className="fix-hidden-inputs"
         width={size === "full" ? "100%" : "auto"}
-        background="white"
+        background="bg"
+        borderRadius="lg"
         padding={0}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <Select.ValueText placeholder={selectValueText}>
           {() => selectValueText}
@@ -230,9 +238,13 @@ export const ModelSelector = React.memo(function ModelSelector({
               startElement={<Search size={16} />}
               startOffset="-4px"
               background="white"
-              width="calc(100% - 9px)"
+              width="calc(100%)"
+              paddingY={1}
+              borderBottom="1px solid"
+              borderColor="border"
             >
               <Input
+                variant={"plain" as any}
                 size="sm"
                 placeholder="Search models"
                 type="search"
@@ -246,10 +258,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           <Select.ItemGroup
             key={group.provider}
             label={
-              <HStack gap={2}>
-                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                  {group.icon}
-                </Box>
+              <HStack gap={2} paddingX={2}>
                 <Text fontWeight="medium">{titleCase(group.provider)}</Text>
               </HStack>
             }
@@ -276,39 +285,26 @@ export const ModelSelector = React.memo(function ModelSelector({
         ))}
         {showConfigureAction && (
           <Box
-            padding={2}
             position="sticky"
-            bottom="-1px"
+            bottom={0}
             bg="white"
             borderTop="1px solid"
             borderColor="border"
             zIndex="1"
-            marginTop={1}
           >
-            <Link
-              href="/settings/model-providers"
-              isExternal
-              _hover={{ textDecoration: "none" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <HStack
-                width="full"
-                padding={2}
-                borderRadius="md"
-                border="1px solid"
-                borderColor="border"
-                cursor="pointer"
-                color="fg.muted"
-                _hover={{ bg: "gray.50", color: "gray.800" }}
-                transition="all 0.15s"
-                gap={2}
+            <Button width="full" fontWeight="500" color="fg.muted" paddingY={5} justifyContent="flex-start" variant="ghost" colorPalette="gray" size="sm" borderRadius="none" asChild>
+              <Link
+                href="/settings/model-providers"
+                isExternal
+                _hover={{ textDecoration: "none" }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <Settings size={16} />
+                <LuSettings2 />
                 <Text fontSize={size === "sm" ? 12 : 14}>
                   Configure available models
                 </Text>
-              </HStack>
-            </Link>
+              </Link>
+            </Button>
           </Box>
         )}
       </Select.Content>
@@ -330,10 +326,12 @@ const getCustomModels = (
     if (!providerConfig) continue;
 
     if (providerConfig.enabled && providerConfig.models && mode === "chat") {
-      providerConfig.models.forEach((model: string) => {
-        models.push(`${provider}/${model}`);
-        customProviders.push(provider);
-      });
+      providerConfig.models
+        .filter((model: string) => !hasVariantSuffix(model))
+        .forEach((model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        });
     }
 
     if (
@@ -341,10 +339,12 @@ const getCustomModels = (
       providerConfig.embeddingsModels &&
       mode === "embedding"
     ) {
-      providerConfig.embeddingsModels.forEach((model: string) => {
-        models.push(`${provider}/${model}`);
-        customProviders.push(provider);
-      });
+      providerConfig.embeddingsModels
+        .filter((model: string) => !hasVariantSuffix(model))
+        .forEach((model: string) => {
+          models.push(`${provider}/${model}`);
+          customProviders.push(provider);
+        });
     }
   }
 

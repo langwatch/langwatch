@@ -1,5 +1,5 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
-import { ChevronDown, Plus } from "lucide-react";
+import { Box, HStack, Link, Spinner, Text } from "@chakra-ui/react";
+import { ChevronDown, ExternalLink, Plus } from "lucide-react";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { createInitialState } from "~/evaluations-v3/types";
@@ -106,6 +106,19 @@ export function NewEvaluationMenu() {
               Block dangerous requests and harmful outputs
             </Text>
           </Box>
+        </Menu.Item>
+        <Menu.Item value="monitor" asChild>
+          <Link href="https://langwatch.ai/docs/evaluations/experiments/sdk" target="_blank">
+            <Box width="100%">
+              <HStack>
+                <Text fontWeight="medium">Evaluate via SDK</Text>
+                <ExternalLink size={14} style={{ marginTop: "-2px" }} />
+              </HStack>
+              <Text fontSize="xs" color="gray.500">
+                Run evaluations programmatically from notebooks or scripts
+              </Text>
+            </Box>
+          </Link>
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

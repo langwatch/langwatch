@@ -18,6 +18,7 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
 
   let totalPromptTokens: number | null = null;
   let totalCompletionTokens: number | null = null;
+  let totalReasoningTokens: number | null = null;
   let tokensEstimated = false;
   let totalCost: number | null = null;
 
@@ -63,6 +64,15 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         }
         totalCompletionTokens += span.metrics.completion_tokens;
       }
+      if (
+        span.metrics.reasoning_tokens !== undefined &&
+        span.metrics.reasoning_tokens !== null
+      ) {
+        if (!totalReasoningTokens) {
+          totalReasoningTokens = 0;
+        }
+        totalReasoningTokens += span.metrics.reasoning_tokens;
+      }
       if (span.metrics.tokens_estimated) {
         tokensEstimated = true;
       }
@@ -86,6 +96,7 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         : null,
     prompt_tokens: totalPromptTokens,
     completion_tokens: totalCompletionTokens,
+    reasoning_tokens: totalReasoningTokens,
     total_cost: totalCost,
     tokens_estimated: tokensEstimated,
   };

@@ -114,6 +114,9 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
               " prompt + " +
               (span.metrics?.completion_tokens ?? 0) +
               " completion"}
+            {span.metrics?.reasoning_tokens != null &&
+              span.metrics.reasoning_tokens > 0 &&
+              ` (${span.metrics.reasoning_tokens} reasoning)`}
             {span.metrics.completion_tokens &&
               span.metrics.completion_tokens > 0 &&
               (() => {

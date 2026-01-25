@@ -10,17 +10,11 @@ dspy.LM(
             {# Normalize reasoning with correct priority: reasoning > reasoning_effort > thinkingLevel > effort #}
             {# Use 'is not none' to preserve zero values #}
             {% set normalized_reasoning = llm_config.reasoning if llm_config.reasoning is not none else (llm_config.reasoning_effort if llm_config.reasoning_effort is not none else (llm_config.thinkingLevel if llm_config.thinkingLevel is not none else llm_config.effort)) %}
-            {# Get effective model from llm_params first, fallback to llm_config.model #}
-            {% set model_str = llm_params.get('model') or llm_config.model or '' %}
-            {% set provider = model_str.split('/')[0].lower() if '/' in model_str else '' %}
-            {# Determine target key based on provider #}
-            {% if provider == 'google' or provider == 'gemini' %}
-            {% set target_key = 'thinkingLevel' %}
-            {% elif provider == 'anthropic' %}
-            {% set target_key = 'effort' %}
-            {% else %}
+            {# LiteLLM expects 'reasoning_effort' for ALL providers - it handles internal transformation #}
+            {# Anthropic: reasoning_effort -> output_config={"effort": ...} + beta header #}
+            {# Gemini: reasoning_effort -> thinking_level or thinking with budget #}
+            {# OpenAI: reasoning_effort -> passed as-is #}
             {% set target_key = 'reasoning_effort' %}
-            {% endif %}
             {# Emit reasoning param only if normalized_reasoning is not none and not already in llm_params #}
             {% if normalized_reasoning is not none and llm_params.get(target_key) is none %}
             {{ target_key }}={{ normalized_reasoning.__repr__() }},

@@ -6,6 +6,24 @@ import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
 
 const llmModels = llmModelsRaw as unknown as LLMModelRegistry;
 
+// ============================================================================
+// Parameter Constraint Types
+// ============================================================================
+
+/**
+ * Constraint for a single parameter (e.g., temperature min/max)
+ */
+export type ParameterConstraint = {
+  min?: number;
+  max?: number;
+};
+
+/**
+ * Provider-level parameter constraints
+ * Maps parameter names to their constraints
+ */
+export type ParameterConstraints = Record<string, ParameterConstraint>;
+
 type ModelProviderDefinition = {
   name: string;
   apiKey: string;
@@ -13,6 +31,8 @@ type ModelProviderDefinition = {
   keysSchema: z.ZodTypeAny;
   enabledSince: Date;
   blurb?: string;
+  /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
+  parameterConstraints?: ParameterConstraints;
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -169,6 +189,10 @@ export const modelProviders = {
       ANTHROPIC_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
+    // Anthropic API limits temperature to 0-1 range
+    parameterConstraints: {
+      temperature: { min: 0, max: 1 },
+    },
   },
   gemini: {
     name: "Gemini",
@@ -254,19 +278,50 @@ export const modelProviders = {
 } satisfies Record<string, ModelProviderDefinition>;
 
 // ============================================================================
+// Parameter Constraints
+// ============================================================================
+
+/**
+ * Get parameter constraints for a model by resolving from its provider.
+ * Returns undefined if the provider has no constraints defined.
+ *
+ * @param modelId - Full model ID (e.g., "anthropic/claude-sonnet-4")
+ * @returns Provider's parameter constraints or undefined
+ */
+export function getParameterConstraints(
+  modelId: string,
+): ParameterConstraints | undefined {
+  const provider = modelId.split("/")[0];
+  if (!provider) return undefined;
+
+  const providerDef = modelProviders[
+    provider as keyof typeof modelProviders
+  ] as ModelProviderDefinition | undefined;
+  return providerDef?.parameterConstraints;
+}
+
+// ============================================================================
 // Backward Compatibility - allLitellmModels
 // ============================================================================
 
 /**
+ * Checks if a model ID has a variant suffix (e.g., :free, :thinking, :extended).
+ * These are LiteLLM routing variants that should be filtered from UI selectors.
+ */
+export function hasVariantSuffix(modelId: string): boolean {
+  return modelId.includes(":");
+}
+
+/**
  * Legacy export for backward compatibility
  * Maps to the new registry format
+ * Excludes models with variant suffixes (:free, :thinking, etc.)
  */
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
   Object.fromEntries(
-    Object.entries(llmModels.models).map(([id, model]) => [
-      id,
-      { mode: model.mode },
-    ]),
+    Object.entries(llmModels.models)
+      .filter(([id]) => !hasVariantSuffix(id))
+      .map(([id, model]) => [id, { mode: model.mode }]),
   );
 
 // ============================================================================

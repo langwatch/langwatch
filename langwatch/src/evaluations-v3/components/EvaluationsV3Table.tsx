@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
 import {
   type ColumnDef,
@@ -8,7 +8,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -22,20 +21,15 @@ import {
 } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 
-/**
- * Type for the config stored in DB Evaluator.config field.
- * The DB stores evaluatorType and settings - inputs are derived from
- * the evaluator definition at runtime, not stored in DB.
- */
-type EvaluatorDbConfig = {
-  evaluatorType?: EvaluatorTypes;
-  settings?: Record<string, unknown>;
-};
-
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field, HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import { DRAWER_WIDTH } from "../constants";
 import { useDatasetSync } from "../hooks/useDatasetSync";
+import {
+  buildInputsFromBodyTemplate,
+  convertHttpComponentConfig,
+} from "../utils/httpAgentUtils";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import {
@@ -63,7 +57,7 @@ import {
 } from "../utils/fieldMappingConverters";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { type ColumnType, TableCell } from "./DatasetSection/TableCell";
+import { type ColumnType } from "./DatasetSection/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
@@ -73,9 +67,25 @@ import {
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
+import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
-// Types are imported from ../types (TableRowData, TableMeta)
-// Meta wrappers are imported from ./TableMetaWrappers
+// Max rows for expanded mode (disable virtualization above this)
+const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+
+// Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
+const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
+const DATASET_COL_DEFAULT_PCT = 16;
+const TARGET_COL_DEFAULT_PCT = 20;
+
+/**
+ * Type for the config stored in DB Evaluator.config field.
+ * The DB stores evaluatorType and settings - inputs are derived from
+ * the evaluator definition at runtime, not stored in DB.
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: EvaluatorTypes;
+  settings?: Record<string, unknown>;
+};
 
 // ============================================================================
 // Main Component
@@ -139,6 +149,7 @@ export function EvaluationsV3Table({
         selectedCell: state.ui.selectedCell,
         columnWidths: state.ui.columnWidths,
         hiddenColumns: state.ui.hiddenColumns,
+        rowHeightMode: state.ui.rowHeightMode,
       },
       // Actions (stable references)
       setSelectedCell: state.setSelectedCell,
@@ -244,20 +255,46 @@ export function EvaluationsV3Table({
     (savedAgent: TypedAgent) => {
       const config = savedAgent.config as Record<string, unknown>;
 
+      // Check if this is an HTTP agent by looking at savedAgent.type or config structure
+      const isHttpAgent =
+        savedAgent.type === "http" ||
+        (config.url !== undefined && config.bodyTemplate !== undefined);
+
       // Convert TypedAgent to TargetConfig format (agent type)
-      // Agent type and workflow ID are fetched at runtime via dbAgentId when needed
+      // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
+      // For code/workflow agents, use config.inputs directly
+      let targetInputs: Field[];
+      let httpConfig: TargetConfig["httpConfig"];
+
+      if (isHttpAgent) {
+        // HTTP agent: extract inputs from body template
+        const httpComponentConfig = config as HttpComponentConfig;
+        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
+        httpConfig = convertHttpComponentConfig(httpComponentConfig);
+
+        // Fall back to default input if bodyTemplate has no variables
+        if (targetInputs.length === 0) {
+          targetInputs = [{ identifier: "input", type: "str" }];
+        }
+      } else {
+        // Code/workflow agent: use config.inputs directly
+        targetInputs = (config.inputs as TargetConfig["inputs"]) ?? [
+          { identifier: "input", type: "str" },
+        ];
+      }
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
-        type: "agent", // This is a target of type "agent" (code/workflow)
+        type: "agent", // This is a target of type "agent" (code/workflow/http)
+        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
         name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: (config.inputs as TargetConfig["inputs"]) ?? [
-          { identifier: "input", type: "str" },
-        ],
+        inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
           { identifier: "output", type: "str" },
         ],
         mappings: {},
+        httpConfig, // Only set for HTTP agents
       };
       addTarget(targetConfig);
       closeDrawer();
@@ -456,6 +493,124 @@ export function EvaluationsV3Table({
     [addTarget],
   );
 
+  // Handler for opening the add target flow (prompts/agents)
+  // Memoized to prevent TargetSuperHeader re-renders
+  const handleAddTarget = useCallback(() => {
+    // Clear any pending mappings from previous flows
+    pendingMappingsRef.current = {};
+
+    // Build available sources for variable mapping (for new prompts)
+    const availableSources = buildAvailableSources();
+
+    // Handler to open promptEditor for new prompts with proper props
+    const openNewPromptEditor = () => {
+      openDrawer(
+        "promptEditor",
+        {
+          // Pass available sources via complexProps
+          availableSources,
+          inputMappings: {},
+          onInputMappingsChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
+            if (mapping) {
+              pendingMappingsRef.current[identifier] = mapping;
+            } else {
+              delete pendingMappingsRef.current[identifier];
+            }
+          },
+        },
+        // Reset stack to prevent back button when creating new prompts
+        { resetStack: true },
+      );
+    };
+
+    // Set flow callbacks for the entire add-target flow
+    setFlowCallbacks("promptList", {
+      onSelect: handleSelectPrompt,
+      // Custom onCreateNew to open promptEditor with availableSources
+      onCreateNew: openNewPromptEditor,
+    });
+    setFlowCallbacks("promptEditor", {
+      // For new prompts: track mappings in pendingMappingsRef, then apply when saved
+      onInputMappingsChange: (
+        identifier: string,
+        mapping: UIFieldMapping | undefined,
+      ) => {
+        if (mapping) {
+          pendingMappingsRef.current[identifier] = mapping;
+        } else {
+          delete pendingMappingsRef.current[identifier];
+        }
+      },
+      onSave: (savedPrompt) => {
+        // Apply pending mappings when creating the target
+        const storeMappings: Record<string, FieldMapping> = {};
+        for (const [key, uiMapping] of Object.entries(
+          pendingMappingsRef.current,
+        )) {
+          storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
+        }
+
+        // Get current state for active dataset
+        const currentActiveDatasetId =
+          useEvaluationsV3Store.getState().activeDatasetId;
+
+        // Create target with pending mappings
+        const targetId = `target_${Date.now()}`;
+        const targetConfig: TargetConfig = {
+          id: targetId,
+          type: "prompt",
+          name: savedPrompt.name,
+          promptId: savedPrompt.id,
+          promptVersionId: savedPrompt.versionId,
+          promptVersionNumber: savedPrompt.version,
+          inputs: (
+            savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]
+          ).map((i) => ({
+            identifier: i.identifier,
+            type: i.type as Field["type"],
+          })),
+          outputs: (
+            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]
+          ).map((o) => ({
+            identifier: o.identifier,
+            type: o.type as Field["type"],
+          })),
+          mappings:
+            Object.keys(storeMappings).length > 0
+              ? { [currentActiveDatasetId]: storeMappings }
+              : {},
+        };
+        addTarget(targetConfig);
+
+        // Clear pending mappings
+        pendingMappingsRef.current = {};
+      },
+    });
+    setFlowCallbacks("agentList", {
+      onSelect: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("agentCodeEditor", {
+      onSave: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("agentHttpEditor", {
+      onSave: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("workflowSelector", {
+      onSave: handleSelectSavedAgent,
+    });
+    openDrawer("targetTypeSelector");
+  }, [
+    buildAvailableSources,
+    openDrawer,
+    handleSelectPrompt,
+    handleSelectSavedAgent,
+    isDatasetSource,
+    addTarget,
+  ]);
+
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
     () => ({
@@ -579,29 +734,12 @@ export function EvaluationsV3Table({
   // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);
 
-  // Estimated row height for virtualization
-  const ROW_HEIGHT = 60;
-
-  // Stable callbacks for virtualizer to prevent infinite re-renders
-  const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
-  );
-  const estimateSize = useCallback(() => ROW_HEIGHT, []);
-
-  // Set up row virtualization with dynamic measurement
-  const rowVirtualizer = useVirtualizer({
-    count: displayRowCount,
-    getScrollElement,
-    estimateSize,
-    overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
-    enabled: !!scrollContainer, // Only enable when scroll container is available
-    // Enable dynamic measurement - measures actual row heights as they render
-    measureElement:
-      typeof window !== "undefined"
-        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
-        : undefined,
-  });
+  // Determine if we should use virtualization
+  // - Always use virtualization in compact mode (fixed 160px rows)
+  // - Disable virtualization in expanded mode for datasets <= 100 rows
+  const rowHeightMode = ui.rowHeightMode;
+  const shouldVirtualize =
+    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
 
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
@@ -711,11 +849,13 @@ export function EvaluationsV3Table({
   const targetIdsKey = targets.map((r) => r.id).join(",");
   const targetIds = useMemo(() => targets.map((r) => r.id), [targetIdsKey]);
 
-  // Similarly stabilize dataset column IDs
-  const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
+  // Similarly stabilize dataset columns - include type in key so icon updates when type changes
+  const datasetColumnsKey = datasetColumns
+    .map((c) => `${c.id}:${c.type}`)
+    .join(",");
   const stableDatasetColumns = useMemo(
     () => datasetColumns,
-    [datasetColumnIdsKey],
+    [datasetColumnsKey],
   );
 
   // Build table meta for passing dynamic data to headers/cells
@@ -830,10 +970,12 @@ export function EvaluationsV3Table({
             tableMeta={info.table.options.meta as TableMeta | undefined}
           />
         ),
-        size: 40,
+        size: CHECKBOX_WIDTH_PX, // Checkbox uses fixed pixels
+        enableResizing: false, // Checkbox column shouldn't be resizable
         meta: {
           columnType: "checkbox" as ColumnType,
           columnId: "__checkbox__",
+          isFixedWidth: true, // Mark as fixed pixel width
         },
       }),
     );
@@ -852,7 +994,8 @@ export function EvaluationsV3Table({
             </HStack>
           ),
           cell: (info) => info.getValue(),
-          size: 200,
+          size: DATASET_COL_DEFAULT_PCT, // Percentage value
+          minSize: 8, // Minimum 8%
           meta: {
             columnType: "dataset" as ColumnType,
             columnId: column.id,
@@ -885,8 +1028,8 @@ export function EvaluationsV3Table({
               />
             );
           },
-          size: 280,
-          minSize: 200,
+          size: TARGET_COL_DEFAULT_PCT, // Percentage value
+          minSize: 10, // Minimum 10%
           meta: {
             columnType: "target" as ColumnType,
             columnId: `target.${targetId}`,
@@ -904,31 +1047,138 @@ export function EvaluationsV3Table({
     columnHelper,
   ]);
 
-  // Column sizing state - initialize from store
+  // Column sizing state - stores percentage values (e.g., 16 means 16%)
+  // Initialize from store, which also stores percentages
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
     () => ui.columnWidths,
   );
 
+  // Track the table container width for converting pixel deltas to percentages
+  const [containerWidth, setContainerWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200,
+  );
+
+  // Update container width on resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (tableRef.current?.parentElement) {
+        setContainerWidth(tableRef.current.parentElement.clientWidth);
+      } else {
+        setContainerWidth(window.innerWidth);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Sync column sizing changes to store (debounced to avoid excessive updates)
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleColumnSizingChange = useCallback(
-    (
-      updater:
-        | ColumnSizingState
-        | ((prev: ColumnSizingState) => ColumnSizingState),
-    ) => {
-      setColumnSizing((prev) => {
-        const newSizing =
-          typeof updater === "function" ? updater(prev) : updater;
-        // Debounce sync to store
-        if (syncTimeoutRef.current) {
-          clearTimeout(syncTimeoutRef.current);
-        }
-        syncTimeoutRef.current = setTimeout(() => {
-          setColumnWidths(newSizing);
-        }, 100);
-        return newSizing;
-      });
+
+  // Track which column is being resized
+  const resizingColumnRef = useRef<string | null>(null);
+  const resizeStartXRef = useRef<number>(0);
+  const resizeStartWidthRef = useRef<number>(0);
+
+  // Custom resize handler - converts pixel movements to percentage changes
+  // This gives us fine-grained control over resize sensitivity
+  const createResizeHandler = useCallback(
+    (columnId: string, columnType: string) => {
+      return (event: React.MouseEvent | React.TouchEvent) => {
+        event.preventDefault();
+
+        const startX =
+          "touches" in event ? event.touches[0]!.clientX : event.clientX;
+
+        // Get current width percentage
+        const currentPct =
+          columnSizing[columnId] ??
+          (columnType === "dataset"
+            ? DATASET_COL_DEFAULT_PCT
+            : TARGET_COL_DEFAULT_PCT);
+
+        resizingColumnRef.current = columnId;
+        resizeStartXRef.current = startX;
+        resizeStartWidthRef.current = currentPct;
+
+        const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+          const currentX =
+            "touches" in moveEvent
+              ? moveEvent.touches[0]!.clientX
+              : moveEvent.clientX;
+
+          const deltaX = currentX - resizeStartXRef.current;
+
+          // Convert pixel delta to percentage delta based on container width
+          // This ensures consistent resize feel regardless of screen size
+          const deltaPct = (deltaX / containerWidth) * 100;
+
+          // Calculate new width percentage
+          const newPct = Math.max(5, resizeStartWidthRef.current + deltaPct);
+
+          // Update column sizing state
+          setColumnSizing((prev) => ({
+            ...prev,
+            [columnId]: newPct,
+          }));
+        };
+
+        const handleEnd = () => {
+          resizingColumnRef.current = null;
+
+          // Sync to store after resize ends - use setState callback to get current value
+          if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+          }
+          syncTimeoutRef.current = setTimeout(() => {
+            setColumnSizing((current) => {
+              setColumnWidths(current);
+              return current;
+            });
+          }, 100);
+
+          document.removeEventListener("mousemove", handleMove);
+          document.removeEventListener("mouseup", handleEnd);
+          document.removeEventListener("touchmove", handleMove);
+          document.removeEventListener("touchend", handleEnd);
+        };
+
+        document.addEventListener("mousemove", handleMove);
+        document.addEventListener("mouseup", handleEnd);
+        document.addEventListener("touchmove", handleMove);
+        document.addEventListener("touchend", handleEnd);
+      };
+    },
+    [columnSizing, containerWidth, setColumnWidths],
+  );
+
+  // Check if a column is currently being resized
+  const isColumnResizing = useCallback(
+    (columnId: string) => resizingColumnRef.current === columnId,
+    [],
+  );
+
+  // Double-click handler to reset column to default width
+  const handleResizeDoubleClick = useCallback(
+    (columnId: string, columnType: string) => {
+      const defaultPct =
+        columnType === "dataset" ? DATASET_COL_DEFAULT_PCT : TARGET_COL_DEFAULT_PCT;
+
+      setColumnSizing((prev) => ({
+        ...prev,
+        [columnId]: defaultPct,
+      }));
+
+      // Sync to store
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+      syncTimeoutRef.current = setTimeout(() => {
+        setColumnSizing((current) => {
+          setColumnWidths(current);
+          return current;
+        });
+      }, 100);
     },
     [setColumnWidths],
   );
@@ -937,24 +1187,65 @@ export function EvaluationsV3Table({
     data: rowData,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    columnResizeMode: "onChange",
-    enableColumnResizing: true,
+    // Disable TanStack's built-in resize - we use our own custom handler
+    // for better control over percentage-based resizing
+    enableColumnResizing: false,
     state: {
       columnSizing,
     },
-    onColumnSizingChange: handleColumnSizingChange,
     meta: tableMeta,
   });
 
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
   // +1 for the spacer column that's always present
-  const targetsColSpan = targets.length + 1;
+  const targetsColSpan = targets.length + 2;
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
-  const DRAWER_WIDTH = 456;
   const MENU_PLUS_PADDING = 56 + 16;
+
+  // Calculate total percentage for all resizable columns
+  // This allows the table to grow beyond 100% when needed
+  const totalColumnPercentage = useMemo(() => {
+    let total = 0;
+
+    // Sum dataset column percentages
+    for (const col of datasetColumns) {
+      const colId = `dataset_${col.id}`;
+      total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
+    }
+
+    // Sum target column percentages
+    for (const target of targets) {
+      total += columnSizing[target.id] ?? TARGET_COL_DEFAULT_PCT;
+    }
+
+    return total;
+  }, [datasetColumns, targets, columnSizing]);
+
+  // Get column width as CSS string
+  // Converts stored percentage values to CSS percentage strings
+  const getColumnWidth = useCallback(
+    (columnId: string, columnType: string, isFixedWidth?: boolean): string => {
+      // Checkbox is always fixed pixels
+      if (columnId === "select" || isFixedWidth) {
+        return `${CHECKBOX_WIDTH_PX}px`;
+      }
+
+      // Get stored percentage or use default
+      const storedPct = columnSizing[columnId];
+      if (storedPct) {
+        return `${storedPct}%`;
+      }
+
+      // Use default percentages based on column type
+      if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
+      if (columnType === "target") return `${TARGET_COL_DEFAULT_PCT}%`;
+      return "auto";
+    },
+    [columnSizing],
+  );
 
   return (
     <Box
@@ -962,7 +1253,11 @@ export function EvaluationsV3Table({
       minHeight="full"
       css={{
         "& table": {
-          width: "100%",
+          // Table width = max(100%, sum of column percentages) + fixed widths (checkbox + drawer)
+          // This allows columns to exceed 100% and trigger horizontal scroll
+          width: `calc(max(100%, ${totalColumnPercentage}%) + ${CHECKBOX_WIDTH_PX}px + ${DRAWER_WIDTH}px)`,
+          minWidth: "100%",
+          tableLayout: "fixed",
           borderCollapse: "separate",
           borderSpacing: "0",
         },
@@ -1044,6 +1339,30 @@ export function EvaluationsV3Table({
       }}
     >
       <table ref={tableRef}>
+        {/* Define column widths with colgroup for table-layout: fixed */}
+        <colgroup>
+          {table.getAllColumns().map((column) => {
+            const meta = column.columnDef.meta as
+              | { columnType?: string; isFixedWidth?: boolean }
+              | undefined;
+            const columnType = meta?.columnType ?? "unknown";
+            const isFixedWidth = meta?.isFixedWidth ?? false;
+            return (
+              <col
+                key={column.id}
+                style={{
+                  width: getColumnWidth(column.id, columnType, isFixedWidth),
+                  // Prevent checkbox column from growing beyond 40px
+                  ...(isFixedWidth && { maxWidth: `${CHECKBOX_WIDTH_PX}px` }),
+                }}
+              />
+            );
+          })}
+          {/* Filler column - absorbs remaining space when total % < 100% */}
+          <col style={{ width: "auto" }} />
+          {/* Spacer column for drawer */}
+          <col style={{ width: DRAWER_WIDTH }} />
+        </colgroup>
         <thead>
           <tr>
             <DatasetSuperHeader
@@ -1054,118 +1373,7 @@ export function EvaluationsV3Table({
             />
             <TargetSuperHeader
               colSpan={targetsColSpan}
-              onAddClick={() => {
-                // Clear any pending mappings from previous flows
-                pendingMappingsRef.current = {};
-
-                // Build available sources for variable mapping (for new prompts)
-                const availableSources = buildAvailableSources();
-
-                // Handler to open promptEditor for new prompts with proper props
-                const openNewPromptEditor = () => {
-                  openDrawer(
-                    "promptEditor",
-                    {
-                      // Pass available sources via complexProps
-                      availableSources,
-                      inputMappings: {},
-                      onInputMappingsChange: (
-                        identifier: string,
-                        mapping: UIFieldMapping | undefined,
-                      ) => {
-                        if (mapping) {
-                          pendingMappingsRef.current[identifier] = mapping;
-                        } else {
-                          delete pendingMappingsRef.current[identifier];
-                        }
-                      },
-                    },
-                    // Reset stack to prevent back button when creating new prompts
-                    { resetStack: true },
-                  );
-                };
-
-                // Set flow callbacks for the entire add-target flow
-                setFlowCallbacks("promptList", {
-                  onSelect: handleSelectPrompt,
-                  // Custom onCreateNew to open promptEditor with availableSources
-                  onCreateNew: openNewPromptEditor,
-                });
-                setFlowCallbacks("promptEditor", {
-                  // For new prompts: track mappings in pendingMappingsRef, then apply when saved
-                  onInputMappingsChange: (
-                    identifier: string,
-                    mapping: UIFieldMapping | undefined,
-                  ) => {
-                    if (mapping) {
-                      pendingMappingsRef.current[identifier] = mapping;
-                    } else {
-                      delete pendingMappingsRef.current[identifier];
-                    }
-                  },
-                  onSave: (savedPrompt) => {
-                    // Apply pending mappings when creating the target
-                    const storeMappings: Record<string, FieldMapping> = {};
-                    for (const [key, uiMapping] of Object.entries(
-                      pendingMappingsRef.current,
-                    )) {
-                      storeMappings[key] = convertFromUIMapping(
-                        uiMapping,
-                        isDatasetSource,
-                      );
-                    }
-
-                    // Get current state for active dataset
-                    const currentActiveDatasetId =
-                      useEvaluationsV3Store.getState().activeDatasetId;
-
-                    // Create target with pending mappings
-                    const targetId = `target_${Date.now()}`;
-                    const targetConfig: TargetConfig = {
-                      id: targetId,
-                      type: "prompt",
-                      name: savedPrompt.name,
-                      promptId: savedPrompt.id,
-                      promptVersionId: savedPrompt.versionId,
-                      promptVersionNumber: savedPrompt.version,
-                      inputs: (
-                        savedPrompt.inputs ?? [
-                          { identifier: "input", type: "str" },
-                        ]
-                      ).map((i) => ({
-                        identifier: i.identifier,
-                        type: i.type as Field["type"],
-                      })),
-                      outputs: (
-                        savedPrompt.outputs ?? [
-                          { identifier: "output", type: "str" },
-                        ]
-                      ).map((o) => ({
-                        identifier: o.identifier,
-                        type: o.type as Field["type"],
-                      })),
-                      mappings:
-                        Object.keys(storeMappings).length > 0
-                          ? { [currentActiveDatasetId]: storeMappings }
-                          : {},
-                    };
-                    addTarget(targetConfig);
-
-                    // Clear pending mappings
-                    pendingMappingsRef.current = {};
-                  },
-                });
-                setFlowCallbacks("agentList", {
-                  onSelect: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("agentCodeEditor", {
-                  onSave: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("workflowSelector", {
-                  onSave: handleSelectSavedAgent,
-                });
-                openDrawer("targetTypeSelector");
-              }}
+              onAddClick={handleAddTarget}
               showWarning={targets.length === 0}
               hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
@@ -1179,11 +1387,18 @@ export function EvaluationsV3Table({
                 const targetId = isTargetColumn
                   ? header.id.replace("target.", "")
                   : undefined;
+                const meta = header.column.columnDef.meta as
+                  | { columnType?: string; isFixedWidth?: boolean }
+                  | undefined;
+                const columnType = meta?.columnType ?? "unknown";
+                const isFixedWidth = meta?.isFixedWidth ?? false;
 
                 return (
                   <th
                     key={header.id}
-                    style={{ width: header.getSize() }}
+                    style={{
+                      width: getColumnWidth(header.id, columnType, isFixedWidth),
+                    }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}
                   >
@@ -1193,13 +1408,17 @@ export function EvaluationsV3Table({
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
-                    {/* Resize handle */}
-                    {header.column.getCanResize() && (
+                    {/* Resize handle - custom handler for percentage-based resizing */}
+                    {/* Double-click resets to default width */}
+                    {!isFixedWidth && header.id !== "select" && (
                       <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
+                        onMouseDown={createResizeHandler(header.id, columnType)}
+                        onTouchStart={createResizeHandler(header.id, columnType)}
+                        onDoubleClick={() =>
+                          handleResizeDoubleClick(header.id, columnType)
+                        }
                         className={`resizer ${
-                          header.column.getIsResizing() ? "isResizing" : ""
+                          isColumnResizing(header.id) ? "isResizing" : ""
                         }`}
                       />
                     )}
@@ -1207,125 +1426,45 @@ export function EvaluationsV3Table({
                 );
               })}
               {targets.length === 0 ? (
-                // Spacer column to match drawer width + default target column width
+                // Filler + Spacer combined when no targets
                 <th
+                  colSpan={2}
                   style={{
-                    width: DRAWER_WIDTH + 280,
-                    minWidth: DRAWER_WIDTH + 280,
+                    width: `calc(${DRAWER_WIDTH}px + ${TARGET_COL_DEFAULT_PCT}%)`,
                   }}
                 >
-                  <Text fontSize="xs" color="fg.subtle" fontStyle="italic">
+                  <Link
+                    fontSize="xs"
+                    color="fg.subtle"
+                    fontStyle="italic"
+                    onClick={handleAddTarget}
+                  >
                     Click "+ Add" above to get started
-                  </Text>
+                  </Link>
                 </th>
               ) : (
-                // Spacer column to match drawer width
-                <th
-                  style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                ></th>
+                <>
+                  {/* Filler column - absorbs remaining space */}
+                  <th style={{ width: "auto" }}></th>
+                  {/* Spacer column to match drawer width */}
+                  <th style={{ width: DRAWER_WIDTH }}></th>
+                </>
               )}
             </tr>
           ))}
         </thead>
         <tbody>
-          {/* Virtualized rows for performance */}
-          {(() => {
-            const virtualRows = rowVirtualizer.getVirtualItems();
-            const totalSize = rowVirtualizer.getTotalSize();
-            const rows = table.getRowModel().rows;
-            const columnCount = table.getAllColumns().length + 1; // +1 for spacer
-
-            // Calculate padding to maintain scroll position (only when virtualizing)
-            const paddingTop =
-              virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
-            const paddingBottom =
-              virtualRows.length > 0
-                ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-                : 0;
-
-            // Test mode: render all rows without virtualization
-            if (disableVirtualization) {
-              return (
-                <>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.id}
-                      data-index={row.index}
-                      data-selected={
-                        selectedRows.has(row.index) ? "true" : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          cell={cell}
-                          rowIndex={row.index}
-                          activeDatasetId={activeDatasetId}
-                          isLoading={isLoadingExperiment || isLoadingDatasets}
-                        />
-                      ))}
-                      {/* Spacer column to match drawer width */}
-                      <td
-                        style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                      />
-                    </tr>
-                  ))}
-                </>
-              );
-            }
-
-            return (
-              <>
-                {/* Top padding row */}
-                {paddingTop > 0 && (
-                  <tr>
-                    <td
-                      style={{ height: `${paddingTop}px`, padding: 0 }}
-                      colSpan={columnCount}
-                    />
-                  </tr>
-                )}
-                {/* Render only virtualized rows - empty until container is measured */}
-                {virtualRows.map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  if (!row) return null;
-                  return (
-                    <tr
-                      key={row.id}
-                      data-index={virtualRow.index}
-                      ref={rowVirtualizer.measureElement}
-                      data-selected={
-                        selectedRows.has(row.index) ? "true" : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          cell={cell}
-                          rowIndex={row.index}
-                          activeDatasetId={activeDatasetId}
-                          isLoading={isLoadingExperiment || isLoadingDatasets}
-                        />
-                      ))}
-                      {/* Spacer column to match drawer width */}
-                      <td
-                        style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                      />
-                    </tr>
-                  );
-                })}
-                {/* Bottom padding row */}
-                {paddingBottom > 0 && (
-                  <tr>
-                    <td
-                      style={{ height: `${paddingBottom}px`, padding: 0 }}
-                      colSpan={columnCount}
-                    />
-                  </tr>
-                )}
-              </>
-            );
-          })()}
+          <VirtualizedTableBody
+            rows={table.getRowModel().rows}
+            scrollContainer={scrollContainer}
+            columnCount={table.getAllColumns().length + 2}
+            selectedRows={selectedRows}
+            activeDatasetId={activeDatasetId}
+            isLoading={isLoadingExperiment || isLoadingDatasets}
+            shouldVirtualize={shouldVirtualize}
+            disableVirtualization={disableVirtualization}
+            displayRowCount={displayRowCount}
+          />
         </tbody>
       </table>
 

@@ -43,6 +43,7 @@ class ChatMessage(TypedDict, total=False):
     tool_calls: Optional[List[ToolCall]]
     tool_call_id: Optional[str]
     name: Optional[str]
+    reasoning_content: Optional[str]
 
 
 class TypedValueChatMessages(TypedDict):
@@ -156,6 +157,7 @@ SpanTypes = Literal[
 class SpanMetrics(TypedDict, total=False):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
+    reasoning_tokens: Optional[int]
     cost: Optional[float]
     first_token_ms: Optional[int]
 
@@ -179,6 +181,7 @@ class SpanParams(TypedDict, total=False):
     functions: Optional[List[Dict[str, Any]]]
     user: Optional[str]
     response_format: Optional[Union[Dict[str, Any], BaseModel]]
+    reasoning_effort: Optional[str]
 
 
 class BaseSpan(TypedDict):

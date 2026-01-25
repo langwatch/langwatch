@@ -2677,7 +2677,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
       await waitFor(
         () => {
           const validationMessage = screen.getByTestId(
-            "pending-mappings-error",
+            "missing-mappings-error",
           );
           expect(validationMessage).toBeInTheDocument();
           expect(validationMessage).toHaveTextContent(/required|mapping/i);

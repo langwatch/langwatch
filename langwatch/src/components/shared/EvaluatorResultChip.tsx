@@ -17,9 +17,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuCircleX } from "react-icons/lu";
+import { LuChevronRight, LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
+import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
@@ -36,23 +37,57 @@ export type EvaluatorResultChipProps = {
   result: unknown;
   /** Override status (e.g., for showing running when target finished but evaluator pending) */
   statusOverride?: EvaluationStatus;
+  /** Optional evaluator inputs (data= from evaluation.log) to display in tooltip */
+  inputs?: Record<string, unknown>;
   /** Optional children to render after the chip content (e.g., dropdown trigger) */
   children?: React.ReactNode;
 };
 
 /**
+ * Sub-tooltip content for displaying evaluator inputs data
+ */
+const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => (
+  <VStack align="stretch" gap={1} padding={2} maxWidth="300px">
+    <Text fontSize="12px" fontWeight="semibold" color="white" marginBottom={1}>
+      Evaluator Inputs
+    </Text>
+    <Box
+      fontSize="11px"
+      fontFamily="mono"
+      color="gray.300"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      maxHeight="250px"
+      overflow="auto"
+    >
+      {JSON.stringify(inputs, null, 2)}
+    </Box>
+  </VStack>
+);
+
+/**
  * Base chip that displays evaluator result - read-only version
+ *
+ * NOTE: When inputs are provided, we use useInteractiveTooltip to manually
+ * manage tooltip state, allowing nested tooltips (for the Data sub-tooltip)
+ * to work correctly.
  */
 export function EvaluatorResultChip({
   name,
   result,
   statusOverride,
+  inputs,
   children,
 }: EvaluatorResultChipProps) {
   const parsed = parseEvaluationResult(result);
   const status = statusOverride ?? parsed.status;
   const { score, label, details } = parsed;
   const statusColor = EVALUATION_STATUS_COLORS[status];
+
+  // Use interactive tooltip when we have inputs (nested tooltip)
+  const hasInputs = inputs && Object.keys(inputs).length > 0;
+  const { isOpen, handleMouseEnter, handleMouseLeave } =
+    useInteractiveTooltip(150);
 
   // Format inline result display
   const getInlineResult = () => {
@@ -133,6 +168,31 @@ export function EvaluatorResultChip({
             </Text>
           </Box>
         )}
+        {/* Data sub-tooltip - only shown when inputs exist */}
+        {hasInputs && (
+          <Tooltip
+            content={<DataTooltipContent inputs={inputs} />}
+            positioning={{ placement: "right" }}
+            openDelay={100}
+            interactive
+          >
+            <HStack
+              justify="space-between"
+              cursor="pointer"
+              _hover={{ bg: "white/10" }}
+              marginX={-2}
+              paddingX={2}
+              paddingY={1}
+              borderRadius="md"
+              marginTop={1}
+            >
+              <Text fontSize="12px" color="gray.300">
+                Data
+              </Text>
+              <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+            </HStack>
+          </Tooltip>
+        )}
       </VStack>
     ) : (
       <Text fontSize="12px">Pending</Text>
@@ -150,6 +210,8 @@ export function EvaluatorResultChip({
       fontSize="11px"
       fontWeight="medium"
       cursor="default"
+      onMouseEnter={hasInputs ? handleMouseEnter : undefined}
+      onMouseLeave={hasInputs ? handleMouseLeave : undefined}
     >
       {/* Status indicator - spinning for running, static for others */}
       {status === "running" ? (
@@ -166,6 +228,25 @@ export function EvaluatorResultChip({
     </HStack>
   );
 
+  // When we have inputs, use controlled tooltip with interactive behavior
+  if (hasInputs) {
+    return (
+      <Tooltip
+        content={tooltipContent}
+        contentProps={{
+          onMouseEnter: handleMouseEnter,
+          onMouseLeave: handleMouseLeave,
+        }}
+        positioning={{ placement: "top" }}
+        open={isOpen}
+        interactive
+      >
+        {chipContent}
+      </Tooltip>
+    );
+  }
+
+  // Simple tooltip when no inputs
   return (
     <Tooltip
       content={tooltipContent}

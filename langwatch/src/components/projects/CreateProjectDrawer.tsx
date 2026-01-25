@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { Heading, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -101,14 +101,8 @@ export function CreateProjectDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger onClick={handleClose} />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              Create New Project
-            </Text>
-          </HStack>
+          <Drawer.CloseTrigger onClick={handleClose} />
+          <Heading>Create New Project</Heading>
         </Drawer.Header>
         <Drawer.Body>
           <ProjectForm

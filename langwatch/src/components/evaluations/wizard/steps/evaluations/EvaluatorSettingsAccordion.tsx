@@ -64,11 +64,13 @@ export const EvaluatorSettingsAccordion = () => {
   const onSubmit = useCallback(
     (data: { settings?: Record<string, any> }) => {
       if (!evaluatorType || !availableEvaluators) return;
+      // Skip evaluators/ path as they're resolved dynamically from DB
+      if (evaluatorType.startsWith("evaluators/")) return;
 
       // This updates the evaluator node with the settings
       setFirstEvaluator(
         {
-          evaluator: evaluatorType,
+          evaluator: evaluatorType as Exclude<typeof evaluatorType, `evaluators/${string}`>,
           parameters: Object.entries(data.settings ?? {}).map(
             ([identifier, value]) =>
               ({

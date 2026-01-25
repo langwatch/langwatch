@@ -68,10 +68,12 @@ export const EvaluatorMappingAccordion = ({
   const evaluatorType = evaluator?.data.evaluator;
   const availableEvaluators = useAvailableEvaluators();
   const evaluatorDefinition = useMemo(() => {
+    // Skip evaluators/ path as they're resolved dynamically from DB
+    if (evaluatorType?.startsWith("evaluators/")) return undefined;
     return evaluatorType &&
       availableEvaluators &&
       evaluatorType in availableEvaluators
-      ? availableEvaluators[evaluatorType]
+      ? availableEvaluators[evaluatorType as Exclude<typeof evaluatorType, `evaluators/${string}`>]
       : undefined;
   }, [availableEvaluators, evaluatorType]);
 

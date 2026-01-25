@@ -116,6 +116,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
     properties: {
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
+      reasoning_tokens: { type: "integer" },
       tokens_estimated: { type: "boolean" },
       cost: { type: "float" },
     },
@@ -242,6 +243,7 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       total_time_ms: { type: "integer" },
       prompt_tokens: { type: "integer" },
       completion_tokens: { type: "integer" },
+      reasoning_tokens: { type: "integer" },
       tokens_estimated: { type: "boolean" },
       total_cost: { type: "float" },
     },

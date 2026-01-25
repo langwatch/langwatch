@@ -248,6 +248,8 @@ export const TargetSummary = memo(function TargetSummary({
         data-testid="target-summary"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        // minWidth="0"
+        overflow="hidden"
       >
         {/* Running progress */}
         {isRunning && aggregates.completedRows < aggregates.totalRows && (
@@ -290,7 +292,7 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Average latency (compact) */}
         {aggregates.averageLatency !== null && (
           <HStack gap={1}>
-            <LuClock />
+            <LuClock style={{ minWidth: "12px" }} />
             <Text fontWeight="medium">
               {formatLatency(aggregates.averageLatency)}
             </Text>
@@ -309,7 +311,7 @@ export const TargetSummary = memo(function TargetSummary({
 
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
-          <Text color="red.fg" fontWeight="medium">
+          <Text color="red.fg" fontWeight="medium" whiteSpace="nowrap">
             {aggregates.errorRows}{" "}
             {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>

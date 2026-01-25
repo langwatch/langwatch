@@ -12,6 +12,7 @@ import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
 import { formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "./types";
 
 // Max characters to display for performance
@@ -19,9 +20,6 @@ const MAX_DISPLAY_CHARS = 10000;
 
 // Max height for collapsed output
 const OUTPUT_MAX_HEIGHT = 120;
-
-// Approximate chars that fit before overflow (rough heuristic to avoid useEffect flicker)
-const OVERFLOW_CHAR_THRESHOLD = 200;
 
 /**
  * Unwrap output if it's an object with only a single "output" key
@@ -133,11 +131,9 @@ export function BatchTargetCell({
     ? rawOutput.slice(0, MAX_DISPLAY_CHARS)
     : rawOutput;
 
-  // Use a simple heuristic to determine if content likely overflows
+  // Use a heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
-  const hasNewlines = rawOutput.includes("\n");
-  const isLikelyOverflowing =
-    rawOutput.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
+  const isLikelyOverflowing = isTextLikelyOverflowing(rawOutput);
 
   // Render output content
   const renderOutput = (expanded: boolean) => {
@@ -249,6 +245,7 @@ export function BatchTargetCell({
               key={evalResult.evaluatorId}
               name={evalResult.evaluatorName}
               result={result}
+              inputs={evalResult.inputs}
             />
           );
         })}

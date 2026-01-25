@@ -222,7 +222,7 @@ describe("transformBatchEvaluationData", () => {
       expect(evalResult.details).toBe("API rate limit exceeded");
     });
 
-    it("handles V2 target execution error", () => {
+    it("handles V2 target execution error with virtual target", () => {
       const data: ESBatchEvaluation = {
         project_id: "proj-1",
         experiment_id: "exp-1",
@@ -240,9 +240,13 @@ describe("transformBatchEvaluationData", () => {
 
       const result = transformBatchEvaluationData(data);
 
-      expect(result.targetColumns).toHaveLength(0); // No predictions, no targets
+      // Now creates a virtual target to display the error
+      expect(result.targetColumns).toHaveLength(1);
+      expect(result.targetColumns[0]?.id).toBe("_default");
+      expect(result.targetColumns[0]?.name).toBe("Output");
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "test" });
+      expect(result.rows[0]?.targets["_default"]?.error).toBe("Connection timeout");
     });
   });
 
@@ -597,26 +601,27 @@ describe("transformBatchEvaluationData", () => {
 
       const result = transformBatchEvaluationData(data);
 
-      // Should have derived target
+      // Should have one virtual target per evaluator
       expect(result.targetColumns).toHaveLength(1);
-      expect(result.targetColumns[0]?.id).toBe("_derived");
-      expect(result.targetColumns[0]?.name).toBe("Output");
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+      expect(result.targetColumns[0]?.name).toBe("Sample Metric");
       expect(result.targetColumns[0]?.type).toBe("legacy");
 
-      // Should have rows with derived output from evaluator inputs
+      // Should have rows with output from evaluator inputs
       expect(result.rows).toHaveLength(2);
-      expect(result.rows[0]?.targets._derived?.output).toEqual({
+      const targetId = "_eval_sample_metric";
+      expect(result.rows[0]?.targets[targetId]?.output).toEqual({
         output: "The answer is 4",
       });
-      expect(result.rows[1]?.targets._derived?.output).toEqual({
+      expect(result.rows[1]?.targets[targetId]?.output).toEqual({
         output: "The answer is 6",
       });
 
       // Evaluator results should be attached
-      expect(result.rows[0]?.targets._derived?.evaluatorResults).toHaveLength(
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults).toHaveLength(
         1,
       );
-      expect(result.rows[0]?.targets._derived?.evaluatorResults[0]?.score).toBe(
+      expect(result.rows[0]?.targets[targetId]?.evaluatorResults[0]?.score).toBe(
         0.95,
       );
     });
@@ -649,11 +654,105 @@ describe("transformBatchEvaluationData", () => {
 
         const result = transformBatchEvaluationData(data);
 
-        expect(result.targetColumns[0]?.id).toBe("_derived");
-        expect(result.rows[0]?.targets._derived?.output).toEqual({
+        // Virtual target is created per evaluator
+        const targetId = "_eval_eval-1";
+        expect(result.targetColumns[0]?.id).toBe(targetId);
+        expect(result.rows[0]?.targets[targetId]?.output).toEqual({
           output: value,
         });
       }
+    });
+
+    it("creates multiple virtual targets when multiple evaluators exist", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
+        evaluations: [
+          {
+            evaluator: "sample_metric",
+            name: "Sample Metric",
+            status: "processed",
+            index: 0,
+            score: 0.95,
+            inputs: { response: "The answer is 4" },
+          },
+          {
+            evaluator: "sample_metric2",
+            name: "Sample Metric 2",
+            status: "processed",
+            index: 0,
+            passed: true,
+            inputs: { response: "Another response" },
+          },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should have two virtual targets, one per evaluator
+      expect(result.targetColumns).toHaveLength(2);
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+      expect(result.targetColumns[0]?.name).toBe("Sample Metric");
+      expect(result.targetColumns[1]?.id).toBe("_eval_sample_metric2");
+      expect(result.targetColumns[1]?.name).toBe("Sample Metric 2");
+
+      // Each target should have its own output from evaluator inputs
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+      ).toEqual({ output: "The answer is 4" });
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.output,
+      ).toEqual({ output: "Another response" });
+
+      // Each target should have only its own evaluator result
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults,
+      ).toHaveLength(1);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults[0]
+          ?.score,
+      ).toBe(0.95);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults,
+      ).toHaveLength(1);
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults[0]
+          ?.passed,
+      ).toBe(true);
+    });
+
+    it("displays arbitrary data as JSON when no common output field exists", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
+        evaluations: [
+          {
+            evaluator: "sample_metric",
+            name: "Sample Metric",
+            status: "processed",
+            index: 0,
+            score: 0.76,
+            inputs: { foo: "bar", bar: "baz" },
+          },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should have virtual target for the evaluator
+      expect(result.targetColumns[0]?.id).toBe("_eval_sample_metric");
+
+      // Output should be the full inputs object (not wrapped in {output: ...})
+      // This will be displayed as JSON in the UI
+      expect(
+        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+      ).toEqual({ foo: "bar", bar: "baz" });
     });
 
     it("does not derive target when dataset already has predicted values", () => {
@@ -684,6 +783,78 @@ describe("transformBatchEvaluationData", () => {
       // Should NOT have derived target - should use the predicted columns
       expect(result.targetColumns[0]?.id).not.toBe("_derived");
       expect(result.targetColumns[0]?.id).toBe("end");
+    });
+
+    it("creates a virtual Output target for row-level errors without any targets or evaluators", () => {
+      // This is the case from SDK's evaluation.run() when the callback throws an error
+      // No targets registered, no evaluations, just dataset rows with errors
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: null,
+        dataset: [
+          {
+            index: 0,
+            entry: { question: "What is 2+2?", expected: "4" },
+            cost: null,
+            duration: 4,
+            error: "Not implemented",
+            trace_id: "trace-1",
+          },
+          {
+            index: 1,
+            entry: { question: "What is the capital of France?", expected: "Paris" },
+            cost: null,
+            duration: 3,
+            error: "Not implemented",
+            trace_id: "trace-2",
+          },
+        ],
+        evaluations: [],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should create a virtual "Output" target to display the errors
+      expect(result.targetColumns).toHaveLength(1);
+      expect(result.targetColumns[0]?.id).toBe("_default");
+      expect(result.targetColumns[0]?.name).toBe("Output");
+      expect(result.targetColumns[0]?.type).toBe("custom");
+
+      // Rows should have the error information attached to the virtual target
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows[0]?.targets["_default"]?.error).toBe("Not implemented");
+      expect(result.rows[0]?.targets["_default"]?.duration).toBe(4);
+      expect(result.rows[0]?.targets["_default"]?.traceId).toBe("trace-1");
+
+      expect(result.rows[1]?.targets["_default"]?.error).toBe("Not implemented");
+      expect(result.rows[1]?.targets["_default"]?.duration).toBe(3);
+      expect(result.rows[1]?.targets["_default"]?.traceId).toBe("trace-2");
+
+      // Output should be null since there's no predicted value
+      expect(result.rows[0]?.targets["_default"]?.output).toBeNull();
+    });
+
+    it("creates virtual target only when there are errors, not for empty dataset", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: null,
+        dataset: [
+          { index: 0, entry: { question: "What is 2+2?" } },
+          { index: 1, entry: { question: "What is 3+3?" } },
+        ],
+        evaluations: [],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // No errors and no evaluators - should NOT create a virtual target
+      expect(result.targetColumns).toHaveLength(0);
     });
   });
 

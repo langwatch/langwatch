@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
+import { useMemo } from "react";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -52,11 +53,23 @@ export function EvaluationStatusItem({
 
   const evaluator = getEvaluatorDefinitions(checkType);
 
-  // Fetch monitor data to get evaluator config with prompt
-  const monitorQuery = api.monitors.getById.useQuery(
-    { id: check.evaluator_id, projectId: project?.id ?? "" },
+  // Determine if this is a new-style Evaluator (evaluator_*) or legacy Monitor
+  const isEvaluatorTable = check.evaluator_id?.startsWith("evaluator_");
+
+  // Fetch from Evaluator table (new style)
+  const evaluatorQuery = api.evaluators.getById.useQuery(
+    { id: check.evaluator_id ?? "", projectId: project?.id ?? "" },
     {
-      enabled: !!check.evaluator_id && !!project?.id,
+      enabled: !!isEvaluatorTable && !!check.evaluator_id && !!project?.id,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    },
+  );
+
+  // Fetch from Monitor table (legacy)
+  const monitorQuery = api.monitors.getById.useQuery(
+    { id: check.evaluator_id ?? "", projectId: project?.id ?? "" },
+    {
+      enabled: !isEvaluatorTable && !!check.evaluator_id && !!project?.id,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     },
   );
@@ -64,15 +77,36 @@ export function EvaluationStatusItem({
   const color = evaluationStatusColor(check);
 
   // Get the prompt from evaluator config if available
-  const evaluatorConfig = monitorQuery.data?.evaluator?.config as
-    | {
-        settings?: { prompt?: string };
-      }
-    | undefined;
-  const customPrompt = evaluatorConfig?.settings?.prompt;
+  // Check both new Evaluator table and legacy Monitor table
+  const customPrompt = useMemo(() => {
+    if (isEvaluatorTable && evaluatorQuery.data) {
+      const config = evaluatorQuery.data.config as
+        | { settings?: { prompt?: string } }
+        | undefined;
+      return config?.settings?.prompt;
+    }
+    if (!isEvaluatorTable && monitorQuery.data) {
+      const config = monitorQuery.data.evaluator?.config as
+        | { settings?: { prompt?: string } }
+        | undefined;
+      return config?.settings?.prompt;
+    }
+    return undefined;
+  }, [isEvaluatorTable, evaluatorQuery.data, monitorQuery.data]);
 
-  const handleOpenMonitorConfig = () => {
-    if (check.evaluator_id) {
+  // Determine if we have data to show configure button
+  const hasEvaluatorData = isEvaluatorTable
+    ? !!evaluatorQuery.data
+    : !!monitorQuery.data;
+
+  const handleOpenConfig = () => {
+    if (!check.evaluator_id) return;
+
+    if (isEvaluatorTable) {
+      // New style: open evaluator editor drawer
+      openDrawer("evaluatorEditor", { evaluatorId: check.evaluator_id });
+    } else {
+      // Legacy: open online evaluation drawer for monitors
       openDrawer("onlineEvaluation", { monitorId: check.evaluator_id });
     }
   };
@@ -94,11 +128,11 @@ export function EvaluationStatusItem({
               <b>{check.name || evaluator?.name}</b>
             </Text>
             <Spacer />
-            {projectSlug && check.evaluator_id && (
+            {projectSlug && check.evaluator_id && hasEvaluatorData && (
               <Link
                 fontSize="sm"
                 color="blue.500"
-                onClick={handleOpenMonitorConfig}
+                onClick={handleOpenConfig}
                 cursor="pointer"
                 display="flex"
                 alignItems="center"

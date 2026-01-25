@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import {
   createInitialState,
   DEFAULT_TEST_DATA_ID,
   type EvaluationsV3State,
+  type HttpConfig,
 } from "../types";
 import { getActiveDatasetData, stateToWorkflow } from "../utils/dslAdapter";
 
@@ -285,6 +287,322 @@ describe("DSL Adapter", () => {
           (i) => i.identifier === "expected",
         );
         expect(expectedInput?.value).toBe("expected result");
+      });
+    });
+
+    describe("HTTP agent targets", () => {
+      it("creates HTTP node for HTTP agent target (not code node)", () => {
+        const httpConfig: HttpConfig = {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          bodyTemplate: '{"messages": {{messages}}}',
+          outputPath: "$.response.content",
+        };
+
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "http-target-1",
+              type: "agent",
+              name: "My HTTP Agent",
+              agentType: "http",
+              httpConfig,
+              inputs: [{ identifier: "messages", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {
+                [DEFAULT_TEST_DATA_ID]: {
+                  messages: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
+                },
+              },
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        // Find the HTTP node
+        const httpNode = workflow.nodes.find((n) => n.id === "http-target-1");
+        expect(httpNode).toBeDefined();
+
+        // Node type should be "http", NOT "code"
+        expect(httpNode?.type).toBe("http");
+        expect(httpNode?.type).not.toBe("code");
+
+        // Node data should include HTTP config
+        const nodeData = httpNode?.data as HttpComponentConfig;
+        expect(nodeData.url).toBe("https://api.example.com/chat");
+        expect(nodeData.method).toBe("POST");
+        expect(nodeData.bodyTemplate).toBe('{"messages": {{messages}}}');
+        expect(nodeData.outputPath).toBe("$.response.content");
+      });
+
+      it("resolves HTTP agent input mappings to dataset entry node", () => {
+        const httpConfig: HttpConfig = {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          bodyTemplate: '{"thread_id": "{{thread_id}}", "input": "{{input}}"}',
+        };
+
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          datasets: [
+            {
+              id: "ds-with-id",
+              name: "Dataset with ID",
+              type: "inline",
+              inline: {
+                columns: [
+                  { id: "id", name: "id", type: "string" },
+                  { id: "input", name: "input", type: "string" },
+                ],
+                records: { id: ["abc-123"], input: ["Hello"] },
+              },
+              columns: [
+                { id: "id", name: "id", type: "string" },
+                { id: "input", name: "input", type: "string" },
+              ],
+            },
+          ],
+          activeDatasetId: "ds-with-id",
+          targets: [
+            {
+              id: "http-target-1",
+              type: "agent",
+              name: "My HTTP Agent",
+              agentType: "http",
+              httpConfig,
+              inputs: [
+                { identifier: "thread_id", type: "str" },
+                { identifier: "input", type: "str" },
+              ],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {
+                "ds-with-id": {
+                  thread_id: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: "ds-with-id",
+                    sourceField: "id",
+                  },
+                  input: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: "ds-with-id",
+                    sourceField: "input",
+                  },
+                },
+              },
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        // Check edges from entry node to HTTP node
+        const httpEdges = workflow.edges.filter(
+          (e) => e.target === "http-target-1",
+        );
+        expect(httpEdges).toHaveLength(2);
+
+        // thread_id edge
+        const threadIdEdge = httpEdges.find(
+          (e) => e.targetHandle === "input-thread_id",
+        );
+        expect(threadIdEdge).toBeDefined();
+        expect(threadIdEdge?.source).toBe("entry");
+        expect(threadIdEdge?.sourceHandle).toBe("output-id");
+
+        // input edge
+        const inputEdge = httpEdges.find(
+          (e) => e.targetHandle === "input-input",
+        );
+        expect(inputEdge).toBeDefined();
+        expect(inputEdge?.source).toBe("entry");
+        expect(inputEdge?.sourceHandle).toBe("output-input");
+      });
+
+      it("includes auth configuration in HTTP node", () => {
+        const httpConfig: HttpConfig = {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          auth: {
+            type: "bearer",
+            token: "sk-test-12345",
+          },
+        };
+
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "http-target-1",
+              type: "agent",
+              name: "My HTTP Agent",
+              agentType: "http",
+              httpConfig,
+              inputs: [{ identifier: "messages", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {
+                [DEFAULT_TEST_DATA_ID]: {
+                  messages: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
+                },
+              },
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        const httpNode = workflow.nodes.find((n) => n.id === "http-target-1");
+        expect(httpNode).toBeDefined();
+        expect(httpNode?.type).toBe("http");
+
+        const nodeData = httpNode?.data as HttpComponentConfig;
+        expect(nodeData.auth).toBeDefined();
+        expect(nodeData.auth?.type).toBe("bearer");
+        if (nodeData.auth?.type === "bearer") {
+          expect(nodeData.auth.token).toBe("sk-test-12345");
+        }
+      });
+
+      it("includes headers configuration in HTTP node", () => {
+        const httpConfig: HttpConfig = {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          headers: [
+            { key: "X-Request-ID", value: "req-456" },
+            { key: "X-Environment", value: "production" },
+          ],
+        };
+
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "http-target-1",
+              type: "agent",
+              name: "My HTTP Agent",
+              agentType: "http",
+              httpConfig,
+              inputs: [{ identifier: "messages", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {
+                [DEFAULT_TEST_DATA_ID]: {
+                  messages: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
+                },
+              },
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        const httpNode = workflow.nodes.find((n) => n.id === "http-target-1");
+        expect(httpNode).toBeDefined();
+
+        const nodeData = httpNode?.data as HttpComponentConfig;
+        expect(nodeData.headers).toBeDefined();
+        expect(nodeData.headers).toHaveLength(2);
+        expect(nodeData.headers?.[0]).toEqual({
+          key: "X-Request-ID",
+          value: "req-456",
+        });
+        expect(nodeData.headers?.[1]).toEqual({
+          key: "X-Environment",
+          value: "production",
+        });
+      });
+
+      it("includes timeout configuration in HTTP node", () => {
+        const httpConfig: HttpConfig = {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          timeoutMs: 5000,
+        };
+
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "http-target-1",
+              type: "agent",
+              name: "My HTTP Agent",
+              agentType: "http",
+              httpConfig,
+              inputs: [{ identifier: "messages", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {},
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        const httpNode = workflow.nodes.find((n) => n.id === "http-target-1");
+        const nodeData = httpNode?.data as HttpComponentConfig;
+        expect(nodeData.timeoutMs).toBe(5000);
+      });
+
+      it("creates code node for non-HTTP agent targets", () => {
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "code-target-1",
+              type: "agent",
+              name: "Code Agent",
+              agentType: "code",
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {},
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        const codeNode = workflow.nodes.find((n) => n.id === "code-target-1");
+        expect(codeNode).toBeDefined();
+        expect(codeNode?.type).toBe("code");
+      });
+
+      it("creates code node when agentType is not specified (backward compatibility)", () => {
+        const state: EvaluationsV3State = {
+          ...createInitialState(),
+          targets: [
+            {
+              id: "legacy-target-1",
+              type: "agent",
+              name: "Legacy Agent",
+              // No agentType specified - should default to code node
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              mappings: {},
+            },
+          ],
+        };
+
+        const workflow = stateToWorkflow(state);
+
+        const codeNode = workflow.nodes.find((n) => n.id === "legacy-target-1");
+        expect(codeNode).toBeDefined();
+        expect(codeNode?.type).toBe("code");
       });
     });
   });

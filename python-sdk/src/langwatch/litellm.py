@@ -246,6 +246,9 @@ class LiteLLMPatch:
                 SpanMetrics(
                     prompt_tokens=safe_get(usage, "prompt_tokens"),
                     completion_tokens=safe_get(usage, "completion_tokens"),
+                    reasoning_tokens=safe_get(
+                        usage, "completion_tokens_details", "reasoning_tokens"
+                    ),
                 )
                 if usage
                 else SpanMetrics()
@@ -281,6 +284,9 @@ class LiteLLMPatch:
             metrics=SpanMetrics(
                 prompt_tokens=safe_get(response, "usage", "prompt_tokens"),
                 completion_tokens=safe_get(response, "usage", "completion_tokens"),
+                reasoning_tokens=safe_get(
+                    response, "usage", "completion_tokens_details", "reasoning_tokens"
+                ),
             ),
             timestamps=timestamps,
             **kwargs,
@@ -338,6 +344,7 @@ class LiteLLMPatch:
             "functions",
             "user",
             "response_format",
+            "reasoning_effort",
         ]
         for param in params:
             if kwargs.get(param):

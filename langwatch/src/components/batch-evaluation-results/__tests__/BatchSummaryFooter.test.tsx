@@ -78,6 +78,52 @@ describe("BatchSummaryFooter", () => {
       expect(screen.getByText("Eval A")).toBeInTheDocument();
       expect(screen.getByText("Eval B")).toBeInTheDocument();
     });
+
+    it("does not show pass rate when averagePassed is null (all passed values were null)", () => {
+      const run = createRunSummary({
+        summary: {
+          evaluations: {
+            response_length: {
+              name: "response_length",
+              averageScore: 6,
+              averagePassed: null, // All passed values were null
+            },
+          },
+        },
+      });
+
+      render(<BatchSummaryFooter run={run} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("response_length")).toBeInTheDocument();
+      // Should show the score only, not a pass rate
+      expect(screen.getByText("6")).toBeInTheDocument();
+      // Should NOT show any pass percentage
+      expect(screen.queryByText(/pass/)).not.toBeInTheDocument();
+    });
+
+    it("shows only score when evaluator has score but no pass rate", () => {
+      const run = createRunSummary({
+        summary: {
+          evaluations: {
+            "score-only": {
+              name: "Score Only Eval",
+              averageScore: 0.75,
+              averagePassed: null,
+            },
+          },
+        },
+      });
+
+      render(<BatchSummaryFooter run={run} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("Score Only Eval")).toBeInTheDocument();
+      expect(screen.getByText("0.75")).toBeInTheDocument();
+      expect(screen.queryByText(/pass/)).not.toBeInTheDocument();
+    });
   });
 
   describe("Cost Display", () => {

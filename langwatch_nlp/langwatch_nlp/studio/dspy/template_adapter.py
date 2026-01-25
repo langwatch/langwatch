@@ -14,6 +14,59 @@ from dspy.signatures.signature import Signature
 import liquid
 
 
+def _filter_empty_content_messages(messages: list[dict]) -> list[dict]:
+    """
+    Filter messages with empty content to prevent Anthropic API errors.
+
+    Anthropic strictly rejects messages with empty text content blocks:
+    "text content blocks must be non-empty"
+
+    This function:
+    - Filters messages with None content
+    - Filters messages with empty string content (after .strip())
+    - For list content: filters empty text blocks, removes message if all blocks empty
+    - Preserves non-text blocks (images, etc.)
+    """
+    filtered_messages = []
+
+    for message in messages:
+        content = message.get("content")
+
+        # Filter None content
+        if content is None:
+            continue
+
+        # Handle string content
+        if isinstance(content, str):
+            if content.strip():
+                filtered_messages.append(message)
+            continue
+
+        # Handle list content (content blocks)
+        if isinstance(content, list):
+            filtered_blocks = []
+            for block in content:
+                # Preserve non-text blocks (images, etc.)
+                if block.get("type") != "text":
+                    filtered_blocks.append(block)
+                    continue
+
+                # Filter empty text blocks
+                text = block.get("text", "")
+                if isinstance(text, str) and text.strip():
+                    filtered_blocks.append(block)
+
+            # Only include message if it has remaining blocks
+            if filtered_blocks:
+                filtered_messages.append({**message, "content": filtered_blocks})
+            continue
+
+        # Preserve messages with other content types
+        filtered_messages.append(message)
+
+    return filtered_messages
+
+
 class TemplateAdapter(dspy.JSONAdapter):
     """
     This is a "TemplateAdapter" DSPy Adapter, that avoid modifying the messages as much as possible,
@@ -81,12 +134,17 @@ class TemplateAdapter(dspy.JSONAdapter):
             instructions = ""
 
         messages = []
-        messages.append(
-            {
-                "role": "system",
-                "content": self._format_template_inputs(instructions, inputs_copy),
-            }
-        )
+
+        # Only add system message if instructions are non-empty after formatting
+        system_content = self._format_template_inputs(instructions, inputs_copy)
+        if system_content.strip():
+            messages.append(
+                {
+                    "role": "system",
+                    "content": system_content,
+                }
+            )
+
         messages.extend(self.format_demos(signature, demos))
         if history_field_name:
             messages.extend(conversation_history)
@@ -98,6 +156,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         )
 
         messages = split_message_content_for_custom_types(messages)
+
+        # Filter empty content to prevent Anthropic "text content blocks must be non-empty" errors
+        messages = _filter_empty_content_messages(messages)
 
         return messages
 

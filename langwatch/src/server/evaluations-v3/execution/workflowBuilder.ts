@@ -11,11 +11,23 @@ import type {
   Entry,
   Evaluator,
   Field,
+  HttpComponentConfig,
   LLMConfig,
   LlmPromptConfigComponent,
   Signature,
   Workflow,
 } from "~/optimization_studio/types/dsl";
+
+/**
+ * HTTP node data structure - uses parameters like other nodes.
+ * This is the data shape for type: "http" nodes.
+ */
+type HttpNodeData = {
+  name: string;
+  inputs: Field[];
+  outputs: Field[];
+  parameters: Field[];
+};
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
@@ -86,6 +98,7 @@ export const buildCellWorkflow = (
     evaluatorConfigs,
     evaluatorNodeIds,
     cell,
+    datasetColumns,
   );
 
   const workflow: Workflow = {
@@ -148,7 +161,7 @@ const buildEntryNode = (
           records: Object.fromEntries(
             columns.map((col) => [
               col.id,
-              [String(datasetEntry[col.name] ?? datasetEntry[col.id] ?? "")],
+              [datasetEntry[col.name] ?? datasetEntry[col.id] ?? ""],
             ]),
           ),
           columnTypes: columns.map((col) => ({
@@ -172,7 +185,7 @@ const buildTargetNode = (
   targetConfig: TargetConfig,
   loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
   cell: ExecutionCell,
-): { targetNode: Node<Signature | Code>; targetNodeId: string } => {
+): { targetNode: Node<Signature | Code | HttpNodeData>; targetNodeId: string } => {
   const targetNodeId = targetConfig.id;
 
   if (targetConfig.type === "prompt") {
@@ -204,8 +217,21 @@ const buildTargetNode = (
       );
     }
   } else {
-    // Agent/code target
+    // Agent target - dispatch based on agent type
     if (loadedData.agent) {
+      // Check if it's an HTTP agent
+      if (loadedData.agent.type === "http") {
+        return {
+          targetNode: buildHttpNodeFromAgent(
+            targetNodeId,
+            loadedData.agent,
+            targetConfig,
+            cell,
+          ),
+          targetNodeId,
+        };
+      }
+      // Default to code node for other agent types (code, signature, workflow)
       return {
         targetNode: buildCodeNodeFromAgent(
           targetNodeId,
@@ -386,6 +412,153 @@ export const buildCodeNodeFromAgent = (
   };
 };
 
+/**
+ * Fixed input fields for HTTP agents - these are always available for mapping.
+ * Users can add custom fields, but these 3 are always present.
+ */
+const HTTP_AGENT_FIXED_INPUTS = ["threadId", "messages", "input"] as const;
+
+/**
+ * Builds an HTTP node from a TypedAgent with type "http".
+ * The HTTP config is read directly from the agent, not duplicated on the target.
+ *
+ * HTTP config is stored in `parameters` like other node types (Code, Signature, etc.)
+ * This ensures consistent handling in the Python parser via parse_fields().
+ */
+export const buildHttpNodeFromAgent = (
+  nodeId: string,
+  agent: TypedAgent,
+  targetConfig: TargetConfig,
+  cell: ExecutionCell,
+): Node<HttpNodeData> => {
+  // The agent.type === "http" check is done before calling this function,
+  // so we can safely cast the config to HttpComponentConfig
+  const config = agent.config as HttpComponentConfig;
+
+  // Start with the fixed HTTP agent inputs (threadId, messages, input)
+  // These are always available for mapping regardless of what's stored
+  const fixedInputs = HTTP_AGENT_FIXED_INPUTS.map((identifier) => ({
+    identifier,
+    type: "str" as Field["type"],
+    value: getInputValue(identifier, targetConfig, cell),
+  }));
+
+  // Add any custom user-defined inputs from targetConfig (excluding fixed ones)
+  const customInputs = (targetConfig.inputs ?? [])
+    .filter(
+      (input) =>
+        !HTTP_AGENT_FIXED_INPUTS.includes(
+          input.identifier as (typeof HTTP_AGENT_FIXED_INPUTS)[number],
+        ),
+    )
+    .map((input) => ({
+      identifier: input.identifier,
+      type: input.type as Field["type"],
+      value: getInputValue(input.identifier, targetConfig, cell),
+    }));
+
+  const inputs = [...fixedInputs, ...customInputs];
+
+  // HTTP agents always have a single "output" output
+  const outputs = [{ identifier: "output", type: "str" as const }];
+
+  // Build parameters array with HTTP config (consistent with other node types)
+  const parameters: Field[] = [
+    { identifier: "url", type: "str", value: config.url },
+    { identifier: "method", type: "str", value: config.method ?? "POST" },
+  ];
+
+  if (config.bodyTemplate) {
+    parameters.push({
+      identifier: "body_template",
+      type: "str",
+      value: config.bodyTemplate,
+    });
+  }
+
+  if (config.outputPath) {
+    parameters.push({
+      identifier: "output_path",
+      type: "str",
+      value: config.outputPath,
+    });
+  }
+
+  if (config.headers && config.headers.length > 0) {
+    // Convert array of {key, value} to dict
+    const headersDict: Record<string, string> = {};
+    for (const h of config.headers) {
+      if (h.key) {
+        headersDict[h.key] = h.value ?? "";
+      }
+    }
+    parameters.push({
+      identifier: "headers",
+      type: "dict",
+      value: headersDict,
+    });
+  }
+
+  if (config.timeoutMs) {
+    parameters.push({
+      identifier: "timeout_ms",
+      type: "int",
+      value: config.timeoutMs,
+    });
+  }
+
+  // Add auth params if configured
+  if (config.auth && config.auth.type !== "none") {
+    parameters.push({
+      identifier: "auth_type",
+      type: "str",
+      value: config.auth.type,
+    });
+
+    if (config.auth.type === "bearer" && "token" in config.auth) {
+      parameters.push({
+        identifier: "auth_token",
+        type: "str",
+        value: config.auth.token,
+      });
+    } else if (config.auth.type === "api_key" && "header" in config.auth) {
+      parameters.push({
+        identifier: "auth_header",
+        type: "str",
+        value: config.auth.header,
+      });
+      parameters.push({
+        identifier: "auth_value",
+        type: "str",
+        value: config.auth.value,
+      });
+    } else if (config.auth.type === "basic" && "username" in config.auth) {
+      parameters.push({
+        identifier: "auth_username",
+        type: "str",
+        value: config.auth.username,
+      });
+      parameters.push({
+        identifier: "auth_password",
+        type: "str",
+        value: config.auth.password,
+      });
+    }
+  }
+
+  return {
+    id: nodeId,
+    type: "http",
+    position: { x: 200, y: 0 },
+    data: {
+      name: agent.name,
+      inputs,
+      outputs,
+      parameters,
+    },
+  };
+};
+
 // ============================================================================
 // Evaluator Node Builder
 // ============================================================================
@@ -424,6 +597,7 @@ const buildEvaluatorNodes = (
       cell,
       index,
       settings,
+      evaluator.dbEvaluatorId, // Pass dbEvaluatorId to use evaluators/{id} path
     );
     evaluatorNodes.push(node);
   });
@@ -434,6 +608,7 @@ const buildEvaluatorNodes = (
 /**
  * Builds a single evaluator node.
  * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
+ * @param dbEvaluatorId - Database evaluator ID for using evaluators/{id} path
  */
 export const buildEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -442,6 +617,7 @@ export const buildEvaluatorNode = (
   cell: ExecutionCell,
   index: number,
   settings: Record<string, unknown> = {},
+  dbEvaluatorId?: string,
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef =
@@ -463,6 +639,13 @@ export const buildEvaluatorNode = (
     value,
   }));
 
+  // Use evaluators/{dbEvaluatorId} path when available so langwatch_nlp
+  // calls LangWatch API which fetches settings from DB
+  // Otherwise fall back to direct evaluator type (e.g., langevals/exact_match)
+  const evaluatorPath = dbEvaluatorId
+    ? (`evaluators/${dbEvaluatorId}` as const)
+    : evaluator.evaluatorType;
+
   return {
     id: nodeId,
     type: "evaluator",
@@ -476,7 +659,7 @@ export const buildEvaluatorNode = (
         { identifier: "score", type: "float" },
         { identifier: "label", type: "str" },
       ],
-      evaluator: evaluator.evaluatorType,
+      evaluator: evaluatorPath,
       parameters,
     },
   };
@@ -496,9 +679,17 @@ const buildEdges = (
   evaluatorConfigs: EvaluatorConfig[],
   evaluatorNodeIds: Record<string, string>,
   cell: ExecutionCell,
+  datasetColumns: Array<{ id: string; name: string; type: string }>,
 ): Edge[] => {
   const edges: Edge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
+
+  // Helper to resolve column name to column ID
+  // sourceField in mappings is the column name, but entry node uses column ID
+  const getColumnId = (columnName: string): string => {
+    const column = datasetColumns.find((c) => c.name === columnName);
+    return column?.id ?? columnName; // Fall back to columnName if not found
+  };
 
   // Build edges from entry to target based on target mappings
   const targetMappings = datasetId
@@ -508,10 +699,11 @@ const buildEdges = (
   // Python NLP expects handles in format "outputs.field" and "inputs.field"
   for (const [inputField, mapping] of Object.entries(targetMappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
+      const columnId = getColumnId(mapping.sourceField);
       edges.push({
         id: `${entryNodeId}->${targetNodeId}.${inputField}`,
         source: entryNodeId,
-        sourceHandle: `outputs.${mapping.sourceField}`,
+        sourceHandle: `outputs.${columnId}`,
         target: targetNodeId,
         targetHandle: `inputs.${inputField}`,
         type: "default",
@@ -531,11 +723,12 @@ const buildEdges = (
     for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
       if (mapping.type === "source") {
         if (mapping.source === "dataset") {
-          // From dataset entry
+          // From dataset entry - use column ID, not name
+          const columnId = getColumnId(mapping.sourceField);
           edges.push({
             id: `${entryNodeId}->${evaluatorNodeId}.${inputField}`,
             source: entryNodeId,
-            sourceHandle: `outputs.${mapping.sourceField}`,
+            sourceHandle: `outputs.${columnId}`,
             target: evaluatorNodeId,
             targetHandle: `inputs.${inputField}`,
             type: "default",

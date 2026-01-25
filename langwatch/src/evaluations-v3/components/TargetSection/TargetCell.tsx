@@ -19,6 +19,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { parseLLMError } from "~/utils/formatLLMError";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
@@ -103,6 +104,9 @@ export function TargetCellContent({
     width: 0,
   });
 
+  // State for expanded error view
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
+
   // Check if content overflows
   useEffect(() => {
     if (outputRef.current) {
@@ -111,6 +115,9 @@ export function TargetCellContent({
       setIsOverflowing(isContentOverflowing);
     }
   }, [output]);
+
+  // Check if error is likely to overflow 2 lines (~100 chars is a rough heuristic)
+  const isErrorOverflowing = (error?.length ?? 0) > 100;
 
   // Handler to open trace drawer (also closes expanded view)
   const handleViewTrace = useCallback(() => {
@@ -255,19 +262,27 @@ export function TargetCellContent({
     // Error state - show error message
     if (error) {
       return (
-        <HStack
-          gap={2}
-          p={2}
-          bg="red.subtle"
-          borderRadius="md"
-          color="red.fg"
-          fontSize="13px"
-        >
-          <Box flexShrink={0}>
-            <LuCircleAlert size={16} />
-          </Box>
-          <Text lineClamp={expanded ? undefined : 2}>{error}</Text>
-        </HStack>
+        <Box position="relative">
+          <HStack
+            gap={2}
+            p={2}
+            bg="red.subtle"
+            borderRadius="md"
+            color="red.fg"
+            fontSize="13px"
+            align="start"
+            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
+            onClick={() => setIsErrorExpanded(true)}
+            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
+          >
+            <Box flexShrink={0} paddingTop={0.5}>
+              <LuCircleAlert size={16} />
+            </Box>
+            <Text lineClamp={expanded || isErrorExpanded ? undefined : 2} userSelect="text" whiteSpace="pre-wrap" wordBreak="break-word">
+              {parseLLMError(error).message}
+            </Text>
+          </HStack>
+        </Box>
       );
     }
 
@@ -526,6 +541,7 @@ export function TargetCellContent({
       <Box
         ref={cellRef}
         position="relative"
+        height="100%"
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
         <VStack align="stretch" gap={2}>
@@ -552,7 +568,7 @@ export function TargetCellContent({
             top={`${expandedPosition.top - 8}px`}
             left={`${expandedPosition.left - 8}px`}
             width={`${Math.max(expandedPosition.width + 16, 250)}px`}
-            maxHeight="calc(100vh - 32px)"
+            maxHeight="min(600px, calc(100vh - 32px))"
             bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
@@ -561,13 +577,22 @@ export function TargetCellContent({
             display="flex"
             flexDirection="column"
             p={3}
+            overflow="hidden"
             css={{
               animation: "scale-in 0.15s ease-out",
             }}
           >
-            <VStack align="stretch" gap={2} height="100%" position="relative">
+            <VStack
+              align="stretch"
+              gap={2}
+              height="100%"
+              position="relative"
+              overflow="hidden"
+            >
               {renderActionButtons(true)}
-              {renderOutput(true)}
+              <Box flex={1} minHeight={0} overflowY="auto">
+                {renderOutput(true)}
+              </Box>
               {renderEvaluatorChips(true)}
             </VStack>
           </Box>

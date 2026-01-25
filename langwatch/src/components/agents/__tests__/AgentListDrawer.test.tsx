@@ -69,6 +69,21 @@ const mockAgents = [
     createdAt: new Date("2025-01-01T10:00:00Z"),
     updatedAt: new Date("2025-01-08T10:00:00Z"),
   },
+  {
+    id: "agent-4",
+    name: "My API Agent",
+    type: "http",
+    config: {
+      url: "https://api.example.com/chat",
+      method: "POST",
+      bodyTemplate: '{"input": "{{input}}"}',
+    },
+    workflowId: null,
+    projectId: "test-project-id",
+    archivedAt: null,
+    createdAt: new Date("2025-01-02T10:00:00Z"),
+    updatedAt: new Date("2025-01-16T10:00:00Z"),
+  },
 ];
 
 // Mock the API
@@ -81,7 +96,18 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         })),
       },
+      delete: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
     },
+    useContext: vi.fn(() => ({
+      agents: {
+        getAll: { invalidate: vi.fn() },
+      },
+    })),
   },
 }));
 
@@ -147,6 +173,14 @@ describe("AgentListDrawer", () => {
         expect(screen.getByText("Prompt")).toBeInTheDocument();
         expect(screen.getByText("Code")).toBeInTheDocument();
         expect(screen.getByText("Workflow")).toBeInTheDocument();
+      });
+    });
+
+    it("shows HTTP agent with correct type label", async () => {
+      renderDrawer();
+      await waitFor(() => {
+        expect(screen.getByText("My API Agent")).toBeInTheDocument();
+        expect(screen.getByText("HTTP")).toBeInTheDocument();
       });
     });
   });

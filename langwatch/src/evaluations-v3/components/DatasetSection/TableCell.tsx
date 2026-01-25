@@ -1,4 +1,4 @@
-import { Skeleton } from "@chakra-ui/react";
+import { Skeleton, VStack } from "@chakra-ui/react";
 import { type Cell, flexRender } from "@tanstack/react-table";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -88,13 +88,18 @@ export const TableCell = ({
     position: isSelected ? ("relative" as const) : undefined,
     zIndex: isSelected ? 5 : undefined,
     userSelect: "none" as const,
+    height: "100%",
   };
 
   // Show skeleton when loading (except checkbox column)
   if (isLoading && meta.columnType !== "checkbox") {
     return (
-      <td key={cell.id} style={{ verticalAlign: "middle" }}>
-        <Skeleton height="16px" width="100%" />
+      <td key={cell.id}>
+        <VStack align="stretch" gap={1}>
+          <Skeleton height="14px" width="100%" />
+          <Skeleton height="14px" width="100%" />
+          <Skeleton height="14px" width="80%" />
+        </VStack>
       </td>
     );
   }

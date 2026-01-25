@@ -116,6 +116,8 @@ export const generateCells = (
         // Skip target execution, use pre-computed output
         skipTarget: scope.targetOutput !== undefined,
         precomputedTargetOutput: scope.targetOutput,
+        // Reuse existing trace ID to append evaluator span to the same trace
+        traceId: scope.traceId,
       });
     }
     return cells;
@@ -216,7 +218,8 @@ export async function* executeCell(
     const targetNodes = new Set([cell.targetId]);
 
     // Generate OTEL-compliant trace ID for this cell execution
-    const traceId = generateOtelTraceId();
+    // Reuse existing traceId if provided (for evaluator reruns to append to existing trace)
+    const traceId = cell.traceId ?? generateOtelTraceId();
 
     let targetOutput: Record<string, unknown> | undefined;
     let targetFailed = false;
@@ -409,6 +412,9 @@ export async function* executeCell(
 
 /**
  * Builds the input values for an evaluator from target output and dataset entry.
+ *
+ * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
+ * so we can use mapping.sourceField directly without ID-to-name translation.
  */
 const buildEvaluatorInputs = (
   cell: ExecutionCell,
@@ -429,7 +435,7 @@ const buildEvaluatorInputs = (
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source") {
       if (mapping.source === "dataset") {
-        // From dataset entry
+        // From dataset entry - uses column name as key
         inputs[inputField] = cell.datasetEntry[mapping.sourceField];
       } else if (
         mapping.source === "target" &&
@@ -448,15 +454,22 @@ const buildEvaluatorInputs = (
 
 /**
  * Builds the input values for a target from the cell's dataset entry.
+ *
+ * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
+ * so we can use mapping.sourceField directly without ID-to-name translation.
  */
-const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
+const buildTargetInputs = (
+  cell: ExecutionCell,
+): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return inputs;
 
   const mappings = cell.targetConfig.mappings[datasetId] ?? {};
+
   for (const [inputField, mapping] of Object.entries(mappings)) {
     if (mapping.type === "source" && mapping.source === "dataset") {
+      // Dataset entries use column name as key
       inputs[inputField] = cell.datasetEntry[mapping.sourceField];
     } else if (mapping.type === "value") {
       inputs[inputField] = mapping.value;

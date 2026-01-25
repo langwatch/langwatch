@@ -585,18 +585,6 @@ function EvaluatorMappingsSection({
         readOnly={true} // Can't add/remove evaluator inputs
         missingMappingIds={missingMappingIds}
       />
-      {/* Red validation message for pending mappings */}
-      {missingMappingIds.size > 0 && (
-        <Text
-          data-testid="pending-mappings-error"
-          color="red.500"
-          fontSize="sm"
-          marginTop={3}
-        >
-          Please map all required fields:{" "}
-          {Array.from(missingMappingIds).join(", ")}
-        </Text>
-      )}
     </Box>
   );
 }

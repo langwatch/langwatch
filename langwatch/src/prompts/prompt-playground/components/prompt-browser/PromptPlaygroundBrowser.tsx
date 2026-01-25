@@ -1,8 +1,9 @@
-import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { HStack, Spacer } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { AddPromptButton } from "../sidebar/AddPromptButton";
+import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
@@ -114,7 +115,6 @@ export function PromptPlaygroundBrowser() {
                 <HStack
                   flexShrink={0}
                   paddingLeft={1}
-                  title="Split tab"
                   position="relative"
                   _before={{
                     content: '""',
@@ -130,12 +130,14 @@ export function PromptPlaygroundBrowser() {
                     pointerEvents: "none",
                   }}
                 >
+                  <ExperimentFromPlaygroundButton />
                   <PageLayout.HeaderButton
                     onClick={() =>
                       tabbedWindow.activeTabId &&
                       handleSplit(tabbedWindow.activeTabId)
                     }
                     disabled={!tabbedWindow.activeTabId}
+                    title="Split tab to compare prompts side by side"
                   >
                     <LuColumns2 size="18px" />
                     Compare

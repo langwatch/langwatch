@@ -132,7 +132,10 @@ describe("VariableInsertMenu", () => {
       const onSelect = vi.fn();
       renderComponent({ onSelect });
 
-      await user.click(screen.getByText("input"));
+      // Wait for popover content to appear
+      const inputField = await screen.findByText("input");
+      expect(inputField).toBeVisible();
+      await user.click(inputField);
 
       expect(onSelect).toHaveBeenCalledWith({
         sourceId: "dataset-1",
@@ -148,7 +151,10 @@ describe("VariableInsertMenu", () => {
       const onSelect = vi.fn();
       renderComponent({ onSelect });
 
-      await user.click(screen.getByText("parsed_result"));
+      // Wait for popover content to appear
+      const parsedResultField = await screen.findByText("parsed_result");
+      expect(parsedResultField).toBeVisible();
+      await user.click(parsedResultField);
 
       expect(onSelect).toHaveBeenCalledWith({
         sourceId: "runner-1",
@@ -263,8 +269,11 @@ describe("VariableInsertMenu", () => {
         highlightedIndex: 0, // First item (the field, not create)
       });
 
+      // Wait for popover content to appear
+      const inputField = await screen.findByText("input");
+      expect(inputField).toBeVisible();
       // Click on the input field directly to verify it's selectable
-      await user.click(screen.getByText("input"));
+      await user.click(inputField);
 
       // Should call onSelect with the field, not onCreateVariable
       expect(onSelect).toHaveBeenCalledWith(
@@ -278,7 +287,12 @@ describe("VariableInsertMenu", () => {
       const onCreateVariable = vi.fn();
       renderComponent({ query: "my_custom", onCreateVariable });
 
-      await user.click(screen.getByText(/Create variable "{{my_custom}}"/));
+      // Wait for popover content to appear
+      const createOption = await screen.findByText(
+        /Create variable "{{my_custom}}"/,
+      );
+      expect(createOption).toBeVisible();
+      await user.click(createOption);
       expect(onCreateVariable).toHaveBeenCalledWith("my_custom");
     });
 

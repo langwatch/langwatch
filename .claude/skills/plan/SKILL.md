@@ -2,12 +2,20 @@
 name: plan
 description: "Create a feature file with acceptance criteria before implementation. Use when no specs/features/*.feature file exists for the work."
 context: fork
-agent: Plan
 user-invocable: true
 argument-hint: "[feature description or issue summary]"
 ---
 
 Create a BDD feature file for: $ARGUMENTS
+
+## First: Read the Spec Guidelines
+
+**Before writing any feature file, read `specs/README.md`** to understand:
+- What makes a good feature file
+- How to achieve non-overlapping test coverage
+- The distinction between @e2e, @integration, and @unit scenarios
+
+Also reference `docs/TESTING_PHILOSOPHY.md` for the test hierarchy and decision tree.
 
 ## Requirements Source
 
@@ -19,29 +27,61 @@ Work should be tied to a GitHub issue. If requirements are unclear:
 ## Output Location
 Write to `specs/features/<feature-name>.feature`
 
+## What Makes a Good Feature File
+
+### Feature Complete
+- Captures ALL acceptance criteria from the issue
+- Describes ALL user-visible behaviors
+- No gaps - if it's not in the feature file, it's not in scope
+- This file IS the specification of work to be done
+
+### Non-Overlapping Test Coverage
+
+Each scenario must be tagged with exactly ONE of:
+
+| Tag | What It Tests | Mocking |
+|-----|---------------|---------|
+| `@e2e` | Happy paths, full system flow | None |
+| `@integration` | Edge cases, error handling, module boundaries | External services only |
+| `@unit` | Pure logic, branches, single function | Collaborators |
+
+**Critical**: Don't duplicate coverage across levels. If E2E covers the happy path, integration tests edge cases, unit tests logic branches.
+
 ## Feature File Format
+
 ```gherkin
 Feature: <Feature Name>
   As a <role>
   I want <goal>
   So that <benefit>
 
-  @unit
-  Scenario: <unit test scenario>
+  # Happy path - full system
+  @e2e
+  Scenario: User successfully completes main flow
     Given <precondition>
     When <action>
     Then <expected result>
 
+  # Edge cases and error handling
   @integration
-  Scenario: <integration test scenario>
-    ...
+  Scenario: Handles invalid input gracefully
+    Given <precondition>
+    When <invalid action>
+    Then <error handling>
+
+  # Pure logic branches
+  @unit
+  Scenario: Validates input format
+    Given <input state>
+    When <validation runs>
+    Then <specific validation result>
 ```
 
 ## Guidelines
-- Extract clear acceptance criteria from the GitHub issue
-- Tag scenarios with @unit, @integration, or @e2e
+
+- One invariant per scenario (test one thing)
+- Scenarios should be independent
 - Focus on behavior, not implementation
-- Keep scenarios independent and atomic
-- If requirements are ambiguous, ask for clarification before writing
+- Ask for clarification if requirements are ambiguous
 
 Return the file path when complete.

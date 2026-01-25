@@ -3,7 +3,7 @@
  *
  * Shared between Evaluations V3 and Batch Results tables.
  */
-import { Hash, List, MessageSquare, Type } from "lucide-react";
+import { Braces, Hash, MessageSquare, Type } from "lucide-react";
 
 export type ColumnType =
   | "string"
@@ -23,7 +23,7 @@ type ColumnTypeIconProps = {
  * Returns an icon based on the column type.
  * - string: Text icon (blue)
  * - number: Hash icon (green)
- * - json: List icon (purple)
+ * - json: Braces icon (purple)
  * - chat_messages: Message icon (orange)
  * - default: Text icon (gray)
  */
@@ -36,7 +36,7 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
     case "number":
       return <Hash {...iconProps} color="var(--chakra-colors-green-500)" />;
     case "json":
-      return <List {...iconProps} color="var(--chakra-colors-purple-500)" />;
+      return <Braces {...iconProps} color="var(--chakra-colors-purple-500)" />;
     case "chat_messages":
       return (
         <MessageSquare {...iconProps} color="var(--chakra-colors-orange-500)" />

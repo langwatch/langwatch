@@ -677,12 +677,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   /**
    * Re-run a single evaluator for a specific cell.
    * Uses the existing target output to avoid re-running the target.
+   * Reuses the existing trace ID to append the evaluator span to the same trace.
    */
   const rerunEvaluator = useCallback(
     async (rowIndex: number, targetId: string, evaluatorId: string) => {
-      // Get the existing target output from the store
+      // Get the existing target output and trace ID from the store
       const state = useEvaluationsV3Store.getState();
       const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
+      const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
       updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
@@ -697,6 +699,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         evaluatorId,
         // Pass target output if available so we don't re-run the target
         targetOutput,
+        // Reuse existing trace ID to append evaluator span to the same trace
+        traceId,
       };
 
       await execute(scope);

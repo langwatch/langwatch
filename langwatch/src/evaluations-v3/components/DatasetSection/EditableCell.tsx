@@ -10,12 +10,16 @@ import {
 } from "react";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
 // Max characters to display before truncating (for rendering performance)
 const MAX_DISPLAY_CHARS = 5000;
 
 // Max height in pixels for compact mode before showing fade
-const COMPACT_MAX_HEIGHT = 100;
+const COMPACT_MAX_HEIGHT = 160 - 17;
+
+// Default max height in pixels for expanded cells (before drag customization)
+const EXPANDED_DEFAULT_MAX_HEIGHT = 600;
 
 // Column types that should be formatted as JSON
 const JSON_LIKE_TYPES: DatasetColumnType[] = [
@@ -107,12 +111,19 @@ export function EditableCell({
   const cellRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Reset edit value when entering edit mode
+  // Reset edit value when entering edit mode, formatting JSON if applicable
   useEffect(() => {
     if (isEditing) {
-      setEditValue(value);
+      // For JSON-like types, format the value for easier editing
+      const isJsonType = dataType && JSON_LIKE_TYPES.includes(dataType);
+      if (isJsonType) {
+        const { formatted } = tryFormatAsJson(value);
+        setEditValue(formatted);
+      } else {
+        setEditValue(value);
+      }
     }
-  }, [isEditing, value]);
+  }, [isEditing, value, dataType]);
 
   // Track the calculated textarea height
   const [textareaHeight, setTextareaHeight] = useState<number | undefined>(
@@ -212,8 +223,9 @@ export function EditableCell({
     };
   }, [value, dataType]);
 
-  // Track if content overflows in compact mode
-  const [isOverflowing, setIsOverflowing] = useState(false);
+  // Use a heuristic to determine if content likely overflows
+  // This avoids useLayoutEffect + scrollHeight measurement which causes issues
+  // with virtualization and column resizing (measurement doesn't update on resize)
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Track hover state for showing resize bar on compact cells
@@ -226,15 +238,11 @@ export function EditableCell({
   const dragStartYRef = useRef(0);
   const dragStartHeightRef = useRef(0);
 
-  useLayoutEffect(() => {
-    if (contentRef.current && rowHeightMode === "compact" && !isCellExpanded) {
-      const isContentOverflowing =
-        contentRef.current.scrollHeight > COMPACT_MAX_HEIGHT;
-      setIsOverflowing(isContentOverflowing);
-    } else {
-      setIsOverflowing(false);
-    }
-  }, [displayValue.text, rowHeightMode, isCellExpanded]);
+  // Heuristic for overflow: uses character count with newlines weighted as full lines
+  const isOverflowing =
+    rowHeightMode === "compact" &&
+    !isCellExpanded &&
+    isTextLikelyOverflowing(displayValue.text);
 
   // Reset custom height when cell is collapsed
   useEffect(() => {
@@ -247,9 +255,12 @@ export function EditableCell({
   const showClamped =
     rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
 
-  // Calculate the effective max height for expanded cells with custom height
+  // Calculate the effective max height for expanded cells
+  // Use custom height if set (from dragging), otherwise use default expanded height
   const expandedMaxHeight =
-    customHeight !== null ? `${customHeight}px` : undefined;
+    customHeight !== null
+      ? `${customHeight}px`
+      : `${EXPANDED_DEFAULT_MAX_HEIGHT}px`;
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
@@ -345,6 +356,7 @@ export function EditableCell({
       <Box
         ref={cellRef}
         data-testid={`cell-${row}-${columnId}`}
+        height="100%"
         minHeight="20px"
         fontSize={displayValue.isJson ? "12px" : "13px"}
         whiteSpace="pre-wrap"
@@ -358,20 +370,20 @@ export function EditableCell({
         {/* Content container with optional max-height */}
         <Box
           ref={contentRef}
+          height="100%"
           maxHeight={
-            showClamped
+            showClamped || (rowHeightMode === "compact" && !isCellExpanded)
               ? `${COMPACT_MAX_HEIGHT}px`
-              : rowHeightMode === "compact" &&
-                  isCellExpanded &&
-                  expandedMaxHeight
+              : isCellExpanded
                 ? expandedMaxHeight
                 : undefined
           }
           overflow={
-            showClamped ||
-            (rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight)
+            showClamped || (rowHeightMode === "compact" && !isCellExpanded)
               ? "hidden"
-              : undefined
+              : isCellExpanded
+                ? "auto"
+                : undefined
           }
         >
           {displayValue.text}
@@ -415,8 +427,8 @@ export function EditableCell({
             <Box
               position="absolute"
               bottom={"-8px"}
-              left={"-12px"}
-              right={"-12px"}
+              left={"-10px"}
+              right={"-10px"}
               height="20px"
               cursor="ns-resize"
               onMouseDown={handleDragStart}
@@ -435,7 +447,7 @@ export function EditableCell({
                 width="40px"
                 height="4px"
                 borderRadius="full"
-                bg="gray.muted"
+                bg="gray.emphasized"
                 _hover={{ bg: "gray.emphasized" }}
                 transition="background 0.15s"
               />

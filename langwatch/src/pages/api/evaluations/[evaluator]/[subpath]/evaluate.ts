@@ -74,14 +74,16 @@ export async function handleEvaluatorCall(
   let checkType: string;
   let evaluatorSettings: Record<string, unknown> | undefined;
   let evaluatorName: string | undefined;
+  let savedEvaluatorId: string | undefined; // ID from Evaluator table when using evaluators/ path
 
-  // Check if using the new evaluators/slug format
+  // Check if using the new evaluators/slug or evaluators/id format
   if (evaluatorSlug.startsWith("evaluators/")) {
-    const slug = evaluatorSlug.replace("evaluators/", "");
+    const slugOrId = evaluatorSlug.replace("evaluators/", "");
+    // Try to find by slug first, then by id
     const savedEvaluator = await prisma.evaluator.findFirst({
       where: {
         projectId: project.id,
-        slug,
+        OR: [{ slug: slugOrId }, { id: slugOrId }],
         archivedAt: null,
       },
     });
@@ -94,14 +96,15 @@ export async function handleEvaluatorCall(
       checkType = config?.evaluatorType ?? evaluatorSlug;
       evaluatorSettings = config?.settings;
       evaluatorName = savedEvaluator.name;
+      savedEvaluatorId = savedEvaluator.id; // Capture the evaluator ID
     } else {
       return res.status(404).json({
-        error: `Evaluator not found with slug: ${slug}`,
+        error: `Evaluator not found with slug or id: ${slugOrId}`,
       });
     }
   } else {
     // Legacy: Look up by Monitor slug or treat as direct checkType
-    const storedEvaluator = await prisma.monitor.findUnique({
+    const monitor = await prisma.monitor.findUnique({
       where: {
         projectId_slug: {
           projectId: project.id,
@@ -110,19 +113,19 @@ export async function handleEvaluatorCall(
       },
     });
 
-    if (storedEvaluator != null) {
-      checkType = storedEvaluator.checkType;
-      evaluatorSettings = storedEvaluator.parameters as
+    if (monitor != null) {
+      checkType = monitor.checkType;
+      evaluatorSettings = monitor.parameters as
         | Record<string, unknown>
         | undefined;
-      evaluatorName = storedEvaluator.name;
+      evaluatorName = monitor.name;
     } else {
       checkType = evaluatorSlug;
     }
   }
 
-  // For backward compatibility, keep storedEvaluator reference for enabled check
-  const storedEvaluator = !evaluatorSlug.startsWith("evaluators/")
+  // For backward compatibility, keep monitor reference for enabled check
+  const monitor = !evaluatorSlug.startsWith("evaluators/")
     ? await prisma.monitor.findUnique({
         where: {
           projectId_slug: {
@@ -166,7 +169,7 @@ export async function handleEvaluatorCall(
 
   const isGuardrail = as_guardrail || params.as_guardrail;
 
-  if (storedEvaluator && !storedEvaluator.enabled && !!isGuardrail) {
+  if (monitor && !monitor.enabled && !!isGuardrail) {
     return res.status(200).json({
       status: "skipped",
       details: `Guardrail is not enabled`,
@@ -185,16 +188,16 @@ export async function handleEvaluatorCall(
   let settings:
     | z.infer<NonNullable<typeof evaluatorSettingSchema>>
     | undefined =
-    ((evaluatorSettings ?? storedEvaluator?.parameters) as z.infer<
+    ((evaluatorSettings ?? monitor?.parameters) as z.infer<
       NonNullable<typeof evaluatorSettingSchema>
     >) ?? {};
 
   try {
     settings = evaluatorSettingSchema?.parse({
       ...getEvaluatorDefaultSettings(evaluatorDefinition),
-      // Use evaluatorSettings from saved Evaluator, or fall back to storedEvaluator (Monitor) parameters
+      // Use evaluatorSettings from saved Evaluator, or fall back to monitor parameters
       ...(evaluatorSettings ??
-        (storedEvaluator ? (storedEvaluator.parameters as object) : {})),
+        (monitor ? (monitor.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
@@ -252,8 +255,10 @@ export async function handleEvaluatorCall(
   const evaluationId =
     params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
   // evaluatorId identifies which evaluator definition is being used
+  // Priority: savedEvaluatorId (from Evaluator table) > monitor > params > autoslug
   const evaluatorId =
-    storedEvaluator?.id ??
+    savedEvaluatorId ??
+    monitor?.id ??
     params.evaluator_id ??
     evaluationNameAutoslug(params.name ?? checkType);
 
@@ -275,7 +280,7 @@ export async function handleEvaluatorCall(
         evaluationId,
         evaluatorId,
         evaluatorType: checkType,
-        evaluatorName: storedEvaluator?.name ?? params.name ?? undefined,
+        evaluatorName: evaluatorName ?? monitor?.name ?? params.name ?? undefined,
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
       });
@@ -356,9 +361,9 @@ export async function handleEvaluatorCall(
         id: generate(KSUID_RESOURCES.COST).toString(),
         projectId: project.id,
         costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-        costName: evaluatorName ?? storedEvaluator?.name ?? checkType,
+        costName: evaluatorName ?? monitor?.name ?? checkType,
         referenceType: CostReferenceType.CHECK,
-        referenceId: evaluatorName ?? storedEvaluator?.id ?? checkType,
+        referenceId: evaluatorName ?? monitor?.id ?? checkType,
         amount: result.cost.amount,
         currency: result.cost.currency,
         extraInfo: {
@@ -393,7 +398,7 @@ export async function handleEvaluatorCall(
         evaluation_id: evaluationId,
         evaluator_id: evaluatorId,
         type: checkType as EvaluatorTypes,
-        name: storedEvaluator?.name ?? params.name ?? checkType,
+        name: evaluatorName ?? monitor?.name ?? params.name ?? checkType,
       },
       trace: {
         trace_id: params.trace_id,

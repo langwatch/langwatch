@@ -995,6 +995,46 @@ export const system = createSystem(defaultConfig, {
           },
           content: {
             background: "bg.panel",
+            borderRadius: "lg",
+          },
+          item: {
+            borderRadius: "lg",
+          },
+        },
+        variants: {
+          size: {
+            xs: {
+              content: {
+                padding: 0,
+              },
+              item: {
+                marginX: 1
+              },
+            },
+            sm: {
+              content: {
+                padding: 0,
+              },
+              item: {
+                marginX: 1
+              },
+            },
+            md: {
+              content: {
+                padding: 0,
+              },
+              item: {
+                marginX: 2
+              },
+            },
+            lg: {
+              content: {
+                padding: 0,
+              },
+              item: {
+                marginX: 2
+              },
+            },
           },
         },
       }),

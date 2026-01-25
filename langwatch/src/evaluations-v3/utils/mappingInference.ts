@@ -93,11 +93,27 @@ const REVERSE_SEMANTIC_LOOKUP = buildReverseLookup();
 // ============================================================================
 
 /**
+ * Normalize a name to a canonical form for comparison.
+ * Converts both camelCase and snake_case to lowercase with no separators.
+ * Examples:
+ * - "threadId" -> "threadid"
+ * - "thread_id" -> "threadid"
+ * - "myVariableName" -> "myvariablename"
+ * - "my_variable_name" -> "myvariablename"
+ */
+export const normalizeForComparison = (name: string): string => {
+  return name
+    .replace(/_/g, "") // Remove underscores (snake_case)
+    .toLowerCase(); // Lowercase (also handles camelCase)
+};
+
+/**
  * Find the best matching column for a field in a dataset.
  *
  * Priority:
  * 1. Exact name match (case-insensitive)
- * 2. Semantic equivalent match
+ * 2. Normalized match (camelCase/snake_case equivalence: threadId == thread_id)
+ * 3. Semantic equivalent match
  *
  * @returns The matching column name, or undefined if no match found
  */
@@ -108,13 +124,23 @@ export const findMatchingColumn = (
   const _columnNames = columns.map((c) => c.name.toLowerCase());
   const fieldLower = fieldName.toLowerCase();
 
-  // 1. Exact match
+  // 1. Exact match (case-insensitive)
   const exactMatch = columns.find((c) => c.name.toLowerCase() === fieldLower);
   if (exactMatch) {
     return exactMatch.name;
   }
 
-  // 2. Semantic equivalent match
+  // 2. Normalized match (camelCase/snake_case equivalence)
+  // e.g., "threadId" matches "thread_id"
+  const fieldNormalized = normalizeForComparison(fieldName);
+  const normalizedMatch = columns.find(
+    (c) => normalizeForComparison(c.name) === fieldNormalized,
+  );
+  if (normalizedMatch) {
+    return normalizedMatch.name;
+  }
+
+  // 3. Semantic equivalent match
   const equivalents = SEMANTIC_EQUIVALENTS[fieldLower] ?? [];
   // Also get canonical names that this field might be an equivalent of
   const canonicalNames = REVERSE_SEMANTIC_LOOKUP.get(fieldLower) ?? new Set();

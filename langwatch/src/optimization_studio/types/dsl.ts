@@ -204,7 +204,7 @@ export const nodeDatasetSchema = z.object({
   name: z.string().optional(),
   inline: z
     .object({
-      records: z.record(z.array(z.string())),
+      records: z.record(z.array(z.any())),
       columnTypes: z.array(
         z.object({
           id: z.string().optional(),
@@ -229,7 +229,7 @@ export type Entry = BaseComponent & {
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
-  evaluator?: EvaluatorTypes | `custom/${string}`;
+  evaluator?: EvaluatorTypes | `custom/${string}` | `evaluators/${string}`;
   workflowId?: string;
   data?: any;
 };

@@ -184,7 +184,7 @@ export class Experiment {
       (this as { experimentSlug: string }).experimentSlug = data.slug;
 
       const encodedRunId = encodeURIComponent(this.runId);
-      console.log(`Follow results at: ${this.endpoint}${data.path}?runId=${encodedRunId}`);
+      console.log(`Follow results at: ${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`);
 
       this.initialized = true;
     } catch (error) {
