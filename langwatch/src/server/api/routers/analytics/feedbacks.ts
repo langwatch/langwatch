@@ -1,93 +1,17 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { getAnalyticsService } from "../../../analytics/analytics.service";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { esClient, TRACE_INDEX } from "../../../elasticsearch";
-import type {
-  ElasticSearchEvent,
-  ElasticSearchTrace,
-} from "../../../tracer/types";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
-import { generateTracesPivotQueryConditions } from "./common";
 
 export const feedbacks = protectedProcedure
   .input(sharedFiltersInputSchema)
   .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
-    const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
-
-    const client = await esClient({ projectId: input.projectId });
-    const result = await client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.for(input.startDate),
-      size: 100,
-      body: {
-        _source: ["events"],
-        query: {
-          bool: {
-            must: [
-              pivotIndexConditions,
-              {
-                nested: {
-                  path: "events",
-                  query: {
-                    bool: {
-                      must: [
-                        {
-                          term: { "events.event_type": "thumbs_up_down" },
-                        },
-                        {
-                          nested: {
-                            path: "events.event_details",
-                            query: {
-                              bool: {
-                                must: [
-                                  {
-                                    term: {
-                                      "events.event_details.key": "feedback",
-                                    },
-                                  },
-                                ] as QueryDslQueryContainer[],
-                              } as QueryDslBoolQuery,
-                            },
-                          },
-                        },
-                      ] as QueryDslQueryContainer[],
-                    } as QueryDslBoolQuery,
-                  },
-                },
-              },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
-        },
-      },
-    });
-
-    const events: ElasticSearchEvent[] = result.hits.hits
-      .flatMap((hit) => hit._source!.events ?? [])
-      .filter((event) =>
-        event.event_details?.some((detail) => detail.key === "feedback"),
-      )
-      .map((event: any) => ({
-        ...event,
-        timestamps: {
-          started_at:
-            "timestamps" in event
-              ? event.timestamps.started_at
-              : event["timestamps.started_at"],
-          inserted_at:
-            "timestamps" in event
-              ? event.timestamps.inserted_at
-              : event["timestamps.inserted_at"],
-          updated_at:
-            "timestamps" in event
-              ? event.timestamps.updated_at
-              : event["timestamps.updated_at"],
-        },
-      }));
-
-    return {
-      events,
-    };
+    const analyticsService = getAnalyticsService();
+    return analyticsService.getFeedbacks(
+      input.projectId,
+      input.startDate,
+      input.endDate,
+      input.filters,
+    );
   });
