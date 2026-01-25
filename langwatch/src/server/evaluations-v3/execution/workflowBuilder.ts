@@ -12,7 +12,6 @@ import type {
   Evaluator,
   Field,
   HttpComponentConfig,
-  LLMConfig,
   LlmPromptConfigComponent,
   Signature,
   Workflow,
@@ -32,6 +31,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import type {
   ExecutionCell,
@@ -268,11 +268,20 @@ export const buildSignatureNodeFromPrompt = (
     type: output.type as Field["type"],
   }));
 
-  const llmConfig: LLMConfig = {
+  const llmConfig = buildLLMConfig({
     model: prompt.model,
     temperature: prompt.temperature,
-    max_tokens: prompt.maxTokens,
-  };
+    maxTokens: prompt.maxTokens,
+    topP: prompt.topP,
+    frequencyPenalty: prompt.frequencyPenalty,
+    presencePenalty: prompt.presencePenalty,
+    seed: prompt.seed,
+    topK: prompt.topK,
+    minP: prompt.minP,
+    repetitionPenalty: prompt.repetitionPenalty,
+    reasoning: prompt.reasoning,
+    verbosity: prompt.verbosity,
+  });
 
   const messages: ChatMessage[] = prompt.messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
@@ -330,12 +339,21 @@ export const buildSignatureNodeFromLocalConfig = (
     type: output.type as Field["type"],
   }));
 
-  const llmConfig: LLMConfig = {
+  const llmConfig = buildLLMConfig({
     model: localConfig.llm.model,
     temperature: localConfig.llm.temperature,
-    max_tokens: localConfig.llm.maxTokens,
-    litellm_params: localConfig.llm.litellmParams,
-  };
+    maxTokens: localConfig.llm.maxTokens,
+    topP: localConfig.llm.topP,
+    frequencyPenalty: localConfig.llm.frequencyPenalty,
+    presencePenalty: localConfig.llm.presencePenalty,
+    seed: localConfig.llm.seed,
+    topK: localConfig.llm.topK,
+    minP: localConfig.llm.minP,
+    repetitionPenalty: localConfig.llm.repetitionPenalty,
+    reasoning: localConfig.llm.reasoning,
+    verbosity: localConfig.llm.verbosity,
+    litellmParams: localConfig.llm.litellmParams,
+  });
 
   // Extract system prompt from messages if present
   const systemMessage = localConfig.messages.find((m) => m.role === "system");
