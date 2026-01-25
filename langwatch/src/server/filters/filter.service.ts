@@ -22,7 +22,7 @@ export type { FilterOption };
  *
  * @example
  * ```ts
- * const service = FilterService.create(prisma);
+ * const service = FilterServiceFacade.create(prisma);
  * const options = await service.getFilterOptions({
  *   projectId: "project-123",
  *   field: "spans.model",
@@ -32,7 +32,7 @@ export type { FilterOption };
  * });
  * ```
  */
-export class FilterService {
+export class FilterServiceFacade {
   private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
   private readonly clickHouseService: ClickHouseFilterService;
@@ -44,10 +44,10 @@ export class FilterService {
   }
 
   /**
-   * Static factory method for creating FilterService with default dependencies.
+   * Static factory method for creating FilterServiceFacade with default dependencies.
    */
-  static create(prisma: PrismaClient = defaultPrisma): FilterService {
-    return new FilterService(prisma);
+  static create(prisma: PrismaClient = defaultPrisma): FilterServiceFacade {
+    return new FilterServiceFacade(prisma);
   }
 
   /**
@@ -70,7 +70,7 @@ export class FilterService {
     input: GetFilterOptionsInput,
   ): Promise<FilterOption[]> {
     return this.tracer.withActiveSpan(
-      "FilterService.getFilterOptions",
+      "FilterServiceFacade.getFilterOptions",
       {
         attributes: {
           "tenant.id": input.projectId,

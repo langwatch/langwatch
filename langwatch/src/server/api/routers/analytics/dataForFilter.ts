@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { FilterService } from "../../../filters/filter.service";
+import { FilterServiceFacade } from "../../../filters/filter.service";
 import { availableFilters } from "../../../filters/registry";
 import { filterFieldsEnum } from "../../../filters/types";
 import { checkProjectPermission } from "../../rbac";
@@ -44,7 +44,7 @@ export const dataForFilter = protectedProcedure
       },
     });
 
-    const filterService = FilterService.create(ctx.prisma);
+    const filterService = FilterServiceFacade.create(ctx.prisma);
     const results = await filterService.getFilterOptions({
       projectId: input.projectId,
       field,
