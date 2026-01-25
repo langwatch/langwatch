@@ -1,5 +1,8 @@
+import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
+
+config();
 
 export default defineConfig({
   test: {
@@ -21,6 +24,9 @@ export default defineConfig({
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
+    env: {
+      BUILD_TIME: "1",
+    },
   },
   esbuild: {
     jsx: "automatic",
