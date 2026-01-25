@@ -28,6 +28,11 @@ import {
   isSequentialOrderingError,
   QueueError,
 } from "../../library/services/errorHandling";
+import {
+  calculateExponentialBackoff,
+  calculateLockContentionDelay,
+  calculateProgressiveDelay,
+} from "./calculateDelays";
 
 /**
  * Configuration for job retry behavior.
@@ -43,61 +48,6 @@ const JOB_RETRY_CONFIG = {
   removeOnCompleteCount: 1000,
   /** How long to keep failed jobs (in seconds) */
   removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
-} as const;
-
-/**
- * Configuration for progressive delay calculation when handling ordering errors.
- * Higher sequence numbers wait longer, giving earlier events priority.
- *
- * These delays should be short since we're just polling for the previous event's
- * checkpoint to appear. Actual event processing is typically fast (10-100ms),
- * so we use short polling intervals to minimize latency when events arrive together.
- */
-const PROGRESSIVE_DELAY_CONFIG = {
-  /** Base delay before any sequence-based adjustment */
-  baseDelayMs: 100,
-  /** Additional delay per sequence number position */
-  perSequenceDelayMs: 50,
-  /** Additional delay per retry attempt */
-  perAttemptDelayMs: 50,
-  /** Maximum delay cap to prevent excessive waits */
-  maxDelayMs: 5000,
-} as const;
-
-/**
- * Configuration for exponential backoff when events are not yet visible in ClickHouse.
- * This handles the "No events found for aggregate" error caused by replication lag.
- * Uses exponential backoff since we're waiting for data replication which can take variable time.
- *
- * Formula: min(baseDelayMs * (multiplier ^ attemptsMade), maxDelayMs)
- * Attempt 0: 2000ms, Attempt 1: 4000ms, Attempt 2: 8000ms, Attempt 3: 16000ms, etc.
- */
-const NO_EVENTS_FOUND_DELAY_CONFIG = {
-  /** Initial delay for first retry */
-  baseDelayMs: 2000,
-  /** Multiplier for exponential growth */
-  multiplier: 2,
-  /** Maximum delay cap */
-  maxDelayMs: 60000,
-} as const;
-
-/**
- * Configuration for lock contention delay.
- * When another process holds the lock, we delay and retry since:
- * 1. The lock holder will process ALL unprocessed events (including ours)
- * 2. With batching + deduplication, most locks are held briefly (few seconds)
- * 3. Using DelayedError means this doesn't count against retry attempts
- *
- * We use short initial delays with progressive backoff to be responsive
- * while still handling longer batch operations gracefully.
- */
-const LOCK_CONTENTION_DELAY_CONFIG = {
-  /** Initial delay - short to handle quick lock releases */
-  baseDelayMs: 2000,
-  /** Additional delay per retry attempt */
-  perAttemptDelayMs: 3000,
-  /** Maximum delay cap (half the lock TTL to ensure timely crash recovery) */
-  maxDelayMs: 30000,
 } as const;
 
 /**
@@ -291,9 +241,9 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       // For ordering errors, re-queue with progressive delay
       if (isOrderingError) {
         const previousSequence = extractPreviousSequenceNumber(error);
-        const progressiveDelayMs = this.calculateProgressiveDelay(
+        const progressiveDelayMs = calculateProgressiveDelay(
           previousSequence,
-          job.attemptsMade,
+          job.attemptsStarted,
         );
 
         this.logger.debug(
@@ -301,7 +251,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
             queueName: this.queueName,
             jobId: job.id,
             delayMs: progressiveDelayMs,
-            attemptsMade: job.attemptsMade,
+            attemptsStarted: job.attemptsStarted,
             previousSequenceNumber: previousSequence,
           },
           "Re-queuing job with delay due to ordering (previous event not yet processed)",
@@ -317,8 +267,8 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       // For lock contention, delay significantly since the lock holder will process all events
       // Use DelayedError so it doesn't count against retry attempts
       if (isLockContention) {
-        const lockContentionDelayMs = this.calculateLockContentionDelay(
-          job.attemptsMade,
+        const lockContentionDelayMs = calculateLockContentionDelay(
+          job.attemptsStarted,
         );
 
         this.logger.debug(
@@ -326,7 +276,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
             queueName: this.queueName,
             jobId: job.id,
             delayMs: lockContentionDelayMs,
-            attemptsMade: job.attemptsMade,
+            attemptsStarted: job.attemptsStarted,
           },
           "Lock contention detected, delaying job (lock holder will process all events)",
         );
@@ -337,29 +287,17 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       }
 
       // For "no events found" errors (ClickHouse replication lag), use exponential backoff
-      // Note: BullMQ doesn't increment attemptsMade for DelayedError, so we track retries in job.data
       if (isNoEventsFoundError(error)) {
-        const jobData = job.data as Payload & {
-          _noEventsFoundRetryCount?: number;
-        };
-        const currentRetryCount = jobData._noEventsFoundRetryCount ?? 0;
-        const nextRetryCount = currentRetryCount + 1;
-
-        // Update job data with incremented retry count
-        await job.updateData({
-          ...jobData,
-          _noEventsFoundRetryCount: nextRetryCount,
-        });
-
-        const exponentialDelayMs =
-          this.calculateExponentialBackoff(currentRetryCount);
+        const exponentialDelayMs = calculateExponentialBackoff(
+          job.attemptsStarted,
+        );
 
         this.logger.debug(
           {
             queueName: this.queueName,
             jobId: job.id,
             delayMs: exponentialDelayMs,
-            noEventsFoundRetryCount: nextRetryCount,
+            attemptsStarted: job.attemptsStarted,
           },
           "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
         );
@@ -407,83 +345,6 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       return "Job failed due to lock contention, will retry";
     }
     return "Job delayed due to events not yet visible in ClickHouse";
-  }
-
-  /**
-   * Calculates a progressive delay based on sequence position and attempts.
-   * Higher sequence numbers wait longer, giving earlier events priority to process first.
-   *
-   * Formula: baseDelay + (sequenceNumber * perSequenceDelay) + (attempts * perAttemptDelay)
-   * - Event 2 (waiting for seq 1): 1000 + (2 * 200) = 1400ms
-   * - Event 3 (waiting for seq 2): 1000 + (3 * 200) = 1600ms
-   * - Event 5 (waiting for seq 4): 1000 + (5 * 200) = 2000ms
-   */
-  private calculateProgressiveDelay(
-    previousSequence: number | null,
-    attemptsMade: number | undefined,
-  ): number {
-    const currentSequence = (previousSequence ?? 0) + 1;
-
-    const sequenceBasedDelay =
-      PROGRESSIVE_DELAY_CONFIG.baseDelayMs +
-      currentSequence * PROGRESSIVE_DELAY_CONFIG.perSequenceDelayMs;
-    const attemptBasedDelay =
-      (attemptsMade ?? 0) * PROGRESSIVE_DELAY_CONFIG.perAttemptDelayMs;
-
-    return Math.min(
-      sequenceBasedDelay + attemptBasedDelay,
-      PROGRESSIVE_DELAY_CONFIG.maxDelayMs,
-    );
-  }
-
-  /**
-   * Calculates exponential backoff delay for "no events found" errors.
-   * Used when events aren't yet visible in ClickHouse due to replication lag.
-   *
-   * Formula: min(baseDelayMs * (multiplier ^ attemptsMade), maxDelayMs)
-   * - Attempt 0: 2000ms
-   * - Attempt 1: 4000ms
-   * - Attempt 2: 8000ms
-   * - Attempt 3: 16000ms
-   * - Attempt 4: 32000ms
-   * - Attempt 5+: 60000ms (capped)
-   */
-  private calculateExponentialBackoff(
-    attemptsMade: number | undefined,
-  ): number {
-    const attempts = attemptsMade ?? 0;
-    const delay =
-      NO_EVENTS_FOUND_DELAY_CONFIG.baseDelayMs *
-      NO_EVENTS_FOUND_DELAY_CONFIG.multiplier ** attempts;
-
-    return Math.min(delay, NO_EVENTS_FOUND_DELAY_CONFIG.maxDelayMs);
-  }
-
-  /**
-   * Calculates delay for lock contention errors.
-   * Uses progressive delays since the lock holder will process all unprocessed events.
-   *
-   * Formula: min(baseDelayMs + (attemptsMade * perAttemptDelayMs), maxDelayMs)
-   * - Attempt 0: 2000ms (2s)
-   * - Attempt 1: 5000ms (5s)
-   * - Attempt 2: 8000ms (8s)
-   * - Attempt 3: 11000ms (11s)
-   * - ...
-   * - Attempt 9+: 30000ms (30s, capped)
-   *
-   * Short initial delays handle the common case (quick batch processing).
-   * Progressive backoff handles longer operations without excessive polling.
-   * Using DelayedError means attempts don't count against max retries.
-   */
-  private calculateLockContentionDelay(
-    attemptsMade: number | undefined,
-  ): number {
-    const attempts = attemptsMade ?? 0;
-    const delay =
-      LOCK_CONTENTION_DELAY_CONFIG.baseDelayMs +
-      attempts * LOCK_CONTENTION_DELAY_CONFIG.perAttemptDelayMs;
-
-    return Math.min(delay, LOCK_CONTENTION_DELAY_CONFIG.maxDelayMs);
   }
 
   /**
