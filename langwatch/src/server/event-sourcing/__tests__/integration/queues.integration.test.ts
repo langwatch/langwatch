@@ -94,13 +94,14 @@ describe("BullMQ Queue - Integration Tests", () => {
     });
 
     // Wait for processing to complete via checkpoint
+    // Using longer timeout (15s) because checkpoints may take time to be visible in ClickHouse
     await waitForCheckpoint(
       pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
       1,
-      5000,
+      15000,
       100,
       pipeline.processorCheckpointStore,
     );
