@@ -19,53 +19,24 @@ import {
   buildFeedbacksQuery,
 } from "./aggregation-builder";
 import { buildMetricAlias } from "./metric-translator";
+import type {
+  TimeseriesResult,
+  TimeseriesBucket,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+} from "../types";
 import type { ElasticSearchEvent } from "../../tracer/types";
 
-const logger = createLogger("langwatch:analytics:clickhouse");
+/** Maximum number of timeseries buckets before auto-adjusting to daily granularity */
+const MAX_TIMESERIES_BUCKETS = 1000;
+/** Minutes in a day - used for daily timeScale */
+const MINUTES_PER_DAY = 24 * 60;
+/** Milliseconds per minute for time calculations */
+const MS_PER_MINUTE = 1000 * 60;
 
-/**
- * Timeseries result structure (matches ES output)
- */
-export interface TimeseriesResult {
-  previousPeriod: TimeseriesBucket[];
-  currentPeriod: TimeseriesBucket[];
-}
-
-export interface TimeseriesBucket {
-  date: string;
-  [key: string]: number | string | Record<string, Record<string, number>>;
-}
-
-/**
- * Filter data result
- */
-export interface FilterDataResult {
-  options: Array<{
-    field: string;
-    label: string;
-    count: number;
-  }>;
-}
-
-/**
- * Top documents result
- */
-export interface TopDocumentsResult {
-  topDocuments: Array<{
-    documentId: string;
-    count: number;
-    traceId: string;
-    content?: string;
-  }>;
-  totalUniqueDocuments: number;
-}
-
-/**
- * Feedbacks result
- */
-export interface FeedbacksResult {
-  events: ElasticSearchEvent[];
-}
+// Re-export types for backward compatibility
+export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksResult };
 
 /**
  * ClickHouse Analytics Service
@@ -110,10 +81,10 @@ export class ClickHouseAnalyticsService {
         let adjustedTimeScale = input.timeScale;
         if (typeof input.timeScale === "number") {
           const totalMinutes =
-            (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+            (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
           const estimatedBuckets = totalMinutes / input.timeScale;
-          if (estimatedBuckets > 1000) {
-            adjustedTimeScale = 24 * 60; // 1 day
+          if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
+            adjustedTimeScale = MINUTES_PER_DAY;
           }
         }
 
@@ -300,6 +271,14 @@ export class ClickHouseAnalyticsService {
     field: FilterField,
     startDate: number,
     endDate: number,
+    _filters?: Partial<
+      Record<
+        FilterField,
+        | string[]
+        | Record<string, string[]>
+        | Record<string, Record<string, string[]>>
+      >
+    >,
     key?: string,
     subkey?: string,
     searchQuery?: string,

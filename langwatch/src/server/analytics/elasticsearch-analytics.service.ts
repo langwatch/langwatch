@@ -18,55 +18,17 @@ import type { FilterField } from "../filters/types";
 import type { ElasticSearchEvent, ElasticSearchTrace } from "../tracer/types";
 import { generateTracesPivotQueryConditions } from "../api/routers/analytics/common";
 import { timeseries } from "./timeseries";
-import type { SharedFiltersInput } from "./types";
+import type {
+  TimeseriesResult,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+} from "./types";
 import type { TimeseriesInputType } from "./registry";
 import { createLogger } from "../../utils/logger";
 
-const logger = createLogger("langwatch:analytics:elasticsearch");
-
-/**
- * Timeseries result structure
- */
-export interface TimeseriesResult {
-  previousPeriod: TimeseriesBucket[];
-  currentPeriod: TimeseriesBucket[];
-}
-
-export interface TimeseriesBucket {
-  date: string;
-  [key: string]: number | string | Record<string, Record<string, number>>;
-}
-
-/**
- * Filter data result
- */
-export interface FilterDataResult {
-  options: Array<{
-    field: string;
-    label: string;
-    count: number;
-  }>;
-}
-
-/**
- * Top documents result
- */
-export interface TopDocumentsResult {
-  topDocuments: Array<{
-    documentId: string;
-    count: number;
-    traceId: string;
-    content?: string;
-  }>;
-  totalUniqueDocuments: number;
-}
-
-/**
- * Feedbacks result
- */
-export interface FeedbacksResult {
-  events: ElasticSearchEvent[];
-}
+// Re-export types for backward compatibility
+export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksResult };
 
 /**
  * Elasticsearch Analytics Service
@@ -77,6 +39,13 @@ export interface FeedbacksResult {
 export class ElasticsearchAnalyticsService {
   private readonly logger = createLogger("langwatch:analytics:elasticsearch");
   private readonly tracer = getLangWatchTracer("langwatch.analytics.elasticsearch");
+
+  /**
+   * Elasticsearch is always available as the default backend
+   */
+  isAvailable(): boolean {
+    return true;
+  }
 
   /**
    * Execute timeseries query using existing ES implementation
