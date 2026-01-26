@@ -26,6 +26,8 @@ export const SCENARIO_WORKER = {
   CONCURRENCY: 3,
   /** Interval to check for stalled jobs (ms) */
   STALLED_INTERVAL_MS: 10 * 60 * 1000, // 10 minutes
+  /** How long to wait when queue is empty before checking again (ms) */
+  DRAIN_DELAY_MS: 300, // Fast pickup when new jobs arrive
 } as const;
 
 /** Scenario defaults */

@@ -14,12 +14,14 @@ import path from "path";
 import type { Job, Worker } from "bullmq";
 import { Worker as BullMQWorker } from "bullmq";
 import { createLogger } from "~/utils/logger";
+import { prisma } from "../db";
 import { connection } from "../redis";
 import { prefetchScenarioData } from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
 import { SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler } from "./scenario-failure-handler";
+import { ScenarioService } from "./scenario.service";
 
 const logger = createLogger("langwatch:scenarios:processor");
 
@@ -216,6 +218,7 @@ export function startScenarioProcessor(): Worker<
       connection,
       concurrency: SCENARIO_WORKER.CONCURRENCY,
       stalledInterval: SCENARIO_WORKER.STALLED_INTERVAL_MS,
+      drainDelay: SCENARIO_WORKER.DRAIN_DELAY_MS,
     },
   );
 
@@ -240,6 +243,13 @@ export function startScenarioProcessor(): Worker<
     // so the frontend can show the error instead of timing out
     if (result && !result.success) {
       try {
+        // Fetch scenario to get name and description for the failure event
+        const scenarioService = ScenarioService.create(prisma);
+        const scenario = await scenarioService.getById({
+          projectId: job.data.projectId,
+          id: job.data.scenarioId,
+        });
+
         const handler = ScenarioFailureHandler.create();
         await handler.ensureFailureEventsEmitted({
           projectId: job.data.projectId,
@@ -247,6 +257,8 @@ export function startScenarioProcessor(): Worker<
           setId: job.data.setId,
           batchRunId: job.data.batchRunId,
           error: result.error,
+          name: scenario?.name,
+          description: scenario?.situation,
         });
         logger.info(
           { jobId: job.id, scenarioId: job.data.scenarioId },

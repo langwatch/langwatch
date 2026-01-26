@@ -23,6 +23,10 @@ export interface FailureEventParams {
   setId: string;
   batchRunId: string;
   error?: string;
+  /** Scenario name for display in UI */
+  name?: string;
+  /** Scenario description/situation for display in UI */
+  description?: string;
 }
 
 /** Terminal statuses that indicate a run has already finished */
@@ -58,7 +62,7 @@ export class ScenarioFailureHandler {
    * - If RUN_FINISHED already exists: does nothing (idempotent)
    */
   async ensureFailureEventsEmitted(params: FailureEventParams): Promise<void> {
-    const { projectId, scenarioId, setId, batchRunId, error } = params;
+    const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
 
     // Check for existing events
     const existingRuns = await this.eventService.getRunDataForBatchRun({
@@ -87,7 +91,10 @@ export class ScenarioFailureHandler {
         batchRunId,
         scenarioSetId: setId,
         timestamp,
-        metadata: {},
+        metadata: {
+          name: name ?? "Unknown Scenario",
+          description: description ?? undefined,
+        },
       });
     }
 
