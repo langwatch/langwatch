@@ -30,6 +30,12 @@ export const SCENARIO_WORKER = {
   DRAIN_DELAY_MS: 300, // Fast pickup when new jobs arrive
 } as const;
 
+/** Child process configuration */
+export const CHILD_PROCESS = {
+  /** Timeout for scenario child process execution (ms) */
+  TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes
+} as const;
+
 /** Scenario defaults */
 export const SCENARIO_DEFAULTS = {
   /** Default set ID for local scenarios */
