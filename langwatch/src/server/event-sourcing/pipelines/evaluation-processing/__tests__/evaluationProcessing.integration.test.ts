@@ -213,12 +213,11 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   // Create EventSourcing instance with the runtime
   const eventSourcing = new EventSourcing(runtime);
 
-  // Use aggregate-based deduplication for tests.
-  // This ensures all events for the same aggregate are processed in a single batched job,
-  // avoiding race conditions where jobs with fewer events overwrite jobs with more events.
-  const aggregateBasedDeduplication = {
-    makeId: (event: { aggregateId: string }) => String(event.aggregateId),
-    ttlMs: 500, // Allow time for multiple events to be batched
+  // Use event-based deduplication for tests.
+  // Each event gets its own unique job ID, avoiding deduplication conflicts.
+  const eventBasedDeduplication = {
+    makeId: (event: { id: string }) => event.id,
+    ttlMs: 100,
   };
 
   // Build pipeline using the existing pipeline definition's handlers
@@ -233,8 +232,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
       "evaluationState",
       EvaluationStateProjectionHandler as any,
       {
-        deduplication: aggregateBasedDeduplication,
-        delay: 500, // Delay to allow events to batch before processing
+        deduplication: eventBasedDeduplication,
       },
     )
     .build();
