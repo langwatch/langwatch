@@ -4,6 +4,7 @@ import type { QueueProcessorFactory } from "../../../runtime/queue";
 import type { Command, CommandHandler } from "../../commands/command";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { AggregateType } from "../../domain/aggregateType";
+import type { TenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
@@ -11,8 +12,17 @@ import type {
   CommandSchemaType,
   CommandType,
   DeduplicationConfig,
+  DeduplicationStrategy,
 } from "../../index";
 import { createCommand, createTenantId, EventUtils } from "../../index";
+
+/**
+ * Constraint interface for payloads that support command processing.
+ * All command payloads must include a tenantId for tenant isolation.
+ */
+interface HasTenantId {
+  tenantId: TenantId | string;
+}
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
@@ -39,7 +49,7 @@ interface KillSwitchOptions {
 interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   delay?: number;
-  deduplication?: DeduplicationConfig<Payload>;
+  deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
   spanAttributes?: (
     payload: Payload,
@@ -112,9 +122,30 @@ async function isComponentDisabled(
 }
 
 /**
+ * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
+ *
+ * @param strategy - The deduplication strategy to resolve
+ * @param createDefaultId - Function to create the default deduplication ID (for "aggregate" strategy)
+ * @returns A DeduplicationConfig or undefined
+ */
+function resolveDeduplicationStrategy<Payload>(
+  strategy: DeduplicationStrategy<Payload> | undefined,
+  createDefaultId: (payload: Payload) => string,
+): DeduplicationConfig<Payload> | undefined {
+  if (strategy === undefined) {
+    return undefined;
+  }
+  if (strategy === "aggregate") {
+    return { makeId: createDefaultId };
+  }
+  // Custom DeduplicationConfig object
+  return strategy;
+}
+
+/**
  * Creates a command dispatcher that processes commands and stores resulting events.
  */
-function createCommandDispatcher<Payload, EventType extends Event>(
+function createCommandDispatcher<Payload extends HasTenantId, EventType extends Event>(
   commandType: CommandType,
   commandSchema: CommandSchemaType<Payload, CommandType>,
   handler: CommandHandler<Command<Payload>, EventType>,
@@ -133,10 +164,19 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   featureFlagService?: FeatureFlagServiceInterface,
   killSwitchOptions?: KillSwitchOptions,
 ): EventSourcedQueueProcessor<Payload> {
+  // Create default deduplication ID for commands based on aggregate
+  const createDefaultCommandDeduplicationId = (payload: Payload): string => {
+    const aggregateId = getAggregateId(payload);
+    return `${String(payload.tenantId)}:${aggregateType}:${String(aggregateId)}`;
+  };
+
   const processor = factory.create<Payload>({
     name: queueName,
     delay: options.delay,
-    deduplication: options.deduplication,
+    deduplication: resolveDeduplicationStrategy(
+      options.deduplication,
+      createDefaultCommandDeduplicationId,
+    ),
     spanAttributes: options.spanAttributes,
     options: options.concurrency
       ? { concurrency: options.concurrency }
@@ -153,7 +193,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         );
       }
 
-      const tenantId = createTenantId((payload as any).tenantId);
+      const tenantId = createTenantId(String(payload.tenantId));
       const aggregateId = getAggregateId(payload);
 
       // Check kill switch - if enabled, skip command processing
@@ -268,6 +308,9 @@ function createCommandDispatcher<Payload, EventType extends Event>(
     async close(): Promise<void> {
       return processor.close();
     },
+    async waitUntilReady(): Promise<void> {
+      return processor.waitUntilReady();
+    },
   };
 }
 
@@ -277,6 +320,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  */
 export class QueueProcessorManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
+  private readonly pipelineName: string;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:queue-processor-manager",
   );
@@ -302,18 +346,21 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
   constructor({
     aggregateType,
+    pipelineName,
     queueProcessorFactory,
     distributedLock,
     commandLockTtlMs = 30000,
     featureFlagService,
   }: {
     aggregateType: AggregateType;
+    pipelineName: string;
     queueProcessorFactory?: QueueProcessorFactory;
     distributedLock?: DistributedLock;
     commandLockTtlMs?: number;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
+    this.pipelineName = pipelineName;
     this.queueProcessorFactory = queueProcessorFactory;
     this.distributedLock = distributedLock;
     this.commandLockTtlMs = commandLockTtlMs;
@@ -356,14 +403,15 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.aggregateType}/handler/${handlerName}`;
+      const queueName = `${this.pipelineName}/handler/${handlerName}`;
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         delay: handlerDef.options.delay,
-        deduplication: handlerDef.options.deduplication ?? {
-          makeId: this.createDefaultDeduplicationId.bind(this),
-        },
+        deduplication: resolveDeduplicationStrategy(
+          handlerDef.options.deduplication,
+          this.createDefaultDeduplicationId.bind(this),
+        ),
         options: handlerDef.options.concurrency
           ? { concurrency: handlerDef.options.concurrency }
           : void 0,
@@ -409,14 +457,15 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.aggregateType}/projection/${projectionName}`;
+      const queueName = `${this.pipelineName}/projection/${projectionName}`;
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         delay: projectionDef.options?.delay,
-        deduplication: projectionDef.options?.deduplication ?? {
-          makeId: this.createDefaultDeduplicationId.bind(this),
-        },
+        deduplication: resolveDeduplicationStrategy(
+          projectionDef.options?.deduplication,
+          this.createDefaultDeduplicationId.bind(this),
+        ),
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
@@ -575,6 +624,38 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    */
   getCommandQueueProcessors(): Map<string, EventSourcedQueueProcessor<any>> {
     return this.commandQueueProcessors;
+  }
+
+  /**
+   * Waits for all queue processors to be ready to accept jobs.
+   * For BullMQ, this waits for workers to connect to Redis.
+   * Should be called before sending commands in tests.
+   */
+  async waitUntilReady(): Promise<void> {
+    const readyPromises: Promise<void>[] = [];
+
+    for (const queueProcessor of this.handlerQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    for (const queueProcessor of this.projectionQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    for (const queueProcessor of this.commandQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    await Promise.all(readyPromises);
+
+    this.logger.debug(
+      {
+        handlerCount: this.handlerQueueProcessors.size,
+        projectionCount: this.projectionQueueProcessors.size,
+        commandCount: this.commandQueueProcessors.size,
+      },
+      "All queue processors ready",
+    );
   }
 
   /**

@@ -90,6 +90,7 @@ export type {
 export type { EventPublisher } from "./publishing/eventPublisher.types";
 export type {
   DeduplicationConfig,
+  DeduplicationStrategy,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,

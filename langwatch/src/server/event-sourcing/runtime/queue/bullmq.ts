@@ -86,7 +86,7 @@ const NO_EVENTS_FOUND_DELAY_CONFIG = {
  */
 const WORKER_CONFIG = {
   /** Default concurrency for job processing */
-  defaultConcurrency: 30,
+  defaultConcurrency: 50,
 } as const;
 
 /**
@@ -441,6 +441,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     const payloadId = payloadWithId.id ?? crypto.randomUUID();
     // Sanitize for BullMQ (replace colons with dots)
     return `${this.queueName}.${payloadId}`.replaceAll(":", ".");
+  }
+
+  async waitUntilReady(): Promise<void> {
+    await this.worker.waitUntilReady();
   }
 
   async send(payload: Payload): Promise<void> {

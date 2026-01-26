@@ -1,7 +1,7 @@
 import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { Event, Projection } from "./domain/types";
 import type { KillSwitchOptions } from "./pipeline/types";
-import type { DeduplicationConfig } from "./queues";
+import type { DeduplicationStrategy } from "./queues";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**
@@ -14,22 +14,10 @@ export interface ProjectionOptions<EventType extends Event = Event> {
   delay?: number;
 
   /**
-   * Optional: Deduplication configuration.
-   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
-   * Default deduplication ID: `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
-   *
-   * @example
-   * ```typescript
-   * // Debounce trace summary updates by deduplicating on aggregate
-   * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
-   *   deduplication: {
-   *     makeId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
-   *     ttlMs: 1000,
-   *   },
-   * })
-   * ```
+   * Optional: Deduplication strategy for this projection.
+   * @see DeduplicationStrategy for available options
    */
-  deduplication?: DeduplicationConfig<EventType>;
+  deduplication?: DeduplicationStrategy<EventType>;
 
   /**
    * Maximum batch size for processing. When set, events are accumulated

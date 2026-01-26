@@ -33,6 +33,39 @@ export interface DeduplicationConfig<Payload> {
   replace?: boolean;
 }
 
+/**
+ * Strategy for deduplicating queue jobs.
+ *
+ * - `undefined`: No deduplication (default) - every event processed individually
+ * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}`
+ * - `DeduplicationConfig`: Custom makeId function and TTL
+ *
+ * @example
+ * ```typescript
+ * // No deduplication (default) - processes every event
+ * .withEventHandler("spanStorage", SpanStorageEventHandler, {
+ *   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+ * })
+ *
+ * // Dedupe by aggregate - only process latest event per aggregate
+ * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
+ *   deduplication: "aggregate",
+ *   delay: 1500,
+ * })
+ *
+ * // Custom deduplication
+ * .withProjection("analytics", AnalyticsProjectionHandler, {
+ *   deduplication: {
+ *     makeId: (event) => `${event.tenantId}:custom-key`,
+ *     ttlMs: 2000,
+ *   },
+ * })
+ * ```
+ */
+export type DeduplicationStrategy<Payload> =
+  | "aggregate"
+  | DeduplicationConfig<Payload>;
+
 export interface EventSourcedQueueDefinition<Payload> {
   /**
    * Base name for the queue and job.
@@ -75,4 +108,10 @@ export interface EventSourcedQueueProcessor<Payload> {
    * Should be called during application shutdown.
    */
   close(): Promise<void>;
+  /**
+   * Waits until the queue processor is ready to accept jobs.
+   * For BullMQ, this waits for the worker to connect to Redis.
+   * For memory queues, this resolves immediately.
+   */
+  waitUntilReady(): Promise<void>;
 }

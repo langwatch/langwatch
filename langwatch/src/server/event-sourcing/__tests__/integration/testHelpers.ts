@@ -31,8 +31,32 @@ const logger = createLogger(
 );
 
 /**
+ * Gracefully closes a pipeline and waits for cleanup to complete.
+ * This ensures all BullMQ workers finish processing before the next test starts.
+ */
+export async function closePipelineGracefully(
+  pipeline: { service: { close: () => Promise<void> } },
+): Promise<void> {
+  await pipeline.service.close();
+  // Wait for BullMQ workers to fully shut down and release Redis connections
+  // Using 2000ms to ensure all async operations complete before next test
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+}
+
+/**
+ * Generates a unique aggregate ID to avoid collisions in parallel tests.
+ */
+export function generateTestAggregateId(
+  prefix: string = "test-aggregate",
+): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
  * Creates a test pipeline using real ClickHouse and Redis (BullMQ).
  * This is the main helper for integration tests.
+ * Each call generates a unique pipeline name to avoid conflicts in parallel tests.
+ * Returns a promise that includes a ready() function to await worker initialization.
  */
 export function createTestPipeline(): PipelineWithCommandHandlers<
   RegisteredPipeline<any, any>,
@@ -40,7 +64,13 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 > & {
   eventStore: EventStoreClickHouse;
   processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
+  pipelineName: string;
+  /** Wait for BullMQ workers to be ready before sending commands */
+  ready: () => Promise<void>;
 } {
+  // Generate unique pipeline name to avoid conflicts when tests run in parallel
+  const pipelineName = `test_pipeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
   const clickHouseClient = getTestClickHouseClient();
   const redisConnection = getTestRedisConnection();
 
@@ -112,7 +142,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 
   const pipeline = eventSourcing
     .registerPipeline<any>()
-    .withName("test_pipeline")
+    .withName(pipelineName)
     .withAggregateType("test_aggregate" as AggregateType)
     .withCommand("testCommand", TestCommandHandler as any)
     .withEventHandler("testHandler", TestEventHandler as any, {
@@ -127,12 +157,17 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     ...pipeline,
     eventStore,
     processorCheckpointStore,
+    pipelineName,
+    // Wait for BullMQ workers to be ready before sending commands
+    ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<
     RegisteredPipeline<any, any>,
     { testCommand: any }
   > & {
     eventStore: EventStoreClickHouse;
     processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
+    pipelineName: string;
+    ready: () => Promise<void>;
   };
 }
 

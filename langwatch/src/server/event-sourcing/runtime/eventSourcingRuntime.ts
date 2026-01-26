@@ -298,14 +298,93 @@ export class EventSourcingRuntime {
 // Singleton instance
 let _runtime: EventSourcingRuntime | null = null;
 
+export interface InitializeEventSourcingOptions {
+  clickHouseClient?: ClickHouseClient | null;
+  redisConnection?: import("ioredis").default | import("ioredis").Cluster | null;
+}
+
+/**
+ * Explicitly initialize event sourcing with provided clients.
+ * Must be called during application startup before using pipelines.
+ *
+ * @throws Error if already initialized (call resetEventSourcingRuntime() first to re-initialize)
+ *
+ * @example
+ * ```typescript
+ * // In app startup (start.ts, worker.ts)
+ * import { initializeEventSourcing } from '~/server/event-sourcing';
+ * import { getClickHouseClient } from '~/server/clickhouse/client';
+ * import { connection as redis } from '~/server/redis';
+ *
+ * initializeEventSourcing({
+ *   clickHouseClient: getClickHouseClient(),
+ *   redisConnection: redis,
+ * });
+ * ```
+ */
+export function initializeEventSourcing(
+  options: InitializeEventSourcingOptions,
+): void {
+  if (_runtime) {
+    throw new Error(
+      "Event sourcing already initialized. Call resetEventSourcingRuntime() first if re-initializing.",
+    );
+  }
+  _runtime = new EventSourcingRuntime(
+    createEventSourcingConfig({
+      clickHouseClient: options.clickHouseClient ?? undefined,
+      redisConnection: options.redisConnection ?? undefined,
+    }),
+  );
+  logger.info("Event sourcing initialized via initializeEventSourcing()");
+}
+
+/**
+ * Initialize event sourcing for testing with in-memory stores.
+ * No external dependencies or env vars required.
+ *
+ * @example
+ * ```typescript
+ * // In test-setup.ts or beforeAll
+ * import { initializeEventSourcingForTesting } from '~/server/event-sourcing';
+ *
+ * initializeEventSourcingForTesting();
+ * ```
+ */
+export function initializeEventSourcingForTesting(): void {
+  if (_runtime) {
+    resetEventSourcingRuntime();
+  }
+  _runtime = new EventSourcingRuntime(
+    createEventSourcingConfig({
+      clickHouseClient: null,
+      redisConnection: null,
+    }),
+  );
+  logger.debug("Event sourcing initialized for testing (in-memory stores)");
+}
+
 /**
  * Returns the singleton EventSourcingRuntime instance.
- * Creates one on first call using auto-detected config.
+ *
+ * @throws Error if not initialized. Call initializeEventSourcing() during app startup
+ *         or initializeEventSourcingForTesting() in tests.
  */
 export function getEventSourcingRuntime(): EventSourcingRuntime {
   if (!_runtime) {
-    _runtime = new EventSourcingRuntime(createEventSourcingConfig());
+    throw new Error(
+      "Event sourcing not initialized. Call initializeEventSourcing() during app startup " +
+        "or initializeEventSourcingForTesting() in tests.",
+    );
   }
+  return _runtime;
+}
+
+/**
+ * Returns the singleton EventSourcingRuntime instance if initialized, null otherwise.
+ * Use this when you want to check if event sourcing is available without throwing.
+ */
+export function getEventSourcingRuntimeOrNull(): EventSourcingRuntime | null {
   return _runtime;
 }
 
