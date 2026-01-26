@@ -28,4 +28,7 @@ export const organizationFactory = Factory.define<
   promoCode: null,
   ssoDomain: null,
   ssoProvider: null,
+  license: null,
+  licenseExpiresAt: null,
+  licenseLastValidatedAt: null,
 }));
