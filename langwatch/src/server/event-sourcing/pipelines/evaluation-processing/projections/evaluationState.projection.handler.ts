@@ -4,7 +4,7 @@ import type {
   Projection,
   ProjectionHandler,
 } from "../../../library";
-import { evaluationStateRepository } from "../repositories";
+import { getEvaluationStateRepository } from "../repositories";
 import { EVALUATION_STATE_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
@@ -63,7 +63,9 @@ export interface EvaluationState extends Projection<EvaluationStateData> {
 export class EvaluationStateProjectionHandler
   implements ProjectionHandler<EvaluationProcessingEvent, EvaluationState>
 {
-  static readonly store = evaluationStateRepository;
+  static get store() {
+    return getEvaluationStateRepository();
+  }
 
   handle(
     stream: EventStream<
