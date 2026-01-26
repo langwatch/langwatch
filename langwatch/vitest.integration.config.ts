@@ -2,6 +2,20 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+// === Handle CI environment BEFORE any imports ===
+// This runs at config load time, before any test files are parsed.
+// CI sets CI_REDIS_URL and CI_CLICKHOUSE_URL, but application code
+// expects REDIS_URL and CLICKHOUSE_URL.
+// BUILD_TIME must be deleted to allow redis.ts to create connections.
+if (process.env.CI && process.env.CI_REDIS_URL) {
+  process.env.REDIS_URL = process.env.CI_REDIS_URL;
+  delete process.env.BUILD_TIME;
+}
+if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
+  process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
+  process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
+}
+
 config();
 
 export default defineConfig({

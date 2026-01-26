@@ -1,33 +1,14 @@
 /**
  * Integration test setup file.
  *
- * IMPORTANT: The env-setting code at the top of this file MUST run before any
- * application imports. This sets REDIS_URL/CLICKHOUSE_URL from the container
- * info file written by globalSetup, before redis.ts or other modules are loaded.
- *
- * This file must be FIRST in vitest's setupFiles to ensure env vars are set
- * before test-setup.ts imports anything.
+ * This file reads container info from globalSetup and connects to containers.
+ * CI environment variables are handled in vitest.integration.config.ts which
+ * runs earlier (at config load time, before modules are parsed).
  */
 
-// === ENV SETUP (runs at import time, before any other imports) ===
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-
-// === Handle CI environment (GitHub Actions service containers) ===
-// CI sets CI_REDIS_URL and CI_CLICKHOUSE_URL, but application code expects
-// REDIS_URL and CLICKHOUSE_URL. Copy these over before any other setup.
-if (process.env.CI && process.env.CI_REDIS_URL) {
-  process.env.REDIS_URL = process.env.CI_REDIS_URL;
-  // Unset BUILD_TIME to allow redis.ts to create a connection
-  // BUILD_TIME is used during Next.js build to skip env validation,
-  // but for integration tests we need actual Redis connections
-  delete process.env.BUILD_TIME;
-}
-if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
-  process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
-  process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
-}
 
 const CONTAINER_INFO_FILE = path.join(
   os.tmpdir(),
