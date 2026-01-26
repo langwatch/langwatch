@@ -1,0 +1,19 @@
+{
+  "name": "@langwatch/analytics-parity-check",
+  "version": "1.0.0",
+  "description": "Verify analytics parity between Elasticsearch and ClickHouse backends",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "check": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
