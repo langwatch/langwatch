@@ -19,6 +19,10 @@ import * as path from "node:path";
 // REDIS_URL and CLICKHOUSE_URL. Copy these over before any other setup.
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;
+  // Unset BUILD_TIME to allow redis.ts to create a connection
+  // BUILD_TIME is used during Next.js build to skip env validation,
+  // but for integration tests we need actual Redis connections
+  delete process.env.BUILD_TIME;
 }
 if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
   process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
