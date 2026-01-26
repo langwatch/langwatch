@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { LicenseStatus } from "../../../ee/licensing";
-import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense } from "./licenseStatusUtils";
+import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense, formatResourceUsage } from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
@@ -100,7 +100,7 @@ export function LicenseDetailsCard({
 
         <VStack align="start" gap={2} width="full">
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="gray.500" width="120px">
               Plan:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
@@ -109,7 +109,7 @@ export function LicenseDetailsCard({
           </HStack>
 
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="gray.500" width="120px">
               Licensed to:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
@@ -118,16 +118,7 @@ export function LicenseDetailsCard({
           </HStack>
 
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
-              Members:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium">
-              {status.currentMembers} / {status.maxMembers}
-            </Text>
-          </HStack>
-
-          <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="gray.500" width="120px">
               Expires:
             </Text>
             <Text
@@ -136,6 +127,75 @@ export function LicenseDetailsCard({
               color={isExpired ? "red.500" : undefined}
             >
               {formatLicenseDate(status.expiresAt)}
+            </Text>
+          </HStack>
+
+          <Box height="2" />
+
+          <Text fontSize="sm" fontWeight="semibold" color="gray.700">
+            Resource Limits
+          </Text>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Members:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentMembers, status.maxMembers)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Members Lite:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentMembersLite, status.maxMembersLite)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Projects:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentProjects, status.maxProjects)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Prompts:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentPrompts, status.maxPrompts)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Workflows:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentWorkflows, status.maxWorkflows)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Scenarios:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentScenarios, status.maxScenarios)}
+            </Text>
+          </HStack>
+
+          <HStack>
+            <Text fontSize="sm" color="gray.500" width="120px">
+              Evaluators:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatResourceUsage(status.currentEvaluators, status.maxEvaluators)}
             </Text>
           </HStack>
         </VStack>

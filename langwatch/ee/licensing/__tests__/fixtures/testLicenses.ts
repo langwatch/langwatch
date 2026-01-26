@@ -24,6 +24,9 @@ export const BASE_LICENSE: LicenseData = {
     maxMessagesPerMonth: 50000,
     evaluationsCredit: 100,
     maxWorkflows: 25,
+    maxPrompts: 25,
+    maxEvaluators: 25,
+    maxScenarios: 25,
     canPublish: true,
   },
 };
@@ -46,6 +49,9 @@ export const ENTERPRISE_LICENSE: LicenseData = {
     maxMessagesPerMonth: 10000000,
     evaluationsCredit: 10000,
     maxWorkflows: 1000,
+    maxPrompts: 1000,
+    maxEvaluators: 1000,
+    maxScenarios: 1000,
     canPublish: true,
   },
 };

@@ -10,10 +10,14 @@ export type PlanInfo = {
   daysSinceCreation?: number;
   overrideAddingLimitations?: boolean;
   maxMembers: number;
+  maxMembersLite: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
   evaluationsCredit: number;
   maxWorkflows: number;
+  maxPrompts: number;
+  maxEvaluators: number;
+  maxScenarios: number;
   canPublish: boolean;
   userPrice?: {
     USD: number;
@@ -53,12 +57,12 @@ export abstract class SubscriptionHandler {
     },
     handler: LicenseHandler = getLicenseHandler(),
   ): Promise<PlanInfo> {
-    // When license enforcement is enabled, delegate to LicenseHandler
-    if (env.LICENSE_ENFORCEMENT_ENABLED) {
-      return handler.getActivePlan(organizationId);
+    // When license enforcement is disabled, return unlimited plan
+    if (env.LICENSE_ENFORCEMENT_DISABLED) {
+      return UNLIMITED_PLAN;
     }
 
-    // Default: return unlimited plan (backward compatible)
-    return UNLIMITED_PLAN;
+    // Default: enforce license limits (enabled by default)
+    return handler.getActivePlan(organizationId);
   }
 }

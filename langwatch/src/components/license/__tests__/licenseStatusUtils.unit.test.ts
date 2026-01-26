@@ -5,6 +5,8 @@ import {
   formatLicenseDate,
   hasLicenseMetadata,
   normalizeKeyForActivation,
+  formatLimitValue,
+  formatResourceUsage,
 } from "../licenseStatusUtils";
 
 /**
@@ -12,18 +14,57 @@ import {
  * No mocks needed - these are pure functions.
  */
 
+/** Base resource fields for license status */
+const baseResourceFields = {
+  currentMembers: 5,
+  maxMembers: 10,
+  currentMembersLite: 2,
+  maxMembersLite: 5,
+  currentProjects: 3,
+  maxProjects: 10,
+  currentPrompts: 5,
+  maxPrompts: 20,
+  currentWorkflows: 4,
+  maxWorkflows: 15,
+  currentScenarios: 2,
+  maxScenarios: 10,
+  currentEvaluators: 3,
+  maxEvaluators: 10,
+} as const;
+
+/**
+ * Creates a valid LicenseStatus with all required resource fields.
+ */
+function createValidLicenseStatus(expiresAt = "2099-12-31") {
+  return {
+    hasLicense: true as const,
+    valid: true as const,
+    plan: "team",
+    planName: "Team",
+    expiresAt,
+    organizationName: "Test Org",
+    ...baseResourceFields,
+  };
+}
+
+/**
+ * Creates an invalid LicenseStatus with all required resource fields.
+ */
+function createInvalidLicenseStatus(expiresAt = "2023-12-31") {
+  return {
+    hasLicense: true as const,
+    valid: false as const,
+    plan: "team",
+    planName: "Team",
+    expiresAt,
+    organizationName: "Test Org",
+    ...baseResourceFields,
+  };
+}
+
 describe("isLicenseExpired", () => {
   it("returns true when license has past expiresAt date", () => {
-    const status = {
-      hasLicense: true,
-      valid: false,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2023-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createInvalidLicenseStatus("2023-12-31");
     expect(isLicenseExpired(status)).toBe(true);
   });
 
@@ -37,30 +78,12 @@ describe("isLicenseExpired", () => {
   });
 
   it("returns false when license is invalid but has future expiresAt", () => {
-    const status = {
-      hasLicense: true,
-      valid: false,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2099-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createInvalidLicenseStatus("2099-12-31");
     expect(isLicenseExpired(status)).toBe(false);
   });
 
   it("returns false when license exists and is valid", () => {
-    const status = {
-      hasLicense: true,
-      valid: true,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2099-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createValidLicenseStatus("2099-12-31");
     expect(isLicenseExpired(status)).toBe(false);
   });
 
@@ -74,16 +97,7 @@ describe("isLicenseExpired", () => {
   });
 
   it("returns false when expiresAt is an invalid date string", () => {
-    const status = {
-      hasLicense: true,
-      valid: false,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "not-a-valid-date",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createInvalidLicenseStatus("not-a-valid-date");
     expect(isLicenseExpired(status)).toBe(false);
   });
 });
@@ -109,30 +123,12 @@ describe("normalizeKeyForActivation", () => {
 
 describe("hasLicenseMetadata", () => {
   it("returns true for valid license with metadata", () => {
-    const status = {
-      hasLicense: true,
-      valid: true,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2025-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createValidLicenseStatus("2025-12-31");
     expect(hasLicenseMetadata(status)).toBe(true);
   });
 
   it("returns true for invalid license with metadata (expired)", () => {
-    const status = {
-      hasLicense: true,
-      valid: false,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2023-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createInvalidLicenseStatus("2023-12-31");
     expect(hasLicenseMetadata(status)).toBe(true);
   });
 
@@ -157,31 +153,51 @@ describe("isCorruptedLicense", () => {
   });
 
   it("returns false for valid license with metadata", () => {
-    const status = {
-      hasLicense: true,
-      valid: true,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2099-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createValidLicenseStatus("2099-12-31");
     expect(isCorruptedLicense(status)).toBe(false);
   });
 
   it("returns false for invalid license with metadata", () => {
-    const status = {
-      hasLicense: true,
-      valid: false,
-      plan: "team",
-      planName: "Team",
-      expiresAt: "2023-12-31",
-      organizationName: "Test Org",
-      currentMembers: 5,
-      maxMembers: 10,
-    } as const;
+    const status = createInvalidLicenseStatus("2023-12-31");
     expect(isCorruptedLicense(status)).toBe(false);
+  });
+});
+
+describe("formatLimitValue", () => {
+  it("returns 'Unlimited' for Infinity", () => {
+    expect(formatLimitValue(Infinity)).toBe("Unlimited");
+  });
+
+  it("returns 'Unlimited' for Number.MAX_SAFE_INTEGER", () => {
+    expect(formatLimitValue(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
+  });
+
+  it("returns 'Unlimited' for values at or above 1 million threshold", () => {
+    expect(formatLimitValue(1_000_000)).toBe("Unlimited");
+    expect(formatLimitValue(10_000_000)).toBe("Unlimited");
+  });
+
+  it("returns formatted number for normal values below threshold", () => {
+    expect(formatLimitValue(100)).toBe("100");
+    expect(formatLimitValue(1000)).toBe("1,000");
+    expect(formatLimitValue(50000)).toBe("50,000");
+    expect(formatLimitValue(999_999)).toBe("999,999");
+  });
+});
+
+describe("formatResourceUsage", () => {
+  it("formats current/max pair with normal limits", () => {
+    expect(formatResourceUsage(5, 10)).toBe("5 / 10");
+    expect(formatResourceUsage(1000, 5000)).toBe("1,000 / 5,000");
+  });
+
+  it("displays 'Unlimited' for Infinity max", () => {
+    expect(formatResourceUsage(5, Infinity)).toBe("5 / Unlimited");
+  });
+
+  it("displays 'Unlimited' for max values at or above threshold", () => {
+    expect(formatResourceUsage(5, 1_000_000)).toBe("5 / Unlimited");
+    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe("5 / Unlimited");
   });
 });
 

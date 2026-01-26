@@ -80,3 +80,28 @@ export function formatLicenseDate(isoDate: string): string {
     timeZone: "UTC",
   });
 }
+
+/**
+ * Threshold above which a limit is considered "unlimited" for display purposes.
+ * Any value above 1 million is practically unlimited for typical usage.
+ */
+const UNLIMITED_THRESHOLD = 1_000_000;
+
+/**
+ * Formats a limit value for display.
+ * Returns "Unlimited" for very large numbers (1M+) or special values like MAX_SAFE_INTEGER.
+ */
+export function formatLimitValue(value: number): string {
+  if (!Number.isFinite(value) || value >= UNLIMITED_THRESHOLD) {
+    return "Unlimited";
+  }
+  return value.toLocaleString();
+}
+
+/**
+ * Formats a current/max pair for display.
+ * Example: "5 / 10" or "5 / Unlimited"
+ */
+export function formatResourceUsage(current: number, max: number): string {
+  return `${current.toLocaleString()} / ${formatLimitValue(max)}`;
+}

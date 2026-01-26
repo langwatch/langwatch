@@ -28,6 +28,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -92,6 +93,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -258,6 +260,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     };
 
     if (evaluatorId) {
+      // Editing existing evaluator - no limit check needed
       updateMutation.mutate({
         id: evaluatorId,
         projectId: project.id,
@@ -265,11 +268,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         config,
       });
     } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: formValues.name.trim(),
-        type: "evaluator",
-        config,
+      // Creating new evaluator - check license limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: formValues.name.trim(),
+          type: "evaluator",
+          config,
+        });
       });
     }
   }, [
@@ -280,6 +286,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     form,
     createMutation,
     updateMutation,
+    checkAndProceed,
   ]);
 
   const handleClose = () => {
@@ -421,6 +428,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+      {upgradeModal}
     </Drawer.Root>
   );
 }

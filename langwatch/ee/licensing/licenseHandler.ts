@@ -1,19 +1,24 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "~/server/subscriptionHandler";
-import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE, FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { OrganizationNotFoundError } from "./errors";
-import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
 import { validateLicense, parseLicenseKey } from "./validation";
+import {
+  LicenseEnforcementRepository,
+  type ILicenseEnforcementRepository,
+} from "~/server/license-enforcement/license-enforcement.repository";
 
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
   publicKey?: string;
+  repository?: ILicenseEnforcementRepository;
 }
 
 /**
  * Manages license validation and storage for self-hosted deployments.
  *
- * This handler is only called when LICENSE_ENFORCEMENT_ENABLED=true.
+ * This handler is only called when LICENSE_ENFORCEMENT_DISABLED=false (the default).
  * When enforcement is disabled, SubscriptionHandler returns UNLIMITED_PLAN directly.
  *
  * Key behaviors (when enforcement is enabled):
@@ -35,10 +40,12 @@ interface LicenseHandlerConfig {
 export class LicenseHandler {
   private prisma: PrismaClient;
   private publicKey: string;
+  private repository: ILicenseEnforcementRepository;
 
   constructor(config: LicenseHandlerConfig) {
     this.prisma = config.prisma;
     this.publicKey = config.publicKey ?? PUBLIC_KEY;
+    this.repository = config.repository ?? new LicenseEnforcementRepository(config.prisma);
   }
 
   /**
@@ -138,22 +145,19 @@ export class LicenseHandler {
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: {
-        license: true,
-        _count: { select: { members: true } },
-      },
+      select: { license: true },
     });
 
     if (!organization?.license) {
       return { hasLicense: false, valid: false };
     }
 
-    const memberCount = organization._count.members;
     const validationResult = validateLicense(organization.license, this.publicKey);
 
     // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {
       const { licenseData } = validationResult;
+      const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
       return {
         hasLicense: true,
         valid: true,
@@ -161,8 +165,7 @@ export class LicenseHandler {
         planName: licenseData.plan.name,
         expiresAt: licenseData.expiresAt,
         organizationName: licenseData.organizationName,
-        currentMembers: memberCount,
-        maxMembers: licenseData.plan.maxMembers,
+        ...resourceCounts,
       };
     }
 
@@ -173,6 +176,7 @@ export class LicenseHandler {
     }
 
     const { data: licenseData } = signedLicense;
+    const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
     return {
       hasLicense: true,
       valid: false,
@@ -180,8 +184,48 @@ export class LicenseHandler {
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,
       organizationName: licenseData.organizationName,
-      currentMembers: memberCount,
-      maxMembers: licenseData.plan.maxMembers,
+      ...resourceCounts,
+    };
+  }
+
+  /**
+   * Fetches all resource counts for an organization and combines with plan limits.
+   */
+  private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+
+    const [
+      currentMembers,
+      currentMembersLite,
+      currentProjects,
+      currentPrompts,
+      currentWorkflows,
+      currentScenarios,
+      currentEvaluators,
+    ] = await Promise.all([
+      this.repository.getMemberCount(organizationId),
+      this.repository.getMembersLiteCount(organizationId),
+      this.repository.getProjectCount(organizationId),
+      this.repository.getPromptCount(organizationId),
+      this.repository.getWorkflowCount(organizationId),
+      this.repository.getScenarioCount(organizationId),
+      this.repository.getEvaluatorCount(organizationId),
+    ]);
+
+    return {
+      currentMembers,
+      maxMembers: plan.maxMembers,
+      currentMembersLite,
+      maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
+      currentProjects,
+      maxProjects: plan.maxProjects,
+      currentPrompts,
+      maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
+      currentWorkflows,
+      maxWorkflows: plan.maxWorkflows,
+      currentScenarios,
+      maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,
+      currentEvaluators,
+      maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
     };
   }
 

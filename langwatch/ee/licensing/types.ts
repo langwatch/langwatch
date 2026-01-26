@@ -7,10 +7,15 @@ export const LicensePlanLimitsSchema = z.object({
   type: z.string(),
   name: z.string(),
   maxMembers: z.number(),
+  maxMembersLite: z.number().optional(),
   maxProjects: z.number(),
   maxMessagesPerMonth: z.number(),
   evaluationsCredit: z.number(),
   maxWorkflows: z.number(),
+  // New fields - optional for backward compatibility with existing signed licenses
+  maxPrompts: z.number().optional(),
+  maxEvaluators: z.number().optional(),
+  maxScenarios: z.number().optional(),
   canPublish: z.boolean(),
 });
 
@@ -62,6 +67,24 @@ type UnreadableLicenseStatus = {
   corrupted: true;
 };
 
+/** Resource usage and limits for license status */
+type LicenseResourceLimits = {
+  currentMembers: number;
+  maxMembers: number;
+  currentMembersLite: number;
+  maxMembersLite: number;
+  currentProjects: number;
+  maxProjects: number;
+  currentPrompts: number;
+  maxPrompts: number;
+  currentWorkflows: number;
+  maxWorkflows: number;
+  currentScenarios: number;
+  maxScenarios: number;
+  currentEvaluators: number;
+  maxEvaluators: number;
+};
+
 type InvalidLicenseStatus = {
   hasLicense: true;
   valid: false;
@@ -70,9 +93,7 @@ type InvalidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
-  currentMembers: number;
-  maxMembers: number;
-};
+} & LicenseResourceLimits;
 
 type ValidLicenseStatus = {
   hasLicense: true;
@@ -81,9 +102,7 @@ type ValidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
-  currentMembers: number;
-  maxMembers: number;
-};
+} & LicenseResourceLimits;
 
 export type LicenseStatus = NoLicenseStatus | UnreadableLicenseStatus | InvalidLicenseStatus | ValidLicenseStatus;
 
