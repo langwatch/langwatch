@@ -23,7 +23,7 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
-import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
+import { getEvaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import { createLogger } from "../../../../../utils/logger";
 import {
   getEvaluatorDataForParams,
@@ -275,7 +275,7 @@ export async function handleEvaluatorCall(
   // should proceed even if event tracking fails. Errors are captured for monitoring.
   if (project.featureEventSourcingEvaluationIngestion) {
     try {
-      await evaluationProcessingPipeline.commands.startEvaluation.send({
+      await getEvaluationProcessingPipeline().commands.startEvaluation.send({
         tenantId: project.id,
         evaluationId,
         evaluatorId,
@@ -329,7 +329,7 @@ export async function handleEvaluatorCall(
   // result should be returned even if event tracking fails. Errors are captured for monitoring.
   if (project.featureEventSourcingEvaluationIngestion) {
     try {
-      await evaluationProcessingPipeline.commands.completeEvaluation.send({
+      await getEvaluationProcessingPipeline().commands.completeEvaluation.send({
         tenantId: project.id,
         evaluationId,
         status: result.status,

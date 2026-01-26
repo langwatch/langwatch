@@ -2,8 +2,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
-import { getClickHouseClient } from "~/server/clickhouse/client";
-import { connection } from "../../redis";
+// Note: getClickHouseClient and connection are NOT imported here to avoid
+// module-level env validation. They are lazy-loaded in getEventSourcingRuntime().
 
 export interface EventSourcingConfig {
   enabled: boolean;
@@ -13,6 +13,15 @@ export interface EventSourcingConfig {
   isBuildTime: boolean;
   clickHouseClient?: ClickHouseClient;
   redisConnection?: IORedis | Cluster;
+}
+
+/**
+ * Options for createEventSourcingConfig to inject pre-resolved clients.
+ * This allows lazy loading of clients to avoid module-level env validation.
+ */
+export interface EventSourcingConfigOptions {
+  clickHouseClient?: ClickHouseClient | null;
+  redisConnection?: IORedis | Cluster | null;
 }
 
 /**
@@ -26,7 +35,9 @@ function isBuildPhase(): boolean {
   );
 }
 
-export function createEventSourcingConfig(): EventSourcingConfig {
+export function createEventSourcingConfig(
+  options?: EventSourcingConfigOptions,
+): EventSourcingConfig {
   const isBuildTime = isBuildPhase();
   const isTestEnvironment =
     process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
@@ -37,17 +48,13 @@ export function createEventSourcingConfig(): EventSourcingConfig {
   const forceClickHouseInTests =
     process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true";
 
-  // Only attempt to get ClickHouse client if enabled and not in build phase
-  const resolvedClickHouseClient =
-    enabled && clickHouseEnabled && !isBuildTime ? getClickHouseClient() : null;
-
   return {
     enabled,
     clickHouseEnabled,
     forceClickHouseInTests,
     isTestEnvironment,
     isBuildTime,
-    clickHouseClient: resolvedClickHouseClient ?? void 0,
-    redisConnection: isBuildTime ? void 0 : (connection ?? void 0),
+    clickHouseClient: options?.clickHouseClient ?? undefined,
+    redisConnection: options?.redisConnection ?? undefined,
   };
 }

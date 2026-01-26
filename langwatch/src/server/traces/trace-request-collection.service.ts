@@ -9,7 +9,7 @@ import {
   spanSchema,
 } from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { traceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
+import { getTraceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
 
 /**
  * Normalizes all ID fields in a span to hex strings before queuing.
@@ -136,7 +136,7 @@ export class TraceRequestCollectionService {
                 // Uint8Array serialization issues through JSON (BullMQ/Redis)
                 const normalizedSpan = normalizeSpanIds(spanParseResult.data);
 
-                await traceProcessingPipeline.commands.recordSpan.send({
+                await getTraceProcessingPipeline().commands.recordSpan.send({
                   tenantId,
                   span: normalizedSpan,
                   resource: resourceParseResult.data ?? null,

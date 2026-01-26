@@ -1,11 +1,20 @@
+import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+config();
+
 export default defineConfig({
   test: {
+    // Global setup runs once before all tests - starts shared containers
+    globalSetup: [
+      "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
+    ],
     setupFiles: [
-      "./test-setup.ts",
+      // setup.ts MUST run first - it sets REDIS_URL/CLICKHOUSE_URL at module load time
+      // before test-setup.ts imports any application code
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
+      "./test-setup.ts",
     ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [
@@ -17,6 +26,11 @@ export default defineConfig({
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
+    // Run test files sequentially to avoid BullMQ/Redis resource contention
+    // when multiple pipelines are created and destroyed in parallel
+    fileParallelism: false,
+    // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
+    // The setup.ts file handles setting the correct URLs from globalSetup.
   },
   esbuild: {
     jsx: "automatic",

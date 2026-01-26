@@ -20,6 +20,8 @@ import { DisabledPipelineBuilder } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
 import {
   EventSourcingRuntime,
+  initializeEventSourcing,
+  initializeEventSourcingForTesting,
   resetEventSourcingRuntime,
 } from "../eventSourcingRuntime";
 import { PipelineBuilder } from "../index";
@@ -52,7 +54,8 @@ describe("EventSourcing", () => {
 
   describe("getInstance", () => {
     it("returns the same singleton instance on multiple calls", () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      // Initialize with in-memory stores for testing
+      initializeEventSourcingForTesting();
 
       const instance1 = EventSourcing.getInstance();
       const instance2 = EventSourcing.getInstance();
@@ -63,7 +66,8 @@ describe("EventSourcing", () => {
     });
 
     it("creates Memory store when ClickHouse client is not available", () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      // Initialize with null client (uses memory store)
+      initializeEventSourcing({ clickHouseClient: null, redisConnection: null });
 
       const instance = EventSourcing.getInstance();
       const eventStore = instance.getEventStore();
@@ -73,7 +77,11 @@ describe("EventSourcing", () => {
 
     it("creates ClickHouse store when client is available", () => {
       const mockClient = {} as ClickHouseClient;
-      mockGetClickHouseClient.mockReturnValue(mockClient);
+      // Initialize with mock ClickHouse client
+      initializeEventSourcing({
+        clickHouseClient: mockClient,
+        redisConnection: null,
+      });
 
       const instance = EventSourcing.getInstance();
       const eventStore = instance.getEventStore();
@@ -82,7 +90,8 @@ describe("EventSourcing", () => {
     });
 
     it("returns the same event store instance across multiple getInstance calls", () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      // Initialize with in-memory stores for testing
+      initializeEventSourcingForTesting();
 
       const instance1 = EventSourcing.getInstance();
       const eventStore1 = instance1.getEventStore();
@@ -251,9 +260,10 @@ describe("EventSourcing", () => {
 
   describe("edge cases and security", () => {
     it("handles null ClickHouse client gracefully", () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      // Initialize with null client (uses memory store)
+      initializeEventSourcing({ clickHouseClient: null, redisConnection: null });
 
-      const instance = new EventSourcing();
+      const instance = EventSourcing.getInstance();
       const eventStore = instance.getEventStore();
 
       expect(eventStore).toBeInstanceOf(EventStoreMemory);
@@ -277,7 +287,8 @@ describe("EventSourcing", () => {
     });
 
     it("handles multiple concurrent getInstance calls deterministically", async () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      // Initialize with in-memory stores for testing
+      initializeEventSourcingForTesting();
 
       const promises = Array.from({ length: 10 }, () =>
         Promise.resolve(EventSourcing.getInstance()),

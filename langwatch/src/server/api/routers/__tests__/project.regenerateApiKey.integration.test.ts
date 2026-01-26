@@ -3,6 +3,8 @@
  *
  * Integration tests for project.regenerateApiKey mutation.
  * Tests the actual mutation behavior with a real test database.
+ *
+ * Requires: PostgreSQL database (Prisma)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
@@ -10,7 +12,11 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-describe("project.regenerateApiKey integration", () => {
+// Skip when running with testcontainers only (no PostgreSQL)
+// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
+const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+
+describe.skipIf(isTestcontainersOnly)("project.regenerateApiKey integration", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
 

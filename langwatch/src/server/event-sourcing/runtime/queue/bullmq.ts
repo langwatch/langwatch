@@ -86,7 +86,7 @@ const NO_EVENTS_FOUND_DELAY_CONFIG = {
  */
 const WORKER_CONFIG = {
   /** Default concurrency for job processing */
-  defaultConcurrency: 30,
+  defaultConcurrency: 50,
 } as const;
 
 /**

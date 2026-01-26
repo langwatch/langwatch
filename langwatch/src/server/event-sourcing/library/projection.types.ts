@@ -15,30 +15,7 @@ export interface ProjectionOptions<EventType extends Event = Event> {
 
   /**
    * Optional: Deduplication strategy for this projection.
-   *
-   * - `"none"`: Explicit no deduplication - processes every event individually
-   * - `"aggregate"`: Dedupe by `${tenantId}:${aggregateType}:${aggregateId}` (most common for projections)
-   * - `DeduplicationConfig`: Custom deduplication configuration object
-   * - `null` or `undefined`: No deduplication (default behavior)
-   *
-   * @default undefined (no deduplication)
-   *
-   * @example
-   * ```typescript
-   * // Use aggregate-based deduplication for projections
-   * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
-   *   deduplication: "aggregate",
-   *   delay: 1500,
-   * })
-   *
-   * // Custom deduplication configuration
-   * .withProjection("analytics", AnalyticsProjectionHandler, {
-   *   deduplication: {
-   *     makeId: (event) => `${event.tenantId}:custom-key`,
-   *     ttlMs: 1000,
-   *   },
-   * })
-   * ```
+   * @see DeduplicationStrategy for available options
    */
   deduplication?: DeduplicationStrategy<EventType>;
 

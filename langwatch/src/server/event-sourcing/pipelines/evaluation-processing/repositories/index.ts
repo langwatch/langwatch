@@ -7,9 +7,21 @@ import { EvaluationStateRepositoryClickHouse } from "./evaluationState.clickhous
 import { EvaluationStateRepositoryMemory } from "./evaluationState.memory.repository";
 import type { EvaluationStateRepository } from "./evaluationState.repository";
 
-const clickHouseClient = getClickHouseClient();
+// Lazy-loaded repository to avoid calling getClickHouseClient() at module load time
+// This prevents t3-env errors when the module is imported in test environments
+let _evaluationStateRepository: EvaluationStateRepository | null = null;
 
-export const evaluationStateRepository: EvaluationStateRepository =
-  clickHouseClient
-    ? new EvaluationStateRepositoryClickHouse(clickHouseClient)
-    : new EvaluationStateRepositoryMemory();
+/**
+ * Gets the evaluation state repository, initializing it lazily on first call.
+ * This defers getClickHouseClient() calls until actual use, preventing t3-env
+ * errors in test environments where env vars may not be configured yet.
+ */
+export function getEvaluationStateRepository(): EvaluationStateRepository {
+  if (_evaluationStateRepository === null) {
+    const clickHouseClient = getClickHouseClient();
+    _evaluationStateRepository = clickHouseClient
+      ? new EvaluationStateRepositoryClickHouse(clickHouseClient)
+      : new EvaluationStateRepositoryMemory();
+  }
+  return _evaluationStateRepository;
+}

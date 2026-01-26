@@ -68,6 +68,7 @@ describe("QueueProcessorManager", () => {
     it("does nothing when queue factory is not provided", () => {
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
       });
 
       const handlers = {
@@ -92,6 +93,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -126,6 +128,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -157,6 +160,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -184,6 +188,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -224,6 +229,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -250,6 +256,7 @@ describe("QueueProcessorManager", () => {
     it("does nothing when queue factory is not provided", () => {
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
       });
 
       const projections = {
@@ -277,6 +284,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -313,6 +321,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -343,6 +352,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -391,6 +401,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -440,6 +451,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -463,7 +475,7 @@ describe("QueueProcessorManager", () => {
       expect(createCall?.deduplication).toBeUndefined();
     });
 
-    it('uses no deduplication when strategy is explicitly "none"', () => {
+    it("uses no deduplication when strategy is explicitly undefined", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -475,6 +487,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -484,7 +497,7 @@ describe("QueueProcessorManager", () => {
           void 0,
           void 0,
           {
-            deduplication: "none",
+            deduplication: undefined,
           },
         ),
       };
@@ -496,7 +509,7 @@ describe("QueueProcessorManager", () => {
       );
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
-      // Explicit "none" should result in no deduplication
+      // Explicit undefined should result in no deduplication
       expect(createCall?.deduplication).toBeUndefined();
     });
   });
@@ -505,6 +518,7 @@ describe("QueueProcessorManager", () => {
     it("does nothing when queue factory is not provided", () => {
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
       });
 
       const commandRegistrations = [
@@ -536,6 +550,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -582,6 +597,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -637,6 +653,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 
@@ -687,6 +704,7 @@ describe("QueueProcessorManager", () => {
 
       const manager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: "test-pipeline",
         queueProcessorFactory: queueFactory as any,
       });
 

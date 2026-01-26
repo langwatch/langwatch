@@ -280,15 +280,46 @@ export class EventSourcing {
   }
 }
 
-export const eventSourcing = EventSourcing.getInstance();
+// Lazy singleton getter to avoid triggering env validation at module load time.
+// This allows importing the EventSourcing class in tests without needing all env vars.
+let _eventSourcingInstance: EventSourcing | null = null;
 
 /**
- * Register the defined pipelines
+ * Returns the singleton EventSourcing instance.
+ * Uses lazy initialization to avoid env validation at module load time.
  */
-export const traceProcessingPipeline = eventSourcing.register(
-  traceProcessingPipelineDefinition,
+export function getEventSourcing(): EventSourcing {
+  if (!_eventSourcingInstance) {
+    _eventSourcingInstance = EventSourcing.getInstance();
+  }
+  return _eventSourcingInstance;
+}
+
+// Helper function to create a lazily initialized singleton.
+// This pattern ensures the getter always returns a non-nullable type
+// while avoiding env validation at module load time.
+function createLazyPipeline<T>(factory: () => T): () => T {
+  let instance: T | null = null;
+  return () => {
+    if (!instance) {
+      instance = factory();
+    }
+    return instance;
+  };
+}
+
+/**
+ * Returns the trace processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export const getTraceProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(traceProcessingPipelineDefinition),
 );
 
-export const evaluationProcessingPipeline = eventSourcing.register(
-  evaluationProcessingPipelineDefinition,
+/**
+ * Returns the evaluation processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(evaluationProcessingPipelineDefinition),
 );

@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AggregateType } from "../../library";
 import {
   cleanupTestDataForTenant,
+  closePipelineGracefully,
   createTestPipeline,
   createTestTenantId,
+  generateTestAggregateId,
   getTenantIdString,
   verifyCheckpoint,
   waitForCheckpoint,
@@ -14,23 +16,23 @@ describe("Event Handlers - Integration Tests", () => {
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline first to stop all workers and queues
-    await pipeline.service.close();
-    // Wait a bit for all async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Gracefully close pipeline to ensure all BullMQ workers finish
+    await closePipelineGracefully(pipeline);
     // Then clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("skips processing when previous events haven't been processed", async () => {
-    const aggregateId = "handler-test-7";
+    const aggregateId = generateTestAggregateId("handler");
 
     // This test verifies that sequential ordering is enforced
     // If event 2 arrives before event 1 is processed, event 2 should wait
@@ -51,7 +53,7 @@ describe("Event Handlers - Integration Tests", () => {
 
     // Wait for handler to process both events (checks checkpoint directly, much faster)
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
