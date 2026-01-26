@@ -16,16 +16,17 @@ import { Worker as BullMQWorker } from "bullmq";
 import { createLogger } from "~/utils/logger";
 import { prisma } from "../db";
 import { connection } from "../redis";
-import { prefetchScenarioData } from "./execution/data-prefetcher";
+import {
+  createDataPrefetcherDependencies,
+  prefetchScenarioData,
+} from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
-import { SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
+import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler } from "./scenario-failure-handler";
 import { ScenarioService } from "./scenario.service";
 
 const logger = createLogger("langwatch:scenarios:processor");
-
-const CHILD_PROCESS_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Build OTEL resource attributes string for scenario labels.
@@ -53,9 +54,11 @@ export async function processScenarioJob(
   );
 
   // Pre-fetch all data needed for child process
+  const deps = createDataPrefetcherDependencies();
   const prefetchResult = await prefetchScenarioData(
     { projectId, scenarioId, setId, batchRunId },
     target,
+    deps,
   );
 
   if (!prefetchResult.success) {
@@ -140,7 +143,7 @@ async function spawnScenarioChildProcess(
         success: false,
         error: "Scenario execution timed out",
       });
-    }, CHILD_PROCESS_TIMEOUT_MS);
+    }, CHILD_PROCESS.TIMEOUT_MS);
 
     // Stream child output to parent logs and Bull Board
     child.stdout?.on("data", (data: Buffer) => {

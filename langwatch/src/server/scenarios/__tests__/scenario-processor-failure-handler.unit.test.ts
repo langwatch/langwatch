@@ -5,9 +5,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Job, Worker } from "bullmq";
+import type { Job } from "bullmq";
 import type { ScenarioJob, ScenarioJobResult } from "../scenario.queue";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
+import { ScenarioService } from "../scenario.service";
 
 // Mock the redis connection to prevent actual worker creation
 vi.mock("../../redis", () => ({
@@ -39,10 +40,18 @@ vi.mock("../scenario-failure-handler", async (importOriginal) => {
   };
 });
 
-describe("ScenarioProcessor Failure Handler", () => {
-  type CompletedHandler = (job: Job<ScenarioJob, ScenarioJobResult>, result: ScenarioJobResult) => Promise<void>;
-  let completedHandler: CompletedHandler | null = null;
+// Mock the ScenarioService to return scenario data
+const mockGetById = vi.fn();
 
+vi.mock("../scenario.service", () => ({
+  ScenarioService: {
+    create: () => ({
+      getById: mockGetById,
+    }),
+  },
+}));
+
+describe("ScenarioProcessor Failure Handler", () => {
   const mockJob = {
     id: "job_123",
     data: {
@@ -55,9 +64,15 @@ describe("ScenarioProcessor Failure Handler", () => {
     log: vi.fn(),
   } as unknown as Job<ScenarioJob, ScenarioJobResult>;
 
+  const mockScenario = {
+    id: "scen_456",
+    name: "Test Scenario",
+    situation: "Test description for the scenario",
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    completedHandler = null;
+    mockGetById.mockResolvedValue(mockScenario);
   });
 
   /**
@@ -71,6 +86,13 @@ describe("ScenarioProcessor Failure Handler", () => {
     // This mirrors the logic in scenario.processor.ts worker.on("completed")
     if (result && !result.success) {
       try {
+        // Fetch scenario to get name and description for the failure event
+        const scenarioService = ScenarioService.create(null as never);
+        const scenario = await scenarioService.getById({
+          projectId: job.data.projectId,
+          id: job.data.scenarioId,
+        });
+
         const handler = ScenarioFailureHandler.create();
         await handler.ensureFailureEventsEmitted({
           projectId: job.data.projectId,
@@ -78,6 +100,8 @@ describe("ScenarioProcessor Failure Handler", () => {
           setId: job.data.setId,
           batchRunId: job.data.batchRunId,
           error: result.error,
+          name: scenario?.name,
+          description: scenario?.situation,
         });
       } catch (error) {
         // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
@@ -107,7 +131,63 @@ describe("ScenarioProcessor Failure Handler", () => {
         setId: "set_789",
         batchRunId: "batch_abc",
         error: "Prefetch failed: Scenario not found",
+        name: "Test Scenario",
+        description: "Test description for the scenario",
       });
+    });
+
+    it("includes name and description from scenario in failure event params", async () => {
+      // Given: a scenario job completes with result.success = false
+      const failedResult: ScenarioJobResult = {
+        success: false,
+        error: "Child process exited with code 1",
+      };
+
+      // And: the scenario has specific name and description
+      mockGetById.mockResolvedValue({
+        id: "scen_456",
+        name: "Custom Scenario Name",
+        situation: "Custom scenario description",
+      });
+
+      // When: the worker's completed event fires
+      await simulateWorkerCompletedEvent(mockJob, failedResult);
+
+      // Then: ScenarioService.getById is called with correct params
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        id: "scen_456",
+      });
+
+      // And: the handler receives name and description from the scenario
+      expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Custom Scenario Name",
+          description: "Custom scenario description",
+        }),
+      );
+    });
+
+    it("handles missing scenario gracefully", async () => {
+      // Given: a scenario job completes with result.success = false
+      const failedResult: ScenarioJobResult = {
+        success: false,
+        error: "Prefetch failed",
+      };
+
+      // And: the scenario does not exist
+      mockGetById.mockResolvedValue(null);
+
+      // When: the worker's completed event fires
+      await simulateWorkerCompletedEvent(mockJob, failedResult);
+
+      // Then: the handler is still called with undefined name and description
+      expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined,
+          description: undefined,
+        }),
+      );
     });
   });
 

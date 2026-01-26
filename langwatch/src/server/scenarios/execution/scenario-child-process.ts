@@ -27,10 +27,7 @@ import { trace } from "@opentelemetry/api";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData } from "./types";
 import { createModelFromParams } from "./model.factory";
-import {
-  SerializedHttpAgentAdapter,
-  SerializedPromptConfigAdapter,
-} from "./serialized.adapters";
+import { createAdapter } from "./serialized-adapter.registry";
 
 async function main(): Promise<void> {
   const jobData = await readJobDataFromStdin();
@@ -59,7 +56,7 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   const { context, scenario, adapterData, modelParams, nlpServiceUrl } = jobData;
 
-  const adapter = createAdapter(adapterData, modelParams, nlpServiceUrl);
+  const adapter = createAdapter({ adapterData, modelParams, nlpServiceUrl });
   const model = createModelFromParams(modelParams, nlpServiceUrl);
 
   // Results are reported via LangWatch SDK automatically
@@ -126,21 +123,6 @@ async function flushOtelTraces(): Promise<void> {
     // Don't fail the scenario if OTEL flush fails
     console.warn(`OTEL flush warning: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-function createAdapter(
-  adapterData: ChildProcessJobData["adapterData"],
-  modelParams: ChildProcessJobData["modelParams"],
-  nlpServiceUrl: string,
-) {
-  if (adapterData.type === "prompt") {
-    return new SerializedPromptConfigAdapter(
-      adapterData,
-      modelParams,
-      nlpServiceUrl,
-    );
-  }
-  return new SerializedHttpAgentAdapter(adapterData);
 }
 
 main().catch(async (error) => {
