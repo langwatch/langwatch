@@ -39,8 +39,8 @@ export async function closePipelineGracefully(
 ): Promise<void> {
   await pipeline.service.close();
   // Wait for BullMQ workers to fully shut down and release Redis connections
-  // Using 1000ms to ensure all async operations complete
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Using 2000ms to ensure all async operations complete before next test
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 }
 
 /**
