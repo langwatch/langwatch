@@ -84,6 +84,7 @@ describe("ProjectionUpdater", () => {
       options.queueManager ??
       new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
     const mockStream = {

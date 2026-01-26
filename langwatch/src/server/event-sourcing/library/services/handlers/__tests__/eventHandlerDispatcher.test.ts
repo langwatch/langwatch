@@ -68,6 +68,7 @@ describe("EventHandlerDispatcher", () => {
       options.queueManager ??
       new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
     const distributedLock = createMockDistributedLock();
@@ -106,6 +107,7 @@ describe("EventHandlerDispatcher", () => {
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       // Manually add queue processor to simulate initialization
       (queueManager as any).handlerQueueProcessors.set(
@@ -214,6 +216,7 @@ describe("EventHandlerDispatcher", () => {
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       (queueManager as any).handlerQueueProcessors.set(
         "handler1",
@@ -270,6 +273,7 @@ describe("EventHandlerDispatcher", () => {
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       (queueManager as any).handlerQueueProcessors.set(
         "enabledHandler",

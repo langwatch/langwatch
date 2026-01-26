@@ -295,41 +295,31 @@ export function getEventSourcing(): EventSourcing {
   return _eventSourcingInstance;
 }
 
-// Lazy pipeline instances to avoid triggering env validation at module load time.
-// Using explicit any for storage, but the getter functions have proper return types.
-let _traceProcessingPipeline: ReturnType<
-  EventSourcing["register"]
-> | null = null;
-let _evaluationProcessingPipeline: ReturnType<
-  EventSourcing["register"]
-> | null = null;
+// Helper function to create a lazily initialized singleton.
+// This pattern ensures the getter always returns a non-nullable type
+// while avoiding env validation at module load time.
+function createLazyPipeline<T>(factory: () => T): () => T {
+  let instance: T | null = null;
+  return () => {
+    if (!instance) {
+      instance = factory();
+    }
+    return instance;
+  };
+}
 
 /**
  * Returns the trace processing pipeline.
  * Lazily initialized to avoid env validation at module load time.
  */
-export function getTraceProcessingPipeline(): ReturnType<
-  EventSourcing["register"]
-> {
-  if (!_traceProcessingPipeline) {
-    _traceProcessingPipeline = getEventSourcing().register(
-      traceProcessingPipelineDefinition,
-    );
-  }
-  return _traceProcessingPipeline;
-}
+export const getTraceProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(traceProcessingPipelineDefinition),
+);
 
 /**
  * Returns the evaluation processing pipeline.
  * Lazily initialized to avoid env validation at module load time.
  */
-export function getEvaluationProcessingPipeline(): ReturnType<
-  EventSourcing["register"]
-> {
-  if (!_evaluationProcessingPipeline) {
-    _evaluationProcessingPipeline = getEventSourcing().register(
-      evaluationProcessingPipelineDefinition,
-    );
-  }
-  return _evaluationProcessingPipeline;
-}
+export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(evaluationProcessingPipelineDefinition),
+);

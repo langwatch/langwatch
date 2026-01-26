@@ -152,6 +152,16 @@ function parseConnectionUrl(
   gooseParsed.pathname = "/";
   gooseParsed.searchParams.set("database", database);
 
+  // If using https, we must explicitly tell the clickhouse-go driver to use TLS
+  if (gooseParsed.protocol === "https:") {
+    gooseParsed.searchParams.set("secure", "true");
+    // If the URL has a skip_verify parameter, pass it to goose as well
+    const skipVerify = parsed.searchParams.get("skip_verify");
+    if (skipVerify) {
+      gooseParsed.searchParams.set("skip_verify", skipVerify);
+    }
+  }
+
   const gooseConnectionString = gooseParsed.toString();
 
   return {

@@ -317,6 +317,7 @@ function createCommandDispatcher<Payload extends HasTenantId, EventType extends 
  */
 export class QueueProcessorManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
+  private readonly pipelineName: string;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:queue-processor-manager",
   );
@@ -342,18 +343,21 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
   constructor({
     aggregateType,
+    pipelineName,
     queueProcessorFactory,
     distributedLock,
     commandLockTtlMs = 30000,
     featureFlagService,
   }: {
     aggregateType: AggregateType;
+    pipelineName: string;
     queueProcessorFactory?: QueueProcessorFactory;
     distributedLock?: DistributedLock;
     commandLockTtlMs?: number;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
+    this.pipelineName = pipelineName;
     this.queueProcessorFactory = queueProcessorFactory;
     this.distributedLock = distributedLock;
     this.commandLockTtlMs = commandLockTtlMs;
@@ -396,7 +400,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.aggregateType}/handler/${handlerName}`;
+      const queueName = `${this.pipelineName}/handler/${handlerName}`;
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -450,7 +454,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.aggregateType}/projection/${projectionName}`;
+      const queueName = `${this.pipelineName}/projection/${projectionName}`;
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,

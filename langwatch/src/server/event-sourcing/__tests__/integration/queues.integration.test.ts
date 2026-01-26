@@ -3,8 +3,10 @@ import type { AggregateType } from "../../library";
 import { getTestRedisConnection } from "./testContainers";
 import {
   cleanupTestDataForTenant,
+  closePipelineGracefully,
   createTestPipeline,
   createTestTenantId,
+  generateTestAggregateId,
   getTenantIdString,
   waitForCheckpoint,
 } from "./testHelpers";
@@ -15,18 +17,18 @@ describe("BullMQ Queue - Integration Tests", () => {
   let tenantIdString: string;
   let redisConnection: ReturnType<typeof getTestRedisConnection>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
     redisConnection = getTestRedisConnection();
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline first to stop all workers and queues
-    await pipeline.service.close();
-    // Wait a bit for all async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Gracefully close pipeline to ensure all BullMQ workers finish
+    await closePipelineGracefully(pipeline);
     // Then clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
@@ -37,7 +39,7 @@ describe("BullMQ Queue - Integration Tests", () => {
     }
 
     // Send a command to trigger queue creation
-    const aggregateId = "queue-test-1";
+    const aggregateId = generateTestAggregateId("queue");
     await pipeline.commands.testCommand.send({
       tenantId: tenantIdString,
       aggregateId,
@@ -46,7 +48,7 @@ describe("BullMQ Queue - Integration Tests", () => {
 
     // Wait for processing to complete via checkpoint
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -56,16 +58,17 @@ describe("BullMQ Queue - Integration Tests", () => {
       pipeline.processorCheckpointStore,
     );
 
-    // Check that queues exist in Redis
+    // Check that queues exist in Redis (using unique pipeline name)
     if (redisConnection) {
+      const pipelineName = pipeline.pipelineName;
       const commandQueueKeys = await redisConnection.keys(
-        "bull:test_pipeline/command/testCommand:*",
+        `bull:${pipelineName}/command/testCommand:*`,
       );
       const handlerQueueKeys = await redisConnection.keys(
-        "bull:test_aggregate/handler/testHandler:*",
+        `bull:${pipelineName}/handler/testHandler:*`,
       );
       const projectionQueueKeys = await redisConnection.keys(
-        "bull:test_aggregate/projection/testProjection:*",
+        `bull:${pipelineName}/projection/testProjection:*`,
       );
 
       // Queues should have been created (keys may exist even if empty)
@@ -82,7 +85,7 @@ describe("BullMQ Queue - Integration Tests", () => {
     // For now, we verify that the queue infrastructure supports retries
     // by checking that failed jobs are tracked
 
-    const aggregateId = "queue-test-3";
+    const aggregateId = generateTestAggregateId("queue-retry");
 
     await pipeline.commands.testCommand.send({
       tenantId: tenantIdString,
@@ -92,7 +95,7 @@ describe("BullMQ Queue - Integration Tests", () => {
 
     // Wait for processing to complete via checkpoint
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,
@@ -113,7 +116,7 @@ describe("BullMQ Queue - Integration Tests", () => {
   });
 
   it("cleans up queues on pipeline close", async () => {
-    const aggregateId = "queue-test-4";
+    const aggregateId = generateTestAggregateId("queue-cleanup");
 
     await pipeline.commands.testCommand.send({
       tenantId: tenantIdString,
@@ -123,7 +126,7 @@ describe("BullMQ Queue - Integration Tests", () => {
 
     // Wait for processing to complete via checkpoint
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testHandler",
       aggregateId,
       tenantIdString,

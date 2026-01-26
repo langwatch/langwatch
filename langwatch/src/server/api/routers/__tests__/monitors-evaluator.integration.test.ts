@@ -3,6 +3,8 @@
  *
  * Integration tests for Monitor-Evaluator integration.
  * Tests creating and updating monitors with evaluatorId references.
+ *
+ * Requires: PostgreSQL database (Prisma)
  */
 import { EvaluationExecutionMode } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -11,7 +13,11 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-describe("Monitor-Evaluator Integration", () => {
+// Skip when running with testcontainers only (no PostgreSQL)
+// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
+const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+
+describe.skipIf(isTestcontainersOnly)("Monitor-Evaluator Integration", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testEvaluatorId: string;
