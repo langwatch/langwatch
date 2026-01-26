@@ -14,6 +14,17 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
+// === Handle CI environment (GitHub Actions service containers) ===
+// CI sets CI_REDIS_URL and CI_CLICKHOUSE_URL, but application code expects
+// REDIS_URL and CLICKHOUSE_URL. Copy these over before any other setup.
+if (process.env.CI && process.env.CI_REDIS_URL) {
+  process.env.REDIS_URL = process.env.CI_REDIS_URL;
+}
+if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
+  process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
+  process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
+}
+
 const CONTAINER_INFO_FILE = path.join(
   os.tmpdir(),
   "langwatch-test-containers.json",
