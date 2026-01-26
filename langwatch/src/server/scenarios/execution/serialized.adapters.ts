@@ -9,10 +9,14 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
 import { JSONPath } from "jsonpath-plus";
+import { Liquid } from "liquidjs";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../adapters/auth.strategies";
 import { createModelFromParams } from "./model.factory";
 import type { HttpAgentData, LiteLLMParams, PromptConfigData } from "./types";
+
+// Shared Liquid engine instance for template interpolation
+const liquid = new Liquid();
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
@@ -33,10 +37,39 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
+    // Build template context for Liquid
+    // Note: messages is serialized to JSON string for template interpolation
+    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
+    const templateContext = {
+      input:
+        typeof lastUserMessage?.content === "string"
+          ? lastUserMessage.content
+          : JSON.stringify(lastUserMessage?.content ?? ""),
+      messages: JSON.stringify(input.messages),
+    };
+
+    // Check if template uses {{messages}} - if so, template handles conversation history
+    const templateUsesMessages = this.templateContainsMessages();
+
+    // Interpolate template variables using Liquid
+    const systemPrompt = await liquid.parseAndRender(
+      this.config.systemPrompt,
+      templateContext,
+    );
+
+    const promptMessages = await Promise.all(
+      this.config.messages.map(async (m) => ({
+        role: m.role as "user" | "assistant",
+        content: await liquid.parseAndRender(m.content, templateContext),
+      })),
+    );
+
+    // Build messages: system + template messages + conversation history (if not handled by template)
     const messages = [
-      { role: "system" as const, content: this.config.systemPrompt },
-      ...this.config.messages,
-      ...input.messages,
+      { role: "system" as const, content: systemPrompt },
+      ...promptMessages,
+      // Only append input.messages if template doesn't use {{messages}}
+      ...(templateUsesMessages ? [] : input.messages),
     ];
 
     const model = createModelFromParams(this.litellmParams, this.nlpServiceUrl);
@@ -49,6 +82,18 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
     });
 
     return result.text;
+  }
+
+  /**
+   * Check if the template (system prompt or any message) contains {{messages}}.
+   * If so, the template handles conversation history placement.
+   */
+  private templateContainsMessages(): boolean {
+    const messagesPattern = /\{\{\s*messages\s*\}\}/;
+    if (messagesPattern.test(this.config.systemPrompt)) {
+      return true;
+    }
+    return this.config.messages.some((m) => messagesPattern.test(m.content));
   }
 }
 

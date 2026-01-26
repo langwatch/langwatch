@@ -165,6 +165,119 @@ describe("SerializedPromptConfigAdapter", () => {
 
     expect(result).toBe("Generated response");
   });
+
+  describe("template interpolation", () => {
+    it("replaces {{input}} in system prompt with last user message", async () => {
+      const config: PromptConfigData = {
+        ...defaultConfig,
+        systemPrompt: "You are helping with: {{input}}",
+        messages: [],
+      };
+      const adapter = new SerializedPromptConfigAdapter(
+        config,
+        defaultLitellmParams,
+        "http://localhost:8080",
+      );
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+
+      expect(messages[0]).toEqual({
+        role: "system",
+        content: "You are helping with: How are you?",
+      });
+      // Input messages still appended for conversation context
+      expect(messages[1]).toEqual({ role: "user", content: "How are you?" });
+    });
+
+    it("replaces {{input}} in template messages", async () => {
+      const config: PromptConfigData = {
+        ...defaultConfig,
+        systemPrompt: "You are a helpful assistant.",
+        messages: [{ role: "user", content: "User asked: {{input}}" }],
+      };
+      const adapter = new SerializedPromptConfigAdapter(
+        config,
+        defaultLitellmParams,
+        "http://localhost:8080",
+      );
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+
+      expect(messages[1]).toEqual({
+        role: "user",
+        content: "User asked: How are you?",
+      });
+    });
+
+    it("replaces {{messages}} in system prompt and does not append input.messages", async () => {
+      const config: PromptConfigData = {
+        ...defaultConfig,
+        systemPrompt: "Conversation so far: {{messages}}",
+        messages: [],
+      };
+      const adapter = new SerializedPromptConfigAdapter(
+        config,
+        defaultLitellmParams,
+        "http://localhost:8080",
+      );
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+
+      // Only system message - input.messages not appended because template handles it
+      expect(messages).toHaveLength(1);
+      expect(messages[0]!.content).toContain("How are you?");
+      expect(messages[0]!.role).toBe("system");
+    });
+
+    it("does not append input.messages when {{messages}} is in template message", async () => {
+      const config: PromptConfigData = {
+        ...defaultConfig,
+        systemPrompt: "You are helpful.",
+        messages: [{ role: "user", content: "History: {{messages}}" }],
+      };
+      const adapter = new SerializedPromptConfigAdapter(
+        config,
+        defaultLitellmParams,
+        "http://localhost:8080",
+      );
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+
+      // System + template message only - input.messages not appended
+      expect(messages).toHaveLength(2);
+      expect(messages[0]!.role).toBe("system");
+      expect(messages[1]!.content).toContain("How are you?");
+    });
+
+    it("appends input.messages when no {{messages}} in template", async () => {
+      const adapter = new SerializedPromptConfigAdapter(
+        defaultConfig,
+        defaultLitellmParams,
+        "http://localhost:8080",
+      );
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockGenerateText.mock.calls[0]![0];
+      const messages = callArgs.messages as Array<{ role: string; content: string }>;
+
+      // System + template message + input message
+      expect(messages).toHaveLength(3);
+      expect(messages[2]).toEqual({ role: "user", content: "How are you?" });
+    });
+  });
 });
 
 describe("SerializedHttpAgentAdapter", () => {
