@@ -62,30 +62,6 @@ function isUsingGlobalSetupContainers(): boolean {
 }
 
 /**
- * Loads container info from the file written by globalSetup.
- * Sets environment variables so subsequent calls to isUsingGlobalSetupContainers() return true.
- */
-export function loadGlobalSetupContainerInfo(): { clickHouseUrl: string; redisUrl: string } | null {
-  try {
-    if (!fs.existsSync(CONTAINER_INFO_FILE)) {
-      return null;
-    }
-    const content = fs.readFileSync(CONTAINER_INFO_FILE, "utf-8");
-    const info = JSON.parse(content) as { clickHouseUrl: string; redisUrl: string };
-
-    // Set env vars so isUsingGlobalSetupContainers() returns true
-    // and so application code (redis.ts, etc.) can use them
-    process.env.TEST_CLICKHOUSE_URL = info.clickHouseUrl;
-    process.env.CLICKHOUSE_URL = info.clickHouseUrl;
-    process.env.REDIS_URL = info.redisUrl;
-
-    return info;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Starts testcontainers for ClickHouse and Redis.
  * Should be called before running integration tests.
  *

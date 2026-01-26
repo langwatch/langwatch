@@ -11,10 +11,10 @@ export default defineConfig({
       "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
     ],
     setupFiles: [
-      // env-setup MUST run first to set REDIS_URL/CLICKHOUSE_URL before redis.ts is imported
-      "./src/server/event-sourcing/__tests__/integration/env-setup.ts",
-      "./test-setup.ts",
+      // setup.ts MUST run first - it sets REDIS_URL/CLICKHOUSE_URL at module load time
+      // before test-setup.ts imports any application code
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
+      "./test-setup.ts",
     ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [
@@ -30,7 +30,7 @@ export default defineConfig({
     // when multiple pipelines are created and destroyed in parallel
     fileParallelism: false,
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
-    // The env-setup.ts file handles setting the correct URLs from globalSetup.
+    // The setup.ts file handles setting the correct URLs from globalSetup.
   },
   esbuild: {
     jsx: "automatic",
