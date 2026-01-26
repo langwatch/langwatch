@@ -895,7 +895,22 @@ export const startCollectorWorker = () => {
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,
-    (job) => processCollectorJob(job.id, job.data),
+    async (job) => {
+      const jobLog = (message: string) => {
+        void job.log(message);
+      };
+
+      jobLog(`Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`);
+
+      try {
+        await processCollectorJob(job.id, job.data);
+        jobLog(`Completed successfully`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        jobLog(`Failed: ${message}`);
+        throw error;
+      }
+    },
     {
       connection,
       concurrency: 20,

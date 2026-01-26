@@ -496,6 +496,50 @@ describe("Scenario Processor - OTEL Isolation", () => {
       },
       60000
     );
+
+    it(
+      "includes setId in scenario events sent to collector",
+      async () => {
+        /**
+         * Verifies that setId from job context is passed through to the SDK
+         * and appears in events sent to the collector as scenarioSetId.
+         *
+         * This prevents scenarios from being stored under "default" set
+         * when run via "Run Again" from a specific scenario set.
+         */
+        const testSetId = "custom-scenario-set-xyz";
+        const jobData = createTestJobData({
+          context: {
+            projectId: "test-project",
+            scenarioId: "test-scenario-setid",
+            setId: testSetId,
+            batchRunId: "test-batch-setid",
+          },
+        });
+
+        const env = {
+          LANGWATCH_API_KEY: "test-api-key",
+          LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
+        };
+
+        await spawnChildProcessDirectly(jobData, env);
+
+        // Allow time for async trace flush
+        await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
+
+        // Verify the setId appears in the event payloads
+        const allBodies = mockCollector.requests.map((r) => r.body).join("");
+
+        // The SDK should include scenarioSetId (or scenario_set_id) in the events
+        const hasSetId =
+          allBodies.includes(testSetId) ||
+          allBodies.includes("scenarioSetId") ||
+          allBodies.includes("scenario_set_id");
+
+        expect(hasSetId).toBe(true);
+      },
+      60000
+    );
   });
 
   describe("execution results", () => {

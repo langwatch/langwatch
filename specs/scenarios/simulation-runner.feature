@@ -120,6 +120,13 @@ Feature: Simulation Runner Service
     And exported traces include batchRunId as resource attribute
 
   @integration
+  Scenario: Worker events include scenario set ID
+    Given scenario "Refund Test" in set "production-tests"
+    When the scenario executes in a worker
+    Then emitted events include scenarioSetId "production-tests"
+    And the events are NOT stored in the default set
+
+  @integration
   Scenario: OTEL context is cleaned up after worker execution
     Given a scenario run completes in a worker
     When the worker finishes execution

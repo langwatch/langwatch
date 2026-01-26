@@ -21,27 +21,28 @@ export function useRunScenario({
   const [isPolling, setIsPolling] = useState(false);
 
   const runScenario = useCallback(
-    async (scenarioId: string, target: TargetValue) => {
+    async (scenarioId: string, target: TargetValue, setId?: string) => {
       if (!projectId || !projectSlug || !target) return;
 
       try {
-        const { setId, batchRunId } = await runMutation.mutateAsync({
+        const { setId: returnedSetId, batchRunId } = await runMutation.mutateAsync({
           projectId,
           scenarioId,
           target: { type: target.type, referenceId: target.id },
+          setId,
         });
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
-          { projectId, scenarioSetId: setId, batchRunId },
+          { projectId, scenarioSetId: returnedSetId, batchRunId },
         );
 
         if (result.success) {
           void router.push(
             buildRoutePath("simulations_run", {
               project: projectSlug,
-              scenarioSetId: setId,
+              scenarioSetId: returnedSetId,
               batchRunId,
               scenarioRunId: result.scenarioRunId,
             }),
@@ -50,7 +51,7 @@ export function useRunScenario({
           const runPath = result.scenarioRunId
             ? buildRoutePath("simulations_run", {
                 project: projectSlug,
-                scenarioSetId: setId,
+                scenarioSetId: returnedSetId,
                 batchRunId,
                 scenarioRunId: result.scenarioRunId,
               })

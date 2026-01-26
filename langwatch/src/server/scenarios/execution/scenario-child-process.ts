@@ -4,7 +4,12 @@
  * This process is self-contained and self-reporting:
  * - Receives job data via stdin
  * - Reports results via LangWatch SDK (OTEL traces/events)
- * - Exits with code 0 on success, 1 on failure
+ * - Exits with code 0 when execution completes (regardless of test pass/fail)
+ * - Exits with code 1 only on actual errors (crashes, network failures, etc.)
+ *
+ * Note: A "failed" test result is still a successful execution - the scenario
+ * ran to completion and reported its results. Only actual errors should cause
+ * a non-zero exit code.
  *
  * OTEL isolation is achieved by:
  * 1. Parent sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars
@@ -12,9 +17,13 @@
  *    at module load time, reading from those env vars
  * 3. Each child process gets its own OTEL TracerProvider
  *
+ * IMPORTANT: We must flush OTEL traces before exiting. The scenario SDK doesn't
+ * expose the observability handle, so we access the global TracerProvider directly.
+ *
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
+import { trace } from "@opentelemetry/api";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData } from "./types";
 import { createModelFromParams } from "./model.factory";
@@ -54,16 +63,19 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   const model = createModelFromParams(modelParams, nlpServiceUrl);
 
   // Results are reported via LangWatch SDK automatically
+  const verbose = process.env.SCENARIO_VERBOSE === "true";
   const result = await ScenarioRunner.run(
     {
       id: scenario.id,
       name: scenario.name,
       description: scenario.situation,
+      setId: context.setId,
       agents: [
         adapter,
         ScenarioRunner.userSimulatorAgent({ model }),
         ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model }),
       ],
+      verbose,
     },
     {
       batchRunId: context.batchRunId,
@@ -74,9 +86,45 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
   );
 
-  if (!result.success) {
-    console.error(`Scenario failed: ${result.reasoning}`);
-    process.exit(1);
+  // Log the result but don't exit with error code for failed tests
+  // A failed test is still a successful execution - results are reported via SDK
+  if (result.success) {
+    console.log(`Scenario passed`);
+  } else {
+    console.log(`Scenario failed: ${result.reasoning}`);
+  }
+
+  // Flush OTEL traces before exiting
+  // The scenario SDK doesn't expose the observability handle, so we access
+  // the global TracerProvider directly and call forceFlush/shutdown
+  await flushOtelTraces();
+}
+
+/**
+ * Flush pending OTEL traces by accessing the global TracerProvider.
+ * This ensures all traces are sent before the process exits.
+ */
+async function flushOtelTraces(): Promise<void> {
+  try {
+    const provider = trace.getTracerProvider();
+
+    // The provider might be a ProxyTracerProvider wrapping the real one
+    // Try to get the delegate if it exists
+    const concreteProvider = (provider as any).getDelegate?.() ?? provider;
+
+    // Try forceFlush first (preferred), then shutdown
+    if (typeof concreteProvider.forceFlush === "function") {
+      console.log("Flushing OTEL traces...");
+      await concreteProvider.forceFlush();
+      console.log("OTEL traces flushed");
+    } else if (typeof concreteProvider.shutdown === "function") {
+      console.log("Shutting down OTEL provider...");
+      await concreteProvider.shutdown();
+      console.log("OTEL provider shutdown complete");
+    }
+  } catch (error) {
+    // Don't fail the scenario if OTEL flush fails
+    console.warn(`OTEL flush warning: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -95,7 +143,9 @@ function createAdapter(
   return new SerializedHttpAgentAdapter(adapterData);
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error(`Scenario execution failed: ${error instanceof Error ? error.message : String(error)}`);
+  // Still flush traces on error so we capture what happened
+  await flushOtelTraces();
   process.exit(1);
 });
