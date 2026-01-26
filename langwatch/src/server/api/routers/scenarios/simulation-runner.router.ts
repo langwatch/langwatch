@@ -5,7 +5,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
+import {
+  createDataPrefetcherDependencies,
+  prefetchScenarioData,
+} from "~/server/scenarios/execution/data-prefetcher";
 import { SCENARIO_DEFAULTS } from "~/server/scenarios/scenario.constants";
 import {
   generateBatchRunId,
@@ -54,9 +57,11 @@ export const simulationRunnerRouter = createTRPCRouter({
       const batchRunId = generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
+      const deps = createDataPrefetcherDependencies();
       const prefetchResult = await prefetchScenarioData(
         { projectId: input.projectId, scenarioId: input.scenarioId, setId, batchRunId },
         input.target,
+        deps,
       );
 
       if (!prefetchResult.success) {

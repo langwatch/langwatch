@@ -38,6 +38,6 @@ export const CHILD_PROCESS = {
 
 /** Scenario defaults */
 export const SCENARIO_DEFAULTS = {
-  /** Default set ID for local scenarios */
-  SET_ID: "local-scenarios",
+  /** Set ID for scenarios run on the LangWatch platform */
+  PLATFORM_SET_ID: "local-scenarios",
 } as const;

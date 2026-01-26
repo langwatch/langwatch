@@ -23,8 +23,97 @@ import {
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
-import { ScenarioFailureHandler } from "./scenario-failure-handler";
+import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
 import { ScenarioService } from "./scenario.service";
+
+// ============================================================================
+// Dependency Interfaces (Dependency Inversion Principle)
+// ============================================================================
+
+/** Minimal interface for scenario lookup in failure handler */
+export interface ScenarioLookup {
+  getById(params: { projectId: string; id: string }): Promise<{
+    name: string;
+    situation: string;
+  } | null>;
+}
+
+/** Minimal interface for failure event emission */
+export interface FailureEmitter {
+  ensureFailureEventsEmitted(params: FailureEventParams): Promise<void>;
+}
+
+/** Dependencies for the scenario processor's failure handling */
+export interface ProcessorDependencies {
+  scenarioLookup: ScenarioLookup;
+  failureEmitter: FailureEmitter;
+}
+
+// ============================================================================
+// Factory Function (wires up production dependencies)
+// ============================================================================
+
+/**
+ * Creates production dependencies for the scenario processor.
+ *
+ * This factory wires up the real implementations:
+ * - ScenarioService for scenario lookup
+ * - ScenarioFailureHandler for failure event emission
+ */
+export function createProcessorDependencies(): ProcessorDependencies {
+  const scenarioService = ScenarioService.create(prisma);
+  const failureHandler = ScenarioFailureHandler.create();
+
+  return {
+    scenarioLookup: {
+      getById: (params) => scenarioService.getById(params),
+    },
+    failureEmitter: {
+      ensureFailureEventsEmitted: (params) =>
+        failureHandler.ensureFailureEventsEmitted(params),
+    },
+  };
+}
+
+// ============================================================================
+// Failure Handling (Single Responsibility)
+// ============================================================================
+
+/**
+ * Handle a failed job result by emitting failure events to Elasticsearch.
+ *
+ * This function is responsible for:
+ * - Fetching scenario metadata (name, description) for the failure event
+ * - Emitting failure events via the failure handler
+ *
+ * Separated from logging concerns to follow Single Responsibility Principle.
+ *
+ * @param jobData - The job data containing project/scenario identifiers
+ * @param error - Optional error message from the failed job
+ * @param deps - Injected dependencies for scenario lookup and failure emission
+ * @internal Exported for testing
+ */
+export async function handleFailedJobResult(
+  jobData: ScenarioJob,
+  error: string | undefined,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  // Fetch scenario to get name and description for the failure event
+  const scenario = await deps.scenarioLookup.getById({
+    projectId: jobData.projectId,
+    id: jobData.scenarioId,
+  });
+
+  await deps.failureEmitter.ensureFailureEventsEmitted({
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    error,
+    name: scenario?.name,
+    description: scenario?.situation,
+  });
+}
 
 const logger = createLogger("langwatch:scenarios:processor");
 
@@ -203,12 +292,12 @@ async function spawnScenarioChildProcess(
  *
  * This should be called from a separate entry point (scenario-worker.ts)
  * to keep scenario processing isolated from the main server.
+ *
+ * @param deps - Optional injected dependencies (defaults to production implementations)
  */
-export function startScenarioProcessor(): Worker<
-  ScenarioJob,
-  ScenarioJobResult,
-  string
-> | undefined {
+export function startScenarioProcessor(
+  deps: ProcessorDependencies = createProcessorDependencies(),
+): Worker<ScenarioJob, ScenarioJobResult, string> | undefined {
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;
@@ -246,23 +335,7 @@ export function startScenarioProcessor(): Worker<
     // so the frontend can show the error instead of timing out
     if (result && !result.success) {
       try {
-        // Fetch scenario to get name and description for the failure event
-        const scenarioService = ScenarioService.create(prisma);
-        const scenario = await scenarioService.getById({
-          projectId: job.data.projectId,
-          id: job.data.scenarioId,
-        });
-
-        const handler = ScenarioFailureHandler.create();
-        await handler.ensureFailureEventsEmitted({
-          projectId: job.data.projectId,
-          scenarioId: job.data.scenarioId,
-          setId: job.data.setId,
-          batchRunId: job.data.batchRunId,
-          error: result.error,
-          name: scenario?.name,
-          description: scenario?.situation,
-        });
+        await handleFailedJobResult(job.data, result.error, deps);
         logger.info(
           { jobId: job.id, scenarioId: job.data.scenarioId },
           "Failure events emitted",

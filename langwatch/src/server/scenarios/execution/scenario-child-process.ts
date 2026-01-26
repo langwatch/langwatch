@@ -23,11 +23,37 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
-import { trace } from "@opentelemetry/api";
+import { trace, type TracerProvider } from "@opentelemetry/api";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData } from "./types";
 import { createModelFromParams } from "./model.factory";
 import { createAdapter } from "./serialized-adapter.registry";
+
+/**
+ * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate.
+ * This interface allows accessing the underlying concrete provider.
+ *
+ * OpenTelemetry's ProxyTracerProvider is used when the SDK hasn't been fully
+ * initialized yet, and it delegates to the real provider once available.
+ * We need the concrete provider to call forceFlush/shutdown methods that
+ * exist on the SDK's TracerProvider but not on the API's TracerProvider interface.
+ */
+interface DelegatingTracerProvider {
+  getDelegate?(): TracerProvider;
+}
+
+/**
+ * Extended TracerProvider interface that includes SDK-level methods.
+ *
+ * The @opentelemetry/api TracerProvider interface is minimal (just getTracer).
+ * The SDK's TracerProvider adds forceFlush/shutdown for lifecycle management.
+ * We use this interface with runtime checks since we can't know at compile time
+ * whether the provider implements these methods.
+ */
+interface FlushableTracerProvider extends TracerProvider {
+  forceFlush?(): Promise<void>;
+  shutdown?(): Promise<void>;
+}
 
 async function main(): Promise<void> {
   const jobData = await readJobDataFromStdin();
@@ -105,16 +131,17 @@ async function flushOtelTraces(): Promise<void> {
   try {
     const provider = trace.getTracerProvider();
 
-    // The provider might be a ProxyTracerProvider wrapping the real one
-    // Try to get the delegate if it exists
-    const concreteProvider = (provider as any).getDelegate?.() ?? provider;
+    // The provider might be a ProxyTracerProvider wrapping the real one.
+    // We need the concrete provider to access forceFlush/shutdown methods.
+    const delegating = provider as DelegatingTracerProvider;
+    const concreteProvider = (delegating.getDelegate?.() ?? provider) as FlushableTracerProvider;
 
     // Try forceFlush first (preferred), then shutdown
-    if (typeof concreteProvider.forceFlush === "function") {
+    if (concreteProvider.forceFlush) {
       console.log("Flushing OTEL traces...");
       await concreteProvider.forceFlush();
       console.log("OTEL traces flushed");
-    } else if (typeof concreteProvider.shutdown === "function") {
+    } else if (concreteProvider.shutdown) {
       console.log("Shutting down OTEL provider...");
       await concreteProvider.shutdown();
       console.log("OTEL provider shutdown complete");
