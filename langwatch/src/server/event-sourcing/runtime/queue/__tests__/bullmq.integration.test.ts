@@ -97,8 +97,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      // Wait a bit for worker to be ready
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("test-payload-1");
 
@@ -129,8 +129,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      // Wait for worker to be fully ready
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("first");
       await processor.send("second");
@@ -172,8 +172,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      // Wait for worker to be fully ready
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       // Send jobs sequentially to ensure they're all queued
       for (const jobId of ["job-1", "job-2", "job-3", "job-4", "job-5"]) {
@@ -209,7 +209,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       const startTime = Date.now();
       await processor.send("delayed-payload");
@@ -248,7 +249,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       // Send same job ID twice - second should replace first if not processed yet
       await processor.send("same-id");
@@ -284,7 +286,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("retry-payload");
 
@@ -310,7 +313,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("failing-payload");
 
@@ -342,7 +346,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("success-1");
       await processor.send("fail");
@@ -371,8 +376,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      // Wait for worker to be ready (worker ready event may fire quickly)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       // Test that processor can send and process jobs (verifies worker is ready)
       await processor.send("test-payload");
@@ -402,7 +407,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       processors.push(processor);
 
       // Wait for worker to be ready
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await processor.waitUntilReady();
 
       await processor.send("in-flight-payload");
 
@@ -437,7 +442,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send("test-payload");
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -462,7 +468,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send(largePayload);
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -485,7 +492,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       await processor.send(specialPayload);
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -518,7 +526,8 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for worker to be ready
+      await processor.waitUntilReady();
 
       // Send multiple jobs with same ID
       await processor.send("first");
