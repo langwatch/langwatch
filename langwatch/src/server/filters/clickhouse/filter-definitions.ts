@@ -1,14 +1,14 @@
 import type { FilterField } from "../types";
-import type { ClickHouseFilterDefinition } from "./types";
 import {
   ATTRIBUTE_KEYS,
-  buildTraceSummariesConditions,
-  buildStoredSpansConditions,
   buildEvaluationStatesConditions,
   buildQueryFilter,
   buildScopeConditions,
+  buildStoredSpansConditions,
+  buildTraceSummariesConditions,
   extractStandardResults,
 } from "./query-helpers";
+import type { ClickHouseFilterDefinition } from "./types";
 
 /**
  * ClickHouse filter definitions for each filter field.
@@ -587,7 +587,7 @@ export const clickHouseFilters: Record<
         return [];
       }
       return [
-        { field: String(Math.ceil(row.min_value)), label: "min", count: 0 },
+        { field: String(Math.floor(row.min_value)), label: "min", count: 0 },
         { field: String(Math.ceil(row.max_value)), label: "max", count: 0 },
       ];
     },
