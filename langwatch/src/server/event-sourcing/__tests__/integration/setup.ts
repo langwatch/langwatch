@@ -65,11 +65,16 @@ export async function setup(): Promise<void> {
 }
 
 /**
- * Global teardown for integration tests.
- * Stops testcontainers after all tests.
+ * Per-file teardown for integration tests.
+ * Closes connections but does NOT flush Redis.
+ *
+ * Important: We don't call cleanupTestData() here because:
+ * 1. Each test uses unique tenant IDs and pipeline names for isolation
+ * 2. Each test's afterEach already cleans up its own data via cleanupTestDataForTenant()
+ * 3. Calling cleanupTestData() without tenantId triggers FLUSHALL which races with
+ *    BullMQ workers that may still be completing (causes "Missing key for job" errors)
  */
 export async function teardown(): Promise<void> {
-  await cleanupTestData();
   await stopTestContainers();
 }
 
