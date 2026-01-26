@@ -1,3 +1,4 @@
+import { generateClickHouseFilterConditions } from "./filter-conditions";
 import type { ClickHouseFilterQueryParams, FilterOption } from "./types";
 
 /**
@@ -82,4 +83,41 @@ export function extractStandardResults(rows: unknown[]): FilterOption[] {
       count: parseInt(row.count, 10),
     }),
   );
+}
+
+/**
+ * Build scope conditions from filter parameters for scoping query results.
+ * Returns SQL fragment and prefixed parameters to avoid collisions.
+ *
+ * @param params - Query parameters including optional scopeFilters
+ * @param scopeParamPrefix - Prefix for parameter names (default: "scope")
+ * @returns Object with sql fragment and prefixed params
+ */
+export function buildScopeConditions(
+  params: ClickHouseFilterQueryParams,
+  scopeParamPrefix: string = "scope",
+): { sql: string; params: Record<string, unknown> } {
+  if (!params.scopeFilters || Object.keys(params.scopeFilters).length === 0) {
+    return { sql: "", params: {} };
+  }
+
+  const result = generateClickHouseFilterConditions(params.scopeFilters);
+
+  if (result.conditions.length === 0) {
+    return { sql: "", params: {} };
+  }
+
+  // Prefix params to avoid collisions with main query params
+  const prefixedParams: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(result.params)) {
+    prefixedParams[`${scopeParamPrefix}_${key}`] = value;
+  }
+
+  // Prefix param references in SQL
+  let sql = result.conditions.join(" AND ");
+  for (const key of Object.keys(result.params)) {
+    sql = sql.replaceAll(`{${key}:`, `{${scopeParamPrefix}_${key}:`);
+  }
+
+  return { sql: `AND ${sql}`, params: prefixedParams };
 }

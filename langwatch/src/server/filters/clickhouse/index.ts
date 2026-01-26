@@ -18,6 +18,7 @@ export {
   buildEvaluationStatesConditions,
   buildQueryFilter,
   extractStandardResults,
+  buildScopeConditions,
 } from "./query-helpers";
 
 // Filter definitions (query builders for filter options)

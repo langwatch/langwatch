@@ -198,4 +198,57 @@ describe("generateClickHouseFilterConditions", () => {
     expect(paramKeys).toContain("f0_values");
     expect(paramKeys).toContain("f1_values");
   });
+
+  describe("two-level nested filters", () => {
+    it("handles key -> subkey -> values nesting", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        "events.metrics.value": {
+          purchase: {
+            amount: ["0", "100"],
+          },
+        },
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.conditions.length).toBe(1);
+      expect(result.params).toHaveProperty("f0_key", "purchase");
+      expect(result.params).toHaveProperty("f0_attrkey", "event.metrics.amount");
+      expect(result.params).toHaveProperty("f0_min");
+      expect(result.params).toHaveProperty("f0_max");
+    });
+
+    it("handles multiple keys at same level", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        "events.metrics.value": {
+          purchase: {
+            amount: ["0", "100"],
+          },
+          signup: {
+            duration: ["0", "5000"],
+          },
+        },
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.conditions.length).toBe(1);
+      expect(result.conditions[0]).toContain(" OR ");
+      // Should have params for both nested conditions
+      expect(
+        Object.keys(result.params).filter((k) => k.includes("_key")).length,
+      ).toBe(2);
+    });
+
+    it("handles single nested condition without wrapping in extra parens", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        "evaluations.score": {
+          "eval-1": ["0.5", "0.9"],
+        },
+      };
+      const result = generateClickHouseFilterConditions(filters);
+
+      expect(result.conditions.length).toBe(1);
+      // Single condition should not have extra OR wrapping
+      expect(result.conditions[0]).not.toContain(" OR ");
+    });
+  });
 });

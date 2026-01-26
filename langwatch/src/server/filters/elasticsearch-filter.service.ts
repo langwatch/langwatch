@@ -13,6 +13,8 @@ export type FilterOption = {
   count: number;
 };
 
+import type { FilterParam } from "~/hooks/useFilterParams";
+
 export type GetFilterOptionsInput = {
   projectId: string;
   field: FilterField;
@@ -22,6 +24,8 @@ export type GetFilterOptionsInput = {
   startDate: number;
   endDate: number;
   pivotIndexConditions: any;
+  /** Optional filters for scoping ClickHouse results to a subset of traces */
+  scopeFilters?: Partial<Record<FilterField, FilterParam>>;
 };
 
 /**

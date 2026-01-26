@@ -265,6 +265,81 @@ export const clickHouseFilterConditions: Record<
 };
 
 /**
+ * Recursively collects ClickHouse WHERE conditions from nested filter parameters.
+ * Mirrors the Elasticsearch collectConditions pattern in common.ts.
+ *
+ * @param field - The filter field being processed
+ * @param params - Filter params: string[] | Record<string, ...> | Record<string, Record<string, ...>>
+ * @param keys - Accumulated keys from parent levels [key, subkey, ...]
+ * @param paramCounter - Mutable counter for unique parameter IDs
+ * @param allParams - Accumulated query parameters
+ * @returns Object with conditions array and unsupported filter flag
+ */
+function collectClickHouseConditions(
+  field: FilterField,
+  params: string[] | Record<string, unknown>,
+  keys: string[],
+  paramCounter: { value: number },
+  allParams: Record<string, unknown>,
+): { conditions: string[]; hasUnsupported: boolean } {
+  const key = keys[0];
+  const subkey = keys[1];
+  const conditionBuilder = clickHouseFilterConditions[field];
+
+  // BASE CASE: params is an array of values (leaf node)
+  if (Array.isArray(params)) {
+    if (params.length === 0) {
+      return { conditions: [], hasUnsupported: false };
+    }
+
+    if (!conditionBuilder) {
+      return { conditions: [], hasUnsupported: true };
+    }
+
+    const paramId = `f${paramCounter.value++}`;
+    const result = conditionBuilder(params, paramId, key, subkey);
+    Object.assign(allParams, result.params);
+
+    return { conditions: [result.sql], hasUnsupported: false };
+  }
+
+  // RECURSIVE CASE: params is a nested object
+  if (typeof params === "object" && params !== null) {
+    const nestedConditions: string[] = [];
+    let hasUnsupported = false;
+
+    for (const [nextKey, nextValue] of Object.entries(params)) {
+      const result = collectClickHouseConditions(
+        field,
+        nextValue as string[] | Record<string, unknown>,
+        [...keys, nextKey], // Accumulate keys as we recurse
+        paramCounter,
+        allParams,
+      );
+
+      if (result.hasUnsupported) hasUnsupported = true;
+      nestedConditions.push(...result.conditions);
+    }
+
+    if (nestedConditions.length === 0) {
+      return { conditions: [], hasUnsupported };
+    }
+
+    // OR together conditions at this level
+    if (nestedConditions.length === 1) {
+      return { conditions: nestedConditions, hasUnsupported };
+    }
+
+    return {
+      conditions: [`(${nestedConditions.join(" OR ")})`],
+      hasUnsupported,
+    };
+  }
+
+  return { conditions: [], hasUnsupported: false };
+}
+
+/**
  * Generate ClickHouse WHERE conditions from filter parameters.
  * Returns SQL condition strings and aggregated parameters for parameterized queries.
  *
@@ -276,8 +351,8 @@ export function generateClickHouseFilterConditions(
 ): GenerateFilterConditionsResult {
   const conditions: string[] = [];
   const allParams: Record<string, unknown> = {};
+  const paramCounter = { value: 0 };
   let hasUnsupportedFilters = false;
-  let paramCounter = 0;
 
   for (const [field, filterParams] of Object.entries(filters)) {
     if (
@@ -296,29 +371,17 @@ export function generateClickHouseFilterConditions(
       continue;
     }
 
-    // Handle simple array filters
-    if (Array.isArray(filterParams)) {
-      const paramId = `f${paramCounter++}`;
-      const result = conditionBuilder(filterParams, paramId);
-      conditions.push(result.sql);
-      Object.assign(allParams, result.params);
-    }
-    // Handle nested filters (key -> values)
-    else if (typeof filterParams === "object") {
-      // For nested filters, we need to OR together the conditions for each key
-      const nestedConditions: string[] = [];
-      for (const [key, values] of Object.entries(filterParams)) {
-        if (Array.isArray(values) && values.length > 0) {
-          const paramId = `f${paramCounter++}`;
-          const result = conditionBuilder(values, paramId, key);
-          nestedConditions.push(result.sql);
-          Object.assign(allParams, result.params);
-        }
-      }
-      if (nestedConditions.length > 0) {
-        conditions.push(`(${nestedConditions.join(" OR ")})`);
-      }
-    }
+    // Use recursive helper to handle any nesting depth
+    const result = collectClickHouseConditions(
+      filterField,
+      filterParams,
+      [], // Start with empty keys array
+      paramCounter,
+      allParams,
+    );
+
+    if (result.hasUnsupported) hasUnsupportedFilters = true;
+    conditions.push(...result.conditions);
   }
 
   return { conditions, params: allParams, hasUnsupportedFilters };

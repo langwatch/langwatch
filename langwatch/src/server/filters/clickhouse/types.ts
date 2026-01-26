@@ -7,6 +7,9 @@ export type FilterConditionResult = {
   params: Record<string, unknown>;
 };
 
+import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterField } from "../types";
+
 export type ClickHouseFilterQueryParams = {
   tenantId: string;
   query?: string;
@@ -14,6 +17,8 @@ export type ClickHouseFilterQueryParams = {
   subkey?: string;
   startDate: number;
   endDate: number;
+  /** Optional filters for scoping results to a subset of traces */
+  scopeFilters?: Partial<Record<FilterField, FilterParam>>;
 };
 
 export type FilterOption = {

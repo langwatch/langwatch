@@ -94,6 +94,7 @@ export class FilterServiceFacade {
               subkey: input.subkey,
               startDate: input.startDate,
               endDate: input.endDate,
+              scopeFilters: input.scopeFilters,
             },
           );
 

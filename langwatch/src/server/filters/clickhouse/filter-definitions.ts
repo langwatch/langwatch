@@ -6,6 +6,7 @@ import {
   buildStoredSpansConditions,
   buildEvaluationStatesConditions,
   buildQueryFilter,
+  buildScopeConditions,
   extractStandardResults,
 } from "./query-helpers";
 
@@ -21,139 +22,167 @@ export const clickHouseFilters: Record<
   // Topics filters
   "topics.topics": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        TopicId as field,
-        TopicId as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-        AND TopicId IS NOT NULL
-        AND TopicId != ''
-        ${buildQueryFilter("TopicId", params)}
-      GROUP BY TopicId
-      ORDER BY TopicId ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          TopicId as field,
+          TopicId as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.TopicId IS NOT NULL
+          AND ts.TopicId != ''
+          ${buildQueryFilter("ts.TopicId", params)}
+          ${scopeSql}
+        GROUP BY TopicId
+        ORDER BY TopicId ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "topics.subtopics": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        SubTopicId as field,
-        SubTopicId as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-        AND SubTopicId IS NOT NULL
-        AND SubTopicId != ''
-        ${buildQueryFilter("SubTopicId", params)}
-      GROUP BY SubTopicId
-      ORDER BY SubTopicId ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          SubTopicId as field,
+          SubTopicId as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.SubTopicId IS NOT NULL
+          AND ts.SubTopicId != ''
+          ${buildQueryFilter("ts.SubTopicId", params)}
+          ${scopeSql}
+        GROUP BY SubTopicId
+        ORDER BY SubTopicId ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   // Metadata filters
   "metadata.user_id": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        ${ATTRIBUTE_KEYS.user_id} as field,
-        ${ATTRIBUTE_KEYS.user_id} as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-        AND ${ATTRIBUTE_KEYS.user_id} != ''
-        ${buildQueryFilter(ATTRIBUTE_KEYS.user_id, params)}
-      GROUP BY field
-      ORDER BY field ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          ts.${ATTRIBUTE_KEYS.user_id} as field,
+          ts.${ATTRIBUTE_KEYS.user_id} as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.${ATTRIBUTE_KEYS.user_id} != ''
+          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.user_id}`, params)}
+          ${scopeSql}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "metadata.thread_id": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        ${ATTRIBUTE_KEYS.thread_id} as field,
-        ${ATTRIBUTE_KEYS.thread_id} as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-        AND ${ATTRIBUTE_KEYS.thread_id} != ''
-        ${buildQueryFilter(ATTRIBUTE_KEYS.thread_id, params)}
-      GROUP BY field
-      ORDER BY field ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          ts.${ATTRIBUTE_KEYS.thread_id} as field,
+          ts.${ATTRIBUTE_KEYS.thread_id} as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.${ATTRIBUTE_KEYS.thread_id} != ''
+          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.thread_id}`, params)}
+          ${scopeSql}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "metadata.customer_id": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        ${ATTRIBUTE_KEYS.customer_id} as field,
-        ${ATTRIBUTE_KEYS.customer_id} as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-        AND ${ATTRIBUTE_KEYS.customer_id} != ''
-        ${buildQueryFilter(ATTRIBUTE_KEYS.customer_id, params)}
-      GROUP BY field
-      ORDER BY field ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          ts.${ATTRIBUTE_KEYS.customer_id} as field,
+          ts.${ATTRIBUTE_KEYS.customer_id} as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.${ATTRIBUTE_KEYS.customer_id} != ''
+          ${buildQueryFilter(`ts.${ATTRIBUTE_KEYS.customer_id}`, params)}
+          ${scopeSql}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "metadata.labels": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        trim(BOTH '"' FROM label) as field,
-        trim(BOTH '"' FROM label) as label,
-        count() as count
-      FROM (
-        SELECT arrayJoin(JSONExtractArrayRaw(Attributes['langwatch.labels'])) as label
-        FROM trace_summaries FINAL
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND Attributes['langwatch.labels'] != ''
-          AND Attributes['langwatch.labels'] != '[]'
-      )
-      WHERE label != '' AND label != 'null'
-        ${params.query ? `AND lower(trim(BOTH '"' FROM label)) LIKE lower(concat({query:String}, '%'))` : ""}
-      GROUP BY label
-      ORDER BY label ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          trim(BOTH '"' FROM label) as field,
+          trim(BOTH '"' FROM label) as label,
+          count() as count
+        FROM (
+          SELECT arrayJoin(JSONExtractArrayRaw(ts.Attributes['langwatch.labels'])) as label
+          FROM trace_summaries ts FINAL
+          WHERE ${buildTraceSummariesConditions(params)}
+            AND ts.Attributes['langwatch.labels'] != ''
+            AND ts.Attributes['langwatch.labels'] != '[]'
+            ${scopeSql}
+        )
+        WHERE label != '' AND label != 'null'
+          ${params.query ? `AND lower(trim(BOTH '"' FROM label)) LIKE lower(concat({query:String}, '%'))` : ""}
+        GROUP BY label
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "metadata.key": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        replaceAll(key, '.', '·') as field,
-        key as label,
-        count() as count
-      FROM (
-        SELECT arrayJoin(mapKeys(Attributes)) as key
-        FROM trace_summaries FINAL
-        WHERE ${buildTraceSummariesConditions(params)}
-      )
-      WHERE NOT startsWith(key, 'langwatch.')
-        AND NOT startsWith(key, 'gen_ai.')
-        ${buildQueryFilter("key", params)}
-      GROUP BY key
-      ORDER BY key ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          replaceAll(key, '.', '·') as field,
+          key as label,
+          count() as count
+        FROM (
+          SELECT arrayJoin(mapKeys(ts.Attributes)) as key
+          FROM trace_summaries ts FINAL
+          WHERE ${buildTraceSummariesConditions(params)}
+            ${scopeSql}
+        )
+        WHERE NOT startsWith(key, 'langwatch.')
+          AND NOT startsWith(key, 'gen_ai.')
+          ${buildQueryFilter("key", params)}
+        GROUP BY key
+        ORDER BY key ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
@@ -163,17 +192,19 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
       // Note: The key parameter is passed via query_params as {key:String}
       // We convert the dot-encoded key back in the service layer before passing it
       return `
         SELECT
-          Attributes[{key:String}] as field,
-          Attributes[{key:String}] as label,
+          ts.Attributes[{key:String}] as field,
+          ts.Attributes[{key:String}] as label,
           count() as count
-        FROM trace_summaries FINAL
+        FROM trace_summaries ts FINAL
         WHERE ${buildTraceSummariesConditions(params)}
-          AND Attributes[{key:String}] != ''
-          ${params.query ? `AND lower(Attributes[{key:String}]) LIKE lower(concat({query:String}, '%'))` : ""}
+          AND ts.Attributes[{key:String}] != ''
+          ${params.query ? `AND lower(ts.Attributes[{key:String}]) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeSql}
         GROUP BY field
         ORDER BY field ASC
         LIMIT 10000
@@ -184,132 +215,167 @@ export const clickHouseFilters: Record<
 
   "metadata.prompt_ids": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        trim(BOTH '"' FROM prompt_id) as field,
-        trim(BOTH '"' FROM prompt_id) as label,
-        count() as count
-      FROM (
-        SELECT arrayJoin(JSONExtractArrayRaw(Attributes['langwatch.prompt_ids'])) as prompt_id
-        FROM trace_summaries FINAL
-        WHERE ${buildTraceSummariesConditions(params)}
-          AND Attributes['langwatch.prompt_ids'] != ''
-          AND Attributes['langwatch.prompt_ids'] != '[]'
-      )
-      WHERE prompt_id != '' AND prompt_id != 'null'
-        ${params.query ? `AND lower(trim(BOTH '"' FROM prompt_id)) LIKE lower(concat({query:String}, '%'))` : ""}
-      GROUP BY prompt_id
-      ORDER BY prompt_id ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          trim(BOTH '"' FROM prompt_id) as field,
+          trim(BOTH '"' FROM prompt_id) as label,
+          count() as count
+        FROM (
+          SELECT arrayJoin(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids'])) as prompt_id
+          FROM trace_summaries ts FINAL
+          WHERE ${buildTraceSummariesConditions(params)}
+            AND ts.Attributes['langwatch.prompt_ids'] != ''
+            AND ts.Attributes['langwatch.prompt_ids'] != '[]'
+            ${scopeSql}
+        )
+        WHERE prompt_id != '' AND prompt_id != 'null'
+          ${params.query ? `AND lower(trim(BOTH '"' FROM prompt_id)) LIKE lower(concat({query:String}, '%'))` : ""}
+        GROUP BY prompt_id
+        ORDER BY prompt_id ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   // Trace filters
   "traces.error": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        if(ContainsErrorStatus, 'true', 'false') as field,
-        if(ContainsErrorStatus, 'Traces with error', 'Traces without error') as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-      GROUP BY ContainsErrorStatus
-      ORDER BY field ASC
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          if(ts.ContainsErrorStatus, 'true', 'false') as field,
+          if(ts.ContainsErrorStatus, 'Traces with error', 'Traces without error') as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          ${scopeSql}
+        GROUP BY ts.ContainsErrorStatus
+        ORDER BY field ASC
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   // Span filters
   "spans.type": {
     tableName: "stored_spans",
-    buildQuery: (params) => `
-      SELECT
-        SpanAttributes['langwatch.span.type'] as field,
-        SpanAttributes['langwatch.span.type'] as label,
-        count() as count
-      FROM stored_spans FINAL
-      WHERE ${buildStoredSpansConditions(params)}
-        AND SpanAttributes['langwatch.span.type'] != ''
-        ${buildQueryFilter("SpanAttributes['langwatch.span.type']", params)}
-      GROUP BY field
-      ORDER BY field ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      // Note: stored_spans doesn't have scope conditions since it needs trace join
+      return `
+        SELECT
+          SpanAttributes['langwatch.span.type'] as field,
+          SpanAttributes['langwatch.span.type'] as label,
+          count() as count
+        FROM stored_spans FINAL
+        WHERE ${buildStoredSpansConditions(params)}
+          AND SpanAttributes['langwatch.span.type'] != ''
+          ${buildQueryFilter("SpanAttributes['langwatch.span.type']", params)}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "spans.model": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        model as field,
-        model as label,
-        count() as count
-      FROM (
-        SELECT arrayJoin(Models) as model
-        FROM trace_summaries FINAL
-        WHERE ${buildTraceSummariesConditions(params)}
-      )
-      WHERE model != ''
-        ${buildQueryFilter("model", params)}
-      GROUP BY model
-      ORDER BY model ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          model as field,
+          model as label,
+          count() as count
+        FROM (
+          SELECT arrayJoin(ts.Models) as model
+          FROM trace_summaries ts FINAL
+          WHERE ${buildTraceSummariesConditions(params)}
+            ${scopeSql}
+        )
+        WHERE model != ''
+          ${buildQueryFilter("model", params)}
+        GROUP BY model
+        ORDER BY model ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   // Annotation filters
   "annotations.hasAnnotation": {
     tableName: "trace_summaries",
-    buildQuery: (params) => `
-      SELECT
-        if(HasAnnotation = true, 'true', 'false') as field,
-        if(HasAnnotation = true, 'Has Annotation', 'No Annotation') as label,
-        count() as count
-      FROM trace_summaries FINAL
-      WHERE ${buildTraceSummariesConditions(params)}
-      GROUP BY HasAnnotation
-      ORDER BY field DESC
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          if(ts.HasAnnotation = true, 'true', 'false') as field,
+          if(ts.HasAnnotation = true, 'Has Annotation', 'No Annotation') as label,
+          count() as count
+        FROM trace_summaries ts FINAL
+        WHERE ${buildTraceSummariesConditions(params)}
+          ${scopeSql}
+        GROUP BY ts.HasAnnotation
+        ORDER BY field DESC
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   // Evaluation filters - using evaluation_states table
+  // Note: evaluation_states filters require a join with trace_summaries for scope conditions
+  // For now, we'll add scope via a subquery when scopeFilters are present
   "evaluations.evaluator_id": {
     tableName: "evaluation_states",
-    buildQuery: (params) => `
-      SELECT
-        EvaluatorId as field,
-        if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
-        count() as count
-      FROM evaluation_states FINAL
-      WHERE ${buildEvaluationStatesConditions(params)}
-        ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
-      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-      ORDER BY label ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
   "evaluations.evaluator_id.guardrails_only": {
     tableName: "evaluation_states",
-    buildQuery: (params) => `
-      SELECT
-        EvaluatorId as field,
-        if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
-        count() as count
-      FROM evaluation_states FINAL
-      WHERE ${buildEvaluationStatesConditions(params)}
-        AND IsGuardrail = 1
-        ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
-      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-      ORDER BY label ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_states FINAL
+        WHERE ${buildEvaluationStatesConditions(params)}
+          AND IsGuardrail = 1
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
@@ -319,6 +385,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           if(Passed = 1, 'true', 'false') as field,
@@ -328,6 +398,7 @@ export const clickHouseFilters: Record<
         WHERE ${buildEvaluationStatesConditions(params)}
           AND EvaluatorId = {key:String}
           AND Passed IS NOT NULL
+          ${scopeJoin}
         GROUP BY Passed
         ORDER BY field DESC
       `;
@@ -341,6 +412,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           min(Score) as min_score,
@@ -349,6 +424,7 @@ export const clickHouseFilters: Record<
         WHERE ${buildEvaluationStatesConditions(params)}
           AND EvaluatorId = {key:String}
           AND Score IS NOT NULL
+          ${scopeJoin}
       `;
     },
     extractResults: (rows: unknown[]) => {
@@ -371,6 +447,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           Status as field,
@@ -380,6 +460,7 @@ export const clickHouseFilters: Record<
         WHERE ${buildEvaluationStatesConditions(params)}
           AND EvaluatorId = {key:String}
           AND Status NOT IN ('succeeded', 'failed')
+          ${scopeJoin}
         GROUP BY Status
         ORDER BY Status ASC
         LIMIT 10000
@@ -394,6 +475,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           Label as field,
@@ -406,6 +491,7 @@ export const clickHouseFilters: Record<
           AND Label != ''
           AND Label NOT IN ('succeeded', 'failed')
           ${params.query ? `AND lower(Label) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
         GROUP BY Label
         ORDER BY Label ASC
         LIMIT 10000
@@ -415,21 +501,29 @@ export const clickHouseFilters: Record<
   },
 
   // Event filters - using stored_spans table with span attributes
+  // Note: stored_spans filters require a join with trace_summaries for scope conditions
   "events.event_type": {
     tableName: "stored_spans",
-    buildQuery: (params) => `
-      SELECT
-        SpanAttributes['event.type'] as field,
-        SpanAttributes['event.type'] as label,
-        count() as count
-      FROM stored_spans FINAL
-      WHERE ${buildStoredSpansConditions(params)}
-        AND SpanAttributes['event.type'] != ''
-        ${params.query ? `AND lower(SpanAttributes['event.type']) LIKE lower(concat({query:String}, '%'))` : ""}
-      GROUP BY field
-      ORDER BY field ASC
-      LIMIT 10000
-    `,
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          SpanAttributes['event.type'] as field,
+          SpanAttributes['event.type'] as label,
+          count() as count
+        FROM stored_spans FINAL
+        WHERE ${buildStoredSpansConditions(params)}
+          AND SpanAttributes['event.type'] != ''
+          ${params.query ? `AND lower(SpanAttributes['event.type']) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
     extractResults: extractStandardResults,
   },
 
@@ -439,6 +533,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.metrics.'), mapKeys(SpanAttributes))) as full_key,
@@ -448,6 +546,7 @@ export const clickHouseFilters: Record<
         FROM stored_spans FINAL
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
+          ${scopeJoin}
         GROUP BY full_key
         HAVING field != ''
           ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}
@@ -464,6 +563,10 @@ export const clickHouseFilters: Record<
       if (!params.key || !params.subkey) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       // Note: subkey is passed via query_params, we construct the full attribute key there
       return `
         SELECT
@@ -473,6 +576,7 @@ export const clickHouseFilters: Record<
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
           AND SpanAttributes[concat('event.metrics.', {subkey:String})] != ''
+          ${scopeJoin}
       `;
     },
     extractResults: (rows: unknown[]) => {
@@ -495,6 +599,10 @@ export const clickHouseFilters: Record<
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
       }
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           arrayJoin(arrayFilter(k -> startsWith(k, 'event.details.'), mapKeys(SpanAttributes))) as full_key,
@@ -504,6 +612,7 @@ export const clickHouseFilters: Record<
         FROM stored_spans FINAL
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['event.type'] = {key:String}
+          ${scopeJoin}
         GROUP BY full_key
         HAVING field != ''
           ${params.query ? `AND lower(field) LIKE lower(concat({query:String}, '%'))` : ""}

@@ -4,11 +4,13 @@ import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type ClickHouseFilterQueryParams,
   clickHouseFilters,
   type FilterOption,
   type SupportedClickHouseFilterDefinition,
+  buildScopeConditions,
 } from "./clickhouse";
 import type { FilterField } from "./types";
 
@@ -93,12 +95,17 @@ export class ClickHouseFilterService {
    *
    * Returns null if:
    * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
    * - The filter field is not supported in ClickHouse
+   *
+   * Note: The caller (FilterServiceFacade) is responsible for checking
+   * if ClickHouse is enabled for the project before calling this method.
+   *
+   * Note: Unlike Elasticsearch, ClickHouse filter options currently scope
+   * results using the filters parameter when provided.
    *
    * @param projectId - The project ID
    * @param field - The filter field to query
-   * @param options - Query options (query string, key, subkey, date range)
+   * @param options - Query options (query string, key, subkey, date range, scope filters)
    * @returns Array of filter options, or null if not supported
    */
   async getFilterOptions(
@@ -110,6 +117,7 @@ export class ClickHouseFilterService {
       subkey?: string;
       startDate: number;
       endDate: number;
+      scopeFilters?: Partial<Record<FilterField, FilterParam>>;
     },
   ): Promise<FilterOption[] | null> {
     return await this.tracer.withActiveSpan(
@@ -145,12 +153,22 @@ export class ClickHouseFilterService {
             subkey: options.subkey,
             startDate: options.startDate,
             endDate: options.endDate,
+            scopeFilters: options.scopeFilters,
           };
 
           const sqlQuery = filterDef.buildQuery(queryParams);
 
+          // Get scope params to merge with base params
+          const { params: scopeParams } = buildScopeConditions(queryParams);
+
           this.logger.debug(
-            { projectId, field, query: options.query },
+            {
+              projectId,
+              field,
+              hasQuery: !!options.query,
+              queryLength: options.query?.length ?? 0,
+              hasScopeFilters: !!options.scopeFilters && Object.keys(options.scopeFilters).length > 0,
+            },
             "Executing ClickHouse filter query",
           );
 
@@ -168,6 +186,7 @@ export class ClickHouseFilterService {
               subkey: actualSubkey,
               startDate: options.startDate,
               endDate: options.endDate,
+              ...scopeParams, // Merge scope params
             },
             format: "JSONEachRow",
           });
