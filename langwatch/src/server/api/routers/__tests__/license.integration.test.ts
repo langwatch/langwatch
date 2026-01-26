@@ -194,10 +194,11 @@ describe("License Router Integration", () => {
       expect(status.hasLicense).toBe(false);
     });
 
-    it("throws NOT_FOUND for non-existent organization", async () => {
+    it("throws UNAUTHORIZED for non-existent organization", async () => {
+      // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
         adminCaller.license.getStatus({ organizationId: "non-existent-org-id" })
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("throws error for empty organizationId", async () => {
@@ -257,22 +258,24 @@ describe("License Router Integration", () => {
       ).rejects.toThrow();
     });
 
-    it("throws FORBIDDEN when member tries to upload", async () => {
+    it("throws UNAUTHORIZED when member tries to upload", async () => {
+      // Member has organization:view but not organization:manage, so permission check throws UNAUTHORIZED
       await expect(
         memberCaller.license.upload({
           organizationId,
           licenseKey: VALID_LICENSE_KEY,
         })
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
-    it("throws NOT_FOUND for non-existent organization", async () => {
+    it("throws UNAUTHORIZED for non-existent organization", async () => {
+      // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
         adminCaller.license.upload({
           organizationId: "non-existent-org-id",
           licenseKey: VALID_LICENSE_KEY,
         })
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 
@@ -312,16 +315,18 @@ describe("License Router Integration", () => {
       expect(result.removed).toBe(true);
     });
 
-    it("throws FORBIDDEN when member tries to remove", async () => {
+    it("throws UNAUTHORIZED when member tries to remove", async () => {
+      // Member has organization:view but not organization:manage, so permission check throws UNAUTHORIZED
       await expect(
         memberCaller.license.remove({ organizationId })
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
-    it("throws NOT_FOUND for non-existent organization", async () => {
+    it("throws UNAUTHORIZED for non-existent organization", async () => {
+      // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
         adminCaller.license.remove({ organizationId: "non-existent-org-id" })
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 });
