@@ -71,14 +71,14 @@ export default function IndividualScenarioRunPage() {
       }
 
       try {
-        await runScenario(scenarioId, target);
+        await runScenario(scenarioId, target, scenarioSetId);
       } catch (error) {
         console.error("Failed to run scenario:", error);
       }
 
       setRunModalOpen(false);
     },
-    [scenarioId, persistTarget, runScenario],
+    [scenarioId, scenarioSetId, persistTarget, runScenario],
   );
 
   // Handle "Run Again" button click
