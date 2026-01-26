@@ -11,30 +11,35 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "../db";
 import type { FilterField } from "../filters/types";
-import type { ElasticSearchEvent } from "../tracer/types";
-import type { SharedFiltersInput } from "./types";
+import type {
+  TimeseriesResult,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+  AnalyticsBackend,
+} from "./types";
 import type { TimeseriesInputType } from "./registry";
-import {
-  type TimeseriesResult,
-  type FilterDataResult,
-  type TopDocumentsResult,
-  type FeedbacksResult,
-  getElasticsearchAnalyticsService,
-} from "./elasticsearch-analytics.service";
+import { getElasticsearchAnalyticsService } from "./elasticsearch-analytics.service";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
+import { AnalyticsComparator, getAnalyticsComparator } from "./analytics-comparator";
 import { createLogger } from "../../utils/logger";
-import { env } from "../../env.mjs";
-
-const logger = createLogger("langwatch:analytics:service");
 
 /**
- * Comparison mode result for debugging
+ * Configuration for comparison mode
  */
-interface ComparisonResult<T> {
-  result: T;
-  esResult?: T;
-  chResult?: T;
-  discrepancies?: string[];
+export interface AnalyticsServiceConfig {
+  comparisonModeEnabled?: boolean;
+}
+
+/**
+ * Dependencies required by AnalyticsService
+ */
+export interface AnalyticsServiceDependencies {
+  esService: AnalyticsBackend;
+  chService: AnalyticsBackend;
+  prisma: PrismaClient;
+  comparator?: AnalyticsComparator;
+  config?: AnalyticsServiceConfig;
 }
 
 /**
@@ -49,13 +54,19 @@ interface ComparisonResult<T> {
  */
 export class AnalyticsService {
   private readonly prisma: PrismaClient;
-  private readonly esService = getElasticsearchAnalyticsService();
-  private readonly chService = getClickHouseAnalyticsService();
+  private readonly esService: AnalyticsBackend;
+  private readonly chService: AnalyticsBackend;
+  private readonly comparator: AnalyticsComparator;
+  private readonly config: AnalyticsServiceConfig;
   private readonly logger = createLogger("langwatch:analytics:service");
   private readonly tracer = getLangWatchTracer("langwatch.analytics.service");
 
-  constructor(prisma: PrismaClient = defaultPrisma) {
-    this.prisma = prisma;
+  constructor(deps: AnalyticsServiceDependencies) {
+    this.esService = deps.esService;
+    this.chService = deps.chService;
+    this.prisma = deps.prisma;
+    this.comparator = deps.comparator ?? getAnalyticsComparator();
+    this.config = deps.config ?? {};
   }
 
   /**
@@ -88,7 +99,7 @@ export class AnalyticsService {
    * Comparison mode runs both ES and CH queries and logs discrepancies
    */
   isComparisonModeEnabled(): boolean {
-    return env.ANALYTICS_COMPARISON_MODE === "true";
+    return this.config.comparisonModeEnabled ?? false;
   }
 
   /**
@@ -118,7 +129,7 @@ export class AnalyticsService {
             chResult.status === "fulfilled" ? chResult.value : undefined;
 
           if (esData && chData) {
-            this.logDiscrepancies("getTimeseries", input, esData, chData);
+            this.comparator.compare("getTimeseries", input, esData, chData);
           } else {
             if (esResult.status === "rejected") {
               this.logger.error(
@@ -201,6 +212,7 @@ export class AnalyticsService {
               field,
               startDate,
               endDate,
+              filters,
               key,
               subkey,
               searchQuery,
@@ -213,7 +225,7 @@ export class AnalyticsService {
             chResult.status === "fulfilled" ? chResult.value : undefined;
 
           if (esData && chData) {
-            this.logDiscrepancies(
+            this.comparator.compare(
               "getDataForFilter",
               { projectId, field, startDate, endDate },
               esData,
@@ -236,6 +248,7 @@ export class AnalyticsService {
             field,
             startDate,
             endDate,
+            filters,
             key,
             subkey,
             searchQuery,
@@ -303,7 +316,7 @@ export class AnalyticsService {
             chResult.status === "fulfilled" ? chResult.value : undefined;
 
           if (esData && chData) {
-            this.logDiscrepancies(
+            this.comparator.compare(
               "getTopUsedDocuments",
               { projectId, startDate, endDate },
               esData,
@@ -376,7 +389,7 @@ export class AnalyticsService {
             chResult.status === "fulfilled" ? chResult.value : undefined;
 
           if (esData && chData) {
-            this.logDiscrepancies(
+            this.comparator.compare(
               "getFeedbacks",
               { projectId, startDate, endDate },
               esData,
@@ -400,150 +413,24 @@ export class AnalyticsService {
       },
     );
   }
+}
 
-  /**
-   * Log discrepancies between ES and CH results
-   */
-  private logDiscrepancies<T>(
-    operation: string,
-    input: unknown,
-    esResult: T,
-    chResult: T,
-  ): void {
-    const discrepancies = this.findDiscrepancies(esResult, chResult);
-
-    if (discrepancies.length > 0) {
-      this.logger.warn(
-        {
-          operation,
-          input,
-          discrepancyCount: discrepancies.length,
-          discrepancies: discrepancies.slice(0, 10), // Limit logged discrepancies
-          esResultSample: this.summarize(esResult),
-          chResultSample: this.summarize(chResult),
-        },
-        "Analytics comparison mode: discrepancies found between ES and CH",
-      );
-    } else {
-      this.logger.debug(
-        { operation },
-        "Analytics comparison mode: ES and CH results match",
-      );
-    }
-  }
-
-  /**
-   * Find discrepancies between two results
-   */
-  private findDiscrepancies<T>(esResult: T, chResult: T): string[] {
-    const discrepancies: string[] = [];
-
-    // For timeseries results, compare bucket counts and values
-    if (this.isTimeseriesResult(esResult) && this.isTimeseriesResult(chResult)) {
-      if (
-        esResult.currentPeriod.length !== chResult.currentPeriod.length
-      ) {
-        discrepancies.push(
-          `Current period bucket count: ES=${esResult.currentPeriod.length}, CH=${chResult.currentPeriod.length}`,
-        );
-      }
-
-      // Compare values within a tolerance
-      for (let i = 0; i < Math.min(esResult.currentPeriod.length, chResult.currentPeriod.length); i++) {
-        const esBucket = esResult.currentPeriod[i];
-        const chBucket = chResult.currentPeriod[i];
-
-        if (!esBucket || !chBucket) continue;
-
-        for (const key of Object.keys(esBucket)) {
-          if (key === "date") continue;
-
-          const esValue = esBucket[key];
-          const chValue = chBucket[key];
-
-          if (typeof esValue === "number" && typeof chValue === "number") {
-            const tolerance = Math.max(Math.abs(esValue * 0.05), 1); // 5% or 1
-            if (Math.abs(esValue - chValue) > tolerance) {
-              discrepancies.push(
-                `Bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`,
-              );
-            }
-          }
-        }
-      }
-    }
-
-    // For filter data results, compare option counts
-    if (this.isFilterDataResult(esResult) && this.isFilterDataResult(chResult)) {
-      if (esResult.options.length !== chResult.options.length) {
-        discrepancies.push(
-          `Option count: ES=${esResult.options.length}, CH=${chResult.options.length}`,
-        );
-      }
-
-      // Compare counts for matching fields
-      const esOptionMap = new Map(
-        esResult.options.map((o) => [o.field, o.count]),
-      );
-      for (const chOption of chResult.options) {
-        const esCount = esOptionMap.get(chOption.field);
-        if (esCount !== undefined) {
-          const tolerance = Math.max(Math.abs(esCount * 0.05), 1);
-          if (Math.abs(esCount - chOption.count) > tolerance) {
-            discrepancies.push(
-              `Option ${chOption.field}: ES=${esCount}, CH=${chOption.count}`,
-            );
-          }
-        }
-      }
-    }
-
-    return discrepancies;
-  }
-
-  /**
-   * Type guard for timeseries results
-   */
-  private isTimeseriesResult(value: unknown): value is TimeseriesResult {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      "currentPeriod" in value &&
-      "previousPeriod" in value
-    );
-  }
-
-  /**
-   * Type guard for filter data results
-   */
-  private isFilterDataResult(value: unknown): value is FilterDataResult {
-    return (
-      typeof value === "object" &&
-      value !== null &&
-      "options" in value &&
-      Array.isArray((value as FilterDataResult).options)
-    );
-  }
-
-  /**
-   * Summarize a result for logging
-   */
-  private summarize<T>(result: T): unknown {
-    if (this.isTimeseriesResult(result)) {
-      return {
-        currentPeriodBuckets: result.currentPeriod.length,
-        previousPeriodBuckets: result.previousPeriod.length,
-        firstCurrentBucket: result.currentPeriod[0],
-      };
-    }
-    if (this.isFilterDataResult(result)) {
-      return {
-        optionCount: result.options.length,
-        firstOptions: result.options.slice(0, 3),
-      };
-    }
-    return result;
-  }
+/**
+ * Create an AnalyticsService with production dependencies
+ */
+export function createAnalyticsService(
+  prisma: PrismaClient = defaultPrisma,
+  config?: AnalyticsServiceConfig,
+): AnalyticsService {
+  return new AnalyticsService({
+    esService: getElasticsearchAnalyticsService(),
+    chService: getClickHouseAnalyticsService(),
+    prisma,
+    config: {
+      comparisonModeEnabled: process.env.ANALYTICS_COMPARISON_MODE === "true",
+      ...config,
+    },
+  });
 }
 
 /**
@@ -552,11 +439,18 @@ export class AnalyticsService {
 let analyticsService: AnalyticsService | null = null;
 
 /**
- * Get the analytics service instance
+ * Get the analytics service singleton instance
  */
 export function getAnalyticsService(prisma?: PrismaClient): AnalyticsService {
   if (!analyticsService) {
-    analyticsService = new AnalyticsService(prisma);
+    analyticsService = createAnalyticsService(prisma);
   }
   return analyticsService;
+}
+
+/**
+ * Reset the singleton (for testing)
+ */
+export function resetAnalyticsService(): void {
+  analyticsService = null;
 }
