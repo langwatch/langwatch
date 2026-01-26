@@ -179,28 +179,17 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return JSON.stringify({ messages: input.messages });
     }
 
-    let body = this.config.bodyTemplate;
-
-    body = body.replace(
-      /\{\{\s*messages\s*\}\}/g,
-      JSON.stringify(input.messages),
-    );
-
-    body = body.replace(
-      /\{\{\s*threadId\s*\}\}/g,
-      input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
-    );
-
+    // Build template context for Liquid (matching prompt adapter pattern)
     const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    if (lastUserMessage) {
-      body = body.replace(
-        /\{\{\s*input\s*\}\}/g,
-        typeof lastUserMessage.content === "string"
+    const templateContext = {
+      messages: JSON.stringify(input.messages),
+      threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
+      input:
+        typeof lastUserMessage?.content === "string"
           ? lastUserMessage.content
-          : JSON.stringify(lastUserMessage.content),
-      );
-    }
+          : JSON.stringify(lastUserMessage?.content ?? ""),
+    };
 
-    return body;
+    return liquid.parseAndRenderSync(this.config.bodyTemplate, templateContext);
   }
 }

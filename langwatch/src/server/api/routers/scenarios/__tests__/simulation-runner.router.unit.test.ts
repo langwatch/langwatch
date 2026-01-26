@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies before importing the router
 vi.mock("~/server/scenarios/execution/data-prefetcher", () => ({
+  createDataPrefetcherDependencies: vi.fn().mockReturnValue({}),
   prefetchScenarioData: vi.fn(),
 }));
 
