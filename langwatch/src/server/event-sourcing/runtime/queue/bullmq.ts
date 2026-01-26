@@ -443,6 +443,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     return `${this.queueName}.${payloadId}`.replaceAll(":", ".");
   }
 
+  async waitUntilReady(): Promise<void> {
+    await this.worker.waitUntilReady();
+  }
+
   async send(payload: Payload): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(

@@ -308,6 +308,9 @@ function createCommandDispatcher<Payload extends HasTenantId, EventType extends 
     async close(): Promise<void> {
       return processor.close();
     },
+    async waitUntilReady(): Promise<void> {
+      return processor.waitUntilReady();
+    },
   };
 }
 
@@ -621,6 +624,38 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    */
   getCommandQueueProcessors(): Map<string, EventSourcedQueueProcessor<any>> {
     return this.commandQueueProcessors;
+  }
+
+  /**
+   * Waits for all queue processors to be ready to accept jobs.
+   * For BullMQ, this waits for workers to connect to Redis.
+   * Should be called before sending commands in tests.
+   */
+  async waitUntilReady(): Promise<void> {
+    const readyPromises: Promise<void>[] = [];
+
+    for (const queueProcessor of this.handlerQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    for (const queueProcessor of this.projectionQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    for (const queueProcessor of this.commandQueueProcessors.values()) {
+      readyPromises.push(queueProcessor.waitUntilReady());
+    }
+
+    await Promise.all(readyPromises);
+
+    this.logger.debug(
+      {
+        handlerCount: this.handlerQueueProcessors.size,
+        projectionCount: this.projectionQueueProcessors.size,
+        commandCount: this.commandQueueProcessors.size,
+      },
+      "All queue processors ready",
+    );
   }
 
   /**

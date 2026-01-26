@@ -236,6 +236,14 @@ export class EventSourcedQueueProcessorMemory<Payload>
   }
 
   /**
+   * Memory queue is always ready immediately (no connection to establish).
+   */
+  async waitUntilReady(): Promise<void> {
+    // Memory queue has no connection to wait for
+    return;
+  }
+
+  /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    */
   async close(): Promise<void> {

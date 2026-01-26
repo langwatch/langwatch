@@ -159,7 +159,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     processorCheckpointStore,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
-    ready: () => new Promise((resolve) => setTimeout(resolve, 200)),
+    ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<
     RegisteredPipeline<any, any>,
     { testCommand: any }

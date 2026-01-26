@@ -103,6 +103,7 @@ describe("EventHandlerDispatcher", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({
@@ -212,6 +213,7 @@ describe("EventHandlerDispatcher", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({
@@ -265,10 +267,12 @@ describe("EventHandlerDispatcher", () => {
       const enabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
       const disabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({

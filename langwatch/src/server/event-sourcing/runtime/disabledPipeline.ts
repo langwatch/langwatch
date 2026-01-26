@@ -34,6 +34,10 @@ class DisabledQueueProcessor<Payload>
   async close(): Promise<void> {
     // No-op
   }
+
+  async waitUntilReady(): Promise<void> {
+    // No-op - disabled queue is always "ready"
+  }
 }
 
 /**

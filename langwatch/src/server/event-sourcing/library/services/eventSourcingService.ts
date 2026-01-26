@@ -743,4 +743,13 @@ export class EventSourcingService<
   async close(): Promise<void> {
     await this.queueManager.close();
   }
+
+  /**
+   * Waits for all queue processors to be ready to accept jobs.
+   * For BullMQ, this waits for workers to connect to Redis.
+   * Should be called before sending commands in tests.
+   */
+  async waitUntilReady(): Promise<void> {
+    await this.queueManager.waitUntilReady();
+  }
 }

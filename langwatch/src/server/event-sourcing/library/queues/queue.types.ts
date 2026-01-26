@@ -108,4 +108,10 @@ export interface EventSourcedQueueProcessor<Payload> {
    * Should be called during application shutdown.
    */
   close(): Promise<void>;
+  /**
+   * Waits until the queue processor is ready to accept jobs.
+   * For BullMQ, this waits for the worker to connect to Redis.
+   * For memory queues, this resolves immediately.
+   */
+  waitUntilReady(): Promise<void>;
 }
