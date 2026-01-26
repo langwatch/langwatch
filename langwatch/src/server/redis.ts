@@ -5,13 +5,29 @@ import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:redis");
 
-export const isBuildOrNoRedis =
-  process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
-  !!process.env.BUILD_TIME ||
-  !!process.env.SKIP_REDIS ||
-  (!env.REDIS_URL && !env.REDIS_CLUSTER_ENDPOINTS);
+/**
+ * Determines if Redis connection should be skipped.
+ * Uses process.env directly to avoid triggering @t3-oss/env validation at module load.
+ * This prevents false "client-side access" errors during vitest execution.
+ */
+function shouldSkipRedis(): boolean {
+  // During Next.js build phase
+  if (process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) return true;
 
-const useCluster = env.REDIS_CLUSTER_ENDPOINTS;
+  // During unit/integration tests (set in vitest.config.ts)
+  if (process.env.BUILD_TIME) return true;
+
+  // Explicitly disabled
+  if (process.env.SKIP_REDIS) return true;
+
+  // No Redis configuration provided
+  if (!process.env.REDIS_URL && !process.env.REDIS_CLUSTER_ENDPOINTS)
+    return true;
+
+  return false;
+}
+
+export const isBuildOrNoRedis = shouldSkipRedis();
 
 function parseClusterEndpoints(endpointsStr: string) {
   return endpointsStr.split(",").map((raw) => {
@@ -23,6 +39,8 @@ function parseClusterEndpoints(endpointsStr: string) {
 export let connection: IORedis | Cluster | undefined;
 
 if (!isBuildOrNoRedis) {
+  // Use validated env inside this block since Redis is definitely needed
+  const useCluster = !!env.REDIS_CLUSTER_ENDPOINTS;
   if (useCluster) {
     const clusterEndpoints = parseClusterEndpoints(
       env.REDIS_CLUSTER_ENDPOINTS ?? "",

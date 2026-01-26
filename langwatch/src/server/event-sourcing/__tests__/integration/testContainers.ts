@@ -96,7 +96,7 @@ export async function startTestContainers(): Promise<{
     }
 
     // Run goose migrations to create database and tables
-    await initializeClickHouseSchema(clickHouseUrl);
+    await initializeClickHouseSchema(clickHouseUrl, TEST_DATABASE);
 
     // Create client with the database in the URL path
     const urlWithDatabase = new URL(clickHouseUrl);
@@ -182,7 +182,7 @@ export async function startTestContainers(): Promise<{
   }
 
   // Run goose migrations to create database and tables
-  await initializeClickHouseSchema(clickHouseUrl);
+  await initializeClickHouseSchema(clickHouseUrl, TEST_DATABASE);
 
   // Close the old client and create a new one with the database in the URL path
   await clickHouseClient.close();
@@ -327,12 +327,15 @@ function createStoragePolicyConfigFile(): string {
  * Runs the same migrations as production to ensure schema parity.
  *
  * @param connectionUrl - The ClickHouse connection URL (without database)
+ * @param database - The database name to create and migrate
  */
 async function initializeClickHouseSchema(
   connectionUrl: string,
+  database?: string,
 ): Promise<void> {
   await migrateUp({
     connectionUrl,
+    database,
     verbose: true,
   });
 }
