@@ -16,22 +16,29 @@ export interface FilterTranslation {
   whereClause: string;
   /** Tables that need to be JOINed for this filter */
   requiredJoins: CHTable[];
+  /** Parameter values for parameterized queries */
+  params: Record<string, unknown>;
   /** Whether this filter uses EXISTS subquery pattern */
   usesExistsSubquery?: boolean;
 }
 
 /**
- * Escape a string value for use in SQL
+ * Parameter counter for generating unique parameter names
  */
-function escapeString(value: string): string {
-  return value.replace(/'/g, "''");
+let paramCounter = 0;
+
+/**
+ * Reset the parameter counter (useful for testing)
+ */
+export function resetParamCounter(): void {
+  paramCounter = 0;
 }
 
 /**
- * Convert an array of values to SQL IN clause format
+ * Generate a unique parameter name
  */
-function toInClause(values: string[]): string {
-  return values.map((v) => `'${escapeString(v)}'`).join(", ");
+function genParamName(prefix: string): string {
+  return `${prefix}_${paramCounter++}`;
 }
 
 /**
@@ -46,7 +53,7 @@ export function translateFilter(
   const requiredJoins: CHTable[] = [];
 
   if (values.length === 0) {
-    return { whereClause: "1=1", requiredJoins };
+    return { whereClause: "1=1", requiredJoins, params: {} };
   }
 
   switch (field) {
@@ -126,7 +133,7 @@ export function translateFilter(
 
     default:
       // Unknown filter - return no-op
-      return { whereClause: "1=1", requiredJoins };
+      return { whereClause: "1=1", requiredJoins, params: {} };
   }
 }
 
@@ -135,9 +142,11 @@ export function translateFilter(
  */
 function translateTopicFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
+  const paramName = genParamName("topicIds");
   return {
-    whereClause: `${ts}.TopicId IN (${toInClause(values)})`,
+    whereClause: `${ts}.TopicId IN ({${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [paramName]: values },
   };
 }
 
@@ -146,9 +155,11 @@ function translateTopicFilter(values: string[]): FilterTranslation {
  */
 function translateSubtopicFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
+  const paramName = genParamName("subtopicIds");
   return {
-    whereClause: `${ts}.SubTopicId IN (${toInClause(values)})`,
+    whereClause: `${ts}.SubTopicId IN ({${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [paramName]: values },
   };
 }
 
@@ -160,9 +171,11 @@ function translateMetadataFilter(
   values: string[],
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
+  const paramName = genParamName("metaValues");
   return {
-    whereClause: `${ts}.Attributes['${attributeKey}'] IN (${toInClause(values)})`,
+    whereClause: `${ts}.Attributes[{${paramName}_key:String}] IN ({${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [`${paramName}_key`]: attributeKey, [paramName]: values },
   };
 }
 
@@ -171,14 +184,12 @@ function translateMetadataFilter(
  */
 function translateLabelsFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  // Labels are stored as JSON array string, need to check if any label matches
-  const conditions = values.map(
-    (v) =>
-      `has(JSONExtract(${ts}.Attributes['langwatch.labels'], 'Array(String)'), '${escapeString(v)}')`,
-  );
+  const paramName = genParamName("labels");
+  // Labels are stored as JSON array string, use hasAny with parameterized array
   return {
-    whereClause: `(${conditions.join(" OR ")})`,
+    whereClause: `hasAny(JSONExtract(${ts}.Attributes['langwatch.labels'], 'Array(String)'), {${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [paramName]: values },
   };
 }
 
@@ -187,13 +198,12 @@ function translateLabelsFilter(values: string[]): FilterTranslation {
  */
 function translateMetadataKeyFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  // Check if any of the keys exist in Attributes
-  const conditions = values.map(
-    (v) => `mapContains(${ts}.Attributes, '${escapeString(v)}')`,
-  );
+  const paramName = genParamName("metaKeys");
+  // Use arrayExists to check if any key exists
   return {
-    whereClause: `(${conditions.join(" OR ")})`,
+    whereClause: `arrayExists(k -> mapContains(${ts}.Attributes, k), {${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [paramName]: values },
   };
 }
 
@@ -206,15 +216,17 @@ function translateMetadataValueFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   if (!key) {
-    return { whereClause: "1=1", requiredJoins: [] };
+    return { whereClause: "1=1", requiredJoins: [], params: {} };
   }
 
   // Key may have dots replaced with special char, restore them
   const attributeKey = key.replace(/·/g, ".");
+  const paramName = genParamName("metaValue");
 
   return {
-    whereClause: `${ts}.Attributes['${escapeString(attributeKey)}'] IN (${toInClause(values)})`,
+    whereClause: `${ts}.Attributes[{${paramName}_key:String}] IN ({${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [`${paramName}_key`]: attributeKey, [paramName]: values },
   };
 }
 
@@ -223,14 +235,12 @@ function translateMetadataValueFilter(
  */
 function translatePromptIdsFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  // Prompt IDs are stored as JSON array string
-  const conditions = values.map(
-    (v) =>
-      `has(JSONExtract(${ts}.Attributes['langwatch.prompt_ids'], 'Array(String)'), '${escapeString(v)}')`,
-  );
+  const paramName = genParamName("promptIds");
+  // Prompt IDs are stored as JSON array string, use hasAny with parameterized array
   return {
-    whereClause: `(${conditions.join(" OR ")})`,
+    whereClause: `hasAny(JSONExtract(${ts}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${paramName}:Array(String)})`,
     requiredJoins: [],
+    params: { [paramName]: values },
   };
 }
 
@@ -247,16 +257,18 @@ function translateErrorFilter(values: string[]): FilterTranslation {
     return {
       whereClause: `${ts}.ContainsErrorStatus = 1`,
       requiredJoins: [],
+      params: {},
     };
   } else if (hasFalse && !hasTrue) {
     return {
       whereClause: `${ts}.ContainsErrorStatus = 0`,
       requiredJoins: [],
+      params: {},
     };
   }
 
   // Both or neither - no filtering
-  return { whereClause: "1=1", requiredJoins: [] };
+  return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
 /**
@@ -265,15 +277,17 @@ function translateErrorFilter(values: string[]): FilterTranslation {
 function translateSpanTypeFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
+  const paramName = genParamName("spanTypes");
 
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
-        AND ${ss}.SpanAttributes['langwatch.span.type'] IN (${toInClause(values)})
+        AND ${ss}.SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params: { [paramName]: values },
     usesExistsSubquery: true,
   };
 }
@@ -284,15 +298,17 @@ function translateSpanTypeFilter(values: string[]): FilterTranslation {
 function translateSpanModelFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
+  const paramName = genParamName("models");
 
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
-        AND ${ss}.SpanAttributes['gen_ai.request.model'] IN (${toInClause(values)})
+        AND ${ss}.SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params: { [paramName]: values },
     usesExistsSubquery: true,
   };
 }
@@ -303,15 +319,17 @@ function translateSpanModelFilter(values: string[]): FilterTranslation {
 function translateEvaluatorIdFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const es = tableAliases.evaluation_states;
+  const paramName = genParamName("evaluatorIds");
 
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM evaluation_states ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
-        AND ${es}.EvaluatorId IN (${toInClause(values)})
+        AND ${es}.EvaluatorId IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params: { [paramName]: values },
     usesExistsSubquery: true,
   };
 }
@@ -325,15 +343,21 @@ function translateEvaluationPassedFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const es = tableAliases.evaluation_states;
+  const paramName = genParamName("evalPassed");
 
-  // Convert string values to boolean
+  // Convert string values to UInt8 (boolean in CH)
   const passedValues = values.map((v) =>
-    v === "true" || v === "1" ? "1" : "0",
+    v === "true" || v === "1" ? 1 : 0,
   );
 
-  const evaluatorCondition = evaluatorId
-    ? `AND ${es}.EvaluatorId = '${escapeString(evaluatorId)}'`
-    : "";
+  const params: Record<string, unknown> = { [paramName]: passedValues };
+  let evaluatorCondition = "";
+
+  if (evaluatorId) {
+    const evalIdParam = genParamName("evaluatorId");
+    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    params[evalIdParam] = evaluatorId;
+  }
 
   return {
     whereClause: `EXISTS (
@@ -341,9 +365,10 @@ function translateEvaluationPassedFilter(
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
-        AND ${es}.Passed IN (${passedValues.join(", ")})
+        AND ${es}.Passed IN ({${paramName}:Array(UInt8)})
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -357,14 +382,24 @@ function translateEvaluationScoreFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const es = tableAliases.evaluation_states;
+  const minParam = genParamName("scoreMin");
+  const maxParam = genParamName("scoreMax");
 
   // Values should be [min, max] for numeric range
   const minValue = parseFloat(values[0] ?? "0");
   const maxValue = parseFloat(values[1] ?? "1");
 
-  const evaluatorCondition = evaluatorId
-    ? `AND ${es}.EvaluatorId = '${escapeString(evaluatorId)}'`
-    : "";
+  const params: Record<string, unknown> = {
+    [minParam]: minValue,
+    [maxParam]: maxValue,
+  };
+  let evaluatorCondition = "";
+
+  if (evaluatorId) {
+    const evalIdParam = genParamName("evaluatorId");
+    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    params[evalIdParam] = evaluatorId;
+  }
 
   return {
     whereClause: `EXISTS (
@@ -372,10 +407,11 @@ function translateEvaluationScoreFilter(
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
-        AND ${es}.Score >= ${minValue}
-        AND ${es}.Score <= ${maxValue}
+        AND ${es}.Score >= {${minParam}:Float64}
+        AND ${es}.Score <= {${maxParam}:Float64}
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -389,10 +425,16 @@ function translateEvaluationLabelFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const es = tableAliases.evaluation_states;
+  const paramName = genParamName("evalLabels");
 
-  const evaluatorCondition = evaluatorId
-    ? `AND ${es}.EvaluatorId = '${escapeString(evaluatorId)}'`
-    : "";
+  const params: Record<string, unknown> = { [paramName]: values };
+  let evaluatorCondition = "";
+
+  if (evaluatorId) {
+    const evalIdParam = genParamName("evaluatorId");
+    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    params[evalIdParam] = evaluatorId;
+  }
 
   return {
     whereClause: `EXISTS (
@@ -400,9 +442,10 @@ function translateEvaluationLabelFilter(
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
-        AND ${es}.Label IN (${toInClause(values)})
+        AND ${es}.Label IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -416,10 +459,16 @@ function translateEvaluationStateFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const es = tableAliases.evaluation_states;
+  const paramName = genParamName("evalStates");
 
-  const evaluatorCondition = evaluatorId
-    ? `AND ${es}.EvaluatorId = '${escapeString(evaluatorId)}'`
-    : "";
+  const params: Record<string, unknown> = { [paramName]: values };
+  let evaluatorCondition = "";
+
+  if (evaluatorId) {
+    const evalIdParam = genParamName("evaluatorId");
+    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    params[evalIdParam] = evaluatorId;
+  }
 
   return {
     whereClause: `EXISTS (
@@ -427,9 +476,10 @@ function translateEvaluationStateFilter(
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
-        AND ${es}.Status IN (${toInClause(values)})
+        AND ${es}.Status IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -440,19 +490,17 @@ function translateEvaluationStateFilter(
 function translateEventTypeFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
-
-  const conditions = values.map(
-    (v) => `has(${ss}."Events.Name", '${escapeString(v)}')`,
-  );
+  const paramName = genParamName("eventTypes");
 
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
-        AND (${conditions.join(" OR ")})
+        AND hasAny(${ss}."Events.Name", {${paramName}:Array(String)})
     )`,
     requiredJoins: [],
+    params: { [paramName]: values },
     usesExistsSubquery: true,
   };
 }
@@ -466,27 +514,29 @@ function translateEventMetricKeyFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
+  const keysParam = genParamName("metricKeys");
 
-  const eventCondition = eventType
-    ? `AND has(${ss}."Events.Name", '${escapeString(eventType)}')`
-    : "";
+  const params: Record<string, unknown> = { [keysParam]: values };
+  let eventCondition = "";
+
+  if (eventType) {
+    const eventTypeParam = genParamName("eventType");
+    eventCondition = `AND has(${ss}."Events.Name", {${eventTypeParam}:String})`;
+    params[eventTypeParam] = eventType;
+  }
 
   // Events.Attributes is Array(Map(String, String))
-  // Need to check if any attribute map contains the metric key
-  const keyConditions = values.map(
-    (v) =>
-      `arrayExists(x -> mapContains(x, '${escapeString(v)}'), ${ss}."Events.Attributes")`,
-  );
-
+  // Check if any attribute map contains any of the metric keys
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
         ${eventCondition}
-        AND (${keyConditions.join(" OR ")})
+        AND arrayExists(x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}), ${ss}."Events.Attributes")
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -503,21 +553,34 @@ function translateEventMetricValueFilter(
   const ss = tableAliases.stored_spans;
 
   if (!metricKey) {
-    return { whereClause: "1=1", requiredJoins: [] };
+    return { whereClause: "1=1", requiredJoins: [], params: {} };
   }
 
-  const eventCondition = eventType
-    ? `AND has(${ss}."Events.Name", '${escapeString(eventType)}')`
-    : "";
+  const metricKeyParam = genParamName("metricKey");
+  const minParam = genParamName("metricMin");
+  const maxParam = genParamName("metricMax");
 
   // Values should be [min, max] for numeric range
   const minValue = parseFloat(values[0] ?? "0");
   const maxValue = parseFloat(values[1] ?? "1");
 
+  const params: Record<string, unknown> = {
+    [metricKeyParam]: metricKey,
+    [minParam]: minValue,
+    [maxParam]: maxValue,
+  };
+  let eventCondition = "";
+
+  if (eventType) {
+    const eventTypeParam = genParamName("eventType");
+    eventCondition = `AND has(${ss}."Events.Name", {${eventTypeParam}:String})`;
+    params[eventTypeParam] = eventType;
+  }
+
   // Check if any event's attribute matches the key and value is in range
   const valueCondition = `arrayExists(
-    x -> toFloat64OrNull(x['${escapeString(metricKey)}']) >= ${minValue}
-      AND toFloat64OrNull(x['${escapeString(metricKey)}']) <= ${maxValue},
+    x -> toFloat64OrNull(x[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
+      AND toFloat64OrNull(x[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
     ${ss}."Events.Attributes"
   )`;
 
@@ -530,6 +593,7 @@ function translateEventMetricValueFilter(
         AND ${valueCondition}
     )`,
     requiredJoins: [],
+    params,
     usesExistsSubquery: true,
   };
 }
@@ -558,16 +622,18 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
     return {
       whereClause: `${ts}.HasAnnotation = 1`,
       requiredJoins: [],
+      params: {},
     };
   } else if (hasFalse && !hasTrue) {
     return {
       whereClause: `(${ts}.HasAnnotation = 0 OR ${ts}.HasAnnotation IS NULL)`,
       requiredJoins: [],
+      params: {},
     };
   }
 
   // Both or neither - no filtering
-  return { whereClause: "1=1", requiredJoins: [] };
+  return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
 /**
@@ -579,20 +645,24 @@ export function combineFilters(
   const nonTrivial = translations.filter((t) => t.whereClause !== "1=1");
 
   if (nonTrivial.length === 0) {
-    return { whereClause: "1=1", requiredJoins: [] };
+    return { whereClause: "1=1", requiredJoins: [], params: {} };
   }
 
   const whereClauses = nonTrivial.map((t) => `(${t.whereClause})`);
   const allJoins = new Set<CHTable>();
+  const allParams: Record<string, unknown> = {};
+
   for (const t of nonTrivial) {
     for (const join of t.requiredJoins) {
       allJoins.add(join);
     }
+    Object.assign(allParams, t.params);
   }
 
   return {
     whereClause: whereClauses.join(" AND "),
     requiredJoins: Array.from(allJoins),
+    params: allParams,
   };
 }
 
