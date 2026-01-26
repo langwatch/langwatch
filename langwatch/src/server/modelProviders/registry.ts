@@ -308,7 +308,7 @@ export function getParameterConstraints(
  * Known LiteLLM routing variant suffixes that should be filtered from UI selectors.
  * Add new suffixes here as LiteLLM introduces them.
  */
-const KNOWN_VARIANT_SUFFIXES = ["free", "thinking", "extended", "beta"];
+export const KNOWN_VARIANT_SUFFIXES = ["free", "thinking", "extended", "beta"];
 
 /**
  * Checks if a model ID has a variant suffix (e.g., :free, :thinking, :extended).

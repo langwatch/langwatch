@@ -14,6 +14,7 @@ import {
   getProviderModelOptions,
   getRegistryMetadata,
   hasVariantSuffix,
+  KNOWN_VARIANT_SUFFIXES,
   modelProviders,
 } from "../registry";
 
@@ -176,17 +177,12 @@ describe("Backward Compatibility", () => {
 
     it("excludes models with known variant suffixes", () => {
       const modelIds = Object.keys(allLitellmModels);
-      const knownSuffixes = [":free", ":thinking", ":extended", ":beta"];
-
-      // No models should have known variant suffixes
-      const variantModels = modelIds.filter((id) =>
-        knownSuffixes.some((suffix) => id.toLowerCase().endsWith(suffix)),
-      );
+      const variantModels = modelIds.filter((id) => hasVariantSuffix(id));
       expect(variantModels).toHaveLength(0);
     });
 
     it("includes models with numeric suffixes like Bedrock version numbers", () => {
-      // Unit tests verify hasVariantSuffix logic; this verifies the filter allows Bedrock models
+      // Bedrock models use :0 suffix for versions, not variants
       expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
       expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(false);
     });
