@@ -13,6 +13,8 @@ import {
   getParameterConstraints,
   getProviderModelOptions,
   getRegistryMetadata,
+  hasVariantSuffix,
+  KNOWN_VARIANT_SUFFIXES,
   modelProviders,
 } from "../registry";
 
@@ -173,15 +175,202 @@ describe("Backward Compatibility", () => {
       expect(openaiModels.length).toBeGreaterThan(0);
     });
 
-    it("excludes models with variant suffixes", () => {
+    it("excludes models with known variant suffixes", () => {
       const modelIds = Object.keys(allLitellmModels);
-      const variantModels = modelIds.filter((id) => id.includes(":"));
+      const variantModels = modelIds.filter((id) => hasVariantSuffix(id));
       expect(variantModels).toHaveLength(0);
+    });
+
+    it("includes models with numeric suffixes like Bedrock version numbers", () => {
+      // Bedrock models use :0 suffix for versions, not variants
+      expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
+      expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(false);
     });
 
     it("includes standard models without suffixes", () => {
       expect(allLitellmModels["anthropic/claude-3.5-sonnet"]).toBeDefined();
       expect(allLitellmModels["openai/gpt-4o"]).toBeDefined();
+    });
+  });
+});
+
+describe("hasVariantSuffix", () => {
+  describe("known variant suffixes", () => {
+    it("returns true for :free suffix", () => {
+      expect(hasVariantSuffix("openrouter/model:free")).toBe(true);
+    });
+
+    it("returns true for :thinking suffix", () => {
+      expect(hasVariantSuffix("anthropic/claude-3-opus:thinking")).toBe(true);
+    });
+
+    it("returns true for :extended suffix", () => {
+      expect(hasVariantSuffix("openrouter/model:extended")).toBe(true);
+    });
+
+    it("returns true for :beta suffix", () => {
+      expect(hasVariantSuffix("openai/gpt-5:beta")).toBe(true);
+    });
+  });
+
+  describe("case insensitivity", () => {
+    it("returns true for :FREE (uppercase)", () => {
+      expect(hasVariantSuffix("openrouter/model:FREE")).toBe(true);
+    });
+
+    it("returns true for :Thinking (mixed case)", () => {
+      expect(hasVariantSuffix("anthropic/model:Thinking")).toBe(true);
+    });
+
+    it("returns true for :EXTENDED (uppercase)", () => {
+      expect(hasVariantSuffix("openrouter/model:EXTENDED")).toBe(true);
+    });
+
+    it("returns true for :BETA (uppercase)", () => {
+      expect(hasVariantSuffix("openai/model:BETA")).toBe(true);
+    });
+  });
+
+  describe("numeric suffixes (Bedrock version numbers)", () => {
+    it("returns false for :0 suffix", () => {
+      expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
+    });
+
+    it("returns false for :1 suffix", () => {
+      expect(hasVariantSuffix("bedrock/model:1")).toBe(false);
+    });
+
+    it("returns false for multi-digit numeric suffix", () => {
+      expect(hasVariantSuffix("bedrock/model:123")).toBe(false);
+    });
+  });
+
+  describe("models without colons", () => {
+    it("returns false for model without any colon", () => {
+      expect(hasVariantSuffix("openai/gpt-4o")).toBe(false);
+    });
+
+    it("returns false for model with only provider slash", () => {
+      expect(hasVariantSuffix("anthropic/claude-3.5-sonnet")).toBe(false);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("handles model with multiple colons correctly", () => {
+      // Should check only the last colon
+      expect(hasVariantSuffix("some/model:v1:free")).toBe(true);
+    });
+
+    it("returns false for empty string", () => {
+      expect(hasVariantSuffix("")).toBe(false);
+    });
+
+    it("returns false for unknown suffix after colon", () => {
+      expect(hasVariantSuffix("model:unknown")).toBe(false);
+    });
+  });
+
+  describe("real-world model IDs from major providers", () => {
+    // AWS Bedrock models (should NOT be filtered - numeric version suffixes)
+    describe("AWS Bedrock", () => {
+      it("preserves Anthropic Claude models on Bedrock", () => {
+        expect(hasVariantSuffix("anthropic.claude-3-haiku-20240307-v1:0")).toBe(
+          false,
+        );
+        expect(
+          hasVariantSuffix("anthropic.claude-opus-4-5-20251101-v1:0"),
+        ).toBe(false);
+        expect(
+          hasVariantSuffix("anthropic.claude-sonnet-4-5-20250929-v1:0"),
+        ).toBe(false);
+      });
+
+      it("preserves Amazon Nova models", () => {
+        expect(hasVariantSuffix("amazon.nova-pro-v1:0")).toBe(false);
+        expect(hasVariantSuffix("amazon.nova-2-lite-v1:0")).toBe(false);
+        expect(hasVariantSuffix("amazon.titan-embed-text-v2:0")).toBe(false);
+      });
+
+      it("preserves Meta Llama models on Bedrock", () => {
+        expect(hasVariantSuffix("meta.llama3-70b-instruct-v1:0")).toBe(false);
+        expect(hasVariantSuffix("meta.llama3-1-405b-instruct-v1:0")).toBe(false);
+      });
+
+      it("preserves Mistral models on Bedrock", () => {
+        expect(hasVariantSuffix("mistral.mistral-7b-instruct-v0:2")).toBe(false);
+        expect(hasVariantSuffix("mistral.mistral-large-2402-v1:0")).toBe(false);
+      });
+
+      it("preserves Cohere models on Bedrock", () => {
+        expect(hasVariantSuffix("cohere.embed-v4:0")).toBe(false);
+        expect(hasVariantSuffix("cohere.rerank-v3-5:0")).toBe(false);
+      });
+
+      it("preserves AI21 models on Bedrock", () => {
+        expect(hasVariantSuffix("ai21.jamba-1-5-large-v1:0")).toBe(false);
+      });
+
+      it("preserves DeepSeek models on Bedrock", () => {
+        expect(hasVariantSuffix("deepseek.r1-v1:0")).toBe(false);
+      });
+
+      it("preserves Stability AI models on Bedrock", () => {
+        expect(hasVariantSuffix("stability.sd3-5-large-v1:0")).toBe(false);
+        expect(hasVariantSuffix("stability.stable-image-ultra-v1:1")).toBe(
+          false,
+        );
+      });
+    });
+
+    // Anthropic direct API (no colons)
+    describe("Anthropic Direct API", () => {
+      it("preserves direct Anthropic model IDs", () => {
+        expect(hasVariantSuffix("claude-sonnet-4-5-20250929")).toBe(false);
+        expect(hasVariantSuffix("claude-opus-4-5-20251101")).toBe(false);
+        expect(hasVariantSuffix("claude-haiku-4-5-20251001")).toBe(false);
+      });
+    });
+
+    // OpenAI (no colons)
+    describe("OpenAI", () => {
+      it("preserves OpenAI model IDs", () => {
+        expect(hasVariantSuffix("gpt-4o")).toBe(false);
+        expect(hasVariantSuffix("gpt-4-turbo")).toBe(false);
+        expect(hasVariantSuffix("gpt-3.5-turbo")).toBe(false);
+      });
+    });
+
+    // Google Gemini (no colons)
+    describe("Google Gemini", () => {
+      it("preserves Gemini model IDs", () => {
+        expect(hasVariantSuffix("gemini-2.5-pro")).toBe(false);
+        expect(hasVariantSuffix("gemini-2.5-flash")).toBe(false);
+        expect(hasVariantSuffix("gemini-1.5-pro")).toBe(false);
+      });
+    });
+
+    // LiteLLM routing variants (SHOULD be filtered)
+    describe("LiteLLM routing variants", () => {
+      it("filters :free variants from OpenRouter", () => {
+        expect(hasVariantSuffix("allenai/molmo-2-8b:free")).toBe(true);
+        expect(hasVariantSuffix("mistralai/devstral-2512:free")).toBe(true);
+        expect(hasVariantSuffix("nvidia/nemotron-3-nano-30b-a3b:free")).toBe(
+          true,
+        );
+      });
+
+      it("filters :thinking variants", () => {
+        expect(hasVariantSuffix("qwen/qwen-plus-2025-07-28:thinking")).toBe(
+          true,
+        );
+        expect(hasVariantSuffix("anthropic/claude-3.7-sonnet:thinking")).toBe(
+          true,
+        );
+      });
+
+      it("filters :extended variants", () => {
+        expect(hasVariantSuffix("openai/gpt-4o:extended")).toBe(true);
+      });
     });
   });
 });
