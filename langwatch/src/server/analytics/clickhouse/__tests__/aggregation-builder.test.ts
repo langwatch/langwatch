@@ -1,12 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { resetParamCounter } from "../filter-translator";
 import {
   buildTimeseriesQuery,
   buildDataForFilterQuery,
   buildTopDocumentsQuery,
   buildFeedbacksQuery,
 } from "../aggregation-builder";
+import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 
 describe("aggregation-builder", () => {
+  beforeEach(() => {
+    resetParamCounter();
+  });
+
   describe("buildTimeseriesQuery", () => {
     const baseInput = {
       projectId: "test-project",
@@ -14,7 +20,7 @@ describe("aggregation-builder", () => {
       endDate: new Date("2024-01-02T00:00:00Z"),
       previousPeriodStartDate: new Date("2023-12-31T00:00:00Z"),
       series: [
-        { metric: "metadata.trace_id", aggregation: "cardinality" as const },
+        { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
       ],
       timeScale: 60, // 1 hour
     };
@@ -63,8 +69,8 @@ describe("aggregation-builder", () => {
       const input = {
         ...baseInput,
         series: [
-          { metric: "metadata.trace_id", aggregation: "cardinality" as const },
-          { metric: "performance.total_cost", aggregation: "sum" as const },
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
         ],
       };
       const result = buildTimeseriesQuery(input);
@@ -79,7 +85,7 @@ describe("aggregation-builder", () => {
         ...baseInput,
         series: [
           {
-            metric: "evaluations.evaluation_score",
+            metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as const,
           },
         ],
@@ -89,7 +95,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("JOIN evaluation_states");
     });
 
-    it("should add filters to WHERE clause", () => {
+    it("should add filters to WHERE clause with parameterized values", () => {
       const input = {
         ...baseInput,
         filters: {
@@ -99,7 +105,8 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       expect(result.sql).toContain("ts.TopicId IN");
-      expect(result.sql).toContain("'topic-1'");
+      expect(result.sql).toContain("{topicIds_0:Array(String)}");
+      expect(result.params).toHaveProperty("topicIds_0", ["topic-1", "topic-2"]);
     });
 
     it("should handle groupBy parameter", () => {
@@ -366,7 +373,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain('Events.Attributes"');
     });
 
-    it("should include filters when provided", () => {
+    it("should include filters when provided with parameterized values", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
       };
@@ -377,7 +384,10 @@ describe("aggregation-builder", () => {
         filters
       );
 
-      expect(result.sql).toContain("langwatch.user_id");
+      // Filter values are now parameterized, key is in params
+      expect(result.sql).toContain("ts.Attributes[{metaValues_");
+      expect(result.params).toHaveProperty("metaValues_0_key", "langwatch.user_id");
+      expect(result.params).toHaveProperty("metaValues_0", ["user-1"]);
     });
 
     it("should limit results to 100", () => {

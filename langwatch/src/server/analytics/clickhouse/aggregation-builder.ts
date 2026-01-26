@@ -20,6 +20,9 @@ import {
 } from "./metric-translator";
 import { translateAllFilters, type FilterTranslation } from "./filter-translator";
 
+/** Maximum number of filter options returned by filter queries */
+const MAX_FILTER_OPTIONS = 10000;
+
 /**
  * Date grouping options
  */
@@ -351,6 +354,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      ...filterTranslation.params,
     },
   };
 }
@@ -391,7 +395,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ts}.TopicId ILIKE {searchQuery:String}` : ""}
         GROUP BY ${ts}.TopicId
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -410,7 +414,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ts}.SubTopicId ILIKE {searchQuery:String}` : ""}
         GROUP BY ${ts}.SubTopicId
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -428,7 +432,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -446,7 +450,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -466,7 +470,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ss}.SpanAttributes['gen_ai.request.model'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -486,7 +490,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${ss}.SpanAttributes['langwatch.span.type'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -507,7 +511,7 @@ export function buildDataForFilterQuery(
           ${searchQuery ? `AND ${es}.EvaluatorName ILIKE {searchQuery:String}` : ""}
         GROUP BY ${es}.EvaluatorId, ${es}.EvaluatorName, ${es}.EvaluatorType
         ORDER BY count DESC
-        LIMIT 10000
+        LIMIT ${MAX_FILTER_OPTIONS}
       `;
       break;
 
@@ -615,6 +619,7 @@ export function buildTopDocumentsQuery(
       tenantId: projectId,
       startDate,
       endDate,
+      ...filterTranslation.params,
     },
   };
 }
@@ -676,6 +681,7 @@ export function buildFeedbacksQuery(
       tenantId: projectId,
       startDate,
       endDate,
+      ...filterTranslation.params,
     },
   };
 }
