@@ -20,6 +20,11 @@ function shouldSkipRedis(): boolean {
   // Explicitly disabled
   if (process.env.SKIP_REDIS) return true;
 
+  // In jsdom environment (vitest with @vitest-environment jsdom)
+  // window is defined but we're not actually in a browser - skip Redis
+  // to avoid @t3-oss/env "client-side access" errors
+  if (typeof window !== "undefined") return true;
+
   // No Redis configuration provided
   if (!process.env.REDIS_URL && !process.env.REDIS_CLUSTER_ENDPOINTS)
     return true;
