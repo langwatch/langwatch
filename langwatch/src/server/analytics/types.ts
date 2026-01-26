@@ -130,3 +130,113 @@ export type TracesPivotFilterQuery = {
   name: string;
   field: string;
 };
+
+// ========== Analytics Result Types ==========
+// Shared result types used by both ES and ClickHouse analytics services
+
+/**
+ * Timeseries result structure
+ */
+export interface TimeseriesResult {
+  previousPeriod: TimeseriesBucket[];
+  currentPeriod: TimeseriesBucket[];
+}
+
+export interface TimeseriesBucket {
+  date: string;
+  [key: string]: number | string | Record<string, Record<string, number>>;
+}
+
+/**
+ * Filter data result for dropdown options
+ */
+export interface FilterDataResult {
+  options: Array<{
+    field: string;
+    label: string;
+    count: number;
+  }>;
+}
+
+/**
+ * Top documents result for RAG analytics
+ */
+export interface TopDocumentsResult {
+  topDocuments: Array<{
+    documentId: string;
+    count: number;
+    traceId: string;
+    content?: string;
+  }>;
+  totalUniqueDocuments: number;
+}
+
+/**
+ * Feedbacks result
+ */
+export interface FeedbacksResult {
+  events: Array<{
+    event_id: string;
+    event_type: string;
+    project_id?: string;
+    trace_id: string;
+    timestamps: {
+      started_at: number;
+      inserted_at: number;
+      updated_at: number;
+    };
+    metrics?: Array<{ key: string; value: number }>;
+    event_details?: Array<{ key: string; value: string }>;
+  }>;
+}
+
+/**
+ * Analytics backend interface for dependency injection
+ */
+export interface AnalyticsBackend {
+  getTimeseries(input: import("./registry").TimeseriesInputType): Promise<TimeseriesResult>;
+  getDataForFilter(
+    projectId: string,
+    field: FilterField,
+    startDate: number,
+    endDate: number,
+    filters: Partial<
+      Record<
+        FilterField,
+        | string[]
+        | Record<string, string[]>
+        | Record<string, Record<string, string[]>>
+      >
+    >,
+    key?: string,
+    subkey?: string,
+    searchQuery?: string,
+  ): Promise<FilterDataResult>;
+  getTopUsedDocuments(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+    filters?: Partial<
+      Record<
+        FilterField,
+        | string[]
+        | Record<string, string[]>
+        | Record<string, Record<string, string[]>>
+      >
+    >,
+  ): Promise<TopDocumentsResult>;
+  getFeedbacks(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+    filters?: Partial<
+      Record<
+        FilterField,
+        | string[]
+        | Record<string, string[]>
+        | Record<string, Record<string, string[]>>
+      >
+    >,
+  ): Promise<FeedbacksResult>;
+  isAvailable(): boolean;
+}
