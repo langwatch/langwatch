@@ -305,11 +305,26 @@ export function getParameterConstraints(
 // ============================================================================
 
 /**
+ * Known LiteLLM routing variant suffixes that should be filtered from UI selectors.
+ * Add new suffixes here as LiteLLM introduces them.
+ */
+const KNOWN_VARIANT_SUFFIXES = ["free", "thinking", "extended", "beta"];
+
+/**
  * Checks if a model ID has a variant suffix (e.g., :free, :thinking, :extended).
  * These are LiteLLM routing variants that should be filtered from UI selectors.
  */
 export function hasVariantSuffix(modelId: string): boolean {
-  return modelId.includes(":");
+  const colonIndex = modelId.lastIndexOf(":");
+  if (colonIndex === -1) return false;
+
+  const suffix = modelId.substring(colonIndex + 1);
+
+  // Numeric suffixes (like ":0" in Bedrock) are version numbers, not variants
+  if (/^\d+$/.test(suffix)) return false;
+
+  // Check for known variant suffixes
+  return KNOWN_VARIANT_SUFFIXES.includes(suffix.toLowerCase());
 }
 
 /**
