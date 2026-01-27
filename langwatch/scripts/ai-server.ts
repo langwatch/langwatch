@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
@@ -194,6 +195,57 @@ const server = createServer(async (req, res) => {
   );
 });
 
+function startCloudflaredTunnel(): void {
+  const cloudflared = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${PORT}`], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  cloudflared.on("error", (err) => {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.log("║  Tunnel: cloudflared not installed                       ║");
+      console.log("║          brew install cloudflared (or see docs)          ║");
+    } else {
+      console.log(`║  Tunnel: Error starting cloudflared: ${err.message.slice(0, 20)}  ║`);
+    }
+    printFooter();
+  });
+
+  // cloudflared outputs the URL to stderr
+  cloudflared.stderr.on("data", (data: Buffer) => {
+    const output = data.toString();
+    const urlMatch = output.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+    if (urlMatch) {
+      const tunnelUrl = urlMatch[0];
+      const paddedUrl = `${tunnelUrl}/generate`.padEnd(43);
+      console.log(`║  Tunnel: ${paddedUrl}║`);
+      printFooter();
+    }
+  });
+
+  cloudflared.on("close", (code) => {
+    if (code !== 0 && code !== null) {
+      console.log(`\n[cloudflared exited with code ${code}]`);
+    }
+  });
+
+  // Cleanup on exit
+  process.on("SIGINT", () => {
+    cloudflared.kill();
+    process.exit();
+  });
+  process.on("SIGTERM", () => {
+    cloudflared.kill();
+    process.exit();
+  });
+}
+
+function printFooter(): void {
+  console.log(`╠════════════════════════════════════════════════════════════╣
+║  Body:    { "model": "gpt-4o-mini", "messages": [...] }    ║
+╚════════════════════════════════════════════════════════════╝
+`);
+}
+
 server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
@@ -204,9 +256,8 @@ server.listen(PORT, () => {
 ║  Method:  POST                                             ║
 ║  Headers: X-API-Key: <openai-api-key>                      ║
 ║           X-Client-ID: <client-identifier>                 ║
-║           Content-Type: application/json                   ║
-╠════════════════════════════════════════════════════════════╣
-║  Body:    { "model": "gpt-4o-mini", "messages": [...] }    ║
-╚════════════════════════════════════════════════════════════╝
-`);
+║           Content-Type: application/json                   ║`);
+
+  // Start cloudflared tunnel (will print tunnel URL or error, then footer)
+  startCloudflaredTunnel();
 });
