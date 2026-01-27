@@ -44,23 +44,19 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   }
 
   /**
-   * Check if a flag is overridden by environment variables.
-   * FEATURE_FLAGS_ENABLED=flag1,flag2 - force enable flags
-   * FEATURE_FLAGS_DISABLED=flag1,flag2 - force disable flags
+   * Check if a flag is overridden by environment variable.
+   * Format: FEATURE_FLAG_NAME=1 (enabled) or FEATURE_FLAG_NAME=0 (disabled)
+   * Flag name is uppercased with dashes replaced by underscores.
+   * Example: ui-simulations-scenarios -> UI_SIMULATIONS_SCENARIOS=1
    */
   private checkEnvOverride(flagKey: string): boolean | undefined {
-    const parseFlags = (envVar: string | undefined): string[] =>
-      (envVar?.split(",") ?? [])
-        .map((flag) => flag.trim())
-        .filter((flag) => flag.length > 0);
+    const envKey = flagKey.toUpperCase().replace(/-/g, "_");
+    const envValue = process.env[envKey];
 
-    const enabledFlags = parseFlags(process.env.FEATURE_FLAGS_ENABLED);
-    const disabledFlags = parseFlags(process.env.FEATURE_FLAGS_DISABLED);
-
-    if (enabledFlags.includes(flagKey)) {
+    if (envValue === "1") {
       return true;
     }
-    if (disabledFlags.includes(flagKey)) {
+    if (envValue === "0") {
       return false;
     }
     return undefined;

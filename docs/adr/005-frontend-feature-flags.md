@@ -26,8 +26,9 @@ We will expose feature flags to the frontend through the NextAuth session:
 4. **Access via session.user.enabledFeatures**: Frontend components check `session?.user?.enabledFeatures?.includes("FLAG_NAME")`.
 
 5. **Environment variable overrides**: Flags can be force-enabled or force-disabled via environment variables, bypassing PostHog:
-   - `FEATURE_FLAGS_ENABLED=flag1,flag2` - force enable listed flags for all users
-   - `FEATURE_FLAGS_DISABLED=flag1,flag2` - force disable listed flags for all users
+   - `FLAG_NAME=1` - force enable (e.g., `UI_SIMULATIONS_SCENARIOS=1`)
+   - `FLAG_NAME=0` - force disable
+   - Flag name is uppercased with dashes replaced by underscores
 
 ## Rationale / Trade-offs
 
