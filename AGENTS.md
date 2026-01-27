@@ -60,6 +60,7 @@ specs/               # BDD feature specs
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
+| Building from scratch without checking existing code | Search the codebase first - follow existing patterns, extend existing systems, reuse existing abstractions |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Code before tests | Outside-In TDD: spec → test → code |
