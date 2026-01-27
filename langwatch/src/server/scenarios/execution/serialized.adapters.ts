@@ -85,13 +85,11 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   }
 
   /**
-   * Check if the template (system prompt or any message) references messages.
-   * Handles: {{ messages }}, {{ messages | json }}, {% for m in messages %}
+   * Check if the template (system prompt or any message) contains {{messages}}.
    * If so, the template handles conversation history placement.
    */
   private templateContainsMessages(): boolean {
-    // Match {{ messages }}, {{ messages | filter }}, or {% for/if with messages %}
-    const messagesPattern = /\{\{[\s\S]*?\bmessages\b[\s\S]*?\}\}|\{%[\s\S]*?\bmessages\b[\s\S]*?%\}/;
+    const messagesPattern = /\{\{\s*messages\s*\}\}/;
     if (messagesPattern.test(this.config.systemPrompt)) {
       return true;
     }
