@@ -54,6 +54,35 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
   }
 
   /**
+   * Get all enabled flags from a list of flag keys.
+   */
+  async getEnabledFlags(
+    flagKeys: string[],
+    distinctId: string,
+  ): Promise<string[]> {
+    return await this.tracer.withActiveSpan(
+      "FeatureFlagServiceMemory.getEnabledFlags",
+      {
+        attributes: {
+          "feature.flag.keys": flagKeys.join(","),
+          "feature.flag.distinct_id": distinctId,
+        },
+      },
+      async (span) => {
+        const enabledFlags: string[] = [];
+        for (const flagKey of flagKeys) {
+          const isEnabled = await this.isEnabled(flagKey, distinctId);
+          if (isEnabled) {
+            enabledFlags.push(flagKey);
+          }
+        }
+        span.setAttribute("feature.flag.enabled_count", enabledFlags.length);
+        return enabledFlags;
+      },
+    );
+  }
+
+  /**
    * Get multiple feature flags at once.
    */
   async getMultiple(

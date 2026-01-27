@@ -39,6 +39,16 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   }
 
   /**
+   * Get all enabled flags from a list of flag keys for a given user or tenant/project.
+   */
+  async getEnabledFlags(
+    flagKeys: string[],
+    distinctId: string,
+  ): Promise<string[]> {
+    return this.service.getEnabledFlags(flagKeys, distinctId);
+  }
+
+  /**
    * Create the appropriate service based on environment.
    */
   private createService(): FeatureFlagServiceInterface {

@@ -10,4 +10,10 @@ export interface FeatureFlagServiceInterface {
     distinctId: string,
     defaultValue?: boolean,
   ): Promise<boolean>;
+
+  /**
+   * Get all enabled flags from a list of flag keys for a given user or tenant/project.
+   * Returns an array of flag keys that are enabled.
+   */
+  getEnabledFlags(flagKeys: string[], distinctId: string): Promise<string[]>;
 }

@@ -22,6 +22,10 @@ import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import {
+  featureFlagService,
+  FRONTEND_FEATURE_FLAGS,
+} from "~/server/featureFlag";
 import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
@@ -39,6 +43,7 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
+      enabledFeatures?: string[];
     };
   }
 }
@@ -77,15 +82,26 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        const enabledFeatures = await featureFlagService.getEnabledFlags(
+          [...FRONTEND_FEATURE_FLAGS],
+          user_.email ?? user_.id,
+        );
+
         return {
           ...session,
           user: {
             ...session.user,
             id: user_.id,
             email: user_.email,
+            enabledFeatures,
           },
         };
       }
+
+      const enabledFeatures = await featureFlagService.getEnabledFlags(
+        [...FRONTEND_FEATURE_FLAGS],
+        user.email ?? user.id,
+      );
 
       return {
         ...session,
@@ -93,6 +109,7 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
+          enabledFeatures,
         },
       };
     },

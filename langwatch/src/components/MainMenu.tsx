@@ -37,9 +37,9 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  // Feature flag: show collapsible navigation for @langwatch.ai users
+  // Feature flag: show collapsible navigation for users with SCENARIOS feature
   const showScenariosOnThePlatform =
-    session?.user?.email?.endsWith("@langwatch.ai");
+    session?.user?.enabledFeatures?.includes("SCENARIOS");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
