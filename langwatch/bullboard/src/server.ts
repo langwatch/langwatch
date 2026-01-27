@@ -32,19 +32,23 @@ async function main() {
 
   // Discover all queues from Redis - handles both standalone and cluster mode
   const allBullKeys = await connection.keys("bull:*");
+
+  // Extract queue names, keeping braces for cluster mode queues
+  // e.g., "bull:{scenarios}:waiting" -> "{scenarios}"
+  // e.g., "bull:collector:waiting" -> "collector"
   const queueNames = Array.from(
     new Set(
-      allBullKeys.map((key) =>
-        key.split(":")[1]?.replace("{", "").replace("}", "")
-      )
+      allBullKeys.map((key) => key.split(":")[1]).filter(Boolean)
     )
-  ).filter(Boolean) as string[];
+  ) as string[];
 
   console.log("Discovered queues:", queueNames);
 
-  const queues = queueNames.map(
-    (name) => new BullMQAdapter(new Queue(name, { connection }))
-  );
+  // For display, strip braces but keep them for the actual Queue connection
+  const queues = queueNames.map((name) => {
+    const displayName = name.replace("{", "").replace("}", "");
+    return new BullMQAdapter(new Queue(name, { connection }), { displayName });
+  });
 
   const serverAdapter = new HonoAdapter(serveStatic);
   serverAdapter.setBasePath("/");
