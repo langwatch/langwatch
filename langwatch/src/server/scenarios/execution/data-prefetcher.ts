@@ -193,8 +193,11 @@ async function fetchProject(
   fetcher: ProjectFetcher,
 ): Promise<FetchProjectResult> {
   const project = await fetcher.findUnique(projectId);
-  if (!project?.apiKey) {
+  if (!project) {
     return { success: false, error: `Project ${projectId} not found` };
+  }
+  if (!project.apiKey) {
+    return { success: false, error: `Project ${projectId} missing API key` };
   }
   // Fall back to DEFAULT_MODEL like the rest of the app does
   return {
