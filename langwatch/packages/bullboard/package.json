@@ -9,7 +9,7 @@
     "@bull-board/api": "^6.11.1",
     "@bull-board/hono": "^6.11.1",
     "@hono/node-server": "^1.14.4",
-    "bullmq": "^6.1.1",
+    "bullmq": "^5.67.1",
     "dotenv": "^16.3.1",
     "hono": "^4.7.12",
     "ioredis": "^5.4.2"
