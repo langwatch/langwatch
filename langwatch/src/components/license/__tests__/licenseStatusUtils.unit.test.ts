@@ -5,8 +5,9 @@ import {
   formatLicenseDate,
   hasLicenseMetadata,
   normalizeKeyForActivation,
-  formatLimitValue,
+  formatLimitOrUnlimited,
   formatResourceUsage,
+  formatFileSize,
 } from "../licenseStatusUtils";
 
 /**
@@ -163,25 +164,25 @@ describe("isCorruptedLicense", () => {
   });
 });
 
-describe("formatLimitValue", () => {
+describe("formatLimitOrUnlimited", () => {
   it("returns 'Unlimited' for Infinity", () => {
-    expect(formatLimitValue(Infinity)).toBe("Unlimited");
+    expect(formatLimitOrUnlimited(Infinity)).toBe("Unlimited");
   });
 
   it("returns 'Unlimited' for Number.MAX_SAFE_INTEGER", () => {
-    expect(formatLimitValue(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
+    expect(formatLimitOrUnlimited(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
   });
 
   it("returns 'Unlimited' for values at or above 1 million threshold", () => {
-    expect(formatLimitValue(1_000_000)).toBe("Unlimited");
-    expect(formatLimitValue(10_000_000)).toBe("Unlimited");
+    expect(formatLimitOrUnlimited(1_000_000)).toBe("Unlimited");
+    expect(formatLimitOrUnlimited(10_000_000)).toBe("Unlimited");
   });
 
   it("returns formatted number for normal values below threshold", () => {
-    expect(formatLimitValue(100)).toBe("100");
-    expect(formatLimitValue(1000)).toBe("1,000");
-    expect(formatLimitValue(50000)).toBe("50,000");
-    expect(formatLimitValue(999_999)).toBe("999,999");
+    expect(formatLimitOrUnlimited(100)).toBe("100");
+    expect(formatLimitOrUnlimited(1000)).toBe("1,000");
+    expect(formatLimitOrUnlimited(50000)).toBe("50,000");
+    expect(formatLimitOrUnlimited(999_999)).toBe("999,999");
   });
 });
 
@@ -213,5 +214,27 @@ describe("formatLicenseDate", () => {
 
   it("returns original string for invalid date", () => {
     expect(formatLicenseDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatFileSize", () => {
+  it("formats bytes correctly", () => {
+    expect(formatFileSize(0)).toBe("0 B");
+    expect(formatFileSize(500)).toBe("500 B");
+    expect(formatFileSize(1023)).toBe("1023 B");
+  });
+
+  it("formats kilobytes correctly", () => {
+    expect(formatFileSize(1024)).toBe("1.0 KB");
+    expect(formatFileSize(2048)).toBe("2.0 KB");
+    expect(formatFileSize(1536)).toBe("1.5 KB");
+    expect(formatFileSize(1024 * 1024 - 1)).toBe("1024.0 KB");
+  });
+
+  it("formats megabytes correctly", () => {
+    expect(formatFileSize(1024 * 1024)).toBe("1.0 MB");
+    expect(formatFileSize(2 * 1024 * 1024)).toBe("2.0 MB");
+    expect(formatFileSize(1.5 * 1024 * 1024)).toBe("1.5 MB");
+    expect(formatFileSize(10 * 1024 * 1024)).toBe("10.0 MB");
   });
 });

@@ -1,4 +1,6 @@
 import { api } from "~/utils/api";
+import { toaster } from "../ui/toaster";
+import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -13,13 +15,37 @@ export function useLicenseActions({
 }: UseLicenseActionsOptions) {
   const uploadMutation = api.license.upload.useMutation({
     onSuccess: () => {
+      toaster.create({
+        title: "License activated",
+        description: "Your license has been successfully activated.",
+        type: "success",
+      });
       onUploadSuccess();
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Failed to activate license",
+        description: getUserFriendlyLicenseError(error.message),
+        type: "error",
+      });
     },
   });
 
   const removeMutation = api.license.remove.useMutation({
     onSuccess: () => {
+      toaster.create({
+        title: "License removed",
+        description: "Your organization is now running without a license. Some features may be limited.",
+        type: "info",
+      });
       onRemoveSuccess();
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Failed to remove license",
+        description: error.message,
+        type: "error",
+      });
     },
   });
 
@@ -36,9 +62,5 @@ export function useLicenseActions({
     remove,
     isUploading: uploadMutation.isLoading,
     isRemoving: removeMutation.isLoading,
-    uploadSuccess: uploadMutation.isSuccess,
-    uploadError: uploadMutation.error,
-    removeSuccess: removeMutation.isSuccess,
-    removeError: removeMutation.error,
   };
 }

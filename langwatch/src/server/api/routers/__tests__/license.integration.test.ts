@@ -16,7 +16,7 @@ import {
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { LicenseHandler } from "../../../../../ee/licensing";
+import { LicenseHandler, LicenseEnforcementRepository } from "../../../../../ee/licensing";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
@@ -34,7 +34,11 @@ vi.mock("../../../subscriptionHandler", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
   return {
     ...original,
-    getLicenseHandler: () => new LicenseHandler({ prisma, publicKey: TEST_PUBLIC_KEY }),
+    getLicenseHandler: () => new LicenseHandler({
+      prisma,
+      publicKey: TEST_PUBLIC_KEY,
+      repository: new LicenseEnforcementRepository(prisma),
+    }),
   };
 });
 
@@ -347,6 +351,7 @@ describe("License Router Integration", () => {
       planType: "PRO" as const,
       plan: {
         maxMembers: 10,
+        maxMembersLite: 5,
         maxProjects: 20,
         maxMessagesPerMonth: 100000,
         evaluationsCredit: 500,
@@ -421,6 +426,7 @@ describe("License Router Integration", () => {
         planType: "ENTERPRISE",
         plan: {
           maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
+          maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
           maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
           maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
           evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,

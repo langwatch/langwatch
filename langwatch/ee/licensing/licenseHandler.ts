@@ -4,15 +4,12 @@ import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE, FREE_PLAN, PUBLIC_KEY } from "./co
 import { OrganizationNotFoundError } from "./errors";
 import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
 import { validateLicense, parseLicenseKey } from "./validation";
-import {
-  LicenseEnforcementRepository,
-  type ILicenseEnforcementRepository,
-} from "~/server/license-enforcement/license-enforcement.repository";
+import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
   publicKey?: string;
-  repository?: ILicenseEnforcementRepository;
+  repository: ILicenseEnforcementRepository;
 }
 
 /**
@@ -45,15 +42,21 @@ export class LicenseHandler {
   constructor(config: LicenseHandlerConfig) {
     this.prisma = config.prisma;
     this.publicKey = config.publicKey ?? PUBLIC_KEY;
-    this.repository = config.repository ?? new LicenseEnforcementRepository(config.prisma);
+    this.repository = config.repository;
   }
 
   /**
    * Factory method for creating a LicenseHandler instance.
-   * Provides proper lifecycle management for production use.
+   * Wires up concrete implementations - the right place for DI wiring.
    */
   static create(prisma: PrismaClient, publicKey?: string): LicenseHandler {
-    return new LicenseHandler({ prisma, publicKey });
+    // Import here to avoid circular dependency and centralize DI wiring
+    const { LicenseEnforcementRepository } = require("~/server/license-enforcement/license-enforcement.repository");
+    return new LicenseHandler({
+      prisma,
+      publicKey,
+      repository: new LicenseEnforcementRepository(prisma),
+    });
   }
 
   /**

@@ -16,6 +16,7 @@ import { getLicenseHandler } from "~/server/subscriptionHandler";
 /** Schema for plan limits input */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
+  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
   maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
   maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
   evaluationsCredit: z.number().int().positive("Plan limits must be positive numbers"),
@@ -160,6 +161,7 @@ export const licenseRouter = createTRPCRouter({
           type: planTypeValue,
           name: planName,
           maxMembers: plan.maxMembers,
+          maxMembersLite: plan.maxMembersLite,
           maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
           evaluationsCredit: plan.evaluationsCredit,

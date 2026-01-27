@@ -20,16 +20,18 @@ import {
 } from "./fixtures/testLicenses";
 import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 import { FREE_PLAN } from "../constants";
+import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
 
 describe("LicenseHandler Integration", () => {
   let organizationId: string;
   let handler: LicenseHandler;
 
   beforeAll(async () => {
-    // Create handler with test public key
+    // Create handler with test public key and repository
     handler = new LicenseHandler({
       prisma,
       publicKey: TEST_PUBLIC_KEY,
+      repository: new LicenseEnforcementRepository(prisma),
     });
 
     // Create test organization

@@ -27,6 +27,10 @@ export { mapToPlanInfo } from "./planMapping";
 // License Handler
 export { LicenseHandler } from "./licenseHandler";
 
+// Repository (re-exported for factory wiring)
+export { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+export type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+
 // Errors
 export { OrganizationNotFoundError } from "./errors";
 

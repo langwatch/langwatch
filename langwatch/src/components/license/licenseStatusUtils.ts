@@ -91,7 +91,7 @@ const UNLIMITED_THRESHOLD = 1_000_000;
  * Formats a limit value for display.
  * Returns "Unlimited" for very large numbers (1M+) or special values like MAX_SAFE_INTEGER.
  */
-export function formatLimitValue(value: number): string {
+export function formatLimitOrUnlimited(value: number): string {
   if (!Number.isFinite(value) || value >= UNLIMITED_THRESHOLD) {
     return "Unlimited";
   }
@@ -103,5 +103,15 @@ export function formatLimitValue(value: number): string {
  * Example: "5 / 10" or "5 / Unlimited"
  */
 export function formatResourceUsage(current: number, max: number): string {
-  return `${current.toLocaleString()} / ${formatLimitValue(max)}`;
+  return `${current.toLocaleString()} / ${formatLimitOrUnlimited(max)}`;
+}
+
+/**
+ * Formats a file size in bytes to a human-readable string.
+ * Returns bytes for < 1KB, KB for < 1MB, MB otherwise.
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

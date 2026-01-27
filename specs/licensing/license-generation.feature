@@ -27,8 +27,9 @@ Feature: License Generation
       | maxScenarios        | 50     |
       | canPublish          | true   |
     And I click "Generate License"
-    Then I see a valid license key displayed
-    And the license key can be copied to clipboard
+    Then a license file is automatically downloaded
+    And the downloaded file is named "Acme Corp.langwatch-license"
+    And I see a success message confirming the download
 
   # Form validation and error handling
   @integration
@@ -97,11 +98,25 @@ Feature: License Generation
     And other fields keep the PRO template defaults
 
   @integration
-  Scenario: Copy generated license to clipboard
+  Scenario: License file download uses organization name in filename
+    Given I have filled in the organization name "Test Company Inc"
+    And I have completed all other required fields
+    When I click "Generate License"
+    Then the downloaded file is named "Test Company Inc.langwatch-license"
+
+  @integration
+  Scenario: License file download sanitizes special characters in filename
+    Given I have filled in the organization name "Company/With:Special*Characters"
+    And I have completed all other required fields
+    When I click "Generate License"
+    Then the downloaded file has a sanitized filename
+    And the filename uses the .langwatch-license extension
+
+  @integration
+  Scenario: License file contains valid license key content
     Given I have successfully generated a license
-    When I click the copy button
-    Then the license key is copied to the clipboard
-    And I see a confirmation message "License copied to clipboard"
+    Then the downloaded file contains a valid base64-encoded license key
+    And the file content can be used to activate a license
 
   @integration
   Scenario: Generate another license after successful generation

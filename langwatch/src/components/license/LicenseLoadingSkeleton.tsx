@@ -7,7 +7,6 @@ export function LicenseLoadingSkeleton() {
       borderRadius="lg"
       padding={6}
       width="full"
-      maxWidth="600px"
     >
       <VStack align="start" gap={4}>
         <Skeleton height="24px" width="150px" />

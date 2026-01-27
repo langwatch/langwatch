@@ -28,6 +28,7 @@ import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
 import { isAtMaxProjects } from "../../../utils/limits";
 import { trackEvent } from "../../../utils/tracking";
+import { usePlanManagementUrl } from "../../../hooks/usePlanManagementUrl";
 
 type RadioCardProps = {
   value: string;
@@ -81,6 +82,7 @@ export default function ProjectOnboarding() {
   const { organization, project } = useOrganizationTeamProject({
     redirectToProjectOnboarding: false,
   });
+  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const { team: teamSlug } = router.query;
   const team = api.team.getBySlug.useQuery(
@@ -157,7 +159,7 @@ export default function ProjectOnboarding() {
                   You have reached the maximum number of projects allowed by
                   your plan. Please{" "}
                   <Link
-                    href={`/settings/subscription`}
+                    href={planManagementUrl}
                     textDecoration="underline"
                     _hover={{
                       textDecoration: "none",

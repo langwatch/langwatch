@@ -23,8 +23,53 @@ export const LICENSE_ERRORS = {
   EXPIRED: "License expired",
 } as const;
 
+/**
+ * User-friendly error messages for display in the UI.
+ * Maps technical errors to human-readable messages.
+ */
+export const LICENSE_ERROR_MESSAGES = {
+  [LICENSE_ERRORS.INVALID_FORMAT]:
+    "The license key is invalid or has been tampered with. Please check the key and try again.",
+  [LICENSE_ERRORS.INVALID_SIGNATURE]:
+    "The license key is invalid or has been tampered with. Please check the key and try again.",
+  [LICENSE_ERRORS.EXPIRED]:
+    "This license has expired. Please contact support to renew your license.",
+} as const;
+
+/**
+ * Returns a user-friendly error message for a given license error.
+ * Falls back to the original error if not found in the mapping.
+ */
+export function getUserFriendlyLicenseError(error: string): string {
+  return (
+    LICENSE_ERROR_MESSAGES[error as keyof typeof LICENSE_ERROR_MESSAGES] ??
+    error
+  );
+}
+
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 
+/** Free tier resource limits - designed for individual evaluation/POC use */
+const FREE_TIER_LIMITS = {
+  /** Single operator model */
+  MEMBERS: 1,
+  /** Single operator model */
+  MEMBERS_LITE: 1,
+  /** Enough for a small POC */
+  PROJECTS: 2,
+  /** Minimal experimentation allowance */
+  WORKFLOWS: 3,
+  /** Minimal experimentation allowance */
+  PROMPTS: 3,
+  /** Minimal experimentation allowance */
+  EVALUATORS: 3,
+  /** Minimal experimentation allowance */
+  SCENARIOS: 3,
+  /** ~33 messages per day */
+  MESSAGES_PER_MONTH: 1_000,
+  /** Just enough to try the feature */
+  EVALUATIONS_CREDIT: 2,
+} as const;
 
 /**
  * UNLIMITED_PLAN: Default plan for self-hosted deployments without a license.
@@ -66,17 +111,17 @@ export const FREE_PLAN: PlanInfo = {
   free: true,
   overrideAddingLimitations: false,
 
-  maxMessagesPerMonth: 1_000,
-  evaluationsCredit: 2,
+  maxMessagesPerMonth: FREE_TIER_LIMITS.MESSAGES_PER_MONTH,
+  evaluationsCredit: FREE_TIER_LIMITS.EVALUATIONS_CREDIT,
 
-  maxMembers: 1,
-  maxMembersLite: 1,
-  maxProjects: 2,
+  maxMembers: FREE_TIER_LIMITS.MEMBERS,
+  maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,
+  maxProjects: FREE_TIER_LIMITS.PROJECTS,
 
-  maxWorkflows: 3,
-  maxPrompts: 3,
-  maxEvaluators: 3,
-  maxScenarios: 3,
+  maxWorkflows: FREE_TIER_LIMITS.WORKFLOWS,
+  maxPrompts: FREE_TIER_LIMITS.PROMPTS,
+  maxEvaluators: FREE_TIER_LIMITS.EVALUATORS,
+  maxScenarios: FREE_TIER_LIMITS.SCENARIOS,
   canPublish: false,
   prices: {
     USD: 0,
