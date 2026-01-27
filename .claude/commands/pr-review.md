@@ -7,27 +7,42 @@ Review and address unresolved PR comments from Code Rabbit and reviewers.
 1. Get PR (from `$ARGUMENTS` or detect from current branch via `gh pr list --head`)
 2. Fetch unresolved review threads via `gh api graphql`
 3. Triage comments into categories:
-   - **Fix now**: Security issues, bugs, logic errors, missing functionality in code we wrote
-   - **Out of scope**: Changes to code we didn't touch, large refactoring beyond PR scope
+   - **Fix now**: Security issues, bugs, logic errors in code we wrote
+   - **Out of scope**: New features, changes to code we didn't touch, large refactoring
    - **Won't fix**: False positives, style preferences that don't improve correctness
 4. Implement fixes for all "fix now" items
 5. Reply to threads explaining resolution or why not addressed
 6. Resolve addressed threads via `gh api graphql` mutation
 7. Check if rebase needed (`git rev-list --count HEAD..origin/main`)
 
+## Triage: Fix vs Out of Scope
+
+**Fix now** = the code is broken or wrong:
+- Security vulnerabilities
+- Logic errors / bugs
+- Missing error handling that causes crashes
+- Incorrect behavior vs documented intent
+
+**Out of scope (YAGNI)** = the code works but could do more:
+- "Add support for X" when X isn't used yet
+- "Handle edge case Y" when Y doesn't exist in production
+- "Extend interface to include Z" when Z isn't stored/implemented
+- Consistency improvements for features not yet built
+
+**Key question**: Is the reviewer pointing out something *broken*, or suggesting something *additional*? Only fix what's broken.
+
 ## Responding to Comments
 
-**Fix issues in code we wrote.** If a reviewer points out a problem in code this PR introduces or modifies, fix it now. "Future PR" is only for:
-- Changes to unrelated code outside the PR's scope
-- Large architectural changes that warrant separate discussion
-- Pre-existing issues not introduced by this PR
+**Fix bugs in code we wrote.** If a reviewer points out broken behavior in code this PR introduces, fix it now.
 
-Never defer fixing our own new code to a "future PR" - that's just avoiding the work.
+**Don't add features that don't exist yet.** If a reviewer suggests "you should also handle X" but X isn't a current requirement, that's YAGNI. Respond with: "X isn't implemented/used yet. Will add when we build that feature."
 
-When replying to comments:
+**Never defer bugs to "future PR"** - that's avoiding work. But deferring unrequested features is correct.
+
+When replying:
 - If fixed: briefly explain the fix
-- If out of scope: explain why and what would be needed
-- If won't fix: provide technical reasoning (not just "will do later")
+- If out of scope: explain what would need to exist first (DB schema, UI, etc.)
+- If won't fix: provide technical reasoning
 
 ## Output
 
