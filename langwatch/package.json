@@ -25,6 +25,7 @@
 		"start:prepare:db": "pnpm run prisma:migrate && pnpm run elastic:migrate && pnpm run clickhouse:migrate",
 		"start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
 		"start:scenario-worker": "tsx --tsconfig tsconfig.workers.json src/scenario-worker.ts",
+		"bullboard": "pnpm --filter @langwatch/bullboard start",
 		"typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
 		"typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
 		"test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
