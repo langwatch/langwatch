@@ -200,6 +200,7 @@ server.listen(PORT, () => {
 ║                    AI Test Server                          ║
 ╠════════════════════════════════════════════════════════════╣
 ║  URL:     http://localhost:${PORT}/generate                   ║
+║  Docker:  http://host.docker.internal:${PORT}/generate        ║
 ║  Method:  POST                                             ║
 ║  Headers: X-API-Key: <openai-api-key>                      ║
 ║           X-Client-ID: <client-identifier>                 ║
