@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import React, { useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
+import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
@@ -38,8 +39,9 @@ export const MainMenu = React.memo(function MainMenu({
   );
 
   // Feature flag: show scenarios menu using backend feature flags
-  const showScenariosOnThePlatform =
-    session?.user?.enabledFeatures?.includes("SCENARIOS");
+  const hasFeature = (flag: FrontendFeatureFlag) =>
+    session?.user?.enabledFeatures?.includes(flag) ?? false;
+  const showScenariosOnThePlatform = hasFeature("SCENARIOS");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
