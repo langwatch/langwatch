@@ -53,7 +53,7 @@ export const simulationRunnerRouter = createTRPCRouter({
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
-      const setId = input.setId ?? SCENARIO_DEFAULTS.SET_ID;
+      const setId = input.setId ?? SCENARIO_DEFAULTS.PLATFORM_SET_ID;
       const batchRunId = generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
