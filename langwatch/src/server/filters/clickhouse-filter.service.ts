@@ -158,6 +158,22 @@ export class ClickHouseFilterService {
 
           const sqlQuery = filterDef.buildQuery(queryParams);
 
+          // Defense-in-depth: ensure projectId (tenantId) is set and query includes tenant isolation
+          if (
+            !projectId ||
+            typeof projectId !== "string" ||
+            projectId.trim() === ""
+          ) {
+            throw new Error(
+              "Security: projectId (tenantId) must be a non-empty string",
+            );
+          }
+          if (!sqlQuery.includes("TenantId = {tenantId:String}")) {
+            throw new Error(
+              `Security: Filter query for ${field} is missing TenantId isolation`,
+            );
+          }
+
           // Get scope params to merge with base params
           const { params: scopeParams } = buildScopeConditions(queryParams);
 

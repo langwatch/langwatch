@@ -264,7 +264,10 @@ export const clickHouseFilters: Record<
   "spans.type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      // Note: stored_spans doesn't have scope conditions since it needs trace join
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts FINAL WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
       return `
         SELECT
           SpanAttributes['langwatch.span.type'] as field,
@@ -274,6 +277,7 @@ export const clickHouseFilters: Record<
         WHERE ${buildStoredSpansConditions(params)}
           AND SpanAttributes['langwatch.span.type'] != ''
           ${buildQueryFilter("SpanAttributes['langwatch.span.type']", params)}
+          ${scopeJoin}
         GROUP BY field
         ORDER BY field ASC
         LIMIT 10000
