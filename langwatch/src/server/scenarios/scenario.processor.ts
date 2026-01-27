@@ -124,8 +124,8 @@ const logger = createLogger("langwatch:scenarios:processor");
  */
 export function buildOtelResourceAttributes(labels: string[]): string | undefined {
   if (!labels.length) return undefined;
-  // Escape commas and equals in label values per OTEL spec
-  const escapedLabels = labels.map((l) => l.replace(/[,=]/g, "\\$&"));
+  // Escape backslashes, commas, and equals in label values per OTEL spec
+  const escapedLabels = labels.map((l) => l.replace(/[\\,=]/g, "\\$&"));
   return `scenario.labels=${escapedLabels.join(",")}`;
 }
 
@@ -327,6 +327,15 @@ export function startScenarioProcessor(
       { jobId: job?.id, error, data: job?.data },
       "Scenario job failed",
     );
+    // Emit failure events for unexpected errors (e.g., exceptions in processScenarioJob)
+    if (job) {
+      void handleFailedJobResult(job.data, error?.message, deps).catch((emitError) =>
+        logger.error(
+          { jobId: job.id, scenarioId: job.data.scenarioId, error: emitError },
+          "Failed to emit failure events from failed handler",
+        ),
+      );
+    }
   });
 
   worker.on("completed", async (job, result) => {
