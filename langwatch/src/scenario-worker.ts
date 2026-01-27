@@ -1,9 +1,13 @@
 /**
- * Scenario worker entry point.
+ * Scenario worker entry point (for independent deployment).
  *
- * This is a separate process from the main workers to ensure OTEL trace isolation.
- * Scenario traces are exported to LangWatch with scenario-specific metadata,
- * not mixed with server telemetry.
+ * Currently, scenario processing runs as part of the main workers process.
+ * This separate entry point exists for future independent scaling if scenarios
+ * need dedicated resources or isolation.
+ *
+ * OTEL trace isolation is handled at the child process level - each scenario
+ * spawns its own process with an independent tracer context, so running in
+ * the main workers process doesn't affect trace isolation.
  *
  * @see https://github.com/langwatch/langwatch/issues/1088
  */

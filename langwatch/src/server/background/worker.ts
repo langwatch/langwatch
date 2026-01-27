@@ -34,6 +34,8 @@ import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { getClickHouseClient } from "../clickhouse/client";
 import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
+import { startScenarioProcessor } from "../scenarios/scenario.processor";
+import type { ScenarioJob, ScenarioJobResult } from "../scenarios/scenario.queue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -83,6 +85,7 @@ type Workers = {
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
   eventSourcingWorker: Worker<EventSourcingJob, void, string> | undefined;
+  scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
 
 export const start = (
@@ -108,6 +111,7 @@ export const start = (
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
     const eventSourcingWorker = startEventSourcingWorker();
+    const scenarioWorker = startScenarioProcessor();
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -117,6 +121,7 @@ export const start = (
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("eventSourcing", eventSourcingWorker);
+    registerCloseable("scenario", scenarioWorker);
     registerCloseable("metricsServer", { close: () => new Promise<void>((resolve) => metricsServer.close(() => resolve())) });
 
     incrementWorkerRestartCount();
@@ -133,6 +138,7 @@ export const start = (
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     eventSourcingWorker?.on("closing", closingListener);
+    scenarioWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -145,6 +151,7 @@ export const start = (
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           eventSourcingWorker?.off("closing", closingListener);
+          scenarioWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
@@ -152,6 +159,7 @@ export const start = (
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
             eventSourcingWorker?.close(),
+            scenarioWorker?.close(),
           ]);
 
           setTimeout(() => {
@@ -169,6 +177,7 @@ export const start = (
         trackEventsWorker,
         usageStatsWorker,
         eventSourcingWorker,
+        scenarioWorker,
       });
     }
   });

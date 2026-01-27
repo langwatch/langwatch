@@ -33,10 +33,10 @@ describe("handleFailedJobResult", () => {
 
     mockDeps = {
       scenarioLookup: {
-        getById: mockGetById,
+        getById: mockGetById as ProcessorDependencies["scenarioLookup"]["getById"],
       },
       failureEmitter: {
-        ensureFailureEventsEmitted: mockEnsureFailureEventsEmitted,
+        ensureFailureEventsEmitted: mockEnsureFailureEventsEmitted as ProcessorDependencies["failureEmitter"]["ensureFailureEventsEmitted"],
       },
     };
   });
