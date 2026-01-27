@@ -3,6 +3,37 @@
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - Link PRs to issues with `Closes #N`
 
+## Branch Naming
+
+| Branch Type | Format | Example |
+|-------------|--------|---------|
+| Issue-linked | `issue<number>/<slug>` | `issue123/user-login-feature` |
+| Feature | `feat/<slug>` | `feat/dark-mode` |
+| Bugfix | `fix/<slug>` | `fix/auth-redirect` |
+| Refactor | `refactor/<slug>` | `refactor/api-cleanup` |
+
+**Rules:**
+- Slugs: lowercase, hyphen-separated, max 40 characters
+- Issue-linked branches: always use `issue<number>/` prefix (no hyphen after "issue")
+- The issue number prefix enables easy lookup: `git branch | grep issue123`
+
+## Worktrees
+
+Worktrees live in a dedicated `../worktrees/` directory (sibling to langwatch-saas).
+
+| Branch | Directory |
+|--------|-----------|
+| `issue123/user-login` | `../worktrees/worktree-issue123-user-login` |
+| `feat/dark-mode` | `../worktrees/worktree-feat-dark-mode` |
+
+Create worktrees with `/worktree`:
+```bash
+/worktree #123          # Creates issue123/<slug> from issue title
+/worktree my-feature    # Creates feat/my-feature
+```
+
+See `.claude/commands/worktree.md` for full details.
+
 ## Issues
 
 When creating issues, add them to the **LangWatch Kanban** project and fill in:
