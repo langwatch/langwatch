@@ -5,4 +5,5 @@ export type { FeatureFlagServiceInterface } from "./types";
 export {
   FRONTEND_FEATURE_FLAGS,
   type FrontendFeatureFlag,
+  getEnabledFrontendFeatures,
 } from "./frontendFeatureFlags";

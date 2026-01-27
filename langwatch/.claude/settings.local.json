@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm run test:unit:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(pnpm run test:integration:*)",
+      "Bash(gh issue create:*)",
+      "Bash(pnpm exec grep:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm pack:*)",
+      "Bash(pnpm install:*)",
+      "Bash(ls:*)",
+      "Bash(npm view:*)",
+      "Bash(tsgo --version:*)",
+      "Bash(time ./node_modules/.bin/tsgo:*)",
+      "Bash(./node_modules/.bin/tsgo:*)",
+      "Bash(time pnpm typecheck:*)",
+      "Bash(time npx tsc:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(npm test:*)",
+      "Bash(pnpm exec biome check:*)",
+      "Bash(pnpm exec biome format:*)",
+      "Bash(pnpm run buildpack:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh label list:*)",
+      "Bash(gh milestone:*)",
+      "Bash(gh api:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

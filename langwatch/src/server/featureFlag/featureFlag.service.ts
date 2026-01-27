@@ -49,8 +49,13 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
    * FEATURE_FLAGS_DISABLED=flag1,flag2 - force disable flags
    */
   private checkEnvOverride(flagKey: string): boolean | undefined {
-    const enabledFlags = process.env.FEATURE_FLAGS_ENABLED?.split(",") ?? [];
-    const disabledFlags = process.env.FEATURE_FLAGS_DISABLED?.split(",") ?? [];
+    const parseFlags = (envVar: string | undefined): string[] =>
+      (envVar?.split(",") ?? [])
+        .map((flag) => flag.trim())
+        .filter((flag) => flag.length > 0);
+
+    const enabledFlags = parseFlags(process.env.FEATURE_FLAGS_ENABLED);
+    const disabledFlags = parseFlags(process.env.FEATURE_FLAGS_DISABLED);
 
     if (enabledFlags.includes(flagKey)) {
       return true;
