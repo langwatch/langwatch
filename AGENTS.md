@@ -64,6 +64,7 @@ specs/               # BDD feature specs
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
+| Flat test structure with GWT comments | Use nested `describe("given X")` and `describe("when Y")` blocks for BDD structure, not comments |
 | Naming tests as unit when they render components | Tests that render components and mock boundaries are integration tests (`.integration.test.ts`), not unit tests |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
