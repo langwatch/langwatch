@@ -118,9 +118,9 @@ test.describe("Scenario Execution", () => {
       { timeout: 60000 }
     );
 
-    // Verify we're NOT in the default set
+    // Verify we're NOT in the legacy "default" fallback set
+    // Note: "local-scenarios" (PLATFORM_SET_ID) is valid - that's the platform default
     expect(page.url()).not.toContain("/default/");
-    expect(page.url()).not.toContain("/local-scenarios/");
   });
 
   /**

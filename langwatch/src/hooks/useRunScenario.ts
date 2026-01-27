@@ -11,6 +11,12 @@ interface UseRunScenarioOptions {
   projectSlug: string | undefined;
 }
 
+interface RunScenarioParams {
+  scenarioId: string;
+  target: TargetValue;
+  setId?: string;
+}
+
 export function useRunScenario({
   projectId,
   projectSlug,
@@ -21,7 +27,8 @@ export function useRunScenario({
   const [isPolling, setIsPolling] = useState(false);
 
   const runScenario = useCallback(
-    async (scenarioId: string, target: TargetValue, setId?: string) => {
+    async (params: RunScenarioParams) => {
+      const { scenarioId, target, setId } = params;
       if (!projectId || !projectSlug || !target) return;
 
       try {
