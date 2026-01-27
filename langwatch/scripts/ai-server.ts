@@ -195,20 +195,21 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
+  const pad = (s: string) => s.padEnd(78);
   console.log(`
 ╔════════════════════════════════════════════════════════════════════════════════╗
-║                              AI Test Server                                    ║
+║${pad("                              AI Test Server")}║
 ╠════════════════════════════════════════════════════════════════════════════════╣
-║  URL:     http://localhost:${PORT}/generate                                       ║
-║  Docker:  http://host.docker.internal:${PORT}/generate                            ║
-║  Method:  POST                                                                 ║
-║  Headers: X-API-Key: <openai-api-key>                                          ║
-║           X-Client-ID: <client-identifier>                                     ║
-║           Content-Type: application/json                                       ║
+║${pad(`  URL:     http://localhost:${PORT}/generate`)}║
+║${pad(`  Docker:  http://host.docker.internal:${PORT}/generate`)}║
+║${pad("  Method:  POST")}║
+║${pad("  Headers: X-API-Key: <openai-api-key>")}║
+║${pad("           X-Client-ID: <client-identifier>")}║
+║${pad("           Content-Type: application/json")}║
 ╠════════════════════════════════════════════════════════════════════════════════╣
-║  Body:    { "model": "gpt-4o-mini", "messages": [...] }                        ║
+║${pad('  Body:    { "model": "gpt-4o-mini", "messages": [...] }')}║
 ╠════════════════════════════════════════════════════════════════════════════════╣
-║  Tunnel:  docker run --rm cloudflare/cloudflared tunnel --url http://host.docker.internal:${PORT}  ║
+║${pad(`  Tunnel:  docker run --rm cloudflare/cloudflared tunnel --url http://host.docker.internal:${PORT}`)}║
 ╚════════════════════════════════════════════════════════════════════════════════╝
 `);
 });

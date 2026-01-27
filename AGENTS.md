@@ -102,6 +102,9 @@ The orchestrator:
 3. Tracks progress via task status updates
 4. Does NOT read or write code directly
 
-Agents: `.claude/agents/coder.md`, `.claude/agents/uncle-bob-reviewer.md`, `.claude/agents/repo-sherpa.md`
+Agents:
+- **coder** (`.claude/agents/coder.md`): Implements features with TDD. Reads requirements, writes failing tests first, implements minimal code to pass, refactors, and self-verifies before returning.
+- **uncle-bob-reviewer** (`.claude/agents/uncle-bob-reviewer.md`): Reviews code for SOLID principles, clean code violations, and TDD practices. Provides uncompromising feedback on software craftsmanship.
+- **repo-sherpa** (`.claude/agents/repo-sherpa.md`): Answers questions about repository structure, documentation, and developer experience. Owns the meta-layer (agents, skills, docs).
 
 See `.claude/README.md` for full orchestration documentation.

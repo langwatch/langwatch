@@ -124,9 +124,39 @@ const logger = createLogger("langwatch:scenarios:processor");
  */
 export function buildOtelResourceAttributes(labels: string[]): string | undefined {
   if (!labels.length) return undefined;
-  // Escape backslashes, commas, and equals in label values per OTEL spec
-  const escapedLabels = labels.map((l) => l.replace(/[\\,=]/g, "\\$&"));
+  // Escape backslashes first, then commas and equals per OTEL spec
+  const escapedLabels = labels.map((l) => l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
   return `scenario.labels=${escapedLabels.join(",")}`;
+}
+
+/**
+ * Build minimal env for child process - whitelist only what's needed.
+ * Following the goose.ts pattern to prevent leaking sensitive vars.
+ * @internal Exported for testing
+ */
+export function buildChildProcessEnv(
+  scenarioVars: Record<string, string | undefined>,
+): NodeJS.ProcessEnv {
+  const vars: Record<string, string | undefined> = {
+    // System vars (required for tsx/node to run)
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    SHELL: process.env.SHELL,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    TERM: process.env.TERM,
+    // Node.js vars
+    NODE_ENV: process.env.NODE_ENV,
+    NODE_OPTIONS: process.env.NODE_OPTIONS,
+    // Scenario-specific vars (passed in)
+    ...scenarioVars,
+  };
+
+  // Filter out undefined values
+  return Object.fromEntries(
+    Object.entries(vars).filter(([, v]) => v !== undefined),
+  ) as NodeJS.ProcessEnv;
 }
 
 /**
@@ -203,15 +233,19 @@ async function spawnScenarioChildProcess(
     // Build OTEL resource attributes including scenario labels
     const otelResourceAttrs = buildOtelResourceAttributes(jobData.scenario.labels);
 
+    // Build minimal env for child process - whitelist only what's needed
+    // Following the goose.ts pattern to prevent leaking sensitive vars
+    // (especially OTEL_* which would corrupt telemetry isolation)
+    const childEnv = buildChildProcessEnv({
+      LANGWATCH_API_KEY: telemetry.apiKey,
+      LANGWATCH_ENDPOINT: telemetry.endpoint,
+      SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
+      ...(otelResourceAttrs && { OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs }),
+    });
+
     // tsx is available since the worker runs via tsx
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
-      env: {
-        ...process.env,
-        LANGWATCH_API_KEY: telemetry.apiKey,
-        LANGWATCH_ENDPOINT: telemetry.endpoint,
-        SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
-        ...(otelResourceAttrs && { OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs }),
-      },
+      env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

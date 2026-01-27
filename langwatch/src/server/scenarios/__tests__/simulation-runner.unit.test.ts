@@ -9,13 +9,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 // Test the batch ID generation pattern directly without importing the module
 // (importing scenario.queue triggers processScenarioJob → database connections)
 describe("generateBatchRunId pattern", () => {
   // Mirror the implementation for unit testing
-  const generateBatchRunId = () => `scenariobatch_${nanoid()}`;
+  const generateBatchRunId = () =>
+    generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
   it("generates IDs with scenariobatch_ prefix", () => {
     const id = generateBatchRunId();
@@ -28,10 +30,11 @@ describe("generateBatchRunId pattern", () => {
     expect(id1).not.toBe(id2);
   });
 
-  it("generates IDs with expected length (prefix + nanoid)", () => {
+  it("generates IDs with expected KSUID format", () => {
     const id = generateBatchRunId();
-    // "scenariobatch_" is 14 chars, nanoid default is 21 chars = 35 total
-    expect(id.length).toBe(35);
+    // KSUID format: {resource}_{base62-encoded-ksuid}
+    // Resource "scenariobatch" + "_" = 14 chars, KSUID payload is 29 chars = 43 total
+    expect(id.length).toBe(43);
   });
 });
 

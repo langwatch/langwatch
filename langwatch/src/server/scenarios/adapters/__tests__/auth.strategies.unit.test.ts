@@ -32,11 +32,6 @@ describe("AUTH_STRATEGIES", () => {
       const result = AUTH_STRATEGIES.bearer({ type: "none" });
       expect(result).toEqual({});
     });
-
-    it("returns empty headers when token is missing", () => {
-      const result = AUTH_STRATEGIES.bearer({ type: "bearer" });
-      expect(result).toEqual({});
-    });
   });
 
   describe("api_key", () => {
@@ -53,22 +48,6 @@ describe("AUTH_STRATEGIES", () => {
 
     it("returns empty headers when type is not api_key", () => {
       const result = AUTH_STRATEGIES.api_key({ type: "none" });
-      expect(result).toEqual({});
-    });
-
-    it("returns empty headers when header is missing", () => {
-      const result = AUTH_STRATEGIES.api_key({
-        type: "api_key",
-        value: "my-api-key",
-      });
-      expect(result).toEqual({});
-    });
-
-    it("returns empty headers when value is missing", () => {
-      const result = AUTH_STRATEGIES.api_key({
-        type: "api_key",
-        header: "X-API-Key",
-      });
       expect(result).toEqual({});
     });
   });
@@ -101,14 +80,6 @@ describe("AUTH_STRATEGIES", () => {
 
     it("returns empty headers when type is not basic", () => {
       const result = AUTH_STRATEGIES.basic({ type: "none" });
-      expect(result).toEqual({});
-    });
-
-    it("returns empty headers when username is missing", () => {
-      const result = AUTH_STRATEGIES.basic({
-        type: "basic",
-        password: "pass",
-      });
       expect(result).toEqual({});
     });
   });
@@ -157,12 +128,5 @@ describe("applyAuthentication", () => {
     expect(result).toEqual({
       Authorization: `Basic ${expectedCredentials}`,
     });
-  });
-
-  it("returns empty headers for unknown auth type", () => {
-    const result = applyAuthentication({
-      type: "unknown" as AuthConfig["type"],
-    });
-    expect(result).toEqual({});
   });
 });

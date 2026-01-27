@@ -1,116 +1,170 @@
 /**
  * Types for scenario execution.
  *
+ * Zod schemas with inferred types for data contracts.
  * Interfaces are segregated by responsibility (ISP) so consumers
  * only depend on what they actually need.
  */
 
+import { z } from "zod";
+
 // ============================================================================
-// Adapter Data Types
+// Adapter Data Types (Zod schemas for data contracts)
 // ============================================================================
 
 /**
  * Pre-fetched prompt configuration data for serialized execution.
  * Contains all data needed to execute prompt-based scenarios without DB access.
  */
-export interface PromptConfigData {
-  type: "prompt";
-  promptId: string;
-  systemPrompt: string;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+export const PromptConfigDataSchema = z.object({
+  type: z.literal("prompt"),
+  promptId: z.string(),
+  systemPrompt: z.string(),
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+    })
+  ),
   /** Model configured on prompt (if any). Used for model selection logic. */
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
+  model: z.string().optional(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional(),
+});
+export type PromptConfigData = z.infer<typeof PromptConfigDataSchema>;
+
+/**
+ * Authentication configuration schemas using discriminated union.
+ * Each auth type has its required fields enforced by the schema.
+ */
+export const AuthConfigNoneSchema = z.object({
+  type: z.literal("none"),
+});
+
+export const AuthConfigBearerSchema = z.object({
+  type: z.literal("bearer"),
+  token: z.string(),
+});
+
+export const AuthConfigApiKeySchema = z.object({
+  type: z.literal("api_key"),
+  header: z.string(),
+  value: z.string(),
+});
+
+export const AuthConfigBasicSchema = z.object({
+  type: z.literal("basic"),
+  username: z.string(),
+  password: z.string().optional(),
+});
+
+export const AuthConfigSchema = z.discriminatedUnion("type", [
+  AuthConfigNoneSchema,
+  AuthConfigBearerSchema,
+  AuthConfigApiKeySchema,
+  AuthConfigBasicSchema,
+]);
 
 /**
  * Pre-fetched HTTP agent configuration for serialized execution.
  * Contains all data needed to execute HTTP-based scenarios without DB access.
  */
-export interface HttpAgentData {
-  type: "http";
-  agentId: string;
-  url: string;
-  method: string;
-  headers: Array<{ key: string; value: string }>;
-  auth?: {
-    type: "none" | "bearer" | "api_key" | "basic";
-    token?: string;
-    header?: string;
-    value?: string;
-    username?: string;
-    password?: string;
-  };
-  bodyTemplate?: string;
-  outputPath?: string;
-}
+export const HttpAgentDataSchema = z.object({
+  type: z.literal("http"),
+  agentId: z.string(),
+  url: z.string(),
+  method: z.string(),
+  headers: z.array(
+    z.object({
+      key: z.string(),
+      value: z.string(),
+    })
+  ),
+  auth: AuthConfigSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
+});
+export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
 /** Union type for all supported target adapter data */
-export type TargetAdapterData = PromptConfigData | HttpAgentData;
+export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
+  PromptConfigDataSchema,
+  HttpAgentDataSchema,
+]);
+export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
 // ============================================================================
 // LiteLLM Types
 // ============================================================================
 
 /** LiteLLM proxy parameters for model access */
-export interface LiteLLMParams {
-  api_key: string;
-  model: string;
-  [key: string]: string;
-}
+export const LiteLLMParamsSchema = z
+  .object({
+    api_key: z.string(),
+    model: z.string(),
+  })
+  .catchall(z.string());
+export type LiteLLMParams = z.infer<typeof LiteLLMParamsSchema>;
 
 // ============================================================================
-// Segregated Interfaces (ISP)
+// Segregated Interfaces (ISP) - Zod schemas for serializable contracts
 // ============================================================================
 
 /** Scenario definition - what to test */
-export interface ScenarioConfig {
-  id: string;
-  name: string;
-  situation: string;
-  criteria: string[];
-  labels: string[];
-}
+export const ScenarioConfigSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  situation: z.string(),
+  criteria: z.array(z.string()),
+  labels: z.array(z.string()),
+});
+export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 
 /** Execution context - grouping and correlation */
-export interface ExecutionContext {
-  projectId: string;
-  scenarioId: string;
-  setId: string;
-  batchRunId: string;
-}
+export const ExecutionContextSchema = z.object({
+  projectId: z.string(),
+  scenarioId: z.string(),
+  setId: z.string(),
+  batchRunId: z.string(),
+});
+export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
 /** Model configuration - LLM settings */
-export interface ModelConfig {
-  defaultModel: string;
-  defaultParams: LiteLLMParams;
-  nlpServiceUrl: string;
-}
+export const ModelConfigSchema = z.object({
+  defaultModel: z.string(),
+  defaultParams: LiteLLMParamsSchema,
+  nlpServiceUrl: z.string(),
+});
+export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 
 /** Telemetry configuration - where to send traces */
-export interface TelemetryConfig {
-  endpoint: string;
-  apiKey: string;
-}
+export const TelemetryConfigSchema = z.object({
+  endpoint: z.string(),
+  apiKey: z.string(),
+});
+export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
-export interface TargetConfig {
-  type: "prompt" | "http";
-  referenceId: string;
-}
+export const TargetConfigSchema = z.object({
+  type: z.enum(["prompt", "http"]),
+  referenceId: z.string(),
+});
+export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 // ============================================================================
 // Result Types
 // ============================================================================
 
 /** Result of scenario execution */
-export interface ScenarioExecutionResult {
-  success: boolean;
-  runId?: string;
-  reasoning?: string;
-  error?: string;
-}
+export const ScenarioExecutionResultSchema = z.object({
+  success: z.boolean(),
+  runId: z.string().optional(),
+  reasoning: z.string().optional(),
+  error: z.string().optional(),
+});
+export type ScenarioExecutionResult = z.infer<
+  typeof ScenarioExecutionResultSchema
+>;
 
 // ============================================================================
 // Child Process Types (for OTEL isolation)
@@ -120,10 +174,11 @@ export interface ScenarioExecutionResult {
  * Complete data package for child process execution.
  * Contains everything needed to run a scenario without DB access.
  */
-export interface ChildProcessJobData {
-  context: ExecutionContext;
-  scenario: ScenarioConfig;
-  adapterData: TargetAdapterData;
-  modelParams: LiteLLMParams;
-  nlpServiceUrl: string;
-}
+export const ChildProcessJobDataSchema = z.object({
+  context: ExecutionContextSchema,
+  scenario: ScenarioConfigSchema,
+  adapterData: TargetAdapterDataSchema,
+  modelParams: LiteLLMParamsSchema,
+  nlpServiceUrl: z.string(),
+});
+export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
