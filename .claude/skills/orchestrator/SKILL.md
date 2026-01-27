@@ -16,7 +16,7 @@ You are the **orchestrator**. You do not read code or write code directly. You h
 
 ### Delegation Syntax
 Use the Skill tool to delegate:
-```
+```text
 Skill(skill: "code", args: "feature file path and requirements...")
 Skill(skill: "review", args: "focus areas for review...")
 ```

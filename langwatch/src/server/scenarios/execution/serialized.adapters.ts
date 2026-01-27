@@ -85,11 +85,13 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
   }
 
   /**
-   * Check if the template (system prompt or any message) contains {{messages}}.
+   * Check if the template (system prompt or any message) references messages.
+   * Handles: {{ messages }}, {{ messages | json }}, {% for m in messages %}
    * If so, the template handles conversation history placement.
    */
   private templateContainsMessages(): boolean {
-    const messagesPattern = /\{\{\s*messages\s*\}\}/;
+    // Match {{ messages }}, {{ messages | filter }}, or {% for/if with messages %}
+    const messagesPattern = /\{\{[\s\S]*?\bmessages\b[\s\S]*?\}\}|\{%[\s\S]*?\bmessages\b[\s\S]*?%\}/;
     if (messagesPattern.test(this.config.systemPrompt)) {
       return true;
     }
@@ -137,10 +139,11 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
+    const method = this.config.method.toUpperCase();
     const response = await ssrfSafeFetch(this.config.url, {
-      method: this.config.method,
+      method,
       headers,
-      body: this.config.method !== "GET" ? body : undefined,
+      body: method !== "GET" ? body : undefined,
     });
 
     if (!response.ok) {

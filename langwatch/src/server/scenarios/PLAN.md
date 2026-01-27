@@ -27,7 +27,7 @@ The initial implementation violated multiple SOLID principles:
 
 ## Architecture
 
-```
+```text
 src/
 ├── scenario-worker.ts                    # Entry point (separate process)
 └── server/scenarios/
