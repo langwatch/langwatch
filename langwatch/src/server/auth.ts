@@ -26,6 +26,7 @@ import { dependencies } from "../injection/dependencies.server";
 import {
   featureFlagService,
   FRONTEND_FEATURE_FLAGS,
+  type FrontendFeatureFlag,
 } from "./featureFlag";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
@@ -33,8 +34,10 @@ import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");
 
-async function getEnabledFrontendFeatures(userId: string): Promise<string[]> {
-  const enabledFeatures: string[] = [];
+async function getEnabledFrontendFeatures(
+  userId: string,
+): Promise<FrontendFeatureFlag[]> {
+  const enabledFeatures: FrontendFeatureFlag[] = [];
   for (const flag of FRONTEND_FEATURE_FLAGS) {
     if (await featureFlagService.isEnabled(flag, userId, false)) {
       enabledFeatures.push(flag);
@@ -53,7 +56,7 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
-      enabledFeatures?: string[];
+      enabledFeatures?: FrontendFeatureFlag[];
     };
   }
 }
