@@ -57,7 +57,6 @@ import { createInnerTRPCContext } from "../../../trpc";
 const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
 const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
-// Create a caller for the router
 function createTestCaller() {
   const ctx = createInnerTRPCContext({
     session: {
@@ -65,12 +64,10 @@ function createTestCaller() {
       expires: "2099-01-01",
     } as any,
   });
-  // Create a minimal router just for this test
-  // We use the simulationRunnerRouter directly
   return simulationRunnerRouter.createCaller({ ...ctx, permissionChecked: true });
 }
 
-describe("simulationRunnerRouter.run - API-level validation", () => {
+describe("simulationRunnerRouter.run", () => {
   const defaultInput = {
     projectId: "proj_123",
     scenarioId: "scen_123",
@@ -84,113 +81,121 @@ describe("simulationRunnerRouter.run - API-level validation", () => {
     caller = createTestCaller();
   });
 
-  describe("Return immediate error when project default model not configured", () => {
-    /**
-     * @feature specs/scenarios/simulation-runner.feature
-     * @scenario Return immediate error when project default model not configured
-     */
-    it("throws TRPCError with BAD_REQUEST when project has no default model", async () => {
-      // Given: project has no default model configured
+  describe("given project has no default model configured", () => {
+    beforeEach(() => {
       mockPrefetchScenarioData.mockResolvedValue({
         success: false,
         error: "Project default model is not configured",
       });
+    });
 
-      // When: the run scenario API is called
-      // Then: it returns an immediate error (not scheduled)
-      await expect(caller.run(defaultInput)).rejects.toThrow(TRPCError);
+    describe("when run is called", () => {
+      it("throws TRPCError with BAD_REQUEST code", async () => {
+        await expect(caller.run(defaultInput)).rejects.toThrow(TRPCError);
 
-      try {
-        await caller.run(defaultInput);
-      } catch (error) {
-        // And: the error message is "Project default model is not configured"
-        expect(error).toBeInstanceOf(TRPCError);
-        const trpcError = error as TRPCError;
-        expect(trpcError.code).toBe("BAD_REQUEST");
-        expect(trpcError.message).toBe("Project default model is not configured");
-      }
+        try {
+          await caller.run(defaultInput);
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          expect((error as TRPCError).code).toBe("BAD_REQUEST");
+        }
+      });
 
-      // And: scheduleScenarioRun is NOT called when validation fails
-      expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      it("returns error message about missing model", async () => {
+        try {
+          await caller.run(defaultInput);
+        } catch (error) {
+          expect((error as TRPCError).message).toBe("Project default model is not configured");
+        }
+      });
+
+      it("does not schedule the job", async () => {
+        try {
+          await caller.run(defaultInput);
+        } catch {
+          // Expected to throw
+        }
+        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      });
     });
   });
 
-  describe("Return immediate error when scenario not found", () => {
-    /**
-     * @feature specs/scenarios/simulation-runner.feature
-     * @scenario Return immediate error when scenario not found
-     */
-    it("throws TRPCError with BAD_REQUEST when scenario does not exist", async () => {
-      // Given: scenario "nonexistent" does not exist
+  describe("given scenario does not exist", () => {
+    beforeEach(() => {
       mockPrefetchScenarioData.mockResolvedValue({
         success: false,
         error: "Scenario nonexistent not found",
       });
+    });
 
-      // When: the run scenario API is called
-      // Then: it returns an immediate error (not scheduled)
-      await expect(caller.run({
-        ...defaultInput,
-        scenarioId: "nonexistent",
-      })).rejects.toThrow(TRPCError);
-
-      try {
-        await caller.run({
+    describe("when run is called", () => {
+      it("throws TRPCError with BAD_REQUEST code", async () => {
+        await expect(caller.run({
           ...defaultInput,
           scenarioId: "nonexistent",
-        });
-      } catch (error) {
-        // And: the error message contains "not found"
-        expect(error).toBeInstanceOf(TRPCError);
-        const trpcError = error as TRPCError;
-        expect(trpcError.code).toBe("BAD_REQUEST");
-        expect(trpcError.message).toContain("not found");
-      }
+        })).rejects.toThrow(TRPCError);
+      });
 
-      // And: scheduleScenarioRun is NOT called when validation fails
-      expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      it("returns error message containing not found", async () => {
+        try {
+          await caller.run({ ...defaultInput, scenarioId: "nonexistent" });
+        } catch (error) {
+          expect((error as TRPCError).code).toBe("BAD_REQUEST");
+          expect((error as TRPCError).message).toContain("not found");
+        }
+      });
+
+      it("does not schedule the job", async () => {
+        try {
+          await caller.run({ ...defaultInput, scenarioId: "nonexistent" });
+        } catch {
+          // Expected to throw
+        }
+        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      });
     });
   });
 
-  describe("Return immediate error when prompt not found", () => {
-    /**
-     * @feature specs/scenarios/simulation-runner.feature
-     * @scenario Return immediate error when prompt not found
-     */
-    it("throws TRPCError with BAD_REQUEST when prompt does not exist", async () => {
-      // Given: scenario "Test" exists, and prompt "nonexistent" does not exist
+  describe("given prompt does not exist", () => {
+    beforeEach(() => {
       mockPrefetchScenarioData.mockResolvedValue({
         success: false,
         error: "Prompt nonexistent not found",
       });
+    });
 
-      // When: the run scenario API is called with prompt target
+    describe("when run is called with prompt target", () => {
       const input = {
         ...defaultInput,
         target: { type: "prompt" as const, referenceId: "nonexistent" },
       };
 
-      // Then: it returns an immediate error (not scheduled)
-      await expect(caller.run(input)).rejects.toThrow(TRPCError);
+      it("throws TRPCError with BAD_REQUEST code", async () => {
+        await expect(caller.run(input)).rejects.toThrow(TRPCError);
+      });
 
-      try {
-        await caller.run(input);
-      } catch (error) {
-        // And: the error message contains "not found"
-        expect(error).toBeInstanceOf(TRPCError);
-        const trpcError = error as TRPCError;
-        expect(trpcError.code).toBe("BAD_REQUEST");
-        expect(trpcError.message).toContain("not found");
-      }
+      it("returns error message containing not found", async () => {
+        try {
+          await caller.run(input);
+        } catch (error) {
+          expect((error as TRPCError).code).toBe("BAD_REQUEST");
+          expect((error as TRPCError).message).toContain("not found");
+        }
+      });
 
-      // And: scheduleScenarioRun is NOT called when validation fails
-      expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      it("does not schedule the job", async () => {
+        try {
+          await caller.run(input);
+        } catch {
+          // Expected to throw
+        }
+        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      });
     });
   });
 
-  describe("Successful validation schedules the job", () => {
-    it("schedules scenario run when validation passes", async () => {
-      // Given: all validation passes
+  describe("given all validation passes", () => {
+    beforeEach(() => {
       mockPrefetchScenarioData.mockResolvedValue({
         success: true,
         data: {
@@ -224,25 +229,30 @@ describe("simulationRunnerRouter.run - API-level validation", () => {
           apiKey: "test-api-key",
         },
       });
+    });
 
-      // When: the run scenario API is called
-      const result = await caller.run(defaultInput);
+    describe("when run is called", () => {
+      it("schedules the scenario run with correct parameters", async () => {
+        await caller.run(defaultInput);
 
-      // Then: the job is scheduled
-      expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-        projectId: "proj_123",
-        scenarioId: "scen_123",
-        target: { type: "prompt", referenceId: "prompt_123" },
-        setId: "local-scenarios",
-        batchRunId: "batch_test_123",
+        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          scenarioId: "scen_123",
+          target: { type: "prompt", referenceId: "prompt_123" },
+          setId: "local-scenarios",
+          batchRunId: "batch_test_123",
+        });
       });
 
-      // And: returns the scheduled job info
-      expect(result).toEqual({
-        scheduled: true,
-        jobId: "job_test_123",
-        setId: "local-scenarios",
-        batchRunId: "batch_test_123",
+      it("returns scheduled job info", async () => {
+        const result = await caller.run(defaultInput);
+
+        expect(result).toEqual({
+          scheduled: true,
+          jobId: "job_test_123",
+          setId: "local-scenarios",
+          batchRunId: "batch_test_123",
+        });
       });
     });
   });

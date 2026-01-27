@@ -17,76 +17,93 @@ import {
 } from "../adapters/prompt.adapter.factory";
 
 describe("TargetAdapterRegistry", () => {
-  it("delegates to matching factory", async () => {
-    // Given: a registry with a prompt factory
-    const fakePromptFactory: TargetAdapterFactory = {
-      supports: (type) => type === "prompt",
-      create: async () => ({
-        success: true as const,
-        adapter: { name: "PromptAdapter" } as any,
-      }),
-    };
-    const registry = new TargetAdapterRegistry([fakePromptFactory]);
+  describe("create", () => {
+    describe("given a registry with a prompt factory", () => {
+      const fakePromptFactory: TargetAdapterFactory = {
+        supports: (type) => type === "prompt",
+        create: async () => ({
+          success: true as const,
+          adapter: { name: "PromptAdapter" } as any,
+        }),
+      };
+      let registry: TargetAdapterRegistry;
 
-    // When: creating a prompt adapter
-    const result = await registry.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "prompt_123" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
+      beforeEach(() => {
+        registry = new TargetAdapterRegistry([fakePromptFactory]);
+      });
+
+      describe("when creating a prompt adapter", () => {
+        it("delegates to matching factory and returns adapter", async () => {
+          const result = await registry.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "prompt_123" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.adapter.name).toBe("PromptAdapter");
+          }
+        });
+      });
     });
 
-    // Then: returns the adapter
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.adapter.name).toBe("PromptAdapter");
-    }
-  });
+    describe("given a registry with no factories", () => {
+      let registry: TargetAdapterRegistry;
 
-  it("returns error for unknown target type", async () => {
-    // Given: a registry with no factories
-    const registry = new TargetAdapterRegistry([]);
+      beforeEach(() => {
+        registry = new TargetAdapterRegistry([]);
+      });
 
-    // When: creating an adapter for unknown type
-    const result = await registry.create({
-      projectId: "proj_123",
-      target: { type: "unknown" as any, referenceId: "ref_123" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
+      describe("when creating an adapter for unknown type", () => {
+        it("returns error with unknown target type message", async () => {
+          const result = await registry.create({
+            projectId: "proj_123",
+            target: { type: "unknown" as any, referenceId: "ref_123" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Unknown target type");
+          }
+        });
+      });
     });
 
-    // Then: returns failure
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("Unknown target type");
-    }
-  });
+    describe("given multiple factories that support the same type", () => {
+      const factory1: TargetAdapterFactory = {
+        supports: (type) => type === "prompt",
+        create: async () => ({ success: true as const, adapter: { name: "First" } as any }),
+      };
+      const factory2: TargetAdapterFactory = {
+        supports: (type) => type === "prompt",
+        create: async () => ({ success: true as const, adapter: { name: "Second" } as any }),
+      };
+      let registry: TargetAdapterRegistry;
 
-  it("uses first matching factory when multiple could match", async () => {
-    // Given: two factories that both support "prompt"
-    const factory1: TargetAdapterFactory = {
-      supports: (type) => type === "prompt",
-      create: async () => ({ success: true as const, adapter: { name: "First" } as any }),
-    };
-    const factory2: TargetAdapterFactory = {
-      supports: (type) => type === "prompt",
-      create: async () => ({ success: true as const, adapter: { name: "Second" } as any }),
-    };
-    const registry = new TargetAdapterRegistry([factory1, factory2]);
+      beforeEach(() => {
+        registry = new TargetAdapterRegistry([factory1, factory2]);
+      });
 
-    // When: creating
-    const result = await registry.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "prompt_123" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
+      describe("when creating an adapter", () => {
+        it("uses first matching factory", async () => {
+          const result = await registry.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "prompt_123" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.adapter.name).toBe("First");
+          }
+        });
+      });
     });
-
-    // Then: uses first factory
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.adapter.name).toBe("First");
-    }
   });
 });
 
@@ -117,97 +134,110 @@ describe("PromptAdapterFactory", () => {
     return new PromptAdapterFactory(promptLookup, modelParamsProvider);
   }
 
-  it("supports prompt type", () => {
-    const factory = createFactory();
-    expect(factory.supports("prompt")).toBe(true);
-    expect(factory.supports("http")).toBe(false);
+  describe("supports", () => {
+    it("returns true for prompt type", () => {
+      const factory = createFactory();
+      expect(factory.supports("prompt")).toBe(true);
+    });
+
+    it("returns false for http type", () => {
+      const factory = createFactory();
+      expect(factory.supports("http")).toBe(false);
+    });
   });
 
-  it("returns success when prompt exists", async () => {
-    // Given: prompt exists
-    const factory = createFactory();
+  describe("create", () => {
+    describe("given prompt exists with model configured", () => {
+      describe("when creating adapter", () => {
+        it("returns success with adapter", async () => {
+          const factory = createFactory();
 
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "prompt_123" },
-      modelParams: defaultParams,
-      nlpServiceUrl: "http://localhost",
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "prompt_123" },
+            modelParams: defaultParams,
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(true);
+        });
+      });
     });
 
-    // Then: returns success with adapter
-    expect(result.success).toBe(true);
-  });
+    describe("given prompt does not exist", () => {
+      describe("when creating adapter", () => {
+        it("returns failure with not found error", async () => {
+          const factory = createFactory({
+            promptLookup: { getPromptByIdOrHandle: async () => null },
+          });
 
-  it("returns failure when prompt not found", async () => {
-    // Given: prompt doesn't exist
-    const factory = createFactory({
-      promptLookup: { getPromptByIdOrHandle: async () => null },
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "nonexistent" },
+            modelParams: defaultParams,
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
     });
 
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "nonexistent" },
-      modelParams: defaultParams,
-      nlpServiceUrl: "http://localhost",
+    describe("given prompt has no model configured", () => {
+      const promptWithoutModel = {
+        id: "prompt_123",
+        prompt: "You are helpful",
+        messages: [],
+        model: undefined,
+        temperature: 0.7,
+        maxTokens: 100,
+      };
+
+      describe("when creating adapter", () => {
+        it("returns failure with clear error message", async () => {
+          const factory = createFactory({
+            promptLookup: { getPromptByIdOrHandle: async () => promptWithoutModel },
+          });
+
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "prompt_123" },
+            modelParams: defaultParams,
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("Prompt prompt_123 does not have a model configured");
+          }
+        });
+      });
     });
 
-    // Then: returns failure
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("not found");
-    }
-  });
+    describe("given model params preparation fails", () => {
+      describe("when creating adapter", () => {
+        it("returns failure with model params error", async () => {
+          const factory = createFactory({
+            modelParamsProvider: { prepare: async () => null },
+          });
 
-  it("returns failure when prompt has no model configured", async () => {
-    // Given: prompt exists but has no model
-    const promptWithoutModel = {
-      id: "prompt_123",
-      prompt: "You are helpful",
-      messages: [],
-      model: undefined,
-      temperature: 0.7,
-      maxTokens: 100,
-    };
-    const factory = createFactory({
-      promptLookup: { getPromptByIdOrHandle: async () => promptWithoutModel },
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "prompt", referenceId: "prompt_123" },
+            modelParams: defaultParams,
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("model params");
+          }
+        });
+      });
     });
-
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "prompt_123" },
-      modelParams: defaultParams,
-      nlpServiceUrl: "http://localhost",
-    });
-
-    // Then: returns failure with clear error message
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("Prompt prompt_123 does not have a model configured");
-    }
-  });
-
-  it("returns failure when model params cannot be prepared", async () => {
-    // Given: model params provider fails
-    const factory = createFactory({
-      modelParamsProvider: { prepare: async () => null },
-    });
-
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "prompt", referenceId: "prompt_123" },
-      modelParams: defaultParams,
-      nlpServiceUrl: "http://localhost",
-    });
-
-    // Then: returns failure
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("model params");
-    }
   });
 });
 
@@ -232,72 +262,83 @@ describe("HttpAdapterFactory", () => {
     return new HttpAdapterFactory(agentLookup);
   }
 
-  it("supports http type", () => {
-    const factory = createFactory();
-    expect(factory.supports("http")).toBe(true);
-    expect(factory.supports("prompt")).toBe(false);
+  describe("supports", () => {
+    it("returns true for http type", () => {
+      const factory = createFactory();
+      expect(factory.supports("http")).toBe(true);
+    });
+
+    it("returns false for prompt type", () => {
+      const factory = createFactory();
+      expect(factory.supports("prompt")).toBe(false);
+    });
   });
 
-  it("returns success when agent exists", async () => {
-    // Given: agent exists
-    const factory = createFactory();
+  describe("create", () => {
+    describe("given HTTP agent exists", () => {
+      describe("when creating adapter", () => {
+        it("returns success with adapter", async () => {
+          const factory = createFactory();
 
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "http", referenceId: "agent_123" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "http", referenceId: "agent_123" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(true);
+        });
+      });
     });
 
-    // Then: returns success
-    expect(result.success).toBe(true);
-  });
+    describe("given agent does not exist", () => {
+      describe("when creating adapter", () => {
+        it("returns failure with not found error", async () => {
+          const factory = createFactory({
+            agentLookup: { findById: async () => null },
+          });
 
-  it("returns failure when agent not found", async () => {
-    // Given: agent doesn't exist
-    const factory = createFactory({
-      agentLookup: { findById: async () => null },
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "http", referenceId: "nonexistent" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
     });
 
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "http", referenceId: "nonexistent" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
+    describe("given agent is wrong type", () => {
+      describe("when creating adapter", () => {
+        it("returns failure with not an HTTP agent error", async () => {
+          const factory = createFactory({
+            agentLookup: {
+              findById: async () => ({
+                ...defaultAgent,
+                type: "llm",
+              }),
+            },
+          });
+
+          const result = await factory.create({
+            projectId: "proj_123",
+            target: { type: "http", referenceId: "agent_123" },
+            modelParams: { api_key: "key", model: "gpt-4" },
+            nlpServiceUrl: "http://localhost",
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("not an HTTP agent");
+          }
+        });
+      });
     });
-
-    // Then: returns failure
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("not found");
-    }
-  });
-
-  it("returns failure when agent is wrong type", async () => {
-    // Given: agent exists but is not HTTP type
-    const factory = createFactory({
-      agentLookup: {
-        findById: async () => ({
-          ...defaultAgent,
-          type: "llm",
-        }),
-      },
-    });
-
-    // When: creating adapter
-    const result = await factory.create({
-      projectId: "proj_123",
-      target: { type: "http", referenceId: "agent_123" },
-      modelParams: { api_key: "key", model: "gpt-4" },
-      nlpServiceUrl: "http://localhost",
-    });
-
-    // Then: returns failure
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("not an HTTP agent");
-    }
   });
 });

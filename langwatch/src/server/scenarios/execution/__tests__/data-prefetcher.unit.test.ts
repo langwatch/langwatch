@@ -55,7 +55,6 @@ describe("prefetchScenarioData", () => {
     model: "openai/gpt-4",
   };
 
-  // Helper to create mock dependencies
   function createMockDeps(
     overrides: Partial<DataPrefetcherDependencies> = {},
   ): DataPrefetcherDependencies {
@@ -89,9 +88,8 @@ describe("prefetchScenarioData", () => {
     };
   }
 
-  describe("model selection for fetchModelParams", () => {
-    it("uses prompt's configured model when prompt has model set", async () => {
-      // Given: a prompt with a specific model configured
+  describe("model selection", () => {
+    describe("given a prompt with a specific model configured", () => {
       const promptWithModel = {
         id: "prompt_123",
         prompt: "You are helpful",
@@ -101,65 +99,67 @@ describe("prefetchScenarioData", () => {
         maxTokens: 1000,
       };
 
-      const mockModelParamsProvider: ModelParamsProvider = {
-        prepare: vi.fn().mockResolvedValue(defaultModelParams),
-      };
+      describe("when prefetching scenario data", () => {
+        it("uses the prompt's configured model", async () => {
+          const mockModelParamsProvider: ModelParamsProvider = {
+            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+          };
 
-      const deps = createMockDeps({
-        promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-        },
-        modelParamsProvider: mockModelParamsProvider,
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+            modelParamsProvider: mockModelParamsProvider,
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "openai/gpt-4",
+          );
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: modelParamsProvider.prepare is called with the prompt's model
-      expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-        "proj_123",
-        "openai/gpt-4",
-      );
     });
 
-    it("falls back to project defaultModel when prompt has no model", async () => {
-      // Given: a prompt without a model configured and project has defaultModel
+    describe("given a prompt without a model configured", () => {
       const promptWithoutModel = {
         id: "prompt_123",
         prompt: "You are helpful",
         messages: [],
-        model: null, // No model set
+        model: null,
         temperature: 0.7,
         maxTokens: 1000,
       };
 
-      const mockModelParamsProvider: ModelParamsProvider = {
-        prepare: vi.fn().mockResolvedValue(defaultModelParams),
-      };
+      describe("when prefetching scenario data", () => {
+        it("falls back to project defaultModel", async () => {
+          const mockModelParamsProvider: ModelParamsProvider = {
+            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+          };
 
-      const deps = createMockDeps({
-        promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
-        },
-        modelParamsProvider: mockModelParamsProvider,
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
+            },
+            modelParamsProvider: mockModelParamsProvider,
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "anthropic/claude-3-sonnet",
+          );
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: modelParamsProvider.prepare is called with the project's default model
-      expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-        "proj_123",
-        "anthropic/claude-3-sonnet", // project.defaultModel
-      );
     });
 
-    it("uses project defaultModel for HTTP agent targets", async () => {
-      // Given: an HTTP agent target (which has no model of its own)
+    describe("given an HTTP agent target", () => {
       const httpAgent = {
         id: "agent_123",
         type: "http" as const,
@@ -176,111 +176,114 @@ describe("prefetchScenarioData", () => {
         archivedAt: null,
       };
 
-      const mockModelParamsProvider: ModelParamsProvider = {
-        prepare: vi.fn().mockResolvedValue(defaultModelParams),
-      };
+      describe("when prefetching scenario data", () => {
+        it("uses project defaultModel (agents have no model)", async () => {
+          const mockModelParamsProvider: ModelParamsProvider = {
+            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+          };
 
-      const deps = createMockDeps({
-        agentFetcher: {
-          findById: vi.fn().mockResolvedValue(httpAgent),
-        },
-        modelParamsProvider: mockModelParamsProvider,
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(httpAgent),
+            },
+            modelParamsProvider: mockModelParamsProvider,
+          });
+
+          const target: TargetConfig = { type: "http", referenceId: "agent_123" };
+
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "anthropic/claude-3-sonnet",
+          );
+        });
       });
+    });
+  });
 
-      const target: TargetConfig = { type: "http", referenceId: "agent_123" };
+  describe("error handling", () => {
+    describe("given scenario does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with scenario not found error", async () => {
+          const deps = createMockDeps({
+            scenarioFetcher: {
+              getById: vi.fn().mockResolvedValue(null),
+            },
+          });
 
-      // When: prefetching scenario data
-      await prefetchScenarioData(defaultContext, target, deps);
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
 
-      // Then: modelParamsProvider.prepare is called with the project's default model
-      expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-        "proj_123",
-        "anthropic/claude-3-sonnet", // project.defaultModel
-      );
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("Scenario scen_123 not found");
+          }
+        });
+      });
     });
 
-    it("returns error when scenario not found", async () => {
-      // Given: scenario does not exist
-      const deps = createMockDeps({
-        scenarioFetcher: {
-          getById: vi.fn().mockResolvedValue(null),
-        },
+    describe("given project does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with project not found error", async () => {
+          const deps = createMockDeps({
+            projectFetcher: {
+              findUnique: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("Project proj_123 not found");
+          }
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns failure with scenario not found error
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("Scenario scen_123 not found");
-      }
     });
 
-    it("returns error when project not found", async () => {
-      // Given: project does not exist
-      const deps = createMockDeps({
-        projectFetcher: {
-          findUnique: vi.fn().mockResolvedValue(null),
-        },
+    describe("given prompt does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with prompt not found error", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("Prompt prompt_123 not found");
+          }
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns failure with project not found error
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("Project proj_123 not found");
-      }
     });
 
-    it("returns error when prompt not found", async () => {
-      // Given: prompt does not exist
-      const deps = createMockDeps({
-        promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
-        },
+    describe("given HTTP agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with agent not found error", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "http", referenceId: "agent_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("HTTP agent agent_123 not found");
+          }
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns failure with prompt not found error
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("Prompt prompt_123 not found");
-      }
     });
 
-    it("returns error when HTTP agent not found", async () => {
-      // Given: agent does not exist
-      const deps = createMockDeps({
-        agentFetcher: {
-          findById: vi.fn().mockResolvedValue(null),
-        },
-      });
-
-      const target: TargetConfig = { type: "http", referenceId: "agent_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns failure with agent not found error
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("HTTP agent agent_123 not found");
-      }
-    });
-
-    it("returns error when model params preparation fails", async () => {
-      // Given: model params preparation fails
+    describe("given model params preparation fails", () => {
       const promptWithModel = {
         id: "prompt_123",
         prompt: "You are helpful",
@@ -288,29 +291,31 @@ describe("prefetchScenarioData", () => {
         model: "openai/gpt-4",
       };
 
-      const deps = createMockDeps({
-        promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-        },
-        modelParamsProvider: {
-          prepare: vi.fn().mockResolvedValue(null),
-        },
+      describe("when prefetching scenario data", () => {
+        it("returns failure with model params error", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+            modelParamsProvider: {
+              prepare: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe("Failed to prepare model params");
+          }
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns failure with model params error
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe("Failed to prepare model params");
-      }
     });
+  });
 
-    it("returns success with all data when everything succeeds", async () => {
-      // Given: all dependencies return valid data
+  describe("successful prefetch", () => {
+    describe("given all dependencies return valid data", () => {
       const promptWithModel = {
         id: "prompt_123",
         prompt: "You are helpful",
@@ -323,33 +328,34 @@ describe("prefetchScenarioData", () => {
         maxTokens: 1000,
       };
 
-      const deps = createMockDeps({
-        promptFetcher: {
-          getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-        },
+      describe("when prefetching scenario data", () => {
+        it("returns success with complete data", async () => {
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+          });
+
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.context).toEqual(defaultContext);
+            expect(result.data.scenario).toEqual(defaultScenario);
+            expect(result.data.adapterData).toMatchObject({
+              type: "prompt",
+              promptId: "prompt_123",
+              systemPrompt: "You are helpful",
+            });
+            expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.telemetry).toEqual({
+              endpoint: "http://localhost:3000",
+              apiKey: "test-api-key",
+            });
+          }
+        });
       });
-
-      const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-
-      // When: prefetching scenario data
-      const result = await prefetchScenarioData(defaultContext, target, deps);
-
-      // Then: returns success with complete data
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.context).toEqual(defaultContext);
-        expect(result.data.scenario).toEqual(defaultScenario);
-        expect(result.data.adapterData).toMatchObject({
-          type: "prompt",
-          promptId: "prompt_123",
-          systemPrompt: "You are helpful",
-        });
-        expect(result.data.modelParams).toEqual(defaultModelParams);
-        expect(result.telemetry).toEqual({
-          endpoint: "http://localhost:3000",
-          apiKey: "test-api-key",
-        });
-      }
     });
   });
 });
