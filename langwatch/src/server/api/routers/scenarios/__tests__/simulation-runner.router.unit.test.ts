@@ -43,6 +43,11 @@ vi.mock("../../../rbac", () => ({
   }),
 }));
 
+// Mock audit log to avoid database calls
+vi.mock("~/server/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { scheduleScenarioRun } from "~/server/scenarios/scenario.queue";
