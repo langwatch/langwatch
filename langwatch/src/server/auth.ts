@@ -23,6 +23,10 @@ import OktaProvider from "next-auth/providers/okta";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
+import {
+  featureFlagService,
+  FRONTEND_FEATURE_FLAGS,
+} from "./featureFlag";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
 import { captureException } from "../utils/posthogErrorCapture";
@@ -39,6 +43,7 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
+      enabledFeatures?: string[];
     };
   }
 }
@@ -77,14 +82,29 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        const enabledFeatures: string[] = [];
+        for (const flag of FRONTEND_FEATURE_FLAGS) {
+          if (await featureFlagService.isEnabled(flag, user_.id, false)) {
+            enabledFeatures.push(flag);
+          }
+        }
+
         return {
           ...session,
           user: {
             ...session.user,
             id: user_.id,
             email: user_.email,
+            enabledFeatures,
           },
         };
+      }
+
+      const enabledFeatures: string[] = [];
+      for (const flag of FRONTEND_FEATURE_FLAGS) {
+        if (await featureFlagService.isEnabled(flag, user.id, false)) {
+          enabledFeatures.push(flag);
+        }
       }
 
       return {
@@ -93,6 +113,7 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
+          enabledFeatures,
         },
       };
     },
