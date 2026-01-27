@@ -39,7 +39,6 @@ import (
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -47,8 +46,14 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// 🔸 First - setup LangWatch tracing
-	setupLangWatch(ctx)
+	// 🔸 First - setup LangWatch tracing (reads LANGWATCH_API_KEY from env)
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx)
 
 	// 🔸 Second - add the middleware to your OpenAI client
 	client := openai.NewClient(
@@ -76,26 +81,72 @@ func main() {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
 
+	log.Printf("Response: %s", response.Choices[0].Message.Content)
 	// 🎉 View your traces at https://app.langwatch.ai
-}
-
-func setupLangWatch(ctx context.Context) {
-	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
-		otlptracehttp.WithHeaders(map[string]string{
-			"Authorization": "Bearer " + os.Getenv("LANGWATCH_API_KEY"),
-		}),
-	)
-	if err != nil {
-		log.Fatalf("failed to create OTLP exporter: %v", err)
-	}
-
-	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
-	otel.SetTracerProvider(tp)
 }
 ```
 
 **That's it!** 🎉 Your LLM interactions are now being traced and will appear in your [LangWatch dashboard](https://app.langwatch.ai).
+
+## LangWatch Exporter
+
+The SDK provides a pre-configured exporter that handles authentication and filtering:
+
+```go
+// Basic usage - reads LANGWATCH_API_KEY from environment
+exporter, err := langwatch.NewExporter(ctx)
+
+// With explicit configuration
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithAPIKey("lw_..."),
+	langwatch.WithEndpoint("https://custom.langwatch.ai"),
+)
+
+// With default filtering (excludes HTTP spans)
+exporter, err := langwatch.NewDefaultExporter(ctx)
+```
+
+### Filtering Spans
+
+Control which spans are exported to LangWatch:
+
+```go
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithFilters(
+		// Preset: exclude HTTP request spans (GET /api, POST /data, etc.)
+		langwatch.ExcludeHTTPRequests(),
+
+		// Preset: keep only LangWatch instrumentation
+		langwatch.LangWatchOnly(),
+
+		// Custom: include specific scopes
+		langwatch.Include(langwatch.Criteria{
+			ScopeName: []langwatch.Matcher{
+				langwatch.StartsWith("github.com/langwatch/"),
+				langwatch.Equals("my-service"),
+			},
+		}),
+
+		// Custom: exclude by span name
+		langwatch.Exclude(langwatch.Criteria{
+			SpanName: []langwatch.Matcher{
+				langwatch.StartsWith("database."),
+				langwatch.MatchRegex(regexp.MustCompile(`internal\..*`)),
+			},
+		}),
+	),
+)
+```
+
+**Filter semantics:**
+- Multiple filters: AND (all must pass)
+- Multiple matchers in a field: OR (any can match)
+- Multiple fields in Criteria: AND (all fields must match)
+
+**Available matchers:**
+- `Equals(s)` / `EqualsIgnoreCase(s)`
+- `StartsWith(prefix)` / `StartsWithIgnoreCase(prefix)`
+- `MatchRegex(re)` / `MustMatchRegex(pattern)`
 
 ## OpenAI + Multi-Provider Support
 
@@ -115,7 +166,7 @@ The same code works with multiple AI providers that support the OpenAI API speci
 
 | Provider | What to Change | Example Model |
 |----------|---------------|---------------|
-| **OpenAI** | Nothing! | `gpt-5` |
+| **OpenAI** | Nothing! | `gpt-4o` |
 | **Anthropic** | Base URL + API key | `claude-3-5-sonnet-20241022` |
 | **Azure OpenAI** | Base URL + API key | `gpt-4` |
 | **OpenRouter** | Base URL + API key | `anthropic/claude-3.5-sonnet` |
@@ -123,18 +174,7 @@ The same code works with multiple AI providers that support the OpenAI API speci
 
 #### Example: Anthropic (Claude)
 
-```bash
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-```
-
 ```go
-import (
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"go.opentelemetry.io/otel/semconv/v1.30.0"
-)
-
 client := openai.NewClient(
 	option.WithBaseURL("https://api.anthropic.com/v1"),
 	option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
@@ -144,20 +184,9 @@ client := openai.NewClient(
 		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("anthropic")),
 	)),
 )
-
-response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-	Model: openai.ChatModel("claude-3-5-sonnet-20241022"),
-	Messages: []openai.ChatCompletionMessageParamUnion{
-		openai.UserMessage("Hello, Claude!"),
-	},
-})
 ```
 
 #### Example: Azure OpenAI
-
-```bash
-export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
-```
 
 ```go
 client := openai.NewClient(
@@ -176,7 +205,7 @@ client := openai.NewClient(
 ```go
 client := openai.NewClient(
 	option.WithBaseURL("http://localhost:11434/v1"),
-	option.WithAPIKey("not-needed"), // Ollama doesn't require API key
+	option.WithAPIKey("not-needed"),
 	option.WithMiddleware(otelopenai.Middleware("my-app-local",
 		otelopenai.WithCaptureInput(),
 		otelopenai.WithCaptureOutput(),
@@ -185,22 +214,37 @@ client := openai.NewClient(
 )
 ```
 
-## Examples & Use Cases
+## Examples
 
-Explore real working examples in the [`examples/`](./examples/) directory:
+### Self-Contained Examples (`examples/`)
 
-| Example | What It Shows | Run It |
-|---------|---------------|---------|
-| **[`simple/`](./examples/simple/)** | Basic OpenAI instrumentation | `go run cmd/main.go run-example simple` |
-| **[`custom-input-output/`](./examples/custom-input-output/)** | Recording custom data | `go run cmd/main.go run-example custom-input-output` |
-| **[`streaming/`](./examples/streaming/)** | Streaming completions | `go run cmd/main.go run-example streaming` |
-| **[`threads/`](./examples/threads/)** | Grouping conversations | `go run cmd/main.go run-example threads` |
-| **[`filtered-spans/`](./examples/filtered-spans/)** | Filtering what gets traced | `go run cmd/main.go run-example filtered-spans` |
+No API keys required:
 
-Run all examples:
+| Example | Description |
+|---------|-------------|
+| [`filtering/`](./examples/filtering/) | Demonstrates all filter capabilities with mock exporter |
+
 ```bash
-cd examples/
-go run cmd/main.go run-examples
+cd examples && go run ./filtering
+```
+
+### E2E Examples (`e2e/`)
+
+Require `LANGWATCH_API_KEY` and `OPENAI_API_KEY`:
+
+| Example | Description |
+|---------|-------------|
+| [`openai-simple/`](./e2e/openai-simple/) | Basic OpenAI instrumentation |
+| [`openai-filtered/`](./e2e/openai-filtered/) | Filtering spans by scope |
+| [`openai-streaming/`](./e2e/openai-streaming/) | Streaming completions |
+| [`openai-threads/`](./e2e/openai-threads/) | Grouping conversations |
+| [`openai-responses/`](./e2e/openai-responses/) | OpenAI Responses API |
+| [`custom-input-output/`](./e2e/custom-input-output/) | Recording custom data |
+
+```bash
+cd e2e
+go run cmd/main.go run-example openai-simple   # Run one
+go run cmd/main.go run-examples                # Run all
 ```
 
 ## Features
@@ -213,6 +257,7 @@ go run cmd/main.go run-examples
 * 🧵 **Thread support** - Group related LLM interactions together
 * 📝 **Custom input/output recording** - Fine-grained control over what's captured
 * 🔄 **Streaming support** - Real-time capture of streaming responses
+* 🎛️ **Span filtering** - Control exactly which spans are exported
 
 ## Core Concepts
 
@@ -314,83 +359,95 @@ span.SetThreadID(threadID)
 
 ## API Reference
 
-The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. In addition, it provides these LangWatch-specific helper methods:
-
-### Input/Output Recording
-
-- **`RecordInput(input any)`** - Records structured input (JSON-serialized)
-- **`RecordInputString(input string)`** - Records raw string input
-- **`RecordOutput(output any)`** - Records structured output (JSON-serialized)
-- **`RecordOutputString(output string)`** - Records raw string output
-
-### Model Information
-
-- **`SetRequestModel(model string)`** - Model used for request (e.g., "gpt-4-turbo")
-- **`SetResponseModel(model string)`** - Model that generated response
-
-### Categorization
-
-- **`SetType(spanType SpanType)`** - Span type for LangWatch processing
-- **`SetThreadID(threadID string)`** - Groups related spans together
-
-### Advanced Features
-
-- **`SetTimestamps(timestamps SpanTimestamps)`** - Fine-grained timing information
-- **`SetRAGContextChunks(contexts []SpanRAGContextChunk)`** - RAG context chunks
-- **`SetRAGContextChunk(context SpanRAGContextChunk)`** - Single RAG chunk
-
-## Configuration Options
-
-### OpenAI Middleware Options
+### Exporter
 
 ```go
-import (
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"go.opentelemetry.io/otel/semconv/v1.30.0"
-)
+// Create exporter (reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from env)
+langwatch.NewExporter(ctx, opts...)
 
-client := openai.NewClient(
-	oaioption.WithAPIKey(apiKey),
-	oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-		// Capture full input/output (be mindful of sensitive data)
-		otelopenai.WithCaptureInput(),
-		otelopenai.WithCaptureOutput(),
+// Create with default ExcludeHTTPRequests filter
+langwatch.NewDefaultExporter(ctx, opts...)
 
-		// For OpenAI-compatible APIs (Azure, etc.)
-		// otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
+// Options
+langwatch.WithAPIKey(key string)
+langwatch.WithEndpoint(url string)
+langwatch.WithFilters(filters ...Filter)
 
-		// Custom tracer provider
-		// otelopenai.WithTracerProvider(customProvider),
-	)),
-)
+// Wrap any exporter with filtering
+langwatch.NewFilteringExporter(wrapped, filters...)
 ```
 
-### Environment Variables
+### Filters
+
+```go
+// Presets
+langwatch.ExcludeHTTPRequests()  // Remove GET/POST/etc spans
+langwatch.LangWatchOnly()        // Keep only LangWatch instrumentation
+
+// Custom
+langwatch.Include(criteria)      // Keep matching spans
+langwatch.Exclude(criteria)      // Remove matching spans
+
+// Criteria
+langwatch.Criteria{
+	ScopeName: []Matcher{...},   // Match InstrumentationScope.Name
+	SpanName:  []Matcher{...},   // Match Span.Name
+}
+
+// Matchers
+langwatch.Equals(s)
+langwatch.EqualsIgnoreCase(s)
+langwatch.StartsWith(prefix)
+langwatch.StartsWithIgnoreCase(prefix)
+langwatch.MatchRegex(re)
+langwatch.MustMatchRegex(pattern)
+```
+
+### LangWatchSpan Methods
+
+The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. Additional methods:
+
+**Input/Output Recording:**
+- `RecordInput(input any)` - Records structured input (JSON-serialized)
+- `RecordInputString(input string)` - Records raw string input
+- `RecordOutput(output any)` - Records structured output (JSON-serialized)
+- `RecordOutputString(output string)` - Records raw string output
+
+**Model Information:**
+- `SetRequestModel(model string)` - Model used for request
+- `SetResponseModel(model string)` - Model that generated response
+
+**Categorization:**
+- `SetType(spanType SpanType)` - Span type for LangWatch processing
+- `SetThreadID(threadID string)` - Groups related spans together
+
+**Advanced:**
+- `SetTimestamps(timestamps SpanTimestamps)` - Fine-grained timing
+- `SetRAGContextChunks(contexts []SpanRAGContextChunk)` - RAG context
+
+## Environment Variables
 
 ```bash
 # Required for LangWatch
 export LANGWATCH_API_KEY="your-langwatch-api-key"
 
-# Required for OpenAI examples
+# Optional: custom endpoint
+export LANGWATCH_ENDPOINT="https://custom.langwatch.ai"
+
+# For OpenAI
 export OPENAI_API_KEY="your-openai-api-key"
 
-# For Anthropic (when using OpenAI-compatible API)
+# For other providers
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
-
-# For Azure OpenAI
 export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
 ```
 
 ## Manual OpenTelemetry Setup
 
-If you prefer to set up OpenTelemetry manually or need more control:
+If you prefer manual setup or need more control:
 
 ```go
 import (
-	"context"
-	"log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -410,11 +467,8 @@ func setupLangWatch(ctx context.Context, apiKey string) func() {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
 
-	// Return cleanup function
 	return func() {
-		if err := tp.Shutdown(ctx); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
-		}
+		tp.Shutdown(ctx)
 	}
 }
 ```
