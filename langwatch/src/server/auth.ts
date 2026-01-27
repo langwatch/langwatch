@@ -25,26 +25,14 @@ import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import {
   featureFlagService,
-  FRONTEND_FEATURE_FLAGS,
   type FrontendFeatureFlag,
+  getEnabledFrontendFeatures,
 } from "./featureFlag";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
 import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");
-
-async function getEnabledFrontendFeatures(
-  userId: string,
-): Promise<FrontendFeatureFlag[]> {
-  const enabledFeatures: FrontendFeatureFlag[] = [];
-  for (const flag of FRONTEND_FEATURE_FLAGS) {
-    if (await featureFlagService.isEnabled(flag, userId, false)) {
-      enabledFeatures.push(flag);
-    }
-  }
-  return enabledFeatures;
-}
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -101,7 +89,7 @@ export const authOptions = (
             ...session.user,
             id: user_.id,
             email: user_.email,
-            enabledFeatures: await getEnabledFrontendFeatures(user_.id),
+            enabledFeatures: await getEnabledFrontendFeatures(user_.id, featureFlagService),
           },
         };
       }
@@ -112,7 +100,7 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
-          enabledFeatures: await getEnabledFrontendFeatures(user.id),
+          enabledFeatures: await getEnabledFrontendFeatures(user.id, featureFlagService),
         },
       };
     },
