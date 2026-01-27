@@ -88,156 +88,161 @@ describe("ScenarioExecutionOrchestrator", () => {
   };
 
   describe("execute", () => {
-    it("returns success when all steps complete", async () => {
-      // Given: all dependencies return valid data
-      const deps = createTestDeps();
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
+    describe("given all dependencies return valid data", () => {
+      describe("when executing a scenario", () => {
+        it("returns success with runId and reasoning", async () => {
+          const deps = createTestDeps();
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
 
-      // When: executing a scenario
-      const result = await orchestrator.execute(defaultInput);
+          const result = await orchestrator.execute(defaultInput);
 
-      // Then: returns successful result
-      expect(result.success).toBe(true);
-      expect(result.runId).toBe("run_123");
-      expect(result.reasoning).toBe("All criteria met");
+          expect(result.success).toBe(true);
+          expect(result.runId).toBe("run_123");
+          expect(result.reasoning).toBe("All criteria met");
+        });
+      });
     });
 
-    it("returns failure when scenario not found", async () => {
-      // Given: scenario repository returns null
-      const deps = createTestDeps({
-        scenarioRepository: { getById: async () => null },
+    describe("given scenario does not exist", () => {
+      describe("when executing", () => {
+        it("returns failure with scenario not found error", async () => {
+          const deps = createTestDeps({
+            scenarioRepository: { getById: async () => null },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toContain("Scenario");
+          expect(result.error).toContain("not found");
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure with error message
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("Scenario");
-      expect(result.error).toContain("not found");
     });
 
-    it("returns failure when project not found", async () => {
-      // Given: project repository returns null
-      const deps = createTestDeps({
-        projectRepository: { getProject: async () => null },
+    describe("given project does not exist", () => {
+      describe("when executing", () => {
+        it("returns failure with project not found error", async () => {
+          const deps = createTestDeps({
+            projectRepository: { getProject: async () => null },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toContain("Project");
+          expect(result.error).toContain("not found");
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("Project");
-      expect(result.error).toContain("not found");
     });
 
-    it("returns failure when project has no default model configured", async () => {
-      // Given: project exists but has no default model
-      const deps = createTestDeps({
-        projectRepository: {
-          getProject: async () => ({ apiKey: "test-api-key", defaultModel: null }),
-        },
+    describe("given project has no default model configured", () => {
+      describe("when executing", () => {
+        it("returns failure with clear error message", async () => {
+          const deps = createTestDeps({
+            projectRepository: {
+              getProject: async () => ({ apiKey: "test-api-key", defaultModel: null }),
+            },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toBe("Project default model is not configured");
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure with clear error message
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Project default model is not configured");
     });
 
-    it("returns failure when model params cannot be prepared", async () => {
-      // Given: model params provider returns null
-      const deps = createTestDeps({
-        modelParamsProvider: { prepare: async () => null },
+    describe("given model params cannot be prepared", () => {
+      describe("when executing", () => {
+        it("returns failure with model params error", async () => {
+          const deps = createTestDeps({
+            modelParamsProvider: { prepare: async () => null },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toContain("model params");
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("model params");
     });
 
-    it("returns failure when adapter creation fails", async () => {
-      // Given: adapter factory returns failure
-      const deps = createTestDeps({
-        adapterFactory: {
-          create: async () => ({ success: false as const, error: "Prompt not found" }),
-        },
+    describe("given adapter creation fails", () => {
+      describe("when executing", () => {
+        it("returns failure with adapter error message", async () => {
+          const deps = createTestDeps({
+            adapterFactory: {
+              create: async () => ({ success: false as const, error: "Prompt not found" }),
+            },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toBe("Prompt not found");
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure with adapter error
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Prompt not found");
     });
 
-    it("returns failure when scenario execution throws", async () => {
-      // Given: executor throws an error
-      const deps = createTestDeps({
-        scenarioExecutor: {
-          run: async () => { throw new Error("SDK crashed"); },
-        },
+    describe("given scenario executor throws an error", () => {
+      describe("when executing", () => {
+        it("returns failure with error message", async () => {
+          const deps = createTestDeps({
+            scenarioExecutor: {
+              run: async () => { throw new Error("SDK crashed"); },
+            },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(false);
+          expect(result.error).toBe("SDK crashed");
+        });
+
+        it("still shuts down tracer", async () => {
+          let tracerShutdownCalled = false;
+          const deps = createTestDeps({
+            tracerFactory: {
+              create: () => ({
+                shutdown: async () => { tracerShutdownCalled = true; },
+              }),
+            },
+            scenarioExecutor: {
+              run: async () => { throw new Error("Execution failed"); },
+            },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          await orchestrator.execute(defaultInput);
+
+          expect(tracerShutdownCalled).toBe(true);
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: returns failure with error message
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("SDK crashed");
     });
 
-    it("shuts down tracer even when execution fails", async () => {
-      // Given: executor throws, but tracer should still be shut down
-      let tracerShutdownCalled = false;
-      const deps = createTestDeps({
-        tracerFactory: {
-          create: () => ({
-            shutdown: async () => { tracerShutdownCalled = true; },
-          }),
-        },
-        scenarioExecutor: {
-          run: async () => { throw new Error("Execution failed"); },
-        },
+    describe("given tracer shutdown fails", () => {
+      describe("when executing", () => {
+        it("returns success (shutdown failure does not affect result)", async () => {
+          const deps = createTestDeps({
+            tracerFactory: {
+              create: () => ({
+                shutdown: async () => { throw new Error("Shutdown failed"); },
+              }),
+            },
+          });
+          const orchestrator = new ScenarioExecutionOrchestrator(deps);
+
+          const result = await orchestrator.execute(defaultInput);
+
+          expect(result.success).toBe(true);
+        });
       });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing (will fail)
-      await orchestrator.execute(defaultInput);
-
-      // Then: tracer was still shut down
-      expect(tracerShutdownCalled).toBe(true);
-    });
-
-    it("handles tracer shutdown failure gracefully", async () => {
-      // Given: tracer shutdown throws
-      const deps = createTestDeps({
-        tracerFactory: {
-          create: () => ({
-            shutdown: async () => { throw new Error("Shutdown failed"); },
-          }),
-        },
-      });
-      const orchestrator = new ScenarioExecutionOrchestrator(deps);
-
-      // When: executing
-      const result = await orchestrator.execute(defaultInput);
-
-      // Then: still returns success (shutdown failure doesn't affect result)
-      expect(result.success).toBe(true);
     });
   });
 });
