@@ -18,8 +18,7 @@ const (
 // LangWatchExporter exports spans to LangWatch with optional filtering.
 // It wraps an OTLP trace exporter with auto-configuration and filter support.
 type LangWatchExporter struct {
-	wrapped sdktrace.SpanExporter
-	filters []Filter
+	*FilteringExporter
 }
 
 // exporterConfig holds configuration for the exporter.
@@ -57,40 +56,47 @@ func WithFilters(filters ...Filter) ExporterOption {
 	}
 }
 
-// NewExporter creates a LangWatch exporter with auto-configuration.
-// It reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from environment variables
-// if not provided via options.
-func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
+// resolveConfig applies options and environment fallbacks.
+func resolveConfig(opts ...ExporterOption) *exporterConfig {
 	cfg := &exporterConfig{
 		apiKey:   os.Getenv("LANGWATCH_API_KEY"),
 		endpoint: os.Getenv("LANGWATCH_ENDPOINT"),
 	}
-
 	if cfg.endpoint == "" {
 		cfg.endpoint = DefaultEndpoint
 	}
-
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	return cfg
+}
 
-	// Create OTLP exporter with LangWatch headers
+// buildHeaders constructs the LangWatch-specific headers.
+func buildHeaders(apiKey string) map[string]string {
+	return map[string]string{
+		"Authorization":            "Bearer " + apiKey,
+		"x-langwatch-sdk-name":     "langwatch-sdk-go",
+		"x-langwatch-sdk-language": "go",
+		"x-langwatch-sdk-version":  Version,
+	}
+}
+
+// NewExporter creates a LangWatch exporter with auto-configuration.
+// It reads LANGWATCH_API_KEY and LANGWATCH_ENDPOINT from environment variables
+// if not provided via options.
+func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
+	cfg := resolveConfig(opts...)
+
 	otlpExporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpointURL(cfg.endpoint+TracesPath),
-		otlptracehttp.WithHeaders(map[string]string{
-			"Authorization":            "Bearer " + cfg.apiKey,
-			"x-langwatch-sdk-name":     "langwatch-sdk-go",
-			"x-langwatch-sdk-language": "go",
-			"x-langwatch-sdk-version":  Version,
-		}),
+		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey)),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LangWatchExporter{
-		wrapped: otlpExporter,
-		filters: cfg.filters,
+		FilteringExporter: NewFilteringExporter(otlpExporter, cfg.filters...),
 	}, nil
 }
 
@@ -101,26 +107,6 @@ func NewDefaultExporter(ctx context.Context, opts ...ExporterOption) (*LangWatch
 	defaultOpts := []ExporterOption{WithFilters(ExcludeHTTPRequests())}
 	allOpts := append(defaultOpts, opts...)
 	return NewExporter(ctx, allOpts...)
-}
-
-// ExportSpans exports spans to LangWatch after applying filters.
-func (e *LangWatchExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
-	if len(spans) == 0 {
-		return nil
-	}
-
-	// Apply filters
-	filtered := applyFilters(spans, e.filters)
-	if len(filtered) == 0 {
-		return nil
-	}
-
-	return e.wrapped.ExportSpans(ctx, filtered)
-}
-
-// Shutdown shuts down the exporter.
-func (e *LangWatchExporter) Shutdown(ctx context.Context) error {
-	return e.wrapped.Shutdown(ctx)
 }
 
 // FilteringExporter wraps any SpanExporter with filtering capabilities.

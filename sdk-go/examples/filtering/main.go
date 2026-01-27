@@ -5,39 +5,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
-
-// mockExporter captures spans for inspection instead of sending them.
-type mockExporter struct {
-	mu    sync.Mutex
-	spans []sdktrace.ReadOnlySpan
-}
-
-func (m *mockExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.spans = append(m.spans, spans...)
-	return nil
-}
-
-func (m *mockExporter) Shutdown(ctx context.Context) error { return nil }
-
-func (m *mockExporter) GetSpans() []sdktrace.ReadOnlySpan {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.spans
-}
-
-func (m *mockExporter) Clear() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.spans = nil
-}
 
 func main() {
 	ctx := context.Background()
@@ -191,7 +164,7 @@ func main() {
 }
 
 func testFiltering(ctx context.Context, filters []langwatch.Filter, spanNames []string) {
-	mock := &mockExporter{}
+	mock := testutil.NewMockExporter()
 
 	// Create filtering exporter wrapping the mock
 	filteringExporter := langwatch.NewFilteringExporter(mock, filters...)
@@ -228,7 +201,7 @@ func testFilteringWithScopes(ctx context.Context, filters []langwatch.Filter, sp
 	scope string
 	name  string
 }) {
-	mock := &mockExporter{}
+	mock := testutil.NewMockExporter()
 	filteringExporter := langwatch.NewFilteringExporter(mock, filters...)
 
 	tp := sdktrace.NewTracerProvider(

@@ -4,20 +4,10 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
-
-// mockSpan creates a mock ReadOnlySpan for testing using tracetest.SpanStub.
-func mockSpan(name string, scopeName string) sdktrace.ReadOnlySpan {
-	stub := tracetest.SpanStub{
-		Name:                 name,
-		InstrumentationScope: instrumentation.Scope{Name: scopeName},
-	}
-	return stub.Snapshot()
-}
 
 func TestMatcher_Equals(t *testing.T) {
 	m := Equals("hello")
@@ -86,7 +76,7 @@ func TestCriteria_EmptyCriteria(t *testing.T) {
 	c := Criteria{}
 
 	// Empty criteria matches everything
-	span := mockSpan("any-span", "any-scope")
+	span := testutil.CreateMockSpan("any-span", "any-scope")
 	assert.True(t, c.Matches(span))
 }
 
@@ -95,8 +85,8 @@ func TestCriteria_SpanNameOnly(t *testing.T) {
 		SpanName: []Matcher{StartsWith("llm.")},
 	}
 
-	assert.True(t, c.Matches(mockSpan("llm.chat", "any-scope")))
-	assert.False(t, c.Matches(mockSpan("database.query", "any-scope")))
+	assert.True(t, c.Matches(testutil.CreateMockSpan("llm.chat", "any-scope")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("database.query", "any-scope")))
 }
 
 func TestCriteria_ScopeNameOnly(t *testing.T) {
@@ -104,8 +94,8 @@ func TestCriteria_ScopeNameOnly(t *testing.T) {
 		ScopeName: []Matcher{Equals("my-service")},
 	}
 
-	assert.True(t, c.Matches(mockSpan("any-span", "my-service")))
-	assert.False(t, c.Matches(mockSpan("any-span", "other-service")))
+	assert.True(t, c.Matches(testutil.CreateMockSpan("any-span", "my-service")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("any-span", "other-service")))
 }
 
 func TestCriteria_BothFieldsANDSemantics(t *testing.T) {
@@ -115,10 +105,10 @@ func TestCriteria_BothFieldsANDSemantics(t *testing.T) {
 	}
 
 	// Both must match
-	assert.True(t, c.Matches(mockSpan("llm.chat", "my-service")))
-	assert.False(t, c.Matches(mockSpan("llm.chat", "other-service")))
-	assert.False(t, c.Matches(mockSpan("database.query", "my-service")))
-	assert.False(t, c.Matches(mockSpan("database.query", "other-service")))
+	assert.True(t, c.Matches(testutil.CreateMockSpan("llm.chat", "my-service")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("llm.chat", "other-service")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("database.query", "my-service")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("database.query", "other-service")))
 }
 
 func TestCriteria_MatchersWithinFieldORSemantics(t *testing.T) {
@@ -130,9 +120,9 @@ func TestCriteria_MatchersWithinFieldORSemantics(t *testing.T) {
 	}
 
 	// Any matcher can match
-	assert.True(t, c.Matches(mockSpan("llm.chat", "any")))
-	assert.True(t, c.Matches(mockSpan("ai.generate", "any")))
-	assert.False(t, c.Matches(mockSpan("database.query", "any")))
+	assert.True(t, c.Matches(testutil.CreateMockSpan("llm.chat", "any")))
+	assert.True(t, c.Matches(testutil.CreateMockSpan("ai.generate", "any")))
+	assert.False(t, c.Matches(testutil.CreateMockSpan("database.query", "any")))
 }
 
 func TestInclude(t *testing.T) {
@@ -141,10 +131,10 @@ func TestInclude(t *testing.T) {
 	})
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("llm.chat", "any"),
-		mockSpan("llm.embeddings", "any"),
-		mockSpan("database.query", "any"),
-		mockSpan("http.request", "any"),
+		testutil.CreateMockSpan("llm.chat", "any"),
+		testutil.CreateMockSpan("llm.embeddings", "any"),
+		testutil.CreateMockSpan("database.query", "any"),
+		testutil.CreateMockSpan("http.request", "any"),
 	}
 
 	result := filter.Apply(spans)
@@ -160,10 +150,10 @@ func TestExclude(t *testing.T) {
 	})
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("llm.chat", "any"),
-		mockSpan("database.query", "any"),
-		mockSpan("database.connect", "any"),
-		mockSpan("http.request", "any"),
+		testutil.CreateMockSpan("llm.chat", "any"),
+		testutil.CreateMockSpan("database.query", "any"),
+		testutil.CreateMockSpan("database.connect", "any"),
+		testutil.CreateMockSpan("http.request", "any"),
 	}
 
 	result := filter.Apply(spans)
@@ -177,16 +167,16 @@ func TestExcludeHTTPRequests(t *testing.T) {
 	filter := ExcludeHTTPRequests()
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("GET /api/users", "net/http"),
-		mockSpan("POST /api/data", "net/http"),
-		mockSpan("PUT /api/data", "net/http"),
-		mockSpan("DELETE /api/data", "net/http"),
-		mockSpan("PATCH /api/data", "net/http"),
-		mockSpan("OPTIONS /api", "net/http"),
-		mockSpan("HEAD /api", "net/http"),
-		mockSpan("llm.chat.completion", "openai"),
-		mockSpan("database.query", "database/sql"),
-		mockSpan("fetch-user", "my-service"), // Not HTTP - doesn't start with HTTP verb
+		testutil.CreateMockSpan("GET /api/users", "net/http"),
+		testutil.CreateMockSpan("POST /api/data", "net/http"),
+		testutil.CreateMockSpan("PUT /api/data", "net/http"),
+		testutil.CreateMockSpan("DELETE /api/data", "net/http"),
+		testutil.CreateMockSpan("PATCH /api/data", "net/http"),
+		testutil.CreateMockSpan("OPTIONS /api", "net/http"),
+		testutil.CreateMockSpan("HEAD /api", "net/http"),
+		testutil.CreateMockSpan("llm.chat.completion", "openai"),
+		testutil.CreateMockSpan("database.query", "database/sql"),
+		testutil.CreateMockSpan("fetch-user", "my-service"), // Not HTTP - doesn't start with HTTP verb
 	}
 
 	result := filter.Apply(spans)
@@ -205,9 +195,9 @@ func TestExcludeHTTPRequests_CaseInsensitive(t *testing.T) {
 	filter := ExcludeHTTPRequests()
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("get /api", "any"),
-		mockSpan("Get /api", "any"),
-		mockSpan("GET /api", "any"),
+		testutil.CreateMockSpan("get /api", "any"),
+		testutil.CreateMockSpan("Get /api", "any"),
+		testutil.CreateMockSpan("GET /api", "any"),
 	}
 
 	result := filter.Apply(spans)
@@ -219,13 +209,13 @@ func TestLangWatchOnly(t *testing.T) {
 	filter := LangWatchOnly()
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("openai.chat", "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"),
-		mockSpan("custom-span", "langwatch"),
-		mockSpan("tracer-span", "github.com/langwatch/langwatch/sdk-go"),
-		mockSpan("query", "database/sql"),
-		mockSpan("GET /api", "net/http"),
-		mockSpan("process", "my-service"),
-		mockSpan("other", "github.com/other/package"),
+		testutil.CreateMockSpan("openai.chat", "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"),
+		testutil.CreateMockSpan("custom-span", "langwatch"),
+		testutil.CreateMockSpan("tracer-span", "github.com/langwatch/langwatch/sdk-go"),
+		testutil.CreateMockSpan("query", "database/sql"),
+		testutil.CreateMockSpan("GET /api", "net/http"),
+		testutil.CreateMockSpan("process", "my-service"),
+		testutil.CreateMockSpan("other", "github.com/other/package"),
 	}
 
 	result := filter.Apply(spans)
@@ -249,10 +239,10 @@ func TestApplyFilters_ANDSemantics(t *testing.T) {
 	}
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("GET /api", "any"),
-		mockSpan("database.query", "any"),
-		mockSpan("llm.chat", "any"),
-		mockSpan("my-service.process", "any"),
+		testutil.CreateMockSpan("GET /api", "any"),
+		testutil.CreateMockSpan("database.query", "any"),
+		testutil.CreateMockSpan("llm.chat", "any"),
+		testutil.CreateMockSpan("my-service.process", "any"),
 	}
 
 	result := applyFilters(spans, filters)
@@ -268,8 +258,8 @@ func TestApplyFilters_ANDSemantics(t *testing.T) {
 
 func TestApplyFilters_EmptyFilters(t *testing.T) {
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("span1", "scope1"),
-		mockSpan("span2", "scope2"),
+		testutil.CreateMockSpan("span1", "scope1"),
+		testutil.CreateMockSpan("span2", "scope2"),
 	}
 
 	result := applyFilters(spans, nil)
@@ -301,7 +291,7 @@ func TestApplyFilters_ShortCircuitOnEmpty(t *testing.T) {
 	}
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("span1", "scope1"),
+		testutil.CreateMockSpan("span1", "scope1"),
 	}
 
 	result := applyFilters(spans, filters)
@@ -323,8 +313,8 @@ func TestFilterFunc(t *testing.T) {
 	})
 
 	spans := []sdktrace.ReadOnlySpan{
-		mockSpan("keep-me", "any"),
-		mockSpan("remove-me", "any"),
+		testutil.CreateMockSpan("keep-me", "any"),
+		testutil.CreateMockSpan("remove-me", "any"),
 	}
 
 	result := customFilter.Apply(spans)
