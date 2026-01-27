@@ -43,8 +43,7 @@ We will expose feature flags to the frontend through the NextAuth session:
 - User IDs are stable (emails can change)
 
 **Trade-offs accepted:**
-- Feature flag changes require session refresh (logout/login or session expiry)
-- All frontend flags are checked on every session callback
+- All frontend flags are checked on every session callback (minor performance overhead)
 - Slight increase in session size
 
 ## Consequences
@@ -54,10 +53,7 @@ We will expose feature flags to the frontend through the NextAuth session:
 - No UI flash on initial load
 - Centralized feature flag management
 - Type-safe flag names
-
-**Negative:**
-- Users must refresh session to see flag changes
-- Minor performance overhead checking flags on each session callback
+- Feature flag changes are picked up on next page load (session callback runs on each session check)
 
 **Neutral:**
 - Session object grows slightly with `enabledFeatures` array
