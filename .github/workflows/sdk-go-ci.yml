@@ -29,12 +29,20 @@ jobs:
         working-directory: ./sdk-go
         run: go test -v ./...
 
-      - name: Install example dependencies
+      - name: Install examples dependencies
         working-directory: ./sdk-go/examples
         run: go mod download
 
-      - name: Run examples
+      - name: Run filtering example
         working-directory: ./sdk-go/examples
+        run: go run ./filtering
+
+      - name: Install e2e dependencies
+        working-directory: ./sdk-go/e2e
+        run: go mod download
+
+      - name: Run e2e examples
+        working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
           LANGWATCH_API_KEY: ${{ secrets.GO_SDK_LANGWATCH_API_KEY }}
