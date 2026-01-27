@@ -56,6 +56,12 @@ importers:
       '@aws-sdk/client-ses':
         specifier: ^3.645.0
         version: 3.645.0
+      '@bull-board/api':
+        specifier: ^6.16.2
+        version: 6.16.2(@bull-board/ui@6.16.2)
+      '@bull-board/hono':
+        specifier: ^6.16.2
+        version: 6.16.2(hono@4.7.5)
       '@chakra-ui/next-js':
         specifier: ^2.4.2
         version: 2.4.2(@chakra-ui/react@3.29.0(@emotion/react@11.14.0(@types/react@19.0.10)(react@19.1.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@emotion/react@11.14.0(@types/react@19.0.10)(react@19.1.0))(next@15.5.7(@babel/core@7.26.8)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(babel-plugin-macros@3.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.79.0))(react@19.1.0)
@@ -706,37 +712,6 @@ importers:
       bufferutil:
         specifier: ^4.0.8
         version: 4.0.9
-
-  packages/bullboard:
-    dependencies:
-      '@bull-board/api':
-        specifier: ^6.11.1
-        version: 6.16.2(@bull-board/ui@6.16.2)
-      '@bull-board/hono':
-        specifier: ^6.11.1
-        version: 6.16.2(hono@4.11.7)
-      '@hono/node-server':
-        specifier: ^1.14.4
-        version: 1.19.9(hono@4.11.7)
-      bullmq:
-        specifier: ^5.67.1
-        version: 5.67.1
-      dotenv:
-        specifier: ^16.3.1
-        version: 16.6.1
-      hono:
-        specifier: ^4.7.12
-        version: 4.11.7
-      ioredis:
-        specifier: ^5.4.2
-        version: 5.8.2
-    devDependencies:
-      tsx:
-        specifier: ^4.7.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
 
   packages/deja-view:
     dependencies:
@@ -8203,10 +8178,6 @@ packages:
       zod-openapi:
         optional: true
 
-  hono@4.11.7:
-    resolution: {integrity: sha512-l7qMiNee7t82bH3SeyUCt9UF15EVmaBvsppY2zQtrbIhl/yzBTny+YUxsVjSjQ6gaqaeVtZmGocom8TzBlA4Yw==}
-    engines: {node: '>=16.9.0'}
-
   hono@4.7.5:
     resolution: {integrity: sha512-fDOK5W2C1vZACsgLONigdZTRZxuBqFtcKh7bUQ5cVSbwI2RWjloJDcgFOVzbQrlI6pCmhlTsVYZ7zpLj4m4qMQ==}
     engines: {node: '>=16.9.0'}
@@ -14549,12 +14520,12 @@ snapshots:
       '@bull-board/ui': 6.16.2
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.16.2(hono@4.11.7)':
+  '@bull-board/hono@6.16.2(hono@4.7.5)':
     dependencies:
       '@bull-board/api': 6.16.2(@bull-board/ui@6.16.2)
       '@bull-board/ui': 6.16.2
       ejs: 3.1.10
-      hono: 4.11.7
+      hono: 4.7.5
 
   '@bull-board/ui@6.16.2':
     dependencies:
@@ -15376,10 +15347,6 @@ snapshots:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
       use-sync-external-store: 1.5.0(react@19.1.0)
-
-  '@hono/node-server@1.19.9(hono@4.11.7)':
-    dependencies:
-      hono: 4.11.7
 
   '@hono/node-server@1.19.9(hono@4.7.5)':
     dependencies:
@@ -22202,8 +22169,6 @@ snapshots:
       hono: 4.7.5
       zod: 3.25.76
       zod-openapi: 4.2.4(zod@3.25.76)
-
-  hono@4.11.7: {}
 
   hono@4.7.5: {}
 
