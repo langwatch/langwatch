@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { dependencies } from "../../../injection/dependencies.server";
 import { prisma } from "../../db";
+import { UsageStatsService } from "../../license-enforcement/usage-stats.service";
 import { UsageLimitService } from "../../notifications/usage-limit.service";
-import { TraceUsageService } from "../../traces/trace-usage.service";
 import { getCurrentMonthStart } from "../../utils/dateUtils";
 import {
   checkUserPermissionForOrganization,
@@ -20,25 +19,8 @@ export const limitsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
-
-      const traceUsageService = TraceUsageService.create();
-      const projectsCount = await getOrganizationProjectsCount(organizationId);
-      const currentMonthMessagesCount =
-        await traceUsageService.getCurrentMonthCount({ organizationId });
-      const currentMonthCost = await getCurrentMonthCost(organizationId);
-      const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-        organizationId,
-        ctx.session.user,
-      );
-      const maxMonthlyUsageLimit_ = await maxMonthlyUsageLimit(organizationId);
-
-      return {
-        projectsCount,
-        currentMonthMessagesCount,
-        currentMonthCost,
-        activePlan,
-        maxMonthlyUsageLimit: maxMonthlyUsageLimit_,
-      };
+      const service = UsageStatsService.create(prisma);
+      return service.getUsageStats(organizationId, ctx.session.user);
     }),
   checkAndSendUsageLimitNotification: protectedProcedure
     .input(

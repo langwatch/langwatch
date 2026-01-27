@@ -26,6 +26,7 @@ export { mapToPlanInfo } from "./planMapping";
 
 // License Handler
 export { LicenseHandler } from "./licenseHandler";
+export type { ITraceUsageService } from "./licenseHandler";
 
 // Repository (re-exported for factory wiring)
 export { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";

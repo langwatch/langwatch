@@ -6,10 +6,19 @@ import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePla
 import { validateLicense, parseLicenseKey } from "./validation";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 
+/**
+ * Interface for trace usage counting.
+ * Follows Interface Segregation Principle - only what we need.
+ */
+export interface ITraceUsageService {
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+}
+
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
   publicKey?: string;
   repository: ILicenseEnforcementRepository;
+  traceUsageService?: ITraceUsageService;
 }
 
 /**
@@ -38,11 +47,13 @@ export class LicenseHandler {
   private prisma: PrismaClient;
   private publicKey: string;
   private repository: ILicenseEnforcementRepository;
+  private traceUsageService: ITraceUsageService | null;
 
   constructor(config: LicenseHandlerConfig) {
     this.prisma = config.prisma;
     this.publicKey = config.publicKey ?? PUBLIC_KEY;
     this.repository = config.repository;
+    this.traceUsageService = config.traceUsageService ?? null;
   }
 
   /**
@@ -52,10 +63,13 @@ export class LicenseHandler {
   static create(prisma: PrismaClient, publicKey?: string): LicenseHandler {
     // Import here to avoid circular dependency and centralize DI wiring
     const { LicenseEnforcementRepository } = require("~/server/license-enforcement/license-enforcement.repository");
+    const { TraceUsageService } = require("~/server/traces/trace-usage.service");
+    const traceUsageService = TraceUsageService.create(prisma);
     return new LicenseHandler({
       prisma,
       publicKey,
       repository: new LicenseEnforcementRepository(prisma),
+      traceUsageService,
     });
   }
 
@@ -195,6 +209,11 @@ export class LicenseHandler {
    * Fetches all resource counts for an organization and combines with plan limits.
    */
   private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+    // Get message count from TraceUsageService (Elasticsearch)
+    // Returns 0 if service not provided (e.g., in tests)
+    const messagesCountPromise = this.traceUsageService
+      ? this.traceUsageService.getCurrentMonthCount({ organizationId })
+      : Promise.resolve(0);
 
     const [
       currentMembers,
@@ -204,6 +223,8 @@ export class LicenseHandler {
       currentWorkflows,
       currentScenarios,
       currentEvaluators,
+      currentMessagesPerMonth,
+      currentEvaluationsCredit,
     ] = await Promise.all([
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
@@ -212,6 +233,8 @@ export class LicenseHandler {
       this.repository.getWorkflowCount(organizationId),
       this.repository.getScenarioCount(organizationId),
       this.repository.getEvaluatorCount(organizationId),
+      messagesCountPromise,
+      this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
 
     return {
@@ -229,6 +252,10 @@ export class LicenseHandler {
       maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,
       currentEvaluators,
       maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
+      currentMessagesPerMonth,
+      maxMessagesPerMonth: plan.maxMessagesPerMonth,
+      currentEvaluationsCredit,
+      maxEvaluationsCredit: plan.evaluationsCredit,
     };
   }
 

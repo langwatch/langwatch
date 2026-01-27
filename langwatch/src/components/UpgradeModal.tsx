@@ -18,8 +18,8 @@ interface UpgradeModalProps {
   open: boolean;
   onClose: () => void;
   limitType: LimitType;
-  current: number;
-  max: number;
+  current?: number;
+  max?: number;
 }
 
 export function UpgradeModal({
@@ -50,13 +50,22 @@ export function UpgradeModal({
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align="start">
-            <Text>
-              You've reached the limit of {max} {limitLabels[limitType]} on your
-              current plan.
-            </Text>
-            <Text color="gray.500">
-              Current usage: {current} / {max}
-            </Text>
+            {typeof max === "number" ? (
+              <>
+                <Text>
+                  You've reached the limit of {max} {limitLabels[limitType]} on
+                  your current plan.
+                </Text>
+                <Text color="gray.500">
+                  Current usage: {current} / {max}
+                </Text>
+              </>
+            ) : (
+              <Text>
+                You've reached the limit of {limitLabels[limitType]} on your
+                current plan.
+              </Text>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

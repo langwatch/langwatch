@@ -88,3 +88,43 @@ Feature: Member Limit Enforcement with License
     And the organization has 3 members
     When I invite users "a@example.com,b@example.com,c@example.com" to the organization
     Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # UI: Click-then-Modal Pattern
+  # ============================================================================
+
+  @unit
+  Scenario: Add members button is always clickable when admin
+    Given the organization has a license with maxMembers 3
+    And the organization has 3 members (at limit)
+    And I am authenticated as an admin of the organization
+    When I view the members page
+    Then the "Add members" button is enabled
+    And the "Add members" button is not visually disabled
+
+  @unit
+  Scenario: Clicking Add members at limit shows upgrade modal
+    Given the organization has a license with maxMembers 3
+    And the organization has 3 members (at limit)
+    And I am authenticated as an admin of the organization
+    When I click the "Add members" button
+    Then an upgrade modal is displayed
+    And the modal shows "team members: 3 / 3"
+    And the modal includes an upgrade call-to-action
+
+  @unit
+  Scenario: Clicking Add members when allowed opens add members form
+    Given the organization has a license with maxMembers 5
+    And the organization has 3 members (under limit)
+    And I am authenticated as an admin of the organization
+    When I click the "Add members" button
+    Then the add members dialog is displayed
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Add members button disabled for non-admin (permission check)
+    Given the organization has a license with maxMembers 5
+    And I am authenticated as a non-admin member of the organization
+    When I view the members page
+    Then the "Add members" button is disabled
+    And the button has tooltip "You need admin privileges to add members"

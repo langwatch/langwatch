@@ -1,9 +1,14 @@
-import type { PrismaClient } from "@prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { getCurrentMonthStart } from "../utils/dateUtils";
 
 /**
  * Repository interface for license enforcement.
  * Defines the contract for counting resources - allows for easy testing
  * and follows Dependency Inversion Principle (DIP).
+ *
+ * Note: Message/trace counting is NOT included here because it queries
+ * Elasticsearch (via TraceUsageService), not Prisma. Repositories should
+ * only do database queries - delegation to other services violates SRP.
  */
 export interface ILicenseEnforcementRepository {
   getWorkflowCount(organizationId: string): Promise<number>;
@@ -13,11 +18,12 @@ export interface ILicenseEnforcementRepository {
   getProjectCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
+  getEvaluationsCreditUsed(organizationId: string): Promise<number>;
 }
 
 /**
  * Repository implementation for counting resources per organization.
- * Pure data access layer - no business logic.
+ * Pure data access layer - only Prisma queries, no business logic.
  */
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
@@ -93,7 +99,21 @@ export class LicenseEnforcementRepository
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     return this.prisma.organizationUser.count({
-      where: { organizationId, role: "EXTERNAL" },
+      where: { organizationId, role: OrganizationUserRole.EXTERNAL },
+    });
+  }
+
+  /**
+   * Counts evaluations credit used for the current month.
+   * Counts BatchEvaluation records created since the start of the month.
+   */
+  async getEvaluationsCreditUsed(organizationId: string): Promise<number> {
+    const startOfMonth = getCurrentMonthStart();
+    return this.prisma.batchEvaluation.count({
+      where: {
+        project: { team: { organizationId } },
+        createdAt: { gte: startOfMonth },
+      },
     });
   }
 }

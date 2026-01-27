@@ -7,11 +7,13 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { TRPCClientError } from "@trpc/client";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
+import { UpgradeModal } from "../../../components/UpgradeModal";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { DEFAULT_MODEL } from "../../../utils/constants";
@@ -167,6 +169,13 @@ export const NewWorkflowForm = ({
       : getRandomWorkflowIcon(),
   );
 
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{
+    current: number;
+    max: number;
+  } | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -224,6 +233,28 @@ export const NewWorkflowForm = ({
         `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
       );
     } catch (error) {
+      // Check for limit exceeded error from backend
+      if (error instanceof TRPCClientError) {
+        const cause = error.data?.cause as
+          | { limitType?: string; current?: number; max?: number }
+          | undefined;
+        if (error.data?.code === "FORBIDDEN" && cause?.limitType === "workflows") {
+          // Only show upgrade modal with limit info when we have valid values
+          if (
+            typeof cause.current === "number" &&
+            typeof cause.max === "number"
+          ) {
+            setLimitInfo({ current: cause.current, max: cause.max });
+            setShowUpgradeModal(true);
+          } else {
+            // Fallback: show upgrade modal without specific limit info
+            // This handles edge cases where limit data is incomplete
+            setLimitInfo(null);
+            setShowUpgradeModal(true);
+          }
+          return;
+        }
+      }
       console.error("Error creating workflow:", error);
     }
   };
@@ -242,57 +273,66 @@ export const NewWorkflowForm = ({
   }, [template]);
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <Dialog.Body>
-        <VStack gap={4} align="stretch">
-          <Field.Root invalid={!!errors.name}>
-            <EmojiPickerModal
-              open={emojiPicker.open}
-              onClose={emojiPicker.onClose}
-              onChange={(emoji) => {
-                setValue("icon", emoji);
-                emojiPicker.onClose();
-              }}
-            />
-            <Field.Label>Name and Icon</Field.Label>
-            <HStack>
-              <Button
-                variant="outline"
-                onClick={emojiPicker.onOpen}
-                fontSize="18px"
-              >
-                {icon}
-              </Button>
-              <Input
-                {...register("name", { required: "Name is required" })}
-                ref={nameRef}
-                onChange={(e) => {
-                  setValue("name", e.target.value);
+    <>
+      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <Dialog.Body>
+          <VStack gap={4} align="stretch">
+            <Field.Root invalid={!!errors.name}>
+              <EmojiPickerModal
+                open={emojiPicker.open}
+                onClose={emojiPicker.onClose}
+                onChange={(emoji) => {
+                  setValue("icon", emoji);
+                  emojiPicker.onClose();
                 }}
               />
-            </HStack>
-            <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-          </Field.Root>
-          <Field.Root invalid={!!errors.description}>
-            <Field.Label>Description</Field.Label>
-            <Textarea {...register("description")} />
-            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-          </Field.Root>
-        </VStack>
-      </Dialog.Body>
-      <Dialog.Footer>
-        <Button
-          type="submit"
-          colorPalette="blue"
-          loading={createWorkflowMutation.isLoading}
-          onClick={() => {
-            void handleSubmit(onSubmit)();
-          }}
-        >
-          Create Workflow
-        </Button>
-      </Dialog.Footer>
-    </form>
+              <Field.Label>Name and Icon</Field.Label>
+              <HStack>
+                <Button
+                  variant="outline"
+                  onClick={emojiPicker.onOpen}
+                  fontSize="18px"
+                >
+                  {icon}
+                </Button>
+                <Input
+                  {...register("name", { required: "Name is required" })}
+                  ref={nameRef}
+                  onChange={(e) => {
+                    setValue("name", e.target.value);
+                  }}
+                />
+              </HStack>
+              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+            </Field.Root>
+            <Field.Root invalid={!!errors.description}>
+              <Field.Label>Description</Field.Label>
+              <Textarea {...register("description")} />
+              <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+            </Field.Root>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button
+            type="submit"
+            colorPalette="blue"
+            loading={createWorkflowMutation.isLoading}
+            onClick={() => {
+              void handleSubmit(onSubmit)();
+            }}
+          >
+            Create Workflow
+          </Button>
+        </Dialog.Footer>
+      </form>
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="workflows"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
+    </>
   );
 };

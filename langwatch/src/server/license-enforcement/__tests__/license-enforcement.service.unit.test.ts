@@ -47,6 +47,7 @@ describe("LicenseEnforcementService", () => {
       getProjectCount: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(0),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),
+      getEvaluationsCreditUsed: vi.fn().mockResolvedValue(0),
     };
 
     mockPlanProvider = {

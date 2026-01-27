@@ -83,6 +83,10 @@ type LicenseResourceLimits = {
   maxScenarios: number;
   currentEvaluators: number;
   maxEvaluators: number;
+  currentMessagesPerMonth: number;
+  maxMessagesPerMonth: number;
+  currentEvaluationsCredit: number;
+  maxEvaluationsCredit: number;
 };
 
 type InvalidLicenseStatus = {

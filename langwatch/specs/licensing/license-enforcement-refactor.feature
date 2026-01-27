@@ -155,6 +155,8 @@ Feature: License Enforcement Refactor
     And the response should include currentWorkflows and maxWorkflows
     And the response should include currentScenarios and maxScenarios
     And the response should include currentEvaluators and maxEvaluators
+    And the response should include currentMessagesPerMonth and maxMessagesPerMonth
+    And the response should include currentEvaluationsCredit and maxEvaluationsCredit
 
   @unit
   Scenario: License details card handles Infinity display
@@ -166,13 +168,15 @@ Feature: License Enforcement Refactor
   @integration
   Scenario: License status counts current resource usage
     Given an organization with:
-      | members       | 3 |
-      | lite_members  | 2 |
-      | projects      | 5 |
-      | prompts       | 10 |
-      | workflows     | 8 |
-      | scenarios     | 4 |
-      | evaluators    | 6 |
+      | members              | 3 |
+      | lite_members         | 2 |
+      | projects             | 5 |
+      | prompts              | 10 |
+      | workflows            | 8 |
+      | scenarios            | 4 |
+      | evaluators           | 6 |
+      | messages_per_month   | 500 |
+      | evaluations_credit   | 25 |
     When the license status is requested
     Then currentMembers should be 3
     And currentMembersLite should be 2
@@ -181,6 +185,8 @@ Feature: License Enforcement Refactor
     And currentWorkflows should be 8
     And currentScenarios should be 4
     And currentEvaluators should be 6
+    And currentMessagesPerMonth should be 500
+    And currentEvaluationsCredit should be 25
 
   # ============================================================================
   # Backward Compatibility

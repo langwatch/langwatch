@@ -240,6 +240,43 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     And no modal is shown
 
   # ============================================================================
+  # UI: Form Error Handling (Backend FORBIDDEN Response)
+  # ============================================================================
+
+  @unit
+  Scenario: Workflow form shows upgrade modal on FORBIDDEN error
+    Given the organization has a license with maxWorkflows 3
+    And the organization reached the limit after the form was opened
+    When I submit the new workflow form
+    And the server returns FORBIDDEN with limitType "workflows"
+    Then an upgrade modal is displayed
+    And the modal shows the current and max limit from the error
+    And no generic "Failed to create workflow" toast is shown
+
+  @unit
+  Scenario: Prompt creation shows upgrade modal on FORBIDDEN error
+    Given the organization has a license with maxPrompts 3
+    And the organization reached the limit after the action started
+    When the prompt creation request returns FORBIDDEN with limitType "prompts"
+    Then an upgrade modal is displayed
+    And the modal shows the current and max limit from the error
+
+  @unit
+  Scenario: Evaluator creation shows upgrade modal on FORBIDDEN error
+    Given the organization has a license with maxEvaluators 3
+    And the organization reached the limit after the action started
+    When the evaluator creation request returns FORBIDDEN with limitType "evaluators"
+    Then an upgrade modal is displayed
+    And the modal shows the current and max limit from the error
+
+  @unit
+  Scenario: Form handles non-limit FORBIDDEN errors normally
+    Given the server returns FORBIDDEN for permission denied
+    When I submit the new workflow form
+    Then an appropriate error toast is shown
+    And no upgrade modal is displayed
+
+  # ============================================================================
   # No License / Enforcement Disabled
   # ============================================================================
 

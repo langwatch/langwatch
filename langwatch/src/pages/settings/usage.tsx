@@ -1,6 +1,5 @@
 import {
   Badge,
-  Box,
   Button,
   Heading,
   HStack,
@@ -20,7 +19,11 @@ import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { ResourceLimitRow } from "../../components/license/ResourceLimitRow";
+import {
+  ResourceLimitsDisplay,
+  mapLicenseStatusToLimits,
+  mapUsageToLimits,
+} from "../../components/license/ResourceLimitsDisplay";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 
 function Usage() {
@@ -123,46 +126,9 @@ function Usage() {
               <Text color="fg.muted" fontSize="sm" marginBottom={2}>
                 Current usage versus your license limits
               </Text>
-              <Box
-                borderWidth="1px"
-                borderRadius="lg"
-                padding={6}
-                width="full"
-                maxWidth="md"
-              >
-                <VStack align="start" gap={2}>
-                  <ResourceLimitRow
-                    label="Members"
-                    current={licenseStatus.data.currentMembers}
-                    max={licenseStatus.data.maxMembers}
-                  />
-                  <ResourceLimitRow
-                    label="Projects"
-                    current={licenseStatus.data.currentProjects}
-                    max={licenseStatus.data.maxProjects}
-                  />
-                  <ResourceLimitRow
-                    label="Prompts"
-                    current={licenseStatus.data.currentPrompts}
-                    max={licenseStatus.data.maxPrompts}
-                  />
-                  <ResourceLimitRow
-                    label="Workflows"
-                    current={licenseStatus.data.currentWorkflows}
-                    max={licenseStatus.data.maxWorkflows}
-                  />
-                  <ResourceLimitRow
-                    label="Scenarios"
-                    current={licenseStatus.data.currentScenarios}
-                    max={licenseStatus.data.maxScenarios}
-                  />
-                  <ResourceLimitRow
-                    label="Evaluators"
-                    current={licenseStatus.data.currentEvaluators}
-                    max={licenseStatus.data.maxEvaluators}
-                  />
-                </VStack>
-              </Box>
+              <ResourceLimitsDisplay
+                limits={mapLicenseStatusToLimits(licenseStatus.data)}
+              />
               <Button asChild marginTop={2}>
                 <Link href={planManagementUrl}>{planButtonLabel}</Link>
               </Button>
@@ -186,56 +152,9 @@ function Usage() {
               <Text color="fg.muted" fontSize="sm" marginBottom={2}>
                 Current usage versus free tier limits
               </Text>
-              <Box
-                borderWidth="1px"
-                borderRadius="lg"
-                padding={6}
-                width="full"
-                maxWidth="md"
-              >
-                <VStack align="start" gap={2}>
-                  <ResourceLimitRow
-                    label="Members"
-                    current={1}
-                    max={FREE_PLAN.maxMembers}
-                  />
-                  <ResourceLimitRow
-                    label="Projects"
-                    current={usage.data.projectsCount}
-                    max={FREE_PLAN.maxProjects}
-                  />
-                  <ResourceLimitRow
-                    label="Prompts"
-                    current={0}
-                    max={FREE_PLAN.maxPrompts ?? 3}
-                  />
-                  <ResourceLimitRow
-                    label="Workflows"
-                    current={0}
-                    max={FREE_PLAN.maxWorkflows}
-                  />
-                  <ResourceLimitRow
-                    label="Scenarios"
-                    current={0}
-                    max={FREE_PLAN.maxScenarios ?? 3}
-                  />
-                  <ResourceLimitRow
-                    label="Evaluators"
-                    current={0}
-                    max={FREE_PLAN.maxEvaluators ?? 3}
-                  />
-                  <ResourceLimitRow
-                    label="Messages/Month"
-                    current={usage.data.currentMonthMessagesCount}
-                    max={FREE_PLAN.maxMessagesPerMonth}
-                  />
-                  <ResourceLimitRow
-                    label="Evaluations Credit"
-                    current={0}
-                    max={FREE_PLAN.evaluationsCredit}
-                  />
-                </VStack>
-              </Box>
+              <ResourceLimitsDisplay
+                limits={mapUsageToLimits(usage.data, FREE_PLAN)}
+              />
               <Button asChild marginTop={2}>
                 <Link href="/settings/license">Manage license</Link>
               </Button>

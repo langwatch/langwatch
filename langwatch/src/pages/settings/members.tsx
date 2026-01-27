@@ -1,7 +1,6 @@
 import {
   Badge,
   Button,
-  Card,
   Flex,
   Heading,
   HStack,
@@ -15,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
-import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
+import { Mail, MoreVertical, Plus, Trash } from "react-feather";
 import type { SubmitHandler } from "react-hook-form";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -30,6 +29,7 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -111,6 +111,7 @@ function MembersList({
   const { hasPermission } = useOrganizationTeamProject();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("members");
   const teamOptions = teams.map((team) => ({
     label: team.name,
     value: team.id,
@@ -316,41 +317,28 @@ function MembersList({
         <HStack width="full">
           <Heading>Organization Members</Heading>
           <Spacer />
-          {activePlan.overrideAddingLimitations &&
-          organization.members.length >= activePlan.maxMembers ? (
+          {activePlan.overrideAddingLimitations && (
             <PageLayout.HeaderButton onClick={() => onAddMembersOpen()}>
               <Plus size={20} />
               (Admin Override) Add members
             </PageLayout.HeaderButton>
-          ) : null}
-          {organization.members.length >= activePlan.maxMembers ? (
-            <Tooltip
-              content="Upgrade your plan to add more members"
-              positioning={{ placement: "top" }}
-            >
-              <PageLayout.HeaderButton disabled={true}>
-                <Lock size={20} />
-                Add members
-              </PageLayout.HeaderButton>
-            </Tooltip>
-          ) : (
-            <Tooltip
-              content={
-                !currentUserIsAdmin
-                  ? "You need admin privileges to add members"
-                  : undefined
-              }
-              positioning={{ placement: "top" }}
-            >
-              <PageLayout.HeaderButton
-                onClick={() => onAddMembersOpen()}
-                disabled={!currentUserIsAdmin}
-              >
-                <Plus size={20} />
-                Add members
-              </PageLayout.HeaderButton>
-            </Tooltip>
           )}
+          <Tooltip
+            content={
+              !currentUserIsAdmin
+                ? "You need admin privileges to add members"
+                : undefined
+            }
+            positioning={{ placement: "top" }}
+          >
+            <PageLayout.HeaderButton
+              onClick={() => checkAndProceed(onAddMembersOpen)}
+              disabled={!currentUserIsAdmin}
+            >
+              <Plus size={20} />
+              Add members
+            </PageLayout.HeaderButton>
+          </Tooltip>
         </HStack>
         <Table.Root borderCollapse="unset" size="md" width="full">
           <Table.Header>
@@ -599,6 +587,8 @@ function MembersList({
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
+
+      {upgradeModal}
     </SettingsLayout>
   );
 }
