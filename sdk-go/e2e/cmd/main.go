@@ -17,12 +17,12 @@ import (
 )
 
 var examples = map[string]string{
-	"threads":             "./threads/main.go",
-	"filtered-spans":      "./filtered-spans/main.go",
+	"openai-threads":      "./openai-threads/main.go",
+	"openai-filtered":     "./openai-filtered/main.go",
 	"custom-input-output": "./custom-input-output/main.go",
-	"streaming":           "./streaming/main.go",
-	"simple":              "./simple/main.go",
-	"responses":           "./responses/main.go",
+	"openai-streaming":    "./openai-streaming/main.go",
+	"openai-simple":       "./openai-simple/main.go",
+	"openai-responses":    "./openai-responses/main.go",
 }
 
 // runExample executes a single example in a subprocess and streams its output.
