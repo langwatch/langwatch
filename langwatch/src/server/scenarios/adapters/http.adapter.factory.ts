@@ -23,6 +23,8 @@ export interface AgentData {
       token?: string;
       header?: string;
       value?: string;
+      username?: string;
+      password?: string;
     };
     bodyTemplate?: string;
     outputPath?: string;
