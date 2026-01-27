@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { createLicenseEnforcementService } from "./index";
-import { LimitExceededError } from "./errors";
+import { LimitExceededError, ProjectNotFoundError } from "./errors";
 import type { LimitType } from "./types";
 import { getOrganizationIdForProject } from "./utils";
 
@@ -41,10 +41,20 @@ export async function enforceLicenseLimit(
   projectId: string,
   limitType: LimitType,
 ): Promise<void> {
-  const organizationId = await getOrganizationIdForProject(
-    ctx.prisma,
-    projectId,
-  );
+  let organizationId: string;
+
+  try {
+    organizationId = await getOrganizationIdForProject(ctx.prisma, projectId);
+  } catch (error) {
+    if (error instanceof ProjectNotFoundError) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+    }
+    throw error;
+  }
+
   const enforcement = createLicenseEnforcementService(ctx.prisma);
 
   try {

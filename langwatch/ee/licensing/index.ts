@@ -29,3 +29,9 @@ export { LicenseHandler } from "./licenseHandler";
 
 // Errors
 export { OrganizationNotFoundError } from "./errors";
+
+// Signing (for license generation)
+export { signLicense, encodeLicenseKey, generateLicenseId } from "./signing";
+
+// Plan Templates
+export { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "./planTemplates";

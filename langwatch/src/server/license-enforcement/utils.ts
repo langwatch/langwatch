@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+import { ProjectNotFoundError } from "./errors";
 
 /**
  * Gets the organizationId for a project.
@@ -8,7 +8,7 @@ import { TRPCError } from "@trpc/server";
  * @param prisma - Prisma client instance
  * @param projectId - The project ID to look up
  * @returns The organizationId for the project
- * @throws TRPCError with NOT_FOUND code if project doesn't exist or has no organization
+ * @throws ProjectNotFoundError if project doesn't exist or has no organization
  */
 export async function getOrganizationIdForProject(
   prisma: PrismaClient,
@@ -20,10 +20,7 @@ export async function getOrganizationIdForProject(
   });
 
   if (!project?.team?.organizationId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Project not found",
-    });
+    throw new ProjectNotFoundError(projectId);
   }
 
   return project.team.organizationId;

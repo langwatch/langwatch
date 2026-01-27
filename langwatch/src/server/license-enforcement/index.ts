@@ -5,7 +5,7 @@ import { LicenseEnforcementService } from "./license-enforcement.service";
 
 // Re-export types and errors for consumers
 export { LicenseEnforcementService } from "./license-enforcement.service";
-export { LimitExceededError } from "./errors";
+export { LimitExceededError, ProjectNotFoundError } from "./errors";
 export { limitTypes, limitTypeSchema } from "./types";
 export type { LimitType, LimitCheckResult } from "./types";
 export type { ILicenseEnforcementRepository } from "./license-enforcement.repository";

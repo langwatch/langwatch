@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { Box, Collapsible, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { api } from "~/utils/api";
 import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
+import { LicenseGeneratorForm } from "./license/LicenseGeneratorForm";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
 import { NoLicenseCard } from "./license/NoLicenseCard";
 import { useLicenseActions } from "./license/useLicenseActions";
@@ -13,6 +16,7 @@ interface LicenseStatusProps {
 
 export function LicenseStatus({ organizationId }: LicenseStatusProps) {
   const [licenseKey, setLicenseKey] = useState("");
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
 
   const {
     data: status,
@@ -94,22 +98,65 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
     return <LicenseLoadingSkeleton />;
   }
 
+  const licenseGeneratorSection = (
+    <Box
+      borderWidth="1px"
+      borderRadius="lg"
+      padding={4}
+      width="full"
+      maxWidth="600px"
+      marginTop={4}
+    >
+      <Collapsible.Root
+        open={isGeneratorOpen}
+        onOpenChange={(details) => setIsGeneratorOpen(details.open)}
+      >
+        <Collapsible.Trigger asChild>
+          <Box as="button" width="full" cursor="pointer">
+            <HStack width="full">
+              <Text fontSize="sm" fontWeight="medium">
+                Generate License
+              </Text>
+              <Spacer />
+              {isGeneratorOpen ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronRight size={16} />
+              )}
+            </HStack>
+          </Box>
+        </Collapsible.Trigger>
+        <Collapsible.Content>
+          <Box paddingTop={4}>
+            <LicenseGeneratorForm organizationId={organizationId} />
+          </Box>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </Box>
+  );
+
   if (!status?.hasLicense) {
     return (
-      <NoLicenseCard
-        licenseKey={licenseKey}
-        onLicenseKeyChange={setLicenseKey}
-        onActivate={handleActivate}
-        isActivating={isUploading}
-      />
+      <VStack align="start" gap={0}>
+        <NoLicenseCard
+          licenseKey={licenseKey}
+          onLicenseKeyChange={setLicenseKey}
+          onActivate={handleActivate}
+          isActivating={isUploading}
+        />
+        {licenseGeneratorSection}
+      </VStack>
     );
   }
 
   return (
-    <LicenseDetailsCard
-      status={status}
-      onRemove={remove}
-      isRemoving={isRemoving}
-    />
+    <VStack align="start" gap={0}>
+      <LicenseDetailsCard
+        status={status}
+        onRemove={remove}
+        isRemoving={isRemoving}
+      />
+      {licenseGeneratorSection}
+    </VStack>
   );
 }
