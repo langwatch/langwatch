@@ -187,35 +187,7 @@ services:
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
-      PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
-    env_file:
-      - langwatch/.env
-    depends_on:
-      init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-          cpus: "0.5"
-
-  scenario-worker:
-    image: node:20
-    working_dir: /app
-    profiles: [scenarios, full]
-    volumes:
-      - ./langwatch:/app
-      - app_modules:/app/node_modules
-    command: sh -c "corepack enable && while true; do pnpm tsx --watch --tsconfig tsconfig.workers.json src/scenario-worker.ts; sleep 1; done"
-    environment:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      NODE_ENV: development
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env
-      REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-      LANGEVALS_ENDPOINT: http://langevals:5562
-      # Override BASE_HOST for Docker networking - child processes post events here
+      # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # Uncomment to enable verbose scenario SDK logging

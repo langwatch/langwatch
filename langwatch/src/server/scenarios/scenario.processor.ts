@@ -290,8 +290,12 @@ async function spawnScenarioChildProcess(
 /**
  * Start the scenario processor (BullMQ worker).
  *
- * This should be called from a separate entry point (scenario-worker.ts)
- * to keep scenario processing isolated from the main server.
+ * Currently runs as part of the main workers process. OTEL trace isolation
+ * is handled at the child process level - each scenario spawns its own
+ * process with an independent tracer context.
+ *
+ * A separate entry point (scenario-worker.ts) exists for future independent
+ * scaling if needed.
  *
  * @param deps - Optional injected dependencies (defaults to production implementations)
  */

@@ -19,7 +19,7 @@ From repo root (requires Docker):
 
 ```bash
 make dev              # Minimal: postgres + redis + app
-make dev-scenarios    # + workers + scenario-worker + bullboard + ai-server + nlp
+make dev-scenarios    # + workers (includes scenarios) + bullboard + ai-server + nlp
 make dev-full         # Everything including opensearch
 make quickstart       # Interactive profile chooser
 make down             # Stop all services
