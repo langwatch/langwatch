@@ -30,26 +30,15 @@ async function main() {
     maxRetriesPerRequest: null,
   });
 
-  // Discover queues from Redis
-  const queueKeysMeta = await connection.keys("bull:*:meta");
-  const discoveredQueues = [
-    ...new Set(
-      queueKeysMeta.map((key) => key.split(":")[1])
-    ),
-  ].filter(Boolean) as string[];
-
-  // Fallback to known queues if none discovered
-  const queueNames =
-    discoveredQueues.length > 0
-      ? discoveredQueues
-      : [
-          "collector",
-          "evaluations",
-          "topicClustering",
-          "trackEvents",
-          "usageStats",
-          "{scenarios}",
-        ];
+  // Discover all queues from Redis - handles both standalone and cluster mode
+  const allBullKeys = await connection.keys("bull:*");
+  const queueNames = Array.from(
+    new Set(
+      allBullKeys.map((key) =>
+        key.split(":")[1]?.replace("{", "").replace("}", "")
+      )
+    )
+  ).filter(Boolean) as string[];
 
   console.log("Discovered queues:", queueNames);
 
