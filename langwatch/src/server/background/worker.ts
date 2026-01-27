@@ -40,21 +40,24 @@ import type { ScenarioJob, ScenarioJobResult } from "../scenarios/scenario.queue
 const logger = createLogger("langwatch:workers");
 
 type Closeable = { name: string; close: () => Promise<void> | void };
-const closeables: Closeable[] = [];
+// Use Map to dedupe closeables by name - prevents accumulation across restarts
+const closeables = new Map<string, Closeable>();
 let isShuttingDown = false;
 
 function registerCloseable(name: string, closeable: { close: () => Promise<void> | void } | undefined) {
-  if (closeable) closeables.push({ name, close: () => closeable.close() });
+  if (closeable) {
+    closeables.set(name, { name, close: () => closeable.close() });
+  }
 }
 
 export async function gracefulShutdown() {
   if (isShuttingDown) return; // Prevent multiple shutdown attempts
   isShuttingDown = true;
 
-  logger.info({ count: closeables.length }, "Shutting down workers...");
+  logger.info({ count: closeables.size }, "Shutting down workers...");
 
   const results = await Promise.allSettled(
-    closeables.map(async (c) => {
+    [...closeables.values()].map(async (c) => {
       try {
         await c.close();
         logger.debug({ name: c.name }, "Closed");
@@ -67,7 +70,7 @@ export async function gracefulShutdown() {
 
   const failed = results.filter((r) => r.status === "rejected").length;
   if (failed > 0) {
-    logger.warn({ failed, total: closeables.length }, "Shutdown completed with errors");
+    logger.warn({ failed, total: closeables.size }, "Shutdown completed with errors");
   } else {
     logger.info("Shutdown complete");
   }
@@ -96,6 +99,10 @@ export const start = (
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
+  // Reset state for restart scenarios - prevents duplicate closeables
+  closeables.clear();
+  isShuttingDown = false;
+
   // Initialize event sourcing with ClickHouse and Redis clients
   initializeEventSourcing({
     clickHouseClient: getClickHouseClient(),
