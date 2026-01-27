@@ -24,6 +24,23 @@ Work should be tied to a GitHub issue. If requirements are unclear:
 - Use `gh issue view <number>` to fetch full context
 - The issue description and acceptance criteria are the source of truth
 
+## Search for Existing Infrastructure
+
+**Before writing any feature file**, check if relevant infrastructure already exists:
+
+```bash
+ls langwatch/src/server/           # Check existing modules
+grep -ri "yourConcept" langwatch/src/server/
+```
+
+Also check the **Existing Infrastructure** table in `AGENTS.md`.
+
+If existing infrastructure covers your needs:
+- Reference it in the feature file ("use existing X")
+- Don't spec out building something that already exists
+
+State explicitly in your feature file background or notes what existing infrastructure will be reused.
+
 ## Output Location
 Write to `specs/features/<feature-name>.feature`
 

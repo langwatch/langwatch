@@ -56,10 +56,30 @@ specs/               # BDD feature specs
 - `docs/best_practices/` - language/framework conventions
 - `docs/adr/` - Architecture Decision Records
 
+## Existing Infrastructure (langwatch/src/server/)
+
+Before building new utilities, check if these exist:
+
+| Need | Location | Notes |
+|------|----------|-------|
+| Feature flags | `featureFlag/` | PostHog + memory implementations, redis cache |
+| Email sending | `mailer/` | Transactional email service |
+| Background jobs | `background/queues/` | BullMQ-based job processing |
+| Event sourcing | `event-sourcing/` | Projections, handlers, pipelines |
+| Model providers | `modelProviders/` | LLM integration (OpenAI, Anthropic, etc.) |
+| Notifications | `notifications/` | User notification system |
+| Analytics | `analytics/` | Usage and metrics tracking |
+| Storage | `storage.ts` | File/blob storage abstraction |
+| Redis | `redis.ts` | Redis client singleton |
+| Elasticsearch | `elasticsearch.ts` | Search client |
+
+Run `ls langwatch/src/server/` to see all available domains.
+
 ## General
 
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
+| Building infrastructure that already exists | **Search before building**: `grep -ri "featureFlag\|feature.flag" langwatch/src/server/` - check if similar functionality exists before implementing |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Code before tests | Outside-In TDD: spec → test → code |
