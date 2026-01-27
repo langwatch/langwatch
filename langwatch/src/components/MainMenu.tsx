@@ -41,7 +41,7 @@ export const MainMenu = React.memo(function MainMenu({
   // Feature flag: show scenarios menu using backend feature flags
   const hasFeature = (flag: FrontendFeatureFlag) =>
     session?.user?.enabledFeatures?.includes(flag) ?? false;
-  const showScenariosOnThePlatform = hasFeature("SCENARIOS");
+  const showScenariosOnThePlatform = hasFeature("ui-simulations-scenarios");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
