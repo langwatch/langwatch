@@ -196,17 +196,19 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`
-╔════════════════════════════════════════════════════════════╗
-║                    AI Test Server                          ║
-╠════════════════════════════════════════════════════════════╣
-║  URL:     http://localhost:${PORT}/generate                   ║
-║  Docker:  http://host.docker.internal:${PORT}/generate        ║
-║  Method:  POST                                             ║
-║  Headers: X-API-Key: <openai-api-key>                      ║
-║           X-Client-ID: <client-identifier>                 ║
-║           Content-Type: application/json                   ║
-╠════════════════════════════════════════════════════════════╣
-║  Body:    { "model": "gpt-4o-mini", "messages": [...] }    ║
-╚════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                              AI Test Server                                    ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║  URL:     http://localhost:${PORT}/generate                                       ║
+║  Docker:  http://host.docker.internal:${PORT}/generate                            ║
+║  Method:  POST                                                                 ║
+║  Headers: X-API-Key: <openai-api-key>                                          ║
+║           X-Client-ID: <client-identifier>                                     ║
+║           Content-Type: application/json                                       ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║  Body:    { "model": "gpt-4o-mini", "messages": [...] }                        ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║  Tunnel:  docker run --rm cloudflare/cloudflared tunnel --url http://host.docker.internal:${PORT}  ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 `);
 });
