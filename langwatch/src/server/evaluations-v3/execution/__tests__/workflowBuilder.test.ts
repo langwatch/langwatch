@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluatorConfig, TargetConfig } from "~/evaluations-v3/types";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type {
+  HttpComponentConfig,
+  SignatureComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { ExecutionCell } from "../types";
-import { buildEvaluatorNode, buildHttpNodeFromAgent } from "../workflowBuilder";
+import {
+  buildCodeNodeFromAgent,
+  buildEvaluatorNode,
+  buildHttpNodeFromAgent,
+  buildSignatureNodeFromAgent,
+} from "../workflowBuilder";
 
 describe("buildEvaluatorNode", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({
@@ -163,6 +171,205 @@ describe("buildEvaluatorNode", () => {
       "score",
       "label",
     ]);
+  });
+});
+
+describe("buildSignatureNodeFromAgent", () => {
+  const createSignatureAgentWithTopLevelLlm = (): TypedAgent => ({
+    id: "signature-agent-1",
+    projectId: "project-1",
+    name: "My Signature Agent",
+    type: "signature",
+    config: {
+      name: "Test Signature",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      // Top-level LLM config (agent drawer format)
+      llm: {
+        model: "openai/gpt-4o",
+        temperature: 0.7,
+        max_tokens: 1024,
+      },
+      prompt: "You are a helpful assistant.",
+      messages: [{ role: "user", content: "{{input}}" }],
+    } as SignatureComponentConfig,
+    workflowId: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const createSignatureAgentWithLlmInParameters = (): TypedAgent => ({
+    id: "signature-agent-2",
+    projectId: "project-1",
+    name: "My Signature Agent",
+    type: "signature",
+    config: {
+      name: "Test Signature",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      // LLM config in parameters array (workflow node format)
+      parameters: [
+        {
+          identifier: "llm",
+          type: "llm",
+          value: {
+            model: "openai/gpt-4o-mini",
+            temperature: 0.5,
+            max_tokens: 2048,
+          },
+        },
+        {
+          identifier: "instructions",
+          type: "str",
+          value: "You are a helpful assistant.",
+        },
+      ],
+    } as SignatureComponentConfig,
+    workflowId: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const createTargetConfig = (): TargetConfig => ({
+    id: "target-1",
+    type: "agent",
+    name: "Signature Agent Target",
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {
+      "dataset-1": {
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
+      },
+    },
+  });
+
+  const createCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-1",
+    targetConfig: createTargetConfig(),
+    evaluatorConfigs: [],
+    datasetEntry: {
+      _datasetId: "dataset-1",
+      question: "What is the capital of France?",
+    },
+  });
+
+  it("creates signature node with correct type", () => {
+    const agent = createSignatureAgentWithTopLevelLlm();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildSignatureNodeFromAgent(
+      "target-1",
+      agent,
+      targetConfig,
+      cell,
+    );
+
+    expect(node.type).toBe("signature");
+  });
+
+  it("includes top-level llm field in parameters array", () => {
+    const agent = createSignatureAgentWithTopLevelLlm();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildSignatureNodeFromAgent(
+      "target-1",
+      agent,
+      targetConfig,
+      cell,
+    );
+
+    // LLM config should be in parameters array
+    const llmParam = node.data.parameters?.find(
+      (p) => p.identifier === "llm" && p.type === "llm",
+    );
+    expect(llmParam).toBeDefined();
+    expect(llmParam?.value).toEqual({
+      model: "openai/gpt-4o",
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+  });
+
+  it("includes top-level prompt as instructions in parameters array", () => {
+    const agent = createSignatureAgentWithTopLevelLlm();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildSignatureNodeFromAgent(
+      "target-1",
+      agent,
+      targetConfig,
+      cell,
+    );
+
+    // Prompt should be converted to instructions parameter
+    const instructionsParam = node.data.parameters?.find(
+      (p) => p.identifier === "instructions" && p.type === "str",
+    );
+    expect(instructionsParam).toBeDefined();
+    expect(instructionsParam?.value).toBe("You are a helpful assistant.");
+  });
+
+  it("includes top-level messages in parameters array", () => {
+    const agent = createSignatureAgentWithTopLevelLlm();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildSignatureNodeFromAgent(
+      "target-1",
+      agent,
+      targetConfig,
+      cell,
+    );
+
+    // Messages should be in parameters array
+    const messagesParam = node.data.parameters?.find(
+      (p) => p.identifier === "messages" && p.type === "chat_messages",
+    );
+    expect(messagesParam).toBeDefined();
+    expect(messagesParam?.value).toEqual([
+      { role: "user", content: "{{input}}" },
+    ]);
+  });
+
+  it("preserves llm in parameters array when already present", () => {
+    const agent = createSignatureAgentWithLlmInParameters();
+    const targetConfig = createTargetConfig();
+    const cell = createCell();
+
+    const node = buildSignatureNodeFromAgent(
+      "target-1",
+      agent,
+      targetConfig,
+      cell,
+    );
+
+    // LLM config should still be from parameters array
+    const llmParam = node.data.parameters?.find(
+      (p) => p.identifier === "llm" && p.type === "llm",
+    );
+    expect(llmParam).toBeDefined();
+    expect(llmParam?.value).toEqual({
+      model: "openai/gpt-4o-mini",
+      temperature: 0.5,
+      max_tokens: 2048,
+    });
+
+    // Should not duplicate llm parameter
+    const llmParams = node.data.parameters?.filter(
+      (p) => p.identifier === "llm" && p.type === "llm",
+    );
+    expect(llmParams).toHaveLength(1);
   });
 });
 
