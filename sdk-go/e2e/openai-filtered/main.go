@@ -25,6 +25,11 @@ func main() {
 		log.Fatal("OPENAI_API_KEY environment variable not set")
 	}
 
+	langwatchAPIKey := os.Getenv("LANGWATCH_API_KEY")
+	if langwatchAPIKey == "" {
+		log.Fatal("LANGWATCH_API_KEY environment variable not set")
+	}
+
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),

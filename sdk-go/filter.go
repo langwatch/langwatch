@@ -22,6 +22,8 @@ func (f FilterFunc) Apply(spans []sdktrace.ReadOnlySpan) []sdktrace.ReadOnlySpan
 }
 
 // Matcher defines how to match a string value.
+// Note: IgnoreCase only applies to Equals and StartsWith matching.
+// For case-insensitive regex, use the (?i) flag in the pattern itself.
 type Matcher struct {
 	Equals     string
 	StartsWith string
@@ -77,12 +79,15 @@ func StartsWithIgnoreCase(prefix string) Matcher {
 }
 
 // MatchRegex creates a matcher that matches strings against the given regular expression.
+// Note: The IgnoreCase field has no effect on regex matching. For case-insensitive
+// regex, use the (?i) flag in the pattern (e.g., regexp.MustCompile(`(?i)pattern`)).
 func MatchRegex(re *regexp.Regexp) Matcher {
 	return Matcher{Regex: re}
 }
 
 // MustMatchRegex creates a matcher that matches strings against the given pattern.
 // Panics if the pattern is invalid.
+// Note: For case-insensitive matching, use the (?i) flag in the pattern.
 func MustMatchRegex(pattern string) Matcher {
 	return Matcher{Regex: regexp.MustCompile(pattern)}
 }

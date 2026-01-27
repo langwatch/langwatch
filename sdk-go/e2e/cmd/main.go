@@ -205,11 +205,7 @@ func displayOutput(outputCh <-chan string, showHeaders bool, ciMode bool) bool {
 			}
 
 			// Stream output immediately for real-time feedback
-			if ciMode {
-				fmt.Print(content)
-			} else {
-				fmt.Print(content)
-			}
+			fmt.Print(content)
 
 			// Also accumulate for final summary in CI mode
 			if ciMode && showHeaders {
