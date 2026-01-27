@@ -11,30 +11,23 @@ import (
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
 
 func main() {
 	ctx := context.Background()
-	langwatchAPIKey := os.Getenv("LANGWATCH_API_KEY")
-	if langwatchAPIKey == "" {
-		log.Fatal("LANGWATCH_API_KEY environment variable not set")
-	}
 
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
 	if openaiAPIKey == "" {
 		log.Fatal("OPENAI_API_KEY environment variable not set")
 	}
 
-	// Setup OTel to export to LangWatch
-	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
-		otlptracehttp.WithHeaders(map[string]string{"Authorization": "Bearer " + langwatchAPIKey}),
-	)
+	// Setup OTel to export to LangWatch using the new exporter
+	// Reads LANGWATCH_API_KEY from environment automatically
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
-		log.Fatalf("failed to create OTLP exporter: %v", err)
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
 	}
 
 	// Set the OTel tracer provider

@@ -38,7 +38,7 @@ export OPENAI_API_KEY="your-openai-api-key"
 Then wrap the `openai.Middleware` using `option.WithMiddleware` when creating the `openai.Client`:
 
 ```go
-package test
+package main
 
 import (
 	"context"
@@ -48,17 +48,23 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Setup LangWatch tracer provider
-	setupOTelWithLangWatch(ctx)
+	// Setup LangWatch exporter (reads LANGWATCH_API_KEY from env)
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx)
 
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
@@ -86,34 +92,27 @@ func main() {
 
 	log.Printf("Chat completion completed: %v\n", response)
 }
-
-func setupOTelWithLangWatch(ctx context.Context) func() {
-	langwatchAPIKey := os.Getenv("LANGWATCH_API_KEY")
-	if langwatchAPIKey == "" {
-		log.Fatal("LANGWATCH_API_KEY environment variable not set")
-	}
-
-	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
-		otlptracehttp.WithHeaders(map[string]string{"Authorization": "Bearer " + langwatchAPIKey}),
-	)
-	if err != nil {
-		log.Fatalf("failed to create OTLP exporter: %v", err)
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-	)
-	otel.SetTracerProvider(tp)
-
-	// Return a function to shutdown the tracer provider
-	return func() {
-		if err := tp.Shutdown(ctx); err != nil {
-			log.Fatalf("failed to shutdown TracerProvider: %v", err)
-		}
-	}
-}
 ```
+
+## Filtering Spans
+
+Use the LangWatch exporter's filtering to control which spans are exported:
+
+```go
+// Only export LangWatch and OpenAI instrumentation spans
+exporter, err := langwatch.NewExporter(ctx,
+	langwatch.WithFilters(
+		langwatch.Include(langwatch.Criteria{
+			ScopeName: []langwatch.Matcher{
+				langwatch.StartsWith("github.com/langwatch/"),
+				langwatch.Equals("my-app"),
+			},
+		}),
+	),
+)
+```
+
+See the [main SDK README](../../README.md#filtering-spans) for full filtering documentation.
 
 ## Configuration Options
 

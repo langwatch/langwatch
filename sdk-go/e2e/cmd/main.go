@@ -17,12 +17,12 @@ import (
 )
 
 var examples = map[string]string{
-	"threads":             "./threads/main.go",
-	"filtered-spans":      "./filtered-spans/main.go",
+	"openai-threads":      "./openai-threads/main.go",
+	"openai-filtered":     "./openai-filtered/main.go",
 	"custom-input-output": "./custom-input-output/main.go",
-	"streaming":           "./streaming/main.go",
-	"simple":              "./simple/main.go",
-	"responses":           "./responses/main.go",
+	"openai-streaming":    "./openai-streaming/main.go",
+	"openai-simple":       "./openai-simple/main.go",
+	"openai-responses":    "./openai-responses/main.go",
 }
 
 // runExample executes a single example in a subprocess and streams its output.
@@ -205,11 +205,7 @@ func displayOutput(outputCh <-chan string, showHeaders bool, ciMode bool) bool {
 			}
 
 			// Stream output immediately for real-time feedback
-			if ciMode {
-				fmt.Print(content)
-			} else {
-				fmt.Print(content)
-			}
+			fmt.Print(content)
 
 			// Also accumulate for final summary in CI mode
 			if ciMode && showHeaders {
