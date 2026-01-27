@@ -29,13 +29,36 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
 
   /**
    * Check if a feature flag is enabled for a given user or tenant/project.
+   * Environment overrides take precedence over PostHog/memory service.
    */
   async isEnabled(
     flagKey: string,
     distinctId: string,
     defaultValue = true,
   ): Promise<boolean> {
+    const envOverride = this.checkEnvOverride(flagKey);
+    if (envOverride !== undefined) {
+      return envOverride;
+    }
     return this.service.isEnabled(flagKey, distinctId, defaultValue);
+  }
+
+  /**
+   * Check if a flag is overridden by environment variables.
+   * FEATURE_FLAGS_ENABLED=flag1,flag2 - force enable flags
+   * FEATURE_FLAGS_DISABLED=flag1,flag2 - force disable flags
+   */
+  private checkEnvOverride(flagKey: string): boolean | undefined {
+    const enabledFlags = process.env.FEATURE_FLAGS_ENABLED?.split(",") ?? [];
+    const disabledFlags = process.env.FEATURE_FLAGS_DISABLED?.split(",") ?? [];
+
+    if (enabledFlags.includes(flagKey)) {
+      return true;
+    }
+    if (disabledFlags.includes(flagKey)) {
+      return false;
+    }
+    return undefined;
   }
 
   /**
