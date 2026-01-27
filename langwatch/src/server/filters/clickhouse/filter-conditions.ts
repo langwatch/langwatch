@@ -122,11 +122,15 @@ export const clickHouseFilterConditions: Record<
 
   "evaluations.score": (values, paramId, key) => {
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
-    const parsedMin = parseFloat(values[0] ?? "");
-    const parsedMax = parseFloat(values[1] ?? "");
-    // Validate numeric values, use safe defaults if parsing fails
-    const minScore = Number.isFinite(parsedMin) ? parsedMin : 0;
-    const maxScore = Number.isFinite(parsedMax) ? parsedMax : 1;
+    const minScore = parseFloat(values[0] ?? "");
+    const maxScore = parseFloat(values[1] ?? "");
+    // Reject invalid ranges: NaN values or min > max
+    if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) {
+      return { sql: "1=0", params: {} };
+    }
+    if (minScore > maxScore) {
+      return { sql: "1=0", params: {} };
+    }
     return {
       sql: `EXISTS (
         SELECT 1 FROM evaluation_states es FINAL
@@ -216,11 +220,15 @@ export const clickHouseFilterConditions: Record<
 
   "events.metrics.value": (values, paramId, key, subkey) => {
     if (!key || !subkey || values.length < 2) return { sql: "1=0", params: {} };
-    const parsedMin = parseFloat(values[0] ?? "");
-    const parsedMax = parseFloat(values[1] ?? "");
-    // Validate numeric values, use safe defaults if parsing fails
-    const minValue = Number.isFinite(parsedMin) ? parsedMin : 0;
-    const maxValue = Number.isFinite(parsedMax) ? parsedMax : 0;
+    const minValue = parseFloat(values[0] ?? "");
+    const maxValue = parseFloat(values[1] ?? "");
+    // Reject invalid ranges: NaN values or min > max
+    if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+      return { sql: "1=0", params: {} };
+    }
+    if (minValue > maxValue) {
+      return { sql: "1=0", params: {} };
+    }
     return {
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp FINAL

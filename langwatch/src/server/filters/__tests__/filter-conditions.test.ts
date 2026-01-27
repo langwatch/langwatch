@@ -121,11 +121,18 @@ describe("clickHouseFilterConditions", () => {
       expect(result.params.f0_max).toBe(0.9);
     });
 
-    it("uses safe defaults for invalid numeric values", () => {
+    it("returns no-match condition for invalid numeric values", () => {
       const builder = clickHouseFilterConditions["evaluations.score"];
       const result = builder!(["invalid", "NaN"], "f0", "eval-1");
-      expect(result.params.f0_min).toBe(0);
-      expect(result.params.f0_max).toBe(1);
+      expect(result.sql).toBe("1=0");
+      expect(result.params).toEqual({});
+    });
+
+    it("returns no-match condition when min > max", () => {
+      const builder = clickHouseFilterConditions["evaluations.score"];
+      const result = builder!(["0.9", "0.5"], "f0", "eval-1");
+      expect(result.sql).toBe("1=0");
+      expect(result.params).toEqual({});
     });
   });
 });
