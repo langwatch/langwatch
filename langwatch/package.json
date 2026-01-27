@@ -24,8 +24,6 @@
 		"start:prepare:files": "pnpm run copy:langevals-types && pnpm run copy:llm-model-costs && pnpm run types:zod:generate && pnpm run prisma:generate:typescript",
 		"start:prepare:db": "pnpm run prisma:migrate && pnpm run elastic:migrate && pnpm run clickhouse:migrate",
 		"start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
-		"start:scenario-worker": "tsx --tsconfig tsconfig.workers.json src/scenario-worker.ts",
-		"bullboard": "tsx bullboard/src/server.ts",
 		"typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
 		"typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
 		"test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",

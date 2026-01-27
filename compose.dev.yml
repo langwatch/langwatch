@@ -242,19 +242,15 @@ services:
     working_dir: /app
     profiles: [debug, scenarios, full]
     volumes:
-      - ./langwatch:/app
-      - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm bullboard"
+      - ./bullboard:/app
+      - bullboard_modules:/app/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm start"
     ports:
       - "${BULLBOARD_PORT:-6380}:6380"
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       REDIS_URL: redis://redis:6379
-    env_file:
-      - langwatch/.env
     depends_on:
-      init:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
     deploy:
@@ -297,3 +293,4 @@ volumes:
   app_modules:
   pnpm_store:
     name: langwatch-pnpm-store  # Shared across all worktrees
+  bullboard_modules:
