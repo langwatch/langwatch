@@ -19,12 +19,12 @@
 
 ## Worktrees
 
-Worktree directories use the pattern: `worktree-<branch-slug>`
+Worktrees live in a dedicated `../worktrees/` directory (sibling to langwatch-saas).
 
 | Branch | Directory |
 |--------|-----------|
-| `issue123/user-login` | `worktree-issue123-user-login` |
-| `feat/dark-mode` | `worktree-feat-dark-mode` |
+| `issue123/user-login` | `../worktrees/worktree-issue123-user-login` |
+| `feat/dark-mode` | `../worktrees/worktree-feat-dark-mode` |
 
 Create worktrees with `/worktree`:
 ```bash

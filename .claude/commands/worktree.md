@@ -1,6 +1,6 @@
 # Worktree
 
-Create a git worktree for a branch. Worktrees go in the parent directory of langwatch-saas (e.g., `../worktree-*`), not inside langwatch-saas.
+Create a git worktree for a branch. Worktrees go in a dedicated `../worktrees/` directory, not inside langwatch-saas.
 
 ## Naming Standards
 
@@ -23,7 +23,7 @@ Create a git worktree for a branch. Worktrees go in the parent directory of lang
 2. Fetch issue: `gh issue view <number> --json title,number`
 3. Derive slug from title (lowercase, hyphens, max 40 chars)
 4. Set branch name: `issue<number>/<slug>` (e.g., `issue123/user-login-feature`)
-5. Set directory: `../worktree-issue<number>-<slug>` (relative to langwatch-saas)
+5. Set directory: `../worktrees/worktree-issue<number>-<slug>`
 6. Check if branch exists: `git branch -r | grep -qw "origin/$BRANCH"`
 7. Create worktree:
    - Existing: `git worktree add "$DIR" "$BRANCH"`
@@ -45,7 +45,7 @@ Create a git worktree for a branch. Worktrees go in the parent directory of lang
 1. `git fetch origin`
 2. Confirm branch doesn't exist
 3. Set branch name: `feat/$ARGUMENTS`
-4. Set directory: `../worktree-feat-$ARGUMENTS` (relative to langwatch-saas)
+4. Set directory: `../worktrees/worktree-feat-$ARGUMENTS`
 5. Create worktree: `git worktree add -b "$BRANCH" "$DIR" origin/main`
 6. Copy .env: `cp langwatch/.env "$DIR/langwatch/.env"`
 7. Report path to user
