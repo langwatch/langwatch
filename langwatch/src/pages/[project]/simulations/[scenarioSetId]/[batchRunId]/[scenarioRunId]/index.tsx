@@ -71,7 +71,7 @@ export default function IndividualScenarioRunPage() {
       }
 
       try {
-        await runScenario(scenarioId, target, scenarioSetId);
+        await runScenario({ scenarioId, target, setId: scenarioSetId });
       } catch (error) {
         console.error("Failed to run scenario:", error);
       }
