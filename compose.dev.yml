@@ -260,8 +260,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128m
-          cpus: "0.25"
+          memory: 512m
+          cpus: "0.5"
 
   # =============================================================================
   # TEST TOOLS (profile: test)
