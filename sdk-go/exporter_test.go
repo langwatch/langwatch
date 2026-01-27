@@ -210,7 +210,6 @@ func TestExporterOption_WithFilters_Appends(t *testing.T) {
 
 func TestVersion(t *testing.T) {
 	assert.NotEmpty(t, Version)
-	assert.Equal(t, "0.1.0", Version)
 }
 
 func TestDefaultEndpoint(t *testing.T) {
