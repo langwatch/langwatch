@@ -71,7 +71,8 @@ export class ScenarioFailureHandler {
       batchRunId,
     });
 
-    const existingRun = existingRuns[0];
+    // Filter by scenarioId to get the correct run for this scenario
+    const existingRun = existingRuns.find((run) => run.scenarioId === scenarioId);
 
     // If run already has a terminal status, do nothing (idempotent)
     if (existingRun && TERMINAL_STATUSES.has(existingRun.status as ScenarioRunStatus)) {

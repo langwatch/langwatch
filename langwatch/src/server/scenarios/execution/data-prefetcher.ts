@@ -158,7 +158,7 @@ export async function prefetchScenarioData(
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
     },
     telemetry: {
-      endpoint: env.BASE_HOST,
+      endpoint: env.BASE_HOST ?? "https://app.langwatch.ai",
       apiKey: project.apiKey,
     },
   };
