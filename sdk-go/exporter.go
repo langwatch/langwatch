@@ -2,6 +2,7 @@ package langwatch
 
 import (
 	"context"
+	"net/url"
 	"os"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -87,8 +88,13 @@ func buildHeaders(apiKey string) map[string]string {
 func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
 	cfg := resolveConfig(opts...)
 
+	endpointURL, err := url.JoinPath(cfg.endpoint, TracesPath)
+	if err != nil {
+		return nil, err
+	}
+
 	otlpExporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpointURL(cfg.endpoint+TracesPath),
+		otlptracehttp.WithEndpointURL(endpointURL),
 		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey)),
 	)
 	if err != nil {
