@@ -33,6 +33,16 @@ import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");
 
+async function getEnabledFrontendFeatures(userId: string): Promise<string[]> {
+  const enabledFeatures: string[] = [];
+  for (const flag of FRONTEND_FEATURE_FLAGS) {
+    if (await featureFlagService.isEnabled(flag, userId, false)) {
+      enabledFeatures.push(flag);
+    }
+  }
+  return enabledFeatures;
+}
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -82,29 +92,15 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        const enabledFeatures: string[] = [];
-        for (const flag of FRONTEND_FEATURE_FLAGS) {
-          if (await featureFlagService.isEnabled(flag, user_.id, false)) {
-            enabledFeatures.push(flag);
-          }
-        }
-
         return {
           ...session,
           user: {
             ...session.user,
             id: user_.id,
             email: user_.email,
-            enabledFeatures,
+            enabledFeatures: await getEnabledFrontendFeatures(user_.id),
           },
         };
-      }
-
-      const enabledFeatures: string[] = [];
-      for (const flag of FRONTEND_FEATURE_FLAGS) {
-        if (await featureFlagService.isEnabled(flag, user.id, false)) {
-          enabledFeatures.push(flag);
-        }
       }
 
       return {
@@ -113,7 +109,7 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
-          enabledFeatures,
+          enabledFeatures: await getEnabledFrontendFeatures(user.id),
         },
       };
     },
