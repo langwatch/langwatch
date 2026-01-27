@@ -1,4 +1,5 @@
 {
+  "sdk-go": "0.1.0",
   "typescript-sdk": "0.13.0",
   "python-sdk": "0.10.0",
   "mcp-server": "0.3.3",
