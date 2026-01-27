@@ -2,7 +2,7 @@
  * Factory for creating HTTP-based scenario adapters.
  */
 
-import type { HttpAgentData } from "../execution/types";
+import { AuthConfigSchema, type HttpAgentData } from "../execution/types";
 import { SerializedHttpAgentAdapter } from "../execution/serialized.adapters";
 import type {
   AdapterCreationContext,
@@ -18,12 +18,8 @@ export interface AgentData {
     url: string;
     method: string;
     headers?: Array<{ key: string; value: string }>;
-    auth?: {
-      type: "none" | "bearer" | "api_key" | "basic";
-      token?: string;
-      header?: string;
-      value?: string;
-    };
+    /** Raw auth config from database - validated at runtime */
+    auth?: unknown;
     bodyTemplate?: string;
     outputPath?: string;
   };
@@ -66,13 +62,25 @@ export class HttpAdapterFactory implements TargetAdapterFactory {
       };
     }
 
+    // Validate auth config using Zod schema if present
+    const authResult = agent.config.auth
+      ? AuthConfigSchema.safeParse(agent.config.auth)
+      : { success: true as const, data: undefined };
+
+    if (!authResult.success) {
+      return {
+        success: false,
+        error: `Invalid auth configuration for agent ${target.referenceId}`,
+      };
+    }
+
     const config: HttpAgentData = {
       type: "http",
       agentId: agent.id,
       url: agent.config.url,
-      method: agent.config.method,
+      method: (agent.config.method ?? "POST").toUpperCase(),
       headers: agent.config.headers ?? [],
-      auth: agent.config.auth,
+      auth: authResult.data,
       bodyTemplate: agent.config.bodyTemplate,
       outputPath: agent.config.outputPath,
     };

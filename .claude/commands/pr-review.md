@@ -31,6 +31,17 @@ Review and address unresolved PR comments from Code Rabbit and reviewers.
 
 **Key question**: Is the reviewer pointing out something *broken*, or suggesting something *additional*? Only fix what's broken.
 
+## When to Ask the User
+
+**Always ask** when:
+- A reviewer's comment is ambiguous (could be a bug or enhancement)
+- Multiple valid approaches exist to fix an issue
+- Removing/moving code that might be needed (e.g., "should we delete X?")
+- The fix would require significant architectural changes
+- You're unsure if something is truly out of scope
+
+Use `AskUserQuestion` to clarify before making decisions that could waste effort or miss the user's intent.
+
 ## Responding to Comments
 
 **Fix bugs in code we wrote.** If a reviewer points out broken behavior in code this PR introduces, fix it now.

@@ -1,7 +1,7 @@
 /**
  * Standalone Bull Board server for queue visualization.
  *
- * Run with: pnpm run bullboard
+ * Run with: pnpm start (from packages/bullboard)
  * Access at: http://localhost:6380
  *
  * Only for development use.
@@ -17,7 +17,7 @@ import { Queue } from "bullmq";
 import { Hono } from "hono";
 import IORedis from "ioredis";
 
-const PORT = 6380;
+const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
 
 async function main() {
   const redisUrl = process.env.REDIS_URL;

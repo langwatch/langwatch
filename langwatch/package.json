@@ -17,7 +17,7 @@
 		"lint": "pnpm exec biome check src/",
 		"lint:fix": "pnpm exec biome check src/ --write",
 		"format": "pnpm exec biome format src/ --write",
-		"dev": "pnpm run start:prepare:files && NODE_ENV=development pnpm run start",
+		"dev": "pnpm run start:prepare:files && ./scripts/dev.sh",
 		"start": "./scripts/start.sh",
 		"start:app": "tsx src/server.ts",
 		"start:quickwit": "cd quickwit && ./quickwit run",
@@ -46,8 +46,7 @@
 		"test:e2e": "playwright test --config=e2e/playwright.config.ts",
 		"test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
 		"test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
-		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
-		"bullboard": "tsx src/bullboard.ts"
+		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
 	},
 	"dependencies": {
 		"@ag-grid-community/client-side-row-model": "^32.3.3",
@@ -66,9 +65,6 @@
 		"@aws-sdk/client-lambda": "^3.744.0",
 		"@aws-sdk/client-s3": "^3.750.0",
 		"@aws-sdk/client-ses": "^3.645.0",
-		"@bull-board/api": "^6.16.2",
-		"@bull-board/hono": "^6.16.2",
-		"@bull-board/ui": "^6.16.2",
 		"@chakra-ui/next-js": "^2.4.2",
 		"@chakra-ui/react": "^3.28.1",
 		"@clickhouse/client": "^1.13.0",
@@ -277,7 +273,6 @@
 		"jsdom": "^27.3.0",
 		"node-mocks-http": "^1.17.2",
 		"playwright": "1.57.0",
-		"prettier": "^3.8.1",
 		"prisma": "5.7.0",
 		"raw-loader": "^4.0.2",
 		"simple-statistics": "^7.8.3",

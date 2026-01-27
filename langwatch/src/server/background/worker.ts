@@ -167,6 +167,7 @@ export const start = (
             usageStatsWorker?.close(),
             eventSourcingWorker?.close(),
             scenarioWorker?.close(),
+            new Promise<void>((resolve) => metricsServer.close(() => resolve())),
           ]);
 
           setTimeout(() => {

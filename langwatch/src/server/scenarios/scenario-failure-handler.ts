@@ -64,15 +64,15 @@ export class ScenarioFailureHandler {
   async ensureFailureEventsEmitted(params: FailureEventParams): Promise<void> {
     const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
 
-    // Check for existing events
-    const existingRuns = await this.eventService.getRunDataForBatchRun({
+    // Check for existing events for this specific scenario
+    const allRuns = await this.eventService.getRunDataForBatchRun({
       projectId,
       scenarioSetId: setId,
       batchRunId,
     });
 
     // Filter by scenarioId to get the correct run for this scenario
-    const existingRun = existingRuns.find((run) => run.scenarioId === scenarioId);
+    const existingRun = allRuns.find((run) => run.scenarioId === scenarioId);
 
     // If run already has a terminal status, do nothing (idempotent)
     if (existingRun && TERMINAL_STATUSES.has(existingRun.status as ScenarioRunStatus)) {

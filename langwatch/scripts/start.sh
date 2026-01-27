@@ -9,14 +9,8 @@ fi
 
 START_APP_COMMAND="pnpm run start:app"
 
-START_WORKERS_COMMAND=""
-# if REDIS_URL or REDIS_CLUSTER_ENDPOINTS is available on .env or set in the environment, start the workers
-# Note: Scenario processing is included in the main workers process
-if grep -Eq "^(REDIS_URL|REDIS_CLUSTER_ENDPOINTS)=\"?[[:alnum:]]" .env \
-   || [ -n "$REDIS_URL" ] \
-   || [ -n "$REDIS_CLUSTER_ENDPOINTS" ]; then
-  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
-fi
+# Workers are started via separate deployment (production) or separate container (docker compose)
+# This script only starts the app process
 
 START_QUICKWIT_COMMAND=""
 if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEARCH_NODE_URL" ] && [[ "$ELASTICSEARCH_NODE_URL" =~ ^quickwit:// ]]); then
@@ -37,10 +31,6 @@ NAMES=()
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("\"$RUNTIME_ENV $START_APP_COMMAND\"")
   NAMES+=("app")
-fi
-if [ -n "$START_WORKERS_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $START_WORKERS_COMMAND\"")
-  NAMES+=("workers")
 fi
 if [ -n "$START_QUICKWIT_COMMAND" ]; then
   COMMANDS+=("\"$RUNTIME_ENV $START_QUICKWIT_COMMAND\"")

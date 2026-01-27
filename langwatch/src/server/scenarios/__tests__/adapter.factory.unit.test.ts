@@ -15,6 +15,13 @@ import {
   type ModelParamsProvider,
   type PromptLookup,
 } from "../adapters/prompt.adapter.factory";
+import {
+  createHttpAdapterFactory,
+  createPromptAdapterFactory,
+  DEFAULT_HTTP_AGENT,
+  DEFAULT_MODEL_PARAMS,
+  DEFAULT_PROMPT,
+} from "./adapter.factory.test-helpers";
 
 describe("TargetAdapterRegistry", () => {
   describe("create", () => {
@@ -108,40 +115,14 @@ describe("TargetAdapterRegistry", () => {
 });
 
 describe("PromptAdapterFactory", () => {
-  const defaultPrompt = {
-    id: "prompt_123",
-    prompt: "You are helpful",
-    messages: [],
-    model: "openai/gpt-4",
-    temperature: 0.7,
-    maxTokens: 100,
-  };
-
-  const defaultParams = { api_key: "key", model: "gpt-4" };
-
-  function createFactory(overrides?: {
-    promptLookup?: Partial<PromptLookup>;
-    modelParamsProvider?: Partial<ModelParamsProvider>;
-  }): PromptAdapterFactory {
-    const promptLookup: PromptLookup = {
-      getPromptByIdOrHandle: async () => defaultPrompt,
-      ...overrides?.promptLookup,
-    };
-    const modelParamsProvider: ModelParamsProvider = {
-      prepare: async () => defaultParams,
-      ...overrides?.modelParamsProvider,
-    };
-    return new PromptAdapterFactory(promptLookup, modelParamsProvider);
-  }
-
   describe("supports", () => {
     it("returns true for prompt type", () => {
-      const factory = createFactory();
+      const factory = createPromptAdapterFactory();
       expect(factory.supports("prompt")).toBe(true);
     });
 
     it("returns false for http type", () => {
-      const factory = createFactory();
+      const factory = createPromptAdapterFactory();
       expect(factory.supports("http")).toBe(false);
     });
   });
@@ -150,12 +131,12 @@ describe("PromptAdapterFactory", () => {
     describe("given prompt exists with model configured", () => {
       describe("when creating adapter", () => {
         it("returns success with adapter", async () => {
-          const factory = createFactory();
+          const factory = createPromptAdapterFactory();
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "prompt", referenceId: "prompt_123" },
-            modelParams: defaultParams,
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -167,14 +148,14 @@ describe("PromptAdapterFactory", () => {
     describe("given prompt does not exist", () => {
       describe("when creating adapter", () => {
         it("returns failure with not found error", async () => {
-          const factory = createFactory({
+          const factory = createPromptAdapterFactory({
             promptLookup: { getPromptByIdOrHandle: async () => null },
           });
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "prompt", referenceId: "nonexistent" },
-            modelParams: defaultParams,
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -188,24 +169,20 @@ describe("PromptAdapterFactory", () => {
 
     describe("given prompt has no model configured", () => {
       const promptWithoutModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [],
+        ...DEFAULT_PROMPT,
         model: undefined,
-        temperature: 0.7,
-        maxTokens: 100,
       };
 
       describe("when creating adapter", () => {
         it("returns failure with clear error message", async () => {
-          const factory = createFactory({
+          const factory = createPromptAdapterFactory({
             promptLookup: { getPromptByIdOrHandle: async () => promptWithoutModel },
           });
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "prompt", referenceId: "prompt_123" },
-            modelParams: defaultParams,
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -220,14 +197,14 @@ describe("PromptAdapterFactory", () => {
     describe("given model params preparation fails", () => {
       describe("when creating adapter", () => {
         it("returns failure with model params error", async () => {
-          const factory = createFactory({
+          const factory = createPromptAdapterFactory({
             modelParamsProvider: { prepare: async () => null },
           });
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "prompt", referenceId: "prompt_123" },
-            modelParams: defaultParams,
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -242,34 +219,14 @@ describe("PromptAdapterFactory", () => {
 });
 
 describe("HttpAdapterFactory", () => {
-  const defaultAgent = {
-    id: "agent_123",
-    type: "http",
-    config: {
-      url: "https://api.example.com",
-      method: "POST",
-      headers: [],
-    },
-  };
-
-  function createFactory(overrides?: {
-    agentLookup?: Partial<AgentLookup>;
-  }): HttpAdapterFactory {
-    const agentLookup: AgentLookup = {
-      findById: async () => defaultAgent,
-      ...overrides?.agentLookup,
-    };
-    return new HttpAdapterFactory(agentLookup);
-  }
-
   describe("supports", () => {
     it("returns true for http type", () => {
-      const factory = createFactory();
+      const factory = createHttpAdapterFactory();
       expect(factory.supports("http")).toBe(true);
     });
 
     it("returns false for prompt type", () => {
-      const factory = createFactory();
+      const factory = createHttpAdapterFactory();
       expect(factory.supports("prompt")).toBe(false);
     });
   });
@@ -278,12 +235,12 @@ describe("HttpAdapterFactory", () => {
     describe("given HTTP agent exists", () => {
       describe("when creating adapter", () => {
         it("returns success with adapter", async () => {
-          const factory = createFactory();
+          const factory = createHttpAdapterFactory();
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "http", referenceId: "agent_123" },
-            modelParams: { api_key: "key", model: "gpt-4" },
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -295,14 +252,14 @@ describe("HttpAdapterFactory", () => {
     describe("given agent does not exist", () => {
       describe("when creating adapter", () => {
         it("returns failure with not found error", async () => {
-          const factory = createFactory({
+          const factory = createHttpAdapterFactory({
             agentLookup: { findById: async () => null },
           });
 
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "http", referenceId: "nonexistent" },
-            modelParams: { api_key: "key", model: "gpt-4" },
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 
@@ -317,10 +274,10 @@ describe("HttpAdapterFactory", () => {
     describe("given agent is wrong type", () => {
       describe("when creating adapter", () => {
         it("returns failure with not an HTTP agent error", async () => {
-          const factory = createFactory({
+          const factory = createHttpAdapterFactory({
             agentLookup: {
               findById: async () => ({
-                ...defaultAgent,
+                ...DEFAULT_HTTP_AGENT,
                 type: "llm",
               }),
             },
@@ -329,7 +286,7 @@ describe("HttpAdapterFactory", () => {
           const result = await factory.create({
             projectId: "proj_123",
             target: { type: "http", referenceId: "agent_123" },
-            modelParams: { api_key: "key", model: "gpt-4" },
+            modelParams: DEFAULT_MODEL_PARAMS,
             nlpServiceUrl: "http://localhost",
           });
 

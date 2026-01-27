@@ -8,7 +8,9 @@
  */
 
 import type { ConnectionOptions, Job } from "bullmq";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger";
 import { QueueWithFallback } from "../background/queues/queueWithFallback";
 import { connection } from "../redis";
@@ -18,29 +20,35 @@ import { processScenarioJob } from "./scenario.processor";
 const logger = createLogger("langwatch:scenarios:queue");
 
 /**
- * Data required to execute a scenario job.
+ * Schema for scenario job data.
  * Kept minimal - processor fetches full data from database.
  */
-export type ScenarioJob = {
-  projectId: string;
-  scenarioId: string;
-  target: {
-    type: "prompt" | "http";
-    referenceId: string;
-  };
-  setId: string;
-  batchRunId: string;
-};
+export const scenarioJobSchema = z.object({
+  projectId: z.string(),
+  scenarioId: z.string(),
+  target: z.object({
+    type: z.enum(["prompt", "http"]),
+    referenceId: z.string(),
+  }),
+  setId: z.string(),
+  batchRunId: z.string(),
+});
+
+/** Data required to execute a scenario job. */
+export type ScenarioJob = z.infer<typeof scenarioJobSchema>;
 
 /**
- * Result of scenario execution.
+ * Schema for scenario job result.
  */
-export type ScenarioJobResult = {
-  success: boolean;
-  runId?: string;
-  error?: string;
-  reasoning?: string;
-};
+export const scenarioJobResultSchema = z.object({
+  success: z.boolean(),
+  runId: z.string().optional(),
+  error: z.string().optional(),
+  reasoning: z.string().optional(),
+});
+
+/** Result of scenario execution. */
+export type ScenarioJobResult = z.infer<typeof scenarioJobResultSchema>;
 
 /**
  * Scenario execution queue with fallback to direct processing.
@@ -68,7 +76,7 @@ export const scenarioQueue = new QueueWithFallback<
 
 /** Generates a unique batch run ID for grouping scenario executions */
 export function generateBatchRunId(): string {
-  return `scenariobatch_${nanoid()}`;
+  return generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 }
 
 /**

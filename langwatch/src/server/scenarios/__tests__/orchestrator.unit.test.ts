@@ -7,7 +7,7 @@
  * not mock call verification. Each test follows Given-When-Then.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ScenarioExecutionOrchestrator } from "../execution/orchestrator";
 import type {
   AdapterFactory,

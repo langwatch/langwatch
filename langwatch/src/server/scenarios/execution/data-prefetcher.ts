@@ -10,6 +10,7 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { z } from "zod";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
@@ -20,15 +21,16 @@ import { AgentRepository, type TypedAgent } from "../../agents/agent.repository"
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
-import type {
-  ChildProcessJobData,
-  ExecutionContext,
-  HttpAgentData,
-  LiteLLMParams,
-  PromptConfigData,
-  ScenarioConfig,
-  TargetAdapterData,
-  TargetConfig,
+import {
+  AuthConfigSchema,
+  type ChildProcessJobData,
+  type ExecutionContext,
+  type HttpAgentData,
+  type LiteLLMParams,
+  type PromptConfigData,
+  type ScenarioConfig,
+  type TargetAdapterData,
+  type TargetConfig,
 } from "./types";
 
 // ============================================================================
@@ -245,6 +247,19 @@ async function fetchPromptConfigData(
   };
 }
 
+/**
+ * Zod schema for HTTP agent config validation.
+ * Used to safely parse agent.config instead of unsafe type assertion.
+ */
+const HttpAgentConfigSchema = z.object({
+  url: z.string(),
+  method: z.string(),
+  headers: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
+  auth: AuthConfigSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
+});
+
 async function fetchHttpAgentData(
   projectId: string,
   agentId: string,
@@ -253,21 +268,11 @@ async function fetchHttpAgentData(
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "http") return null;
 
-  const config = agent.config as {
-    url: string;
-    method: string;
-    headers?: Array<{ key: string; value: string }>;
-    auth?: {
-      type: "none" | "bearer" | "api_key" | "basic";
-      token?: string;
-      header?: string;
-      value?: string;
-      username?: string;
-      password?: string;
-    };
-    bodyTemplate?: string;
-    outputPath?: string;
-  };
+  const parseResult = HttpAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) {
+    return null;
+  }
+  const config = parseResult.data;
 
   return {
     type: "http",
