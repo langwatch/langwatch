@@ -8,6 +8,8 @@ import { getLangWatchTracer, type LangWatchSpan } from "langwatch/observability"
 import type { TraceVariation, Span, LLMSpan, RAGSpan, TraceMetadata } from "./types.js";
 import { ATTR_GEN_AI_SYSTEM } from "@opentelemetry/semantic-conventions/incubating";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 interface SendResult {
   success: number;
@@ -15,47 +17,97 @@ interface SendResult {
   errors: string[];
 }
 
-interface SDKSender {
-  handle: ObservabilityHandle;
-  sendVariations: (
-    variations: TraceVariation[],
-    onProgress?: (sent: number, total: number) => void,
-  ) => Promise<SendResult>;
-  shutdown: () => Promise<void>;
-}
-
 /**
- * Create an SDK sender for a specific project
+ * Send variations to both ES and CH projects using a single SDK with dual exporters
+ *
+ * This approach uses a single OpenTelemetry SDK instance with two span processors,
+ * each sending to a different project. This avoids the global state issues that occur
+ * when trying to reinitialize OpenTelemetry multiple times.
  */
-export function createSDKSender(
-  apiKey: string,
+export async function sendVariationsToProjectsWithSDK(
   endpoint: string,
-  serviceName: string,
-): SDKSender {
-  const handle = setupObservability({
-    langwatch: {
-      apiKey,
-      endpoint,
-      processorType: "simple", // Use simple for immediate export
+  esApiKey: string,
+  chApiKey: string,
+  variations: TraceVariation[],
+  onProgress?: (project: string, sent: number, total: number) => void,
+): Promise<{
+  es: SendResult;
+  ch: SendResult;
+}> {
+  const totalTraces = variations.flatMap((v) => v.traces).length;
+
+  // Create exporters for both projects using OTLPTraceExporter directly
+  // This allows us to set a longer timeout (default is 10s which is too short)
+  const otelEndpoint = `${endpoint}/api/otel/v1/traces`;
+
+  const esExporter = new OTLPTraceExporter({
+    url: otelEndpoint,
+    headers: {
+      authorization: `Bearer ${esApiKey}`,
     },
-    serviceName,
+    timeoutMillis: 120000, // 2 minute timeout
+  });
+
+  const chExporter = new OTLPTraceExporter({
+    url: otelEndpoint,
+    headers: {
+      authorization: `Bearer ${chApiKey}`,
+    },
+    timeoutMillis: 120000, // 2 minute timeout
+  });
+
+  // Create batch span processors for both exporters with longer timeouts
+  const batchConfig = {
+    maxQueueSize: 2048,
+    maxExportBatchSize: 512,
+    scheduledDelayMillis: 5000, // Export batch every 5 seconds
+    exportTimeoutMillis: 60000, // 60 seconds timeout for export
+  };
+
+  const esProcessor = new BatchSpanProcessor(esExporter, batchConfig);
+  const chProcessor = new BatchSpanProcessor(chExporter, batchConfig);
+
+  console.log(`\nSetting up dual-exporter SDK for ${totalTraces} traces...`);
+  console.log(`  ES endpoint: ${endpoint}/api/otel/v1/traces`);
+  console.log(`  CH endpoint: ${endpoint}/api/otel/v1/traces`);
+
+  // Setup single SDK with both processors
+  const handle = setupObservability({
+    langwatch: "disabled", // We provide our own processors
+    serviceName: "parity-check",
     debug: { logLevel: "warn" },
+    spanProcessors: [esProcessor, chProcessor],
     advanced: {
       UNSAFE_forceOpenTelemetryReinitialization: true,
       disableAutoShutdown: true,
     },
   });
 
-  const tracer = getLangWatchTracer(serviceName);
+  const tracer = getLangWatchTracer("parity-check");
 
+  // Send traces
+  console.log(`\nSending ${totalTraces} traces to both projects simultaneously...`);
+  const result = await sendVariationsWithSDK(tracer, variations, (sent, total) => {
+    onProgress?.("BOTH", sent, total);
+  });
+
+  // Force flush all pending spans before shutdown
+  console.log("\nFlushing batch exporters...");
+  await esProcessor.forceFlush();
+  await chProcessor.forceFlush();
+
+  // Give extra time for network requests to complete
+  console.log("Waiting for exports to complete...");
+  await sleep(5000);
+
+  // Shutdown SDK
+  console.log("Shutting down SDK...");
+  await handle.shutdown();
+
+  // Both projects receive the same traces
   return {
-    handle,
-    sendVariations: async (variations, onProgress) => {
-      return sendVariationsWithSDK(tracer, variations, onProgress);
-    },
-    shutdown: async () => {
-      await handle.shutdown();
-    },
+    es: result,
+    ch: result,
   };
 }
 
@@ -188,8 +240,8 @@ async function createSpanHierarchy(
       if (isRAGSpan(spanData)) {
         span.setRAGContexts(
           spanData.contexts.map((ctx) => ({
-            documentId: ctx.document_id ?? undefined,
-            chunkId: ctx.chunk_id ?? undefined,
+            document_id: ctx.document_id ?? "unknown",
+            chunk_id: ctx.chunk_id ?? "unknown",
             content: ctx.content,
           })),
         );
@@ -270,43 +322,6 @@ function isLLMSpan(span: Span): span is LLMSpan {
  */
 function isRAGSpan(span: Span): span is RAGSpan {
   return span.type === "rag" && "contexts" in span;
-}
-
-/**
- * Send variations to both ES and CH projects using SDK
- */
-export async function sendVariationsToProjectsWithSDK(
-  endpoint: string,
-  esApiKey: string,
-  chApiKey: string,
-  variations: TraceVariation[],
-  onProgress?: (project: string, sent: number, total: number) => void,
-): Promise<{
-  es: SendResult;
-  ch: SendResult;
-}> {
-  const totalTraces = variations.flatMap((v) => v.traces).length;
-
-  // Send to ES project
-  console.log(`\nSending ${totalTraces} traces to ES project via SDK...`);
-  const esSender = createSDKSender(esApiKey, endpoint, "parity-check-es");
-  const esResult = await esSender.sendVariations(variations, (sent, total) =>
-    onProgress?.("ES", sent, total),
-  );
-  await esSender.shutdown();
-
-  // Wait a bit for the sender to fully shut down before creating a new one
-  await sleep(500);
-
-  // Send to CH project
-  console.log(`\nSending ${totalTraces} traces to CH project via SDK...`);
-  const chSender = createSDKSender(chApiKey, endpoint, "parity-check-ch");
-  const chResult = await chSender.sendVariations(variations, (sent, total) =>
-    onProgress?.("CH", sent, total),
-  );
-  await chSender.shutdown();
-
-  return { es: esResult, ch: chResult };
 }
 
 function sleep(ms: number): Promise<void> {

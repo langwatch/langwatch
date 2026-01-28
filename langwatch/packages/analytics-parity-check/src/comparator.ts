@@ -404,9 +404,26 @@ export function compareAllResults(
         chResultSummary: null,
       });
     } else {
-      comparisons.push(
-        compareQueryResult(name, esQuery.result, chQuery.result, tolerance),
-      );
+      // Check for query errors first
+      if (esQuery.error || chQuery.error) {
+        comparisons.push({
+          passed: false,
+          queryName: name,
+          discrepancies: [
+            {
+              path: "query_error",
+              esValue: esQuery.error ?? "success",
+              chValue: chQuery.error ?? "success",
+            },
+          ],
+          esResultSummary: esQuery.error ? { error: esQuery.error } : summarizeResult(esQuery.result),
+          chResultSummary: chQuery.error ? { error: chQuery.error } : summarizeResult(chQuery.result),
+        });
+      } else {
+        comparisons.push(
+          compareQueryResult(name, esQuery.result, chQuery.result, tolerance),
+        );
+      }
     }
   }
 
@@ -450,50 +467,147 @@ export function generateSummary(comparisons: ComparisonResult[]): {
 }
 
 /**
+ * Categorize a query by its name
+ */
+function categorizeQuery(queryName: string): string {
+  if (queryName.startsWith("grouped_by_")) {
+    return "Grouping";
+  }
+  if (queryName.startsWith("filtered_by_")) {
+    return "Filters";
+  }
+  if (queryName.startsWith("timeseries_")) {
+    return "Metrics";
+  }
+  return "Other";
+}
+
+/**
+ * Generate category statistics
+ */
+function generateCategoryStats(comparisons: ComparisonResult[]): Map<string, { total: number; passed: number; failed: number }> {
+  const stats = new Map<string, { total: number; passed: number; failed: number }>();
+
+  for (const comparison of comparisons) {
+    const category = categorizeQuery(comparison.queryName);
+    const existing = stats.get(category) ?? { total: 0, passed: 0, failed: 0 };
+    existing.total++;
+    if (comparison.passed) {
+      existing.passed++;
+    } else {
+      existing.failed++;
+    }
+    stats.set(category, existing);
+  }
+
+  return stats;
+}
+
+/**
  * Format comparison results for console output
  */
 export function formatComparisonReport(comparisons: ComparisonResult[]): string {
   const lines: string[] = [];
   const summary = generateSummary(comparisons);
+  const categoryStats = generateCategoryStats(comparisons);
 
   lines.push("");
-  lines.push("=".repeat(60));
+  lines.push("=".repeat(70));
   lines.push("ANALYTICS PARITY CHECK RESULTS");
-  lines.push("=".repeat(60));
+  lines.push("=".repeat(70));
   lines.push("");
 
   // Overall summary
   lines.push(`Total Queries: ${summary.totalQueries}`);
   lines.push(`Passed: ${summary.passedQueries}`);
   lines.push(`Failed: ${summary.failedQueries}`);
-  lines.push(`Overall: ${summary.overallPassed ? "PASSED" : "FAILED"}`);
+  lines.push(`Overall: ${summary.overallPassed ? "✓ PASSED" : "✗ FAILED"}`);
   lines.push("");
 
-  // Detailed results
-  lines.push("-".repeat(60));
-  lines.push("QUERY DETAILS");
-  lines.push("-".repeat(60));
+  // Category summary
+  lines.push("-".repeat(70));
+  lines.push("CATEGORY BREAKDOWN");
+  lines.push("-".repeat(70));
+  for (const [category, stats] of categoryStats) {
+    const statusIcon = stats.failed === 0 ? "✓" : "✗";
+    lines.push(`  ${statusIcon} ${category}: ${stats.passed}/${stats.total} passed`);
+  }
+  lines.push("");
 
+  // Group comparisons by category
+  const categorized = new Map<string, ComparisonResult[]>();
   for (const comparison of comparisons) {
-    const status = comparison.passed ? "[PASS]" : "[FAIL]";
-    lines.push(`\n${status} ${comparison.queryName}`);
-
-    if (!comparison.passed && comparison.discrepancies.length > 0) {
-      lines.push("  Discrepancies:");
-      for (const disc of comparison.discrepancies.slice(0, 10)) {
-        const percentStr = disc.percentDiff !== undefined
-          ? ` (${(disc.percentDiff * 100).toFixed(1)}% diff)`
-          : "";
-        lines.push(`    - ${disc.path}: ES=${JSON.stringify(disc.esValue)} vs CH=${JSON.stringify(disc.chValue)}${percentStr}`);
-      }
-      if (comparison.discrepancies.length > 10) {
-        lines.push(`    ... and ${comparison.discrepancies.length - 10} more`);
-      }
-    }
+    const category = categorizeQuery(comparison.queryName);
+    const existing = categorized.get(category) ?? [];
+    existing.push(comparison);
+    categorized.set(category, existing);
   }
 
-  lines.push("");
-  lines.push("=".repeat(60));
+  // Detailed results by category
+  for (const [category, categoryComparisons] of categorized) {
+    lines.push("-".repeat(70));
+    lines.push(`${category.toUpperCase()} QUERIES`);
+    lines.push("-".repeat(70));
+
+    for (const comparison of categoryComparisons) {
+      const status = comparison.passed ? "[✓]" : "[✗]";
+      const shortName = comparison.queryName
+        .replace("timeseries_", "")
+        .replace("grouped_by_", "by ")
+        .replace("filtered_by_", "by ");
+      lines.push(`\n${status} ${shortName}`);
+
+      // Always show the values
+      if (comparison.esResultSummary || comparison.chResultSummary) {
+        const esSum = comparison.esResultSummary as Record<string, unknown>;
+        const chSum = comparison.chResultSummary as Record<string, unknown>;
+
+        // For timeseries, show the first bucket values
+        if (esSum?.firstBucket || chSum?.firstBucket) {
+          const esBucket = (esSum?.firstBucket ?? {}) as Record<string, unknown>;
+          const chBucket = (chSum?.firstBucket ?? {}) as Record<string, unknown>;
+          const keys = new Set([...Object.keys(esBucket), ...Object.keys(chBucket)]);
+          for (const key of keys) {
+            if (key === "date") continue;
+            const esVal = formatValue(esBucket[key]);
+            const chVal = formatValue(chBucket[key]);
+            const match = esVal === chVal ? "" : " ⚠";
+            lines.push(`    ${key}: ES=${esVal} | CH=${chVal}${match}`);
+          }
+        }
+      }
+
+      if (!comparison.passed && comparison.discrepancies.length > 0) {
+        lines.push("    Discrepancies:");
+        for (const disc of comparison.discrepancies.slice(0, 5)) {
+          const percentStr = disc.percentDiff !== undefined
+            ? ` (${(disc.percentDiff * 100).toFixed(1)}% diff)`
+            : "";
+          lines.push(`      - ${disc.path}: ES=${JSON.stringify(disc.esValue)} vs CH=${JSON.stringify(disc.chValue)}${percentStr}`);
+        }
+        if (comparison.discrepancies.length > 5) {
+          lines.push(`      ... and ${comparison.discrepancies.length - 5} more`);
+        }
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push("=".repeat(70));
 
   return lines.join("\n");
+}
+
+/**
+ * Format a value for display
+ */
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+  if (typeof value === "number") {
+    // Round to 4 decimal places for readability
+    return Number.isInteger(value) ? String(value) : value.toFixed(4);
+  }
+  return String(value);
 }
