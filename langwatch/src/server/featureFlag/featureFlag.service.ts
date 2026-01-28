@@ -61,11 +61,11 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   private createService(): FeatureFlagServiceInterface {
     // Use PostHog if the environment variable is set
     if (env.POSTHOG_KEY) {
-      this.logger.debug("Using PostHog feature flag service");
+      this.logger.info("Using PostHog feature flag service");
       return FeatureFlagServicePostHog.create();
     }
 
-    this.logger.debug("Using memory feature flag service");
+    this.logger.warn("POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. UI_SIMULATIONS_SCENARIOS=1).");
     return FeatureFlagServiceMemory.create();
   }
 
@@ -91,7 +91,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     );
 
     const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
-    this.logger.debug({ userId, enabledFeatures: enabled }, "User frontend features resolved");
+    this.logger.info({ userId, enabledFeatures: enabled }, "User frontend features resolved");
     return enabled;
   }
 
@@ -113,7 +113,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     );
 
     const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
-    this.logger.debug({ userId, projectId, enabledFeatures: enabled }, "Project features resolved");
+    this.logger.info({ userId, projectId, enabledFeatures: enabled }, "Project features resolved");
     return enabled;
   }
 }

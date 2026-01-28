@@ -66,6 +66,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
+        // Register groups in PostHog before any flag check (including cached)
+        this.ensureGroupsIdentified(options);
+
         const projectKey = options?.groups?.project ?? "";
         const orgKey = options?.groups?.organization ?? "";
         const cacheKey = `${flagKey}:${distinctId}:${projectKey}:${orgKey}`;
@@ -83,9 +86,6 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
 
         try {
-          // Ensure groups are registered in PostHog before checking flags
-          this.ensureGroupsIdentified(options);
-
           // Fetch from PostHog
           const isEnabled = await this.posthog.isFeatureEnabled(
             flagKey,
@@ -133,7 +133,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
       const cacheKey = `${groupType}:${groupKey}`;
       if (this.identifiedGroups.has(cacheKey)) continue;
 
-      this.logger.debug({ groupType, groupKey }, "Registering group in PostHog");
+      this.logger.info({ groupType, groupKey }, "Registering group in PostHog");
       this.posthog.groupIdentify({
         groupType,
         groupKey,
