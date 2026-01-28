@@ -16,6 +16,7 @@ export const PRO_TEMPLATE: LicensePlanLimits = {
   maxPrompts: 50,
   maxEvaluators: 50,
   maxScenarios: 50,
+  maxAgents: 50,
   canPublish: true,
 };
 
@@ -35,6 +36,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxPrompts: 1000,
   maxEvaluators: 1000,
   maxScenarios: 1000,
+  maxAgents: 1000,
   canPublish: true,
 };
 

@@ -15,6 +15,7 @@ export interface PlanFormDefaults {
   maxPrompts?: number;
   maxEvaluators?: number;
   maxScenarios?: number;
+  maxAgents?: number;
   canPublish?: boolean;
 }
 
@@ -33,6 +34,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxPrompts: PRO_TEMPLATE.maxPrompts,
     maxEvaluators: PRO_TEMPLATE.maxEvaluators,
     maxScenarios: PRO_TEMPLATE.maxScenarios,
+    maxAgents: PRO_TEMPLATE.maxAgents,
     canPublish: PRO_TEMPLATE.canPublish,
   },
   ENTERPRISE: {
@@ -45,6 +47,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts,
     maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,
     maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
+    maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
     canPublish: ENTERPRISE_TEMPLATE.canPublish,
   },
   CUSTOM: {},

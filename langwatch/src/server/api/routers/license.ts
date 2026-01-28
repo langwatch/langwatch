@@ -22,6 +22,7 @@ const planLimitsSchema = z.object({
   maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
   maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
   maxScenarios: z.number().int().positive("Plan limits must be positive numbers"),
+  maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
 });
 
@@ -167,6 +168,7 @@ export const licenseRouter = createTRPCRouter({
           maxPrompts: plan.maxPrompts,
           maxEvaluators: plan.maxEvaluators,
           maxScenarios: plan.maxScenarios,
+          maxAgents: plan.maxAgents,
           canPublish: plan.canPublish,
         },
       };

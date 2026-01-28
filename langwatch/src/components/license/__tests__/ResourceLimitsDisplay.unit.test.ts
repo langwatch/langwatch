@@ -27,6 +27,8 @@ describe("mapLicenseStatusToLimits", () => {
     maxScenarios: 25,
     currentEvaluators: 3,
     maxEvaluators: 10,
+    currentAgents: 7,
+    maxAgents: 50,
     currentMessagesPerMonth: 1500,
     maxMessagesPerMonth: 10000,
     currentEvaluationsCredit: 50,
@@ -44,6 +46,7 @@ describe("mapLicenseStatusToLimits", () => {
       workflows: { current: 4, max: 15 },
       scenarios: { current: 6, max: 25 },
       evaluators: { current: 3, max: 10 },
+      agents: { current: 7, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
       evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
@@ -65,6 +68,8 @@ describe("mapLicenseStatusToLimits", () => {
       maxScenarios: 0,
       currentEvaluators: 0,
       maxEvaluators: 0,
+      currentAgents: 0,
+      maxAgents: 0,
       currentMessagesPerMonth: 0,
       maxMessagesPerMonth: 0,
       currentEvaluationsCredit: 0,
@@ -79,9 +84,26 @@ describe("mapLicenseStatusToLimits", () => {
 
   it("handles large values (unlimited)", () => {
     const unlimitedStatus = {
-      ...baseLicenseStatus,
+      currentMembers: 5,
       maxMembers: Infinity,
+      currentMembersLite: 2,
+      maxMembersLite: 5,
+      currentProjects: 3,
       maxProjects: Number.MAX_SAFE_INTEGER,
+      currentPrompts: 8,
+      maxPrompts: 20,
+      currentWorkflows: 4,
+      maxWorkflows: 15,
+      currentScenarios: 6,
+      maxScenarios: 25,
+      currentEvaluators: 3,
+      maxEvaluators: 10,
+      currentAgents: 7,
+      maxAgents: 50,
+      currentMessagesPerMonth: 1500,
+      maxMessagesPerMonth: 10000,
+      currentEvaluationsCredit: 50,
+      maxEvaluationsCredit: 100,
     };
 
     const result = mapLicenseStatusToLimits(unlimitedStatus);
@@ -100,6 +122,7 @@ describe("mapUsageToLimits", () => {
     workflowsCount: 4,
     scenariosCount: 6,
     evaluatorsCount: 3,
+    agentsCount: 7,
     currentMonthMessagesCount: 1500,
     evaluationsCreditUsed: 50,
   };
@@ -115,6 +138,7 @@ describe("mapUsageToLimits", () => {
     maxWorkflows: 15,
     maxScenarios: 25,
     maxEvaluators: 10,
+    maxAgents: 50,
     maxMessagesPerMonth: 10000,
     evaluationsCredit: 100,
     canPublish: true,
@@ -132,6 +156,7 @@ describe("mapUsageToLimits", () => {
       workflows: { current: 4, max: 15 },
       scenarios: { current: 6, max: 25 },
       evaluators: { current: 3, max: 10 },
+      agents: { current: 7, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
       evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
@@ -146,6 +171,7 @@ describe("mapUsageToLimits", () => {
       workflowsCount: 0,
       scenariosCount: 0,
       evaluatorsCount: 0,
+      agentsCount: 0,
       currentMonthMessagesCount: 0,
       evaluationsCreditUsed: 0,
     };
@@ -169,6 +195,7 @@ describe("mapUsageToLimits", () => {
       maxWorkflows: 1,
       maxScenarios: 1,
       maxEvaluators: 1,
+      maxAgents: 3,
       maxMessagesPerMonth: 1000,
       evaluationsCredit: 10,
       canPublish: false,
@@ -185,9 +212,21 @@ describe("mapUsageToLimits", () => {
 
   it("handles unlimited plan values", () => {
     const unlimitedPlan: PlanInfo = {
-      ...basePlan,
+      type: "test-plan",
+      name: "Test Plan",
+      free: false,
       maxMembers: Infinity,
+      maxMembersLite: 5,
       maxProjects: Number.MAX_SAFE_INTEGER,
+      maxPrompts: 20,
+      maxWorkflows: 15,
+      maxScenarios: 25,
+      maxEvaluators: 10,
+      maxAgents: 50,
+      maxMessagesPerMonth: 10000,
+      evaluationsCredit: 100,
+      canPublish: true,
+      prices: { USD: 0, EUR: 0 },
     };
 
     const result = mapUsageToLimits(baseUsage, unlimitedPlan);
@@ -198,9 +237,16 @@ describe("mapUsageToLimits", () => {
 
   it("correctly maps usage that exceeds plan limits", () => {
     const overLimitUsage = {
-      ...baseUsage,
       membersCount: 15, // Exceeds max of 10
+      membersLiteCount: 2,
       projectsCount: 20, // Exceeds max of 10
+      promptsCount: 8,
+      workflowsCount: 4,
+      scenariosCount: 6,
+      evaluatorsCount: 3,
+      agentsCount: 7,
+      currentMonthMessagesCount: 1500,
+      evaluationsCreditUsed: 50,
     };
 
     const result = mapUsageToLimits(overLimitUsage, basePlan);

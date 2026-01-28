@@ -21,6 +21,7 @@ export type PlanInfo = {
   maxPrompts: number;
   maxEvaluators: number;
   maxScenarios: number;
+  maxAgents: number;
   canPublish: boolean;
   userPrice?: {
     USD: number;

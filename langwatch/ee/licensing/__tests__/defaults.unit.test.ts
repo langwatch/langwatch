@@ -42,6 +42,7 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxPrompts).toBe(DEFAULT_LIMIT);
     expect(resolved.maxEvaluators).toBe(DEFAULT_LIMIT);
     expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
+    expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
   });
 
   it("preserves explicitly set optional fields", () => {
@@ -57,6 +58,7 @@ describe("resolvePlanDefaults", () => {
       maxPrompts: 25,
       maxEvaluators: 30,
       maxScenarios: 20,
+      maxAgents: 15,
       canPublish: true,
     };
 
@@ -67,6 +69,7 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxPrompts).toBe(25);
     expect(resolved.maxEvaluators).toBe(30);
     expect(resolved.maxScenarios).toBe(20);
+    expect(resolved.maxAgents).toBe(15);
   });
 
   it("handles partial optional fields (some set, some not)", () => {
@@ -82,6 +85,7 @@ describe("resolvePlanDefaults", () => {
       maxPrompts: 10, // Set
       // maxEvaluators: omitted
       // maxScenarios: omitted
+      // maxAgents: omitted
       canPublish: false,
     };
 
@@ -94,6 +98,7 @@ describe("resolvePlanDefaults", () => {
     // Omitted values get defaults
     expect(resolved.maxEvaluators).toBe(DEFAULT_LIMIT);
     expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
+    expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
   });
 
   it("returns a type-safe ResolvedPlanLimits with all fields required", () => {
@@ -124,6 +129,7 @@ describe("resolvePlanDefaults", () => {
       maxPrompts: resolved.maxPrompts,
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
+      maxAgents: resolved.maxAgents,
       canPublish: resolved.canPublish,
     };
 

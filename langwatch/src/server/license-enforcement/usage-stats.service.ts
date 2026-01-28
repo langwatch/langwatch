@@ -32,6 +32,7 @@ export interface UsageStats {
   workflowsCount: number;
   scenariosCount: number;
   evaluatorsCount: number;
+  agentsCount: number;
   evaluationsCreditUsed: number;
 }
 
@@ -87,6 +88,7 @@ export class UsageStatsService {
       workflowsCount,
       scenariosCount,
       evaluatorsCount,
+      agentsCount,
       evaluationsCreditUsed,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
@@ -100,6 +102,7 @@ export class UsageStatsService {
       this.repository.getWorkflowCount(organizationId),
       this.repository.getScenarioCount(organizationId),
       this.repository.getEvaluatorCount(organizationId),
+      this.repository.getAgentCount(organizationId),
       this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
 
@@ -115,6 +118,7 @@ export class UsageStatsService {
       workflowsCount,
       scenariosCount,
       evaluatorsCount,
+      agentsCount,
       evaluationsCreditUsed,
     };
   }

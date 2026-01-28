@@ -65,6 +65,8 @@ const FREE_TIER_LIMITS = {
   EVALUATORS: 3,
   /** Minimal experimentation allowance */
   SCENARIOS: 3,
+  /** Minimal experimentation allowance */
+  AGENTS: 3,
   /** ~33 messages per day */
   MESSAGES_PER_MONTH: 1_000,
   /** Just enough to try the feature */
@@ -94,6 +96,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxPrompts: Number.MAX_SAFE_INTEGER,
   maxEvaluators: Number.MAX_SAFE_INTEGER,
   maxScenarios: Number.MAX_SAFE_INTEGER,
+  maxAgents: Number.MAX_SAFE_INTEGER,
   canPublish: true,
   prices: {
     USD: 0,
@@ -122,6 +125,7 @@ export const FREE_PLAN: PlanInfo = {
   maxPrompts: FREE_TIER_LIMITS.PROMPTS,
   maxEvaluators: FREE_TIER_LIMITS.EVALUATORS,
   maxScenarios: FREE_TIER_LIMITS.SCENARIOS,
+  maxAgents: FREE_TIER_LIMITS.AGENTS,
   canPublish: false,
   prices: {
     USD: 0,

@@ -36,6 +36,9 @@ const createMockPrisma = () => ({
   organizationUser: {
     count: vi.fn().mockResolvedValue(0),
   },
+  agent: {
+    count: vi.fn().mockResolvedValue(0),
+  },
   batchEvaluation: {
     count: vi.fn().mockResolvedValue(0),
   },
@@ -211,6 +214,30 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 
+  describe("getAgentCount", () => {
+    it("queries agents with organization filter and archivedAt null", async () => {
+      mockPrisma.agent.count.mockResolvedValue(7);
+
+      const result = await repository.getAgentCount(organizationId);
+
+      expect(mockPrisma.agent.count).toHaveBeenCalledWith({
+        where: {
+          project: { team: { organizationId } },
+          archivedAt: null,
+        },
+      });
+      expect(result).toBe(7);
+    });
+
+    it("returns zero when no agents exist", async () => {
+      mockPrisma.agent.count.mockResolvedValue(0);
+
+      const result = await repository.getAgentCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+  });
+
   describe("getEvaluationsCreditUsed", () => {
     it("queries batch evaluations with date filter for current month", async () => {
       vi.useFakeTimers();
@@ -284,6 +311,13 @@ describe("LicenseEnforcementRepository", () => {
 
       const call = mockPrisma.scenario.count.mock.calls[0]?.[0];
       expect(call?.where).not.toHaveProperty("archivedAt");
+    });
+
+    it("agent query excludes archived agents", async () => {
+      await repository.getAgentCount(organizationId);
+
+      const call = mockPrisma.agent.count.mock.calls[0]?.[0];
+      expect(call?.where).toHaveProperty("archivedAt", null);
     });
   });
 

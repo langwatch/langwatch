@@ -49,6 +49,7 @@ export interface ILicenseEnforcementRepository {
   getProjectCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
+  getAgentCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -133,6 +134,19 @@ export class LicenseEnforcementRepository
   async getMembersLiteCount(organizationId: string): Promise<number> {
     return this.prisma.organizationUser.count({
       where: { organizationId, role: OrganizationUserRole.EXTERNAL },
+    });
+  }
+
+  /**
+   * Counts active (non-archived) agents for license enforcement.
+   * Only active agents count against the license limit.
+   */
+  async getAgentCount(organizationId: string): Promise<number> {
+    return this.prisma.agent.count({
+      where: {
+        project: { team: { organizationId } },
+        archivedAt: null,
+      },
     });
   }
 

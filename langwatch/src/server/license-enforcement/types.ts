@@ -12,6 +12,7 @@ export const limitTypes = [
   "scenarios",
   "projects",
   "members",
+  "agents",
 ] as const;
 
 export type LimitType = (typeof limitTypes)[number];

@@ -49,6 +49,7 @@ interface FormData {
   maxPrompts: number;
   maxEvaluators: number;
   maxScenarios: number;
+  maxAgents: number;
   canPublish: boolean;
 }
 
@@ -75,6 +76,7 @@ const defaultFormData: FormData = {
   maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
   maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
   maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
+  maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
 };
 
@@ -232,6 +234,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxPrompts: formData.maxPrompts,
           maxEvaluators: formData.maxEvaluators,
           maxScenarios: formData.maxScenarios,
+          maxAgents: formData.maxAgents,
           canPublish: formData.canPublish,
         },
       });
@@ -524,6 +527,14 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 label="Max Scenarios"
                 value={formData.maxScenarios}
                 onChange={(value) => handleInputChange("maxScenarios", value)}
+              />
+            </HStack>
+
+            <HStack width="full" gap={4}>
+              <NumberField
+                label="Max Agents"
+                value={formData.maxAgents}
+                onChange={(value) => handleInputChange("maxAgents", value)}
               />
             </HStack>
 

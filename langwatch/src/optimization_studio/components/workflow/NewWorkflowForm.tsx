@@ -7,7 +7,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { TRPCClientError } from "@trpc/client";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,6 +17,10 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "../../../utils/api";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { trackEvent } from "../../../utils/tracking";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "../../../utils/trpcError";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 
@@ -171,10 +174,7 @@ export const NewWorkflowForm = ({
 
   // State for upgrade modal when limit is exceeded
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<{
-    current: number;
-    max: number;
-  } | null>(null);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   const {
     register,
@@ -233,27 +233,11 @@ export const NewWorkflowForm = ({
         `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
       );
     } catch (error) {
-      // Check for limit exceeded error from backend
-      if (error instanceof TRPCClientError) {
-        const cause = error.data?.cause as
-          | { limitType?: string; current?: number; max?: number }
-          | undefined;
-        if (error.data?.code === "FORBIDDEN" && cause?.limitType === "workflows") {
-          // Only show upgrade modal with limit info when we have valid values
-          if (
-            typeof cause.current === "number" &&
-            typeof cause.max === "number"
-          ) {
-            setLimitInfo({ current: cause.current, max: cause.max });
-            setShowUpgradeModal(true);
-          } else {
-            // Fallback: show upgrade modal without specific limit info
-            // This handles edge cases where limit data is incomplete
-            setLimitInfo(null);
-            setShowUpgradeModal(true);
-          }
-          return;
-        }
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "workflows") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
       }
       console.error("Error creating workflow:", error);
     }

@@ -19,6 +19,7 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   scenarios: "scenarios",
   projects: "projects",
   members: "team members",
+  agents: "agents",
 } as const;
 
 /**
@@ -38,4 +39,5 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   scenarios: "Scenarios",
   projects: "Projects",
   members: "Team Members",
+  agents: "Agents",
 } as const;

@@ -20,6 +20,7 @@ describe("planFormDefaults", () => {
         maxPrompts: PRO_TEMPLATE.maxPrompts,
         maxEvaluators: PRO_TEMPLATE.maxEvaluators,
         maxScenarios: PRO_TEMPLATE.maxScenarios,
+        maxAgents: PRO_TEMPLATE.maxAgents,
         canPublish: PRO_TEMPLATE.canPublish,
       });
     });
@@ -37,6 +38,7 @@ describe("planFormDefaults", () => {
         maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts,
         maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,
         maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
+        maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
         canPublish: ENTERPRISE_TEMPLATE.canPublish,
       });
     });
@@ -63,6 +65,7 @@ describe("planFormDefaults", () => {
       expect(proDefaults.maxPrompts).toBe(PRO_TEMPLATE.maxPrompts);
       expect(proDefaults.maxEvaluators).toBe(PRO_TEMPLATE.maxEvaluators);
       expect(proDefaults.maxScenarios).toBe(PRO_TEMPLATE.maxScenarios);
+      expect(proDefaults.maxAgents).toBe(PRO_TEMPLATE.maxAgents);
     });
 
     it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {
@@ -71,6 +74,7 @@ describe("planFormDefaults", () => {
       expect(enterpriseDefaults.maxPrompts).toBe(ENTERPRISE_TEMPLATE.maxPrompts);
       expect(enterpriseDefaults.maxEvaluators).toBe(ENTERPRISE_TEMPLATE.maxEvaluators);
       expect(enterpriseDefaults.maxScenarios).toBe(ENTERPRISE_TEMPLATE.maxScenarios);
+      expect(enterpriseDefaults.maxAgents).toBe(ENTERPRISE_TEMPLATE.maxAgents);
     });
   });
 });

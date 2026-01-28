@@ -12,6 +12,7 @@ export type ResourceKey =
   | "workflows"
   | "scenarios"
   | "evaluators"
+  | "agents"
   | "messagesPerMonth"
   | "evaluationsCredit";
 
@@ -27,6 +28,7 @@ export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   membersLite: "Members Lite",
   messagesPerMonth: "Messages/Month",
   evaluationsCredit: "Evaluations Credit",
+  // Note: "agents" is now in LIMIT_TYPE_DISPLAY_LABELS, no override needed
 } as const;
 
 /** Ordered list of resource keys for consistent rendering */
@@ -38,6 +40,7 @@ const RESOURCE_ORDER: ResourceKey[] = [
   "workflows",
   "scenarios",
   "evaluators",
+  "agents",
   "messagesPerMonth",
   "evaluationsCredit",
 ] as const;
@@ -50,6 +53,7 @@ export interface ResourceLimits {
   workflows: { current: number; max: number };
   scenarios: { current: number; max: number };
   evaluators: { current: number; max: number };
+  agents: { current: number; max: number };
   messagesPerMonth: { current: number; max: number };
   evaluationsCredit: { current: number; max: number };
 }
@@ -70,6 +74,8 @@ interface LicenseStatusWithPlan {
   maxScenarios: number;
   currentEvaluators: number;
   maxEvaluators: number;
+  currentAgents: number;
+  maxAgents: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
   currentEvaluationsCredit: number;
@@ -85,6 +91,7 @@ interface UsageData {
   workflowsCount: number;
   scenariosCount: number;
   evaluatorsCount: number;
+  agentsCount: number;
   currentMonthMessagesCount: number;
   evaluationsCreditUsed: number;
 }
@@ -104,6 +111,7 @@ export function mapLicenseStatusToLimits(
     workflows: { current: licenseData.currentWorkflows, max: licenseData.maxWorkflows },
     scenarios: { current: licenseData.currentScenarios, max: licenseData.maxScenarios },
     evaluators: { current: licenseData.currentEvaluators, max: licenseData.maxEvaluators },
+    agents: { current: licenseData.currentAgents, max: licenseData.maxAgents },
     messagesPerMonth: { current: licenseData.currentMessagesPerMonth, max: licenseData.maxMessagesPerMonth },
     evaluationsCredit: { current: licenseData.currentEvaluationsCredit, max: licenseData.maxEvaluationsCredit },
   };
@@ -125,6 +133,7 @@ export function mapUsageToLimits(
     workflows: { current: usage.workflowsCount, max: plan.maxWorkflows },
     scenarios: { current: usage.scenariosCount, max: plan.maxScenarios },
     evaluators: { current: usage.evaluatorsCount, max: plan.maxEvaluators },
+    agents: { current: usage.agentsCount, max: plan.maxAgents },
     messagesPerMonth: { current: usage.currentMonthMessagesCount, max: plan.maxMessagesPerMonth },
     evaluationsCredit: { current: usage.evaluationsCreditUsed, max: plan.evaluationsCredit },
   };

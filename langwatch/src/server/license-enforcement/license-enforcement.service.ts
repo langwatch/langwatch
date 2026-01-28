@@ -50,6 +50,10 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
     getCount: (repo, orgId) => repo.getMemberCount(orgId),
     getMax: (plan) => plan.maxMembers,
   },
+  agents: {
+    getCount: (repo, orgId) => repo.getAgentCount(orgId),
+    getMax: (plan) => plan.maxAgents,
+  },
 };
 
 // Compile-time check: ensure all LimitTypes are covered in config
