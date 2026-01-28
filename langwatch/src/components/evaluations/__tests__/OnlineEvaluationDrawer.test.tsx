@@ -253,6 +253,14 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
+    licenseEnforcement: {
+      checkLimit: {
+        useQuery: vi.fn(() => ({
+          data: { allowed: true, current: 0, max: 100 },
+          isLoading: false,
+        })),
+      },
+    },
     useContext: vi.fn(() => ({
       evaluators: {
         getAll: { invalidate: mockInvalidate },
