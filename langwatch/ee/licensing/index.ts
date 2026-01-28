@@ -31,8 +31,10 @@ export { mapToPlanInfo } from "./planMapping";
 export { LicenseHandler } from "./licenseHandler";
 export type { ITraceUsageService } from "./licenseHandler";
 
-// Repository (re-exported for factory wiring)
-export { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+// Repository type (re-exported for factory wiring)
+// NOTE: The class LicenseEnforcementRepository is NOT exported here to avoid
+// bundling server-side code (Prisma) into client components. Import directly
+// from "~/server/license-enforcement/license-enforcement.repository" for server usage.
 export type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 
 // Errors
