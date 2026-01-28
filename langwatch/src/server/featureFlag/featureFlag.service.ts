@@ -1,6 +1,7 @@
 import { getLangWatchTracer } from "langwatch";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger";
+import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
 import {
@@ -40,30 +41,11 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     distinctId: string,
     defaultValue = true,
   ): Promise<boolean> {
-    const envOverride = this.checkEnvOverride(flagKey);
+    const envOverride = checkFlagEnvOverride(flagKey);
     if (envOverride !== undefined) {
       return envOverride;
     }
     return this.service.isEnabled(flagKey, distinctId, defaultValue);
-  }
-
-  /**
-   * Check if a flag is overridden by environment variable.
-   * Format: FEATURE_FLAG_NAME=1 (enabled) or FEATURE_FLAG_NAME=0 (disabled)
-   * Flag name is uppercased with dashes replaced by underscores.
-   * Example: ui-simulations-scenarios -> UI_SIMULATIONS_SCENARIOS=1
-   */
-  private checkEnvOverride(flagKey: string): boolean | undefined {
-    const envKey = flagKey.toUpperCase().replace(/-/g, "_");
-    const envValue = process.env[envKey];
-
-    if (envValue === "1") {
-      return true;
-    }
-    if (envValue === "0") {
-      return false;
-    }
-    return undefined;
   }
 
   /**
