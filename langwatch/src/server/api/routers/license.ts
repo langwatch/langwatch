@@ -5,12 +5,10 @@ import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import {
   type LicenseStatus,
   OrganizationNotFoundError,
-  signLicense,
-  encodeLicenseKey,
-  generateLicenseId,
   getPlanTemplate,
 } from "../../../../ee/licensing";
 import type { LicenseData, LicensePlanLimits } from "../../../../ee/licensing";
+import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 
 /** Schema for plan limits input */

@@ -3,7 +3,7 @@ import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../planFormDefaul
 import {
   PRO_TEMPLATE,
   ENTERPRISE_TEMPLATE,
-} from "../../../../ee/licensing";
+} from "../../../../ee/licensing/planTemplates";
 
 describe("planFormDefaults", () => {
   describe("getPlanDefaults", () => {

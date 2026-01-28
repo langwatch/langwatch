@@ -40,12 +40,13 @@ export type { ILicenseEnforcementRepository } from "~/server/license-enforcement
 // Errors
 export { OrganizationNotFoundError } from "./errors";
 
-// Signing (for license generation)
-export { signLicense, encodeLicenseKey, generateLicenseId } from "./signing";
-
 // Plan Templates
 export { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "./planTemplates";
 
-// Server-side factory (createLicenseHandler) is in ./server.ts to avoid
+// NOTE: Signing functions (signLicense, encodeLicenseKey, generateLicenseId) are NOT
+// exported here to avoid bundling Node.js crypto in client bundles. Import directly
+// from 'ee/licensing/signing' for server-side usage.
+
+// NOTE: Server-side factory (createLicenseHandler) is in ./server.ts to avoid
 // bundling Node.js-only dependencies (Elasticsearch, etc.) in client code.
 // Import from 'ee/licensing/server' for server-side usage.
