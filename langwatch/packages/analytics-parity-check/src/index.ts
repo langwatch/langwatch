@@ -13,7 +13,7 @@ import {
   getTotalTraceCount,
   getTimeRange,
 } from "./trace-generator.js";
-import { sendVariationsToProjects } from "./collector-client.js";
+import { sendVariationsToProjectsWithSDK } from "./sdk-trace-sender.js";
 import { executeStructuredQueries } from "./analytics-client.js";
 import {
   compareAllResults,
@@ -86,8 +86,8 @@ async function main(): Promise<void> {
   });
   console.log(`  Time range: ${new Date(timeRange.startDate).toISOString()} to ${new Date(timeRange.endDate).toISOString()}`);
 
-  console.log("\n[2/4] Sending traces to both projects...");
-  const sendResults = await sendVariationsToProjects(
+  console.log("\n[2/4] Sending traces to both projects via SDK (OTEL endpoint)...");
+  const sendResults = await sendVariationsToProjectsWithSDK(
     config.baseUrl,
     config.esApiKey,
     config.chApiKey,
