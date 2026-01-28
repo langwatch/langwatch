@@ -1,5 +1,21 @@
 {
   "packages": {
+    "sdk-go": {
+      "release-type": "go",
+      "package-name": "langwatch-go",
+      "prerelease": true,
+      "component": "sdk-go",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": false },
+        { "type": "docs", "section": "Documentation", "hidden": false },
+        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+      ],
+      "extra-files": ["version.go"]
+    },
     "typescript-sdk": {
       "release-type": "node",
       "package-name": "langwatch",
