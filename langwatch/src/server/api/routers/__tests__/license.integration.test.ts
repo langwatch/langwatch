@@ -483,10 +483,10 @@ describe("License Router Integration", () => {
       ).rejects.toThrow();
     });
 
-    it("throws FORBIDDEN when member tries to generate", async () => {
+    it("throws UNAUTHORIZED when member tries to generate", async () => {
       await expect(
         memberCaller.license.generate(getValidInput())
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 });
