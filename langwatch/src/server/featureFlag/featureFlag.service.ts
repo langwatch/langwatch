@@ -82,7 +82,9 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const results = await Promise.all(
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
-        enabled: await this.isEnabled(flag, userId, false),
+        enabled: await this.isEnabled(flag, userId, false, {
+          groups: { user: userId },
+        }),
       })),
     );
 
@@ -104,7 +106,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
         enabled: await this.isEnabled(flag, userId, false, {
-          groups: { project: projectId, organization: organizationId },
+          groups: { user: userId, project: projectId, organization: organizationId },
         }),
       })),
     );
