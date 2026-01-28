@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.0...langwatch@v2.0.1) (2026-01-28)
+
+
+### Bug Fixes
+
+* **licensing:** add production public key for license validation ([#1234](https://github.com/langwatch/langwatch/issues/1234)) ([1aba398](https://github.com/langwatch/langwatch/commit/1aba3983ae1dfdf31bef10ca13271714f2cebcd3))
+
 ## [2.0.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.12.0...langwatch@v2.0.0) (2026-01-28)
 
 
