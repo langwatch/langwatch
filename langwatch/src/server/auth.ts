@@ -44,6 +44,7 @@ declare module "next-auth" {
     user: DefaultSession["user"] & {
       id: string;
       enabledFeatures?: FrontendFeatureFlag[];
+      projectFeatures?: Record<string, FrontendFeatureFlag[]>;
     };
   }
 }
@@ -71,6 +72,32 @@ export const authOptions = (
         if (newSession) return newSession;
       }
 
+      const getProjectFeaturesForUser = async (
+        userId: string,
+      ): Promise<Record<string, FrontendFeatureFlag[]>> => {
+        const userProjects = await prisma.project.findMany({
+          where: {
+            team: { members: { some: { userId } }, archivedAt: null },
+            archivedAt: null,
+          },
+          select: { id: true },
+        });
+
+        const projectResults = await Promise.all(
+          userProjects.map(async (project) => ({
+            projectId: project.id,
+            features: await featureFlagService.getEnabledProjectFeatures(
+              userId,
+              project.id,
+            ),
+          })),
+        );
+
+        return Object.fromEntries(
+          projectResults.map((r) => [r.projectId, r.features]),
+        );
+      };
+
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
           where: {
@@ -82,16 +109,27 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        const [enabledFeatures, projectFeatures] = await Promise.all([
+          featureFlagService.getEnabledFrontendFeatures(user_.id),
+          getProjectFeaturesForUser(user_.id),
+        ]);
+
         return {
           ...session,
           user: {
             ...session.user,
             id: user_.id,
             email: user_.email,
-            enabledFeatures: await featureFlagService.getEnabledFrontendFeatures(user_.id),
+            enabledFeatures,
+            projectFeatures,
           },
         };
       }
+
+      const [enabledFeatures, projectFeatures] = await Promise.all([
+        featureFlagService.getEnabledFrontendFeatures(user.id),
+        getProjectFeaturesForUser(user.id),
+      ]);
 
       return {
         ...session,
@@ -99,7 +137,8 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
-          enabledFeatures: await featureFlagService.getEnabledFrontendFeatures(user.id),
+          enabledFeatures,
+          projectFeatures,
         },
       };
     },
