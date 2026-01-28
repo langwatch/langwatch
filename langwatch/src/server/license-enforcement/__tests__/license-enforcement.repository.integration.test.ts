@@ -356,7 +356,7 @@ describe("LicenseEnforcementRepository Integration", () => {
   });
 
   describe("getMemberCount", () => {
-    it("counts all members regardless of role", async () => {
+    it("counts only ADMIN and MEMBER roles, excluding EXTERNAL", async () => {
       // Given: members with various roles already exist from previous tests
       const countBefore = await repository.getMemberCount(organization.id);
 
@@ -365,11 +365,11 @@ describe("LicenseEnforcementRepository Integration", () => {
       await createOrgUser(OrganizationUserRole.MEMBER);
       await createOrgUser(OrganizationUserRole.EXTERNAL);
 
-      // When: counting all members
+      // When: counting full members
       const count = await repository.getMemberCount(organization.id);
 
-      // Then: all members are counted
-      expect(count).toBe(countBefore + 3);
+      // Then: only ADMIN and MEMBER are counted (EXTERNAL excluded)
+      expect(count).toBe(countBefore + 2);
     });
   });
 

@@ -119,11 +119,15 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all members in organization.
+   * Counts full members in organization (ADMIN and MEMBER roles).
+   * EXTERNAL members are counted separately via getMembersLiteCount().
    */
   async getMemberCount(organizationId: string): Promise<number> {
     return this.prisma.organizationUser.count({
-      where: { organizationId },
+      where: {
+        organizationId,
+        role: { not: OrganizationUserRole.EXTERNAL },
+      },
     });
   }
 

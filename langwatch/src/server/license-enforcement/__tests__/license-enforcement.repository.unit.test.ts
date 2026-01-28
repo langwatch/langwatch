@@ -173,13 +173,13 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getMemberCount", () => {
-    it("queries organization users with organization filter", async () => {
+    it("queries organization users excluding EXTERNAL role", async () => {
       mockPrisma.organizationUser.count.mockResolvedValue(8);
 
       const result = await repository.getMemberCount(organizationId);
 
       expect(mockPrisma.organizationUser.count).toHaveBeenCalledWith({
-        where: { organizationId },
+        where: { organizationId, role: { not: OrganizationUserRole.EXTERNAL } },
       });
       expect(result).toBe(8);
     });
