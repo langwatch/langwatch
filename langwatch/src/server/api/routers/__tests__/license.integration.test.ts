@@ -17,7 +17,7 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { LicenseHandler } from "../../../../../ee/licensing";
-import { LicenseEnforcementRepository } from "../../../../license-enforcement/license-enforcement.repository";
+import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
