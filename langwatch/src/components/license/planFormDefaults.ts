@@ -1,7 +1,7 @@
 import {
   PRO_TEMPLATE,
   ENTERPRISE_TEMPLATE,
-} from "../../../ee/licensing";
+} from "../../../ee/licensing/planTemplates";
 
 export type PlanType = "PRO" | "ENTERPRISE" | "CUSTOM";
 

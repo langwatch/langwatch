@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { LicenseStatus } from "../../../ee/licensing";
+import type { LicenseStatus } from "../../../ee/licensing/client";
 import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense } from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {

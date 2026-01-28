@@ -15,7 +15,7 @@ import { Upload, X } from "lucide-react";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
-import { ENTERPRISE_TEMPLATE } from "../../../ee/licensing";
+import { ENTERPRISE_TEMPLATE } from "../../../ee/licensing/planTemplates";
 import { getPlanDefaults, type PlanType } from "./planFormDefaults";
 import { formatFileSize } from "./licenseStatusUtils";
 
