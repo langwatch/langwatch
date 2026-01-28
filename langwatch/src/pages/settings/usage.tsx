@@ -77,6 +77,30 @@ function Usage() {
     },
   );
 
+  // Derived states for self-hosted license display
+  const isSelfHosted = !isSaaS;
+  const isLoadingLimits =
+    isSelfHosted &&
+    (licenseStatus.isLoading || usage.isLoading) &&
+    !licenseStatus.data &&
+    !usage.data;
+  const hasLimitsError =
+    isSelfHosted && (licenseStatus.isError || usage.isError);
+  const hasCorruptedLicense =
+    isSelfHosted &&
+    licenseStatus.data?.hasLicense &&
+    "corrupted" in licenseStatus.data &&
+    licenseStatus.data.corrupted;
+  const hasValidLicense =
+    isSelfHosted &&
+    licenseStatus.data?.hasLicense &&
+    "plan" in licenseStatus.data;
+  const isFreeTier =
+    isSelfHosted &&
+    licenseStatus.data &&
+    !licenseStatus.data.hasLicense &&
+    usage.data;
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
@@ -129,7 +153,7 @@ function Usage() {
               </Text>
             </>
           )}
-          {!isSaaS && (licenseStatus.isLoading || usage.isLoading) && !licenseStatus.data && !usage.data && (
+          {isLoadingLimits && (
             <>
               <Heading size="md" as="h2">
                 Resource Limits
@@ -138,12 +162,12 @@ function Usage() {
               <Skeleton height="100px" width="full" maxWidth="400px" />
             </>
           )}
-          {!isSaaS && (licenseStatus.isError || usage.isError) && (
+          {hasLimitsError && (
             <Text color="fg.muted">
               Unable to load resource limits. Please refresh the page or contact support if the issue persists.
             </Text>
           )}
-          {!isSaaS && licenseStatus.data?.hasLicense && "corrupted" in licenseStatus.data && licenseStatus.data.corrupted && (
+          {hasCorruptedLicense && (
             <>
               <Heading size="md" as="h2">
                 Resource Limits
@@ -157,7 +181,7 @@ function Usage() {
               </Text>
             </>
           )}
-          {!isSaaS && licenseStatus.data?.hasLicense && "plan" in licenseStatus.data && (
+          {hasValidLicense && (
             <>
               <Heading size="md" as="h2">
                 Resource Limits
@@ -173,7 +197,7 @@ function Usage() {
               </Button>
             </>
           )}
-          {!isSaaS && licenseStatus.data && !licenseStatus.data.hasLicense && usage.data && (
+          {isFreeTier && (
             <>
               <HStack gap={3}>
                 <Heading size="md" as="h2">
