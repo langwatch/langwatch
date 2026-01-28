@@ -21,6 +21,10 @@ RUN ARCH=$(uname -m) && \
     chmod +x /usr/local/bin/goose
 
 WORKDIR /app
+
+# Skip Prisma checksum verification for air-gapped builds
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
