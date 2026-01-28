@@ -31,6 +31,8 @@ const baseResourceFields = {
   maxScenarios: 10,
   currentEvaluators: 3,
   maxEvaluators: 10,
+  currentAgents: 2,
+  maxAgents: 10,
   currentMessagesPerMonth: 500,
   maxMessagesPerMonth: 10000,
   currentEvaluationsCredit: 25,
