@@ -14,6 +14,7 @@ import {
   getDisplayKeysForProvider,
   getEffectiveDefaults,
   getSchemaShape,
+  hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
   isProviderDefaultModel,
 } from "../utils/modelProviderHelpers";
@@ -448,13 +449,17 @@ export function useModelProviderForm(
 
       // Determine what customKeys to send:
       // - Not using env vars: send all customKeys
-      // - Using env vars with non-API-key changes: send filtered keys (without masked API keys)
+      // - Using env vars with new API key or non-API-key changes: send the keys
       // - Using env vars without changes: send undefined (don't update)
       let customKeysToSend: Record<string, unknown> | undefined;
+      const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
         customKeysToSend = { ...customKeys };
-      } else if (hasNonApiKeyChanges) {
-        customKeysToSend = filterMaskedApiKeys(customKeys);
+      } else if (userEnteredNewKey || hasNonApiKeyChanges) {
+        // User entered a new key or modified non-API-key fields - send the keys
+        customKeysToSend = userEnteredNewKey
+          ? { ...customKeys }
+          : filterMaskedApiKeys(customKeys);
       } else {
         customKeysToSend = undefined;
       }
