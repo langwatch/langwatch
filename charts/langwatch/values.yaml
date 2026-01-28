@@ -1189,18 +1189,21 @@ postgresql:
       databaseKey: "database"
 
   # PostgreSQL container image
+  # Note: Using bitnamilegacy/postgresql (set in image.repository above) with tag "16"
+  # as Bitnami has deprecated their main postgresql images on Docker Hub
   image:
-    ## @param postgresql.image.tag [string, default: 16.6.0-debian-12-r2] PostgreSQL image tag.
-    tag: 16.6.0-debian-12-r2
+    ## @param postgresql.image.tag [string, default: 16] PostgreSQL image tag.
+    tag: "16"
 
   # Data directory path
   ## @param postgresql.postgresqlDataDir [string, default: /var/lib/postgresql/data/pgdata] Data dir path.
   postgresqlDataDir: /var/lib/postgresql/data/pgdata
 
   # Volume permissions initialization
+  # Disabled by default as the bitnami/os-shell init container image is no longer available
   volumePermissions:
-    ## @param postgresql.volumePermissions.enabled [default: true] Enable volume permissions init.
-    enabled: true
+    ## @param postgresql.volumePermissions.enabled [default: false] Enable volume permissions init.
+    enabled: false
 
   # Primary database configuration
   primary:
@@ -1301,13 +1304,15 @@ opensearch:
       discovery.type: single-node
       plugins.security.disabled: true
 
+  # Single node mode - required for single replica deployments
+  ## @param opensearch.singleNode [default: true] Enable single node mode.
+  singleNode: true
+
   # Additional environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
   ## @extra opensearch.extraEnvs Additional environment variables.
   ## @skip opensearch.extraEnvs Skip documenting example environment variable item.
-  extraEnvs:
-    - name: cluster.initial_master_nodes
-      value: "" # force empty so the setting is gone
+  extraEnvs: []
 
   # Persistent storage configuration
   # See: https://kubespec.dev/v1/PersistentVolumeClaim
