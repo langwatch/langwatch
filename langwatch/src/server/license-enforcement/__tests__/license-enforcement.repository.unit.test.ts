@@ -173,7 +173,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getMemberCount", () => {
-    it("queries organization users excluding EXTERNAL role", async () => {
+    it("queries organization users excluding Member Lite (EXTERNAL) role", async () => {
       mockPrisma.organizationUser.count.mockResolvedValue(8);
 
       const result = await repository.getMemberCount(organizationId);
@@ -194,7 +194,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getMembersLiteCount", () => {
-    it("queries organization users with EXTERNAL role filter", async () => {
+    it("queries organization users with Member Lite (EXTERNAL) role filter", async () => {
       mockPrisma.organizationUser.count.mockResolvedValue(2);
 
       const result = await repository.getMembersLiteCount(organizationId);
@@ -205,7 +205,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(2);
     });
 
-    it("returns zero when no lite members exist", async () => {
+    it("returns zero when no Member Lite users exist", async () => {
       mockPrisma.organizationUser.count.mockResolvedValue(0);
 
       const result = await repository.getMembersLiteCount(organizationId);

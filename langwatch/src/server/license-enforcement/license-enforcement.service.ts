@@ -46,9 +46,17 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
     getCount: (repo, orgId) => repo.getProjectCount(orgId),
     getMax: (plan) => plan.maxProjects,
   },
+  teams: {
+    getCount: (repo, orgId) => repo.getTeamCount(orgId),
+    getMax: (plan) => plan.maxTeams,
+  },
   members: {
     getCount: (repo, orgId) => repo.getMemberCount(orgId),
     getMax: (plan) => plan.maxMembers,
+  },
+  membersLite: {
+    getCount: (repo, orgId) => repo.getMembersLiteCount(orgId),
+    getMax: (plan) => plan.maxMembersLite,
   },
   agents: {
     getCount: (repo, orgId) => repo.getAgentCount(orgId),

@@ -2,6 +2,7 @@ import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { dependencies } from "../../../injection/dependencies.server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { slugify } from "~/utils/slugify";
 import {
@@ -368,6 +369,27 @@ export const teamRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      // Check teams license limit
+      const subscriptionLimits =
+        await dependencies.subscriptionHandler.getActivePlan(
+          input.organizationId,
+          ctx.session.user,
+        );
+
+      if (!subscriptionLimits.overrideAddingLimitations) {
+        const currentTeamCount = await prisma.team.count({
+          where: { organizationId: input.organizationId },
+        });
+
+        if (currentTeamCount >= subscriptionLimits.maxTeams) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Over the limit of teams allowed",
+          });
+        }
+      }
+
       const teamNanoId = nanoid();
       const teamId = `team_${teamNanoId}`;
       const teamSlug =

@@ -47,6 +47,7 @@ export interface ILicenseEnforcementRepository {
   getEvaluatorCount(organizationId: string): Promise<number>;
   getScenarioCount(organizationId: string): Promise<number>;
   getProjectCount(organizationId: string): Promise<number>;
+  getTeamCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
   getAgentCount(organizationId: string): Promise<number>;
@@ -119,8 +120,17 @@ export class LicenseEnforcementRepository
   }
 
   /**
+   * Counts teams in organization.
+   */
+  async getTeamCount(organizationId: string): Promise<number> {
+    return this.prisma.team.count({
+      where: { organizationId },
+    });
+  }
+
+  /**
    * Counts full members in organization (ADMIN and MEMBER roles).
-   * EXTERNAL members are counted separately via getMembersLiteCount().
+   * Member Lite users (EXTERNAL role) are counted separately via getMembersLiteCount().
    */
   async getMemberCount(organizationId: string): Promise<number> {
     return this.prisma.organizationUser.count({
@@ -132,8 +142,8 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts lite members in organization.
-   * Lite members are users with EXTERNAL role.
+   * Counts Member Lite users in organization.
+   * Member Lite users have the EXTERNAL role.
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     return this.prisma.organizationUser.count({

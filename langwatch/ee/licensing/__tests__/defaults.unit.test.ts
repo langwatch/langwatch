@@ -122,6 +122,7 @@ describe("resolvePlanDefaults", () => {
       name: resolved.name,
       maxMembers: resolved.maxMembers,
       maxMembersLite: resolved.maxMembersLite,
+      maxTeams: resolved.maxTeams,
       maxProjects: resolved.maxProjects,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       evaluationsCredit: resolved.evaluationsCredit,

@@ -34,6 +34,7 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
 
     // Apply defaults to optional fields
     maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
+    maxTeams: plan.maxTeams ?? DEFAULT_LIMIT,
     maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
     maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
     maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,

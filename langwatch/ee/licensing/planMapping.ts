@@ -12,6 +12,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     overrideAddingLimitations: false, // Enforce limits, don't bypass
     maxMembers: resolved.maxMembers,
     maxMembersLite: resolved.maxMembersLite,
+    maxTeams: resolved.maxTeams,
     maxProjects: resolved.maxProjects,
     maxMessagesPerMonth: resolved.maxMessagesPerMonth,
     evaluationsCredit: resolved.evaluationsCredit,

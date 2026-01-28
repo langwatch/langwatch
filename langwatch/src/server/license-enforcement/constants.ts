@@ -18,7 +18,9 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   evaluators: "evaluators",
   scenarios: "scenarios",
   projects: "projects",
+  teams: "teams",
   members: "team members",
+  membersLite: "lite members",
   agents: "agents",
 } as const;
 
@@ -38,6 +40,8 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   evaluators: "Evaluators",
   scenarios: "Scenarios",
   projects: "Projects",
+  teams: "Teams",
   members: "Team Members",
+  membersLite: "Lite Members",
   agents: "Agents",
 } as const;

@@ -55,6 +55,8 @@ const FREE_TIER_LIMITS = {
   MEMBERS: 1,
   /** Members Lite requires paid plan */
   MEMBERS_LITE: 0,
+  /** Single team for individual use */
+  TEAMS: 1,
   /** Enough for a small POC */
   PROJECTS: 2,
   /** Minimal experimentation allowance */
@@ -89,6 +91,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   overrideAddingLimitations: true,
   maxMembers: Number.MAX_SAFE_INTEGER,
   maxMembersLite: Number.MAX_SAFE_INTEGER,
+  maxTeams: Number.MAX_SAFE_INTEGER,
   maxProjects: Number.MAX_SAFE_INTEGER,
   maxMessagesPerMonth: Number.MAX_SAFE_INTEGER,
   evaluationsCredit: Number.MAX_SAFE_INTEGER,
@@ -119,6 +122,7 @@ export const FREE_PLAN: PlanInfo = {
 
   maxMembers: FREE_TIER_LIMITS.MEMBERS,
   maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,
+  maxTeams: FREE_TIER_LIMITS.TEAMS,
   maxProjects: FREE_TIER_LIMITS.PROJECTS,
 
   maxWorkflows: FREE_TIER_LIMITS.WORKFLOWS,

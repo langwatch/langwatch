@@ -181,7 +181,7 @@ function Usage() {
               </Text>
             </>
           )}
-          {hasValidLicense && (
+          {hasValidLicense && licenseStatus.data && "currentMembers" in licenseStatus.data && (
             <>
               <Heading size="md" as="h2">
                 Resource Limits

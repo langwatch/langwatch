@@ -20,6 +20,7 @@ import {
   useForm,
   useWatch,
 } from "react-hook-form";
+import { useEffect, useMemo, useRef } from "react";
 import { api } from "~/utils/api";
 
 type Option = { label: string; value: string; description?: string };
@@ -204,6 +205,46 @@ function MemberRow({
     name: `invites.${index}.teams`,
   });
 
+  // Watch the org role for this member to filter team role options
+  const orgRole = useWatch({
+    control,
+    name: `invites.${index}.orgRole`,
+  }) as OrganizationUserRole;
+
+  // Track previous org role to detect changes
+  const prevOrgRoleRef = useRef<OrganizationUserRole>(orgRole);
+
+  // Auto-correct team roles when org role changes
+  useEffect(() => {
+    if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
+      selectedTeams.forEach(
+        (team: TeamAssignment | undefined, teamIndex: number) => {
+          if (!team) return;
+
+          const currentRole = team.role;
+          const isBuiltInRole = Object.values(TeamUserRole).includes(
+            currentRole as TeamUserRole,
+          );
+
+          if (orgRole === OrganizationUserRole.EXTERNAL) {
+            // Member Lite: force all team roles to Viewer
+            if (currentRole !== TeamUserRole.VIEWER) {
+              setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+              setValue(`invites.${index}.teams.${teamIndex}.customRoleId`, undefined);
+            }
+          } else if (orgRole === OrganizationUserRole.MEMBER) {
+            // Member: if current role is Viewer, switch to Member
+            if (currentRole === TeamUserRole.VIEWER) {
+              setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+            }
+          }
+          // Admin: no changes needed, all roles are valid
+        },
+      );
+    }
+    prevOrgRoleRef.current = orgRole;
+  }, [orgRole, selectedTeams, index, setValue]);
+
   /**
    * Get available team options by filtering out already selected teams
    * @param currentTeamIndex - The index of the team currently being edited (to exclude it from filtering)
@@ -233,7 +274,7 @@ function MemberRow({
     if (availableTeams.length > 0) {
       appendTeam({
         teamId: availableTeams[0]?.value ?? "",
-        role: TeamUserRole.MEMBER,
+        role: getDefaultTeamRole(orgRole),
       });
     }
   };
@@ -373,6 +414,7 @@ function MemberRow({
                         teamIndex={teamIndex}
                         control={control}
                         organizationId={organizationId}
+                        orgRole={orgRole}
                         setValue={setValue}
                       />
                     </Table.Cell>
@@ -412,34 +454,83 @@ function MemberRow({
 }
 
 /**
+ * Get the appropriate team role options based on org role
+ * - EXTERNAL (Member Lite): only Viewer
+ * - MEMBER: all except Viewer (+ custom roles)
+ * - ADMIN: all roles (+ custom roles)
+ */
+function getFilteredTeamRoles(
+  orgRole: OrganizationUserRole,
+  customRoles: Array<{ id: string; name: string }>,
+): Array<{ label: string; value: string; customRoleId?: string }> {
+  const baseRoles = [
+    { label: "Admin", value: TeamUserRole.ADMIN },
+    { label: "Member", value: TeamUserRole.MEMBER },
+    { label: "Viewer", value: TeamUserRole.VIEWER },
+  ];
+
+  const customRoleOptions = customRoles.map((role) => ({
+    label: `${role.name} (Custom)`,
+    value: `custom:${role.id}`,
+    customRoleId: role.id,
+  }));
+
+  if (orgRole === OrganizationUserRole.EXTERNAL) {
+    // Member Lite: only Viewer, no custom roles
+    return [{ label: "Viewer", value: TeamUserRole.VIEWER }];
+  }
+
+  if (orgRole === OrganizationUserRole.MEMBER) {
+    // Member: all except Viewer, plus custom roles
+    return [
+      ...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER),
+      ...customRoleOptions,
+    ];
+  }
+
+  // Admin: all roles plus custom roles
+  return [...baseRoles, ...customRoleOptions];
+}
+
+/**
+ * Get the default team role based on org role
+ * - EXTERNAL (Member Lite): Viewer
+ * - MEMBER: Member
+ * - ADMIN: Member
+ */
+function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
+  if (orgRole === OrganizationUserRole.EXTERNAL) {
+    return TeamUserRole.VIEWER;
+  }
+  return TeamUserRole.MEMBER;
+}
+
+/**
  * TeamRoleSelect component - renders a dropdown for team roles including custom roles
+ * Filters available roles based on organization role
  */
 function TeamRoleSelect({
   index,
   teamIndex,
   control,
   organizationId,
+  orgRole,
   setValue,
 }: {
   index: number;
   teamIndex: number;
   control: any;
   organizationId: string;
+  orgRole: OrganizationUserRole;
   setValue: UseFormSetValue<MembersForm>;
 }) {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  // Build role options: built-in roles + custom roles
-  const roleOptions = [
-    { label: "Admin", value: TeamUserRole.ADMIN },
-    { label: "Member", value: TeamUserRole.MEMBER },
-    { label: "Viewer", value: TeamUserRole.VIEWER },
-    ...(customRoles.data ?? []).map((role: { id: string; name: string }) => ({
-      label: `${role.name} (Custom)`,
-      value: `custom:${role.id}`,
-      customRoleId: role.id,
-    })),
-  ];
+  // Build role options filtered by org role
+  const roleOptions = useMemo(
+    () => getFilteredTeamRoles(orgRole, customRoles.data ?? []),
+    [orgRole, customRoles.data],
+  );
 
   return (
     <Controller

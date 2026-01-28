@@ -8,6 +8,7 @@ export const LicensePlanLimitsSchema = z.object({
   name: z.string(),
   maxMembers: z.number(),
   maxMembersLite: z.number().optional(),
+  maxTeams: z.number().optional(),
   maxProjects: z.number(),
   maxMessagesPerMonth: z.number(),
   evaluationsCredit: z.number(),
@@ -74,6 +75,8 @@ type LicenseResourceLimits = {
   maxMembers: number;
   currentMembersLite: number;
   maxMembersLite: number;
+  currentTeams: number;
+  maxTeams: number;
   currentProjects: number;
   maxProjects: number;
   currentPrompts: number;

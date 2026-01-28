@@ -1,7 +1,7 @@
 @wip
-Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
+Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams)
   As a LangWatch self-hosted deployment with a license
-  I want resource creation limits to be enforced for workflows, prompts, and evaluators
+  I want resource creation limits to be enforced for workflows, prompts, evaluators, and teams
   So that organizations respect their licensed resource counts
 
   Background:
@@ -156,6 +156,32 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
     Then the request fails with FORBIDDEN
 
   # ============================================================================
+  # Teams: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows team creation when under limit
+    Given the organization has a license with maxTeams 5
+    And the organization has 3 teams
+    When I create a team in the organization
+    Then the team is created successfully
+
+  @integration
+  Scenario: Blocks team creation when at limit
+    Given the organization has a license with maxTeams 3
+    And the organization has 3 teams
+    When I create a team in the organization
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of teams"
+
+  @integration
+  Scenario: Blocks team creation when over limit
+    Given the organization has a license with maxTeams 2
+    And the organization has 3 teams
+    When I create a team in the organization
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================
 
@@ -227,6 +253,25 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
     And the modal shows "Scenarios: 3 / 3"
     And the modal includes an upgrade call-to-action
 
+  @unit
+  Scenario: Create Team button is always clickable
+    Given the organization has a license with maxTeams 3
+    And the organization has 3 teams (at limit)
+    When I view the teams settings page
+    Then the "Create team" button is enabled
+    And the "Create team" button is not visually disabled
+
+  @unit
+  Scenario: Clicking Create Team at limit shows upgrade modal on submit
+    Given the organization has a license with maxTeams 3
+    And the organization has 3 teams (at limit)
+    When I click the "Create team" button
+    Then the team creation form is displayed
+    When I fill the team name and click save
+    Then an upgrade modal is displayed
+    And the modal shows "Teams: 3 / 3"
+    And the modal includes an upgrade call-to-action
+
   # ============================================================================
   # UI: Allowed State Behavior
   # ============================================================================
@@ -261,6 +306,15 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
     And the organization has 3 scenarios (under limit)
     When I click the "New Scenario" button
     Then the scenario creation drawer is displayed
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Clicking Create Team when allowed creates the team
+    Given the organization has a license with maxTeams 5
+    And the organization has 3 teams (under limit)
+    When I click the "Create team" button
+    And I fill the team name and click save
+    Then the team is created successfully
     And no upgrade modal is shown
 
   # ============================================================================
@@ -364,6 +418,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
     When I create a scenario in project "proj-789"
     Then the scenario is created successfully
 
+  @integration
+  Scenario: No license allows unlimited teams when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 teams
+    When I create a team in the organization
+    Then the team is created successfully
+
   # ============================================================================
   # Invalid/Expired License Falls to FREE Tier
   # ============================================================================
@@ -394,4 +456,11 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
     Given the organization has an expired license
     And the organization has 5 scenarios
     When I create a scenario in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Expired license enforces FREE tier team limit
+    Given the organization has an expired license
+    And the organization has 2 teams
+    When I create a team in the organization
     Then the request fails with FORBIDDEN

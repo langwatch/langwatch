@@ -602,14 +602,36 @@ export const organizationRouter = createTRPCRouter({
           ctx.session.user,
         );
 
-      if (
-        !subscriptionLimits.overrideAddingLimitations &&
-        organization.members.length >= subscriptionLimits.maxMembers
-      ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Over the limit of invites allowed",
-        });
+      // Count existing members by type
+      const fullMemberCount = organization.members.filter(
+        (m) => m.role !== OrganizationUserRole.EXTERNAL
+      ).length;
+      const liteMemberCount = organization.members.filter(
+        (m) => m.role === OrganizationUserRole.EXTERNAL
+      ).length;
+
+      // Count new invites by type
+      const newFullMembers = input.invites.filter(
+        (i) => i.role !== OrganizationUserRole.EXTERNAL
+      ).length;
+      const newLiteMembers = input.invites.filter(
+        (i) => i.role === OrganizationUserRole.EXTERNAL
+      ).length;
+
+      // Check limits separately for full members and lite members
+      if (!subscriptionLimits.overrideAddingLimitations) {
+        if (fullMemberCount + newFullMembers > subscriptionLimits.maxMembers) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Over the limit of full members allowed",
+          });
+        }
+        if (liteMemberCount + newLiteMembers > subscriptionLimits.maxMembersLite) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Over the limit of lite members allowed",
+          });
+        }
       }
 
       const invites = await Promise.all(

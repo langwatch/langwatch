@@ -11,7 +11,9 @@ export const limitTypes = [
   "evaluators",
   "scenarios",
   "projects",
+  "teams",
   "members",
+  "membersLite",
   "agents",
 ] as const;
 

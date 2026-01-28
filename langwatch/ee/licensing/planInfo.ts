@@ -14,6 +14,7 @@ export type PlanInfo = {
   overrideAddingLimitations?: boolean;
   maxMembers: number;
   maxMembersLite: number;
+  maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
   evaluationsCredit: number;

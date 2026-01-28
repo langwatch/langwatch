@@ -206,6 +206,7 @@ export class LicenseHandler {
     const [
       currentMembers,
       currentMembersLite,
+      currentTeams,
       currentProjects,
       currentPrompts,
       currentWorkflows,
@@ -217,6 +218,7 @@ export class LicenseHandler {
     ] = await Promise.all([
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
+      this.repository.getTeamCount(organizationId),
       this.repository.getProjectCount(organizationId),
       this.repository.getPromptCount(organizationId),
       this.repository.getWorkflowCount(organizationId),
@@ -232,6 +234,8 @@ export class LicenseHandler {
       maxMembers: resolved.maxMembers,
       currentMembersLite,
       maxMembersLite: resolved.maxMembersLite,
+      currentTeams,
+      maxTeams: resolved.maxTeams,
       currentProjects,
       maxProjects: resolved.maxProjects,
       currentPrompts,

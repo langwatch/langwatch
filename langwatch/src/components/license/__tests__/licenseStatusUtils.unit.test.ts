@@ -21,6 +21,8 @@ const baseResourceFields = {
   maxMembers: 10,
   currentMembersLite: 2,
   maxMembersLite: 5,
+  currentTeams: 2,
+  maxTeams: 5,
   currentProjects: 3,
   maxProjects: 10,
   currentPrompts: 5,

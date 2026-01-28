@@ -25,7 +25,7 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * Tests counting logic against a real database to verify:
  * - Archived workflows are excluded from getWorkflowCount
  * - Archived evaluators are excluded from getEvaluatorCount
- * - getMembersLiteCount correctly filters by EXTERNAL role
+ * - getMembersLiteCount correctly filters by Member Lite (EXTERNAL) role
  *
  * These tests correspond to the scenarios in enforcement-resources.feature:
  * - "Counts only non-archived workflows toward limit"
@@ -320,43 +320,43 @@ describe("LicenseEnforcementRepository Integration", () => {
 
   // ==========================================================================
   // Member Count Tests
-  // Feature: getMembersLiteCount filters by EXTERNAL role
+  // Feature: getMembersLiteCount filters by Member Lite (EXTERNAL) role
   // ==========================================================================
 
   describe("getMembersLiteCount", () => {
-    it("counts only EXTERNAL role members", async () => {
-      // Given: a mix of ADMIN, MEMBER, and EXTERNAL users
+    it("counts only Member Lite (EXTERNAL) role users", async () => {
+      // Given: a mix of ADMIN, MEMBER, and Member Lite (EXTERNAL) users
       await createOrgUser(OrganizationUserRole.ADMIN);
       await createOrgUser(OrganizationUserRole.MEMBER);
       await createOrgUser(OrganizationUserRole.EXTERNAL);
       await createOrgUser(OrganizationUserRole.EXTERNAL);
 
-      // When: counting lite members
+      // When: counting Member Lite users
       const count = await repository.getMembersLiteCount(organization.id);
 
-      // Then: only EXTERNAL members are counted
+      // Then: only Member Lite users are counted
       expect(count).toBe(2);
     });
 
-    it("returns zero when no EXTERNAL members exist", async () => {
+    it("returns zero when no Member Lite users exist", async () => {
       // Count before creating any more users
       const externalCountBefore =
         await repository.getMembersLiteCount(organization.id);
 
-      // Given: only ADMIN and MEMBER users (no additional EXTERNAL)
+      // Given: only ADMIN and MEMBER users (no additional Member Lite)
       await createOrgUser(OrganizationUserRole.ADMIN);
       await createOrgUser(OrganizationUserRole.MEMBER);
 
-      // When: counting lite members
+      // When: counting Member Lite users
       const count = await repository.getMembersLiteCount(organization.id);
 
-      // Then: count should be same as before (only previously created EXTERNAL)
+      // Then: count should be same as before (only previously created Member Lite)
       expect(count).toBe(externalCountBefore);
     });
   });
 
   describe("getMemberCount", () => {
-    it("counts only ADMIN and MEMBER roles, excluding EXTERNAL", async () => {
+    it("counts only ADMIN and MEMBER roles, excluding Member Lite", async () => {
       // Given: members with various roles already exist from previous tests
       const countBefore = await repository.getMemberCount(organization.id);
 
@@ -368,7 +368,7 @@ describe("LicenseEnforcementRepository Integration", () => {
       // When: counting full members
       const count = await repository.getMemberCount(organization.id);
 
-      // Then: only ADMIN and MEMBER are counted (EXTERNAL excluded)
+      // Then: only ADMIN and MEMBER are counted (Member Lite excluded)
       expect(count).toBe(countBefore + 2);
     });
   });

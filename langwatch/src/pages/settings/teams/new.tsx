@@ -1,6 +1,6 @@
 import { TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
@@ -9,6 +9,8 @@ import {
 } from "../../../components/settings/TeamForm";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
 import { toaster } from "../../../components/ui/toaster";
+import { UpgradeModal } from "../../../components/UpgradeModal";
+import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import type { FullyLoadedOrganization } from "../../../server/api/routers/organization";
@@ -40,10 +42,23 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
   });
   const router = useRouter();
 
+  // License enforcement for teams
+  const { limitInfo: teamsLimitInfo } = useLicenseEnforcement("teams");
+  const [showTeamsLimitModal, setShowTeamsLimitModal] = useState(false);
+
   const createTeam = api.team.createTeamWithMembers.useMutation();
 
   const onSubmit: SubmitHandler<TeamFormData> = useCallback(
     (data: TeamFormData) => {
+      // Validate teams limit before creating
+      if (
+        teamsLimitInfo &&
+        !teamsLimitInfo.allowed
+      ) {
+        setShowTeamsLimitModal(true);
+        return;
+      }
+
       createTeam.mutate(
         {
           name: data.name,
@@ -81,7 +96,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
         },
       );
     },
-    [createTeam, organization.id, router],
+    [createTeam, organization.id, router, teamsLimitInfo],
   );
 
   return (
@@ -91,6 +106,15 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
         form={form}
         onSubmit={onSubmit}
         isLoading={createTeam.isLoading}
+      />
+      
+      {/* Upgrade modal for teams limit */}
+      <UpgradeModal
+        open={showTeamsLimitModal}
+        onClose={() => setShowTeamsLimitModal(false)}
+        limitType="teams"
+        current={teamsLimitInfo?.current ?? 0}
+        max={teamsLimitInfo?.max ?? 0}
       />
     </SettingsLayout>
   );
