@@ -53,8 +53,8 @@ export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];
 const FREE_TIER_LIMITS = {
   /** Single operator model */
   MEMBERS: 1,
-  /** Single operator model */
-  MEMBERS_LITE: 1,
+  /** Members Lite requires paid plan */
+  MEMBERS_LITE: 0,
   /** Enough for a small POC */
   PROJECTS: 2,
   /** Minimal experimentation allowance */
