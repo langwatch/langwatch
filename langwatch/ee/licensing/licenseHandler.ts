@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "~/server/subscriptionHandler";
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE, FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
 import { validateLicense, parseLicenseKey } from "./validation";
@@ -56,22 +57,6 @@ export class LicenseHandler {
     this.traceUsageService = config.traceUsageService ?? null;
   }
 
-  /**
-   * Factory method for creating a LicenseHandler instance.
-   * Wires up concrete implementations - the right place for DI wiring.
-   */
-  static create(prisma: PrismaClient, publicKey?: string): LicenseHandler {
-    // Import here to avoid circular dependency and centralize DI wiring
-    const { LicenseEnforcementRepository } = require("~/server/license-enforcement/license-enforcement.repository");
-    const { TraceUsageService } = require("~/server/traces/trace-usage.service");
-    const traceUsageService = TraceUsageService.create(prisma);
-    return new LicenseHandler({
-      prisma,
-      publicKey,
-      repository: new LicenseEnforcementRepository(prisma),
-      traceUsageService,
-    });
-  }
 
   /**
    * Gets the active plan for an organization based on its stored license.
@@ -209,6 +194,9 @@ export class LicenseHandler {
    * Fetches all resource counts for an organization and combines with plan limits.
    */
   private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+    // Resolve defaults for optional plan fields
+    const resolved = resolvePlanDefaults(plan);
+
     // Get message count from TraceUsageService (Elasticsearch)
     // Returns 0 if service not provided (e.g., in tests)
     const messagesCountPromise = this.traceUsageService
@@ -239,23 +227,23 @@ export class LicenseHandler {
 
     return {
       currentMembers,
-      maxMembers: plan.maxMembers,
+      maxMembers: resolved.maxMembers,
       currentMembersLite,
-      maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
+      maxMembersLite: resolved.maxMembersLite,
       currentProjects,
-      maxProjects: plan.maxProjects,
+      maxProjects: resolved.maxProjects,
       currentPrompts,
-      maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
+      maxPrompts: resolved.maxPrompts,
       currentWorkflows,
-      maxWorkflows: plan.maxWorkflows,
+      maxWorkflows: resolved.maxWorkflows,
       currentScenarios,
-      maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,
+      maxScenarios: resolved.maxScenarios,
       currentEvaluators,
-      maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
+      maxEvaluators: resolved.maxEvaluators,
       currentMessagesPerMonth,
-      maxMessagesPerMonth: plan.maxMessagesPerMonth,
+      maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       currentEvaluationsCredit,
-      maxEvaluationsCredit: plan.evaluationsCredit,
+      maxEvaluationsCredit: resolved.evaluationsCredit,
     };
   }
 

@@ -1,4 +1,5 @@
 import { LicenseHandler, PUBLIC_KEY, UNLIMITED_PLAN } from "../../ee/licensing";
+import { createLicenseHandler } from "../../ee/licensing/server";
 import { env } from "../env.mjs";
 import { prisma } from "./db";
 
@@ -42,7 +43,7 @@ let licenseHandler: LicenseHandler | null = null;
  */
 export function getLicenseHandler(): LicenseHandler {
   if (!licenseHandler) {
-    licenseHandler = LicenseHandler.create(prisma, PUBLIC_KEY);
+    licenseHandler = createLicenseHandler(prisma, PUBLIC_KEY);
   }
   return licenseHandler;
 }
