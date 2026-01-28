@@ -32,6 +32,12 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { toaster } from "~/components/ui/toaster";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
   CodeComponentConfig,
@@ -167,6 +173,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -198,6 +207,19 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
       onClose();
+    },
+    onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "agents") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
+      toaster.create({
+        title: "Error creating agent",
+        description: error.message,
+        type: "error",
+      });
     },
   });
 
@@ -444,6 +466,14 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         setCode={handleCodeChange}
         open={isCodeModalOpen}
         onClose={() => setIsCodeModalOpen(false)}
+      />
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="agents"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
       />
     </>
   );

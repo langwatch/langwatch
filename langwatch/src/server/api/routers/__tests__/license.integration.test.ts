@@ -360,6 +360,7 @@ describe("License Router Integration", () => {
         maxPrompts: 50,
         maxEvaluators: 50,
         maxScenarios: 50,
+        maxAgents: 50,
         canPublish: true,
       },
     });
@@ -435,6 +436,7 @@ describe("License Router Integration", () => {
           maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
           maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
           maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
+          maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
           canPublish: true,
         },
       });

@@ -29,6 +29,12 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import { toaster } from "~/components/ui/toaster";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -163,6 +169,9 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // State for upgrade modal when limit is exceeded (handles race conditions)
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   // Update form defaults when evaluator type changes
   useEffect(() => {
@@ -219,6 +228,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       } else {
         onClose();
       }
+    },
+    onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "evaluators") {
+        setLimitInfo(limitExceeded);
+        setShowLimitModal(true);
+        return;
+      }
+      toaster.create({
+        title: "Error creating evaluator",
+        description: error.message,
+        type: "error",
+      });
     },
   });
 
@@ -429,6 +451,13 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
       {upgradeModal}
+      <UpgradeModal
+        open={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType="evaluators"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
     </Drawer.Root>
   );
 }
