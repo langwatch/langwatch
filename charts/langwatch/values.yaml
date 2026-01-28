@@ -1187,8 +1187,6 @@ postgresql:
   # PostgreSQL container image
   image:
     repository: bitnamilegacy/postgresql
-    ## @param postgresql.image.tag [string, default: 16.6.0-debian-12-r2] PostgreSQL image tag.
-    tag: 16.6.0-debian-12-r2
 
   # Data directory path
   ## @param postgresql.postgresqlDataDir [string, default: /var/lib/postgresql/data/pgdata] Data dir path.
@@ -1199,9 +1197,8 @@ postgresql:
     ## @param postgresql.volumePermissions.enabled [default: true] Enable volume permissions init.
     enabled: true
     image:
-      registry: docker.io
       repository: bitnamilegacy/os-shell
-
+      tag: 12-debian-12-r51
 
   # Primary database configuration
   primary:
