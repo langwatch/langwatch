@@ -140,9 +140,18 @@ export const FREE_PLAN: PlanInfo = {
 /**
  * Placeholder public key used when no env var is configured.
  * This will fail signature verification, which is the safe default.
+ * DO NOT REPLACE WITH A PLACEHOLDER, LEAVE IT AS IS.
  */
+// gitleaks:allow — publbic keys
+
 const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-PLACEHOLDER_FOR_PRODUCTION_PUBLIC_KEY
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu
+fM907tHWnBITXVDfnpPAwUgzrODdjfTt73XW1S+EDd8AM0FzOpx0YolXipS4+SNK
+axSXwNO0S0XjJGLW7wz9Nv8/PP9V23LtiLQQOj8eGol/texr5pIZy2CRjVeEYcBZ
+GCNz8mT/4tEM8v/NaoTFngsRwNJTuRlro+MZF7eArdBmtIU1fNLchZEH2kojMHKj
+8vMIyZoTXB4TF/9iXL40eJQUWrVM1llGzJrZ7GhD3lIeyiZz+cQvako1BIthRuUa
+2qLWpbVP63RSjxphslVvXk1RycL3esr2cj0Pe8loWxeKoxWjnXdLJYWygQh8aUbZ
+iQIDAQAB
 -----END PUBLIC KEY-----`;
 
 /**
