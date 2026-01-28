@@ -16,12 +16,12 @@ export default function License() {
         <HStack width="full">
           <Heading>License</Heading>
           <Spacer />
-          <PageLayout.HeaderButton
+          {/* <PageLayout.HeaderButton
             onClick={() => setIsGeneratorOpen(true)}
           >
             <Plus size={20} />
             New License
-          </PageLayout.HeaderButton>
+          </PageLayout.HeaderButton> */}
         </HStack>
         <Text color="fg.muted">
           Manage your LangWatch license for self-hosted deployments. A valid
