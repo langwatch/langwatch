@@ -142,7 +142,7 @@ export const FREE_PLAN: PlanInfo = {
  * * Enables license verification out-of-the-box; override via env for rotation.
  * DO NOT REPLACE WITH A PLACEHOLDER, LEAVE IT AS IS.
  */
-// gitleaks:allow — publbic keys
+// gitleaks:allow — public keys
 
 const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu
