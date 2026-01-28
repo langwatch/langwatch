@@ -102,18 +102,19 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   async getEnabledProjectFeatures(
     userId: string,
     projectId: string,
+    organizationId?: string,
   ): Promise<FrontendFeatureFlag[]> {
     const results = await Promise.all(
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
         enabled: await this.isEnabled(flag, userId, false, {
-          groups: { project: projectId },
+          groups: { project: projectId, organization: organizationId },
         }),
       })),
     );
 
     const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
-    this.logger.info({ userId, projectId, enabledFeatures: enabled }, "Project features resolved");
+    this.logger.info({ userId, projectId, organizationId, enabledFeatures: enabled }, "Project features resolved");
     return enabled;
   }
 }

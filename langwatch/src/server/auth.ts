@@ -80,7 +80,7 @@ export const authOptions = (
             team: { members: { some: { userId } }, archivedAt: null },
             archivedAt: null,
           },
-          select: { id: true },
+          select: { id: true, team: { select: { organizationId: true } } },
         });
 
         const projectResults = await Promise.all(
@@ -89,6 +89,7 @@ export const authOptions = (
             features: await featureFlagService.getEnabledProjectFeatures(
               userId,
               project.id,
+              project.team.organizationId,
             ),
           })),
         );
