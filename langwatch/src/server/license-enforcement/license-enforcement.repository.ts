@@ -140,14 +140,32 @@ export class LicenseEnforcementRepository
   /**
    * Counts active (non-archived) agents for license enforcement.
    * Only active agents count against the license limit.
+   *
+   * Note: Agent model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
    */
   async getAgentCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
     return this.prisma.agent.count({
       where: {
-        project: { team: { organizationId } },
+        projectId: { in: projectIds },
         archivedAt: null,
       },
     });
+  }
+
+  /**
+   * Helper to get all project IDs for an organization.
+   * Used by methods that need to query models with RLS policies.
+   */
+  private async getProjectIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((p) => p.id);
   }
 
   /**

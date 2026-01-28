@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { VStack } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
 import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
@@ -24,10 +24,16 @@ export function LicenseStatus({
   const {
     data: status,
     isLoading,
+    isError,
+    error,
     refetch,
   } = api.license.getStatus.useQuery(
     { organizationId },
-    { enabled: !!organizationId }
+    {
+      enabled: !!organizationId,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000, // Consider fresh for 30 seconds
+    }
   );
 
   const {
@@ -62,6 +68,22 @@ export function LicenseStatus({
 
   if (isLoading) {
     return <LicenseLoadingSkeleton />;
+  }
+
+  if (isError) {
+    return (
+      <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
+        <VStack align="start" gap={4}>
+          <Text fontWeight="medium">Unable to load license</Text>
+          <Text color="fg.muted">
+            Your license status could not be retrieved. Please try again or contact support if the issue persists.
+          </Text>
+          <Button onClick={() => void refetch()} size="sm">
+            Retry
+          </Button>
+        </VStack>
+      </Box>
+    );
   }
 
   if (!status?.hasLicense) {

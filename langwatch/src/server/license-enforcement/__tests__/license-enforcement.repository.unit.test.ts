@@ -215,21 +215,39 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getAgentCount", () => {
-    it("queries agents with organization filter and archivedAt null", async () => {
+    it("fetches project IDs then counts agents with projectId filter", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1" },
+        { id: "proj-2" },
+      ]);
       mockPrisma.agent.count.mockResolvedValue(7);
 
       const result = await repository.getAgentCount(organizationId);
 
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
       expect(mockPrisma.agent.count).toHaveBeenCalledWith({
         where: {
-          project: { team: { organizationId } },
+          projectId: { in: ["proj-1", "proj-2"] },
           archivedAt: null,
         },
       });
       expect(result).toBe(7);
     });
 
+    it("returns zero when no projects exist (skips agent count)", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+
+      const result = await repository.getAgentCount(organizationId);
+
+      expect(mockPrisma.agent.count).not.toHaveBeenCalled();
+      expect(result).toBe(0);
+    });
+
     it("returns zero when no agents exist", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
       mockPrisma.agent.count.mockResolvedValue(0);
 
       const result = await repository.getAgentCount(organizationId);
@@ -314,6 +332,7 @@ describe("LicenseEnforcementRepository", () => {
     });
 
     it("agent query excludes archived agents", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
       await repository.getAgentCount(organizationId);
 
       const call = mockPrisma.agent.count.mock.calls[0]?.[0];

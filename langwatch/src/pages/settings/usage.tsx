@@ -4,6 +4,7 @@ import {
   Heading,
   HStack,
   Progress,
+  Skeleton,
   Spacer,
   Text,
   VStack,
@@ -36,6 +37,8 @@ function Usage() {
     },
     {
       enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
     },
   );
 
@@ -45,7 +48,11 @@ function Usage() {
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
     },
-    {},
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
   );
 
   const usage = api.limits.getUsage.useQuery(
@@ -63,7 +70,11 @@ function Usage() {
 
   const licenseStatus = api.license.getStatus.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization && !isSaaS }
+    {
+      enabled: !!organization && !isSaaS,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
   );
 
   return (
@@ -115,6 +126,34 @@ function Usage() {
               </Heading>
               <Text paddingBottom={4}>
                 You are on the <b>{activePlan.data.name}</b> plan
+              </Text>
+            </>
+          )}
+          {!isSaaS && (licenseStatus.isLoading || usage.isLoading) && !licenseStatus.data && !usage.data && (
+            <>
+              <Heading size="md" as="h2">
+                Resource Limits
+              </Heading>
+              <Skeleton height="20px" width="200px" />
+              <Skeleton height="100px" width="full" maxWidth="400px" />
+            </>
+          )}
+          {!isSaaS && (licenseStatus.isError || usage.isError) && (
+            <Text color="fg.muted">
+              Unable to load resource limits. Please refresh the page or contact support if the issue persists.
+            </Text>
+          )}
+          {!isSaaS && licenseStatus.data?.hasLicense && "corrupted" in licenseStatus.data && licenseStatus.data.corrupted && (
+            <>
+              <Heading size="md" as="h2">
+                Resource Limits
+              </Heading>
+              <Text color="orange.500">
+                Your license appears to be corrupted. Please re-upload your license on the{" "}
+                <Link href="/settings/license" textDecoration="underline">
+                  License page
+                </Link>
+                .
               </Text>
             </>
           )}
