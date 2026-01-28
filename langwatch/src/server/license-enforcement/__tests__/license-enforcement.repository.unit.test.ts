@@ -212,9 +212,15 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getEvaluationsCreditUsed", () => {
+    const projectIds = ["proj-1", "proj-2"];
+
+    beforeEach(() => {
+      mockPrisma.project.findMany.mockResolvedValue(
+        projectIds.map((id) => ({ id }))
+      );
+    });
+
     it("queries batch evaluations with date filter for current month", async () => {
-      // Mock Date to have consistent test
-      const mockStartOfMonth = new Date("2024-01-01T00:00:00.000Z");
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
 
@@ -222,15 +228,30 @@ describe("LicenseEnforcementRepository", () => {
 
       const result = await repository.getEvaluationsCreditUsed(organizationId);
 
+      // First fetches project IDs
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      // Then queries by projectId for multi-tenancy guard
       expect(mockPrisma.batchEvaluation.count).toHaveBeenCalledWith({
         where: {
-          project: { team: { organizationId } },
+          projectId: { in: projectIds },
           createdAt: { gte: expect.any(Date) },
         },
       });
       expect(result).toBe(50);
 
       vi.useRealTimers();
+    });
+
+    it("returns zero when no projects exist", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+
+      const result = await repository.getEvaluationsCreditUsed(organizationId);
+
+      expect(result).toBe(0);
+      expect(mockPrisma.batchEvaluation.count).not.toHaveBeenCalled();
     });
 
     it("returns zero when no evaluations this month", async () => {
