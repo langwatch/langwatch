@@ -1,4 +1,3 @@
-import { getLangWatchTracer } from "langwatch";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger";
 import { checkFlagEnvOverride } from "./envOverride";
@@ -20,9 +19,6 @@ import type {
 export class FeatureFlagService implements FeatureFlagServiceInterface {
   private readonly service: FeatureFlagServiceInterface;
   private readonly logger = createLogger("langwatch:feature-flag-service");
-  private readonly _tracer = getLangWatchTracer(
-    "langwatch.feature-flag-service",
-  );
 
   constructor() {
     this.service = this.createService();
