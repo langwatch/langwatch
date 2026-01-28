@@ -1,5 +1,138 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.12.0...langwatch@v2.0.0) (2026-01-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* Monitors now store evaluation level explicitly in 'level' column
+
+### Features
+
+* add AI scenario generation ([#1110](https://github.com/langwatch/langwatch/issues/1110)) ([7da469d](https://github.com/langwatch/langwatch/commit/7da469d8812a7ceaadfc667260a1201b98ac85d8))
+* add CI/CD execution support for evaluations v3 ([#1118](https://github.com/langwatch/langwatch/issues/1118)) ([d28adac](https://github.com/langwatch/langwatch/commit/d28adaceeb87921d9c7c0f1cf76b5e03f3b90fbd))
+* add COSS licensing enforcement for self-hosted deployments ([#1170](https://github.com/langwatch/langwatch/issues/1170)) ([37c30ec](https://github.com/langwatch/langwatch/commit/37c30ec30b344065aabd879b6a1f9a9e5181f1f4))
+* add http agent ([#1053](https://github.com/langwatch/langwatch/issues/1053)) ([02284be](https://github.com/langwatch/langwatch/commit/02284be2b3e02f9dac4f9cc7b9041e84f836454a))
+* add link to setup evaluations from sdk ([2130e30](https://github.com/langwatch/langwatch/commit/2130e30c171eb1cc6410ee00602bf6ba11e204b6))
+* add orchestrator pattern for Claude Code context management ([#1163](https://github.com/langwatch/langwatch/issues/1163)) ([7b3415b](https://github.com/langwatch/langwatch/commit/7b3415be0984b6a44ed1a5bb06220df87fb58b1a))
+* **analytics:** track onboarding progress metrics in PostHog ([1533de5](https://github.com/langwatch/langwatch/commit/1533de5beede58f1f1c697b39c63160105f704fe))
+* **claude:** add rogerio-cto-review agent and worktree command ([#1192](https://github.com/langwatch/langwatch/issues/1192)) ([326196a](https://github.com/langwatch/langwatch/commit/326196a02998301198b38096aa2803d1fa2fd1c3))
+* **claude:** add workflow commands for worktrees and PR review ([#1135](https://github.com/langwatch/langwatch/issues/1135)) ([8643e92](https://github.com/langwatch/langwatch/commit/8643e928c6e8e7d6915148a8a891ff1be402a045))
+* clickhouse trace filtering ([#1079](https://github.com/langwatch/langwatch/issues/1079)) ([12f4b03](https://github.com/langwatch/langwatch/commit/12f4b0327eaee774b48c14f9ae0b6833f9044d48))
+* **dev:** add Docker Compose dev environment with profiles ([#1188](https://github.com/langwatch/langwatch/issues/1188)) ([72e8df5](https://github.com/langwatch/langwatch/commit/72e8df5147490db7f455cfbc9c6cb7cf32def06f))
+* evaluations v3 execution and new evaluations results page ([#1113](https://github.com/langwatch/langwatch/issues/1113)) ([510f65d](https://github.com/langwatch/langwatch/commit/510f65d17e13c539b877e7eed2fefff118ceb705))
+* **evaluations-v3:** add lambda warmup for faster evaluation runs ([cc95cca](https://github.com/langwatch/langwatch/commit/cc95cca172ab3ad39c4a81d4b8e2c850f22793d9))
+* **evaluations-v3:** implement HTTP agent support ([#1196](https://github.com/langwatch/langwatch/issues/1196)) ([7afb24e](https://github.com/langwatch/langwatch/commit/7afb24ea0691d18ab79f2f82091c459a5f7e1810))
+* **evaluations-v3:** improve table column resizing and overflow handling ([d1d3831](https://github.com/langwatch/langwatch/commit/d1d3831479d6718ea4bd0d2444a5c0131e74f2e3))
+* **evaluations-v3:** major table performance improvements, prompts to experiment button and other bugfixes ([#1181](https://github.com/langwatch/langwatch/issues/1181)) ([2cbf430](https://github.com/langwatch/langwatch/commit/2cbf4303f670edcd65a81f3af4d7a00a85b13010))
+* **evaluations-v3:** support evaluators/{id} path for database evaluators ([2f65327](https://github.com/langwatch/langwatch/commit/2f653271fe793d19d5da4cf39c187586bbb2ef1a))
+* **evaluators:** add "Use via API" dialog with code snippets ([58ccaf5](https://github.com/langwatch/langwatch/commit/58ccaf5a58d80cab941dfc4d2985623e3134cd87))
+* event sourcing powered evaluations ([#1090](https://github.com/langwatch/langwatch/issues/1090)) ([fd9898e](https://github.com/langwatch/langwatch/commit/fd9898e1217f60f52d25d1610998a5810eb02c57))
+* improve trace/span event sourcing pipeline ([#980](https://github.com/langwatch/langwatch/issues/980)) ([d67854d](https://github.com/langwatch/langwatch/commit/d67854d8433bf9a08bc4de59e32e7e06b0ff0ddc))
+* integrate HTTP agent into scenario/simulations quick run ([#1071](https://github.com/langwatch/langwatch/issues/1071)) ([3e3a8d4](https://github.com/langwatch/langwatch/commit/3e3a8d4918d4889f028b86837fd055f9d490fd4d))
+* introduce first step towards dark mode ([#1143](https://github.com/langwatch/langwatch/issues/1143)) ([426d776](https://github.com/langwatch/langwatch/commit/426d776c39d1696b7e4ea45b1feead847c8e0de5))
+* **licensing:** add centralized license enforcement with resource limits ([#1208](https://github.com/langwatch/langwatch/issues/1208)) ([a511233](https://github.com/langwatch/langwatch/commit/a511233acb4e4cf739ad569e23f06ae3cac6bdb3))
+* **llm-config:** upgrade model registry with dynamic parameters and OpenRouter sync ([#1115](https://github.com/langwatch/langwatch/issues/1115)) ([f03a283](https://github.com/langwatch/langwatch/commit/f03a283c1e49fa4127bbc82d01f301c6cc3fcf49))
+* new online evaluations and guardrails setup ([#1151](https://github.com/langwatch/langwatch/issues/1151)) ([7c8a804](https://github.com/langwatch/langwatch/commit/7c8a804e265946a9a96e44b110f17266abaafc73))
+* new simulation card design ([#1106](https://github.com/langwatch/langwatch/issues/1106)) ([3a116af](https://github.com/langwatch/langwatch/commit/3a116af08d8297183960eb403af4004e3341c8c5))
+* **projects:** add drawer-based project creation ([#1068](https://github.com/langwatch/langwatch/issues/1068)) ([5620034](https://github.com/langwatch/langwatch/commit/562003496e9e4402c9a43a707e4145a92069f13d))
+* **prompts:** show icon-only buttons with tooltips in compare mode ([4f4ecfe](https://github.com/langwatch/langwatch/commit/4f4ecfe4a1dc4cf5397f10a14a7a11ec5c1c3a1b))
+* refactor model providers UI to drawer-based ([#1050](https://github.com/langwatch/langwatch/issues/1050)) ([8c8df73](https://github.com/langwatch/langwatch/commit/8c8df73cc799cb82c6f8332c239ba66ffa74c3da))
+* regenerate api key ([#1083](https://github.com/langwatch/langwatch/issues/1083)) ([e09bf3f](https://github.com/langwatch/langwatch/commit/e09bf3f51c29cca81611c1198f134ec9530231f7))
+* **scenarios:** add help text and tooltips to scenario form fields ([#1128](https://github.com/langwatch/langwatch/issues/1128)) ([fec3e73](https://github.com/langwatch/langwatch/commit/fec3e73fe239ae51e6e9936a122f339a6afb694a))
+* **sdk:** add online evaluations API and ensureSetup for TypeScript ([2209258](https://github.com/langwatch/langwatch/commit/22092580433b9a3014123e62f39cf8c44543d8cc))
+* **traces:** add reasoning tokens and effort support for LLM models ([16f1d4a](https://github.com/langwatch/langwatch/commit/16f1d4a80f1425d85c5f700da01287a2415bdd88))
+* track events as spans for REST API ([#1089](https://github.com/langwatch/langwatch/issues/1089)) ([ec8243e](https://github.com/langwatch/langwatch/commit/ec8243ece7b55767e3823f294a307b568e533203))
+* **ui:** revamp LLM parameter controls with button-based selects ([9a42d93](https://github.com/langwatch/langwatch/commit/9a42d930797c4c48cd79b0cf3758da2b9c6a3365))
+* update onboarding for new go sdk shape ([#1225](https://github.com/langwatch/langwatch/issues/1225)) ([ae6b6a2](https://github.com/langwatch/langwatch/commit/ae6b6a25d08219dc848c777e9912d80397b2edba))
+* use programmatic langwatch config in scenario runner ([#1074](https://github.com/langwatch/langwatch/issues/1074)) ([34a9d62](https://github.com/langwatch/langwatch/commit/34a9d62417cd6a25f70d6a166898108170eb50e3))
+* walking skeleton for scenarios ([#1047](https://github.com/langwatch/langwatch/issues/1047)) ([f6acbb8](https://github.com/langwatch/langwatch/commit/f6acbb822696ff1818ee853825bb6c11db857953))
+
+
+### Bug Fixes
+
+* add vendor folder before installation to fix docker build ([292fe83](https://github.com/langwatch/langwatch/commit/292fe837cbd09babcf32dd4cc83f49b99a6bd3c3))
+* add z-index to tooltip ([#1078](https://github.com/langwatch/langwatch/issues/1078)) ([1804329](https://github.com/langwatch/langwatch/commit/180432967a6644e0e3b9dd6a3507ad4e8a7a311e))
+* annotation highlight scroll ([#1073](https://github.com/langwatch/langwatch/issues/1073)) ([7e3471d](https://github.com/langwatch/langwatch/commit/7e3471d3aa104177cc1fb431d9890aefece0e369))
+* base64 markdown rendering ([8017548](https://github.com/langwatch/langwatch/commit/8017548ae98538d8d55a40f70d6da0d722d34d48))
+* check if graph exists ([#1067](https://github.com/langwatch/langwatch/issues/1067)) ([eef4089](https://github.com/langwatch/langwatch/commit/eef4089ddda25e1b814c54ccb9fff6dc07de4137))
+* **ci:** add pnpm-lock.yaml for agentic-e2e-tests ([#1216](https://github.com/langwatch/langwatch/issues/1216)) ([761a1a0](https://github.com/langwatch/langwatch/commit/761a1a0a3df24ae9f086b4810a57d2112fe27664))
+* clickhouse replication issue with goose migrations + tables not replicating correctly ([#1116](https://github.com/langwatch/langwatch/issues/1116)) ([db6638f](https://github.com/langwatch/langwatch/commit/db6638fc77fd999fc563c50ef8e1d9ec064a641e))
+* cluster goose db ([#1140](https://github.com/langwatch/langwatch/issues/1140)) ([2cc0e69](https://github.com/langwatch/langwatch/commit/2cc0e6971b16143b4a0857a10dc10e8da68036cf))
+* **config:** disable HSTS and upgrade-insecure-requests in development ([#1149](https://github.com/langwatch/langwatch/issues/1149)) ([f88086e](https://github.com/langwatch/langwatch/commit/f88086e6ba3dd9eee47d61cc88bd50394d3e93d2))
+* **dspy:** capture full message output including reasoning_content ([8257cae](https://github.com/langwatch/langwatch/commit/8257cae1b9a4dbe8be8e7001fa88d7a0e3de6653))
+* elasticsearch migrations for batch evals for new target fields ([530bb73](https://github.com/langwatch/langwatch/commit/530bb73426a470ede12dca56d311d79ded0a74f2))
+* **evaluations-v3:** display Code Agent outputs with custom field names ([#1226](https://github.com/langwatch/langwatch/issues/1226)) ([9a69c53](https://github.com/langwatch/langwatch/commit/9a69c53bed7a391e53687634b9bc2a0d62a4509b))
+* **evaluations-v3:** fix type errors in httpAgentUtils and dslAdapter ([3196cc7](https://github.com/langwatch/langwatch/commit/3196cc7adaf177b965fd1409c8038d27db8a403a))
+* **evaluations-v3:** pass all LLM params including reasoning to targets ([c786a73](https://github.com/langwatch/langwatch/commit/c786a733bb13d82fb3894c6a63b7065d75dccba7))
+* **evaluations-v3:** persist all LLM parameters in local prompt config ([4b87561](https://github.com/langwatch/langwatch/commit/4b875619557a9b66dc440ffb3029d97e02a64b7b))
+* **evaluations-v3:** prevent autosave data loss on back navigation ([335e571](https://github.com/langwatch/langwatch/commit/335e571c63d491662cff36d4522ec01454b7a10a))
+* event sourcing improvements from testing ([#1109](https://github.com/langwatch/langwatch/issues/1109)) ([2a400db](https://github.com/langwatch/langwatch/commit/2a400db59f85d665e1d34355b6df8ebb8dfe80e7))
+* fix emojis without breaking multiline prompt evaluators anymore ([2d47925](https://github.com/langwatch/langwatch/commit/2d4792575b96679d10780d16088109ce3e30bd3c))
+* fix failing unit tests ([9f9ad87](https://github.com/langwatch/langwatch/commit/9f9ad87a3348ec143b41f3be12f2c99a6fb49dea))
+* goose migrate missing priming row ([#1145](https://github.com/langwatch/langwatch/issues/1145)) ([5698c57](https://github.com/langwatch/langwatch/commit/5698c57f401be8b06379b5cd10efca0c94a554d6))
+* goose migration directory was wrong in dockerfile ([#1105](https://github.com/langwatch/langwatch/issues/1105)) ([ecd620b](https://github.com/langwatch/langwatch/commit/ecd620bb30fc11a76c242178127e69c55de543fe))
+* improve dedupe logic, and fix span dropping issue in span storage event handler ([#1201](https://github.com/langwatch/langwatch/issues/1201)) ([3b43fae](https://github.com/langwatch/langwatch/commit/3b43fae3ac6905923f06f4aff0765076a299c754))
+* improve locking contention delay config and error handling ([#1171](https://github.com/langwatch/langwatch/issues/1171)) ([5d84748](https://github.com/langwatch/langwatch/commit/5d84748fdf555c4cfa48d413737878cadec32bac))
+* light mode token changes + hide theme selector if no feature flag ([#1152](https://github.com/langwatch/langwatch/issues/1152)) ([6729925](https://github.com/langwatch/langwatch/commit/672992501322e9a263e377e28cb5ca72b064c7fc))
+* **litellm:** fix Anthropic model integration issues ([#1197](https://github.com/langwatch/langwatch/issues/1197)) ([1ed2c7f](https://github.com/langwatch/langwatch/commit/1ed2c7fdfe61a9516d6a889d667ab1ba98792423))
+* **llm-config:** smart max_tokens handling on model switch ([7513131](https://github.com/langwatch/langwatch/commit/75131316abc33d89422d9594d6cccd7c7c3cb087))
+* make otlp validation and parsing less strict, to support more otlp protocol versions ([#1148](https://github.com/langwatch/langwatch/issues/1148)) ([dc1e1eb](https://github.com/langwatch/langwatch/commit/dc1e1eb828c4abcfee9b48e1423e12f9db123659))
+* navigation to the same drawer url, get the trace id button on the conversation working again ([f906f56](https://github.com/langwatch/langwatch/commit/f906f56089b29fd7b1682771207d4ed0f8c25498))
+* normalize otlp ids to guaranteed otel ids ([#1164](https://github.com/langwatch/langwatch/issues/1164)) ([2e54acb](https://github.com/langwatch/langwatch/commit/2e54acb386e181513e837100441e96fbb3941fec))
+* normalize span IDs to hex strings before BullMQ queue ([2e54acb](https://github.com/langwatch/langwatch/commit/2e54acb386e181513e837100441e96fbb3941fec))
+* **onboarding:** prevent model provider credential inputs from resetting ([#1060](https://github.com/langwatch/langwatch/issues/1060)) ([ca8b8ee](https://github.com/langwatch/langwatch/commit/ca8b8ee311810aa48f28d10f91a3499534371675))
+* **prompts:** default maxTokens to undefined for model-based defaults ([4a36aee](https://github.com/langwatch/langwatch/commit/4a36aee9d30504ddbb668b1bde4a9132f831e2ea))
+* **prompts:** show Bedrock models in model selector dropdown ([#1206](https://github.com/langwatch/langwatch/issues/1206)) ([2e49e01](https://github.com/langwatch/langwatch/commit/2e49e01c7634795d8e7811dadbcd0d92a1cf263f))
+* **prompts:** structured outputs with custom field names and types ([#1112](https://github.com/langwatch/langwatch/issues/1112)) ([d1c0370](https://github.com/langwatch/langwatch/commit/d1c03708221275bc2b4d6b7b62188913ed812697))
+* **prompts:** use model's actual max_tokens for new prompts ([5aaa234](https://github.com/langwatch/langwatch/commit/5aaa23417e216cb04aaaac9553fdecaf4fb69529))
+* proper terminology on analytics and add linking button for the graph ([15e3c2c](https://github.com/langwatch/langwatch/commit/15e3c2cb4dedabaef83754f7b8ffd1ce68ec4290))
+* properly handle clickhouse engine tag macros for replicated cluster configs ([#1111](https://github.com/langwatch/langwatch/issues/1111)) ([6052374](https://github.com/langwatch/langwatch/commit/6052374329356b7d0ee12a44194291ad0d0a52f8))
+* **python-sdk:** resolve name collision between Evaluation TypedDict and class alias ([873909a](https://github.com/langwatch/langwatch/commit/873909a09414bb309fa955b68e4a19bddc93e21f))
+* react imports on deja view ([#1160](https://github.com/langwatch/langwatch/issues/1160)) ([6514a1a](https://github.com/langwatch/langwatch/commit/6514a1a8851ab9c1d587db8f0971237581e03b00))
+* remove duplicate evaluations unit test (already in integration) ([#1177](https://github.com/langwatch/langwatch/issues/1177)) ([8ed9d28](https://github.com/langwatch/langwatch/commit/8ed9d28a413d626012a53d31f2599df525eb0380))
+* rework pie/donut data and colours ([#1055](https://github.com/langwatch/langwatch/issues/1055)) ([8d50910](https://github.com/langwatch/langwatch/commit/8d50910ca442e0cdcb5cb6007c37351a14bdacf2))
+* scenario editor UX improvements and bug fixes ([#1086](https://github.com/langwatch/langwatch/issues/1086)) ([1d44f72](https://github.com/langwatch/langwatch/commit/1d44f7212413fe83dfc51af4fa13ff727fc47819))
+* set correct ksuid environment in worker ([#1173](https://github.com/langwatch/langwatch/issues/1173)) ([10ec064](https://github.com/langwatch/langwatch/commit/10ec064de252cf15604d9848ecfab9f12b388176))
+* small project drawer title fix, make + Add clickable ([9746fdb](https://github.com/langwatch/langwatch/commit/9746fdb6b353568f35de4958f47ee733a1de84f2))
+* **tests:** align license router tests with RBAC middleware behavior ([#1207](https://github.com/langwatch/langwatch/issues/1207)) ([1def54d](https://github.com/langwatch/langwatch/commit/1def54de02861d583d89c18b7bb601fb840266f2))
+* **tests:** normalize column IDs to names in orchestrator integration test ([dc7c2ea](https://github.com/langwatch/langwatch/commit/dc7c2ead6a5fcdeb61557e068dc9c574dc41c7c6))
+* unit tests and typecheck ([802ccc1](https://github.com/langwatch/langwatch/commit/802ccc17c3c65841034f26f18825e6e9bf7ccff8))
+* various evaluations v3 fixes ([#1122](https://github.com/langwatch/langwatch/issues/1122)) ([c9904fc](https://github.com/langwatch/langwatch/commit/c9904fc898a7982ec0b23b11fcfeed83f34fbeb7))
+
+
+### Miscellaneous
+
+* ✨ new readme preview video 💅🏼  ([#1036](https://github.com/langwatch/langwatch/issues/1036)) ([ba949c5](https://github.com/langwatch/langwatch/commit/ba949c559eca591082bd392e449cefdf9b650964))
+* eval pagination footer ([#1044](https://github.com/langwatch/langwatch/issues/1044)) ([aaea14f](https://github.com/langwatch/langwatch/commit/aaea14f268298978d5429e080287aeb2c34cef3e))
+* fix all biome lint issues ([#1121](https://github.com/langwatch/langwatch/issues/1121)) ([d83bb6e](https://github.com/langwatch/langwatch/commit/d83bb6e4379148b48f5b8230648eac7598169681))
+* improve stressed+blessed event sourcing tooling ([#1108](https://github.com/langwatch/langwatch/issues/1108)) ([82ccab6](https://github.com/langwatch/langwatch/commit/82ccab60ffc400298134831b224279b31e374ac3))
+* **main:** release python-sdk 0.10.0 ([#1142](https://github.com/langwatch/langwatch/issues/1142)) ([749a977](https://github.com/langwatch/langwatch/commit/749a977afc8efaf6e417e11cd155827ff54c18e6))
+* **main:** release python-sdk 0.9.0 ([#1114](https://github.com/langwatch/langwatch/issues/1114)) ([0f24551](https://github.com/langwatch/langwatch/commit/0f245515164052b9c3b798c007f644b690b7b7ed))
+* migrate Cursor config to Claude Code system ([#1147](https://github.com/langwatch/langwatch/issues/1147)) ([fc20384](https://github.com/langwatch/langwatch/commit/fc20384cf89e93b24d25ab645ac1e9dfeb9e3673))
+* remove litellm enterprise deps, add license file generation ([792243a](https://github.com/langwatch/langwatch/commit/792243a4e936094e33141905b0544b60cbb77e28))
+* standardize top-level rules on AGENTS.md, remove duplicate CLAUDE.md ([#1150](https://github.com/langwatch/langwatch/issues/1150)) ([43ba172](https://github.com/langwatch/langwatch/commit/43ba172f9a60fbce04c9446c9d35a2eac3708207))
+* sync model registry ([43bb203](https://github.com/langwatch/langwatch/commit/43bb20307f5535ba87a13db9ea6414f8fbee4f87))
+* sync model registry (363 models) ([#1138](https://github.com/langwatch/langwatch/issues/1138)) ([43bb203](https://github.com/langwatch/langwatch/commit/43bb20307f5535ba87a13db9ea6414f8fbee4f87))
+* update where goose migration db is stored + improve handling ([#1141](https://github.com/langwatch/langwatch/issues/1141)) ([e9265ed](https://github.com/langwatch/langwatch/commit/e9265ed44c8c675b166a62e1096a126e630c3c9e))
+
+
+### Documentation
+
+* add Repository + Service pattern documentation ([#1190](https://github.com/langwatch/langwatch/issues/1190)) ([fa6a81e](https://github.com/langwatch/langwatch/commit/fa6a81e792e0d0f8f762efd55f2caa3461557e65))
+* extract design principles from PR [#1025](https://github.com/langwatch/langwatch/issues/1025) into searchable documentation ([#1139](https://github.com/langwatch/langwatch/issues/1139)) ([41e57d2](https://github.com/langwatch/langwatch/commit/41e57d279f1a5ff552d4cbfea212a26446a5d5c3))
+* improve Claude Code agent configuration and BDD workflow ([#1189](https://github.com/langwatch/langwatch/issues/1189)) ([e2a1e2d](https://github.com/langwatch/langwatch/commit/e2a1e2da8809fd3223ae048ef93824ec44f06a68))
+* move TESTING.md to docs/TESTING_PHILOSOPHY.md ([#1157](https://github.com/langwatch/langwatch/issues/1157)) ([c475c86](https://github.com/langwatch/langwatch/commit/c475c8692f461dc737a082ca687db101a74be9fb))
+* standardize worktree and branch naming conventions ([#1211](https://github.com/langwatch/langwatch/issues/1211)) ([c3ef006](https://github.com/langwatch/langwatch/commit/c3ef0060715d60b9a36e0ca24199df2e73114fa1))
+
+
+### Code Refactoring
+
+* extract SSRF protection utils and remove cruft files ([#1065](https://github.com/langwatch/langwatch/issues/1065)) ([12ece04](https://github.com/langwatch/langwatch/commit/12ece048d95334bb989d4756909772c682f6d394))
+* **sdk:** fix evaluation API naming consistency ([3aef2a3](https://github.com/langwatch/langwatch/commit/3aef2a353cc4939c8087b53044f441e7501530ae))
+* **sdk:** rename evaluation API to experiment for new terminology ([f10326c](https://github.com/langwatch/langwatch/commit/f10326c0f2ee5818fbcf51507a95933bfe83caeb))
+* **sdk:** rename internal evaluation classes to experiment ([ff70cab](https://github.com/langwatch/langwatch/commit/ff70cab904905b85a77a68e7b1eb60e9c364a18d))
+
 ## [1.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.11.0...langwatch@v1.12.0) (2026-01-06)
 
 
