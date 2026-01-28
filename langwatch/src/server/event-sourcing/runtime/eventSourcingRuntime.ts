@@ -310,9 +310,10 @@ if (globalForEventSourcing.eventSourcingRuntime === undefined) {
 
 /**
  * Explicitly initialize event sourcing with provided clients.
- * Must be called during application startup before using pipelines.
+ * Should be called during application startup for predictable initialization.
  *
- * @throws Error if already initialized (call resetEventSourcingRuntime() first to re-initialize)
+ * This function is idempotent - if already initialized (either explicitly or via lazy init),
+ * it will log and return without error.
  *
  * @example
  * ```typescript
