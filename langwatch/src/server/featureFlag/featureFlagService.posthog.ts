@@ -2,7 +2,10 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import { getPostHogInstance } from "../posthog";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
-import type { FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.
@@ -22,6 +25,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     1 * 30 * 1000,
   );
 
+  // Track which groups have been identified to avoid redundant calls
+  private readonly identifiedGroups = new Set<string>();
+
   constructor() {
     this.posthog = getPostHogInstance();
   }
@@ -40,6 +46,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     flagKey: string,
     distinctId: string,
     defaultValue = true,
+    options?: FeatureFlagOptions,
   ): Promise<boolean> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServicePostHog.isEnabled",
@@ -48,6 +55,8 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.key": flagKey,
           "feature.flag.distinct_id": distinctId,
           "feature.flag.default": defaultValue,
+          "feature.flag.project": options?.groups?.project ?? "",
+          "feature.flag.organization": options?.groups?.organization ?? "",
           "cache.redis_available": this.cache.isRedisAvailable(),
         },
       },
@@ -57,7 +66,12 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
-        const cacheKey = `${flagKey}:${distinctId}`;
+        // Register groups in PostHog before any flag check (including cached)
+        this.ensureGroupsIdentified(options);
+
+        const projectKey = options?.groups?.project ?? "";
+        const orgKey = options?.groups?.organization ?? "";
+        const cacheKey = `${flagKey}:${distinctId}:${projectKey}:${orgKey}`;
 
         // Check hybrid cache first
         const cachedResult = await this.cache.get(cacheKey);
@@ -78,6 +92,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
             distinctId,
             {
               disableGeoip: true,
+              groups: options?.groups,
             },
           );
 
@@ -103,6 +118,28 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
       },
     );
+  }
+
+  /**
+   * Lazily register groups in PostHog so they exist for flag targeting.
+   * Each group is only identified once per service instance.
+   */
+  private ensureGroupsIdentified(options?: FeatureFlagOptions): void {
+    if (!options?.groups || !this.posthog) return;
+
+    for (const [groupType, groupKey] of Object.entries(options.groups)) {
+      if (!groupKey) continue;
+
+      const cacheKey = `${groupType}:${groupKey}`;
+      if (this.identifiedGroups.has(cacheKey)) continue;
+
+      this.logger.info({ groupType, groupKey }, "Registering group in PostHog");
+      this.posthog.groupIdentify({
+        groupType,
+        groupKey,
+      });
+      this.identifiedGroups.add(cacheKey);
+    }
   }
 
   /**
