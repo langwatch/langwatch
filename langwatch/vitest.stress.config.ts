@@ -1,5 +1,8 @@
+import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
+
+config();
 
 export default defineConfig({
   test: {
