@@ -20,6 +20,13 @@ export type {
   LicenseEnforcementInput,
 } from "./enforcement.middleware";
 
+// Re-export license limit guard for member type changes
+export {
+  assertMemberTypeLimitNotExceeded,
+  LICENSE_LIMIT_ERRORS,
+} from "./license-limit-guard";
+export type { MemberTypeLimits } from "./license-limit-guard";
+
 /**
  * Factory function to create a LicenseEnforcementService.
  *

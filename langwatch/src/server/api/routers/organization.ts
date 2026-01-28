@@ -4,6 +4,7 @@ import {
   type OrganizationUser,
   OrganizationUserRole,
   type Prisma,
+  type PrismaClient,
   type Project,
   type Team,
   type TeamUser,
@@ -17,6 +18,15 @@ import { z } from "zod";
 
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  isViewOnlyCustomRole,
+  LicenseEnforcementRepository,
+} from "../../license-enforcement/license-enforcement.repository";
+import { getRoleChangeType } from "../../license-enforcement/member-classification";
+import {
+  assertMemberTypeLimitNotExceeded,
+  LICENSE_LIMIT_ERRORS,
+} from "../../license-enforcement/license-limit-guard";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
@@ -73,6 +83,65 @@ export type OrganizationMemberWithUser = OrganizationUser & {
 export type OrganizationWithMembersAndTheirTeams = Organization & {
   members: OrganizationMemberWithUser[];
 };
+
+type TransactionClient = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
+/**
+ * Gets permissions for a custom role by its ID.
+ */
+async function getCustomRolePermissions(
+  tx: TransactionClient,
+  customRoleId: string | null | undefined
+): Promise<string[] | undefined> {
+  if (!customRoleId) return undefined;
+
+  const role = await tx.customRole.findUnique({
+    where: { id: customRoleId },
+    select: { permissions: true },
+  });
+
+  return role?.permissions as string[] | undefined;
+}
+
+/**
+ * Gets a user's merged custom role permissions across all their team assignments.
+ */
+async function getUserCustomRolePermissions(
+  tx: TransactionClient,
+  userId: string,
+  organizationId: string
+): Promise<string[] | undefined> {
+  // Get teams in org
+  const teams = await tx.team.findMany({
+    where: { organizationId },
+    select: { id: true },
+  });
+
+  if (teams.length === 0) return undefined;
+
+  // Get user's team assignments with custom roles
+  const teamUsers = await tx.teamUser.findMany({
+    where: {
+      userId,
+      teamId: { in: teams.map((t) => t.id) },
+      assignedRoleId: { not: null },
+    },
+    include: { assignedRole: true },
+  });
+
+  // Merge all permissions
+  const allPermissions: string[] = [];
+  for (const tu of teamUsers) {
+    if (tu.assignedRole?.permissions) {
+      allPermissions.push(...(tu.assignedRole.permissions as string[]));
+    }
+  }
+
+  return allPermissions.length > 0 ? allPermissions : undefined;
+}
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -602,34 +671,64 @@ export const organizationRouter = createTRPCRouter({
           ctx.session.user,
         );
 
-      // Count existing members by type
-      const fullMemberCount = organization.members.filter(
-        (m) => m.role !== OrganizationUserRole.EXTERNAL
-      ).length;
-      const liteMemberCount = organization.members.filter(
-        (m) => m.role === OrganizationUserRole.EXTERNAL
-      ).length;
+      // Get current counts using the centralized repository (includes pending invites)
+      const licenseRepo = new LicenseEnforcementRepository(prisma);
+      const currentFullMembers = await licenseRepo.getMemberCount(
+        input.organizationId
+      );
+      const currentMembersLite = await licenseRepo.getMembersLiteCount(
+        input.organizationId
+      );
 
-      // Count new invites by type
-      const newFullMembers = input.invites.filter(
-        (i) => i.role !== OrganizationUserRole.EXTERNAL
-      ).length;
-      const newLiteMembers = input.invites.filter(
-        (i) => i.role === OrganizationUserRole.EXTERNAL
-      ).length;
+      // Get custom roles for checking new invites
+      const customRoles = await prisma.customRole.findMany({
+        where: { organizationId: input.organizationId },
+        select: { id: true, permissions: true },
+      });
+      const customRoleMap = new Map(
+        customRoles.map((r) => [r.id, r.permissions as string[]])
+      );
+
+      // Count new invites by type (check custom roles for EXTERNAL members)
+      let newFullMembers = 0;
+      let newLiteMembers = 0;
+
+      for (const invite of input.invites) {
+        if (
+          invite.role === OrganizationUserRole.ADMIN ||
+          invite.role === OrganizationUserRole.MEMBER
+        ) {
+          newFullMembers++;
+        } else if (invite.role === OrganizationUserRole.EXTERNAL) {
+          // Check if any team assignment has non-view custom role
+          const hasNonViewRole = invite.teams?.some((t) => {
+            if (!t.customRoleId) return false;
+            const permissions = customRoleMap.get(t.customRoleId);
+            return permissions && !isViewOnlyCustomRole(permissions);
+          });
+          if (hasNonViewRole) {
+            newFullMembers++;
+          } else {
+            newLiteMembers++;
+          }
+        }
+      }
 
       // Check limits separately for full members and lite members
       if (!subscriptionLimits.overrideAddingLimitations) {
-        if (fullMemberCount + newFullMembers > subscriptionLimits.maxMembers) {
+        if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Over the limit of full members allowed",
+            message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
           });
         }
-        if (liteMemberCount + newLiteMembers > subscriptionLimits.maxMembersLite) {
+        if (
+          currentMembersLite + newLiteMembers >
+          subscriptionLimits.maxMembersLite
+        ) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Over the limit of lite members allowed",
+            message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
           });
         }
       }
@@ -1036,7 +1135,7 @@ export const organizationRouter = createTRPCRouter({
           }
           const role = await tx.customRole.findUnique({
             where: { id: input.customRoleId },
-            select: { organizationId: true },
+            select: { organizationId: true, permissions: true },
           });
           if (!role || role.organizationId !== team.organizationId) {
             throw new TRPCError({
@@ -1044,6 +1143,60 @@ export const organizationRouter = createTRPCRouter({
               message: "Role does not belong to team's organization",
             });
           }
+
+          // Check license limits for EXTERNAL users when changing custom roles
+          const orgMembership = await tx.organizationUser.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: input.userId,
+                organizationId: team.organizationId,
+              },
+            },
+          });
+
+          if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
+            // Get the current team user to find old custom role
+            const currentTeamUser = await tx.teamUser.findUnique({
+              where: {
+                userId_teamId: {
+                  userId: input.userId,
+                  teamId: input.teamId,
+                },
+              },
+              select: { assignedRoleId: true },
+            });
+
+            // Get old permissions
+            const oldPermissions = await getCustomRolePermissions(
+              tx,
+              currentTeamUser?.assignedRoleId
+            );
+
+            // New permissions from the role we're assigning
+            const newPermissions = role.permissions as string[] | undefined;
+
+            const changeType = getRoleChangeType(
+              OrganizationUserRole.EXTERNAL,
+              oldPermissions,
+              OrganizationUserRole.EXTERNAL,
+              newPermissions
+            );
+
+            // Check license limits for member type changes
+            const subscriptionLimits =
+              await dependencies.subscriptionHandler.getActivePlan(
+                team.organizationId,
+                ctx.session.user
+              );
+            const licenseRepo = new LicenseEnforcementRepository(prisma);
+            await assertMemberTypeLimitNotExceeded(
+              changeType,
+              team.organizationId,
+              licenseRepo,
+              subscriptionLimits
+            );
+          }
+
           // Lock and validate admin count within transaction
           const adminCount = await tx.teamUser.count({
             where: {
@@ -1129,6 +1282,69 @@ export const organizationRouter = createTRPCRouter({
       } else {
         // It's a built-in role - update it and remove any custom roles
         await prisma.$transaction(async (tx) => {
+          // Get team for organization ID
+          const team = await tx.team.findUnique({
+            where: { id: input.teamId },
+            select: { organizationId: true },
+          });
+          if (!team) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Team not found",
+            });
+          }
+
+          // Check license limits for EXTERNAL users when removing custom roles
+          const orgMembership = await tx.organizationUser.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: input.userId,
+                organizationId: team.organizationId,
+              },
+            },
+          });
+
+          if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
+            // Get the current team user to find old custom role
+            const currentTeamUser = await tx.teamUser.findUnique({
+              where: {
+                userId_teamId: {
+                  userId: input.userId,
+                  teamId: input.teamId,
+                },
+              },
+              select: { assignedRoleId: true },
+            });
+
+            // Get old permissions
+            const oldPermissions = await getCustomRolePermissions(
+              tx,
+              currentTeamUser?.assignedRoleId
+            );
+
+            // Built-in roles have no custom permissions
+            const changeType = getRoleChangeType(
+              OrganizationUserRole.EXTERNAL,
+              oldPermissions,
+              OrganizationUserRole.EXTERNAL,
+              undefined // No custom permissions for built-in role
+            );
+
+            // Check license limits for member type changes
+            const subscriptionLimits =
+              await dependencies.subscriptionHandler.getActivePlan(
+                team.organizationId,
+                ctx.session.user
+              );
+            const licenseRepo = new LicenseEnforcementRepository(prisma);
+            await assertMemberTypeLimitNotExceeded(
+              changeType,
+              team.organizationId,
+              licenseRepo,
+              subscriptionLimits
+            );
+          }
+
           // Lock and validate admin count within transaction
           const adminCount = await tx.teamUser.count({
             where: {
@@ -1252,33 +1468,71 @@ export const organizationRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
-        if (input.role !== OrganizationUserRole.ADMIN) {
-          // Lock the target user's membership row to prevent concurrent modifications
-          const currentMember = await tx.organizationUser.findUnique({
+        // Get the current member's role
+        const currentMember = await tx.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.userId,
+              organizationId: input.organizationId,
+            },
+          },
+        });
+
+        if (!currentMember) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Member not found",
+          });
+        }
+
+        // Check admin demotion constraints
+        if (
+          input.role !== OrganizationUserRole.ADMIN &&
+          currentMember.role === OrganizationUserRole.ADMIN
+        ) {
+          const adminCount = await tx.organizationUser.count({
             where: {
-              userId_organizationId: {
-                userId: input.userId,
-                organizationId: input.organizationId,
-              },
+              organizationId: input.organizationId,
+              role: OrganizationUserRole.ADMIN,
             },
           });
 
-          if (currentMember?.role === OrganizationUserRole.ADMIN) {
-            const adminCount = await tx.organizationUser.count({
-              where: {
-                organizationId: input.organizationId,
-                role: OrganizationUserRole.ADMIN,
-              },
+          if (adminCount <= 1) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot remove the last admin from an organization",
             });
-
-            if (adminCount <= 1) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "Cannot remove the last admin from an organization",
-              });
-            }
           }
         }
+
+        // Get current member's custom role permissions (if any)
+        const userPermissions = await getUserCustomRolePermissions(
+          tx,
+          input.userId,
+          input.organizationId
+        );
+
+        // Determine if this change affects member type
+        const changeType = getRoleChangeType(
+          currentMember.role,
+          userPermissions,
+          input.role,
+          undefined // New role won't have custom permissions yet
+        );
+
+        // Check limits for member type changes
+        const subscriptionLimits =
+          await dependencies.subscriptionHandler.getActivePlan(
+            input.organizationId,
+            ctx.session.user
+          );
+        const licenseRepo = new LicenseEnforcementRepository(prisma);
+        await assertMemberTypeLimitNotExceeded(
+          changeType,
+          input.organizationId,
+          licenseRepo,
+          subscriptionLimits
+        );
 
         await tx.organizationUser.update({
           where: {
