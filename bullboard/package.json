@@ -7,16 +7,16 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "@bull-board/api": "^6.16.2",
-    "@bull-board/hono": "^6.16.2",
-    "@hono/node-server": "^1.14.0",
-    "bullmq": "^5.67.1",
-    "dotenv": "^16.3.1",
-    "hono": "^4.7.5",
-    "ioredis": "^5.8.2"
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/hono": "^6.16.4",
+    "@hono/node-server": "^1.19.9",
+    "bullmq": "^5.67.2",
+    "dotenv": "^17.2.3",
+    "hono": "^4.11.7",
+    "ioredis": "^5.9.2"
   },
   "devDependencies": {
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -9,32 +9,32 @@ importers:
   .:
     dependencies:
       '@bull-board/api':
-        specifier: ^6.16.2
+        specifier: ^6.16.4
         version: 6.16.4(@bull-board/ui@6.16.4)
       '@bull-board/hono':
-        specifier: ^6.16.2
+        specifier: ^6.16.4
         version: 6.16.4(hono@4.11.7)
       '@hono/node-server':
-        specifier: ^1.14.0
+        specifier: ^1.19.9
         version: 1.19.9(hono@4.11.7)
       bullmq:
-        specifier: ^5.67.1
-        version: 5.67.1
+        specifier: ^5.67.2
+        version: 5.67.2
       dotenv:
-        specifier: ^16.3.1
-        version: 16.6.1
+        specifier: ^17.2.3
+        version: 17.2.3
       hono:
-        specifier: ^4.7.5
+        specifier: ^4.11.7
         version: 4.11.7
       ioredis:
-        specifier: ^5.8.2
+        specifier: ^5.9.2
         version: 5.9.2
     devDependencies:
       tsx:
-        specifier: ^4.19.0
+        specifier: ^4.21.0
         version: 4.21.0
       typescript:
-        specifier: ^5.7.0
+        specifier: ^5.9.3
         version: 5.9.3
 
 packages:
@@ -256,8 +256,8 @@ packages:
   brace-expansion@2.0.2:
     resolution: {integrity: sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ==}
 
-  bullmq@5.67.1:
-    resolution: {integrity: sha512-ELJEAzwzesgFxk29emvnAakqrwdBEhEyfZREPQ8pbG4ALVz/mk/AhfuChzxkFpJ7SfL2qclPHbiUGBZzaqcLvg==}
+  bullmq@5.67.2:
+    resolution: {integrity: sha512-3KYqNqQptKcgksACO1li4YW9/jxEh6XWa1lUg4OFrHa80Pf0C7H9zeb6ssbQQDfQab/K3QCXopbZ40vrvcyrLw==}
 
   cluster-key-slot@1.1.2:
     resolution: {integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==}
@@ -284,8 +284,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  dotenv@16.6.1:
-    resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+  dotenv@17.2.3:
+    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
     engines: {node: '>=12'}
 
   ejs@3.1.10:
@@ -526,7 +526,7 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
 
-  bullmq@5.67.1:
+  bullmq@5.67.2:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.9.2
@@ -553,7 +553,7 @@ snapshots:
   detect-libc@2.1.2:
     optional: true
 
-  dotenv@16.6.1: {}
+  dotenv@17.2.3: {}
 
   ejs@3.1.10:
     dependencies:
