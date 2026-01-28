@@ -74,6 +74,20 @@ spec:
         {{- with .Values.app.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        # Fix permissions for Next.js cache/static directories when running as non-root
+        - name: fix-nextjs-permissions
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          command: ['sh', '-c']
+          args:
+            - |
+              cp -r /app/langwatch/.next/* /next-tmp/ 2>/dev/null || true
+              echo "Copied .next contents to writable volume"
+          volumeMounts:
+            - name: next-dir
+              mountPath: /next-tmp
+          securityContext:
+            runAsUser: 1000
+            runAsNonRoot: true
         {{- if .Values.opensearch.chartManaged }}
         - name: wait-for-opensearch
           image: curlimages/curl:latest
@@ -632,10 +646,14 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
+            - name: next-dir
+              mountPath: /app/langwatch/.next
 
       volumes:
         {{- with .Values.app.extraVolumes}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
+          emptyDir: {}
+        - name: next-dir
           emptyDir: {}
