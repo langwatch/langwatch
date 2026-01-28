@@ -25,6 +25,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     1 * 30 * 1000,
   );
 
+  // Track which groups have been identified to avoid redundant calls
+  private readonly identifiedGroups = new Set<string>();
+
   constructor() {
     this.posthog = getPostHogInstance();
   }
@@ -80,6 +83,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
 
         try {
+          // Ensure groups are registered in PostHog before checking flags
+          this.ensureGroupsIdentified(options);
+
           // Fetch from PostHog
           const isEnabled = await this.posthog.isFeatureEnabled(
             flagKey,
@@ -112,6 +118,27 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
       },
     );
+  }
+
+  /**
+   * Lazily register groups in PostHog so they exist for flag targeting.
+   * Each group is only identified once per service instance.
+   */
+  private ensureGroupsIdentified(options?: FeatureFlagOptions): void {
+    if (!options?.groups || !this.posthog) return;
+
+    for (const [groupType, groupKey] of Object.entries(options.groups)) {
+      if (!groupKey) continue;
+
+      const cacheKey = `${groupType}:${groupKey}`;
+      if (this.identifiedGroups.has(cacheKey)) continue;
+
+      this.posthog.groupIdentify({
+        groupType,
+        groupKey,
+      });
+      this.identifiedGroups.add(cacheKey);
+    }
   }
 
   /**
