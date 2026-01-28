@@ -136,6 +136,7 @@ describe("LicenseEnforcementService", () => {
         { type: "scenarios", repoMethod: "getScenarioCount", planField: "maxScenarios" },
         { type: "projects", repoMethod: "getProjectCount", planField: "maxProjects" },
         { type: "members", repoMethod: "getMemberCount", planField: "maxMembers" },
+        { type: "agents", repoMethod: "getAgentCount", planField: "maxAgents" },
       ];
 
       it.each(limitTypeTests)(

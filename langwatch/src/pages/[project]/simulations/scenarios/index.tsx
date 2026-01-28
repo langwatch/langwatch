@@ -12,12 +12,14 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("scenarios");
 
   const {
     data: scenarios,
@@ -41,7 +43,9 @@ function ScenarioLibraryPage() {
   };
 
   const handleNewScenario = () => {
-    openDrawer("scenarioEditor");
+    checkAndProceed(() => {
+      openDrawer("scenarioEditor");
+    });
   };
 
   return (
@@ -92,6 +96,7 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+      {upgradeModal}
     </DashboardLayout>
   );
 }

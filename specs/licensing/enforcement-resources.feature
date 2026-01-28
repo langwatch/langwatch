@@ -1,5 +1,5 @@
 @wip
-Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
+Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios)
   As a LangWatch self-hosted deployment with a license
   I want resource creation limits to be enforced for workflows, prompts, and evaluators
   So that organizations respect their licensed resource counts
@@ -129,6 +129,33 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     Then the evaluator is created successfully
 
   # ============================================================================
+  # Scenarios: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows scenario creation when under limit
+    Given the organization has a license with maxScenarios 5
+    And the organization has 3 scenarios across all projects
+    When I create a scenario in project "proj-789"
+    Then the scenario is created successfully
+
+  @integration
+  Scenario: Blocks scenario creation when at limit
+    Given the organization has a license with maxScenarios 3
+    And the organization has 3 scenarios across all projects
+    When I create a scenario in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of scenarios"
+
+  @integration
+  Scenario: Counts scenarios across all projects in organization
+    Given the organization has a license with maxScenarios 3
+    And project "proj-A" has 2 scenarios
+    And project "proj-B" has 1 scenario
+    When I create a scenario in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================
 
@@ -183,6 +210,23 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     And the modal shows "Evaluators: 3 / 3"
     And the modal includes an upgrade call-to-action
 
+  @unit
+  Scenario: Create Scenario button is always clickable
+    Given the organization has a license with maxScenarios 3
+    And the organization has 3 scenarios (at limit)
+    When I view the scenarios page
+    Then the "New Scenario" button is enabled
+    And the "New Scenario" button is not visually disabled
+
+  @unit
+  Scenario: Clicking Create Scenario at limit shows upgrade modal
+    Given the organization has a license with maxScenarios 3
+    And the organization has 3 scenarios (at limit)
+    When I click the "New Scenario" button
+    Then an upgrade modal is displayed
+    And the modal shows "Scenarios: 3 / 3"
+    And the modal includes an upgrade call-to-action
+
   # ============================================================================
   # UI: Allowed State Behavior
   # ============================================================================
@@ -209,6 +253,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     And the organization has 3 evaluators (under limit)
     When I click the "Create Evaluator" button
     Then the evaluator creation flow starts
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Clicking Create Scenario when allowed opens creation form
+    Given the organization has a license with maxScenarios 5
+    And the organization has 3 scenarios (under limit)
+    When I click the "New Scenario" button
+    Then the scenario creation drawer is displayed
     And no upgrade modal is shown
 
   # ============================================================================
@@ -304,6 +356,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     When I create an evaluator in project "proj-789"
     Then the evaluator is created successfully
 
+  @integration
+  Scenario: No license allows unlimited scenarios when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 scenarios
+    When I create a scenario in project "proj-789"
+    Then the scenario is created successfully
+
   # ============================================================================
   # Invalid/Expired License Falls to FREE Tier
   # ============================================================================
@@ -327,4 +387,11 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators)
     Given the organization has an expired license
     And the organization has 5 evaluators
     When I create an evaluator in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Expired license enforces FREE tier scenario limit
+    Given the organization has an expired license
+    And the organization has 5 scenarios
+    When I create a scenario in project "proj-789"
     Then the request fails with FORBIDDEN
