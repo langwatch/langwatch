@@ -3,6 +3,10 @@ import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
+import {
+  FRONTEND_FEATURE_FLAGS,
+  type FrontendFeatureFlag,
+} from "./frontendFeatureFlags";
 import type { FeatureFlagServiceInterface } from "./types";
 
 /**
@@ -81,6 +85,23 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
    */
   getService(): FeatureFlagServiceInterface {
     return this.service;
+  }
+
+  /**
+   * Get enabled frontend feature flags for a user.
+   * Checks all flags in parallel for performance.
+   */
+  async getEnabledFrontendFeatures(
+    userId: string,
+  ): Promise<FrontendFeatureFlag[]> {
+    const results = await Promise.all(
+      FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
+        flag,
+        enabled: await this.isEnabled(flag, userId, false),
+      })),
+    );
+
+    return results.filter((r) => r.enabled).map((r) => r.flag);
   }
 }
 
