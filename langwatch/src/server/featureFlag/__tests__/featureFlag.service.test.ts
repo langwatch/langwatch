@@ -41,7 +41,7 @@ describe("FeatureFlagService", () => {
       expect(result).toContain("ui-simulations-scenarios");
     });
 
-    it("calls isEnabled with correct arguments", async () => {
+    it("calls isEnabled with correct arguments including user group", async () => {
       const isEnabledSpy = vi
         .spyOn(service, "isEnabled")
         .mockResolvedValue(false);
@@ -52,6 +52,7 @@ describe("FeatureFlagService", () => {
         "ui-simulations-scenarios",
         "user-456",
         false,
+        { groups: { user: "user-456" } },
       );
     });
   });
@@ -85,7 +86,7 @@ describe("FeatureFlagService", () => {
       expect(result).toContain("ui-simulations-scenarios");
     });
 
-    it("calls isEnabled with project group option", async () => {
+    it("calls isEnabled with user and project group options", async () => {
       const isEnabledSpy = vi
         .spyOn(service, "isEnabled")
         .mockResolvedValue(false);
@@ -96,7 +97,22 @@ describe("FeatureFlagService", () => {
         "ui-simulations-scenarios",
         "user-789",
         false,
-        { groups: { project: "project-abc" } },
+        { groups: { user: "user-789", project: "project-abc" } },
+      );
+    });
+
+    it("calls isEnabled with user, project, and organization group options", async () => {
+      const isEnabledSpy = vi
+        .spyOn(service, "isEnabled")
+        .mockResolvedValue(false);
+
+      await service.getEnabledProjectFeatures("user-789", "project-abc", "org-xyz");
+
+      expect(isEnabledSpy).toHaveBeenCalledWith(
+        "ui-simulations-scenarios",
+        "user-789",
+        false,
+        { groups: { user: "user-789", project: "project-abc", organization: "org-xyz" } },
       );
     });
   });
