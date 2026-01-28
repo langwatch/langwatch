@@ -35,7 +35,7 @@ import type {
 /**
  * Time to wait for OTEL traces to flush after process completion.
  */
-const TRACE_FLUSH_WAIT_MS = 1000;
+const TRACE_FLUSH_WAIT_MS = 3000;
 
 /**
  * Time to wait for OTEL traces to flush when running concurrent processes.
