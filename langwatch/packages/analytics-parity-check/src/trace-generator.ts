@@ -42,13 +42,13 @@ const EVALUATION_NAMES = [
 ];
 
 /**
- * Generate a deterministic base timestamp for reproducibility
+ * Generate a base timestamp for the current run
+ * Uses a narrow window (last 5 minutes) to avoid counting traces from previous runs
  */
 function getBaseTimestamp(): number {
-  // Use a fixed recent timestamp for reproducibility
-  // This represents roughly "now minus 7 days" to ensure data spans multiple days
   const now = Date.now();
-  return now - 7 * 24 * 60 * 60 * 1000;
+  // Start 5 minutes ago, spread traces within that window
+  return now - 5 * 60 * 1000;
 }
 
 /**
@@ -268,7 +268,7 @@ function generateLLMVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-llm-${i}`;
-    const traceTime = baseTime + i * 60 * 60 * 1000; // Spread across hours
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const llmSpan = generateLLMSpan(traceId, null, traceTime, i);
 
@@ -302,7 +302,7 @@ function generateRAGVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-rag-${i}`;
-    const traceTime = baseTime + i * 30 * 60 * 1000; // Spread across 30-min intervals
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const chainSpan = generateChainSpan(traceId, null, traceTime, i, "chain");
     const ragSpan = generateRAGSpan(traceId, chainSpan.span_id, traceTime + 100, i);
@@ -338,7 +338,7 @@ function generateChainVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-chain-${i}`;
-    const traceTime = baseTime + i * 45 * 60 * 1000;
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const spans: Span[] = [];
     const chainSpan = generateChainSpan(traceId, null, traceTime, i, "chain");
@@ -396,7 +396,7 @@ function generateMetadataVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-meta-${i}`;
-    const traceTime = baseTime + i * 20 * 60 * 1000;
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const llmSpan = generateLLMSpan(traceId, null, traceTime, i);
 
@@ -439,7 +439,7 @@ function generateErrorVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-error-${i}`;
-    const traceTime = baseTime + i * 60 * 60 * 1000;
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const errorSpan = generateErrorSpan(traceId, null, traceTime);
 
@@ -472,7 +472,7 @@ function generateEvaluationVariations(
 
   for (let i = 0; i < count; i++) {
     const traceId = `${runPrefix}-eval-${i}`;
-    const traceTime = baseTime + i * 40 * 60 * 1000;
+    const traceTime = baseTime + i * 10 * 1000; // Spread across 10-second intervals
 
     const llmSpan = generateLLMSpan(traceId, null, traceTime, i);
     const evaluations = generateEvaluations(traceId, i);

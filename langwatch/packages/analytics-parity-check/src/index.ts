@@ -14,7 +14,7 @@ import {
   getTimeRange,
 } from "./trace-generator.js";
 import { sendVariationsToProjectsWithSDK } from "./sdk-trace-sender.js";
-import { executeStructuredQueries } from "./analytics-client.js";
+import { executeStructuredQueries, pollUntilTracesReady } from "./analytics-client.js";
 import {
   compareAllResults,
   formatComparisonReport,
@@ -34,7 +34,7 @@ function loadConfig(): Config {
     chApiKey: process.env["CH_API_KEY"] ?? "",
     tolerance: parseFloat(process.env["TOLERANCE"] ?? "0.05"),
     traceCount: parseInt(process.env["TRACE_COUNT"] ?? "20", 10),
-    waitTimeMs: parseInt(process.env["WAIT_TIME_MS"] ?? "10000", 10),
+    waitTimeMs: parseInt(process.env["WAIT_TIME_MS"] ?? "120000", 10), // 2 minutes default
   };
 
   // Validate required config
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   });
   console.log(`  Time range: ${new Date(timeRange.startDate).toISOString()} to ${new Date(timeRange.endDate).toISOString()}`);
 
-  console.log("\n[2/4] Sending traces to both projects via SDK (OTEL endpoint)...");
+  console.log("\n[2/4] Sending traces to both projects via dual-exporter SDK (OTEL endpoint)...");
   const sendResults = await sendVariationsToProjectsWithSDK(
     config.baseUrl,
     config.esApiKey,
@@ -98,20 +98,36 @@ async function main(): Promise<void> {
   );
 
   console.log("\n");
-  console.log(`  ES: ${sendResults.es.success} succeeded, ${sendResults.es.failed} failed`);
-  console.log(`  CH: ${sendResults.ch.success} succeeded, ${sendResults.ch.failed} failed`);
+  console.log(`  Traces sent: ${sendResults.es.success} succeeded, ${sendResults.es.failed} failed`);
+  console.log("  (Both ES and CH receive the same traces via dual exporters)");
 
   if (sendResults.es.errors.length > 0) {
-    console.log("  ES Errors:");
+    console.log("  Errors:");
     sendResults.es.errors.slice(0, 5).forEach((e) => console.log(`    - ${e}`));
   }
-  if (sendResults.ch.errors.length > 0) {
-    console.log("  CH Errors:");
-    sendResults.ch.errors.slice(0, 5).forEach((e) => console.log(`    - ${e}`));
+
+  console.log(`\n[3/4] Polling for trace ingestion (max wait: ${config.waitTimeMs}ms)...`);
+  const pollResult = await pollUntilTracesReady(
+    config.baseUrl,
+    config.esApiKey,
+    config.esProjectId,
+    config.chApiKey,
+    config.chProjectId,
+    totalTraces,
+    timeRange.startDate,
+    timeRange.endDate,
+    config.waitTimeMs,
+  );
+
+  if (pollResult.esError || pollResult.chError) {
+    console.log("\n  Warning: Errors during polling:");
+    if (pollResult.esError) console.log(`    ES: ${pollResult.esError.slice(0, 100)}`);
+    if (pollResult.chError) console.log(`    CH: ${pollResult.chError.slice(0, 100)}`);
   }
 
-  console.log(`\n[3/4] Waiting ${config.waitTimeMs}ms for ingestion...`);
-  await sleep(config.waitTimeMs);
+  if (!pollResult.esReady || !pollResult.chReady) {
+    console.log(`\n  Warning: Not all traces ingested. ES: ${pollResult.esCount}/${totalTraces}, CH: ${pollResult.chCount}/${totalTraces}`);
+  }
 
   console.log("\n[4/4] Querying analytics from both projects...");
 
@@ -124,6 +140,10 @@ async function main(): Promise<void> {
     timeRange.endDate,
   );
 
+  if (esResults.failedQueries > 0) {
+    console.log(`  Warning: ${esResults.failedQueries}/${esResults.totalQueries} queries failed`);
+  }
+
   console.log("\nQuerying CH project...");
   const chResults = await executeStructuredQueries(
     config.baseUrl,
@@ -132,6 +152,22 @@ async function main(): Promise<void> {
     timeRange.startDate,
     timeRange.endDate,
   );
+
+  if (chResults.failedQueries > 0) {
+    console.log(`  Warning: ${chResults.failedQueries}/${chResults.totalQueries} queries failed`);
+  }
+
+  // Early exit if all queries failed
+  if (esResults.successfulQueries === 0 || chResults.successfulQueries === 0) {
+    console.error("\nERROR: All analytics queries failed!");
+    if (esResults.successfulQueries === 0) {
+      console.error("  ES: All queries failed - check API key permissions");
+    }
+    if (chResults.successfulQueries === 0) {
+      console.error("  CH: All queries failed - check API key permissions");
+    }
+    process.exit(1);
+  }
 
   console.log("\nComparing results...");
   const comparisons = compareAllResults(esResults, chResults, config.tolerance);
@@ -158,10 +194,6 @@ async function main(): Promise<void> {
   console.log(`\nFull report saved to: ${reportPath}`);
 
   process.exit(summary.overallPassed ? 0 : 1);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 main().catch((error) => {
