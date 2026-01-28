@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.1...langwatch@v2.0.2) (2026-01-28)
+
+
+### Bug Fixes
+
+* **tests:** load .env at config time for stress tests ([643f2dc](https://github.com/langwatch/langwatch/commit/643f2dc08a210d33f21dbdd0da79650ea1369490))
+* **traces:** check plan before bypassing trace limits for self-hosted ([#1244](https://github.com/langwatch/langwatch/issues/1244)) ([6ce3e0d](https://github.com/langwatch/langwatch/commit/6ce3e0d01c7b703bf0b54163891696744c2d92fd))
+
 ## [2.0.1](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.0...langwatch@v2.0.1) (2026-01-28)
 
 
