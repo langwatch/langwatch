@@ -109,6 +109,34 @@ function createMockCollectorServer(): {
 }
 
 /**
+ * Build a minimal whitelisted env for child processes, matching production's
+ * buildChildProcessEnv pattern. This prevents CI env vars (e.g., OTEL_*,
+ * NODE_OPTIONS with conflicting flags) from leaking into child processes.
+ */
+function buildTestChildProcessEnv(
+  testEnv: Record<string, string>,
+): NodeJS.ProcessEnv {
+  const vars: Record<string, string | undefined> = {
+    // System vars (required for tsx/node to run)
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    SHELL: process.env.SHELL,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    TERM: process.env.TERM,
+    // Node.js vars
+    NODE_ENV: process.env.NODE_ENV,
+    // Test-specific vars
+    ...testEnv,
+  };
+
+  return Object.fromEntries(
+    Object.entries(vars).filter(([, v]) => v !== undefined),
+  ) as NodeJS.ProcessEnv;
+}
+
+/**
  * Spawns the child process directly (not through the processor) for testing.
  * This allows us to pass controlled job data and capture results.
  */
@@ -128,7 +156,7 @@ async function spawnChildProcessDirectly(
     );
 
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
-      env: { ...process.env, ...env },
+      env: buildTestChildProcessEnv(env),
       stdio: ["pipe", "pipe", "pipe"],
       cwd: process.cwd(),
     });
@@ -327,13 +355,13 @@ describe("Scenario Processor - OTEL Isolation", () => {
           LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
         };
 
-        await spawnChildProcessDirectly(jobData, env);
+        const { stderr, exitCode } = await spawnChildProcessDirectly(jobData, env);
 
         // Allow time for async trace flush
         await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
 
         // Verify traces actually arrived at the mock collector
-        expect(mockCollector.requests.length).toBeGreaterThan(0);
+        expect(mockCollector.requests.length, `Expected traces but got 0 requests. Child exit code: ${exitCode}, stderr: ${stderr.slice(0, 500)}`).toBeGreaterThan(0);
       },
       60000
     );
@@ -352,7 +380,7 @@ describe("Scenario Processor - OTEL Isolation", () => {
           LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
         };
 
-        await spawnChildProcessDirectly(jobData, env);
+        const { stderr, exitCode } = await spawnChildProcessDirectly(jobData, env);
 
         // Allow time for async trace flush
         await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
@@ -361,7 +389,7 @@ describe("Scenario Processor - OTEL Isolation", () => {
         const hasTracesRequest = mockCollector.requests.some(
           (r) => r.url?.includes("traces") || r.url?.includes("otel")
         );
-        expect(hasTracesRequest).toBe(true);
+        expect(hasTracesRequest, `Expected traces endpoint request. Requests: ${mockCollector.requests.length}, urls: ${mockCollector.requests.map(r => r.url).join(", ")}, child exit: ${exitCode}, stderr: ${stderr.slice(0, 500)}`).toBe(true);
       },
       60000
     );
@@ -692,13 +720,13 @@ describe("Scenario Processor - OTEL Isolation", () => {
           LANGWATCH_ENDPOINT: `http://127.0.0.1:${mockCollector.port}`,
         };
 
-        await spawnChildProcessDirectly(jobData, env);
+        const { stderr, exitCode } = await spawnChildProcessDirectly(jobData, env);
 
         // Allow time for async trace flush
         await new Promise((resolve) => setTimeout(resolve, TRACE_FLUSH_WAIT_MS));
 
         // Traces should have been flushed to the mock collector
-        expect(mockCollector.requests.length).toBeGreaterThan(0);
+        expect(mockCollector.requests.length, `Expected flushed traces but got 0. Child exit: ${exitCode}, stderr: ${stderr.slice(0, 500)}`).toBeGreaterThan(0);
       },
       60000
     );
