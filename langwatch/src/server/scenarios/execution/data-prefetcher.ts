@@ -129,7 +129,7 @@ export async function prefetchScenarioData(
   }
   const project = projectResult.data;
 
-  const adapterData = await fetchAdapterData(context.projectId, target, deps);
+  const adapterData = await fetchAgentData(context.projectId, target, deps);
   if (!adapterData) {
     return {
       success: false,
@@ -211,7 +211,7 @@ async function fetchProject(
   };
 }
 
-async function fetchAdapterData(
+async function fetchAgentData(
   projectId: string,
   target: TargetConfig,
   deps: DataPrefetcherDependencies,

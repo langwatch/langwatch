@@ -18,6 +18,10 @@ import { Hono } from "hono";
 import IORedis from "ioredis";
 
 const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
+if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
+  console.error("Invalid BULLBOARD_PORT: must be a number between 1 and 65535");
+  process.exit(1);
+}
 
 async function main() {
   const redisUrl = process.env.REDIS_URL;

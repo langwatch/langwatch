@@ -315,9 +315,18 @@ async function spawnScenarioChildProcess(
       });
     });
 
-    // Send job data to child via stdin
-    child.stdin?.write(JSON.stringify(jobData));
-    child.stdin?.end();
+    // Send job data to child via stdin with error handling to prevent EPIPE crashes
+    if (child.stdin) {
+      child.stdin.on("error", (err) => {
+        log("warn", `Child stdin error: ${err.message}`);
+      });
+      try {
+        child.stdin.write(JSON.stringify(jobData));
+        child.stdin.end();
+      } catch (err) {
+        log("warn", `Child stdin write failed: ${(err as Error).message}`);
+      }
+    }
   });
 }
 
