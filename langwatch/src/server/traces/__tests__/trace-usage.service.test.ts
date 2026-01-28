@@ -5,6 +5,12 @@ import {
   TraceUsageService,
 } from "../trace-usage.service";
 
+vi.mock("~/env.mjs", () => ({
+  env: {
+    IS_SAAS: true,
+  },
+}));
+
 describe("TraceUsageService", () => {
   const mockOrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
@@ -99,6 +105,24 @@ describe("TraceUsageService", () => {
         const result = await service.checkLimit({ teamId: "team-123" });
 
         expect(result.exceeded).toBe(false);
+      });
+    });
+
+    describe("when self-hosted (IS_SAAS=false)", () => {
+      it("returns exceeded: false without checking limits", async () => {
+        const { env } = await import("~/env.mjs");
+        vi.mocked(env).IS_SAAS = false;
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(false);
+        expect(
+          mockOrganizationRepository.getOrganizationIdByTeamId,
+        ).not.toHaveBeenCalled();
+        expect(mockSubscriptionHandler.getActivePlan).not.toHaveBeenCalled();
+
+        // Reset for other tests
+        vi.mocked(env).IS_SAAS = true;
       });
     });
   });
