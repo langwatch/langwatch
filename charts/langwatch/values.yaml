@@ -1188,7 +1188,7 @@ postgresql:
   image:
     repository: bitnamilegacy/postgresql
     ## @param postgresql.image.tag [string, default: 16.6.0-debian-12-r2] PostgreSQL image tag.
-    tag: 17
+    tag: 16.6.0-debian-12-r2
 
   # Data directory path
   ## @param postgresql.postgresqlDataDir [string, default: /var/lib/postgresql/data/pgdata] Data dir path.
