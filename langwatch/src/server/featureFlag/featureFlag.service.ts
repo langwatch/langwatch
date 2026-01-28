@@ -8,7 +8,10 @@ import {
   FRONTEND_FEATURE_FLAGS,
   type FrontendFeatureFlag,
 } from "./frontendFeatureFlags";
-import type { FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * Feature flag service that automatically chooses between PostHog and memory
@@ -40,12 +43,13 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     flagKey: string,
     distinctId: string,
     defaultValue = true,
+    options?: FeatureFlagOptions,
   ): Promise<boolean> {
     const envOverride = checkFlagEnvOverride(flagKey);
     if (envOverride !== undefined) {
       return envOverride;
     }
-    return this.service.isEnabled(flagKey, distinctId, defaultValue);
+    return this.service.isEnabled(flagKey, distinctId, defaultValue, options);
   }
 
   /**
@@ -80,6 +84,26 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
         enabled: await this.isEnabled(flag, userId, false),
+      })),
+    );
+
+    return results.filter((r) => r.enabled).map((r) => r.flag);
+  }
+
+  /**
+   * Get enabled frontend feature flags for a user within a specific project.
+   * Uses PostHog groups for project-level targeting.
+   */
+  async getEnabledProjectFeatures(
+    userId: string,
+    projectId: string,
+  ): Promise<FrontendFeatureFlag[]> {
+    const results = await Promise.all(
+      FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
+        flag,
+        enabled: await this.isEnabled(flag, userId, false, {
+          groups: { project: projectId },
+        }),
       })),
     );
 

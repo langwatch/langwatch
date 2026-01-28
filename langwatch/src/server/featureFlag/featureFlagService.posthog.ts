@@ -2,7 +2,10 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import { getPostHogInstance } from "../posthog";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
-import type { FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.
@@ -40,6 +43,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     flagKey: string,
     distinctId: string,
     defaultValue = true,
+    options?: FeatureFlagOptions,
   ): Promise<boolean> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServicePostHog.isEnabled",
@@ -48,6 +52,8 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.key": flagKey,
           "feature.flag.distinct_id": distinctId,
           "feature.flag.default": defaultValue,
+          "feature.flag.project": options?.groups?.project ?? "",
+          "feature.flag.organization": options?.groups?.organization ?? "",
           "cache.redis_available": this.cache.isRedisAvailable(),
         },
       },
@@ -57,7 +63,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
-        const cacheKey = `${flagKey}:${distinctId}`;
+        const projectKey = options?.groups?.project ?? "";
+        const orgKey = options?.groups?.organization ?? "";
+        const cacheKey = `${flagKey}:${distinctId}:${projectKey}:${orgKey}`;
 
         // Check hybrid cache first
         const cachedResult = await this.cache.get(cacheKey);
@@ -78,6 +86,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
             distinctId,
             {
               disableGeoip: true,
+              groups: options?.groups,
             },
           );
 

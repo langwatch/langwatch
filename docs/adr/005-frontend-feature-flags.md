@@ -23,9 +23,15 @@ We will expose feature flags to the frontend through the NextAuth session:
 
 3. **Use user.id as distinctId**: Consistent with existing usage, we use `user.id` (not email) as the PostHog distinctId for feature flag evaluation.
 
-4. **Access via session.user.enabledFeatures**: Frontend components check `session?.user?.enabledFeatures?.includes("FLAG_NAME")`.
+4. **Access via session.user.enabledFeatures**: Frontend components check `session?.user?.enabledFeatures?.includes("FLAG_NAME")` for user-level flags.
 
-5. **Environment variable overrides**: Flags can be force-enabled or force-disabled via environment variables, bypassing PostHog:
+5. **Project-level flags with PostHog groups**: For project-scoped feature flags:
+   - The session callback fetches all user projects and checks flags with PostHog groups
+   - Access via `session?.user?.projectFeatures?.[projectId]?.includes("FLAG_NAME")`
+   - Use `useHasFeature()(flag, projectId)` hook for project-level checks
+   - PostHog groups are passed as `{ project: projectId }` to `isEnabled()`
+
+6. **Environment variable overrides**: Flags can be force-enabled or force-disabled via environment variables, bypassing PostHog:
    - `FLAG_NAME=1` - force enable (e.g., `UI_SIMULATIONS_SCENARIOS=1`)
    - `FLAG_NAME=0` - force disable
    - Flag name is uppercased with dashes replaced by underscores
@@ -47,9 +53,15 @@ We will expose feature flags to the frontend through the NextAuth session:
 - Consistent with how other feature flags are evaluated
 - User IDs are stable (emails can change)
 
+**Why PostHog groups for project-level flags:**
+- PostHog natively supports groups for multi-tenancy
+- Enables targeting flags to specific projects without custom logic
+- Cache key includes project ID for proper isolation
+
 **Trade-offs accepted:**
 - All frontend flags are checked on every session callback (minor performance overhead)
 - Slight increase in session size
+- Project-level flags multiply PostHog calls (projects x flags), mitigated by parallel execution and caching
 
 ## Consequences
 
@@ -59,12 +71,14 @@ We will expose feature flags to the frontend through the NextAuth session:
 - Centralized feature flag management
 - Type-safe flag names
 - Feature flag changes are picked up on next page load (session callback runs on each session check)
+- Project-level targeting via PostHog groups
 
 **Neutral:**
-- Session object grows slightly with `enabledFeatures` array
+- Session object grows slightly with `enabledFeatures` and `projectFeatures`
 - New pattern for frontend feature flags (may require documentation)
 
 ## References
 
 - PostHog feature flags documentation
+- PostHog groups documentation
 - NextAuth.js session callback documentation
