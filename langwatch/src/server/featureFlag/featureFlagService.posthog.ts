@@ -133,6 +133,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
       const cacheKey = `${groupType}:${groupKey}`;
       if (this.identifiedGroups.has(cacheKey)) continue;
 
+      this.logger.debug({ groupType, groupKey }, "Registering group in PostHog");
       this.posthog.groupIdentify({
         groupType,
         groupKey,

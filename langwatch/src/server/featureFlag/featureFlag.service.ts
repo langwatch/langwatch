@@ -47,9 +47,12 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   ): Promise<boolean> {
     const envOverride = checkFlagEnvOverride(flagKey);
     if (envOverride !== undefined) {
+      this.logger.debug({ flagKey, distinctId, envOverride }, "Flag resolved via env override");
       return envOverride;
     }
-    return this.service.isEnabled(flagKey, distinctId, defaultValue, options);
+    const result = await this.service.isEnabled(flagKey, distinctId, defaultValue, options);
+    this.logger.debug({ flagKey, distinctId, enabled: result, groups: options?.groups }, "Flag checked");
+    return result;
   }
 
   /**
@@ -87,7 +90,9 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       })),
     );
 
-    return results.filter((r) => r.enabled).map((r) => r.flag);
+    const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
+    this.logger.debug({ userId, enabledFeatures: enabled }, "User frontend features resolved");
+    return enabled;
   }
 
   /**
@@ -107,7 +112,9 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       })),
     );
 
-    return results.filter((r) => r.enabled).map((r) => r.flag);
+    const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
+    this.logger.debug({ userId, projectId, enabledFeatures: enabled }, "Project features resolved");
+    return enabled;
   }
 }
 
