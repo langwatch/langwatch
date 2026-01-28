@@ -31,7 +31,7 @@ prompts/**
 .chainlit
 
 # Claude Code personal settings
-.claude/settings.local.json
+**/.claude/settings.local.json
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
