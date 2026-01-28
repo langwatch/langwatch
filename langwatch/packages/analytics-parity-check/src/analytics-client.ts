@@ -29,19 +29,16 @@ async function executeTrpcQuery<T>(
   procedure: string,
   input: unknown,
 ): Promise<T | null> {
-  // Build the tRPC batch query URL
-  const url = `${baseUrl}/api/trpc/${procedure}`;
+  // Build the tRPC query URL with input as query parameter (queries use GET)
+  const encodedInput = encodeURIComponent(JSON.stringify({ json: input }));
+  const url = `${baseUrl}/api/trpc/${procedure}?input=${encodedInput}`;
 
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
         "X-Auth-Token": apiKey,
-        // For tRPC, we typically need cookie-based auth
-        // This may need adjustment based on actual auth mechanism
       },
-      body: JSON.stringify({ json: input }),
     });
 
     if (!response.ok) {

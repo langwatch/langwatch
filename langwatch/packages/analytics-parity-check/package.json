@@ -5,10 +5,15 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "check": "tsx src/index.ts"
+    "start": "tsx --env-file=.env src/index.ts",
+    "check": "tsx --env-file=.env src/index.ts"
   },
   "dependencies": {
+    "langwatch": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/context-async-hooks": "^2.1.0",
+    "@opentelemetry/sdk-node": "0.205.0",
+    "@opentelemetry/semantic-conventions": "^1.36.0",
     "nanoid": "^5.0.7"
   },
   "devDependencies": {
