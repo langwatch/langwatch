@@ -38,6 +38,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
@@ -324,6 +325,7 @@ function PublishMenu({
   };
 
   const { organization } = useOrganizationTeamProject();
+  const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -356,7 +358,7 @@ function PublishMenu({
                 projectId: project?.id,
                 hook: "studio_click_subscribe_to_publish",
               });
-              void router.push("/settings/subscription");
+              void router.push(planManagementUrl);
             }}
           >
             {usage.data ? <Lock size={16} /> : <Spinner size="sm" />}

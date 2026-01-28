@@ -7,7 +7,7 @@ import {
   it,
 } from "vitest";
 import { prisma } from "../../../src/server/db";
-import { LicenseHandler } from "../licenseHandler";
+import { LicenseHandler, type ITraceUsageService } from "../licenseHandler";
 import { OrganizationNotFoundError } from "../errors";
 import {
   BASE_LICENSE,
@@ -20,16 +20,24 @@ import {
 } from "./fixtures/testLicenses";
 import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
 import { FREE_PLAN } from "../constants";
+import { LicenseEnforcementRepository } from "../../../src/server/license-enforcement/license-enforcement.repository";
+
+// Mock TraceUsageService for testing - returns 0 for all counts
+const mockTraceUsageService: ITraceUsageService = {
+  getCurrentMonthCount: async () => 0,
+};
 
 describe("LicenseHandler Integration", () => {
   let organizationId: string;
   let handler: LicenseHandler;
 
   beforeAll(async () => {
-    // Create handler with test public key
+    // Create handler with test public key, repository, and trace service
     handler = new LicenseHandler({
       prisma,
       publicKey: TEST_PUBLIC_KEY,
+      repository: new LicenseEnforcementRepository(prisma),
+      traceUsageService: mockTraceUsageService,
     });
 
     // Create test organization

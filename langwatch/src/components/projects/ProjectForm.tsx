@@ -22,6 +22,7 @@ import {
   validateNewTeamName,
   validateProjectName,
 } from "./projectFormValidation";
+import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 
 export interface ProjectFormData {
   name: string;
@@ -46,6 +47,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     defaultTeamId,
   } = props;
   const { organization, project } = useOrganizationTeamProject();
+  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const {
     register,
@@ -116,7 +118,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                 You have reached the maximum number of projects allowed by your
                 plan. Please{" "}
                 <Link
-                  href="/settings/subscription"
+                  href={planManagementUrl}
                   textDecoration="underline"
                   _hover={{ textDecoration: "none" }}
                   onClick={() => {

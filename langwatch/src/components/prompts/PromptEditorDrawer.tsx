@@ -14,6 +14,11 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -525,6 +530,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "prompts") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -615,6 +626,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
   // State for change handle dialog (for renaming existing prompts)
   const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
   const pendingSaveDataRef = useRef<ReturnType<
     typeof formValuesToTriggerSaveVersionParams
   > | null>(null);
@@ -1108,6 +1122,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           </Drawer.Footer>
         )}
       </Drawer.Content>
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="prompts"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
     </Drawer.Root>
   );
 }

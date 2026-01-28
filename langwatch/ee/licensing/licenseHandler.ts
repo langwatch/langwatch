@@ -1,19 +1,31 @@
 import type { PrismaClient } from "@prisma/client";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "./planInfo";
 import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
-import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
 import { validateLicense, parseLicenseKey } from "./validation";
+import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+
+/**
+ * Interface for trace usage counting.
+ * Follows Interface Segregation Principle - only what we need.
+ */
+export interface ITraceUsageService {
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+}
 
 interface LicenseHandlerConfig {
   prisma: PrismaClient;
   publicKey?: string;
+  repository: ILicenseEnforcementRepository;
+  traceUsageService?: ITraceUsageService;
 }
 
 /**
  * Manages license validation and storage for self-hosted deployments.
  *
- * This handler is only called when LICENSE_ENFORCEMENT_ENABLED=true.
+ * This handler is only called when LICENSE_ENFORCEMENT_DISABLED=false (the default).
  * When enforcement is disabled, SubscriptionHandler returns UNLIMITED_PLAN directly.
  *
  * Key behaviors (when enforcement is enabled):
@@ -35,19 +47,16 @@ interface LicenseHandlerConfig {
 export class LicenseHandler {
   private prisma: PrismaClient;
   private publicKey: string;
+  private repository: ILicenseEnforcementRepository;
+  private traceUsageService: ITraceUsageService | null;
 
   constructor(config: LicenseHandlerConfig) {
     this.prisma = config.prisma;
     this.publicKey = config.publicKey ?? PUBLIC_KEY;
+    this.repository = config.repository;
+    this.traceUsageService = config.traceUsageService ?? null;
   }
 
-  /**
-   * Factory method for creating a LicenseHandler instance.
-   * Provides proper lifecycle management for production use.
-   */
-  static create(prisma: PrismaClient, publicKey?: string): LicenseHandler {
-    return new LicenseHandler({ prisma, publicKey });
-  }
 
   /**
    * Gets the active plan for an organization based on its stored license.
@@ -138,22 +147,19 @@ export class LicenseHandler {
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: {
-        license: true,
-        _count: { select: { members: true } },
-      },
+      select: { license: true },
     });
 
     if (!organization?.license) {
       return { hasLicense: false, valid: false };
     }
 
-    const memberCount = organization._count.members;
     const validationResult = validateLicense(organization.license, this.publicKey);
 
     // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {
       const { licenseData } = validationResult;
+      const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
       return {
         hasLicense: true,
         valid: true,
@@ -161,8 +167,7 @@ export class LicenseHandler {
         planName: licenseData.plan.name,
         expiresAt: licenseData.expiresAt,
         organizationName: licenseData.organizationName,
-        currentMembers: memberCount,
-        maxMembers: licenseData.plan.maxMembers,
+        ...resourceCounts,
       };
     }
 
@@ -173,6 +178,7 @@ export class LicenseHandler {
     }
 
     const { data: licenseData } = signedLicense;
+    const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
     return {
       hasLicense: true,
       valid: false,
@@ -180,8 +186,72 @@ export class LicenseHandler {
       planName: licenseData.plan.name,
       expiresAt: licenseData.expiresAt,
       organizationName: licenseData.organizationName,
-      currentMembers: memberCount,
-      maxMembers: licenseData.plan.maxMembers,
+      ...resourceCounts,
+    };
+  }
+
+  /**
+   * Fetches all resource counts for an organization and combines with plan limits.
+   */
+  private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+    // Resolve defaults for optional plan fields
+    const resolved = resolvePlanDefaults(plan);
+
+    // Get message count from TraceUsageService (Elasticsearch)
+    // Returns 0 if service not provided (e.g., in tests)
+    const messagesCountPromise = this.traceUsageService
+      ? this.traceUsageService.getCurrentMonthCount({ organizationId })
+      : Promise.resolve(0);
+
+    const [
+      currentMembers,
+      currentMembersLite,
+      currentTeams,
+      currentProjects,
+      currentPrompts,
+      currentWorkflows,
+      currentScenarios,
+      currentEvaluators,
+      currentAgents,
+      currentMessagesPerMonth,
+      currentEvaluationsCredit,
+    ] = await Promise.all([
+      this.repository.getMemberCount(organizationId),
+      this.repository.getMembersLiteCount(organizationId),
+      this.repository.getTeamCount(organizationId),
+      this.repository.getProjectCount(organizationId),
+      this.repository.getPromptCount(organizationId),
+      this.repository.getWorkflowCount(organizationId),
+      this.repository.getScenarioCount(organizationId),
+      this.repository.getEvaluatorCount(organizationId),
+      this.repository.getAgentCount(organizationId),
+      messagesCountPromise,
+      this.repository.getEvaluationsCreditUsed(organizationId),
+    ]);
+
+    return {
+      currentMembers,
+      maxMembers: resolved.maxMembers,
+      currentMembersLite,
+      maxMembersLite: resolved.maxMembersLite,
+      currentTeams,
+      maxTeams: resolved.maxTeams,
+      currentProjects,
+      maxProjects: resolved.maxProjects,
+      currentPrompts,
+      maxPrompts: resolved.maxPrompts,
+      currentWorkflows,
+      maxWorkflows: resolved.maxWorkflows,
+      currentScenarios,
+      maxScenarios: resolved.maxScenarios,
+      currentEvaluators,
+      maxEvaluators: resolved.maxEvaluators,
+      currentAgents,
+      maxAgents: resolved.maxAgents,
+      currentMessagesPerMonth,
+      maxMessagesPerMonth: resolved.maxMessagesPerMonth,
+      currentEvaluationsCredit,
+      maxEvaluationsCredit: resolved.evaluationsCredit,
     };
   }
 

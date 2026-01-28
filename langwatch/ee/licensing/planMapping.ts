@@ -1,26 +1,27 @@
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "./planInfo";
+import { resolvePlanDefaults } from "./defaults";
 import type { LicenseData } from "./types";
 
-/**
- * Maps license data to a PlanInfo structure compatible with the subscription system.
- *
- * @param licenseData - The license data containing plan limits
- * @returns PlanInfo for use with existing enforcement code
- */
 export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
-  const { plan } = licenseData;
+  const resolved = resolvePlanDefaults(licenseData.plan);
 
   return {
-    type: plan.type,
-    name: plan.name,
+    type: resolved.type,
+    name: resolved.name,
     free: false, // Paid license = not a free tier
     overrideAddingLimitations: false, // Enforce limits, don't bypass
-    maxMembers: plan.maxMembers,
-    maxProjects: plan.maxProjects,
-    maxMessagesPerMonth: plan.maxMessagesPerMonth,
-    evaluationsCredit: plan.evaluationsCredit,
-    maxWorkflows: plan.maxWorkflows,
-    canPublish: plan.canPublish,
+    maxMembers: resolved.maxMembers,
+    maxMembersLite: resolved.maxMembersLite,
+    maxTeams: resolved.maxTeams,
+    maxProjects: resolved.maxProjects,
+    maxMessagesPerMonth: resolved.maxMessagesPerMonth,
+    evaluationsCredit: resolved.evaluationsCredit,
+    maxWorkflows: resolved.maxWorkflows,
+    maxPrompts: resolved.maxPrompts,
+    maxEvaluators: resolved.maxEvaluators,
+    maxScenarios: resolved.maxScenarios,
+    maxAgents: resolved.maxAgents,
+    canPublish: resolved.canPublish,
     prices: {
       USD: 0,
       EUR: 0,

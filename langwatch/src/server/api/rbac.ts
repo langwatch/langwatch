@@ -204,7 +204,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:delete",
   ],
   [OrganizationUserRole.MEMBER]: ["organization:view"],
-  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for external users
+  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Member Lite users
 };
 
 // ============================================================================

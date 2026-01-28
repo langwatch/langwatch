@@ -14,7 +14,13 @@ import { useCallback, useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { UpgradeModal } from "~/components/UpgradeModal";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -51,6 +57,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     null,
   );
   const [agentName, setAgentName] = useState(props.agentName ?? "");
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   const workflowsQuery = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -73,6 +82,19 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
       onClose();
+    },
+    onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "agents") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
+      toaster.create({
+        title: "Error creating agent",
+        description: error.message,
+        type: "error",
+      });
     },
   });
 
@@ -110,11 +132,12 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const isValid = selectedWorkflowId && agentName.trim().length > 0;
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-    >
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && onClose()}
+        size="md"
+      >
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header>
@@ -231,7 +254,16 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
-    </Drawer.Root>
+      </Drawer.Root>
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="agents"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
+    </>
   );
 }
 

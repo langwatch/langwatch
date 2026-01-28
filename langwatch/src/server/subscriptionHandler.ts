@@ -1,33 +1,11 @@
 import { LicenseHandler, PUBLIC_KEY, UNLIMITED_PLAN } from "../../ee/licensing";
+import type { PlanInfo } from "../../ee/licensing/planInfo";
+import { createLicenseHandler } from "../../ee/licensing/server";
 import { env } from "../env.mjs";
 import { prisma } from "./db";
 
-export type PlanInfo = {
-  type: string;
-  name: string;
-  free: boolean;
-  trialDays?: number;
-  daysSinceCreation?: number;
-  overrideAddingLimitations?: boolean;
-  maxMembers: number;
-  maxProjects: number;
-  maxMessagesPerMonth: number;
-  evaluationsCredit: number;
-  maxWorkflows: number;
-  canPublish: boolean;
-  userPrice?: {
-    USD: number;
-    EUR: number;
-  };
-  tracesPrice?: {
-    USD: number;
-    EUR: number;
-  };
-  prices: {
-    USD: number;
-    EUR: number;
-  };
-};
+// Re-export PlanInfo from canonical location for backward compatibility
+export type { PlanInfo } from "../../ee/licensing/planInfo";
 
 // Singleton LicenseHandler instance for self-hosted deployments
 let licenseHandler: LicenseHandler | null = null;
@@ -38,7 +16,7 @@ let licenseHandler: LicenseHandler | null = null;
  */
 export function getLicenseHandler(): LicenseHandler {
   if (!licenseHandler) {
-    licenseHandler = LicenseHandler.create(prisma, PUBLIC_KEY);
+    licenseHandler = createLicenseHandler(prisma, PUBLIC_KEY);
   }
   return licenseHandler;
 }
@@ -53,12 +31,12 @@ export abstract class SubscriptionHandler {
     },
     handler: LicenseHandler = getLicenseHandler(),
   ): Promise<PlanInfo> {
-    // When license enforcement is enabled, delegate to LicenseHandler
-    if (env.LICENSE_ENFORCEMENT_ENABLED) {
-      return handler.getActivePlan(organizationId);
+    // When license enforcement is disabled, return unlimited plan
+    if (env.LICENSE_ENFORCEMENT_DISABLED) {
+      return UNLIMITED_PLAN;
     }
 
-    // Default: return unlimited plan (backward compatible)
-    return UNLIMITED_PLAN;
+    // Default: enforce license limits (enabled by default)
+    return handler.getActivePlan(organizationId);
   }
 }

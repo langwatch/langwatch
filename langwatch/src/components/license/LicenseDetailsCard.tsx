@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { LicenseStatus } from "../../../ee/licensing";
+import type { LicenseStatus } from "../../../ee/licensing/client";
 import { isLicenseExpired, formatLicenseDate, hasLicenseMetadata, isCorruptedLicense } from "./licenseStatusUtils";
 
 interface LicenseDetailsCardProps {
@@ -31,12 +31,11 @@ export function LicenseDetailsCard({
         borderRadius="lg"
         padding={6}
         width="full"
-        maxWidth="600px"
       >
         <VStack align="start" gap={4}>
           <HStack>
             <Badge
-              colorScheme="red"
+              colorPalette="red"
               fontSize="sm"
               paddingX={2}
               paddingY={1}
@@ -61,7 +60,7 @@ export function LicenseDetailsCard({
             <Button
               variant="outline"
               size="sm"
-              colorScheme="red"
+              colorPalette="red"
               onClick={onRemove}
               loading={isRemoving}
               disabled={isRemoving}
@@ -84,12 +83,11 @@ export function LicenseDetailsCard({
       borderRadius="lg"
       padding={6}
       width="full"
-      maxWidth="600px"
     >
       <VStack align="start" gap={4}>
         <HStack>
           <Badge
-            colorScheme={isValid ? "green" : "red"}
+            colorPalette={isValid ? "green" : "red"}
             fontSize="sm"
             paddingX={2}
             paddingY={1}
@@ -100,7 +98,7 @@ export function LicenseDetailsCard({
 
         <VStack align="start" gap={2} width="full">
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="fg.muted" width="120px">
               Plan:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
@@ -109,7 +107,7 @@ export function LicenseDetailsCard({
           </HStack>
 
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="fg.muted" width="120px">
               Licensed to:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
@@ -118,16 +116,7 @@ export function LicenseDetailsCard({
           </HStack>
 
           <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
-              Members:
-            </Text>
-            <Text fontSize="sm" fontWeight="medium">
-              {status.currentMembers} / {status.maxMembers}
-            </Text>
-          </HStack>
-
-          <HStack>
-            <Text fontSize="sm" color="gray.500" width="100px">
+            <Text fontSize="sm" color="fg.muted" width="120px">
               Expires:
             </Text>
             <Text
@@ -159,7 +148,7 @@ export function LicenseDetailsCard({
           <Button
             variant="outline"
             size="sm"
-            colorScheme="red"
+            colorPalette="red"
             onClick={onRemove}
             loading={isRemoving}
             disabled={isRemoving}

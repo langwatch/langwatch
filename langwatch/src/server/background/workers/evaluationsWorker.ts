@@ -21,10 +21,7 @@ import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import {
-  getCurrentMonthCost,
-  maxMonthlyUsageLimit,
-} from "../../api/routers/limits";
+import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -425,10 +422,13 @@ export const runEvaluation = async ({
   if (!project) {
     throw new Error("Project not found");
   }
-  const maxMonthlyUsage = await maxMonthlyUsageLimit(
+  const costChecker = createCostChecker(prisma);
+  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
     project.team.organizationId,
   );
-  const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
+  const getCurrentCost = await costChecker.getCurrentMonthCost(
+    project.team.organizationId,
+  );
   if (getCurrentCost >= maxMonthlyUsage) {
     return {
       status: "skipped",

@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PageLayout } from "./ui/layouts/PageLayout";
 
 export default function SettingsLayout({
@@ -10,6 +11,8 @@ export default function SettingsLayout({
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
   const { project } = useOrganizationTeamProject();
+  const publicEnv = usePublicEnv();
+  const isSaaS = publicEnv.data?.IS_SAAS ?? false;
 
   return (
     <DashboardLayout compactMenu>
@@ -48,7 +51,8 @@ export default function SettingsLayout({
           </MenuLink>
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
-          <MenuLink href="/settings/subscription">Subscription</MenuLink>
+          {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
+          {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
         </VStack>
         <Container maxWidth="1280px" padding={4} paddingBottom={16}>
           {children}
