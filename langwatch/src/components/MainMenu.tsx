@@ -1,11 +1,10 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 import React, { useState } from "react";
+import { useHasFeature } from "../hooks/useHasFeature";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
-import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
@@ -28,7 +27,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { data: session } = useSession();
+  const hasFeature = useHasFeature();
   const { project, hasOrganizationPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
@@ -38,9 +37,6 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  // Feature flag: show scenarios menu using backend feature flags
-  const hasFeature = (flag: FrontendFeatureFlag) =>
-    session?.user?.enabledFeatures?.includes(flag) ?? false;
   const showScenariosOnThePlatform = hasFeature("ui-simulations-scenarios");
 
   // In compact mode, show expanded view on hover

@@ -26,7 +26,6 @@ import { dependencies } from "../injection/dependencies.server";
 import {
   featureFlagService,
   type FrontendFeatureFlag,
-  getEnabledFrontendFeatures,
 } from "./featureFlag";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
@@ -89,7 +88,7 @@ export const authOptions = (
             ...session.user,
             id: user_.id,
             email: user_.email,
-            enabledFeatures: await getEnabledFrontendFeatures(user_.id, featureFlagService),
+            enabledFeatures: await featureFlagService.getEnabledFrontendFeatures(user_.id),
           },
         };
       }
@@ -100,7 +99,7 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
-          enabledFeatures: await getEnabledFrontendFeatures(user.id, featureFlagService),
+          enabledFeatures: await featureFlagService.getEnabledFrontendFeatures(user.id),
         },
       };
     },
