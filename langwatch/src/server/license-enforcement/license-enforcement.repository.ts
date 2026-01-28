@@ -142,22 +142,9 @@ export class LicenseEnforcementRepository
    */
   async getEvaluationsCreditUsed(organizationId: string): Promise<number> {
     const startOfMonth = getCurrentMonthStart();
-
-    // Get project IDs first to satisfy multi-tenancy guard
-    const projectIds = (
-      await this.prisma.project.findMany({
-        where: { team: { organizationId } },
-        select: { id: true },
-      })
-    ).map((p) => p.id);
-
-    if (projectIds.length === 0) {
-      return 0;
-    }
-
     return this.prisma.batchEvaluation.count({
       where: {
-        projectId: { in: projectIds },
+        project: { team: { organizationId } },
         createdAt: { gte: startOfMonth },
       },
     });

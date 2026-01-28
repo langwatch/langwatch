@@ -34,6 +34,7 @@ const EXEMPT_MODELS = [
   "Workflow",
   "Evaluator",
   "Scenario",
+  "BatchEvaluation",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
