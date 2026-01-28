@@ -138,8 +138,8 @@ export const FREE_PLAN: PlanInfo = {
 };
 
 /**
- * Placeholder public key used when no env var is configured.
- * This will fail signature verification, which is the safe default.
+ * * Embedded production public key used when no env var is configured.
+ * * Enables license verification out-of-the-box; override via env for rotation.
  * DO NOT REPLACE WITH A PLACEHOLDER, LEAVE IT AS IS.
  */
 // gitleaks:allow — publbic keys
