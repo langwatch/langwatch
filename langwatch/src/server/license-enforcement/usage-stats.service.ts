@@ -1,8 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { dependencies } from "../../injection/dependencies.server";
 import { TraceUsageService } from "../traces/trace-usage.service";
-import { getCurrentMonthStart } from "../utils/dateUtils";
-import { LicenseEnforcementRepository } from "./license-enforcement.repository";
+import {
+  type ILicenseEnforcementRepository,
+  LicenseEnforcementRepository,
+} from "./license-enforcement.repository";
 import type { MinimalUser } from "./license-enforcement.service";
 
 /**
@@ -46,8 +48,7 @@ export interface UsageStats {
  */
 export class UsageStatsService {
   constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: LicenseEnforcementRepository,
+    private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
     private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
   ) {}
@@ -60,7 +61,6 @@ export class UsageStatsService {
     const traceUsageService = TraceUsageService.create(prisma);
     const repository = new LicenseEnforcementRepository(prisma);
     return new UsageStatsService(
-      prisma,
       repository,
       traceUsageService,
       dependencies.subscriptionHandler,
@@ -91,7 +91,7 @@ export class UsageStatsService {
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
-      this.getCurrentMonthCost(organizationId),
+      this.repository.getCurrentMonthCost(organizationId),
       this.subscriptionHandler.getActivePlan(organizationId, user),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
@@ -117,39 +117,6 @@ export class UsageStatsService {
       evaluatorsCount,
       evaluationsCreditUsed,
     };
-  }
-
-  /**
-   * Gets current month cost for an organization.
-   */
-  private async getCurrentMonthCost(organizationId: string): Promise<number> {
-    const projectIds = (
-      await this.prisma.project.findMany({
-        where: { team: { organizationId } },
-        select: { id: true },
-      })
-    ).map((project) => project.id);
-
-    return this.getCurrentMonthCostForProjects(projectIds);
-  }
-
-  /**
-   * Gets current month cost for a list of projects.
-   */
-  private async getCurrentMonthCostForProjects(
-    projectIds: string[],
-  ): Promise<number> {
-    return (
-      (
-        await this.prisma.cost.aggregate({
-          where: {
-            projectId: { in: projectIds },
-            createdAt: { gte: getCurrentMonthStart() },
-          },
-          _sum: { amount: true },
-        })
-      )._sum?.amount ?? 0
-    );
   }
 
   /**

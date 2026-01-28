@@ -1,38 +1,11 @@
 import { LicenseHandler, PUBLIC_KEY, UNLIMITED_PLAN } from "../../ee/licensing";
+import type { PlanInfo } from "../../ee/licensing/planInfo";
 import { createLicenseHandler } from "../../ee/licensing/server";
 import { env } from "../env.mjs";
 import { prisma } from "./db";
 
-export type PlanInfo = {
-  type: string;
-  name: string;
-  free: boolean;
-  trialDays?: number;
-  daysSinceCreation?: number;
-  overrideAddingLimitations?: boolean;
-  maxMembers: number;
-  maxMembersLite: number;
-  maxProjects: number;
-  maxMessagesPerMonth: number;
-  evaluationsCredit: number;
-  maxWorkflows: number;
-  maxPrompts: number;
-  maxEvaluators: number;
-  maxScenarios: number;
-  canPublish: boolean;
-  userPrice?: {
-    USD: number;
-    EUR: number;
-  };
-  tracesPrice?: {
-    USD: number;
-    EUR: number;
-  };
-  prices: {
-    USD: number;
-    EUR: number;
-  };
-};
+// Re-export PlanInfo from canonical location for backward compatibility
+export type { PlanInfo } from "../../ee/licensing/planInfo";
 
 // Singleton LicenseHandler instance for self-hosted deployments
 let licenseHandler: LicenseHandler | null = null;

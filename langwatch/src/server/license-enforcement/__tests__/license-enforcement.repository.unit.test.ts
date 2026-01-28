@@ -31,12 +31,16 @@ const createMockPrisma = () => ({
   },
   project: {
     count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
   },
   organizationUser: {
     count: vi.fn().mockResolvedValue(0),
   },
   batchEvaluation: {
     count: vi.fn().mockResolvedValue(0),
+  },
+  cost: {
+    aggregate: vi.fn().mockResolvedValue({ _sum: { amount: null } }),
   },
 });
 
@@ -282,6 +286,118 @@ describe("LicenseEnforcementRepository", () => {
 
       const call = mockPrisma.scenario.count.mock.calls[0]?.[0];
       expect(call?.where).not.toHaveProperty("archivedAt");
+    });
+  });
+
+  describe("getCurrentMonthCost", () => {
+    it("fetches project IDs and aggregates cost for current month", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1" },
+        { id: "proj-2" },
+      ]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: ["proj-1", "proj-2"] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(150.5);
+    });
+
+    it("returns zero when no cost data exists", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      expect(result).toBe(0);
+    });
+
+    it("returns zero when no projects exist", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+
+      const result = await repository.getCurrentMonthCost(organizationId);
+
+      // Should still call aggregate with empty array
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: [] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(0);
+    });
+
+    it("uses start of current month for date filter", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-03-20T15:30:00.000Z"));
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 100 } });
+
+      await repository.getCurrentMonthCost(organizationId);
+
+      const call = mockPrisma.cost.aggregate.mock.calls[0]?.[0];
+      const dateFilter = call?.where?.createdAt?.gte as Date;
+
+      expect(dateFilter.getFullYear()).toBe(2024);
+      expect(dateFilter.getMonth()).toBe(2); // March (0-indexed)
+      expect(dateFilter.getDate()).toBe(1);
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe("getCurrentMonthCostForProjects", () => {
+    it("aggregates cost for specified project IDs", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
+      const projectIds = ["proj-a", "proj-b", "proj-c"];
+
+      const result =
+        await repository.getCurrentMonthCostForProjects(projectIds);
+
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: projectIds },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(75.25);
+    });
+
+    it("returns zero when amount is null", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCostForProjects([
+        "proj-1",
+      ]);
+
+      expect(result).toBe(0);
+    });
+
+    it("handles empty project array", async () => {
+      mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
+
+      const result = await repository.getCurrentMonthCostForProjects([]);
+
+      expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: [] },
+          createdAt: { gte: expect.any(Date) },
+        },
+        _sum: { amount: true },
+      });
+      expect(result).toBe(0);
     });
   });
 });

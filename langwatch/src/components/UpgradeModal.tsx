@@ -3,16 +3,8 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "./ui/dialog";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../utils/tracking";
-import type { LimitType } from "../server/license-enforcement";
-
-const limitLabels: Record<LimitType, string> = {
-  workflows: "workflows",
-  prompts: "prompts",
-  evaluators: "evaluators",
-  scenarios: "scenarios",
-  projects: "projects",
-  members: "team members",
-};
+import { LIMIT_TYPE_LABELS } from "../server/license-enforcement/constants";
+import type { LimitType } from "../server/license-enforcement/types";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -53,7 +45,7 @@ export function UpgradeModal({
             {typeof max === "number" ? (
               <>
                 <Text>
-                  You've reached the limit of {max} {limitLabels[limitType]} on
+                  You've reached the limit of {max} {LIMIT_TYPE_LABELS[limitType]} on
                   your current plan.
                 </Text>
                 <Text color="gray.500">
@@ -62,7 +54,7 @@ export function UpgradeModal({
               </>
             ) : (
               <Text>
-                You've reached the limit of {limitLabels[limitType]} on your
+                You've reached the limit of {LIMIT_TYPE_LABELS[limitType]} on your
                 current plan.
               </Text>
             )}

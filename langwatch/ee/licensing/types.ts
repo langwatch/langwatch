@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "./planInfo";
 import type { LicenseError } from "./constants";
 
 /** Plan limits embedded within a license */

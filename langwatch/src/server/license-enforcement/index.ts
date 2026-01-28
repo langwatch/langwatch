@@ -7,6 +7,7 @@ import { LicenseEnforcementService } from "./license-enforcement.service";
 export { LicenseEnforcementService } from "./license-enforcement.service";
 export { LimitExceededError, ProjectNotFoundError } from "./errors";
 export { limitTypes, limitTypeSchema } from "./types";
+export { LIMIT_TYPE_LABELS, LIMIT_TYPE_DISPLAY_LABELS } from "./constants";
 export type { LimitType, LimitCheckResult } from "./types";
 export type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 export type { PlanProvider } from "./license-enforcement.service";

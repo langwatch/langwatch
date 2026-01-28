@@ -9,6 +9,9 @@ export type {
   ValidationResult,
 } from "./types";
 
+// PlanInfo type (client-safe, no server dependencies)
+export type { PlanInfo } from "./planInfo";
+
 // Constants
 export { FREE_PLAN, LICENSE_ERRORS, PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 export type { LicenseError } from "./constants";
@@ -40,3 +43,7 @@ export { signLicense, encodeLicenseKey, generateLicenseId } from "./signing";
 
 // Plan Templates
 export { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "./planTemplates";
+
+// Server-side factory (createLicenseHandler) is in ./server.ts to avoid
+// bundling Node.js-only dependencies (Elasticsearch, etc.) in client code.
+// Import from 'ee/licensing/server' for server-side usage.

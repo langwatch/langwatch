@@ -1,4 +1,4 @@
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "./planInfo";
 
 /**
  * Default limit for fields not present in older licenses.

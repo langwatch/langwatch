@@ -1,26 +1,25 @@
-import type { PlanInfo } from "~/server/subscriptionHandler";
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "./constants";
+import type { PlanInfo } from "./planInfo";
+import { resolvePlanDefaults } from "./defaults";
 import type { LicenseData } from "./types";
 
 export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
-  const { plan } = licenseData;
+  const resolved = resolvePlanDefaults(licenseData.plan);
 
   return {
-    type: plan.type,
-    name: plan.name,
+    type: resolved.type,
+    name: resolved.name,
     free: false, // Paid license = not a free tier
     overrideAddingLimitations: false, // Enforce limits, don't bypass
-    maxMembers: plan.maxMembers,
-    maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
-    maxProjects: plan.maxProjects,
-    maxMessagesPerMonth: plan.maxMessagesPerMonth,
-    evaluationsCredit: plan.evaluationsCredit,
-    maxWorkflows: plan.maxWorkflows,
-    // New fields with defaults for backward compatibility with existing licenses
-    maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
-    maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
-    maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,
-    canPublish: plan.canPublish,
+    maxMembers: resolved.maxMembers,
+    maxMembersLite: resolved.maxMembersLite,
+    maxProjects: resolved.maxProjects,
+    maxMessagesPerMonth: resolved.maxMessagesPerMonth,
+    evaluationsCredit: resolved.evaluationsCredit,
+    maxWorkflows: resolved.maxWorkflows,
+    maxPrompts: resolved.maxPrompts,
+    maxEvaluators: resolved.maxEvaluators,
+    maxScenarios: resolved.maxScenarios,
+    canPublish: resolved.canPublish,
     prices: {
       USD: 0,
       EUR: 0,

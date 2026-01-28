@@ -1,8 +1,66 @@
 import type { PlanInfo } from "../subscriptionHandler";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 import type { LimitCheckResult, LimitType } from "./types";
+import { limitTypes } from "./types";
 import { LimitExceededError } from "./errors";
-import { assertNever } from "../../utils/typescript";
+
+/**
+ * Configuration for a single limit type.
+ * Associates each LimitType with functions to get count and max.
+ */
+type LimitTypeConfig = {
+  getCount: (
+    repo: ILicenseEnforcementRepository,
+    orgId: string,
+  ) => Promise<number>;
+  getMax: (plan: PlanInfo) => number;
+};
+
+/**
+ * Mapping from LimitType to its configuration.
+ * Adding a new LimitType to the union requires adding it here (compile-time enforced).
+ *
+ * Open/Closed Principle (OCP): To add a new limit type:
+ * 1. Add the type to limitTypes array in types.ts
+ * 2. Add the configuration entry here
+ * No need to modify any switch statements.
+ */
+const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
+  workflows: {
+    getCount: (repo, orgId) => repo.getWorkflowCount(orgId),
+    getMax: (plan) => plan.maxWorkflows,
+  },
+  prompts: {
+    getCount: (repo, orgId) => repo.getPromptCount(orgId),
+    getMax: (plan) => plan.maxPrompts,
+  },
+  evaluators: {
+    getCount: (repo, orgId) => repo.getEvaluatorCount(orgId),
+    getMax: (plan) => plan.maxEvaluators,
+  },
+  scenarios: {
+    getCount: (repo, orgId) => repo.getScenarioCount(orgId),
+    getMax: (plan) => plan.maxScenarios,
+  },
+  projects: {
+    getCount: (repo, orgId) => repo.getProjectCount(orgId),
+    getMax: (plan) => plan.maxProjects,
+  },
+  members: {
+    getCount: (repo, orgId) => repo.getMemberCount(orgId),
+    getMax: (plan) => plan.maxMembers,
+  },
+};
+
+// Compile-time check: ensure all LimitTypes are covered in config
+// This will fail to compile if a LimitType is added but not configured
+type _AssertAllTypesConfigured = (typeof limitTypes)[number] extends keyof typeof LIMIT_TYPE_CONFIG
+  ? keyof typeof LIMIT_TYPE_CONFIG extends (typeof limitTypes)[number]
+    ? true
+    : never
+  : never;
+const _typeCheck: _AssertAllTypesConfigured = true;
+void _typeCheck; // Suppress unused variable warning
 
 /**
  * Minimal user type for plan resolution.
@@ -89,50 +147,22 @@ export class LicenseEnforcementService {
 
   /**
    * Gets the current count for a resource type.
-   * Exhaustive switch ensures all types are handled.
+   * Uses LIMIT_TYPE_CONFIG mapping for OCP compliance.
    */
   private async getCountForType(
     organizationId: string,
     limitType: LimitType,
   ): Promise<number> {
-    switch (limitType) {
-      case "workflows":
-        return this.repository.getWorkflowCount(organizationId);
-      case "prompts":
-        return this.repository.getPromptCount(organizationId);
-      case "evaluators":
-        return this.repository.getEvaluatorCount(organizationId);
-      case "scenarios":
-        return this.repository.getScenarioCount(organizationId);
-      case "projects":
-        return this.repository.getProjectCount(organizationId);
-      case "members":
-        return this.repository.getMemberCount(organizationId);
-      default:
-        return assertNever(limitType);
-    }
+    const config = LIMIT_TYPE_CONFIG[limitType];
+    return config.getCount(this.repository, organizationId);
   }
 
   /**
    * Gets the maximum allowed for a resource type from the plan.
-   * Exhaustive switch ensures all types are handled.
+   * Uses LIMIT_TYPE_CONFIG mapping for OCP compliance.
    */
   private getMaxForType(plan: PlanInfo, limitType: LimitType): number {
-    switch (limitType) {
-      case "workflows":
-        return plan.maxWorkflows;
-      case "prompts":
-        return plan.maxPrompts;
-      case "evaluators":
-        return plan.maxEvaluators;
-      case "scenarios":
-        return plan.maxScenarios;
-      case "projects":
-        return plan.maxProjects;
-      case "members":
-        return plan.maxMembers;
-      default:
-        return assertNever(limitType);
-    }
+    const config = LIMIT_TYPE_CONFIG[limitType];
+    return config.getMax(plan);
   }
 }

@@ -2,6 +2,37 @@ import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 
 /**
+ * Minimal interface for cost checking operations.
+ * Follows Interface Segregation Principle - callers only depend on what they need.
+ * Used by workers and API routes that just need to check cost limits.
+ */
+export interface ICostChecker {
+  getCurrentMonthCost(organizationId: string): Promise<number>;
+  maxMonthlyUsageLimit(organizationId: string): Promise<number>;
+}
+
+/**
+ * Factory function to create a minimal cost checker.
+ * Used by callers that only need cost checking (evaluate.ts, evaluationsWorker.ts, topicClustering.ts).
+ */
+export function createCostChecker(prisma: PrismaClient): ICostChecker {
+  const repository = new LicenseEnforcementRepository(prisma);
+  return {
+    getCurrentMonthCost: (organizationId: string) =>
+      repository.getCurrentMonthCost(organizationId),
+    /**
+     * Get the maximum monthly usage limit for the organization.
+     * FIXME: This was recently changed to return Infinity,
+     * but still takes the organizationId as a parameter.
+     *
+     * Either we remove the organizationId parameter from all the calls to this function,
+     * or we use to get the plan and return it correctly.
+     */
+    maxMonthlyUsageLimit: (_organizationId: string) => Promise.resolve(Infinity),
+  };
+}
+
+/**
  * Repository interface for license enforcement.
  * Defines the contract for counting resources - allows for easy testing
  * and follows Dependency Inversion Principle (DIP).
@@ -19,6 +50,8 @@ export interface ILicenseEnforcementRepository {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
+  getCurrentMonthCost(organizationId: string): Promise<number>;
+  getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
 
 /**
@@ -115,5 +148,37 @@ export class LicenseEnforcementRepository
         createdAt: { gte: startOfMonth },
       },
     });
+  }
+
+  /**
+   * Gets current month cost for an organization.
+   * Aggregates costs across all projects in the organization.
+   */
+  async getCurrentMonthCost(organizationId: string): Promise<number> {
+    const projectIds = (
+      await this.prisma.project.findMany({
+        where: { team: { organizationId } },
+        select: { id: true },
+      })
+    ).map((project) => project.id);
+
+    return this.getCurrentMonthCostForProjects(projectIds);
+  }
+
+  /**
+   * Gets current month cost for a list of projects.
+   */
+  async getCurrentMonthCostForProjects(projectIds: string[]): Promise<number> {
+    return (
+      (
+        await this.prisma.cost.aggregate({
+          where: {
+            projectId: { in: projectIds },
+            createdAt: { gte: getCurrentMonthStart() },
+          },
+          _sum: { amount: true },
+        })
+      )._sum?.amount ?? 0
+    );
   }
 }

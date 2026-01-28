@@ -1,3 +1,4 @@
+import { LIMIT_TYPE_LABELS } from "./constants";
 import type { LimitType } from "./types";
 
 /**
@@ -13,7 +14,7 @@ export class LimitExceededError extends Error {
     public readonly current: number,
     public readonly max: number,
   ) {
-    super(`You have reached the maximum number of ${limitType}`);
+    super(`You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`);
   }
 }
 

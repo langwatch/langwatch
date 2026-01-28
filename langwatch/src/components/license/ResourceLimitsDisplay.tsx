@@ -1,6 +1,7 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { ResourceLimitRow } from "./ResourceLimitRow";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "~/server/license-enforcement/constants";
 
 /** Resource keys that can be displayed in the limits component */
 export type ResourceKey =
@@ -14,15 +15,16 @@ export type ResourceKey =
   | "messagesPerMonth"
   | "evaluationsCredit";
 
-/** Display labels for each resource type */
+/**
+ * Display labels for each resource type.
+ * Uses LIMIT_TYPE_DISPLAY_LABELS for core limit types, with additional
+ * resource-specific labels that are used only in the usage display.
+ */
 export const RESOURCE_LABELS: Record<ResourceKey, string> = {
-  members: "Members",
+  // Core limit types - imported from centralized constants
+  ...LIMIT_TYPE_DISPLAY_LABELS,
+  // Extended resource types - only used in usage display (not for limit enforcement)
   membersLite: "Members Lite",
-  projects: "Projects",
-  prompts: "Prompts",
-  workflows: "Workflows",
-  scenarios: "Scenarios",
-  evaluators: "Evaluators",
   messagesPerMonth: "Messages/Month",
   evaluationsCredit: "Evaluations Credit",
 } as const;

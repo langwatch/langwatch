@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "./planInfo";
 import { FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";

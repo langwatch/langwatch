@@ -37,7 +37,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/api/routers/organization";
-import type { PlanInfo } from "../../server/subscriptionHandler";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 
 const selectOptions = [
