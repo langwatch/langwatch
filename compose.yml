@@ -12,6 +12,7 @@ services:
       LANGEVALS_ENDPOINT: http://langevals:5562
       INSTALL_METHOD: docker
       NODE_ENV: production
+      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
     env_file:
       - langwatch/.env
     pull_policy: always
