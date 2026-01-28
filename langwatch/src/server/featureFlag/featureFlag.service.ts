@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger";
 import { checkFlagEnvOverride } from "./envOverride";
@@ -114,6 +115,52 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const enabled = results.filter((r) => r.enabled).map((r) => r.flag);
     this.logger.info({ userId, projectId, organizationId, enabledFeatures: enabled }, "Project features resolved");
     return enabled;
+  }
+
+  /**
+   * Get all session features for a user (user-level and project-level).
+   * Fetches user's projects and checks feature flags for each.
+   */
+  async getSessionFeatures(
+    userId: string,
+    prisma: PrismaClient,
+  ): Promise<{
+    enabledFeatures: FrontendFeatureFlag[];
+    projectFeatures: Record<string, FrontendFeatureFlag[]>;
+  }> {
+    const userProjects = await prisma.project.findMany({
+      where: {
+        team: { members: { some: { userId } }, archivedAt: null },
+        archivedAt: null,
+      },
+      select: { id: true, team: { select: { organizationId: true } } },
+    });
+
+    const [enabledFeatures, projectResults] = await Promise.all([
+      this.getEnabledFrontendFeatures(userId),
+      Promise.all(
+        userProjects.map(async (project) => ({
+          projectId: project.id,
+          features: await this.getEnabledProjectFeatures(
+            userId,
+            project.id,
+            project.team.organizationId ?? undefined,
+          ),
+        })),
+      ),
+    ]);
+
+    this.logger.info(
+      { userId, projectCount: userProjects.length },
+      "Session features resolved",
+    );
+
+    return {
+      enabledFeatures,
+      projectFeatures: Object.fromEntries(
+        projectResults.map((r) => [r.projectId, r.features]),
+      ),
+    };
   }
 }
 

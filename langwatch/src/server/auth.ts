@@ -34,6 +34,27 @@ import { captureException } from "../utils/posthogErrorCapture";
 const logger = createLogger("langwatch:auth");
 
 /**
+ * Builds a session object with user features.
+ * Extracted to eliminate duplication between session callback code paths.
+ */
+const buildSessionWithFeatures = (
+  session: DefaultSession,
+  userId: string,
+  email: string | null,
+  enabledFeatures: FrontendFeatureFlag[],
+  projectFeatures: Record<string, FrontendFeatureFlag[]>,
+) => ({
+  ...session,
+  user: {
+    ...session.user,
+    id: userId,
+    email,
+    enabledFeatures,
+    projectFeatures,
+  },
+});
+
+/**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
  *
@@ -72,33 +93,6 @@ export const authOptions = (
         if (newSession) return newSession;
       }
 
-      const getProjectFeaturesForUser = async (
-        userId: string,
-      ): Promise<Record<string, FrontendFeatureFlag[]>> => {
-        const userProjects = await prisma.project.findMany({
-          where: {
-            team: { members: { some: { userId } }, archivedAt: null },
-            archivedAt: null,
-          },
-          select: { id: true, team: { select: { organizationId: true } } },
-        });
-
-        const projectResults = await Promise.all(
-          userProjects.map(async (project) => ({
-            projectId: project.id,
-            features: await featureFlagService.getEnabledProjectFeatures(
-              userId,
-              project.id,
-              project.team.organizationId,
-            ),
-          })),
-        );
-
-        return Object.fromEntries(
-          projectResults.map((r) => [r.projectId, r.features]),
-        );
-      };
-
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
           where: {
@@ -110,38 +104,56 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        const [enabledFeatures, projectFeatures] = await Promise.all([
-          featureFlagService.getEnabledFrontendFeatures(user_.id),
-          getProjectFeaturesForUser(user_.id),
-        ]);
+        let enabledFeatures: FrontendFeatureFlag[] = [];
+        let projectFeatures: Record<string, FrontendFeatureFlag[]> = {};
 
-        return {
-          ...session,
-          user: {
-            ...session.user,
-            id: user_.id,
-            email: user_.email,
-            enabledFeatures,
-            projectFeatures,
-          },
-        };
-      }
+        try {
+          const sessionFeatures = await featureFlagService.getSessionFeatures(
+            user_.id,
+            prisma,
+          );
+          enabledFeatures = sessionFeatures.enabledFeatures;
+          projectFeatures = sessionFeatures.projectFeatures;
+        } catch (error) {
+          logger.error(
+            { error, userId: user_.id },
+            "Failed to load feature flags for session",
+          );
+        }
 
-      const [enabledFeatures, projectFeatures] = await Promise.all([
-        featureFlagService.getEnabledFrontendFeatures(user.id),
-        getProjectFeaturesForUser(user.id),
-      ]);
-
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: user.id,
-          email: user.email,
+        return buildSessionWithFeatures(
+          session,
+          user_.id,
+          user_.email,
           enabledFeatures,
           projectFeatures,
-        },
-      };
+        );
+      }
+
+      let enabledFeatures: FrontendFeatureFlag[] = [];
+      let projectFeatures: Record<string, FrontendFeatureFlag[]> = {};
+
+      try {
+        const sessionFeatures = await featureFlagService.getSessionFeatures(
+          user.id,
+          prisma,
+        );
+        enabledFeatures = sessionFeatures.enabledFeatures;
+        projectFeatures = sessionFeatures.projectFeatures;
+      } catch (error) {
+        logger.error(
+          { error, userId: user.id },
+          "Failed to load feature flags for session",
+        );
+      }
+
+      return buildSessionWithFeatures(
+        session,
+        user.id,
+        user.email,
+        enabledFeatures,
+        projectFeatures,
+      );
     },
     signIn: async ({ user, account }) => {
       if (!user.email) {

@@ -77,6 +77,26 @@ We will expose feature flags to the frontend through the NextAuth session:
 - Session object grows slightly with `enabledFeatures` and `projectFeatures`
 - New pattern for frontend feature flags (may require documentation)
 
+## Default Value Strategy (Fail-Open vs Fail-Closed)
+
+The `isEnabled` method accepts a `defaultValue` parameter (defaults to `true`) that determines behavior when PostHog is unavailable or the flag doesn't exist.
+
+**Current usage patterns:**
+
+- `getEnabledFrontendFeatures` and `getEnabledProjectFeatures` pass `defaultValue = false` (fail-closed). New UI features stay hidden if PostHog fails.
+- The session callback wraps feature flag calls in try/catch, returning empty arrays on error. Users can still log in when PostHog is down.
+
+**When to use each default:**
+
+| Default | Use case |
+|---------|----------|
+| `false` (fail-closed) | New features, experimental UI, paid features, anything that should be off by default |
+| `true` (fail-open) | Killswitches that disable functionality when enabled (e.g., `feature-killswitch` should default to false/disabled) |
+
+**Error handling:**
+
+The session callback catches exceptions from feature flag calls and logs errors without blocking authentication. On failure, `enabledFeatures` and `projectFeatures` are empty arrays, gracefully hiding all feature-flagged UI.
+
 ## References
 
 - PostHog feature flags documentation
