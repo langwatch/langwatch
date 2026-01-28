@@ -305,9 +305,10 @@ export interface InitializeEventSourcingOptions {
 
 /**
  * Explicitly initialize event sourcing with provided clients.
- * Must be called during application startup before using pipelines.
+ * Should be called during application startup for predictable initialization.
  *
- * @throws Error if already initialized (call resetEventSourcingRuntime() first to re-initialize)
+ * This function is idempotent - if already initialized (either explicitly or via lazy init),
+ * it will log and return without error.
  *
  * @example
  * ```typescript
@@ -326,9 +327,8 @@ export function initializeEventSourcing(
   options: InitializeEventSourcingOptions,
 ): void {
   if (_runtime) {
-    throw new Error(
-      "Event sourcing already initialized. Call resetEventSourcingRuntime() first if re-initializing.",
-    );
+    logger.debug("Event sourcing already initialized, skipping");
+    return;
   }
   _runtime = new EventSourcingRuntime(
     createEventSourcingConfig({
@@ -367,15 +367,23 @@ export function initializeEventSourcingForTesting(): void {
 /**
  * Returns the singleton EventSourcingRuntime instance.
  *
- * @throws Error if not initialized. Call initializeEventSourcing() during app startup
- *         or initializeEventSourcingForTesting() in tests.
+ * Auto-initializes with default clients (ClickHouse and Redis) if not already initialized.
+ * This enables lazy initialization without requiring explicit startup configuration.
  */
 export function getEventSourcingRuntime(): EventSourcingRuntime {
   if (!_runtime) {
-    throw new Error(
-      "Event sourcing not initialized. Call initializeEventSourcing() during app startup " +
-        "or initializeEventSourcingForTesting() in tests.",
+    // Lazy initialization with default clients
+    // Import here to avoid circular dependencies
+    const { getClickHouseClient } = require("~/server/clickhouse/client");
+    const { connection: redis } = require("~/server/redis");
+
+    _runtime = new EventSourcingRuntime(
+      createEventSourcingConfig({
+        clickHouseClient: getClickHouseClient(),
+        redisConnection: redis,
+      }),
     );
+    logger.info("Event sourcing auto-initialized via getEventSourcingRuntime()");
   }
   return _runtime;
 }
