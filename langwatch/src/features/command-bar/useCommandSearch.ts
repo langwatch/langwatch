@@ -1,130 +1,49 @@
 import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
-import {
-  Bot,
-  BookText,
-  ListTree,
-  Percent,
-  Table,
-  Workflow,
-  Play,
-  Bell,
-  FlaskConical,
-} from "lucide-react";
+import { Bot, BookText, Percent, Table, Workflow } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { api } from "~/utils/api";
 import type { SearchResult } from "./types";
 import { SEARCH_DEBOUNCE_MS, MIN_SEARCH_QUERY_LENGTH } from "./constants";
-
-/**
- * Entity ID prefixes for direct navigation.
- * Maps prefix to entity type and path builder.
- */
-const ENTITY_PREFIXES: Record<
-  string,
-  {
-    type: SearchResult["type"];
-    icon: SearchResult["icon"];
-    label: string;
-    pathBuilder: (id: string, projectSlug: string) => string;
-  }
-> = {
-  agent_: {
-    type: "agent",
-    icon: Bot,
-    label: "Agent",
-    pathBuilder: (id, p) =>
-      `/${p}/agents?drawer.open=agentViewer&drawer.agentId=${id}`,
-  },
-  dataset_: {
-    type: "dataset",
-    icon: Table,
-    label: "Dataset",
-    pathBuilder: (id, p) => `/${p}/datasets/${id}`,
-  },
-  evaluator_: {
-    type: "evaluator",
-    icon: Percent,
-    label: "Evaluator",
-    pathBuilder: (id, p) =>
-      `/${p}/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=${id}`,
-  },
-  experiment_: {
-    type: "workflow",
-    icon: FlaskConical,
-    label: "Experiment",
-    pathBuilder: (id, p) => `/${p}/experiments/${id}`,
-  },
-  prompt_: {
-    type: "prompt",
-    icon: BookText,
-    label: "Prompt",
-    pathBuilder: (id, p) => `/${p}/prompts?handle=${id}`,
-  },
-  workflow_: {
-    type: "workflow",
-    icon: Workflow,
-    label: "Workflow",
-    pathBuilder: (id, p) => `/${p}/workflows/${id}`,
-  },
-  scen_: {
-    type: "workflow",
-    icon: Play,
-    label: "Scenario",
-    pathBuilder: (id, p) => `/${p}/simulations/scenarios/${id}`,
-  },
-  monitor_: {
-    type: "workflow",
-    icon: Bell,
-    label: "Trigger",
-    pathBuilder: (id, p) => `/${p}/triggers/${id}`,
-  },
-};
-
-// OpenTelemetry trace ID format (128-bit hex)
-const OTEL_TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
-// OpenTelemetry span ID format (64-bit hex)
-const OTEL_SPAN_ID_REGEX = /^[0-9a-f]{16}$/i;
-// Prefixed trace format
-const TRACE_PREFIX_REGEX = /^trace_/i;
-// Prefixed span format
-const SPAN_PREFIX_REGEX = /^span_/i;
+import {
+  findEntityByPrefix,
+  isTraceId,
+  isSpanId,
+  traceIcon,
+} from "./entityRegistry";
 
 /**
  * Detect if the query is an entity ID and return navigation info.
+ * Exported for testing.
  */
-function detectEntityId(
+export function detectEntityId(
   query: string,
   projectSlug: string
 ): SearchResult | null {
   const trimmedQuery = query.trim();
   if (!trimmedQuery || !projectSlug) return null;
 
-  // Check KSUID-prefixed entities
-  for (const [prefix, config] of Object.entries(ENTITY_PREFIXES)) {
-    if (trimmedQuery.startsWith(prefix)) {
-      return {
-        id: `id-${trimmedQuery}`,
-        label: `Go to ${config.label}`,
-        description: trimmedQuery,
-        icon: config.icon,
-        path: config.pathBuilder(trimmedQuery, projectSlug),
-        type: config.type,
-      };
-    }
+  // Check KSUID-prefixed entities using the registry
+  const entityConfig = findEntityByPrefix(trimmedQuery);
+  if (entityConfig) {
+    return {
+      id: `id-${trimmedQuery}`,
+      label: `Go to ${entityConfig.label}`,
+      description: trimmedQuery,
+      icon: entityConfig.icon,
+      path: entityConfig.pathBuilder(trimmedQuery, projectSlug),
+      type: entityConfig.type,
+    };
   }
 
   // Check for trace ID patterns
-  if (
-    TRACE_PREFIX_REGEX.test(trimmedQuery) ||
-    OTEL_TRACE_ID_REGEX.test(trimmedQuery)
-  ) {
+  if (isTraceId(trimmedQuery)) {
     return {
       id: `trace-${trimmedQuery}`,
       label: "Open trace",
       description: trimmedQuery,
-      icon: ListTree,
+      icon: traceIcon,
       path: `/${projectSlug}/messages/${trimmedQuery}`,
       type: "trace",
       drawerAction: {
@@ -135,15 +54,12 @@ function detectEntityId(
   }
 
   // Check for span ID patterns
-  if (
-    SPAN_PREFIX_REGEX.test(trimmedQuery) ||
-    OTEL_SPAN_ID_REGEX.test(trimmedQuery)
-  ) {
+  if (isSpanId(trimmedQuery)) {
     return {
       id: `span-${trimmedQuery}`,
       label: "Find span in traces",
       description: trimmedQuery,
-      icon: ListTree,
+      icon: traceIcon,
       path: `/${projectSlug}/messages?query=${encodeURIComponent(trimmedQuery)}`,
       type: "trace",
     };

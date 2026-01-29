@@ -1,48 +1,27 @@
 import { describe, it, expect } from "vitest";
+import { detectEntityId } from "../useCommandSearch";
 
 /**
  * Tests for entity ID detection in command search.
- * These test the parsing logic without requiring API mocking.
+ * Uses the actual detectEntityId function for DRY compliance.
  */
-describe("useCommandSearch ID detection", () => {
-  // Entity ID prefixes
-  const ENTITY_PREFIXES = [
-    "agent_",
-    "dataset_",
-    "evaluator_",
-    "experiment_",
-    "prompt_",
-    "workflow_",
-    "scen_",
-    "monitor_",
-  ];
+describe("detectEntityId", () => {
+  const PROJECT_SLUG = "test-project";
 
-  // Regex patterns
-  const OTEL_TRACE_ID_REGEX = /^[0-9a-f]{32}$/i;
-  const OTEL_SPAN_ID_REGEX = /^[0-9a-f]{16}$/i;
-  const TRACE_PREFIX_REGEX = /^trace_/i;
-  const SPAN_PREFIX_REGEX = /^span_/i;
+  /**
+   * Helper to extract the type from detectEntityId result.
+   * Returns "entity" for KSUID-prefixed items, or the actual type for traces/spans.
+   */
+  function detectIdType(query: string): "entity" | "trace" | "span" | null {
+    const result = detectEntityId(query, PROJECT_SLUG);
+    if (!result) return null;
 
-  function detectIdType(
-    query: string
-  ): "entity" | "trace" | "span" | null {
-    const trimmed = query.trim();
-    if (!trimmed) return null;
+    // KSUID-prefixed entities have id starting with "id-"
+    if (result.id.startsWith("id-")) return "entity";
 
-    // Check KSUID prefixes
-    for (const prefix of ENTITY_PREFIXES) {
-      if (trimmed.startsWith(prefix)) return "entity";
-    }
-
-    // Check trace patterns
-    if (TRACE_PREFIX_REGEX.test(trimmed) || OTEL_TRACE_ID_REGEX.test(trimmed)) {
-      return "trace";
-    }
-
-    // Check span patterns
-    if (SPAN_PREFIX_REGEX.test(trimmed) || OTEL_SPAN_ID_REGEX.test(trimmed)) {
-      return "span";
-    }
+    // Trace and span types
+    if (result.id.startsWith("trace-")) return "trace";
+    if (result.id.startsWith("span-")) return "span";
 
     return null;
   }
@@ -60,6 +39,23 @@ describe("useCommandSearch ID detection", () => {
     ])("detects %s as %s", (input, expected) => {
       expect(detectIdType(input)).toBe(expected);
     });
+
+    it("builds correct path for agent", () => {
+      const result = detectEntityId("agent_abc123", PROJECT_SLUG);
+      expect(result?.path).toBe(
+        "/test-project/agents?drawer.open=agentViewer&drawer.agentId=agent_abc123"
+      );
+    });
+
+    it("builds correct path for dataset", () => {
+      const result = detectEntityId("dataset_xyz789", PROJECT_SLUG);
+      expect(result?.path).toBe("/test-project/datasets/dataset_xyz789");
+    });
+
+    it("returns correct label format", () => {
+      const result = detectEntityId("agent_abc123", PROJECT_SLUG);
+      expect(result?.label).toBe("Go to Agent");
+    });
   });
 
   describe("trace ID detection", () => {
@@ -73,6 +69,19 @@ describe("useCommandSearch ID detection", () => {
 
     it("is case insensitive for OTEL format", () => {
       expect(detectIdType("0123456789ABCDEF0123456789ABCDEF")).toBe("trace");
+    });
+
+    it("includes drawerAction for traces", () => {
+      const result = detectEntityId("trace_abc123", PROJECT_SLUG);
+      expect(result?.drawerAction).toEqual({
+        drawer: "traceDetails",
+        params: { traceId: "trace_abc123" },
+      });
+    });
+
+    it("builds correct path for trace", () => {
+      const result = detectEntityId("trace_abc123", PROJECT_SLUG);
+      expect(result?.path).toBe("/test-project/messages/trace_abc123");
     });
   });
 
@@ -88,23 +97,39 @@ describe("useCommandSearch ID detection", () => {
     it("is case insensitive for OTEL format", () => {
       expect(detectIdType("0123456789ABCDEF")).toBe("span");
     });
+
+    it("builds correct path for span (search query)", () => {
+      const result = detectEntityId("span_abc123", PROJECT_SLUG);
+      expect(result?.path).toBe(
+        "/test-project/messages?query=span_abc123"
+      );
+    });
+
+    it("does not include drawerAction for spans", () => {
+      const result = detectEntityId("span_abc123", PROJECT_SLUG);
+      expect(result?.drawerAction).toBeUndefined();
+    });
   });
 
   describe("non-ID queries", () => {
     it("returns null for regular search queries", () => {
-      expect(detectIdType("my prompt")).toBeNull();
-      expect(detectIdType("test agent")).toBeNull();
-      expect(detectIdType("foo")).toBeNull();
+      expect(detectEntityId("my prompt", PROJECT_SLUG)).toBeNull();
+      expect(detectEntityId("test agent", PROJECT_SLUG)).toBeNull();
+      expect(detectEntityId("foo", PROJECT_SLUG)).toBeNull();
     });
 
     it("returns null for empty or whitespace", () => {
-      expect(detectIdType("")).toBeNull();
-      expect(detectIdType("   ")).toBeNull();
+      expect(detectEntityId("", PROJECT_SLUG)).toBeNull();
+      expect(detectEntityId("   ", PROJECT_SLUG)).toBeNull();
     });
 
     it("returns null for partial prefixes", () => {
-      expect(detectIdType("agent")).toBeNull();
-      expect(detectIdType("trace")).toBeNull();
+      expect(detectEntityId("agent", PROJECT_SLUG)).toBeNull();
+      expect(detectEntityId("trace", PROJECT_SLUG)).toBeNull();
+    });
+
+    it("returns null when projectSlug is empty", () => {
+      expect(detectEntityId("agent_abc123", "")).toBeNull();
     });
   });
 });
