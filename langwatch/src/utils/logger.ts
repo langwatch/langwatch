@@ -1,26 +1,11 @@
 import pino, { type LoggerOptions, type Logger as PinoLogger } from "pino";
 import { getContext } from "../server/context/contextProvider";
 
+// Initialize context provider registration (no-op if already done)
+// This ensures getLogContext is registered before any logger is created
+import "../server/context/init";
+
 const isBrowser = typeof window !== "undefined";
-const isNodeDev = !isBrowser && process.env.NODE_ENV !== "production";
-const otelEndpoint = !isBrowser
-  ? process.env.OTEL_EXPORTER_OTLP_ENDPOINT
-  : undefined;
-
-// Console level: WARN+ in dev by default, configurable
-const consoleLevel = !isBrowser
-  ? (process.env.PINO_CONSOLE_LEVEL ?? (isNodeDev ? "warn" : "info"))
-  : "info";
-
-// OTel level: DEBUG+ by default (or configurable)
-const otelLevel = !isBrowser
-  ? (process.env.PINO_OTEL_LEVEL ?? "debug")
-  : "debug";
-
-// Base level for the logger (lowest of console and otel levels to ensure all messages flow through)
-const baseLevel = !isBrowser
-  ? (process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "debug")
-  : "info";
 
 export interface CreateLoggerOptions {
   /**
@@ -32,96 +17,111 @@ export interface CreateLoggerOptions {
 }
 
 /**
- * Creates transport configuration for pino.
- * - Console: WARN+ in dev (via pino-pretty), INFO+ in prod (stdout)
- * - OTel: DEBUG+ to OTLP endpoint (when OTEL_EXPORTER_OTLP_ENDPOINT is set)
- */
-const getTransport = (): ReturnType<typeof pino.transport> | undefined => {
-  if (isBrowser) return undefined;
-
-  const targets: pino.TransportTargetOptions[] = [
-    // Console transport
-    {
-      target: isNodeDev ? "pino-pretty" : "pino/file",
-      options: isNodeDev
-        ? { colorize: true, minimumLevel: consoleLevel }
-        : { destination: 1 },
-      level: consoleLevel,
-    },
-  ];
-
-  // Add OTel transport if endpoint is configured
-  if (otelEndpoint) {
-    targets.push({
-      target: "pino-opentelemetry-transport",
-      options: {
-        loggerName: "langwatch-backend",
-        serviceVersion: process.env.npm_package_version ?? "1.0.0",
-        resourceAttributes: {
-          "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
-          "deployment.environment":
-            process.env.ENVIRONMENT ?? "development",
-        },
-      },
-      level: otelLevel,
-    });
-  }
-
-  return pino.transport({ targets });
-};
-
-/**
  * Creates a logger instance with the given name.
  *
- * By default, the logger automatically includes request context (traceId, spanId,
- * organizationId, projectId, userId) in all log entries when available via
- * AsyncLocalStorage. This enables automatic trace correlation.
+ * Server-side: Uses pino transports for console output and optional OTel export.
+ * Browser: Uses pino's browser mode with console output.
  *
- * Transport configuration:
- * - Console: WARN+ in dev (PINO_CONSOLE_LEVEL), INFO+ in prod
- * - OTel: DEBUG+ to OTLP endpoint (when OTEL_EXPORTER_OTLP_ENDPOINT is set)
+ * Environment variables:
+ * - PINO_CONSOLE_LEVEL: Console log level (default: "warn" in dev, "info" in prod)
+ * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
+ * - OTEL_EXPORTER_OTLP_ENDPOINT: Enable OTel log export to this endpoint
  *
  * @param name - Logger name (e.g., "langwatch:api:hono")
  * @param options - Optional configuration
- * @param options.disableContext - Set to true to disable automatic context injection
  */
 export const createLogger = (
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger => {
-  // Determine if we should use the mixin for context injection
-  const shouldInjectContext = !options?.disableContext && !isBrowser;
+  if (isBrowser) {
+    return pino({ name, level: "info", browser: { asObject: true } });
+  }
+
+  return createServerLogger(name, options);
+};
+
+function createServerLogger(
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger {
+  const isDevMode = process.env.NODE_ENV !== "production";
+  const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+
+  const consoleLevel =
+    process.env.PINO_CONSOLE_LEVEL ?? (isDevMode ? "warn" : "info");
+  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
+  const baseLevel =
+    process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "debug";
 
   const pinoOptions: LoggerOptions = {
     name,
-    // Set to lowest level - individual transports will filter
     level: baseLevel,
-    timestamp: isBrowser ? undefined : pino.stdTimeFunctions.isoTime,
-    browser: isBrowser ? { asObject: true } : undefined,
-    serializers: {
-      error: pino.stdSerializers.err,
-    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+    serializers: { error: pino.stdSerializers.err },
     formatters: {
-      bindings: (bindings) => {
-        return bindings;
-      },
-      level: (label) => {
-        return { level: label.toUpperCase() };
-      },
+      bindings: (bindings) => bindings,
+      level: (label) => ({ level: label.toUpperCase() }),
     },
-    // Use pino's built-in mixin to inject context into every log entry
-    mixin: shouldInjectContext ? () => getContext() : undefined,
+    mixin: options?.disableContext ? undefined : () => getContext(),
   };
 
-  const transport = getTransport();
+  const transport = buildTransport({ isDevMode, otelEndpoint, consoleLevel, otelLevel });
 
-  // Handle both ESM and CJS module formats
-  const pinoFactory =
-    typeof pino === "function"
-      ? pino
-      : (pino as unknown as { default: typeof pino }).default;
+  return pino(pinoOptions, transport);
+}
 
-  return pinoFactory(pinoOptions, transport);
-};
+function buildTransport(config: {
+  isDevMode: boolean;
+  otelEndpoint: string | undefined;
+  consoleLevel: string;
+  otelLevel: string;
+}) {
+  const { isDevMode, otelEndpoint, consoleLevel, otelLevel } = config;
+
+  const targets: pino.TransportTargetOptions[] = [
+    buildConsoleTransport(isDevMode, consoleLevel),
+  ];
+
+  if (otelEndpoint) {
+    targets.push(buildOtelTransport(otelLevel));
+  }
+
+  return pino.transport({ targets });
+}
+
+function buildConsoleTransport(
+  isDevMode: boolean,
+  level: string,
+): pino.TransportTargetOptions {
+  if (isDevMode) {
+    return {
+      target: require.resolve("pino-pretty"),
+      options: { colorize: true, minimumLevel: level },
+      level,
+    };
+  }
+
+  return {
+    target: require.resolve("pino/file"),
+    options: { destination: 1 },
+    level,
+  };
+}
+
+function buildOtelTransport(level: string): pino.TransportTargetOptions {
+  return {
+    target: require.resolve("pino-opentelemetry-transport"),
+    options: {
+      loggerName: "langwatch-backend",
+      serviceVersion: process.env.npm_package_version ?? "1.0.0",
+      resourceAttributes: {
+        "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+        "deployment.environment": process.env.ENVIRONMENT ?? "development",
+      },
+    },
+    level,
+  };
+}
 
 export type Logger = PinoLogger;
