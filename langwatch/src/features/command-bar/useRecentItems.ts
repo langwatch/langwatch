@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import type { RecentItem, RecentItemType } from "./types";
+import { MAX_RECENT_ITEMS } from "./constants";
 
 const STORAGE_KEY = "langwatch-recent-items";
-const MAX_ITEMS = 50;
 
 /**
  * Time groupings for recent items.
@@ -62,7 +62,7 @@ export function useRecentItems() {
         const updated = [newItem, ...filtered];
 
         // Prune to max items
-        return updated.slice(0, MAX_ITEMS);
+        return updated.slice(0, MAX_RECENT_ITEMS);
       });
     },
     [setRecentItems]

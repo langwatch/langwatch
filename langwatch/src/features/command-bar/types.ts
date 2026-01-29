@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { DrawerType } from "~/components/drawerRegistry";
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";
 
@@ -47,7 +48,7 @@ export interface SearchResult {
   type: "prompt" | "agent" | "dataset" | "workflow" | "evaluator" | "trace";
   /** If set, opens a drawer instead of navigating */
   drawerAction?: {
-    drawer: string;
+    drawer: DrawerType;
     params: Record<string, string>;
   };
 }

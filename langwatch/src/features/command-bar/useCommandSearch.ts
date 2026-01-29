@@ -15,6 +15,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { api } from "~/utils/api";
 import type { SearchResult } from "./types";
+import { SEARCH_DEBOUNCE_MS, MIN_SEARCH_QUERY_LENGTH } from "./constants";
 
 /**
  * Entity ID prefixes for direct navigation.
@@ -161,8 +162,8 @@ export function useCommandSearch(query: string) {
   const projectSlug = project?.slug ?? "";
 
   // Debounce the query to prevent excessive filtering
-  const [debouncedQuery] = useDebounceValue(query, 300);
-  const shouldSearch = debouncedQuery.length >= 2;
+  const [debouncedQuery] = useDebounceValue(query, SEARCH_DEBOUNCE_MS);
+  const shouldSearch = debouncedQuery.length >= MIN_SEARCH_QUERY_LENGTH;
 
   // Fetch all entities - queries only run when project is available
   const { data: prompts, isLoading: promptsLoading } =
@@ -191,7 +192,7 @@ export function useCommandSearch(query: string) {
 
   // Detect ID-based navigation (immediate, no debounce needed)
   const idResult = useMemo<SearchResult | null>(() => {
-    if (query.trim().length < 2) return null;
+    if (query.trim().length < MIN_SEARCH_QUERY_LENGTH) return null;
     return detectEntityId(query, projectSlug);
   }, [query, projectSlug]);
 
