@@ -1,6 +1,18 @@
-import { Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+"use client";
+
+import {
+  Field,
+  HStack,
+  Portal,
+  Select,
+  Span,
+  Spinner,
+  Stack,
+  Text,
+  VStack,
+  createListCollection,
+} from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { toaster } from "../../components/ui/toaster";
 import type { TeamMemberWithUser } from "../../server/api/routers/organization";
@@ -124,7 +136,7 @@ export const TeamUserRoleField = ({
                 },
               }}
             />
-            {updateTeamMemberRoleMutation.isLoading && <Spinner size="sm" />}
+            {updateTeamMemberRoleMutation.isPending && <Spinner size="sm" />}
           </HStack>
         )}
       />
@@ -158,53 +170,65 @@ export const TeamRoleSelect = ({
     })),
   ];
 
+  const collection = createListCollection({
+    items: allRoleOptions,
+  });
+
   return (
-    <MultiSelect
-      {...field}
-      options={allRoleOptions}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          minWidth: "200px",
-        }),
+    <Select.Root
+      collection={collection}
+      size="sm"
+      width="220px"
+      value={field.value ? [field.value.value] : []}
+      onValueChange={({ value }) => {
+        const selectedOption = allRoleOptions.find(
+          (option) => option.value === value[0]
+        );
+        if (selectedOption) {
+          field.onChange(selectedOption);
+        }
       }}
-      useBasicStyles
-      isLoading={customRoles.isLoading}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "300px" },
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start" paddingY={1}>
-              <HStack>
-                <Text>{children}</Text>
-                {(props.data as RoleOption).isCustom && (
-                  <Text fontSize="xs" color="orange.500">
-                    Custom
-                  </Text>
-                )}
-              </HStack>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {(props.data as RoleOption).description}
-              </Text>
-            </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
+      positioning={{ sameWidth: false }}
+    >
+      <Select.HiddenSelect />
+      <Select.Control>
+        <Select.Trigger>
+          <Select.ValueText placeholder="Select role" />
+        </Select.Trigger>
+        <Select.IndicatorGroup>
+          {customRoles.isLoading ? (
+            <Spinner size="xs" />
+          ) : (
+            <Select.Indicator />
+          )}
+        </Select.IndicatorGroup>
+      </Select.Control>
+      <Portal>
+        <Select.Positioner>
+          <Select.Content minWidth="320px">
+            {allRoleOptions.map((role) => (
+              <Select.Item item={role} key={role.value}>
+                <Stack gap="0" maxWidth="280px">
+                  <HStack gap={2}>
+                    <Select.ItemText fontWeight="bold" wordBreak="break-word">
+                      {role.label}
+                    </Select.ItemText>
+                    {role.isCustom && (
+                      <Span fontSize="xs" color="orange.500" flexShrink={0}>
+                        Custom
+                      </Span>
+                    )}
+                  </HStack>
+                  <Span color="fg.muted" textStyle="xs" wordBreak="break-word">
+                    {role.description}
+                  </Span>
+                </Stack>
+                <Select.ItemIndicator />
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Positioner>
+      </Portal>
+    </Select.Root>
   );
 };
