@@ -26,6 +26,20 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when no env override is set", () => {
+      const originalEnvValue = process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED;
+
+      beforeEach(() => {
+        delete process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED;
+      });
+
+      afterEach(() => {
+        if (originalEnvValue === undefined) {
+          delete process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED;
+        } else {
+          process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = originalEnvValue;
+        }
+      });
+
       it("delegates to underlying service", async () => {
         const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
         vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);

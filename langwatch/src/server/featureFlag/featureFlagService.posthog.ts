@@ -76,6 +76,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.default": defaultValue,
           "feature.flag.project_id": options?.projectId ?? "",
           "feature.flag.organization_id": options?.organizationId ?? "",
+          "tenant.id": options?.projectId ?? "",
           "cache.redis_available": this.cache.isRedisAvailable(),
         },
       },
