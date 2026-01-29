@@ -143,6 +143,13 @@ export async function collectStorageStats(
   client: ClickHouseClient,
 ): Promise<void> {
   try {
+    interface TableStats {
+      table: string;
+      total_rows: string;
+      total_bytes: string;
+      parts_count: string;
+    }
+
     const result = await client.query({
       query: `
         SELECT
@@ -159,14 +166,7 @@ export async function collectStorageStats(
       query_params: { tables: MONITORED_TABLES },
     });
 
-    const rows = await result.json<{
-      data: Array<{
-        table: string;
-        total_rows: string;
-        total_bytes: string;
-        parts_count: string;
-      }>;
-    }>();
+    const rows = await result.json<TableStats>();
 
     for (const row of rows.data) {
       setClickHouseTableRows(row.table, parseInt(row.total_rows, 10));
