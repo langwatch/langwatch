@@ -115,11 +115,9 @@ describe("ClickHouse metrics", () => {
 
   describe("executeWithMetrics", () => {
     it("executes query and records success metrics", async () => {
-      const mockClient = {} as ClickHouseClient;
       const mockQueryFn = vi.fn().mockResolvedValue({ data: "result" });
 
       const result = await metrics.executeWithMetrics(
-        mockClient,
         mockQueryFn,
         "SELECT",
         "test_table"
@@ -130,12 +128,11 @@ describe("ClickHouse metrics", () => {
     });
 
     it("records error metrics on query failure", async () => {
-      const mockClient = {} as ClickHouseClient;
       const testError = new Error("Query failed");
       const mockQueryFn = vi.fn().mockRejectedValue(testError);
 
       await expect(
-        metrics.executeWithMetrics(mockClient, mockQueryFn, "INSERT", "events")
+        metrics.executeWithMetrics(mockQueryFn, "INSERT", "events")
       ).rejects.toThrow("Query failed");
 
       expect(mockQueryFn).toHaveBeenCalled();

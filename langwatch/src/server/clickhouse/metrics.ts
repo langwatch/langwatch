@@ -96,7 +96,6 @@ export const setClickHouseActiveConnections = (count: number) =>
  * Automatically records query duration and success/failure counts.
  */
 export async function executeWithMetrics<T>(
-  client: ClickHouseClient,
   queryFn: () => Promise<T>,
   queryType: "SELECT" | "INSERT" | "OTHER",
   table: string,
