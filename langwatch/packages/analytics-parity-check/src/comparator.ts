@@ -106,7 +106,7 @@ function compareTimeseriesResults(
             percentDiff: percentDiff(esValue, chValue),
           });
         }
-      } else if (esValue !== chValue) {
+      } else if (JSON.stringify(esValue) !== JSON.stringify(chValue)) {
         discrepancies.push({
           path: `currentPeriod[${i}].${key}`,
           esValue,
