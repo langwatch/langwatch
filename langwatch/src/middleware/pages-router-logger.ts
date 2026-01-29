@@ -4,6 +4,10 @@ import {
   createContextFromNextApiRequest,
   runWithContext,
 } from "../server/context/asyncContext";
+import {
+  hasAuthorizationToken,
+  logHttpRequest,
+} from "../server/middleware/requestLogging";
 
 const logger = createLogger("langwatch:pages-router:logger");
 
@@ -23,10 +27,10 @@ export function withPagesRouterLogger(
       // Extract basic request info
       const method = req.method ?? "UNKNOWN";
       const url = req.url ?? "";
-      const userAgent = req.headers["user-agent"] ?? "unknown";
+      const userAgent = req.headers["user-agent"] ?? null;
 
-      // Extract additional context based on path
-      const additionalContext = extractContextFromPath(req);
+      // Extract additional context based on request
+      const extra = extractContextFromRequest(req);
 
       let error: Error | null = null;
 
@@ -38,47 +42,34 @@ export function withPagesRouterLogger(
         throw err;
       } finally {
         const duration = Date.now() - startTime;
-        const status = res.statusCode ?? 500;
+        const statusCode = res.statusCode ?? 500;
 
-        // Logger automatically includes context (traceId, spanId, etc.)
-        const logData: Record<string, unknown> = {
+        // Log the request
+        logHttpRequest(logger, {
           method,
           url,
-          statusCode: status,
+          statusCode,
           duration,
           userAgent,
-          ...additionalContext,
-        };
-
-        if (error) {
-          logData.error = error;
-          logger.error(logData, "error handling request");
-        } else {
-          logger.info(logData, "request handled");
-        }
+          error: error ?? undefined,
+          extra,
+        });
       }
     });
   };
 }
 
-function extractContextFromPath(req: NextApiRequest): Record<string, unknown> {
+function extractContextFromRequest(
+  req: NextApiRequest,
+): Record<string, unknown> {
   const url = req.url ?? "";
   const context: Record<string, unknown> = {};
 
-  // Extract auth token for logging (without exposing the full token)
-  const xAuthToken = req.headers["x-auth-token"];
-  const authHeader = req.headers.authorization;
-  const hasAuthToken = !!(
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null)
-  );
-
-  // Note: In Next.js middleware, we don't have access to user/project/org context
-  // like Hono does. These would need to be extracted in the actual route handlers.
-  // For now, we'll include basic auth information.
-  context.hasAuthToken = hasAuthToken;
+  // Check for auth token presence (without exposing the token value)
+  context.hasAuthToken = hasAuthorizationToken({
+    "x-auth-token": req.headers["x-auth-token"] as string | undefined,
+    authorization: req.headers.authorization,
+  });
 
   // Extract context based on path patterns
   if (url.startsWith("/api/collector")) {
