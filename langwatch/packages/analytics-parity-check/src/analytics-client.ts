@@ -725,7 +725,7 @@ export async function executeStructuredQueries(
       { metric: "performance.prompt_tokens", aggregation: "sum" },
       { metric: "performance.completion_tokens", aggregation: "sum" },
     ],
-    groupBy: "spans.model",
+    groupBy: "metadata.model",
     timeZone: "UTC",
   };
   const groupByModelResult = await queryTimeseries(baseUrl, apiKey, groupByModelInput);
@@ -757,7 +757,7 @@ export async function executeStructuredQueries(
   const groupBySpanTypeInput: TimeseriesInput = {
     ...sharedInput,
     series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
-    groupBy: "spans.type",
+    groupBy: "metadata.span_type",
     timeZone: "UTC",
   };
   const groupBySpanTypeResult = await queryTimeseries(baseUrl, apiKey, groupBySpanTypeInput);

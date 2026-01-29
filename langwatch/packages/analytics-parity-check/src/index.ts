@@ -129,6 +129,9 @@ async function main(): Promise<void> {
     console.log(`\n  Warning: Not all traces ingested. ES: ${pollResult.esCount}/${totalTraces}, CH: ${pollResult.chCount}/${totalTraces}`);
   }
 
+  console.log("\n  Waiting 30 seconds for analytics indexing...");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
+
   console.log("\n[4/4] Querying analytics from both projects...");
 
   console.log("\nQuerying ES project...");
