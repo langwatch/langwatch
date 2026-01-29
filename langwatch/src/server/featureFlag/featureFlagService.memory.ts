@@ -1,9 +1,6 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
-import type {
-  FeatureFlagOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import type { FeatureFlagServiceInterface } from "./types";
 
 /**
  * In-memory feature flag service with default values.
@@ -32,13 +29,11 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
 
   /**
    * Check if a feature flag is enabled.
-   * Note: options parameter is accepted for interface compatibility but ignored.
    */
   async isEnabled(
     flagKey: string,
     distinctId: string,
     defaultValue = true,
-    _options?: FeatureFlagOptions,
   ): Promise<boolean> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServiceMemory.isEnabled",

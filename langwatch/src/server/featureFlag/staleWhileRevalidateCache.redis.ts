@@ -8,31 +8,8 @@ interface CacheEntry {
 }
 
 /**
- * Hybrid Redis/in-memory cache with stale-while-revalidate pattern.
- *
- * This cache provides fast, resilient caching for feature flags with automatic
- * fallback from Redis to in-memory storage when Redis is unavailable.
- *
- * ## Cache Strategy
- *
- * 1. **Redis first**: When available, uses Redis for cross-instance cache sharing
- * 2. **Memory fallback**: Falls back to in-memory TtlCache when Redis is down
- * 3. **Stale-while-revalidate**: Returns cached data immediately, refreshes in background
- *
- * ## Key Structure
- *
- * Redis keys are prefixed with `feature_flag:` followed by a composite key:
- * `{flagKey}:{distinctId}:{projectId}:{organizationId}`
- *
- * ## TTL Configuration
- *
- * The cache uses a 5-second TTL (see `FEATURE_FLAG_CACHE_TTL_MS`) which provides:
- * - Fast kill switch response (changes propagate within 5 seconds)
- * - Reduced PostHog API calls (one call per 5 seconds per unique key)
- * - Resilience to PostHog outages (serves cached values while down)
- *
- * @see docs/adr/005-feature-flags.md for architecture decisions
- * @see FEATURE_FLAG_CACHE_TTL_MS for TTL configuration
+ * Hybrid cache with stale-while-revalidate pattern.
+ * Always returns cached data immediately, but refreshes in background when stale, rapido.
  */
 export class StaleWhileRevalidateCache {
   private readonly staleThresholdMs: number; // How long before considering data stale
@@ -46,8 +23,8 @@ export class StaleWhileRevalidateCache {
     this.staleThresholdMs = staleThresholdMs;
     this.refreshThresholdMs = refreshThresholdMs;
 
-    // Memory cache TTL matches stale threshold
-    this.memoryCache = new TtlCache<CacheEntry>(staleThresholdMs);
+    // Keep entries in memory much longer than stale threshold for background refresh
+    this.memoryCache = new TtlCache<CacheEntry>(staleThresholdMs * 10);
   }
 
   async get(key: string): Promise<CacheEntry | undefined> {
@@ -57,7 +34,6 @@ export class StaleWhileRevalidateCache {
         const result = await redisConnection.get(`${this.prefix}${key}`);
         if (result !== null) {
           const entry: CacheEntry = JSON.parse(result);
-          // Redis TTL handles expiration, so if it exists it's valid
           return entry;
         }
       } catch (_error) {
@@ -66,13 +42,7 @@ export class StaleWhileRevalidateCache {
     }
 
     // Fall back to memory cache
-    const entry = this.memoryCache.get(key);
-    // Check if memory cache entry is stale
-    if (entry && this.isStale(entry)) {
-      this.memoryCache.delete(key);
-      return undefined;
-    }
-    return entry;
+    return this.memoryCache.get(key);
   }
 
   async set(key: string, value: boolean): Promise<void> {
@@ -84,11 +54,10 @@ export class StaleWhileRevalidateCache {
     // Try Redis first if available
     if (redisConnection && !isBuildOrNoRedis) {
       try {
-        // Store for stale threshold (convert ms to seconds)
-        const ttlSeconds = Math.ceil(this.staleThresholdMs / 1000);
+        // Store for much longer than stale threshold (24 hours for Redis)
         await redisConnection.setex(
           `${this.prefix}${key}`,
-          ttlSeconds,
+          24 * 60 * 60, // 24 hours
           JSON.stringify(entry),
         );
       } catch (_error) {

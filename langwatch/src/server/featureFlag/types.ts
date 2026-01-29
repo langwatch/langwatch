@@ -1,12 +1,4 @@
 /**
- * Options for feature flag evaluation.
- */
-export interface FeatureFlagOptions {
-  projectId?: string;
-  organizationId?: string;
-}
-
-/**
  * Common interface for feature flag services.
  */
 export interface FeatureFlagServiceInterface {
@@ -17,6 +9,5 @@ export interface FeatureFlagServiceInterface {
     flagKey: string,
     distinctId: string,
     defaultValue?: boolean,
-    options?: FeatureFlagOptions,
   ): Promise<boolean>;
 }

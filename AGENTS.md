@@ -65,7 +65,7 @@ specs/               # BDD feature specs
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
 | Shared types in `types.ts` | Colocate unless truly shared |
-| Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
+| Duplicating Zod + TS types | Zod only, use `infer` |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
 | Writing tests in the incorrect order | Outside-In TDD: examples drive E2E tests => then integration tests => then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
