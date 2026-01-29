@@ -25,6 +25,7 @@ import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
 import { dependencies } from "../injection/dependencies.client";
+import { CommandBarProvider } from "../features/command-bar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -1218,21 +1219,23 @@ const LangWatch: AppType<{
           <Head>
             <title>LangWatch</title>
           </Head>
-          <AnalyticsProvider
-            client={createAppAnalyticsClient({
-              isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-              posthogClient: postHog,
-            })}
-          >
-            {postHog ? (
-              <PostHogProvider client={postHog}>
+          <CommandBarProvider>
+            <AnalyticsProvider
+              client={createAppAnalyticsClient({
+                isSaaS: Boolean(publicEnv.data?.IS_SAAS),
+                posthogClient: postHog,
+              })}
+            >
+              {postHog ? (
+                <PostHogProvider client={postHog}>
+                  <Component {...pageProps} />
+                </PostHogProvider>
+              ) : (
                 <Component {...pageProps} />
-              </PostHogProvider>
-            ) : (
-              <Component {...pageProps} />
-            )}
-          </AnalyticsProvider>
-          <Toaster />
+              )}
+            </AnalyticsProvider>
+            <Toaster />
+          </CommandBarProvider>
 
           {dependencies.ExtraFooterComponents && (
             <dependencies.ExtraFooterComponents />
