@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { CornerDownLeft } from "lucide-react";
-import { formatTimeAgo } from "../formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { getIconInfo, type ListItem } from "../getIconInfo";
 
 interface CommandItemProps {
@@ -83,7 +83,7 @@ export function CommandItem({
       {/* Time ago for recent items */}
       {item.type === "recent" && (
         <Text fontSize="11px" color="fg.muted" flexShrink={0}>
-          {formatTimeAgo(item.data.accessedAt)}
+          {formatTimeAgoCompact(item.data.accessedAt)}
         </Text>
       )}
       {isSelected && (

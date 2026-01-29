@@ -11,6 +11,7 @@ interface Organization {
   name: string;
   teams: Array<{
     name: string;
+    members?: Array<unknown>;
     projects: Array<{
       slug: string;
       name: string;
@@ -49,6 +50,10 @@ export function useFilteredProjects(
 
     for (const org of organizations) {
       for (const team of org.teams) {
+        // Skip teams where user is not a member
+        const isTeamMember = team.members && team.members.length > 0;
+        if (!isTeamMember) continue;
+
         for (const proj of team.projects) {
           if (proj.slug === currentProjectSlug) continue;
 

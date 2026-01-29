@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { isToday, isYesterday, differenceInDays } from "date-fns";
 import type { RecentItem, RecentItemType } from "./types";
 import { RecentItemSchema } from "./types";
 import { MAX_RECENT_ITEMS } from "./constants";
@@ -22,15 +23,10 @@ export interface GroupedRecentItems {
  * Get the time group for a given timestamp.
  */
 function getTimeGroup(timestamp: number): TimeGroup {
-  const now = Date.now();
-  const hourMs = 60 * 60 * 1000;
-  const dayMs = 24 * hourMs;
-
-  const diff = now - timestamp;
-
-  if (diff < dayMs) return "today";
-  if (diff < 2 * dayMs) return "yesterday";
-  if (diff < 7 * dayMs) return "pastWeek";
+  const date = new Date(timestamp);
+  if (isToday(date)) return "today";
+  if (isYesterday(date)) return "yesterday";
+  if (differenceInDays(new Date(), date) < 7) return "pastWeek";
   return "past30Days";
 }
 

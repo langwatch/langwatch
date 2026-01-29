@@ -17,11 +17,15 @@ interface CommandBarResultsProps {
   filteredActions: Command[];
   filteredSupport: Command[];
   filteredTheme: Command[];
+  filteredPage: Command[];
   searchResults: SearchResult[];
   filteredProjects: FilteredProject[];
   searchInTracesItem: ListItem | null;
+  searchInDocsItem: ListItem | null;
   idResult: SearchResult | null;
   recentItemsLimited: RecentItem[];
+  mathResultItem: ListItem | null;
+  easterEggItem: ListItem | null;
   isLoading: boolean;
 }
 
@@ -48,11 +52,15 @@ export const CommandBarResults = forwardRef<
     filteredActions,
     filteredSupport,
     filteredTheme,
+    filteredPage,
     searchResults,
     filteredProjects,
     searchInTracesItem,
+    searchInDocsItem,
     idResult,
     recentItemsLimited,
+    mathResultItem,
+    easterEggItem,
     isLoading,
   },
   ref
@@ -81,6 +89,22 @@ export const CommandBarResults = forwardRef<
   // Build group configurations for query state
   const queryGroups = useMemo<GroupConfig[]>(() => {
     const groups: GroupConfig[] = [];
+
+    // Easter egg at the very top
+    if (easterEggItem) {
+      groups.push({
+        label: "Easter Egg",
+        items: [easterEggItem],
+      });
+    }
+
+    // Math result
+    if (mathResultItem) {
+      groups.push({
+        label: "Calculator",
+        items: [mathResultItem],
+      });
+    }
 
     if (idResult) {
       groups.push({
@@ -129,6 +153,16 @@ export const CommandBarResults = forwardRef<
       });
     }
 
+    if (filteredPage.length > 0) {
+      groups.push({
+        label: "Page Actions",
+        items: filteredPage.map((d) => ({
+          type: "command" as const,
+          data: d,
+        })),
+      });
+    }
+
     if (searchResults.length > 0) {
       groups.push({
         label: "Search Results",
@@ -156,16 +190,27 @@ export const CommandBarResults = forwardRef<
       });
     }
 
+    if (searchInDocsItem) {
+      groups.push({
+        label: "Search Docs",
+        items: [searchInDocsItem],
+      });
+    }
+
     return groups;
   }, [
+    easterEggItem,
+    mathResultItem,
     idResult,
     filteredNavigation,
     filteredActions,
     filteredSupport,
     filteredTheme,
+    filteredPage,
     searchResults,
     filteredProjects,
     searchInTracesItem,
+    searchInDocsItem,
   ]);
 
   const groups = query === "" ? emptyQueryGroups : queryGroups;

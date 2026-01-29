@@ -1,10 +1,12 @@
 import { useRouter } from "next/router";
 import { useTheme } from "next-themes";
+import { subDays } from "date-fns";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Dialog } from "~/components/ui/dialog";
+import { toaster } from "~/components/ui/toaster";
 import { useCommandBar } from "./CommandBarContext";
 import { useCommandSearch } from "./useCommandSearch";
 import { useRecentItems } from "./useRecentItems";
@@ -31,6 +33,104 @@ import {
   handleRecentItemSelect,
   handleProjectSelect,
 } from "./selectHandlers";
+import { findEasterEgg } from "./easterEggs";
+import { useEasterEggEffects } from "./effects/useEasterEggEffects";
+import type { NextRouter } from "next/router";
+
+/**
+ * Handle page-specific commands for the traces page.
+ */
+function handleTracesPageCommand(
+  commandId: string,
+  router: NextRouter,
+  close: () => void
+) {
+  switch (commandId) {
+    case "page-traces-view-list":
+      void router.push(
+        { query: { ...router.query, view: "list" } },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+    case "page-traces-view-table":
+      void router.push(
+        { query: { ...router.query, view: "table" } },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+    case "page-traces-date-7d": {
+      const end7d = new Date();
+      const start7d = subDays(end7d, 6);
+      void router.push(
+        {
+          query: {
+            ...router.query,
+            startDate: start7d.getTime().toString(),
+            endDate: end7d.getTime().toString(),
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+    }
+    case "page-traces-date-30d": {
+      const end30d = new Date();
+      const start30d = subDays(end30d, 29);
+      void router.push(
+        {
+          query: {
+            ...router.query,
+            startDate: start30d.getTime().toString(),
+            endDate: end30d.getTime().toString(),
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+    }
+    case "page-traces-date-today": {
+      const today = new Date();
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      void router.push(
+        {
+          query: {
+            ...router.query,
+            startDate: startOfDay.getTime().toString(),
+            endDate: today.getTime().toString(),
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+    }
+    case "page-traces-clear-filters":
+      // Keep only project and view params, remove filters
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: {
+            project: router.query.project,
+            ...(router.query.view ? { view: router.query.view } : {}),
+          },
+        },
+        undefined,
+        { shallow: true }
+      );
+      close();
+      break;
+  }
+}
 
 /**
  * CommandBar component - global Cmd+K command palette.
@@ -67,7 +167,14 @@ export function CommandBar() {
   );
 
   // Build flat list of all items for keyboard navigation
-  const { allItems, recentItemsLimited, searchInTracesItem } = useCommandBarItems(
+  const {
+    allItems,
+    recentItemsLimited,
+    searchInTracesItem,
+    searchInDocsItem,
+    mathResultItem,
+    easterEggItem,
+  } = useCommandBarItems(
     query,
     filteredCommands,
     filteredProjects,
@@ -76,6 +183,9 @@ export function CommandBar() {
     groupedItems,
     project?.slug
   );
+
+  // Easter egg effects
+  const { triggerEffect } = useEasterEggEffects();
 
   // Reset selection when results change
   useEffect(() => {
@@ -130,6 +240,35 @@ export function CommandBar() {
           return;
         }
 
+        // Handle easter eggs
+        if (cmd.id.startsWith("easter-")) {
+          const egg = findEasterEgg(query);
+          if (egg) {
+            triggerEffect(egg);
+            if (!egg.keepOpen) {
+              close();
+            }
+          }
+          return;
+        }
+
+        // Handle math result - copy to clipboard
+        if (cmd.id === "computed-math") {
+          const match = cmd.label.match(/= (.+)$/);
+          if (match?.[1]) {
+            void navigator.clipboard.writeText(match[1]);
+            toaster.create({ title: `Copied ${match[1]} to clipboard`, type: "info" });
+          }
+          close();
+          return;
+        }
+
+        // Handle page-specific commands (traces page)
+        if (cmd.id.startsWith("page-traces-")) {
+          handleTracesPageCommand(cmd.id, router, close);
+          return;
+        }
+
         handleCommandSelect(
           cmd,
           projectSlug,
@@ -151,7 +290,7 @@ export function CommandBar() {
         handleProjectSelect(item.data, ctx, addRecentItem);
       }
     },
-    [project?.slug, router, close, openDrawer, addRecentItem, setTheme]
+    [project?.slug, router, close, openDrawer, addRecentItem, setTheme, query, triggerEffect]
   );
 
   // Copy link to clipboard
@@ -222,11 +361,15 @@ export function CommandBar() {
           filteredActions={filteredCommands.actions}
           filteredSupport={filteredCommands.support}
           filteredTheme={filteredCommands.theme}
+          filteredPage={filteredCommands.page}
           searchResults={searchResults}
           filteredProjects={filteredProjects}
           searchInTracesItem={searchInTracesItem}
+          searchInDocsItem={searchInDocsItem}
           idResult={idResult}
           recentItemsLimited={recentItemsLimited}
+          mathResultItem={mathResultItem}
+          easterEggItem={easterEggItem}
           isLoading={searchLoading}
         />
 

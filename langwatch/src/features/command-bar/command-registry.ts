@@ -382,6 +382,15 @@ export const actionCommands: Command[] = [
  */
 export const supportCommands: Command[] = [
   {
+    id: "support-plans",
+    label: "View Plans",
+    description: "Manage subscription or license",
+    icon: CreditCard,
+    category: "actions",
+    keywords: ["plan", "upgrade", "subscription", "billing", "license", "pricing"],
+    // Path is set dynamically in useFilteredCommands based on IS_SAAS
+  },
+  {
     id: "action-open-chat",
     label: "Open Chat",
     description: "Chat with support",
