@@ -26,6 +26,12 @@ import {
 import { HintsSection } from "./components/HintsSection";
 import { CommandGroup } from "./components/CommandGroup";
 import type { ListItem } from "./getIconInfo";
+import {
+  handleCommandSelect,
+  handleSearchResultSelect,
+  handleRecentItemSelect,
+  handleProjectSelect,
+} from "./selectHandlers";
 
 /**
  * CommandBar component - global Cmd+K command palette.
@@ -216,124 +222,35 @@ export function CommandBar() {
     }
   }, [isOpen]);
 
-  // Handle item selection
+  // Handle item selection - delegates to focused handlers
   const handleSelect = useCallback(
     (item: ListItem, newTab = false) => {
       const projectSlug = project?.slug ?? "";
-
-      const navigate = (path: string) => {
-        if (newTab) {
-          window.open(path, "_blank");
-        } else {
-          void router.push(path);
-        }
-        close();
-      };
+      const ctx = { router, newTab, close };
 
       if (item.type === "command") {
-        const cmd = item.data;
-
-        if (cmd.category === "navigation" && cmd.path) {
-          // Extract parent context from description (e.g., "Settings → Teams" becomes "Settings")
-          const parentContext = cmd.description?.includes("→")
-            ? cmd.description.split("→")[0]?.trim()
-            : undefined;
-          addRecentItem({
-            id: cmd.id,
-            type: "page",
-            label: cmd.label,
-            description: parentContext,
-            path: cmd.path.replace("[project]", projectSlug),
-            iconName: cmd.id.replace("nav-", ""),
-            projectSlug,
-          });
-        }
-
-        if (cmd.path) {
-          const path = cmd.path.replace("[project]", projectSlug);
-          navigate(path);
-          return;
-        }
-
-        switch (cmd.id) {
-          case "action-new-agent":
-            close();
-            openDrawer("agentTypeSelector");
-            break;
-          case "action-new-evaluation":
-            navigate(`/${projectSlug}/evaluations/new`);
-            break;
-          case "action-new-prompt":
-            close();
-            openDrawer("promptEditor");
-            break;
-          case "action-new-dataset":
-            close();
-            openDrawer("addOrEditDataset");
-            break;
-          case "action-new-scenario":
-            navigate(`/${projectSlug}/simulations/scenarios`);
-            break;
-        }
+        handleCommandSelect(
+          item.data,
+          projectSlug,
+          ctx,
+          addRecentItem,
+          openDrawer
+        );
       } else if (item.type === "search") {
-        // Check if this should open a drawer instead of navigating
-        if (item.data.drawerAction) {
-          addRecentItem({
-            id: item.data.id,
-            type: "trace",
-            label: item.data.label,
-            description: item.data.type === "trace" ? "Trace" : undefined,
-            path: item.data.path,
-            iconName: item.data.type,
-            projectSlug,
-          });
-          close();
-          openDrawer(item.data.drawerAction.drawer, item.data.drawerAction.params);
-        } else {
-          addRecentItem({
-            id: item.data.id,
-            type: "entity",
-            label: item.data.label,
-            path: item.data.path,
-            iconName: item.data.type,
-            projectSlug,
-          });
-          navigate(item.data.path);
-        }
+        handleSearchResultSelect(
+          item.data,
+          projectSlug,
+          ctx,
+          addRecentItem,
+          openDrawer
+        );
       } else if (item.type === "recent") {
-        addRecentItem({
-          id: item.data.id,
-          type: item.data.type,
-          label: item.data.label,
-          description: item.data.description,
-          path: item.data.path,
-          iconName: item.data.iconName,
-          projectSlug: item.data.projectSlug,
-        });
-        // Open traces in drawer, navigate for everything else
-        if (item.data.type === "trace") {
-          // Extract trace ID from path (e.g., "/project/messages/traceId")
-          const traceId = item.data.path.split("/").pop();
-          if (traceId) {
-            close();
-            openDrawer("traceDetails", { traceId });
-          }
-        } else {
-          navigate(item.data.path);
-        }
+        handleRecentItemSelect(item.data, ctx, addRecentItem, openDrawer);
       } else if (item.type === "project") {
-        addRecentItem({
-          id: `project-${item.data.slug}`,
-          type: "project",
-          label: item.data.name,
-          path: `/${item.data.slug}`,
-          iconName: "project",
-          projectSlug: item.data.slug,
-        });
-        navigate(`/${item.data.slug}`);
+        handleProjectSelect(item.data, ctx, addRecentItem);
       }
     },
-    [project?.slug, router, close, openDrawer, addRecentItem],
+    [project?.slug, router, close, openDrawer, addRecentItem]
   );
 
   // Copy link to clipboard
