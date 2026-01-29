@@ -21,7 +21,7 @@ export function getIconInfo(item: ListItem) {
 
   if (item.type === "command") {
     Icon = item.data.icon;
-    colorKey = item.data.id.replace("nav-", "").replace("action-new-", "");
+    colorKey = item.data.id.replace("nav-", "").replace("action-new-", "").replace("action-", "");
   } else if (item.type === "search") {
     Icon = item.data.icon;
     colorKey = item.data.type;

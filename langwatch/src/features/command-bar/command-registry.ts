@@ -1,16 +1,24 @@
 import {
+  Activity,
   Bell,
+  BookOpen,
   Bot,
   BookText,
+  Bug,
   CheckSquare,
   CreditCard,
   DollarSign,
   FileText,
   FlaskConical,
+  Github,
   Home,
   Inbox,
   Key,
+  Lightbulb,
   ListTree,
+  MessageCircle,
+  Monitor,
+  Moon,
   Pencil,
   Percent,
   Play,
@@ -18,6 +26,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Sun,
   Table,
   Tags,
   TrendingUp,
@@ -28,6 +37,11 @@ import {
   Building2,
 } from "lucide-react";
 import type { Command } from "./types";
+
+// Check if dark mode feature is enabled via build-time env var
+const isDarkModeEnabled =
+  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
+  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
 
 /**
  * Static navigation commands that map to main app routes.
@@ -364,6 +378,106 @@ export const actionCommands: Command[] = [
 ];
 
 /**
+ * Support/help commands that open external links.
+ */
+export const supportCommands: Command[] = [
+  {
+    id: "action-open-chat",
+    label: "Open Chat",
+    description: "Chat with support",
+    icon: MessageCircle,
+    category: "actions",
+    keywords: ["help", "support", "chat", "crisp", "contact"],
+  },
+  {
+    id: "action-docs",
+    label: "Documentation",
+    description: "Open LangWatch docs",
+    icon: BookOpen,
+    category: "actions",
+    keywords: ["docs", "help", "guide", "manual", "documentation"],
+    externalUrl: "https://docs.langwatch.ai",
+  },
+  {
+    id: "action-github",
+    label: "GitHub Support",
+    description: "Get help on GitHub",
+    icon: Github,
+    category: "actions",
+    keywords: ["github", "support", "help", "community"],
+    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/support",
+  },
+  {
+    id: "action-discord",
+    label: "Discord",
+    description: "Join our Discord community",
+    icon: MessageCircle,
+    category: "actions",
+    keywords: ["discord", "community", "chat", "help"],
+    externalUrl: "https://discord.gg/kT4PhDS2gH",
+  },
+  {
+    id: "action-status",
+    label: "Status Page",
+    description: "Check system status",
+    icon: Activity,
+    category: "actions",
+    keywords: ["status", "uptime", "health", "outage"],
+    externalUrl: "https://status.langwatch.ai/",
+  },
+  {
+    id: "action-feature-request",
+    label: "Feature Request",
+    description: "Request a new feature",
+    icon: Lightbulb,
+    category: "actions",
+    keywords: ["feature", "request", "idea", "suggestion"],
+    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/ideas",
+  },
+  {
+    id: "action-bug-report",
+    label: "Report a Bug",
+    description: "Report an issue",
+    icon: Bug,
+    category: "actions",
+    keywords: ["bug", "issue", "report", "problem", "error"],
+    externalUrl: "https://github.com/langwatch/langwatch/issues",
+  },
+];
+
+/**
+ * Theme switching commands (only available when dark mode is enabled).
+ */
+export const themeCommands: Command[] = isDarkModeEnabled
+  ? [
+      {
+        id: "action-theme-light",
+        label: "Light Theme",
+        description: "Switch to light mode",
+        icon: Sun,
+        category: "actions",
+        keywords: ["theme", "light", "mode", "bright", "day"],
+      },
+      {
+        id: "action-theme-dark",
+        label: "Dark Theme",
+        description: "Switch to dark mode",
+        icon: Moon,
+        category: "actions",
+        keywords: ["theme", "dark", "mode", "night"],
+      },
+      {
+        id: "action-theme-system",
+        label: "System Theme",
+        description: "Use system preference",
+        icon: Monitor,
+        category: "actions",
+        keywords: ["theme", "system", "auto", "default"],
+      },
+    ]
+  : [];
+
+/**
  * Top-level navigation command IDs (shown by default).
  */
 const topLevelNavIds = new Set([
@@ -395,6 +509,8 @@ export const topLevelNavigationCommands: Command[] = navigationCommands.filter(
 export const allStaticCommands: Command[] = [
   ...navigationCommands,
   ...actionCommands,
+  ...supportCommands,
+  ...themeCommands,
 ];
 
 /**

@@ -52,6 +52,7 @@ export function CommandItem({
   return (
     <HStack
       key={key}
+      data-index={index}
       px={4}
       py={1.5}
       cursor="pointer"

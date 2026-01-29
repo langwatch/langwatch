@@ -3,6 +3,8 @@ import {
   filterCommands,
   navigationCommands,
   actionCommands,
+  supportCommands,
+  themeCommands,
   allStaticCommands,
 } from "../command-registry";
 
@@ -99,9 +101,12 @@ describe("command-registry", () => {
   });
 
   describe("allStaticCommands", () => {
-    it("combines navigation and action commands", () => {
+    it("combines navigation, action, support, and theme commands", () => {
       expect(allStaticCommands.length).toBe(
-        navigationCommands.length + actionCommands.length
+        navigationCommands.length +
+          actionCommands.length +
+          supportCommands.length +
+          themeCommands.length
       );
     });
   });

@@ -52,12 +52,25 @@ export const iconColors: Record<string, string> = {
   evaluator: "red.400",
   project: "orange.300",
   // Phase 2: Trace and span types
+  "search-traces": "green.400",
   trace: "green.400",
   span: "green.300",
   "simulation-run": "purple.400",
   scenario: "purple.300",
   experiment: "teal.300",
   trigger: "orange.300",
+  // Support and help
+  "open-chat": "blue.400",
+  docs: "cyan.400",
+  github: "gray.400",
+  discord: "purple.400",
+  status: "green.400",
+  "feature-request": "yellow.400",
+  "bug-report": "red.400",
+  // Theme commands
+  "theme-light": "yellow.400",
+  "theme-dark": "purple.400",
+  "theme-system": "blue.400",
 };
 
 /**
@@ -87,14 +100,15 @@ export const HINTS = [
   "Expert Mode! Set up annotation queues for structured human review workflows.",
   "Bridge Builder! Integrate with LangChain, LangGraph, CrewAI and 15+ frameworks.",
   "Your House! Self-host LangWatch on Docker or Kubernetes for full data control.",
-  "Low Code! Connect n8n, Langflow, or Flowise for no-code LLM observability.",
 
   // Fun tips
+  "Dry January? Connect with your favourite no code platform such as n8n, Langflow, or Flowise.",
   "Token Hoarder? Check Analytics to see which prompts are burning through your budget.",
   "Deja Vu! Create Datasets from production traces to replay that one weird edge case.",
   "Trust Issues? Use guardrail Evaluators to keep your AI from going rogue.",
   "Enter the Matrix! Test your agent with a simulated users before real ones show up.",
   "New to LangWatch? Feel free to ask for help. We don't bite.",
+  "Did you know? Taylor Swift is one of the best artists of our generation.",
 ];
 
 // Layout constants

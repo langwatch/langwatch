@@ -182,7 +182,10 @@ export function useActivityTracker() {
         entityMatch = parseDrawerEntity(url, project.slug);
       }
 
-      if (!entityMatch) return;
+      if (!entityMatch) {
+        lastAddedRef.current = null; // Clear ref so revisits work
+        return;
+      }
 
       // Prevent adding the same item twice in quick succession
       const itemKey = `${entityMatch.type}-${entityMatch.id}`;
@@ -226,5 +229,5 @@ export function useActivityTracker() {
     return () => {
       router.events.off("routeChangeComplete", handleRouteChange);
     };
-  }, [router, project?.slug, trackRouteChange]);
+  }, [router, router.isReady, project?.slug, trackRouteChange]);
 }

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import type { RecentItem, RecentItemType } from "./types";
+import { RecentItemSchema } from "./types";
 import { MAX_RECENT_ITEMS } from "./constants";
 
 const STORAGE_KEY = "langwatch-recent-items";
@@ -10,7 +11,7 @@ const STORAGE_KEY = "langwatch-recent-items";
  */
 export type TimeGroup = "today" | "yesterday" | "pastWeek" | "past30Days";
 
-interface GroupedRecentItems {
+export interface GroupedRecentItems {
   today: RecentItem[];
   yesterday: RecentItem[];
   pastWeek: RecentItem[];
@@ -77,14 +78,18 @@ export function useRecentItems() {
 
   /**
    * Get recent items grouped by time period.
-   * Filters out items older than 30 days.
+   * Validates localStorage data and filters out items older than 30 days.
    */
   const groupedItems = useMemo<GroupedRecentItems>(() => {
+    // Validate localStorage data
+    const parseResult = RecentItemSchema.array().safeParse(recentItems);
+    const safeItems = parseResult.success ? parseResult.data : [];
+
     const now = Date.now();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
     // Filter out items older than 30 days
-    const validItems = recentItems.filter(
+    const validItems = safeItems.filter(
       (item) => now - item.accessedAt < thirtyDaysMs
     );
 

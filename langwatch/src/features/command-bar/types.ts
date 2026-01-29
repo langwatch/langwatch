@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { DrawerType } from "~/components/drawerRegistry";
+import { z } from "zod";
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";
 
@@ -13,31 +14,34 @@ export interface Command {
   shortcut?: string;
   /** Route path for navigation commands */
   path?: string;
+  /** External URL (opens in new tab) */
+  externalUrl?: string;
   /** Action function for action commands */
   action?: () => void;
 }
 
-export type RecentItemType =
-  | "page"
-  | "entity"
-  | "project"
-  | "trace"
-  | "span"
-  | "simulation-run";
+export const RecentItemTypeSchema = z.enum([
+  "page",
+  "entity",
+  "project",
+  "trace",
+  "span",
+  "simulation-run",
+]);
 
-export interface RecentItem {
-  id: string;
-  type: RecentItemType;
-  label: string;
-  /** Optional description for trace input preview, etc. */
-  description?: string;
-  path: string;
-  /** Icon component name for serialization */
-  iconName: string;
-  /** Unix timestamp */
-  accessedAt: number;
-  projectSlug?: string;
-}
+export const RecentItemSchema = z.object({
+  id: z.string(),
+  type: RecentItemTypeSchema,
+  label: z.string(),
+  description: z.string().optional(),
+  path: z.string(),
+  iconName: z.string(),
+  accessedAt: z.number(),
+  projectSlug: z.string().optional(),
+});
+
+export type RecentItemType = z.infer<typeof RecentItemTypeSchema>;
+export type RecentItem = z.infer<typeof RecentItemSchema>;
 
 export interface SearchResult {
   id: string;

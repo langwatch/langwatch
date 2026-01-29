@@ -155,8 +155,9 @@ export function handleRecentItemSelect(
 
   // Open traces in drawer, navigate for everything else
   if (item.type === "trace") {
-    // Extract trace ID from path (e.g., "/project/messages/traceId")
-    const traceId = item.path.split("/").pop();
+    // Extract trace ID from path (e.g., "/project/messages/traceId?tab=details")
+    const lastSegment = item.path.split("/").pop() ?? "";
+    const traceId = lastSegment.split("?")[0]?.split("#")[0];
     if (traceId) {
       ctx.close();
       openDrawer("traceDetails", { traceId });
