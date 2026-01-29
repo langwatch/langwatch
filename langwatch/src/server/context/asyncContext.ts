@@ -3,6 +3,7 @@ import { context as otContext, trace } from "@opentelemetry/api";
 import type { Context as HonoContext } from "hono";
 import type { NextRequest } from "next/server";
 import type { NextApiRequest } from "next";
+import { registerContextProvider } from "./contextProvider";
 
 /**
  * Request context that can be propagated across async boundaries.
@@ -221,3 +222,7 @@ function generateSpanId(): string {
     Math.floor(Math.random() * 16).toString(16),
   ).join("");
 }
+
+// Register the context provider for the logger to use
+// This must be done at module load time to ensure it's available
+registerContextProvider(getLogContext);
