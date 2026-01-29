@@ -1,6 +1,9 @@
-import { context as otContext, trace } from "@opentelemetry/api";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createLogger } from "../utils/logger";
+import {
+  createContextFromNextApiRequest,
+  runWithContext,
+} from "../server/context/asyncContext";
 
 const logger = createLogger("langwatch:pages-router:logger");
 
@@ -11,52 +14,50 @@ export function withPagesRouterLogger(
   ) => Promise<void | NextApiResponse>,
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    const startTime = Date.now();
+    // Create context from Next.js API request and run within it
+    const ctx = createContextFromNextApiRequest(req);
 
-    // Extract basic request info
-    const method = req.method ?? "UNKNOWN";
-    const url = req.url ?? "";
-    const userAgent = req.headers["user-agent"] ?? "unknown";
+    return runWithContext(ctx, async () => {
+      const startTime = Date.now();
 
-    // Extract additional context based on path
-    const additionalContext = extractContextFromPath(req);
+      // Extract basic request info
+      const method = req.method ?? "UNKNOWN";
+      const url = req.url ?? "";
+      const userAgent = req.headers["user-agent"] ?? "unknown";
 
-    let error: Error | null = null;
+      // Extract additional context based on path
+      const additionalContext = extractContextFromPath(req);
 
-    try {
-      // Execute the handler
-      await handler(req, res);
-    } catch (err) {
-      error = err as Error;
-      throw err;
-    } finally {
-      const duration = Date.now() - startTime;
-      const status = res.statusCode ?? 500;
+      let error: Error | null = null;
 
-      const logData: Record<string, unknown> = {
-        method,
-        url,
-        statusCode: status,
-        duration,
-        userAgent,
-        ...additionalContext,
-        traceId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return span?.spanContext().traceId ?? null;
-        })(),
-        spanId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return span?.spanContext().spanId ?? null;
-        })(),
-      };
+      try {
+        // Execute the handler
+        await handler(req, res);
+      } catch (err) {
+        error = err as Error;
+        throw err;
+      } finally {
+        const duration = Date.now() - startTime;
+        const status = res.statusCode ?? 500;
 
-      if (error) {
-        logData.error = error;
-        logger.error(logData, "error handling request");
-      } else {
-        logger.info(logData, "request handled");
+        // Logger automatically includes context (traceId, spanId, etc.)
+        const logData: Record<string, unknown> = {
+          method,
+          url,
+          statusCode: status,
+          duration,
+          userAgent,
+          ...additionalContext,
+        };
+
+        if (error) {
+          logData.error = error;
+          logger.error(logData, "error handling request");
+        } else {
+          logger.info(logData, "request handled");
+        }
       }
-    }
+    });
   };
 }
 
