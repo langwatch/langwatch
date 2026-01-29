@@ -120,11 +120,11 @@ export function OrganizationUserRoleField({
           </Select.Control>
           <Portal>
             <Select.Positioner>
-              <Select.Content minWidth="320px">
+              <Select.Content minWidth="320px" paddingY={1}>
                 {orgRoleOptions.map((role) => (
-                  <Select.Item item={role} key={role.value}>
-                    <Stack gap="0" maxWidth="280px">
-                      <Select.ItemText fontWeight="bold" wordBreak="break-word">
+                  <Select.Item item={role} key={role.value} paddingY={2.5}>
+                    <Stack gap="0.5" maxWidth="280px">
+                      <Select.ItemText fontWeight="500" wordBreak="break-word">
                         {role.label}
                       </Select.ItemText>
                       <Span color="fg.muted" textStyle="xs" wordBreak="break-word">

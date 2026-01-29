@@ -205,12 +205,12 @@ export const TeamRoleSelect = ({
       </Select.Control>
       <Portal>
         <Select.Positioner>
-          <Select.Content minWidth="320px">
+          <Select.Content minWidth="320px" paddingY={1}>
             {allRoleOptions.map((role) => (
-              <Select.Item item={role} key={role.value}>
-                <Stack gap="0" maxWidth="280px">
+              <Select.Item item={role} key={role.value} paddingY={2.5}>
+                <Stack gap="0.5" maxWidth="280px">
                   <HStack gap={2}>
-                    <Select.ItemText fontWeight="bold" wordBreak="break-word">
+                    <Select.ItemText fontWeight="500" wordBreak="break-word">
                       {role.label}
                     </Select.ItemText>
                     {role.isCustom && (
