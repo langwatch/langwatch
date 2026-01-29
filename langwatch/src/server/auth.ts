@@ -42,7 +42,6 @@ const buildSessionWithFeatures = (
   userId: string,
   email: string | null,
   enabledFeatures: FrontendFeatureFlag[],
-  projectFeatures: Record<string, FrontendFeatureFlag[]>,
 ) => ({
   ...session,
   user: {
@@ -50,7 +49,6 @@ const buildSessionWithFeatures = (
     id: userId,
     email,
     enabledFeatures,
-    projectFeatures,
   },
 });
 
@@ -65,7 +63,6 @@ declare module "next-auth" {
     user: DefaultSession["user"] & {
       id: string;
       enabledFeatures?: FrontendFeatureFlag[];
-      projectFeatures?: Record<string, FrontendFeatureFlag[]>;
     };
   }
 }
@@ -105,15 +102,12 @@ export const authOptions = (
         }
 
         let enabledFeatures: FrontendFeatureFlag[] = [];
-        let projectFeatures: Record<string, FrontendFeatureFlag[]> = {};
 
         try {
-          const sessionFeatures = await featureFlagService.getSessionFeatures(
+          enabledFeatures = await featureFlagService.getSessionFeatures(
             user_.id,
             prisma,
           );
-          enabledFeatures = sessionFeatures.enabledFeatures;
-          projectFeatures = sessionFeatures.projectFeatures;
         } catch (error) {
           logger.error(
             { error, userId: user_.id },
@@ -126,20 +120,16 @@ export const authOptions = (
           user_.id,
           user_.email,
           enabledFeatures,
-          projectFeatures,
         );
       }
 
       let enabledFeatures: FrontendFeatureFlag[] = [];
-      let projectFeatures: Record<string, FrontendFeatureFlag[]> = {};
 
       try {
-        const sessionFeatures = await featureFlagService.getSessionFeatures(
+        enabledFeatures = await featureFlagService.getSessionFeatures(
           user.id,
           prisma,
         );
-        enabledFeatures = sessionFeatures.enabledFeatures;
-        projectFeatures = sessionFeatures.projectFeatures;
       } catch (error) {
         logger.error(
           { error, userId: user.id },
@@ -152,7 +142,6 @@ export const authOptions = (
         user.id,
         user.email,
         enabledFeatures,
-        projectFeatures,
       );
     },
     signIn: async ({ user, account }) => {

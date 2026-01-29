@@ -117,16 +117,13 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   }
 
   /**
-   * Get all session features for a user (user-level and project-level).
-   * Fetches user's projects and checks feature flags for each.
+   * Get all session features for a user.
+   * Checks flags against all user's projects/orgs - if ANY match, flag is enabled.
    */
   async getSessionFeatures(
     userId: string,
     prisma: PrismaClient,
-  ): Promise<{
-    enabledFeatures: FrontendFeatureFlag[];
-    projectFeatures: Record<string, FrontendFeatureFlag[]>;
-  }> {
+  ): Promise<FrontendFeatureFlag[]> {
     const userProjects = await prisma.project.findMany({
       where: {
         team: { members: { some: { userId } }, archivedAt: null },
@@ -135,31 +132,38 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       select: { id: true, team: { select: { organizationId: true } } },
     });
 
-    const [enabledFeatures, projectResults] = await Promise.all([
-      this.getEnabledFrontendFeatures(userId),
-      Promise.all(
-        userProjects.map(async (project) => ({
-          projectId: project.id,
-          features: await this.getEnabledProjectFeatures(
-            userId,
-            project.id,
-            project.team.organizationId ?? undefined,
-          ),
-        })),
-      ),
-    ]);
+    // Check each flag against all user's project/org contexts
+    // If ANY context returns true, the flag is enabled
+    const enabledFlags = new Set<FrontendFeatureFlag>();
 
+    await Promise.all(
+      FRONTEND_FEATURE_FLAGS.map(async (flag) => {
+        // Check user-level first (no project context)
+        if (await this.isEnabled(flag, userId, false)) {
+          enabledFlags.add(flag);
+          return;
+        }
+
+        // Check each project context
+        for (const project of userProjects) {
+          if (await this.isEnabled(flag, userId, false, {
+            projectId: project.id,
+            organizationId: project.team.organizationId ?? undefined,
+          })) {
+            enabledFlags.add(flag);
+            return; // Found a match, no need to check more projects
+          }
+        }
+      }),
+    );
+
+    const enabledFeatures = Array.from(enabledFlags);
     this.logger.info(
-      { userId, projectCount: userProjects.length },
+      { userId, projectCount: userProjects.length, enabledFeatures },
       "Session features resolved",
     );
 
-    return {
-      enabledFeatures,
-      projectFeatures: Object.fromEntries(
-        projectResults.map((r) => [r.projectId, r.features]),
-      ),
-    };
+    return enabledFeatures;
   }
 }
 

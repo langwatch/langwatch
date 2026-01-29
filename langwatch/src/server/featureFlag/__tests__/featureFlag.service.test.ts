@@ -205,50 +205,52 @@ describe("FeatureFlagService", () => {
       };
     });
 
-    it("returns empty features when user has no projects", async () => {
+    it("returns empty array when user has no projects and no flags enabled", async () => {
       mockPrisma.project.findMany.mockResolvedValue([]);
-      vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([]);
+      vi.spyOn(service, "isEnabled").mockResolvedValue(false);
 
       const result = await service.getSessionFeatures(
         "user-123",
         mockPrisma as unknown as PrismaClient,
       );
 
-      expect(result).toEqual({
-        enabledFeatures: [],
-        projectFeatures: {},
-      });
+      expect(result).toEqual([]);
     });
 
-    it("returns user features and project features", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([
-        { id: "project-1", team: { organizationId: "org-1" } },
-        { id: "project-2", team: { organizationId: null } },
-      ]);
-      vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([
-        "release_ui_simulations_menu_enabled",
-      ]);
-      vi.spyOn(service, "getEnabledProjectFeatures")
-        .mockResolvedValueOnce(["release_ui_simulations_menu_enabled"])
-        .mockResolvedValueOnce([]);
+    it("returns flag when enabled at user level", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+      vi.spyOn(service, "isEnabled").mockResolvedValue(true);
 
       const result = await service.getSessionFeatures(
         "user-456",
         mockPrisma as unknown as PrismaClient,
       );
 
-      expect(result).toEqual({
-        enabledFeatures: ["release_ui_simulations_menu_enabled"],
-        projectFeatures: {
-          "project-1": ["release_ui_simulations_menu_enabled"],
-          "project-2": [],
-        },
-      });
+      expect(result).toContain("release_ui_simulations_menu_enabled");
+    });
+
+    it("returns flag when enabled for any project context", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "project-1", team: { organizationId: "org-1" } },
+        { id: "project-2", team: { organizationId: null } },
+      ]);
+      // First call: user-level check returns false
+      // Second call: project-1 context returns true
+      vi.spyOn(service, "isEnabled")
+        .mockResolvedValueOnce(false) // user-level
+        .mockResolvedValueOnce(true); // project-1 context
+
+      const result = await service.getSessionFeatures(
+        "user-456",
+        mockPrisma as unknown as PrismaClient,
+      );
+
+      expect(result).toContain("release_ui_simulations_menu_enabled");
     });
 
     it("queries projects with correct filters", async () => {
       mockPrisma.project.findMany.mockResolvedValue([]);
-      vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([]);
+      vi.spyOn(service, "isEnabled").mockResolvedValue(false);
 
       await service.getSessionFeatures(
         "user-789",
@@ -264,45 +266,52 @@ describe("FeatureFlagService", () => {
       });
     });
 
+    it("checks isEnabled with project and org context", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "project-1", team: { organizationId: "org-abc" } },
+      ]);
+      const isEnabledSpy = vi
+        .spyOn(service, "isEnabled")
+        .mockResolvedValue(false);
+
+      await service.getSessionFeatures(
+        "user-123",
+        mockPrisma as unknown as PrismaClient,
+      );
+
+      // Should be called with user-level check first (no options)
+      expect(isEnabledSpy).toHaveBeenCalledWith(
+        "release_ui_simulations_menu_enabled",
+        "user-123",
+        false,
+      );
+      // Then with project context
+      expect(isEnabledSpy).toHaveBeenCalledWith(
+        "release_ui_simulations_menu_enabled",
+        "user-123",
+        false,
+        { projectId: "project-1", organizationId: "org-abc" },
+      );
+    });
+
     it("passes organizationId as undefined when null", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "project-1", team: { organizationId: null } },
       ]);
-      vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([]);
-      const getProjectFeaturesSpy = vi
-        .spyOn(service, "getEnabledProjectFeatures")
-        .mockResolvedValue([]);
+      const isEnabledSpy = vi
+        .spyOn(service, "isEnabled")
+        .mockResolvedValue(false);
 
       await service.getSessionFeatures(
         "user-123",
         mockPrisma as unknown as PrismaClient,
       );
 
-      expect(getProjectFeaturesSpy).toHaveBeenCalledWith(
+      expect(isEnabledSpy).toHaveBeenCalledWith(
+        "release_ui_simulations_menu_enabled",
         "user-123",
-        "project-1",
-        undefined,
-      );
-    });
-
-    it("passes organizationId when present", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([
-        { id: "project-1", team: { organizationId: "org-abc" } },
-      ]);
-      vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([]);
-      const getProjectFeaturesSpy = vi
-        .spyOn(service, "getEnabledProjectFeatures")
-        .mockResolvedValue([]);
-
-      await service.getSessionFeatures(
-        "user-123",
-        mockPrisma as unknown as PrismaClient,
-      );
-
-      expect(getProjectFeaturesSpy).toHaveBeenCalledWith(
-        "user-123",
-        "project-1",
-        "org-abc",
+        false,
+        { projectId: "project-1", organizationId: undefined },
       );
     });
   });
