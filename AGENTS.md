@@ -51,7 +51,7 @@ specs/               # BDD feature specs
 
 ## Key References
 
-- `docs/CODING_STANDARDS.md` - clean code, SOLID principles
+- `docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
 - `docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
 - `docs/best_practices/` - language/framework conventions
 - `docs/adr/` - Architecture Decision Records
@@ -96,7 +96,7 @@ Implementation tasks use `/orchestrate` to manage the plan → code → review �
 
 The orchestrator:
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
-2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer agent)
+2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
 3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)
 4. Tracks progress via task status updates
 5. Does NOT read or write code directly
