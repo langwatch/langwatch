@@ -131,6 +131,18 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Labels/Tags
+    // SDK may send as langwatch.tags, normalize to langwatch.labels
+    // ─────────────────────────────────────────────────────────────────────────
+    const labels =
+      attrs.take(ATTR_KEYS.LANGWATCH_LABELS) ??
+      attrs.take(ATTR_KEYS.LANGWATCH_TAGS);
+    if (labels !== undefined) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_LABELS, labels);
+      ctx.recordRule(`${this.id}:labels`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Params (passthrough)
     // May be computed upstream
     // ─────────────────────────────────────────────────────────────────────────

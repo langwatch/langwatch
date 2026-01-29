@@ -172,14 +172,41 @@ const extractStatusInfo = (spans: NormalizedSpan[]): StatusInfo => {
       }
     }
 
+    const attrs = span.spanAttributes;
+
     // Check for error attributes if no error message from status
     if (!info.errorMessage) {
-      const attrs = span.spanAttributes;
       const errorMsg =
         attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
       if (typeof errorMsg === "string") {
         info.errorMessage = errorMsg;
         info.containsError = true;
+      }
+    }
+
+    // Check for error.has_error and span.error.has_error attributes
+    if (!info.containsError) {
+      const hasError =
+        attrs[ATTR_KEYS.ERROR_HAS_ERROR] ??
+        attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+      if (hasError === true || hasError === "true") {
+        info.containsError = true;
+      }
+    }
+
+    // Check span events for exception events (OTEL recordException)
+    if (!info.containsError && span.events?.length) {
+      for (const event of span.events) {
+        if (event.name === "exception") {
+          info.containsError = true;
+          if (!info.errorMessage) {
+            const exceptionMessage = event.attributes?.["exception.message"];
+            if (typeof exceptionMessage === "string") {
+              info.errorMessage = exceptionMessage;
+            }
+          }
+          break;
+        }
       }
     }
   }
@@ -319,6 +346,51 @@ const extractTraceAttributes = (
       !attributes["langgraph.thread_id"]
     ) {
       attributes["langgraph.thread_id"] = langgraphThreadId;
+    }
+
+    // Labels from span attributes - check langwatch.labels first
+    const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+    if (typeof labels === "string" && !attributes["langwatch.labels"]) {
+      attributes["langwatch.labels"] = labels;
+    }
+
+    // Also check metadata.labels attribute
+    const metadataLabels = spanAttrs["metadata.labels"];
+    if (typeof metadataLabels === "string" && !attributes["langwatch.labels"]) {
+      attributes["langwatch.labels"] = metadataLabels;
+    }
+
+    // Also check metadata JSON attribute (Python SDK sends labels this way)
+    // Parse JSON and expand subkeys to dot notation
+    // This hoists metadata from ANY span to trace summary attributes
+    const metadataJson = spanAttrs["metadata"];
+    if (typeof metadataJson === "string") {
+      try {
+        const parsed = JSON.parse(metadataJson) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const parsedObj = parsed as Record<string, unknown>;
+          // Extract labels specifically for langwatch.labels
+          if (
+            Array.isArray(parsedObj.labels) &&
+            !attributes["langwatch.labels"]
+          ) {
+            attributes["langwatch.labels"] = JSON.stringify(parsedObj.labels);
+          }
+          // Expand ALL subkeys to dot notation (e.g., metadata.thread_id, metadata.custom_field)
+          // This hoists metadata from span level to trace summary level
+          for (const [key, value] of Object.entries(parsedObj)) {
+            if (key !== "labels" && value !== null && value !== undefined) {
+              const dotKey = `metadata.${key}`;
+              if (!attributes[dotKey]) {
+                attributes[dotKey] =
+                  typeof value === "string" ? value : JSON.stringify(value);
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
     }
   }
 

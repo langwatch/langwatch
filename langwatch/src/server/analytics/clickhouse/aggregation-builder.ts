@@ -209,8 +209,8 @@ function getGroupByExpression(
 
     case "error.has_error":
       return {
-        column: `if(${ts}.ContainsErrorStatus = 1, 'with error', 'without error')`,
-        requiredJoins: [],
+        column: `if(${ss}.StatusCode = 2, 'with error', 'without error')`,
+        requiredJoins: ["stored_spans"],
       };
 
     default:
@@ -299,8 +299,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   }
 
   // Add groupBy column if present
+  // Use 'unknown' for null/empty values to match ES behavior (missing: "unknown")
   if (groupByColumn) {
-    selectExprs.push(`${groupByColumn} AS group_key`);
+    selectExprs.push(`if(${groupByColumn} = '' OR ${groupByColumn} IS NULL, 'unknown', ${groupByColumn}) AS group_key`);
   }
 
   // Add metric expressions
@@ -334,6 +335,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       ? `AND ${filterTranslation.whereClause}`
       : "";
 
+  // No HAVING filter needed - empty/null values are converted to 'unknown' above
+  // to match ES behavior (missing: "unknown")
+  const havingClause = "";
+
   // Build the complete SQL
   const sql = `
     SELECT
@@ -343,6 +348,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     WHERE ${baseWhere}
       ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
+    ${havingClause}
     ORDER BY period${input.timeScale !== "full" && typeof input.timeScale === "number" ? ", date" : ""}
   `;
 
