@@ -70,7 +70,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                 </Text>
               </HStack>
               <Progress.Root
-                value={usage.data.currentMonthMessagesCount}
+                value={Math.min(usage.data.currentMonthMessagesCount, usage.data.activePlan.maxMessagesPerMonth)}
                 max={usage.data.activePlan.maxMessagesPerMonth}
                 colorPalette="orange"
                 width="full"
