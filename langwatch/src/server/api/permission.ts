@@ -280,10 +280,6 @@ export const backendHasOrganizationPermission = async (
   );
 };
 
-/**
- * @deprecated Use `skipPermissionCheck` from `./rbac.ts` instead.
- * @see ./rbac.ts for documentation
- */
 export const skipPermissionCheck = ({
   ctx,
   next,
@@ -304,9 +300,6 @@ export const skipPermissionCheck = ({
   return next();
 };
 
-/**
- * @deprecated Use `skipPermissionCheckProjectCreation` from `./rbac.ts` instead.
- */
 export const skipPermissionCheckProjectCreation = ({
   ctx,
   next,
