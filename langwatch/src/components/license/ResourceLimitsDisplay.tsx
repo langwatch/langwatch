@@ -25,7 +25,7 @@ export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   // Core limit types - imported from centralized constants
   ...LIMIT_TYPE_DISPLAY_LABELS,
   // Extended resource types - only used in usage display (not for limit enforcement)
-  membersLite: "Members Lite",
+  membersLite: "Lite Members",
   messagesPerMonth: "Messages/Month",
   evaluationsCredit: "Evaluations Credit",
   // Note: "agents" is now in LIMIT_TYPE_DISPLAY_LABELS, no override needed

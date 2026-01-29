@@ -53,7 +53,7 @@ const selectOptions = [
     description: "Can manage their own projects and view other projects",
   },
   {
-    label: "Member Lite",
+    label: "Lite Member",
     value: OrganizationUserRole.EXTERNAL,
     description: "Can only view projects they are invited to, cannot see costs",
   },

@@ -31,9 +31,9 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
  * Classification rules:
  * - ADMIN or MEMBER roles are always FullMember
  * - EXTERNAL role with non-view permissions is FullMember (elevated to full access)
- * - EXTERNAL role with no permissions or view-only permissions is Member Lite
+ * - EXTERNAL role with no permissions or view-only permissions is Lite Member
  *
- * Note: The EXTERNAL enum value corresponds to "Member Lite" in user-facing terminology.
+ * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
  *
  * @param role - Organization user role (ADMIN, MEMBER, or EXTERNAL)
  * @param permissions - Optional array of permission strings from custom role
@@ -60,7 +60,7 @@ export function classifyMemberType(
     return "FullMember";
   }
 
-  // EXTERNAL role with no permissions or view-only permissions is Member Lite
+  // EXTERNAL role with no permissions or view-only permissions is Lite Member
   return "MemberLite";
 }
 
@@ -79,13 +79,13 @@ export function isFullMember(
 }
 
 /**
- * Checks if a member is a Member Lite based on role and permissions.
+ * Checks if a member is a Lite Member based on role and permissions.
  *
- * Member Lite users have the EXTERNAL role with view-only or no custom permissions.
+ * Lite Member users have the EXTERNAL role with view-only or no custom permissions.
  *
  * @param role - Organization user role
  * @param permissions - Optional array of permission strings from custom role
- * @returns true if the member is a Member Lite
+ * @returns true if the member is a Lite Member
  */
 export function isMemberLite(
   role: OrganizationUserRole,
@@ -96,8 +96,8 @@ export function isMemberLite(
 
 export type RoleChangeType =
   | "no-change" // Same member type
-  | "lite-to-full" // Member Lite → Full Member
-  | "full-to-lite"; // Full Member → Member Lite
+  | "lite-to-full" // Lite Member → Full Member
+  | "full-to-lite"; // Full Member → Lite Member
 
 /**
  * Determines if a role change would change the member type.

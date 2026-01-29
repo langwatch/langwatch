@@ -182,7 +182,7 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts Member Lite users in organization:
+   * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
    * - Pending invites (not expired) with EXTERNAL role AND (no custom role OR view-only custom role)
    */
