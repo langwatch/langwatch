@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock pino before importing logger
 vi.mock("pino", () => {
@@ -12,7 +12,7 @@ vi.mock("pino", () => {
     child: vi.fn(),
     level: "info",
   };
-  const pinoFn = vi.fn(() => mockLogger);
+  const pinoFn = vi.fn(() => mockLogger) as any;
   pinoFn.transport = vi.fn(() => ({}));
   pinoFn.stdTimeFunctions = { isoTime: () => ',"time":"2024-01-01T00:00:00Z"' };
   pinoFn.stdSerializers = { err: (e: Error) => ({ message: e.message }) };
@@ -90,13 +90,5 @@ describe("createLogger", () => {
     expect(typeof logger.error).toBe("function");
     expect(typeof logger.warn).toBe("function");
     expect(typeof logger.debug).toBe("function");
-  });
-});
-
-describe("Logger type", () => {
-  it("exports Logger type alias", async () => {
-    const { Logger } = await import("../logger");
-    // Type-only check - just verifying it compiles
-    expect(true).toBe(true);
   });
 });
