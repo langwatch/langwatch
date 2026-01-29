@@ -510,7 +510,7 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("organization:delete");
       });
 
-      it("should return limited permissions for Member Lite (EXTERNAL)", () => {
+      it("should return limited permissions for Lite Member (EXTERNAL)", () => {
         const permissions = getOrganizationRolePermissions(
           OrganizationUserRole.EXTERNAL,
         );

@@ -483,7 +483,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 onChange={(value) => handleInputChange("maxMembers", value)}
               />
               <NumberField
-                label="Max Members Lite"
+                label="Max Lite Members"
                 value={formData.maxMembersLite}
                 onChange={(value) => handleInputChange("maxMembersLite", value)}
               />

@@ -15,10 +15,10 @@ import {
  * These pure functions determine member types based on roles and permissions:
  * - isViewOnlyPermission: checks if a single permission is view-only
  * - isViewOnlyCustomRole: checks if all permissions in a role are view-only
- * - classifyMemberType: classifies as FullMember or MemberLite (Member Lite)
+ * - classifyMemberType: classifies as FullMember or MemberLite (Lite Member)
  * - isFullMember/isMemberLite: convenience predicates
  *
- * Note: The EXTERNAL enum value corresponds to "Member Lite" in user-facing terminology.
+ * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
  */
 
 describe("isViewOnlyPermission", () => {
@@ -126,14 +126,14 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
-    it("returns MemberLite for EXTERNAL role with no permissions (Member Lite)", () => {
+    it("returns MemberLite for EXTERNAL role with no permissions (Lite Member)", () => {
       expect(classifyMemberType(OrganizationUserRole.EXTERNAL, undefined)).toBe(
         "MemberLite"
       );
     });
   });
 
-  describe("EXTERNAL role (Member Lite) with custom permissions", () => {
+  describe("EXTERNAL role (Lite Member) with custom permissions", () => {
     it("returns MemberLite for view-only permissions", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])
@@ -289,7 +289,7 @@ describe("getRoleChangeType", () => {
       ).toBe("no-change");
     });
 
-    it("returns no-change when both roles are Member Lite (EXTERNAL to EXTERNAL)", () => {
+    it("returns no-change when both roles are Lite Member (EXTERNAL to EXTERNAL)", () => {
       expect(
         getRoleChangeType(
           OrganizationUserRole.EXTERNAL,

@@ -4,11 +4,11 @@ import type { ILicenseEnforcementRepository } from "./license-enforcement.reposi
 
 /**
  * Error messages for license limit violations.
- * Consistent wording using "Member Lite" (not "External").
+ * Consistent wording using "Lite Member" (not "External").
  */
 export const LICENSE_LIMIT_ERRORS = {
   FULL_MEMBER_LIMIT: "Cannot complete action: full member limit reached",
-  MEMBER_LITE_LIMIT: "Cannot complete action: Member Lite limit reached",
+  MEMBER_LITE_LIMIT: "Cannot complete action: Lite Member limit reached",
 } as const;
 
 /**
