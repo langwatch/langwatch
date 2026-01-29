@@ -12,10 +12,7 @@ import {
 } from "../../utils/constants";
 import { createLogger } from "../../utils/logger";
 import { getExtractedInput } from "../../utils/traceExtraction";
-import {
-  getCurrentMonthCost,
-  maxMonthlyUsageLimit,
-} from "../api/routers/limits";
+import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -50,10 +47,13 @@ export const clusterTopicsForProject = async (
   if (!project) {
     throw new Error("Project not found");
   }
-  const maxMonthlyUsage = await maxMonthlyUsageLimit(
+  const costChecker = createCostChecker(prisma);
+  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
     project.team.organizationId,
   );
-  const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
+  const getCurrentCost = await costChecker.getCurrentMonthCost(
+    project.team.organizationId,
+  );
   if (getCurrentCost >= maxMonthlyUsage) {
     logger.info(
       { projectId },

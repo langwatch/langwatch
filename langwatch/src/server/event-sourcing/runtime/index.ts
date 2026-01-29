@@ -6,13 +6,21 @@ export type { EventSourcingConfig } from "./config";
 export { createEventSourcingConfig } from "./config";
 export { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 export type { EventSourcing } from "./eventSourcing";
-export { eventSourcing } from "./eventSourcing";
+export {
+  getEventSourcing,
+  getTraceProcessingPipeline,
+  getEvaluationProcessingPipeline,
+} from "./eventSourcing";
 
 export {
   EventSourcingRuntime,
   getEventSourcingRuntime,
+  getEventSourcingRuntimeOrNull,
+  initializeEventSourcing,
+  initializeEventSourcingForTesting,
   resetEventSourcingRuntime,
 } from "./eventSourcingRuntime";
+export type { InitializeEventSourcingOptions } from "./eventSourcingRuntime";
 export type { PipelineBuilderOptions } from "./pipeline/builder";
 export { PipelineBuilder } from "./pipeline/builder";
 export type {

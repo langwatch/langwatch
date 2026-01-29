@@ -342,9 +342,14 @@ describe("PipelineBuilder Integration Tests", () => {
       // Spy on the prototype so it works with new instances
       const handleSpy = vi.spyOn(EventHandlerClass.prototype, "handle");
 
+      const tenantId = createTenantId("tenant-1");
       const events: TestEvent[] = [
-        createTestEventForBuilder("aggregate-1", createTenantId("tenant-1")),
+        createTestEventForBuilder("aggregate-1", tenantId),
       ];
+
+      // Mock getEvents to return the events when batch processor fetches them
+      const getEventsSpy = vi.spyOn(eventStore, "getEvents");
+      getEventsSpy.mockResolvedValue(events);
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
@@ -1081,10 +1086,8 @@ describe("PipelineBuilder Integration Tests", () => {
       const event2 = createTestEventForBuilder(aggregateId, tenantId);
       event2.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP + 1000;
 
-      // Store events
-      await eventStore.storeEvents([event1, event2], { tenantId }, "trace");
-
       // Process event1 - should succeed
+      // Note: pipeline.service.storeEvents stores the event AND dispatches to handlers
       await pipeline.service.storeEvents([event1], { tenantId });
 
       // Verify event1 was processed

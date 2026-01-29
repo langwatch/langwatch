@@ -26,6 +26,8 @@ export const evaluationProcessingPipelineDefinition =
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
     .withProjection("evaluationState", EvaluationStateProjectionHandler, {
+      // Dedupe by aggregate to process only the latest event per evaluation
+      deduplication: "aggregate",
       // Small delay to batch multiple rapid updates to the same evaluation
       delay: 500,
     })

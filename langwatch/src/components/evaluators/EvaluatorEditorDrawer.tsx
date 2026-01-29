@@ -28,6 +28,13 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import { toaster } from "~/components/ui/toaster";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
@@ -92,6 +99,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -161,6 +169,9 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // State for upgrade modal when limit is exceeded (handles race conditions)
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   // Update form defaults when evaluator type changes
   useEffect(() => {
@@ -218,6 +229,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         onClose();
       }
     },
+    onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "evaluators") {
+        setLimitInfo(limitExceeded);
+        setShowLimitModal(true);
+        return;
+      }
+      toaster.create({
+        title: "Error creating evaluator",
+        description: error.message,
+        type: "error",
+      });
+    },
   });
 
   const updateMutation = api.evaluators.update.useMutation({
@@ -258,6 +282,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     };
 
     if (evaluatorId) {
+      // Editing existing evaluator - no limit check needed
       updateMutation.mutate({
         id: evaluatorId,
         projectId: project.id,
@@ -265,11 +290,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         config,
       });
     } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: formValues.name.trim(),
-        type: "evaluator",
-        config,
+      // Creating new evaluator - check license limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: formValues.name.trim(),
+          type: "evaluator",
+          config,
+        });
       });
     }
   }, [
@@ -280,6 +308,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     form,
     createMutation,
     updateMutation,
+    checkAndProceed,
   ]);
 
   const handleClose = () => {
@@ -421,6 +450,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+      {upgradeModal}
+      <UpgradeModal
+        open={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        limitType="evaluators"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
     </Drawer.Root>
   );
 }

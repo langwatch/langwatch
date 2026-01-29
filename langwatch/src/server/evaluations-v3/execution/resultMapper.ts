@@ -53,6 +53,36 @@ export const isEvaluatorNode = (nodeId: string): boolean => {
 };
 
 /**
+ * Extracts target output from execution outputs.
+ *
+ * Strategy (OCP-compliant - handles new output formats without modification):
+ * 1. If outputs.output exists -> return it (backward compatible with prompts/signatures)
+ * 2. If outputs has exactly one key -> return that value (single custom field)
+ * 3. Otherwise -> return full outputs object (multiple custom fields like {result, reason})
+ *
+ * This allows Code Agents to return any output structure while maintaining
+ * backward compatibility with standard signature/prompt targets.
+ */
+export const extractTargetOutput = (
+  outputs: Record<string, unknown> | undefined,
+): unknown => {
+  if (!outputs) return undefined;
+
+  // Backward compatible: standard "output" field takes precedence
+  if ("output" in outputs) return outputs.output;
+
+  // Empty outputs
+  const keys = Object.keys(outputs);
+  if (keys.length === 0) return undefined;
+
+  // Single custom field: unwrap the value for cleaner display
+  if (keys.length === 1) return outputs[keys[0]!];
+
+  // Multiple fields: return full object (e.g., {result, reason})
+  return outputs;
+};
+
+/**
  * Maps a target completion event to a target_result SSE event.
  */
 export const mapTargetResult = (
@@ -80,7 +110,7 @@ export const mapTargetResult = (
     type: "target_result",
     rowIndex,
     targetId,
-    output: executionState.outputs?.output,
+    output: extractTargetOutput(executionState.outputs),
     cost: executionState.cost,
     duration,
     traceId: executionState.trace_id,

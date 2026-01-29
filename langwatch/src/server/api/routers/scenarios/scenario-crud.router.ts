@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -28,6 +29,9 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(createScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
+      // Enforce scenario limit before creation
+      await enforceLicenseLimit(ctx, input.projectId, "scenarios");
+
       const service = ScenarioService.create(ctx.prisma);
       return service.create({
         ...input,

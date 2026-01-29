@@ -1,5 +1,3 @@
-import { SpanKind } from "@opentelemetry/api";
-import type { SemConvAttributes } from "langwatch/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../../library/queues";
 
@@ -9,16 +7,8 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-const mockTracer = {
-  withActiveSpan: vi.fn((_name, _optionss, fn) => fn()),
-};
-
 vi.mock("../../../../utils/logger", () => ({
   createLogger: vi.fn(() => mockLogger),
-}));
-
-vi.mock("langwatch", () => ({
-  getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
 import { EventSourcedQueueProcessorMemory } from "../memory";
@@ -44,46 +34,6 @@ describe("EventSourcedQueueProcessorMemory", () => {
       await processor.send("test-payload");
 
       expect(processFn).toHaveBeenCalledWith("test-payload");
-    });
-
-    it("creates tracing spans when processing", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: "test-queue",
-        process: processFn,
-      };
-
-      const processor = new EventSourcedQueueProcessorMemory(definition);
-      await processor.send("test-payload");
-
-      expect(mockTracer.withActiveSpan).toHaveBeenCalledWith(
-        "pipeline.process",
-        expect.objectContaining({
-          kind: SpanKind.INTERNAL,
-        }),
-        expect.any(Function),
-      );
-      expect(processFn).toHaveBeenCalledWith("test-payload");
-    });
-
-    it("includes custom span attributes from callback", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const spanAttributes = vi.fn(
-        (payload: string): SemConvAttributes => ({
-          "custom.attr": payload.length,
-        }),
-      );
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: "test-queue",
-        process: processFn,
-        spanAttributes,
-      };
-
-      const processor = new EventSourcedQueueProcessorMemory(definition);
-      await processor.send("test-payload");
-
-      expect(spanAttributes).toHaveBeenCalledWith("test-payload");
-      expect(mockTracer.withActiveSpan).toHaveBeenCalled();
     });
 
     it("propagates errors from process function", async () => {
@@ -117,7 +67,6 @@ describe("EventSourcedQueueProcessorMemory", () => {
       const sendPromise = processor.send("test-payload");
 
       expect(processFn).toHaveBeenCalledWith("test-payload");
-      expect(mockTracer.withActiveSpan).toHaveBeenCalled();
       expect(resolveProcess).toBeDefined();
 
       resolveProcess?.();

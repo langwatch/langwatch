@@ -14,6 +14,11 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -27,6 +32,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
@@ -49,6 +55,8 @@ import {
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;
@@ -153,6 +161,7 @@ const extractLocalConfig = (
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
+  const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const flowCallbacks = getFlowCallbacks("promptEditor");
@@ -351,9 +360,23 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       savedFormValuesRef.current = serverValues;
       methods.reset(formValues);
       setIsFormInitialized(true);
-    } else if (!promptId) {
-      // New prompt - use defaults
-      const defaults = buildDefaultFormValues();
+    } else if (!promptId && modelMetadata) {
+      // New prompt - use defaults with model's max tokens
+      // Wait for modelMetadata to be loaded before initializing
+      const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+      const defaultModelMetadata = modelMetadata[defaultModel];
+      const maxTokens = getMaxTokenLimit(defaultModelMetadata);
+
+      const defaults = buildDefaultFormValues({
+        version: {
+          configData: {
+            llm: {
+              model: defaultModel,
+              maxTokens,
+            },
+          },
+        },
+      });
       setConfigValues(defaults);
       methods.reset(defaults);
       setIsFormInitialized(true);
@@ -400,6 +423,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     isFormInitialized,
     availableSources,
     _onMappingsChangeProp,
+    modelMetadata,
+    project?.defaultModel,
   ]);
 
   // Reset when drawer closes
@@ -505,6 +530,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "prompts") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -595,6 +626,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
   // State for change handle dialog (for renaming existing prompts)
   const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
   const pendingSaveDataRef = useRef<ReturnType<
     typeof formValuesToTriggerSaveVersionParams
   > | null>(null);
@@ -1088,6 +1122,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           </Drawer.Footer>
         )}
       </Drawer.Content>
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="prompts"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
     </Drawer.Root>
   );
 }

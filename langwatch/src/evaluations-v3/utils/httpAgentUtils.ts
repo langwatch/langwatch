@@ -62,7 +62,7 @@ export const convertHttpComponentConfig = (
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
-    timeoutMs: config.timeout,
+    timeoutMs: config.timeoutMs,
   };
 };
 

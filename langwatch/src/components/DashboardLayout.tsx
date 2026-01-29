@@ -30,6 +30,7 @@ import { api } from "../utils/api";
 import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
+import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -245,6 +246,7 @@ export const AddProjectButton = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -271,7 +273,7 @@ export const AddProjectButton = ({
   ) : (
     <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
-        href={`/settings/subscription`}
+        href={planManagementUrl}
         _hover={{
           textDecoration: "none",
         }}
@@ -326,6 +328,7 @@ export const DashboardLayout = ({
     },
   );
   const publicEnv = usePublicEnv();
+  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const [query, setQuery] = useState(router.query.query as string);
 
@@ -603,7 +606,7 @@ export const DashboardLayout = ({
                       messages for this month, new messages will not be
                       processed.{" "}
                       <Link
-                        href="/settings/subscription"
+                        href={planManagementUrl}
                         textDecoration="underline"
                         _hover={{
                           textDecoration: "none",

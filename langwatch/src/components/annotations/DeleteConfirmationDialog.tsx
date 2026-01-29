@@ -1,7 +1,16 @@
-import { Button, Code, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, Input, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/dialog";
 
+/**
+ * Confirmation dialog for delete operations.
+ *
+ * Note: All interactive elements use stopPropagation() to prevent event bubbling.
+ * This dialog is rendered inside clickable parent elements (e.g., table rows,
+ * cards with click handlers), and without stopPropagation, clicks on the dialog
+ * inputs and buttons would trigger the parent's click handlers, causing
+ * unintended navigation or actions.
+ */
 export function DeleteConfirmationDialog({
   title = "Are you really sure?",
   description = "There is no going back, so if you're sure you want to delete this annotation score, type 'delete' below:",
@@ -43,9 +52,13 @@ export function DeleteConfirmationDialog({
               placeholder="Type 'delete' to confirm"
               value={confirmationText}
               autoFocus
-              onChange={(e) => setConfirmationText(e.target.value)}
+              onChange={(e) => {
+                e.stopPropagation();
+                setConfirmationText(e.target.value);
+              }}
               ref={inputRef}
               onKeyDown={(e) => {
+                e.stopPropagation();
                 if (e.key === "Enter") {
                   if (confirmationText.toLowerCase() === "delete") {
                     onConfirm();
@@ -57,12 +70,20 @@ export function DeleteConfirmationDialog({
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="outline" mr={3} onClick={onClose}>
+          <Button
+            variant="outline"
+            mr={3}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          >
             Cancel
           </Button>
           <Button
             colorPalette="red"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               if (confirmationText.toLowerCase() === "delete") {
                 onConfirm();
                 onClose();

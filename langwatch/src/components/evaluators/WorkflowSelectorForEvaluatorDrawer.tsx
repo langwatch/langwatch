@@ -14,7 +14,13 @@ import { useCallback, useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { UpgradeModal } from "~/components/UpgradeModal";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -56,6 +62,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
     null,
   );
   const [evaluatorName, setEvaluatorName] = useState(props.evaluatorName ?? "");
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   const workflowsQuery = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -98,6 +107,19 @@ export function WorkflowSelectorForEvaluatorDrawer(
         workflowId: evaluator.workflowId ?? "",
       });
       onClose();
+    },
+    onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "evaluators") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
+      toaster.create({
+        title: "Error creating evaluator",
+        description: error.message,
+        type: "error",
+      });
     },
   });
 
@@ -143,13 +165,14 @@ export function WorkflowSelectorForEvaluatorDrawer(
     !workflowsWithEvaluator.has(selectedWorkflowId);
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-    >
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && onClose()}
+        size="md"
+      >
+        <Drawer.Content>
+          <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
             {canGoBack && (
@@ -266,8 +289,17 @@ export function WorkflowSelectorForEvaluatorDrawer(
             </Button>
           </HStack>
         </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        </Drawer.Content>
+      </Drawer.Root>
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="evaluators"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
+    </>
   );
 }
 

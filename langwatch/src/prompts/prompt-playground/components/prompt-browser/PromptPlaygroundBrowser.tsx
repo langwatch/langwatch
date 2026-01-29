@@ -1,6 +1,7 @@
 import { HStack, Spacer } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";
@@ -130,19 +131,23 @@ export function PromptPlaygroundBrowser() {
                     pointerEvents: "none",
                   }}
                 >
-                  <ExperimentFromPlaygroundButton />
-                  <PageLayout.HeaderButton
-                    onClick={() =>
-                      tabbedWindow.activeTabId &&
-                      handleSplit(tabbedWindow.activeTabId)
-                    }
-                    disabled={!tabbedWindow.activeTabId}
-                    title="Split tab to compare prompts side by side"
-                  >
-                    <LuColumns2 size="18px" />
-                    Compare
-                  </PageLayout.HeaderButton>
-                  <AddPromptButton />
+                  <ExperimentFromPlaygroundButton
+                    iconOnly={windows.length > 1}
+                  />
+                  <Tooltip content="Compare" disabled={windows.length <= 1}>
+                    <PageLayout.HeaderButton
+                      onClick={() =>
+                        tabbedWindow.activeTabId &&
+                        handleSplit(tabbedWindow.activeTabId)
+                      }
+                      disabled={!tabbedWindow.activeTabId}
+                      title="Split tab to compare prompts side by side"
+                    >
+                      <LuColumns2 size="18px" />
+                      {windows.length <= 1 && "Compare"}
+                    </PageLayout.HeaderButton>
+                  </Tooltip>
+                  <AddPromptButton iconOnly={windows.length > 1} />
                 </HStack>
               </>
             )}

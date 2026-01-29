@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
+  extractTargetOutput,
   isEvaluatorNode,
   mapErrorEvent,
   mapEvaluatorResult,
@@ -42,6 +43,44 @@ describe("resultMapper", () => {
 
     it("returns true for evaluator nodes", () => {
       expect(isEvaluatorNode("target-1.eval-1")).toBe(true);
+    });
+  });
+
+  describe("extractTargetOutput", () => {
+    it("returns undefined for undefined outputs", () => {
+      expect(extractTargetOutput(undefined)).toBeUndefined();
+    });
+
+    it("returns undefined for empty outputs object", () => {
+      expect(extractTargetOutput({})).toBeUndefined();
+    });
+
+    it("returns output field when present (backward compatible)", () => {
+      expect(extractTargetOutput({ output: "hello world" })).toBe("hello world");
+    });
+
+    it("returns output field even when other fields present", () => {
+      expect(extractTargetOutput({ output: "main", extra: "ignored" })).toBe(
+        "main",
+      );
+    });
+
+    it("returns single custom field value unwrapped", () => {
+      expect(extractTargetOutput({ result: "my title" })).toBe("my title");
+    });
+
+    it("returns full object for multiple custom fields", () => {
+      const outputs = { result: "title", reason: "because it fits" };
+      expect(extractTargetOutput(outputs)).toEqual(outputs);
+    });
+
+    it("handles nested object in output field", () => {
+      const nested = { result: "title", reason: "because" };
+      expect(extractTargetOutput({ output: nested })).toEqual(nested);
+    });
+
+    it("handles null output value", () => {
+      expect(extractTargetOutput({ output: null })).toBeNull();
     });
   });
 

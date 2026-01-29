@@ -88,6 +88,7 @@ export function createMockQueueProcessorFactory(): QueueProcessorFactory & {
           await processFn(payload);
         }),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
       createdProcessors.push({
         name: definition.name,
@@ -111,6 +112,7 @@ export function createMockQueueProcessor<
   return {
     send: vi.fn().mockResolvedValue(void 0),
     close: vi.fn().mockResolvedValue(void 0),
+    waitUntilReady: vi.fn().mockResolvedValue(void 0),
   };
 }
 

@@ -12,6 +12,7 @@ import {
   agentTypeSchema,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
+import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -105,6 +106,9 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      // Enforce license limit before creating agent
+      await enforceLicenseLimit(ctx, input.projectId, "agents");
+
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({

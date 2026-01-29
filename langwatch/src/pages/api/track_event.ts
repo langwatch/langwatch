@@ -4,7 +4,7 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import { getTraceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { generateOtelSpanId } from "~/utils/trace";
@@ -158,7 +158,7 @@ export default async function handler(
         }
       }
 
-      await traceProcessingPipeline.commands.recordSpan.send({
+      await getTraceProcessingPipeline().commands.recordSpan.send({
         tenantId: project.id,
         span: {
           traceId: body.trace_id,

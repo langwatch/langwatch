@@ -14,9 +14,10 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 export function computeInitialFormValuesForPrompt(params: {
   prompt?: VersionedPrompt | null;
   defaultModel?: string;
+  maxTokens?: number;
   useSystemMessage?: boolean;
 }): PromptConfigFormValues {
-  const { prompt, defaultModel, useSystemMessage } = params;
+  const { prompt, defaultModel, maxTokens, useSystemMessage } = params;
 
   if (prompt) {
     return useSystemMessage
@@ -26,7 +27,7 @@ export function computeInitialFormValuesForPrompt(params: {
 
   if (typeof defaultModel === "string" && defaultModel.length > 0) {
     return buildDefaultFormValues({
-      version: { configData: { llm: { model: defaultModel } } },
+      version: { configData: { llm: { model: defaultModel, maxTokens } } },
     });
   }
 

@@ -7,6 +7,9 @@ import { register } from "prom-client";
 import type { Duplex } from "stream";
 import { parse } from "url";
 import { initializeBackgroundWorkers } from "./server/background/init";
+import { getClickHouseClient } from "./server/clickhouse/client";
+import { initializeEventSourcing } from "./server/event-sourcing";
+import { connection as redis } from "./server/redis";
 import { createLogger } from "./utils/logger";
 
 const logger = createLogger("langwatch:start");
@@ -59,6 +62,12 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 };
 
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
+  // Initialize event sourcing with ClickHouse and Redis clients
+  initializeEventSourcing({
+    clickHouseClient: getClickHouseClient(),
+    redisConnection: redis,
+  });
+
   const dev = process.env.NODE_ENV !== "production";
   const env = process.env.ENVIRONMENT ?? "local";
   setEnvironment(env);

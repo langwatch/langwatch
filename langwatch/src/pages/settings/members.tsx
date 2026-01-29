@@ -1,7 +1,6 @@
 import {
   Badge,
   Button,
-  Card,
   Flex,
   Heading,
   HStack,
@@ -15,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
-import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
+import { Mail, MoreVertical, Plus, Trash } from "react-feather";
 import type { SubmitHandler } from "react-hook-form";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -30,6 +29,8 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
+import { UpgradeModal } from "../../components/UpgradeModal";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -37,7 +38,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/api/routers/organization";
-import type { PlanInfo } from "../../server/subscriptionHandler";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 
 const selectOptions = [
@@ -52,7 +53,7 @@ const selectOptions = [
     description: "Can manage their own projects and view other projects",
   },
   {
-    label: "External / Viewer",
+    label: "Member Lite",
     value: OrganizationUserRole.EXTERNAL,
     description: "Can only view projects they are invited to, cannot see costs",
   },
@@ -111,6 +112,15 @@ function MembersList({
   const { hasPermission } = useOrganizationTeamProject();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
+  
+  // License enforcement for both member types
+  const { limitInfo: membersLimitInfo } = useLicenseEnforcement("members");
+  const { limitInfo: membersLiteLimitInfo } = useLicenseEnforcement("membersLite");
+  
+  // State to control which upgrade modal to show (based on validation result)
+  const [showMembersLimitModal, setShowMembersLimitModal] = useState(false);
+  const [showMembersLiteLimitModal, setShowMembersLiteLimitModal] = useState(false);
+  
   const teamOptions = teams.map((team) => ({
     label: team.name,
     value: team.id,
@@ -155,6 +165,37 @@ function MembersList({
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
+    // Validate license limits before submitting
+    // Count new invites by member type
+    const newFullMembers = data.invites.filter(
+      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL
+    ).length;
+    const newLiteMembers = data.invites.filter(
+      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL
+    ).length;
+
+    // Check if adding full members would exceed limit
+    if (
+      membersLimitInfo &&
+      !activePlan.overrideAddingLimitations &&
+      newFullMembers > 0 &&
+      membersLimitInfo.current + newFullMembers > membersLimitInfo.max
+    ) {
+      setShowMembersLimitModal(true);
+      return;
+    }
+
+    // Check if adding lite members would exceed limit
+    if (
+      membersLiteLimitInfo &&
+      !activePlan.overrideAddingLimitations &&
+      newLiteMembers > 0 &&
+      membersLiteLimitInfo.current + newLiteMembers > membersLiteLimitInfo.max
+    ) {
+      setShowMembersLiteLimitModal(true);
+      return;
+    }
+
     createInvitesMutation.mutate(
       {
         organizationId: organization.id,
@@ -316,41 +357,28 @@ function MembersList({
         <HStack width="full">
           <Heading>Organization Members</Heading>
           <Spacer />
-          {activePlan.overrideAddingLimitations &&
-          organization.members.length >= activePlan.maxMembers ? (
+          {activePlan.overrideAddingLimitations && (
             <PageLayout.HeaderButton onClick={() => onAddMembersOpen()}>
               <Plus size={20} />
               (Admin Override) Add members
             </PageLayout.HeaderButton>
-          ) : null}
-          {organization.members.length >= activePlan.maxMembers ? (
-            <Tooltip
-              content="Upgrade your plan to add more members"
-              positioning={{ placement: "top" }}
-            >
-              <PageLayout.HeaderButton disabled={true}>
-                <Lock size={20} />
-                Add members
-              </PageLayout.HeaderButton>
-            </Tooltip>
-          ) : (
-            <Tooltip
-              content={
-                !currentUserIsAdmin
-                  ? "You need admin privileges to add members"
-                  : undefined
-              }
-              positioning={{ placement: "top" }}
-            >
-              <PageLayout.HeaderButton
-                onClick={() => onAddMembersOpen()}
-                disabled={!currentUserIsAdmin}
-              >
-                <Plus size={20} />
-                Add members
-              </PageLayout.HeaderButton>
-            </Tooltip>
           )}
+          <Tooltip
+            content={
+              !currentUserIsAdmin
+                ? "You need admin privileges to add members"
+                : undefined
+            }
+            positioning={{ placement: "top" }}
+          >
+            <PageLayout.HeaderButton
+              onClick={onAddMembersOpen}
+              disabled={!currentUserIsAdmin}
+            >
+              <Plus size={20} />
+              Add members
+            </PageLayout.HeaderButton>
+          </Tooltip>
         </HStack>
         <Table.Root borderCollapse="unset" size="md" width="full">
           <Table.Header>
@@ -599,6 +627,24 @@ function MembersList({
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
+
+      {/* Upgrade modal for full members limit */}
+      <UpgradeModal
+        open={showMembersLimitModal}
+        onClose={() => setShowMembersLimitModal(false)}
+        limitType="members"
+        current={membersLimitInfo?.current ?? 0}
+        max={membersLimitInfo?.max ?? 0}
+      />
+      
+      {/* Upgrade modal for lite members limit */}
+      <UpgradeModal
+        open={showMembersLiteLimitModal}
+        onClose={() => setShowMembersLiteLimitModal(false)}
+        limitType="membersLite"
+        current={membersLiteLimitInfo?.current ?? 0}
+        max={membersLiteLimitInfo?.max ?? 0}
+      />
     </SettingsLayout>
   );
 }

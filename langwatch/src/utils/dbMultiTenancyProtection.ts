@@ -26,6 +26,16 @@ const EXEMPT_MODELS = [
    * Notifications can be at organization or project level
    */
   "Notification",
+  /**
+   * License enforcement needs to count resources across all projects in an organization.
+   * These models are queried by organizationId (through project.team.organizationId)
+   * for license limit enforcement.
+   */
+  "Workflow",
+  "Evaluator",
+  "Scenario",
+  "BatchEvaluation",
+  "Agent",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

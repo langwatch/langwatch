@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type AggregateType, EventUtils } from "../../library";
 import {
   cleanupTestDataForTenant,
+  closePipelineGracefully,
   createTestPipeline,
   createTestTenantId,
+  generateTestAggregateId,
   getTenantIdString,
   waitForCheckpoint,
 } from "./testHelpers";
@@ -14,23 +16,23 @@ describe("Projections - Integration Tests", () => {
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     pipeline = createTestPipeline();
     tenantId = createTestTenantId();
     tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
   });
 
   afterEach(async () => {
-    // Close pipeline first to stop all workers and queues
-    await pipeline.service.close();
-    // Wait a bit for all async operations to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Gracefully close pipeline to ensure all BullMQ workers finish
+    await closePipelineGracefully(pipeline);
     // Then clean up test data
     await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("rebuilds projection correctly after events are stored", async () => {
-    const aggregateId = "projection-test-8";
+    const aggregateId = generateTestAggregateId("projection");
 
     // Store events directly (bypassing command)
     const event1 = EventUtils.createEvent(
@@ -57,7 +59,7 @@ describe("Projections - Integration Tests", () => {
 
     // Wait for projection checkpoint at sequence 2
     await waitForCheckpoint(
-      "test_pipeline",
+      pipeline.pipelineName,
       "testProjection",
       aggregateId,
       tenantIdString,

@@ -13,6 +13,8 @@ import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "./routers/evaluators";
+import { licenseRouter } from "./routers/license";
+import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { experimentsRouter } from "./routers/experiments";
 import { graphsRouter } from "./routers/graphs";
 import { homeRouter } from "./routers/home";
@@ -84,6 +86,8 @@ export const appRouter = createTRPCRouter({
   scenarios: scenarioRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  license: licenseRouter,
+  licenseEnforcement: licenseEnforcementRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

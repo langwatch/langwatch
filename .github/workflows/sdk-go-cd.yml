@@ -1,0 +1,52 @@
+name: sdk-go-cd
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'sdk-go@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: sdk-go/go.sum
+
+      - name: Run tests
+        working-directory: sdk-go
+        run: go test -v ./...
+
+      - name: Trigger pkg.go.dev to index the new version
+        run: |
+          # Request pkg.go.dev to fetch the new version
+          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdk-go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's/sdk-go@//').info" || true
+
+      - name: Get version from tag or manifest
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/sdk-go@v}
+          else
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdk-go"')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            sdk-go/CHANGELOG.md \
+            "Go SDK" \
+            "${{ steps.get_version.outputs.version }}"

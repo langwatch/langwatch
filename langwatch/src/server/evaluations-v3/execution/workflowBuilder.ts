@@ -12,7 +12,6 @@ import type {
   Evaluator,
   Field,
   HttpComponentConfig,
-  LLMConfig,
   LlmPromptConfigComponent,
   Signature,
   Workflow,
@@ -32,6 +31,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import type {
   ExecutionCell,
@@ -219,28 +219,43 @@ const buildTargetNode = (
   } else {
     // Agent target - dispatch based on agent type
     if (loadedData.agent) {
-      // Check if it's an HTTP agent
-      if (loadedData.agent.type === "http") {
-        return {
-          targetNode: buildHttpNodeFromAgent(
+      switch (loadedData.agent.type) {
+        case "http":
+          return {
+            targetNode: buildHttpNodeFromAgent(
+              targetNodeId,
+              loadedData.agent,
+              targetConfig,
+              cell,
+            ),
             targetNodeId,
-            loadedData.agent,
-            targetConfig,
-            cell,
-          ),
-          targetNodeId,
-        };
+          };
+        case "signature":
+          return {
+            targetNode: buildSignatureNodeFromAgent(
+              targetNodeId,
+              loadedData.agent,
+              targetConfig,
+              cell,
+            ),
+            targetNodeId,
+          };
+        case "code":
+        case "workflow":
+          return {
+            targetNode: buildCodeNodeFromAgent(
+              targetNodeId,
+              loadedData.agent,
+              targetConfig,
+              cell,
+            ),
+            targetNodeId,
+          };
+        default: {
+          const _exhaustive: never = loadedData.agent.type;
+          throw new Error(`Unknown agent type: ${_exhaustive}`);
+        }
       }
-      // Default to code node for other agent types (code, signature, workflow)
-      return {
-        targetNode: buildCodeNodeFromAgent(
-          targetNodeId,
-          loadedData.agent,
-          targetConfig,
-          cell,
-        ),
-        targetNodeId,
-      };
     } else {
       throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);
     }
@@ -268,11 +283,20 @@ export const buildSignatureNodeFromPrompt = (
     type: output.type as Field["type"],
   }));
 
-  const llmConfig: LLMConfig = {
+  const llmConfig = buildLLMConfig({
     model: prompt.model,
     temperature: prompt.temperature,
-    max_tokens: prompt.maxTokens,
-  };
+    maxTokens: prompt.maxTokens,
+    topP: prompt.topP,
+    frequencyPenalty: prompt.frequencyPenalty,
+    presencePenalty: prompt.presencePenalty,
+    seed: prompt.seed,
+    topK: prompt.topK,
+    minP: prompt.minP,
+    repetitionPenalty: prompt.repetitionPenalty,
+    reasoning: prompt.reasoning,
+    verbosity: prompt.verbosity,
+  });
 
   const messages: ChatMessage[] = prompt.messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
@@ -330,12 +354,21 @@ export const buildSignatureNodeFromLocalConfig = (
     type: output.type as Field["type"],
   }));
 
-  const llmConfig: LLMConfig = {
+  const llmConfig = buildLLMConfig({
     model: localConfig.llm.model,
     temperature: localConfig.llm.temperature,
-    max_tokens: localConfig.llm.maxTokens,
-    litellm_params: localConfig.llm.litellmParams,
-  };
+    maxTokens: localConfig.llm.maxTokens,
+    topP: localConfig.llm.topP,
+    frequencyPenalty: localConfig.llm.frequencyPenalty,
+    presencePenalty: localConfig.llm.presencePenalty,
+    seed: localConfig.llm.seed,
+    topK: localConfig.llm.topK,
+    minP: localConfig.llm.minP,
+    repetitionPenalty: localConfig.llm.repetitionPenalty,
+    reasoning: localConfig.llm.reasoning,
+    verbosity: localConfig.llm.verbosity,
+    litellmParams: localConfig.llm.litellmParams,
+  });
 
   // Extract system prompt from messages if present
   const systemMessage = localConfig.messages.find((m) => m.role === "system");
@@ -376,7 +409,117 @@ export const buildSignatureNodeFromLocalConfig = (
 };
 
 /**
- * Builds a code node from a TypedAgent (database agent).
+ * Builds a signature node from a TypedAgent with type "signature".
+ *
+ * Signature agents store config in SignatureComponentConfig format:
+ * - llm: top-level or in parameters array
+ * - prompt: top-level or as "instructions" in parameters
+ * - messages: top-level or in parameters array
+ */
+export const buildSignatureNodeFromAgent = (
+  nodeId: string,
+  agent: TypedAgent,
+  targetConfig: TargetConfig,
+  cell: ExecutionCell,
+): Node<Signature> => {
+  const config = agent.config;
+
+  // Get inputs with value mappings applied
+  const inputs = (config.inputs ?? []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type as Field["type"],
+    value: getInputValue(input.identifier, targetConfig, cell),
+  }));
+
+  const outputs = (config.outputs ?? []).map((output) => ({
+    identifier: output.identifier,
+    type: output.type as Field["type"],
+  }));
+
+  // Build parameters array, normalizing from top-level fields or existing parameters
+  const parameters = buildSignatureNodeParameters(config);
+
+  return {
+    id: nodeId,
+    type: "signature",
+    position: { x: 200, y: 0 },
+    data: {
+      name: agent.name,
+      inputs,
+      outputs,
+      parameters,
+    } as LlmPromptConfigComponent,
+  };
+};
+
+/**
+ * Builds parameters array for signature node from agent config.
+ *
+ * Signature-type agents can store config in two formats:
+ * 1. Top-level fields (llm, prompt, messages) - agent drawer format
+ * 2. Parameters array with llm/instructions/messages entries - workflow node format
+ *
+ * This function normalizes both formats into the parameters array
+ * so that addEnvs() can process them consistently.
+ */
+const buildSignatureNodeParameters = (
+  config: TypedAgent["config"],
+): Field[] => {
+  const baseParams = config.parameters ?? [];
+
+  // Start with existing parameters (may already have llm, instructions, messages)
+  const resultParams: Field[] = [...baseParams];
+
+  // Check if llm exists in parameters
+  const hasLlmInParams = resultParams.some(
+    (p) => p.identifier === "llm" && p.type === "llm",
+  );
+
+  // Add top-level llm if not in parameters
+  if (!hasLlmInParams && "llm" in config && config.llm) {
+    resultParams.unshift({
+      identifier: "llm",
+      type: "llm",
+      value: config.llm,
+    });
+  }
+
+  // Check if instructions exists in parameters
+  const hasInstructionsInParams = resultParams.some(
+    (p) => p.identifier === "instructions" && p.type === "str",
+  );
+
+  // Add top-level prompt as instructions if not in parameters
+  if (!hasInstructionsInParams && "prompt" in config && config.prompt) {
+    resultParams.push({
+      identifier: "instructions",
+      type: "str",
+      value: config.prompt,
+    });
+  }
+
+  // Check if messages exists in parameters
+  const hasMessagesInParams = resultParams.some(
+    (p) => p.identifier === "messages" && p.type === "chat_messages",
+  );
+
+  // Add top-level messages if not in parameters
+  if (!hasMessagesInParams && "messages" in config && config.messages) {
+    resultParams.push({
+      identifier: "messages",
+      type: "chat_messages",
+      value: config.messages,
+    });
+  }
+
+  return resultParams;
+};
+
+/**
+ * Builds a code node from a TypedAgent with type "code" or "workflow".
+ *
+ * Code agents contain Python code with DSPy modules that handle their own LLM calls.
+ * Parameters are passed directly - no LLM config normalization needed.
  */
 export const buildCodeNodeFromAgent = (
   nodeId: string,

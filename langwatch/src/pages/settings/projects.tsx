@@ -27,6 +27,7 @@ import type {
 import { api } from "../../utils/api";
 import { canAddProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
+import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -43,6 +44,7 @@ function ProjectsList({
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
@@ -79,7 +81,7 @@ function ProjectsList({
                 positioning={{ placement: "top" }}
               >
                 <Link
-                  href={`/settings/subscription`}
+                  href={planManagementUrl}
                   _hover={{
                     textDecoration: "none",
                   }}

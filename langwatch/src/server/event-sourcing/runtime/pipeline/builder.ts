@@ -1,7 +1,7 @@
 import type {
   AggregateType,
   CommandHandlerClass,
-  DeduplicationConfig,
+  DeduplicationStrategy,
   Event,
   EventHandlerClass,
   EventPublisher,
@@ -62,10 +62,10 @@ export interface CommandHandlerOptions<Payload> {
   delay?: number;
 
   /**
-   * Optional: Deduplication configuration.
-   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   * Optional: Deduplication strategy for this command handler.
+   * @see DeduplicationStrategy for available options
    */
-  deduplication?: DeduplicationConfig<Payload>;
+  deduplication?: DeduplicationStrategy<Payload>;
 
   /**
    * Optional: Concurrency limit for processing jobs.

@@ -15,6 +15,11 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { UpgradeModal } from "~/components/UpgradeModal";
+import {
+  extractLimitExceededInfo,
+  type LimitExceededInfo,
+} from "~/utils/trpcError";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -209,6 +214,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
+  // State for upgrade modal when limit is exceeded
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   // All variables = fixed + custom
   const variables = useMemo(() => {
@@ -308,6 +316,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      const limitExceeded = extractLimitExceededInfo(error);
+      if (limitExceeded?.limitType === "agents") {
+        setLimitInfo(limitExceeded);
+        setShowUpgradeModal(true);
+        return;
+      }
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -448,13 +462,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   );
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && handleClose()}
-      size="lg"
-      closeOnInteractOutside={false}
-      modal={false}
-      preventScroll={false}
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && handleClose()}
+        size="lg"
+        closeOnInteractOutside={false}
+        modal={false}
+        preventScroll={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
@@ -704,6 +719,15 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
-    </Drawer.Root>
+      </Drawer.Root>
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType="agents"
+        current={limitInfo?.current}
+        max={limitInfo?.max}
+      />
+    </>
   );
 }

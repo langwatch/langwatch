@@ -14,7 +14,7 @@ export const DEFAULT_MAX_TOKENS = 64_000;
 
 export const MIN_MAX_TOKENS = 256;
 
-export const FALLBACK_MAX_TOKENS = 64_000;
+export const FALLBACK_MAX_TOKENS = 4096;
 
 export const KSUID_RESOURCES = {
   COST: "cost",

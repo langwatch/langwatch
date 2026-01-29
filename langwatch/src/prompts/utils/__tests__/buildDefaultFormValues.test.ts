@@ -100,9 +100,10 @@ describe("buildDefaultFormValues", () => {
       expect(defaults.version.configData.llm.temperature).toBeUndefined();
     });
 
-    it("sets maxTokens to 4096 by default", () => {
+    it("sets maxTokens to FALLBACK_MAX_TOKENS (safe default for all models)", () => {
       const defaults = buildDefaultFormValues();
 
+      // Safe fallback that works for all models
       expect(defaults.version.configData.llm.maxTokens).toBe(4096);
     });
   });

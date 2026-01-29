@@ -11,7 +11,7 @@ import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
-import { evaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
+import { getEvaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
@@ -96,7 +96,7 @@ export const scheduleEvaluation = async ({
       select: { featureEventSourcingEvaluationIngestion: true },
     });
     if (project?.featureEventSourcingEvaluationIngestion) {
-      await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
+      await getEvaluationProcessingPipeline().commands.scheduleEvaluation.send({
         tenantId: trace.project_id,
         evaluationId: getEvaluationId(check),
         evaluatorId: getEvaluatorId(check),
@@ -355,7 +355,7 @@ export const updateEvaluationStatusInES = async ({
         const evaluationId = getEvaluationId(check);
         if (status === "in_progress") {
           // Emit started event
-          await evaluationProcessingPipeline.commands.startEvaluation.send({
+          await getEvaluationProcessingPipeline().commands.startEvaluation.send({
             tenantId: trace.project_id,
             evaluationId,
             evaluatorId: getEvaluatorId(check),
@@ -370,7 +370,7 @@ export const updateEvaluationStatusInES = async ({
           status === "skipped"
         ) {
           // Emit completed event
-          await evaluationProcessingPipeline.commands.completeEvaluation.send({
+          await getEvaluationProcessingPipeline().commands.completeEvaluation.send({
             tenantId: trace.project_id,
             evaluationId,
             status,

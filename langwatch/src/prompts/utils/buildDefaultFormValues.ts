@@ -1,7 +1,7 @@
 import { PromptScope } from "@prisma/client";
 import { merge } from "lodash-es";
 
-import { DEFAULT_MODEL } from "~/utils/constants";
+import { DEFAULT_MODEL, FALLBACK_MAX_TOKENS } from "~/utils/constants";
 import type { DeepPartial } from "~/utils/types";
 
 import type { PromptConfigFormValues } from "../types";
@@ -20,8 +20,9 @@ export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
         // Temperature is omitted - not all models support it (e.g., reasoning models)
         // The UI will apply model-appropriate defaults based on supportedParameters
         temperature: undefined,
-        // Sensible default for most models - the UI will adjust based on model's maxCompletionTokens
-        maxTokens: 4096,
+        // Use high fallback - UI will cap to model's actual max when displayed
+        // This ensures new prompts start at model's max (capped by useSliderControl)
+        maxTokens: FALLBACK_MAX_TOKENS,
       },
       messages: [
         { role: "system", content: "You are a helpful assistant." },

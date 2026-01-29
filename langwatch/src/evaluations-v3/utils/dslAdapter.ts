@@ -239,8 +239,8 @@ const createHttpNode = (
     type: "http",
     data: {
       name: target.name,
-      inputs,
-      outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
+      inputs: inputs as HttpComponentConfig["inputs"],
+      outputs: (target.outputs ?? [{ identifier: "output", type: "str" }]) as HttpComponentConfig["outputs"],
       // HTTP-specific config
       url: httpConfig.url,
       method: httpConfig.method,

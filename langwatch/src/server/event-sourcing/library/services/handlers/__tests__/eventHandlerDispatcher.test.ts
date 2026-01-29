@@ -68,6 +68,7 @@ describe("EventHandlerDispatcher", () => {
       options.queueManager ??
       new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
     const distributedLock = createMockDistributedLock();
@@ -102,10 +103,12 @@ describe("EventHandlerDispatcher", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       // Manually add queue processor to simulate initialization
       (queueManager as any).handlerQueueProcessors.set(
@@ -210,10 +213,12 @@ describe("EventHandlerDispatcher", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       (queueManager as any).handlerQueueProcessors.set(
         "handler1",
@@ -262,14 +267,17 @@ describe("EventHandlerDispatcher", () => {
       const enabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
       const disabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
       const queueManager = new QueueProcessorManager({
         aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       (queueManager as any).handlerQueueProcessors.set(
         "enabledHandler",

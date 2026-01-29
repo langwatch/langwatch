@@ -1,5 +1,7 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { FREE_PLAN } from "../../../ee/licensing/constants";
 import type { PrismaClient } from "@prisma/client";
+import { env } from "~/env.mjs";
 import { dependencies } from "~/injection/dependencies.server";
 import { prisma } from "~/server/db";
 import {
@@ -64,6 +66,11 @@ export class TraceUsageService {
       this.getCurrentMonthCount({ organizationId }),
       this.subscriptionHandler.getActivePlan(organizationId),
     ]);
+
+    // Self-hosted = unlimited traces
+    if (!env.IS_SAAS && plan === FREE_PLAN) {
+      return { exceeded: false };
+    }
 
     if (count >= plan.maxMessagesPerMonth) {
       return {

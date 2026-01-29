@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -72,6 +74,9 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      // Enforce evaluator limit before creation
+      await enforceLicenseLimit(ctx, input.projectId, "evaluators");
+
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
         const existingEvaluator = await ctx.prisma.evaluator.findFirst({
@@ -83,9 +88,10 @@ export const evaluatorsRouter = createTRPCRouter({
         });
 
         if (existingEvaluator) {
-          throw new Error(
-            `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
-          );
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `An evaluator already exists for this workflow: "${existingEvaluator.name}"`,
+          });
         }
       }
 

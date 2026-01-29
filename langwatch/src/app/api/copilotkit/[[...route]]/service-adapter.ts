@@ -18,7 +18,7 @@ import type {
 } from "~/optimization_studio/types/events";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { mapReasoningToProvider } from "~/server/prompt-config/reasoningBoundary";
+import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { createLogger } from "~/utils/logger";
@@ -336,29 +336,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          // Convert camelCase form values to snake_case for Python backend
-          // Reasoning is mapped to provider-specific parameter at this boundary
-          value: {
-            model: formValues.version.configData.llm.model,
-            temperature: formValues.version.configData.llm.temperature,
-            max_tokens: formValues.version.configData.llm.maxTokens,
-            top_p: formValues.version.configData.llm.topP,
-            frequency_penalty:
-              formValues.version.configData.llm.frequencyPenalty,
-            presence_penalty: formValues.version.configData.llm.presencePenalty,
-            seed: formValues.version.configData.llm.seed,
-            top_k: formValues.version.configData.llm.topK,
-            min_p: formValues.version.configData.llm.minP,
-            repetition_penalty:
-              formValues.version.configData.llm.repetitionPenalty,
-            // Map unified 'reasoning' to provider-specific parameter at runtime boundary
-            ...mapReasoningToProvider(
-              formValues.version.configData.llm.model,
-              formValues.version.configData.llm.reasoning,
-            ),
-            verbosity: formValues.version.configData.llm.verbosity,
-            litellm_params: formValues.version.configData.llm.litellmParams,
-          },
+          // Use shared buildLLMConfig for consistent camelCase to snake_case conversion
+          // and reasoning mapping across all execution entry points
+          value: buildLLMConfig(formValues.version.configData.llm),
         },
         {
           identifier: "prompting_technique",

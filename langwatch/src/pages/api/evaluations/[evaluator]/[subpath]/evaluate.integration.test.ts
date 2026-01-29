@@ -128,7 +128,12 @@ describe("Guardrail API Endpoint", () => {
   });
 });
 
-describe("Evaluator API with evaluators/{id} path", () => {
+// Skip these tests when running with testcontainers only (no Prisma/NLP service)
+// These tests require a PostgreSQL database and the NLP service running
+// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
+const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL && !process.env.LANGWATCH_NLP_SERVICE;
+
+describe.skipIf(isTestcontainersOnly)("Evaluator API with evaluators/{id} path", () => {
   let project: Project;
   let evaluator: Evaluator;
 

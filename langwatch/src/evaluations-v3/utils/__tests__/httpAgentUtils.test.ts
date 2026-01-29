@@ -96,7 +96,7 @@ describe("convertHttpComponentConfig", () => {
       method: "POST",
       bodyTemplate: '{"input": "{{input}}"}',
       outputPath: "$.result",
-      timeout: 30000,
+      timeoutMs: 30000,
       headers: [{ key: "Content-Type", value: "application/json" }],
     };
 
@@ -115,6 +115,7 @@ describe("convertHttpComponentConfig", () => {
       name: "Test HTTP",
       description: "Test",
       url: "https://api.example.com/chat",
+      method: "POST",
     };
 
     const result = convertHttpComponentConfig(config);

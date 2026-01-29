@@ -46,7 +46,7 @@ export function PromptEditorHeader({
   const configId = formMethods.watch("configId");
 
   return (
-    <Box width="full" display="flex" gap={8}>
+    <Box width="full" display="flex" gap={8} justifyContent="space-between">
       <ModelSelectFieldMini />
       <HStack gap={2} flexShrink={0}>
         {configId && onVersionRestore && (

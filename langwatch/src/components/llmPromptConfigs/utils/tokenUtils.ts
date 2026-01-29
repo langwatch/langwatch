@@ -6,7 +6,6 @@
 
 import type { ModelMetadataForFrontend } from "../../../hooks/useModelProvidersSettings";
 import { FALLBACK_MAX_TOKENS } from "../../../utils/constants";
-import { DYNAMIC_MAX_DEFAULT_PROPORTION } from "../constants";
 import { parameterRegistry as defaultRegistry } from "../parameterRegistry";
 import type { LLMConfigValues } from "../types";
 
@@ -31,13 +30,12 @@ export function calculateSensibleDefaults(
     const formKey = registry.getFormKey(paramName);
 
     if (paramName === "max_tokens" && config.type === "slider") {
-      // Dynamic default based on model's maxCompletionTokens
+      // Default to model's absolute maximum
       if (modelMetadata) {
         const maxLimit = getMaxTokenLimit(modelMetadata);
-        defaults[formKey] = Math.min(
-          config.default,
-          Math.floor(maxLimit * DYNAMIC_MAX_DEFAULT_PROPORTION),
-        );
+        // Set both camelCase and snake_case for compatibility with different consumers
+        defaults[formKey] = maxLimit;
+        defaults[paramName] = maxLimit;
       }
       // If no metadata, leave undefined (backward compat - Python will use its fallback)
     } else if (config.type === "slider") {
@@ -57,14 +55,22 @@ export function calculateSensibleDefaults(
  * Returns a clean LLMConfig for a new model.
  * Clears all registered parameters and applies sensible defaults.
  *
+ * For max_tokens specifically:
+ * - If previous value was at the previous model's max → set to new model's max (keep maxed)
+ * - If previous value was below max (user customized) → min(previous, new max)
+ *
  * @param newModel - The new model identifier
  * @param registry - Parameter registry (defaults to singleton)
- * @param modelMetadata - Optional model metadata for dynamic defaults (e.g., max_tokens)
+ * @param newModelMetadata - Optional model metadata for the new model
+ * @param previousValues - Optional previous config values (for smart max_tokens handling)
+ * @param previousModelMetadata - Optional metadata for the previous model
  */
 export function buildModelChangeValues(
   newModel: string,
   registry: typeof defaultRegistry = defaultRegistry,
-  modelMetadata?: ModelMetadataForFrontend,
+  newModelMetadata?: ModelMetadataForFrontend,
+  previousValues?: LLMConfigValues,
+  previousModelMetadata?: ModelMetadataForFrontend,
 ): LLMConfigValues {
   const result: LLMConfigValues = { model: newModel };
   const resultRecord = result as Record<string, unknown>;
@@ -79,10 +85,35 @@ export function buildModelChangeValues(
   }
 
   // Then apply sensible defaults so form state matches what UI displays
-  const defaults = calculateSensibleDefaults(modelMetadata, registry);
+  const defaults = calculateSensibleDefaults(newModelMetadata, registry);
   for (const [key, value] of Object.entries(defaults)) {
     if (value !== undefined) {
       resultRecord[key] = value;
+    }
+  }
+
+  // Smart max_tokens handling when switching models
+  if (previousValues && newModelMetadata) {
+    const previousMaxTokens =
+      (previousValues.maxTokens as number | undefined) ??
+      (previousValues.max_tokens as number | undefined);
+
+    if (previousMaxTokens !== undefined) {
+      const previousMax = previousModelMetadata
+        ? getMaxTokenLimit(previousModelMetadata)
+        : previousMaxTokens; // If no previous metadata, assume it was at max
+      const newMax = getMaxTokenLimit(newModelMetadata);
+
+      // Check if previous value was at the max (user hadn't customized it)
+      const wasAtMax = previousMaxTokens >= previousMax;
+
+      const newMaxTokens = wasAtMax
+        ? newMax // Keep it maxed out for the new model
+        : Math.min(previousMaxTokens, newMax); // User had a custom value - cap it at new model's max
+
+      // Set both camelCase and snake_case for compatibility with different consumers
+      resultRecord.maxTokens = newMaxTokens;
+      resultRecord.max_tokens = newMaxTokens;
     }
   }
 

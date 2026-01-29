@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Tooltip } from "~/components/ui/tooltip";
 import { createInitialState, type DatasetReference } from "~/evaluations-v3/types";
 import { extractPersistedState } from "~/evaluations-v3/types/persistence";
 import { inferAllTargetMappings } from "~/evaluations-v3/utils/mappingInference";
@@ -177,13 +178,19 @@ const convertTabToTarget = (
   };
 };
 
+interface ExperimentFromPlaygroundButtonProps {
+  iconOnly?: boolean;
+}
+
 /**
  * Button to create an experiment from the current prompt playground tabs.
  * Opens a confirmation dialog and creates the experiment with all open prompts as targets.
  *
  * Single Responsibility: Handles the "Create Experiment from Playground" flow.
  */
-export function ExperimentFromPlaygroundButton() {
+export function ExperimentFromPlaygroundButton({
+  iconOnly,
+}: ExperimentFromPlaygroundButtonProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -292,14 +299,16 @@ export function ExperimentFromPlaygroundButton() {
 
   return (
     <>
-      <PageLayout.HeaderButton
-        onClick={() => setIsDialogOpen(true)}
-        disabled={isDisabled}
-        title={isDisabled ? "Open a prompt to create an experiment" : undefined}
-      >
-        <FlaskConical size="18px" />
-        Experiment
-      </PageLayout.HeaderButton>
+      <Tooltip content="Experiment" disabled={!iconOnly}>
+        <PageLayout.HeaderButton
+          onClick={() => setIsDialogOpen(true)}
+          disabled={isDisabled}
+          title={isDisabled ? "Open a prompt to create an experiment" : undefined}
+        >
+          <FlaskConical size="18px" />
+          {!iconOnly && "Experiment"}
+        </PageLayout.HeaderButton>
+      </Tooltip>
 
       <Dialog.Root
         open={isDialogOpen}
