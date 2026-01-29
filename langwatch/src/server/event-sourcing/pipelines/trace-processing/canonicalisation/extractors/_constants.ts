@@ -92,6 +92,8 @@ export const ATTR_KEYS = {
   LANGWATCH_LANGGRAPH_THREAD_ID: "langwatch.langgraph.thread_id",
   LANGWATCH_LANGGRAPH_NODE: "langwatch.langgraph.langgraph_node",
   LANGWATCH_LANGGRAPH_STEP: "langwatch.langgraph.langgraph_step",
+  LANGWATCH_LABELS: "langwatch.labels",
+  LANGWATCH_TAGS: "langwatch.tags", // Legacy/alternative name
 
   // Error attributes
   ERROR_TYPE: "error.type",

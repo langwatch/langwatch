@@ -66,7 +66,8 @@ function translateSimpleAggregation(
     case "avg":
       return `avg(${columnExpr}) AS ${alias}`;
     case "sum":
-      return `sum(${columnExpr}) AS ${alias}`;
+      // Use COALESCE to return 0 instead of null to match ES behavior
+      return `coalesce(sum(${columnExpr}), 0) AS ${alias}`;
     case "min":
       return `min(${columnExpr}) AS ${alias}`;
     case "max":
@@ -201,7 +202,7 @@ function translateMetadataMetric(
     case "metadata.user_id":
       return {
         selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['langwatch.user_id']`,
+          `${ts}.Attributes['user.id']`,
           aggregation,
           alias,
         ),
@@ -212,7 +213,7 @@ function translateMetadataMetric(
     case "metadata.thread_id":
       return {
         selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['gen_ai.conversation.id']`,
+          `${ts}.Attributes['thread.id']`,
           aggregation,
           alias,
         ),
@@ -532,7 +533,7 @@ function translateThreadsMetric(
         requiredJoins,
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, max(${ts}.CreatedAt) - min(${ts}.CreatedAt) AS thread_duration`,
+          innerSelect: `${ts}.Attributes['thread.id'] AS thread_id, max(${ts}.CreatedAt) - min(${ts}.CreatedAt) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -575,13 +576,13 @@ export function translatePipelineAggregation(
       pipelineColumn = `${ts}.TraceId`;
       break;
     case "user_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.user_id']`;
+      pipelineColumn = `${ts}.Attributes['user.id']`;
       break;
     case "thread_id":
-      pipelineColumn = `${ts}.Attributes['gen_ai.conversation.id']`;
+      pipelineColumn = `${ts}.Attributes['thread.id']`;
       break;
     case "customer_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.customer_id']`;
+      pipelineColumn = `${ts}.Attributes['customer.id']`;
       break;
     default:
       pipelineColumn = `${ts}.TraceId`;
