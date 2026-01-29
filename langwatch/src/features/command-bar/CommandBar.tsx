@@ -11,10 +11,7 @@ import { useCommandBar } from "./CommandBarContext";
 import { useCommandSearch } from "./useCommandSearch";
 import { useRecentItems } from "./useRecentItems";
 import type { ListItem } from "./getIconInfo";
-import {
-  COMMAND_BAR_TOP_MARGIN,
-  COMMAND_BAR_MAX_WIDTH,
-} from "./constants";
+import { COMMAND_BAR_TOP_MARGIN, COMMAND_BAR_MAX_WIDTH } from "./constants";
 import { HintsSection } from "./components/HintsSection";
 import { CommandBarInput } from "./components/CommandBarInput";
 import { CommandBarResults } from "./components/CommandBarResults";
@@ -43,14 +40,14 @@ import type { NextRouter } from "next/router";
 function handleTracesPageCommand(
   commandId: string,
   router: NextRouter,
-  close: () => void
+  close: () => void,
 ) {
   switch (commandId) {
     case "page-traces-view-list":
       void router.push(
         { query: { ...router.query, view: "list" } },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -58,7 +55,7 @@ function handleTracesPageCommand(
       void router.push(
         { query: { ...router.query, view: "table" } },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -74,7 +71,7 @@ function handleTracesPageCommand(
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -91,7 +88,7 @@ function handleTracesPageCommand(
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -109,7 +106,7 @@ function handleTracesPageCommand(
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -125,7 +122,7 @@ function handleTracesPageCommand(
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
       close();
       break;
@@ -163,7 +160,7 @@ export function CommandBar() {
   const filteredProjects = useFilteredProjects(
     query,
     organizations,
-    project?.slug
+    project?.slug,
   );
 
   // Build flat list of all items for keyboard navigation
@@ -172,7 +169,6 @@ export function CommandBar() {
     recentItemsLimited,
     searchInTracesItem,
     searchInDocsItem,
-    mathResultItem,
     easterEggItem,
   } = useCommandBarItems(
     query,
@@ -181,7 +177,7 @@ export function CommandBar() {
     searchResults,
     idResult,
     groupedItems,
-    project?.slug
+    project?.slug,
   );
 
   // Easter egg effects
@@ -216,7 +212,11 @@ export function CommandBar() {
 
         // Handle Open Chat (Crisp)
         if (cmd.id === "action-open-chat") {
-          const crisp = (window as unknown as { $crisp?: { push: (args: unknown[]) => void } }).$crisp;
+          const crisp = (
+            window as unknown as {
+              $crisp?: { push: (args: unknown[]) => void };
+            }
+          ).$crisp;
           crisp?.push(["do", "chat:show"]);
           crisp?.push(["do", "chat:toggle"]);
           close();
@@ -252,37 +252,20 @@ export function CommandBar() {
           return;
         }
 
-        // Handle math result - copy to clipboard
-        if (cmd.id === "computed-math") {
-          const match = cmd.label.match(/= (.+)$/);
-          if (match?.[1]) {
-            void navigator.clipboard.writeText(match[1]);
-            toaster.create({ title: `Copied ${match[1]} to clipboard`, type: "info" });
-          }
-          close();
-          return;
-        }
-
         // Handle page-specific commands (traces page)
         if (cmd.id.startsWith("page-traces-")) {
           handleTracesPageCommand(cmd.id, router, close);
           return;
         }
 
-        handleCommandSelect(
-          cmd,
-          projectSlug,
-          ctx,
-          addRecentItem,
-          openDrawer
-        );
+        handleCommandSelect(cmd, projectSlug, ctx, addRecentItem, openDrawer);
       } else if (item.type === "search") {
         handleSearchResultSelect(
           item.data,
           projectSlug,
           ctx,
           addRecentItem,
-          openDrawer
+          openDrawer,
         );
       } else if (item.type === "recent") {
         handleRecentItemSelect(item.data, ctx, addRecentItem, openDrawer);
@@ -290,7 +273,16 @@ export function CommandBar() {
         handleProjectSelect(item.data, ctx, addRecentItem);
       }
     },
-    [project?.slug, router, close, openDrawer, addRecentItem, setTheme, query, triggerEffect]
+    [
+      project?.slug,
+      router,
+      close,
+      openDrawer,
+      addRecentItem,
+      setTheme,
+      query,
+      triggerEffect,
+    ],
   );
 
   // Copy link to clipboard
@@ -324,7 +316,7 @@ export function CommandBar() {
     setSelectedIndex,
     handleSelect,
     handleCopyLink,
-    isMac
+    isMac,
   );
 
   return (
@@ -368,7 +360,6 @@ export function CommandBar() {
           searchInDocsItem={searchInDocsItem}
           idResult={idResult}
           recentItemsLimited={recentItemsLimited}
-          mathResultItem={mathResultItem}
           easterEggItem={easterEggItem}
           isLoading={searchLoading}
         />

@@ -24,7 +24,6 @@ interface CommandBarResultsProps {
   searchInDocsItem: ListItem | null;
   idResult: SearchResult | null;
   recentItemsLimited: RecentItem[];
-  mathResultItem: ListItem | null;
   easterEggItem: ListItem | null;
   isLoading: boolean;
 }
@@ -59,11 +58,10 @@ export const CommandBarResults = forwardRef<
     searchInDocsItem,
     idResult,
     recentItemsLimited,
-    mathResultItem,
     easterEggItem,
     isLoading,
   },
-  ref
+  ref,
 ) {
   // Build group configurations for empty query state
   const emptyQueryGroups = useMemo<GroupConfig[]>(
@@ -83,7 +81,7 @@ export const CommandBarResults = forwardRef<
         })),
       },
     ],
-    [recentItemsLimited]
+    [recentItemsLimited],
   );
 
   // Build group configurations for query state
@@ -95,14 +93,6 @@ export const CommandBarResults = forwardRef<
       groups.push({
         label: "Easter Egg",
         items: [easterEggItem],
-      });
-    }
-
-    // Math result
-    if (mathResultItem) {
-      groups.push({
-        label: "Calculator",
-        items: [mathResultItem],
       });
     }
 
@@ -200,7 +190,6 @@ export const CommandBarResults = forwardRef<
     return groups;
   }, [
     easterEggItem,
-    mathResultItem,
     idResult,
     filteredNavigation,
     filteredActions,

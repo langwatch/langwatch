@@ -11,7 +11,6 @@ import {
 } from "../constants";
 import type { GroupedRecentItems } from "../useRecentItems";
 import { findEasterEgg } from "../easterEggs";
-import { useMathResult } from "./useMathResult";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
@@ -23,13 +22,12 @@ export function useCommandBarItems(
   searchResults: SearchResult[],
   idResult: SearchResult | null,
   groupedItems: GroupedRecentItems,
-  projectSlug: string | undefined
+  projectSlug: string | undefined,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
   searchInTracesItem: ListItem | null;
   searchInDocsItem: ListItem | null;
-  mathResultItem: ListItem | null;
   easterEggItem: ListItem | null;
 } {
   // Get top recent items across all time groups
@@ -81,9 +79,6 @@ export function useCommandBarItems(
     };
   }, [query]);
 
-  // Math result item (e.g., "1+2*3 = 7")
-  const mathResultItem = useMathResult(query);
-
   // Easter egg item
   const easterEggItem = useMemo<ListItem | null>(() => {
     const egg = findEasterEgg(query);
@@ -117,10 +112,6 @@ export function useCommandBarItems(
       // Add easter egg item first if found
       if (easterEggItem) {
         items.push(easterEggItem);
-      }
-      // Add math result item
-      if (mathResultItem) {
-        items.push(mathResultItem);
       }
       // Add ID result if detected
       if (idResult) {
@@ -162,7 +153,6 @@ export function useCommandBarItems(
     query,
     recentItemsLimited,
     easterEggItem,
-    mathResultItem,
     idResult,
     filteredCommands,
     searchResults,
@@ -176,7 +166,6 @@ export function useCommandBarItems(
     recentItemsLimited,
     searchInTracesItem,
     searchInDocsItem,
-    mathResultItem,
     easterEggItem,
   };
 }
