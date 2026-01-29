@@ -2,7 +2,7 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
-import { useHasFeature } from "../hooks/useHasFeature";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
@@ -27,8 +27,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const hasFeature = useHasFeature();
-  const { project, hasOrganizationPermission, isPublicRoute } =
+  const { project, hasOrganizationPermission, isPublicRoute, organization } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -37,7 +36,10 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  const showScenariosOnThePlatform = hasFeature("release_ui_simulations_menu_enabled");
+  const { enabled: showScenariosOnThePlatform } = useFeatureFlag(
+    "release_ui_simulations_menu_enabled",
+    { projectId: project?.id, organizationId: organization?.id },
+  );
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;

@@ -23,34 +23,11 @@ import OktaProvider from "next-auth/providers/okta";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
-import {
-  featureFlagService,
-  type FrontendFeatureFlag,
-} from "./featureFlag";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger";
 import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");
-
-/**
- * Builds a session object with user features.
- * Extracted to eliminate duplication between session callback code paths.
- */
-const buildSessionWithFeatures = (
-  session: DefaultSession,
-  userId: string,
-  email: string | null,
-  enabledFeatures: FrontendFeatureFlag[],
-) => ({
-  ...session,
-  user: {
-    ...session.user,
-    id: userId,
-    email,
-    enabledFeatures,
-  },
-});
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -62,7 +39,6 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
-      enabledFeatures?: FrontendFeatureFlag[];
     };
   }
 }
@@ -101,48 +77,24 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        let enabledFeatures: FrontendFeatureFlag[] = [];
-
-        try {
-          enabledFeatures = await featureFlagService.getSessionFeatures(
-            user_.id,
-            prisma,
-          );
-        } catch (error) {
-          logger.error(
-            { error, userId: user_.id },
-            "Failed to load feature flags for session",
-          );
-        }
-
-        return buildSessionWithFeatures(
-          session,
-          user_.id,
-          user_.email,
-          enabledFeatures,
-        );
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id: user_.id,
+            email: user_.email,
+          },
+        };
       }
 
-      let enabledFeatures: FrontendFeatureFlag[] = [];
-
-      try {
-        enabledFeatures = await featureFlagService.getSessionFeatures(
-          user.id,
-          prisma,
-        );
-      } catch (error) {
-        logger.error(
-          { error, userId: user.id },
-          "Failed to load feature flags for session",
-        );
-      }
-
-      return buildSessionWithFeatures(
-        session,
-        user.id,
-        user.email,
-        enabledFeatures,
-      );
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: user.id,
+          email: user.email,
+        },
+      };
     },
     signIn: async ({ user, account }) => {
       if (!user.email) {
