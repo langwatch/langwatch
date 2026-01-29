@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   HStack,
-  Input,
   Portal,
   Spacer,
   type StackProps,
@@ -13,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -38,10 +37,10 @@ import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { RandomColorAvatar } from "./RandomColorAvatar";
-import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
+import { CommandBarTrigger } from "../features/command-bar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -330,8 +329,6 @@ export const DashboardLayout = ({
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
 
-  const [query, setQuery] = useState(router.query.query as string);
-
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -425,59 +422,8 @@ export const DashboardLayout = ({
 
         {/* Right side: Search, integrations, user */}
         <HStack gap={2} justifyContent="flex-end">
-          {/* Search bar - compact, expands on focus */}
-          {project && (
-            <form
-              action={`${project.slug}/messages`}
-              method="GET"
-              onSubmit={(e: React.FormEvent) => {
-                e.preventDefault();
-                if (
-                  router.query.view === "list" ||
-                  router.query.view === "table"
-                ) {
-                  void router.replace({ query: { ...router.query, query } });
-                } else {
-                  void router.push(
-                    `/${project.slug}/messages?query=${encodeURIComponent(
-                      query,
-                    )}`,
-                  );
-                }
-              }}
-            >
-              <InputGroup
-                startElement={
-                  <Search color="var(--chakra-colors-fg-muted)" size={14} />
-                }
-              >
-                <Input
-                  name="query"
-                  type="search"
-                  placeholder="Search"
-                  _placeholder={{ color: "fg.muted" }}
-                  fontSize="13px"
-                  paddingY={1}
-                  paddingLeft={8}
-                  paddingRight={3}
-                  width="120px"
-                  height="32px"
-                  backgroundColor="bg.input"
-                  border="none"
-                  borderRadius="full"
-                  transition="all 0.2s ease-in-out"
-                  _focus={{
-                    width: "240px",
-                    backgroundColor: "bg.inputHover",
-                    boxShadow: "sm",
-                    outline: "none",
-                  }}
-                  value={query ?? router.query.query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </InputGroup>
-            </form>
-          )}
+          {/* Command bar trigger */}
+          {project && <CommandBarTrigger />}
 
           <Menu.Root>
             <Menu.Trigger asChild>
