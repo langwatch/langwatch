@@ -133,19 +133,19 @@ function getGroupByExpression(
 
     case "metadata.user_id":
       return {
-        column: `${ts}.Attributes['langwatch.user_id']`,
+        column: `${ts}.Attributes['user.id']`,
         requiredJoins: [],
       };
 
     case "metadata.thread_id":
       return {
-        column: `${ts}.Attributes['gen_ai.conversation.id']`,
+        column: `${ts}.Attributes['thread.id']`,
         requiredJoins: [],
       };
 
     case "metadata.customer_id":
       return {
-        column: `${ts}.Attributes['langwatch.customer_id']`,
+        column: `${ts}.Attributes['customer.id']`,
         requiredJoins: [],
       };
 
@@ -421,15 +421,15 @@ export function buildDataForFilterQuery(
     case "metadata.user_id":
       sql = `
         SELECT
-          ${ts}.Attributes['langwatch.user_id'] AS field,
-          ${ts}.Attributes['langwatch.user_id'] AS label,
+          ${ts}.Attributes['user.id'] AS field,
+          ${ts}.Attributes['user.id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
           AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
-          AND ${ts}.Attributes['langwatch.user_id'] != ''
-          ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
+          AND ${ts}.Attributes['user.id'] != ''
+          ${searchQuery ? `AND ${ts}.Attributes['user.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -439,15 +439,15 @@ export function buildDataForFilterQuery(
     case "metadata.thread_id":
       sql = `
         SELECT
-          ${ts}.Attributes['gen_ai.conversation.id'] AS field,
-          ${ts}.Attributes['gen_ai.conversation.id'] AS label,
+          ${ts}.Attributes['thread.id'] AS field,
+          ${ts}.Attributes['thread.id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
           AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
-          AND ${ts}.Attributes['gen_ai.conversation.id'] != ''
-          ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
+          AND ${ts}.Attributes['thread.id'] != ''
+          ${searchQuery ? `AND ${ts}.Attributes['thread.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
