@@ -214,37 +214,45 @@ const auditLogMutations = t.middleware(
 
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
-    const start = Date.now();
-    let error: unknown = null;
+    // Import context utilities dynamically to avoid circular deps
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
-    try {
-      return await next();
-    } catch (err) {
-      error = err;
-      throw err;
-    } finally {
-      const duration = Date.now() - start;
-      const logData: Record<string, any> = {
-        path,
-        type,
-        duration,
-        userId: ctx.session?.user?.id ?? null,
-        userAgent: ctx.req?.headers["user-agent"] ?? null,
-        statusCode: ctx.res?.statusCode ?? null,
-        projectId: (input as any)?.projectId ?? null,
-        organizationId: (input as any)?.organizationId ?? null,
-      };
+    // Create context from tRPC context and input
+    const requestContext = createContextFromTRPC(ctx, input as any);
 
-      if (error) {
-        logData.error = error instanceof Error ? error : JSON.stringify(error);
+    return runWithContext(requestContext, async () => {
+      const start = Date.now();
+      let error: unknown = null;
 
-        captureException(error);
+      try {
+        return await next();
+      } catch (err) {
+        error = err;
+        throw err;
+      } finally {
+        const duration = Date.now() - start;
+        // Logger automatically includes context (traceId, spanId, userId, projectId, organizationId)
+        const logData: Record<string, any> = {
+          path,
+          type,
+          duration,
+          userAgent: ctx.req?.headers["user-agent"] ?? null,
+          statusCode: ctx.res?.statusCode ?? null,
+        };
 
-        logger.error(logData, "trpc error");
-      } else {
-        logger.info(logData, "trpc call");
+        if (error) {
+          logData.error = error instanceof Error ? error : JSON.stringify(error);
+
+          captureException(error);
+
+          logger.error(logData, "trpc error");
+        } else {
+          logger.info(logData, "trpc call");
+        }
       }
-    }
+    });
   },
 );
 
