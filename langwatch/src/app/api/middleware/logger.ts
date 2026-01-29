@@ -32,12 +32,8 @@ export const loggerMiddleware = () => {
         // Extract path for metrics (without query params)
         const urlPath = new URL(url).pathname;
 
-        // Record HTTP request duration metric with context
-        observeHttpRequestDuration(method, urlPath, statusCode, duration / 1000, {
-          organizationId: ctx.organizationId,
-          projectId: ctx.projectId,
-          userId: ctx.userId,
-        });
+        // Record HTTP request duration metric
+        observeHttpRequestDuration(method, urlPath, statusCode, duration / 1000);
 
         // Logger automatically includes context (traceId, spanId, etc.)
         const logData: Record<string, unknown> = {
