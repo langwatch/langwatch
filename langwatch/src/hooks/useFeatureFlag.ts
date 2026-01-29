@@ -1,4 +1,4 @@
-import { FEATURE_FLAG_CACHE_TTL_MS } from "../server/featureFlag/config";
+import { FEATURE_FLAG_CACHE_TTL_MS } from "../server/featureFlag/constants";
 import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
 import { api } from "../utils/api";
 

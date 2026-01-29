@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/config";
+import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/constants";
 import { useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
