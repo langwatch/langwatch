@@ -290,9 +290,9 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   /**
    * Processes a single job from the queue.
    */
-  private async processJob(job: Job<JobDataWithContext<Payload>>): Promise<void> {
-    // Extract context metadata from job data
-    const jobData = job.data;
+  private async processJob(job: Job<Payload>): Promise<void> {
+    // Cast to JobDataWithContext to access the __context field we attached
+    const jobData = job.data as JobDataWithContext<Payload>;
     const contextMetadata = jobData.__context;
 
     // Create request context from job metadata
@@ -525,10 +525,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     // Get current context metadata and attach it to the job payload for trace correlation
     const contextMetadata = getJobContextMetadata();
-    const payloadWithContext: JobDataWithContext<Payload> = {
+    const payloadWithContext = {
       ...payload,
       __context: contextMetadata,
-    };
+    } as Payload; // Cast back to Payload for the queue, but includes __context at runtime
 
     await this.queue.add(
       // @ts-expect-error - jobName is a string, this is stupid typing from BullMQ
