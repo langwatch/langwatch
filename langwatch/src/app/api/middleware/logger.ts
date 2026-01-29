@@ -6,6 +6,10 @@ import {
   runWithContext,
 } from "../../../server/context/asyncContext";
 import { observeHttpRequestDuration } from "../../../server/metrics";
+import {
+  getStatusCodeFromError,
+  logHttpRequest,
+} from "../../../server/middleware/requestLogging";
 
 const logger = createLogger("langwatch:api:hono");
 
@@ -27,7 +31,7 @@ export const loggerMiddleware = () => {
         const duration = Date.now() - start;
         const { method } = c.req;
         const url = c.req.url;
-        const statusCode = c.res.status || getStatusCode(error);
+        const statusCode = c.res.status || getStatusCodeFromError(error);
 
         // Extract path for metrics (without query params)
         const urlPath = new URL(url).pathname;
@@ -35,38 +39,16 @@ export const loggerMiddleware = () => {
         // Record HTTP request duration metric
         observeHttpRequestDuration(method, urlPath, statusCode, duration / 1000);
 
-        // Logger automatically includes context (traceId, spanId, etc.)
-        const logData: Record<string, unknown> = {
+        // Log the request
+        logHttpRequest(logger, {
           method,
           url,
           statusCode,
           duration,
           userAgent: c.req.header("user-agent") ?? null,
-        };
-
-        if (error || c.error) {
-          logData.error = error;
-          logger.error(logData, "error handling request");
-        } else {
-          logger.info(logData, "request handled");
-        }
+          error: error || c.error,
+        });
       }
     });
   };
 };
-
-function getStatusCode(error: unknown): number {
-  if (
-    error instanceof Error &&
-    "status" in error &&
-    typeof error.status === "number"
-  ) {
-    return error.status;
-  }
-
-  if (error) {
-    return 500;
-  }
-
-  return 200;
-}
