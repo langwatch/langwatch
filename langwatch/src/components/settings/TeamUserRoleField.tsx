@@ -107,7 +107,7 @@ export const TeamUserRoleField = ({
   };
 
   return (
-    <VStack align="start">
+    <VStack align="start" paddingY={1}>
       <Controller
         control={control}
         name={`role`}
