@@ -343,7 +343,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     WHERE ${baseWhere}
       ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
-    ORDER BY period, ${input.timeScale !== "full" ? "date" : "1"}
+    ORDER BY period${input.timeScale !== "full" && typeof input.timeScale === "number" ? ", date" : ""}
   `;
 
   return {

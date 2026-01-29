@@ -9,7 +9,8 @@ import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import { timeseries } from "~/server/analytics/timeseries";
+import { getAnalyticsService } from "~/server/analytics/analytics.service";
+import type { TimeseriesResult } from "~/server/analytics/types";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -23,17 +24,6 @@ type StoredGraphConfig = Pick<
   CustomGraphInput,
   "series" | "groupBy" | "groupByKey" | "timeScale"
 >;
-
-// Types for timeseries results (no existing type found, so we define it)
-interface TimeseriesBucket {
-  date: string;
-  [seriesName: string]: string | number;
-}
-
-interface TimeseriesResult {
-  previousPeriod: TimeseriesBucket[];
-  currentPeriod: TimeseriesBucket[];
-}
 
 export const processCustomGraphTrigger = async (
   trigger: Trigger,
@@ -167,7 +157,8 @@ export const processCustomGraphTrigger = async (
     };
 
     // Get analytics data
-    const timeseriesResult = await timeseries(timeseriesInput);
+    const analyticsService = getAnalyticsService();
+    const timeseriesResult = await analyticsService.getTimeseries(timeseriesInput);
 
     // Calculate current value (sum or average of the last period)
     // Use seriesName as the key to find the value in timeseries results
