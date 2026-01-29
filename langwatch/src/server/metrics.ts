@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { Counter, Histogram, register } from "prom-client";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 type Endpoint =
   | "collector"
@@ -160,3 +160,132 @@ export const piiChecksCounter = new Counter({
 
 export const getPiiChecksCounter = (method: string) =>
   piiChecksCounter.labels(method);
+
+// ============================================================================
+// BullMQ Queue Metrics
+// ============================================================================
+
+export type BullMQQueueState =
+  | "waiting"
+  | "active"
+  | "completed"
+  | "failed"
+  | "delayed"
+  | "paused"
+  | "prioritized"
+  | "waiting-children";
+
+// Gauge for BullMQ job counts by state (from getJobCounts())
+register.removeSingleMetric("bullmq_job_total");
+const bullmqJobTotal = new Gauge({
+  name: "bullmq_job_total",
+  help: "Total number of jobs in the queue by state",
+  labelNames: ["queue_name", "state"] as const,
+});
+
+export const setBullMQJobCount = (
+  queueName: string,
+  state: BullMQQueueState,
+  count: number,
+) => bullmqJobTotal.labels(queueName, state).set(count);
+
+// Histogram for job wait time (time from enqueue to processing start)
+register.removeSingleMetric("bullmq_job_wait_duration_milliseconds");
+export const bullmqJobWaitDurationHistogram = new Histogram({
+  name: "bullmq_job_wait_duration_milliseconds",
+  help: "Time jobs spend waiting in queue before processing starts",
+  labelNames: ["queue_name"] as const,
+  buckets: [
+    10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000,
+    300000,
+  ],
+});
+
+export const getBullMQJobWaitDurationHistogram = (queueName: string) =>
+  bullmqJobWaitDurationHistogram.labels(queueName);
+
+// Counter for stalled jobs
+register.removeSingleMetric("bullmq_job_stalled_total");
+const bullmqJobStalledTotal = new Counter({
+  name: "bullmq_job_stalled_total",
+  help: "Total number of jobs that have stalled",
+  labelNames: ["queue_name"] as const,
+});
+
+export const getBullMQJobStalledCounter = (queueName: string) =>
+  bullmqJobStalledTotal.labels(queueName);
+
+// ============================================================================
+// Event Sourcing Metrics
+// ============================================================================
+
+// Gauge for checkpoint lag (number of unprocessed events)
+register.removeSingleMetric("event_sourcing_checkpoint_lag");
+const eventSourcingCheckpointLag = new Gauge({
+  name: "event_sourcing_checkpoint_lag",
+  help: "Number of unprocessed events (lag) for event sourcing processors",
+  labelNames: ["pipeline_name", "processor_name", "processor_type"] as const,
+});
+
+export const setEventSourcingCheckpointLag = (
+  pipelineName: string,
+  processorName: string,
+  processorType: string,
+  lag: number,
+) =>
+  eventSourcingCheckpointLag.labels(pipelineName, processorName, processorType).set(lag);
+
+// Counter for lock contention events
+register.removeSingleMetric("event_sourcing_lock_contention_total");
+const eventSourcingLockContentionTotal = new Counter({
+  name: "event_sourcing_lock_contention_total",
+  help: "Total number of lock contention events in event sourcing",
+  labelNames: ["pipeline_name", "processor_name"] as const,
+});
+
+export const getEventSourcingLockContentionCounter = (
+  pipelineName: string,
+  processorName: string,
+) => eventSourcingLockContentionTotal.labels(pipelineName, processorName);
+
+// ============================================================================
+// HTTP Request Metrics (with org/project/user labels)
+// ============================================================================
+
+// Histogram for HTTP request duration with context labels
+register.removeSingleMetric("http_request_duration_seconds");
+export const httpRequestDurationHistogram = new Histogram({
+  name: "http_request_duration_seconds",
+  help: "Duration of HTTP requests in seconds",
+  labelNames: [
+    "method",
+    "path",
+    "status_code",
+    "organization_id",
+    "project_id",
+    "user_id",
+  ] as const,
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
+
+export const observeHttpRequestDuration = (
+  method: string,
+  path: string,
+  statusCode: number,
+  durationSeconds: number,
+  context?: {
+    organizationId?: string;
+    projectId?: string;
+    userId?: string;
+  },
+) =>
+  httpRequestDurationHistogram
+    .labels(
+      method,
+      path,
+      statusCode.toString(),
+      context?.organizationId ?? "",
+      context?.projectId ?? "",
+      context?.userId ?? "",
+    )
+    .observe(durationSeconds);
