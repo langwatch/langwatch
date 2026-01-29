@@ -110,9 +110,10 @@ export function handleSearchResultSelect(
   if (result.drawerAction) {
     addRecentItem({
       id: result.id,
-      type: "trace",
+      type: result.type === "trace" ? "trace" : "entity",
       label: result.label,
-      description: result.type === "trace" ? "Trace" : undefined,
+      description:
+        result.type.charAt(0).toUpperCase() + result.type.slice(1),
       path: result.path,
       iconName: result.type,
       projectSlug,

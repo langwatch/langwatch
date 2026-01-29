@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import { HINTS } from "../constants";
@@ -8,8 +8,13 @@ import { HINTS } from "../constants";
  * Displays a random tip that stays stable for the session.
  */
 export function HintsSection() {
-  // Pick a random hint on mount (stable for the session)
-  const [hintIndex] = useState(() => Math.floor(Math.random() * HINTS.length));
+  // Initialize to 0 for SSR, then randomize on client to avoid hydration mismatch
+  const [hintIndex, setHintIndex] = useState(0);
+
+  useEffect(() => {
+    setHintIndex(Math.floor(Math.random() * HINTS.length));
+  }, []);
+
   const hint = HINTS[hintIndex];
 
   return (

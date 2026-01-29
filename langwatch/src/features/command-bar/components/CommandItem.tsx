@@ -40,18 +40,8 @@ export function CommandItem({
     description = item.data.orgTeam;
   }
 
-  const key =
-    item.type === "project"
-      ? `project-${item.data.slug}`
-      : item.type === "command"
-        ? item.data.id
-        : item.type === "search"
-          ? item.data.id
-          : item.data.id;
-
   return (
     <HStack
-      key={key}
       data-index={index}
       px={4}
       py={1.5}

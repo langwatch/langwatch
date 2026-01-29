@@ -1,6 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { CommandItem } from "./CommandItem";
-import type { ListItem } from "../getIconInfo";
+import { getItemKey, type ListItem } from "../getIconInfo";
 
 interface CommandGroupProps {
   label: string;
@@ -38,15 +38,7 @@ export function CommandGroup({
       </Text>
       {items.map((item, i) => (
         <CommandItem
-          key={
-            item.type === "project"
-              ? `project-${item.data.slug}`
-              : item.type === "command"
-                ? item.data.id
-                : item.type === "search"
-                  ? item.data.id
-                  : item.data.id
-          }
+          key={getItemKey(item)}
           item={item}
           index={startIndex + i}
           isSelected={startIndex + i === selectedIndex}

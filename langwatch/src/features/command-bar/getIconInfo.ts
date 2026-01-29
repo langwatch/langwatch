@@ -13,6 +13,21 @@ export type ListItem =
   | { type: "project"; data: { slug: string; name: string; orgTeam: string } };
 
 /**
+ * Get a unique key for a list item.
+ * Extracted to avoid duplicate logic in CommandGroup and CommandItem.
+ */
+export function getItemKey(item: ListItem): string {
+  switch (item.type) {
+    case "project":
+      return `project-${item.data.slug}`;
+    case "command":
+    case "search":
+    case "recent":
+      return item.data.id;
+  }
+}
+
+/**
  * Get icon component and color for a list item.
  */
 export function getIconInfo(item: ListItem) {

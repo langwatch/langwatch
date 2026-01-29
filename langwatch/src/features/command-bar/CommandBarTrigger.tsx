@@ -1,6 +1,7 @@
-import { Button, HStack, Kbd, Text } from "@chakra-ui/react";
+import { Button, Kbd, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { useCommandBar } from "./CommandBarContext";
+import { getCommandBarShortcut } from "./utils/platform";
 
 /**
  * Button to trigger opening the command bar.
@@ -8,15 +9,11 @@ import { useCommandBar } from "./CommandBarContext";
  */
 export function CommandBarTrigger() {
   const { open } = useCommandBar();
-
-  // Detect platform for keyboard hint
-  const isMac =
-    typeof navigator !== "undefined" &&
-    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-  const shortcut = isMac ? "⌘K" : "Ctrl+K";
+  const shortcut = getCommandBarShortcut();
 
   return (
     <Button
+      aria-label="Open command bar"
       variant="ghost"
       borderRadius="full"
       backgroundColor="bg.input"
@@ -30,7 +27,7 @@ export function CommandBarTrigger() {
       onClick={open}
       _hover={{ backgroundColor: "bg.inputHover" }}
     >
-      <Search size={14} />
+      <Search size={14} aria-hidden />
       <Text display={{ base: "none", md: "block" }}>Search</Text>
       <Kbd size="sm" display={{ base: "none", md: "block" }}>
         {shortcut}

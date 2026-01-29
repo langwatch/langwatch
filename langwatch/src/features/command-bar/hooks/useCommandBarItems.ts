@@ -43,7 +43,10 @@ export function useCommandBarItems(
     if (!query.trim() || query.trim().length < MIN_SEARCH_QUERY_LENGTH) {
       return null;
     }
-    const slug = projectSlug ?? "";
+    // Don't create invalid path when projectSlug is missing
+    if (!projectSlug) {
+      return null;
+    }
     return {
       type: "command",
       data: {
@@ -51,7 +54,7 @@ export function useCommandBarItems(
         label: `Search "${query.trim()}" in traces`,
         icon: Search,
         category: "navigation",
-        path: `/${slug}/messages?query=${encodeURIComponent(query.trim())}`,
+        path: `/${projectSlug}/messages?query=${encodeURIComponent(query.trim())}`,
       } as Command,
     };
   }, [query, projectSlug]);

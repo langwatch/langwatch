@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react";
 import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
 import { useActivityTracker } from "./useActivityTracker";
+import { getIsMac } from "./utils/platform";
 
 interface CommandBarProviderProps {
   children: React.ReactNode;
@@ -45,7 +46,7 @@ export function CommandBarProvider({ children }: CommandBarProviderProps) {
       if (!session) return;
 
       // Check for Cmd+K (Mac) or Ctrl+K (Windows/Linux)
-      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const isMac = getIsMac();
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
       if (modKey && e.key === "k") {

@@ -19,10 +19,12 @@ export function useCommandBarKeyboard(
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
+          if (allItems.length === 0) break;
           setSelectedIndex((i) => (i >= allItems.length - 1 ? 0 : i + 1));
           break;
         case "ArrowUp":
           e.preventDefault();
+          if (allItems.length === 0) break;
           setSelectedIndex((i) => (i <= 0 ? allItems.length - 1 : i - 1));
           break;
         case "Enter":
