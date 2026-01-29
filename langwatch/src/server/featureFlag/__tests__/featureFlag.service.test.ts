@@ -18,94 +18,100 @@ vi.mock("../featureFlagService.memory", () => ({
 }));
 
 describe("FeatureFlagService", () => {
-  describe("isEnabled", () => {
+  describe("isEnabled()", () => {
     let service: FeatureFlagService;
 
     beforeEach(() => {
       service = FeatureFlagService.create();
     });
 
-    it("returns result from underlying service", async () => {
-      const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-      vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+    describe("when no env override is set", () => {
+      it("delegates to underlying service", async () => {
+        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
 
-      const result = await service.isEnabled("some-flag", "user-1", false);
+        const result = await service.isEnabled("some-flag", "user-1", false);
 
-      expect(result).toBe(true);
-      expect(mockService.isEnabled).toHaveBeenCalledWith(
-        "some-flag",
-        "user-1",
-        false,
-        undefined,
-      );
+        expect(result).toBe(true);
+        expect(mockService.isEnabled).toHaveBeenCalledWith(
+          "some-flag",
+          "user-1",
+          false,
+          undefined,
+        );
+      });
+
+      it("passes projectId to underlying service", async () => {
+        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+
+        const options = { projectId: "proj-123" };
+        await service.isEnabled("some-flag", "user-1", true, options);
+
+        expect(mockService.isEnabled).toHaveBeenCalledWith(
+          "some-flag",
+          "user-1",
+          true,
+          options,
+        );
+      });
+
+      it("passes organizationId to underlying service", async () => {
+        const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
+        vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+
+        const options = { organizationId: "org-456" };
+        await service.isEnabled("some-flag", "user-1", false, options);
+
+        expect(mockService.isEnabled).toHaveBeenCalledWith(
+          "some-flag",
+          "user-1",
+          false,
+          options,
+        );
+      });
     });
 
-    it("forwards projectId option to underlying service", async () => {
-      const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-      vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+    describe("when env override is set", () => {
+      const originalEnv = process.env;
 
-      const options = { projectId: "proj-123" };
-      await service.isEnabled("some-flag", "user-1", true, options);
+      beforeEach(() => {
+        process.env = { ...originalEnv };
+      });
 
-      expect(mockService.isEnabled).toHaveBeenCalledWith(
-        "some-flag",
-        "user-1",
-        true,
-        options,
-      );
-    });
+      afterEach(() => {
+        process.env = originalEnv;
+      });
 
-    it("forwards organizationId option to underlying service", async () => {
-      const mockService = { isEnabled: vi.fn().mockResolvedValue(true) };
-      vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
+      describe("when env var is 1", () => {
+        it("returns true regardless of default", async () => {
+          process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "1";
+          const service = FeatureFlagService.create();
 
-      const options = { organizationId: "org-456" };
-      await service.isEnabled("some-flag", "user-1", false, options);
+          const result = await service.isEnabled(
+            "release_ui_simulations_menu_enabled",
+            "user-123",
+            false,
+          );
 
-      expect(mockService.isEnabled).toHaveBeenCalledWith(
-        "some-flag",
-        "user-1",
-        false,
-        options,
-      );
-    });
-  });
+          expect(result).toBe(true);
+        });
+      });
 
-  describe("isEnabled with env override", () => {
-    const originalEnv = process.env;
+      describe("when env var is 0", () => {
+        it("returns false regardless of default", async () => {
+          process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "0";
+          const service = FeatureFlagService.create();
 
-    beforeEach(() => {
-      process.env = { ...originalEnv };
-    });
+          const result = await service.isEnabled(
+            "release_ui_simulations_menu_enabled",
+            "user-123",
+            true,
+          );
 
-    it("returns env override when set to 1", async () => {
-      process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "1";
-      const service = FeatureFlagService.create();
-
-      const result = await service.isEnabled(
-        "release_ui_simulations_menu_enabled",
-        "user-123",
-        false,
-      );
-
-      expect(result).toBe(true);
-    });
-
-    it("returns env override when set to 0", async () => {
-      process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "0";
-      const service = FeatureFlagService.create();
-
-      const result = await service.isEnabled(
-        "release_ui_simulations_menu_enabled",
-        "user-123",
-        true,
-      );
-
-      expect(result).toBe(false);
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
+          expect(result).toBe(false);
+        });
+      });
     });
   });
 });

@@ -20,122 +20,185 @@ import { api } from "../../utils/api";
 
 const mockUseQuery = vi.mocked(api.featureFlag.isEnabled.useQuery);
 
-describe("useFeatureFlag", () => {
+describe("useFeatureFlag()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns loading state initially", () => {
-    mockUseQuery.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    } as any);
+  describe("when query is loading", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+      } as any);
+    });
 
-    const { result } = renderHook(() =>
-      useFeatureFlag("release_ui_simulations_menu_enabled"),
-    );
+    it("returns isLoading true", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
 
-    expect(result.current.isLoading).toBe(true);
-    expect(result.current.enabled).toBe(false);
+      expect(result.current.isLoading).toBe(true);
+    });
+
+    it("returns enabled false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
+
+      expect(result.current.enabled).toBe(false);
+    });
   });
 
-  it("returns enabled false when flag is disabled", () => {
-    mockUseQuery.mockReturnValue({
-      data: { enabled: false },
-      isLoading: false,
-    } as any);
+  describe("when flag is disabled", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: { enabled: false },
+        isLoading: false,
+      } as any);
+    });
 
-    const { result } = renderHook(() =>
-      useFeatureFlag("release_ui_simulations_menu_enabled"),
-    );
+    it("returns enabled false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
 
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.enabled).toBe(false);
+      expect(result.current.enabled).toBe(false);
+    });
+
+    it("returns isLoading false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
+
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
-  it("returns enabled true when flag is enabled", () => {
-    mockUseQuery.mockReturnValue({
-      data: { enabled: true },
-      isLoading: false,
-    } as any);
+  describe("when flag is enabled", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: { enabled: true },
+        isLoading: false,
+      } as any);
+    });
 
-    const { result } = renderHook(() =>
-      useFeatureFlag("release_ui_simulations_menu_enabled"),
-    );
+    it("returns enabled true", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
 
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.enabled).toBe(true);
+      expect(result.current.enabled).toBe(true);
+    });
+
+    it("returns isLoading false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled"),
+      );
+
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
-  it("passes flag and options to useQuery", () => {
-    mockUseQuery.mockReturnValue({
-      data: { enabled: false },
-      isLoading: false,
-    } as any);
+  describe("when options are provided", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: { enabled: false },
+        isLoading: false,
+      } as any);
+    });
 
-    renderHook(() =>
-      useFeatureFlag("release_ui_simulations_menu_enabled", {
-        projectId: "proj-123",
-        organizationId: "org-456",
-      }),
-    );
+    it("passes projectId and organizationId to query", () => {
+      renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled", {
+          projectId: "proj-123",
+          organizationId: "org-456",
+        }),
+      );
 
-    expect(mockUseQuery).toHaveBeenCalledWith(
-      {
-        flag: "release_ui_simulations_menu_enabled",
-        targetProjectId: "proj-123",
-        targetOrganizationId: "org-456",
-      },
-      {
-        staleTime: FEATURE_FLAG_CACHE_TTL_MS,
-        refetchOnWindowFocus: false,
-        enabled: true,
-      },
-    );
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        {
+          flag: "release_ui_simulations_menu_enabled",
+          targetProjectId: "proj-123",
+          targetOrganizationId: "org-456",
+        },
+        {
+          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          refetchOnWindowFocus: false,
+          enabled: true,
+        },
+      );
+    });
   });
 
-  it("passes undefined for optional params when not provided", () => {
-    mockUseQuery.mockReturnValue({
-      data: { enabled: false },
-      isLoading: false,
-    } as any);
+  describe("when options are not provided", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: { enabled: false },
+        isLoading: false,
+      } as any);
+    });
 
-    renderHook(() => useFeatureFlag("release_ui_simulations_menu_enabled"));
+    it("passes undefined for optional params", () => {
+      renderHook(() => useFeatureFlag("release_ui_simulations_menu_enabled"));
 
-    expect(mockUseQuery).toHaveBeenCalledWith(
-      {
-        flag: "release_ui_simulations_menu_enabled",
-        targetProjectId: undefined,
-        targetOrganizationId: undefined,
-      },
-      {
-        staleTime: FEATURE_FLAG_CACHE_TTL_MS,
-        refetchOnWindowFocus: false,
-        enabled: true,
-      },
-    );
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        {
+          flag: "release_ui_simulations_menu_enabled",
+          targetProjectId: undefined,
+          targetOrganizationId: undefined,
+        },
+        {
+          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          refetchOnWindowFocus: false,
+          enabled: true,
+        },
+      );
+    });
   });
 
-  it("disables query when enabled option is false", () => {
-    mockUseQuery.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-    } as any);
+  describe("when enabled option is false", () => {
+    beforeEach(() => {
+      mockUseQuery.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      } as any);
+    });
 
-    const { result } = renderHook(() =>
-      useFeatureFlag("release_ui_simulations_menu_enabled", {
-        projectId: undefined,
-        enabled: false,
-      }),
-    );
+    it("disables the query", () => {
+      renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled", {
+          projectId: undefined,
+          enabled: false,
+        }),
+      );
 
-    expect(mockUseQuery).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        enabled: false,
-      }),
-    );
-    expect(result.current.enabled).toBe(false);
-    expect(result.current.isLoading).toBe(false);
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          enabled: false,
+        }),
+      );
+    });
+
+    it("returns enabled false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled", {
+          enabled: false,
+        }),
+      );
+
+      expect(result.current.enabled).toBe(false);
+    });
+
+    it("returns isLoading false", () => {
+      const { result } = renderHook(() =>
+        useFeatureFlag("release_ui_simulations_menu_enabled", {
+          enabled: false,
+        }),
+      );
+
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 });
