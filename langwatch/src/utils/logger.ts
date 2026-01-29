@@ -23,9 +23,9 @@ export interface CreateLoggerOptions {
  * Browser: Uses pino's browser mode with console output.
  *
  * Environment variables:
- * - PINO_CONSOLE_LEVEL: Console log level (default: "warn" in dev, "info" in prod)
+ * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
+ * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export (local dev only)
  * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
- * - OTEL_EXPORTER_OTLP_ENDPOINT: Enable OTel log export to this endpoint
  *
  * @param name - Logger name (e.g., "langwatch:api:hono")
  * @param options - Optional configuration
@@ -46,10 +46,9 @@ function createServerLogger(
   options?: CreateLoggerOptions,
 ): PinoLogger {
   const isDevMode = process.env.NODE_ENV !== "production";
-  const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
 
-  const consoleLevel =
-    process.env.PINO_CONSOLE_LEVEL ?? (isDevMode ? "warn" : "info");
+  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
   const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
   const baseLevel =
     process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "debug";
@@ -66,24 +65,29 @@ function createServerLogger(
     mixin: options?.disableContext ? undefined : () => getContext(),
   };
 
-  const transport = buildTransport({ isDevMode, otelEndpoint, consoleLevel, otelLevel });
-
-  return pino(pinoOptions, transport);
+  // Try to create transport, fallback to stdout on error
+  try {
+    const transport = buildTransport({ isDevMode, otelLogsEnabled, consoleLevel, otelLevel });
+    return pino(pinoOptions, transport);
+  } catch (error) {
+    console.error("Failed to create pino transport, falling back to stdout:", error);
+    return pino(pinoOptions, process.stdout);
+  }
 }
 
 function buildTransport(config: {
   isDevMode: boolean;
-  otelEndpoint: string | undefined;
+  otelLogsEnabled: boolean;
   consoleLevel: string;
   otelLevel: string;
 }) {
-  const { isDevMode, otelEndpoint, consoleLevel, otelLevel } = config;
+  const { isDevMode, otelLogsEnabled, consoleLevel, otelLevel } = config;
 
   const targets: pino.TransportTargetOptions[] = [
     buildConsoleTransport(isDevMode, consoleLevel),
   ];
 
-  if (otelEndpoint) {
+  if (otelLogsEnabled) {
     targets.push(buildOtelTransport(otelLevel));
   }
 
