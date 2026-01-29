@@ -32,17 +32,7 @@ Then explore relevant code to understand existing patterns.
 4. Run `pnpm typecheck` after changes
 5. Run relevant tests after changes
 
-### 4. Update Documentation
-
-Before returning, check if documentation needs updating:
-- **ADRs**: If implementing a new architectural pattern, check `docs/adr/` for existing ADRs or create one
-- **JSDoc**: Add/update JSDoc for new public APIs, classes, and exported functions
-- **README**: If feature affects usage, update README
-- **CLAUDE.md/AGENTS.md**: If introducing new patterns or common mistakes
-
-Documentation that contradicts implementation is worse than no documentation.
-
-### 5. Self-Verify Before Returning
+### 4. Self-Verify Before Returning
 
 **Tests must pass before you return.** If tests fail, fix them.
 
@@ -54,7 +44,7 @@ Check EACH acceptance criterion:
 
 If ANY criterion is not met or tests are failing, fix it before returning.
 
-### 6. Return Summary
+### 5. Return Summary
 
 ```
 ## Implemented
@@ -62,10 +52,6 @@ If ANY criterion is not met or tests are failing, fix it before returning.
 
 ## Tests
 - What tests added/modified
-
-## Documentation
-- ADRs created/updated: [list or "N/A"]
-- JSDoc added: [list key classes/functions]
 
 ## Verification
 [x] Criterion 1 - test_name
@@ -86,6 +72,3 @@ Ready for review / Blocked on [X]
 - Returning with failing tests
 - Assuming "it should work" without verification
 - Not reporting pivots/discoveries
-- Implementing new patterns without updating/creating ADRs
-- Leaving public APIs undocumented
-- Creating ADRs that don't match implementation
