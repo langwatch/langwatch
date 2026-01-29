@@ -1,7 +1,17 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+"use client";
+
+import {
+  HStack,
+  Portal,
+  Select,
+  Span,
+  Spinner,
+  Stack,
+  VStack,
+  createListCollection,
+} from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { api } from "../../utils/api";
 import { toaster } from "../ui/toaster";
 
@@ -46,21 +56,20 @@ export function OrganizationUserRoleField({
       orgRoleOptions.find((o) => o.value === defaultRole) ?? orgRoleOptions[0]!,
   );
 
+  const collection = createListCollection({
+    items: orgRoleOptions,
+  });
+
   return (
     <VStack align="start">
       <HStack gap={6}>
-        <MultiSelect
-          options={orgRoleOptions}
-          value={selectedRole}
-          isSearchable={false}
-          chakraStyles={{
-            container: (base) => ({
-              ...base,
-              minWidth: "200px",
-            }),
-          }}
-          onChange={(value) => {
-            const next = (value as OrgRoleOption | null)?.value;
+        <Select.Root
+          collection={collection}
+          size="sm"
+          width="220px"
+          value={[selectedRole.value]}
+          onValueChange={({ value }) => {
+            const next = value[0] as OrganizationUserRole;
             if (!next || next === selectedRole.value) return;
 
             // Optimistic update - immediately update UI
@@ -98,34 +107,38 @@ export function OrganizationUserRoleField({
               },
             );
           }}
-          components={{
-            Menu: ({ children, ...props }) => (
-              <chakraComponents.Menu
-                {...props}
-                innerProps={{
-                  ...props.innerProps,
-                  style: { width: "320px", zIndex: 10 },
-                }}
-              >
-                {children}
-              </chakraComponents.Menu>
-            ),
-            Option: ({ children, ...props }) => (
-              <chakraComponents.Option {...props}>
-                <VStack align="start">
-                  <Text>{children}</Text>
-                  <Text
-                    color={props.isSelected ? "white" : "gray.500"}
-                    fontSize="13px"
-                  >
-                    {props.data.description}
-                  </Text>
-                </VStack>
-              </chakraComponents.Option>
-            ),
-          }}
-        />
-        {updateOrganizationMemberRoleMutation.isLoading && (
+          positioning={{ sameWidth: false }}
+        >
+          <Select.HiddenSelect />
+          <Select.Control>
+            <Select.Trigger>
+              <Select.ValueText placeholder="Select role" />
+            </Select.Trigger>
+            <Select.IndicatorGroup>
+              <Select.Indicator />
+            </Select.IndicatorGroup>
+          </Select.Control>
+          <Portal>
+            <Select.Positioner>
+              <Select.Content minWidth="320px">
+                {orgRoleOptions.map((role) => (
+                  <Select.Item item={role} key={role.value}>
+                    <Stack gap="0" maxWidth="280px">
+                      <Select.ItemText fontWeight="bold" wordBreak="break-word">
+                        {role.label}
+                      </Select.ItemText>
+                      <Span color="fg.muted" textStyle="xs" wordBreak="break-word">
+                        {role.description}
+                      </Span>
+                    </Stack>
+                    <Select.ItemIndicator />
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Positioner>
+          </Portal>
+        </Select.Root>
+        {updateOrganizationMemberRoleMutation.isPending && (
           <Spinner size="sm" />
         )}
       </HStack>
