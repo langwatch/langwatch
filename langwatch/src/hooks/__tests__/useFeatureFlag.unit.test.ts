@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/config";
 import { useFeatureFlag } from "../useFeatureFlag";
 

@@ -90,7 +90,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       return FeatureFlagServicePostHog.create();
     }
 
-    this.logger.warn("POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. UI_SIMULATIONS_SCENARIOS=1).");
+    this.logger.warn("POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. RELEASE_UI_SIMULATIONS_MENU_ENABLED=1).");
     return FeatureFlagServiceMemory.create();
   }
 
