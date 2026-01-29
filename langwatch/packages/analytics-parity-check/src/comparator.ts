@@ -651,5 +651,8 @@ function formatValue(value: unknown): string {
     // Round to 4 decimal places for readability
     return Number.isInteger(value) ? String(value) : value.toFixed(4);
   }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
   return String(value);
 }
