@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
-import { skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
@@ -24,26 +24,29 @@ export const featureFlagRouter = createTRPCRouter({
    * Check if a feature flag is enabled for the current user.
    *
    * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param targetProjectId - Optional project ID for project-level targeting
-   * @param targetOrganizationId - Optional organization ID for org-level targeting
+   * @param projectId - Optional project ID for project-level targeting
+   * @param organizationId - Optional organization ID for org-level targeting
    * @returns { enabled: boolean }
    */
   isEnabled: protectedProcedure
     .input(
       z.object({
         flag: frontendFeatureFlagSchema,
-        // Named with "target" prefix to avoid skipPermissionCheck blocking
-        // These are for PostHog targeting, not permission verification
-        targetProjectId: z.string().optional(),
-        targetOrganizationId: z.string().optional(),
+        projectId: z.string().optional(),
+        organizationId: z.string().optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .use(skipPermissionCheck({
+      allow: {
+        projectId: "for PostHog targeting, not resource access",
+        organizationId: "for PostHog targeting, not resource access",
+      },
+    }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
       logger.debug(
-        { userId, flag: input.flag, projectId: input.targetProjectId, organizationId: input.targetOrganizationId },
+        { userId, flag: input.flag, projectId: input.projectId, organizationId: input.organizationId },
         "Feature flag check requested",
       );
 
@@ -52,8 +55,8 @@ export const featureFlagRouter = createTRPCRouter({
         userId,
         false,
         {
-          projectId: input.targetProjectId,
-          organizationId: input.targetOrganizationId,
+          projectId: input.projectId,
+          organizationId: input.organizationId,
         },
       );
 

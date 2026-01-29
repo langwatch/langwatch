@@ -1,7 +1,7 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import { getPostHogInstance } from "../posthog";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "./config";
+import { FEATURE_FLAG_CACHE_TTL_MS } from "./constants";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
 import type {
   FeatureFlagOptions,

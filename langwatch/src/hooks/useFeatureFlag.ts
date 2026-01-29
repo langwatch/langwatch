@@ -65,8 +65,8 @@ export function useFeatureFlag(
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
       flag,
-      targetProjectId: options?.projectId,
-      targetOrganizationId: options?.organizationId,
+      projectId: options?.projectId,
+      organizationId: options?.organizationId,
     },
     {
       staleTime: FEATURE_FLAG_CACHE_TTL_MS,

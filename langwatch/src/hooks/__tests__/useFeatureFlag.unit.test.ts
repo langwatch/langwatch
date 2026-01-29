@@ -119,8 +119,8 @@ describe("useFeatureFlag()", () => {
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
           flag: "release_ui_simulations_menu_enabled",
-          targetProjectId: "proj-123",
-          targetOrganizationId: "org-456",
+          projectId: "proj-123",
+          organizationId: "org-456",
         },
         {
           staleTime: FEATURE_FLAG_CACHE_TTL_MS,
@@ -145,8 +145,8 @@ describe("useFeatureFlag()", () => {
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
           flag: "release_ui_simulations_menu_enabled",
-          targetProjectId: undefined,
-          targetOrganizationId: undefined,
+          projectId: undefined,
+          organizationId: undefined,
         },
         {
           staleTime: FEATURE_FLAG_CACHE_TTL_MS,
