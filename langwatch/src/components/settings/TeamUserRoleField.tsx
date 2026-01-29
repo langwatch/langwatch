@@ -186,7 +186,7 @@ export const TeamRoleSelect = ({
         ),
         Option: ({ children, ...props }) => (
           <chakraComponents.Option {...props}>
-            <VStack align="start">
+            <VStack align="start" paddingY={1}>
               <HStack>
                 <Text>{children}</Text>
                 {(props.data as RoleOption).isCustom && (
