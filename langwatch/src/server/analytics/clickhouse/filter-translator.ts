@@ -66,13 +66,13 @@ export function translateFilter(
 
     // ===== Metadata Filters =====
     case "metadata.user_id":
-      return translateMetadataFilter("langwatch.user_id", values);
+      return translateMetadataFilter("user.id", values);
 
     case "metadata.thread_id":
-      return translateMetadataFilter("gen_ai.conversation.id", values);
+      return translateMetadataFilter("thread.id", values);
 
     case "metadata.customer_id":
-      return translateMetadataFilter("langwatch.customer_id", values);
+      return translateMetadataFilter("customer.id", values);
 
     case "metadata.labels":
       return translateLabelsFilter(values);
