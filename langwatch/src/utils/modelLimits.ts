@@ -68,7 +68,7 @@ export function getModelLimits(modelName: string): ModelLimits | null {
     // Model not found in any variation
     return null;
   } catch (error) {
-    logger.error("error getting model limits for", { modelName, error });
+    logger.error({ modelName, error }, "error getting model limits");
     // Return null for any parsing errors (safer than throwing)
     return null;
   }
