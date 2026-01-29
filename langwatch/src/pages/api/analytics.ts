@@ -2,11 +2,11 @@ import { TRPCError } from "@trpc/server";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 
+import { getAnalyticsService } from "../../server/analytics/analytics.service";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,
 } from "../../server/analytics/registry";
-import { timeseries } from "../../server/analytics/timeseries";
 import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 
@@ -56,7 +56,8 @@ export default async function handler(
   }
 
   try {
-    const timeseriesResult = await timeseries(params);
+    const analyticsService = getAnalyticsService();
+    const timeseriesResult = await analyticsService.getTimeseries(params);
 
     return res.status(200).json(timeseriesResult);
   } catch (e) {
