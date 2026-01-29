@@ -100,7 +100,7 @@ async function generateLLMTraces(
       // Set metadata on root span
       span.setAttribute("langwatch.user.id", `user-${(i % 10) + 1}`);
       span.setAttribute("langwatch.thread.id", `thread-${(i % 5) + 1}`);
-      span.setAttribute("langwatch.labels", JSON.stringify([LABELS[i % LABELS.length]!]));
+      span.setAttribute("metadata", JSON.stringify({ labels: [LABELS[i % LABELS.length]!] }));
 
       // Small delay to simulate processing
       await sleep(50 + Math.floor(Math.random() * 100));
@@ -127,7 +127,7 @@ async function generateRAGTraces(
       // Set metadata on root span
       rootSpan.setAttribute("langwatch.user.id", `user-${(i % 8) + 1}`);
       rootSpan.setAttribute("langwatch.thread.id", `thread-rag-${(i % 3) + 1}`);
-      rootSpan.setAttribute("langwatch.labels", JSON.stringify(["rag", LABELS[i % LABELS.length]!]));
+      rootSpan.setAttribute("metadata", JSON.stringify({ labels: ["rag", LABELS[i % LABELS.length]!] }));
 
       // Nested RAG retrieval span
       await tracer.withActiveSpan("document retrieval", async (ragSpan) => {
@@ -201,7 +201,7 @@ async function generateChainToolTraces(
       // Set metadata
       rootSpan.setAttribute("langwatch.user.id", `user-${(i % 6) + 1}`);
       rootSpan.setAttribute("langwatch.customer.id", `customer-${(i % 4) + 1}`);
-      rootSpan.setAttribute("langwatch.labels", JSON.stringify(["agent", LABELS[i % LABELS.length]!]));
+      rootSpan.setAttribute("metadata", JSON.stringify({ labels: ["agent", LABELS[i % LABELS.length]!] }));
 
       // Create nested tool spans
       for (let j = 0; j < numTools; j++) {
@@ -277,8 +277,8 @@ async function generateMetadataVariationTraces(
       span.setAttribute("langwatch.thread.id", `thread-${(i % 10) + 1}`);
       span.setAttribute("langwatch.customer.id", `customer-${(i % 5) + 1}`);
       span.setAttribute(
-        "langwatch.labels",
-        JSON.stringify([LABELS[i % LABELS.length]!, LABELS[(i + 1) % LABELS.length]!]),
+        "metadata",
+        JSON.stringify({ labels: [LABELS[i % LABELS.length]!, LABELS[(i + 1) % LABELS.length]!] }),
       );
 
       // Custom metadata
@@ -306,7 +306,7 @@ async function generateErrorTraces(
 
       // Set metadata
       span.setAttribute("langwatch.user.id", `user-${(i % 5) + 1}`);
-      span.setAttribute("langwatch.labels", JSON.stringify(["error", LABELS[i % LABELS.length]!]));
+      span.setAttribute("metadata", JSON.stringify({ labels: ["error", LABELS[i % LABELS.length]!] }));
 
       // Record error
       const error = new Error("API rate limit exceeded");
@@ -353,7 +353,7 @@ async function generateEvaluationTraces(
 
       // Set metadata
       span.setAttribute("langwatch.user.id", `user-${(i % 7) + 1}`);
-      span.setAttribute("langwatch.labels", JSON.stringify(["evaluated"]));
+      span.setAttribute("metadata", JSON.stringify({ labels: ["evaluated"] }));
 
       // Generate evaluations as nested spans
       const numEvaluations = 1 + (i % 3);
