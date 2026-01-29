@@ -1,132 +1,9 @@
 /**
  * Types for analytics parity check
+ *
+ * Note: Intermediate span types (CollectorRESTParams, Span, LLMSpan, RAGSpan, etc.)
+ * have been removed as the parity check now generates OTEL traces directly.
  */
-
-// Span types matching the tracer types
-export type SpanType =
-  | "span"
-  | "llm"
-  | "chain"
-  | "tool"
-  | "agent"
-  | "rag"
-  | "guardrail"
-  | "evaluation"
-  | "workflow"
-  | "component"
-  | "module"
-  | "server"
-  | "client"
-  | "producer"
-  | "consumer"
-  | "task"
-  | "unknown";
-
-export interface RAGChunk {
-  document_id?: string | null;
-  chunk_id?: string | null;
-  content: string;
-}
-
-export interface SpanMetrics {
-  prompt_tokens?: number | null;
-  completion_tokens?: number | null;
-  reasoning_tokens?: number | null;
-  tokens_estimated?: boolean | null;
-  cost?: number | null;
-}
-
-export interface SpanTimestamps {
-  started_at: number;
-  first_token_at?: number | null;
-  finished_at: number;
-}
-
-export interface ErrorCapture {
-  has_error: true;
-  message: string;
-  stacktrace: string[];
-}
-
-export interface ChatMessage {
-  role?: "system" | "user" | "assistant" | "function" | "tool" | "unknown";
-  content?: string | null;
-  name?: string | null;
-}
-
-export type SpanInputOutput =
-  | { type: "text"; value: string }
-  | { type: "chat_messages"; value: ChatMessage[] }
-  | { type: "json"; value: unknown }
-  | { type: "raw"; value: string };
-
-export interface BaseSpan {
-  span_id: string;
-  parent_id?: string | null;
-  trace_id: string;
-  type: SpanType;
-  name?: string | null;
-  input?: SpanInputOutput | null;
-  output?: SpanInputOutput | null;
-  error?: ErrorCapture | null;
-  timestamps: SpanTimestamps;
-  metrics?: SpanMetrics | null;
-  params?: Record<string, unknown> | null;
-}
-
-export interface LLMSpan extends BaseSpan {
-  type: "llm";
-  vendor?: string | null;
-  model?: string | null;
-}
-
-export interface RAGSpan extends BaseSpan {
-  type: "rag";
-  contexts: RAGChunk[];
-}
-
-export type Span = LLMSpan | RAGSpan | BaseSpan;
-
-export interface TraceMetadata {
-  thread_id?: string | null;
-  user_id?: string | null;
-  customer_id?: string | null;
-  labels?: string[] | null;
-  [key: string]: unknown;
-}
-
-export interface RESTEvaluation {
-  evaluation_id?: string | null;
-  evaluator_id?: string | null;
-  span_id?: string | null;
-  name: string;
-  type?: string | null;
-  is_guardrail?: boolean | null;
-  status?: "processed" | "skipped" | "error" | null;
-  passed?: boolean | null;
-  score?: number | null;
-  label?: string | null;
-  details?: string | null;
-  timestamps?: {
-    started_at?: number | null;
-    finished_at?: number | null;
-  } | null;
-}
-
-export interface CollectorRESTParams {
-  trace_id?: string | null;
-  spans: Span[];
-  metadata?: TraceMetadata;
-  expected_output?: string | null;
-  evaluations?: RESTEvaluation[];
-}
-
-// Trace variation for testing
-export interface TraceVariation {
-  name: string;
-  description: string;
-  traces: CollectorRESTParams[];
-}
 
 // Analytics query types
 export interface SharedFiltersInput {
@@ -246,6 +123,7 @@ export interface Config {
   esApiKey: string;
   chProjectId: string;
   chApiKey: string;
+  prodApiKey: string | null;
   tolerance: number;
   traceCount: number;
   waitTimeMs: number;

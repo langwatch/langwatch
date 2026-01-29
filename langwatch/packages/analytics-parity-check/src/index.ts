@@ -7,13 +7,8 @@
  * Configure via .env file, then run: pnpm start
  */
 
-import {
-  createRunPrefix,
-  generateTestVariations,
-  getTotalTraceCount,
-  getTimeRange,
-} from "./trace-generator.js";
-import { sendVariationsToProjectsWithSDK } from "./sdk-trace-sender.js";
+import { createRunPrefix, generateAllVariations } from "./otel-trace-generator.js";
+import { setupDualExporterSDK } from "./sdk-trace-sender.js";
 import { executeStructuredQueries, pollUntilTracesReady } from "./analytics-client.js";
 import {
   compareAllResults,
@@ -32,6 +27,7 @@ function loadConfig(): Config {
     esApiKey: process.env["ES_API_KEY"] ?? "",
     chProjectId: process.env["CH_PROJECT_ID"] ?? "",
     chApiKey: process.env["CH_API_KEY"] ?? "",
+    prodApiKey: process.env["PROD_API_KEY"] ?? null,
     tolerance: parseFloat(process.env["TOLERANCE"] ?? "0.05"),
     traceCount: parseInt(process.env["TRACE_COUNT"] ?? "20", 10),
     waitTimeMs: parseInt(process.env["WAIT_TIME_MS"] ?? "120000", 10), // 2 minutes default
@@ -75,36 +71,31 @@ async function main(): Promise<void> {
   const runPrefix = createRunPrefix();
   console.log(`\nRun ID: ${runPrefix}`);
 
-  console.log("\n[1/4] Generating test traces...");
-  const variations = generateTestVariations(runPrefix, config.traceCount);
-  const totalTraces = getTotalTraceCount(variations);
-  const timeRange = getTimeRange(variations);
-
-  console.log(`  Generated ${variations.length} variations with ${totalTraces} total traces`);
-  variations.forEach((v) => {
-    console.log(`    - ${v.name}: ${v.traces.length} traces`);
-  });
-  console.log(`  Time range: ${new Date(timeRange.startDate).toISOString()} to ${new Date(timeRange.endDate).toISOString()}`);
-
-  console.log("\n[2/4] Sending traces to both projects via dual-exporter SDK (OTEL endpoint)...");
-  const sendResults = await sendVariationsToProjectsWithSDK(
+  console.log("\n[1/4] Setting up dual-exporter SDK...");
+  const { tracer, flush, shutdown } = await setupDualExporterSDK(
     config.baseUrl,
     config.esApiKey,
     config.chApiKey,
-    variations,
-    (project, sent, total) => {
-      process.stdout.write(`\r  ${project}: ${sent}/${total} traces sent`);
-    },
+    config.prodApiKey,
   );
 
-  console.log("\n");
-  console.log(`  Traces sent: ${sendResults.es.success} succeeded, ${sendResults.es.failed} failed`);
-  console.log("  (Both ES and CH receive the same traces via dual exporters)");
+  console.log("\n[2/4] Generating and sending traces via OTEL SDK...");
+  const { variations, totalTraces, timeRange } = await generateAllVariations(
+    tracer,
+    runPrefix,
+    { tracesPerVariation: config.traceCount },
+  );
 
-  if (sendResults.es.errors.length > 0) {
-    console.log("  Errors:");
-    sendResults.es.errors.slice(0, 5).forEach((e) => console.log(`    - ${e}`));
-  }
+  console.log(`\n  Generated ${variations.length} variations with ${totalTraces} total traces`);
+  variations.forEach((v) => {
+    console.log(`    - ${v.name}: ${v.count} traces`);
+  });
+  console.log(`  Time range: ${new Date(timeRange.startDate).toISOString()} to ${new Date(timeRange.endDate).toISOString()}`);
+
+  console.log("\n  Flushing and shutting down SDK...");
+  await flush();
+  await shutdown();
+  console.log("  Both ES and CH receive the same traces via dual exporters");
 
   console.log(`\n[3/4] Polling for trace ingestion (max wait: ${config.waitTimeMs}ms)...`);
   const pollResult = await pollUntilTracesReady(
@@ -181,8 +172,8 @@ async function main(): Promise<void> {
     runId: runPrefix,
     tracesGenerated: totalTraces,
     tracesSent: {
-      es: sendResults.es.success,
-      ch: sendResults.ch.success,
+      es: totalTraces,
+      ch: totalTraces,
     },
     comparisons,
     overallPassed: summary.overallPassed,
