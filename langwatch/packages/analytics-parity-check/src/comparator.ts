@@ -38,6 +38,14 @@ function withinTolerance(a: number, b: number, tolerance: number): boolean {
 }
 
 /**
+ * Check if a value is considered "empty" (null or undefined)
+ * ES returns 0 for missing values, CH omits them (undefined)
+ */
+function isEmptyValue(value: unknown): boolean {
+  return value === null || value === undefined;
+}
+
+/**
  * Type guard for timeseries results
  */
 function isTimeseriesResult(value: unknown): value is TimeseriesResult {
@@ -91,11 +99,19 @@ function compareTimeseriesResults(
     const esBucket = esResult.currentPeriod[i]!;
     const chBucket = chResult.currentPeriod[i]!;
 
-    for (const key of Object.keys(esBucket)) {
+    // Get all keys from both buckets
+    const allKeys = new Set([...Object.keys(esBucket), ...Object.keys(chBucket)]);
+
+    for (const key of allKeys) {
       if (key === "date") continue;
 
       const esValue = esBucket[key];
       const chValue = chBucket[key];
+
+      // Handle missing keys gracefully - treat undefined as equivalent to null
+      if (isEmptyValue(esValue) && isEmptyValue(chValue)) {
+        continue;
+      }
 
       if (isNumeric(esValue) && isNumeric(chValue)) {
         if (!withinTolerance(esValue, chValue, tolerance)) {
@@ -106,12 +122,29 @@ function compareTimeseriesResults(
             percentDiff: percentDiff(esValue, chValue),
           });
         }
-      } else if (JSON.stringify(esValue) !== JSON.stringify(chValue)) {
+      } else if (isEmptyValue(esValue) || isEmptyValue(chValue)) {
+        // Treat 0 and null/undefined as equivalent for numeric values
+        if (isNumeric(esValue) && esValue === 0 && isEmptyValue(chValue)) {
+          continue;
+        }
+        if (isEmptyValue(esValue) && isNumeric(chValue) && chValue === 0) {
+          continue;
+        }
+        // One is empty, one is not - this is a discrepancy
         discrepancies.push({
           path: `currentPeriod[${i}].${key}`,
           esValue,
           chValue,
         });
+      } else {
+        // For objects and other types, use deepCompare to handle nested 0/null equivalence
+        const nestedDiscrepancies = deepCompare(
+          esValue,
+          chValue,
+          `currentPeriod[${i}].${key}`,
+          tolerance,
+        );
+        discrepancies.push(...nestedDiscrepancies);
       }
     }
   }
@@ -202,16 +235,25 @@ function deepCompare(
 ): Discrepancy[] {
   const discrepancies: Discrepancy[] = [];
 
-  // Handle null/undefined
-  if (esValue === null && chValue === null) return [];
-  if (esValue === undefined && chValue === undefined) return [];
-  if (esValue === null || esValue === undefined) {
-    if (chValue !== null && chValue !== undefined) {
+  // Handle null/undefined equivalence
+  // Treat null and undefined as equivalent since ES and CH handle missing values differently
+  if (isEmptyValue(esValue) && isEmptyValue(chValue)) {
+    return [];
+  }
+  // Treat 0 and null/undefined as equivalent for numeric values
+  if (isNumeric(esValue) && esValue === 0 && isEmptyValue(chValue)) {
+    return [];
+  }
+  if (isEmptyValue(esValue) && isNumeric(chValue) && chValue === 0) {
+    return [];
+  }
+  if (isEmptyValue(esValue)) {
+    if (!isEmptyValue(chValue)) {
       discrepancies.push({ path, esValue, chValue });
     }
     return discrepancies;
   }
-  if (chValue === null || chValue === undefined) {
+  if (isEmptyValue(chValue)) {
     discrepancies.push({ path, esValue, chValue });
     return discrepancies;
   }
