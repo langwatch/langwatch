@@ -1,6 +1,7 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import { getPostHogInstance } from "../posthog";
+import { FEATURE_FLAG_CACHE_TTL_MS } from "./config";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
 import type {
   FeatureFlagOptions,
@@ -9,6 +10,28 @@ import type {
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.
+ *
+ * This service evaluates feature flags via PostHog's API with a hybrid caching
+ * strategy that uses Redis when available, falling back to in-memory cache.
+ *
+ * ## Architecture
+ *
+ * The service follows a stale-while-revalidate pattern:
+ * 1. Check Redis cache first (shared across instances)
+ * 2. Fall back to in-memory cache (per-instance)
+ * 3. On cache miss, call PostHog API and cache result
+ *
+ * ## Targeting
+ *
+ * Flags can target users, projects, or organizations via personProperties:
+ * - `distinctId` - The user ID (required)
+ * - `projectId` - Optional project ID for project-level targeting
+ * - `organizationId` - Optional organization ID for org-level targeting
+ *
+ * Configure targeting rules in PostHog release conditions.
+ *
+ * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see FEATURE_FLAG_CACHE_TTL_MS for cache TTL configuration
  */
 export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   private readonly posthog: ReturnType<typeof getPostHogInstance>;
@@ -19,10 +42,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     "langwatch.posthog-feature-flag-service",
   );
 
-  // Cache TTL: 5 seconds for fast kill switch response
   private readonly cache = new StaleWhileRevalidateCache(
-    5 * 1000,
-    5 * 1000,
+    FEATURE_FLAG_CACHE_TTL_MS,
+    FEATURE_FLAG_CACHE_TTL_MS,
   );
 
   constructor() {
@@ -63,9 +85,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
-        const projectId = options?.projectId ?? "";
-        const orgId = options?.organizationId ?? "";
-        const cacheKey = `${flagKey}:${distinctId}:${projectId}:${orgId}`;
+        const projectId = options?.projectId;
+        const orgId = options?.organizationId;
+        const cacheKey = `${flagKey}:${distinctId}:${projectId ?? ""}:${orgId ?? ""}`;
 
         // Check hybrid cache first
         const cachedResult = await this.cache.get(cacheKey);
@@ -80,17 +102,34 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
 
         try {
-          // Fetch from PostHog with personProperties for flexible targeting
+          // Build personProperties only with defined values
+          const personProperties: Record<string, string> = {};
+          if (projectId) {
+            personProperties.project_id = projectId;
+          }
+          if (orgId) {
+            personProperties.organization_id = orgId;
+          }
+
+          const posthogOptions = {
+            disableGeoip: true,
+            personProperties,
+          };
+
+          this.logger.debug(
+            { flagKey, distinctId, posthogOptions },
+            "Checking PostHog feature flag",
+          );
+
           const isEnabled = await this.posthog.isFeatureEnabled(
             flagKey,
             distinctId,
-            {
-              disableGeoip: true,
-              personProperties: {
-                project_id: projectId,
-                organization_id: orgId,
-              },
-            },
+            posthogOptions,
+          );
+
+          this.logger.debug(
+            { flagKey, distinctId, isEnabled, posthogOptions },
+            "PostHog feature flag result",
           );
 
           const result = isEnabled ?? defaultValue;

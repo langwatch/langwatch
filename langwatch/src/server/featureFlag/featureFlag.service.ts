@@ -9,8 +9,41 @@ import type {
 } from "./types";
 
 /**
- * Feature flag service that automatically chooses between PostHog and memory
- * based on environment configuration.
+ * Main feature flag service with automatic backend selection and env overrides.
+ *
+ * This is the primary entry point for feature flag evaluation. It automatically
+ * selects the appropriate backend (PostHog or memory) based on environment
+ * configuration and supports environment variable overrides for local development.
+ *
+ * ## Backend Selection
+ *
+ * - **PostHog** (production): Used when `POSTHOG_KEY` env var is set
+ * - **Memory** (development): Fallback when PostHog is not configured
+ *
+ * ## Environment Overrides
+ *
+ * Flags can be force-enabled/disabled via environment variables:
+ * - `FLAG_NAME=1` - Force enable (e.g., `RELEASE_UI_SIMULATIONS_MENU_ENABLED=1`)
+ * - `FLAG_NAME=0` - Force disable
+ *
+ * Env overrides take precedence over PostHog evaluation.
+ *
+ * ## Usage
+ *
+ * ```typescript
+ * // Use the singleton instance
+ * import { featureFlagService } from "./featureFlag";
+ *
+ * const enabled = await featureFlagService.isEnabled(
+ *   "release_ui_simulations_menu_enabled",
+ *   userId,
+ *   false, // defaultValue
+ *   { projectId, organizationId }
+ * );
+ * ```
+ *
+ * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see FeatureFlagServicePostHog for PostHog implementation details
  */
 export class FeatureFlagService implements FeatureFlagServiceInterface {
   private readonly service: FeatureFlagServiceInterface;

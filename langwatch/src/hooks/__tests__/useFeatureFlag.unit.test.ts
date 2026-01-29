@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/config";
 import { useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
@@ -82,12 +83,13 @@ describe("useFeatureFlag", () => {
     expect(mockUseQuery).toHaveBeenCalledWith(
       {
         flag: "release_ui_simulations_menu_enabled",
-        projectId: "proj-123",
-        organizationId: "org-456",
+        targetProjectId: "proj-123",
+        targetOrganizationId: "org-456",
       },
       {
-        staleTime: 5000,
+        staleTime: FEATURE_FLAG_CACHE_TTL_MS,
         refetchOnWindowFocus: false,
+        enabled: true,
       },
     );
   });
@@ -103,13 +105,37 @@ describe("useFeatureFlag", () => {
     expect(mockUseQuery).toHaveBeenCalledWith(
       {
         flag: "release_ui_simulations_menu_enabled",
-        projectId: undefined,
-        organizationId: undefined,
+        targetProjectId: undefined,
+        targetOrganizationId: undefined,
       },
       {
-        staleTime: 5000,
+        staleTime: FEATURE_FLAG_CACHE_TTL_MS,
         refetchOnWindowFocus: false,
+        enabled: true,
       },
     );
+  });
+
+  it("disables query when enabled option is false", () => {
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as any);
+
+    const { result } = renderHook(() =>
+      useFeatureFlag("release_ui_simulations_menu_enabled", {
+        projectId: undefined,
+        enabled: false,
+      }),
+    );
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        enabled: false,
+      }),
+    );
+    expect(result.current.enabled).toBe(false);
+    expect(result.current.isLoading).toBe(false);
   });
 });
