@@ -1,23 +1,26 @@
-import pino, { type LoggerOptions } from "pino";
+import pino, { type LoggerOptions, type Logger as PinoLogger } from "pino";
 import { getContext } from "../server/context/contextProvider";
 
 const isBrowser = typeof window !== "undefined";
 const isNodeDev = !isBrowser && process.env.NODE_ENV !== "production";
+const otelEndpoint = !isBrowser
+  ? process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+  : undefined;
 
-let pinoPretty: any;
-if (isNodeDev) {
-  try {
-    pinoPretty = require("pino-pretty");
-  } catch (e) {
-    console.error("Failed to load pino-pretty for server-side logging:", e);
-  }
-}
+// Console level: WARN+ in dev by default, configurable
+const consoleLevel = !isBrowser
+  ? (process.env.PINO_CONSOLE_LEVEL ?? (isNodeDev ? "warn" : "info"))
+  : "info";
 
-const getDestinationStream = () => {
-  if (isNodeDev && pinoPretty) return pinoPretty({ colorize: true });
-  if (!isBrowser) return process.stdout;
-  return void 0;
-};
+// OTel level: DEBUG+ by default (or configurable)
+const otelLevel = !isBrowser
+  ? (process.env.PINO_OTEL_LEVEL ?? "debug")
+  : "debug";
+
+// Base level for the logger (lowest of console and otel levels to ensure all messages flow through)
+const baseLevel = !isBrowser
+  ? (process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "debug")
+  : "info";
 
 export interface CreateLoggerOptions {
   /**
@@ -29,70 +32,96 @@ export interface CreateLoggerOptions {
 }
 
 /**
+ * Creates transport configuration for pino.
+ * - Console: WARN+ in dev (via pino-pretty), INFO+ in prod (stdout)
+ * - OTel: DEBUG+ to OTLP endpoint (when OTEL_EXPORTER_OTLP_ENDPOINT is set)
+ */
+const getTransport = (): ReturnType<typeof pino.transport> | undefined => {
+  if (isBrowser) return undefined;
+
+  const targets: pino.TransportTargetOptions[] = [
+    // Console transport
+    {
+      target: isNodeDev ? "pino-pretty" : "pino/file",
+      options: isNodeDev
+        ? { colorize: true, minimumLevel: consoleLevel }
+        : { destination: 1 },
+      level: consoleLevel,
+    },
+  ];
+
+  // Add OTel transport if endpoint is configured
+  if (otelEndpoint) {
+    targets.push({
+      target: "pino-opentelemetry-transport",
+      options: {
+        loggerName: "langwatch-backend",
+        serviceVersion: process.env.npm_package_version ?? "1.0.0",
+        resourceAttributes: {
+          "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+          "deployment.environment":
+            process.env.ENVIRONMENT ?? "development",
+        },
+      },
+      level: otelLevel,
+    });
+  }
+
+  return pino.transport({ targets });
+};
+
+/**
  * Creates a logger instance with the given name.
  *
  * By default, the logger automatically includes request context (traceId, spanId,
  * organizationId, projectId, userId) in all log entries when available via
  * AsyncLocalStorage. This enables automatic trace correlation.
  *
+ * Transport configuration:
+ * - Console: WARN+ in dev (PINO_CONSOLE_LEVEL), INFO+ in prod
+ * - OTel: DEBUG+ to OTLP endpoint (when OTEL_EXPORTER_OTLP_ENDPOINT is set)
+ *
  * @param name - Logger name (e.g., "langwatch:api:hono")
  * @param options - Optional configuration
  * @param options.disableContext - Set to true to disable automatic context injection
  */
-export const createLogger = (name: string, options?: CreateLoggerOptions) => {
+export const createLogger = (
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger => {
+  // Determine if we should use the mixin for context injection
+  const shouldInjectContext = !options?.disableContext && !isBrowser;
+
   const pinoOptions: LoggerOptions = {
     name,
-    level: isBrowser
-      ? "info"
-      : (process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "info"),
+    // Set to lowest level - individual transports will filter
+    level: baseLevel,
     timestamp: isBrowser ? undefined : pino.stdTimeFunctions.isoTime,
-    browser: isBrowser ? { asObject: true } : void 0,
+    browser: isBrowser ? { asObject: true } : undefined,
     serializers: {
       error: pino.stdSerializers.err,
     },
     formatters: {
       bindings: (bindings) => {
-        return bindings; // TODO(afr): Later, add git commit hash, and other stuff for production Node.js
+        return bindings;
       },
       level: (label) => {
         return { level: label.toUpperCase() };
       },
     },
+    // Use pino's built-in mixin to inject context into every log entry
+    mixin: shouldInjectContext ? () => getContext() : undefined,
   };
 
-  const destination = getDestinationStream();
-  const baseLogger = (pino as any).default(pinoOptions, destination) as ReturnType<typeof pino>;
+  const transport = getTransport();
 
-  // If context is disabled or we're in browser, return the base logger
-  if (options?.disableContext || isBrowser) {
-    return baseLogger;
-  }
+  // Handle both ESM and CJS module formats
+  const pinoFactory =
+    typeof pino === "function"
+      ? pino
+      : (pino as unknown as { default: typeof pino }).default;
 
-  // Return a wrapper that automatically includes context
-  return {
-    info: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.info({ ...data, ...getContext() }, msg);
-    },
-    error: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.error({ ...data, ...getContext() }, msg);
-    },
-    warn: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.warn({ ...data, ...getContext() }, msg);
-    },
-    debug: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.debug({ ...data, ...getContext() }, msg);
-    },
-    trace: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.trace({ ...data, ...getContext() }, msg);
-    },
-    fatal: (data: Record<string, unknown>, msg: string) => {
-      baseLogger.fatal({ ...data, ...getContext() }, msg);
-    },
-    // Expose child for cases where it's needed
-    child: baseLogger.child.bind(baseLogger),
-    // Expose level for compatibility
-    level: baseLogger.level,
-  } as ReturnType<typeof pino>;
+  return pinoFactory(pinoOptions, transport);
 };
 
-export type Logger = ReturnType<typeof createLogger>;
+export type Logger = PinoLogger;
