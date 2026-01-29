@@ -37,7 +37,7 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  const showScenariosOnThePlatform = hasFeature("ui-simulations-scenarios");
+  const showScenariosOnThePlatform = hasFeature("release_ui_simulations_menu_enabled");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;

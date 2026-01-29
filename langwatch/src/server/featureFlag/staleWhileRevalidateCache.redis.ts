@@ -54,10 +54,11 @@ export class StaleWhileRevalidateCache {
     // Try Redis first if available
     if (redisConnection && !isBuildOrNoRedis) {
       try {
-        // Store for much longer than stale threshold (24 hours for Redis)
+        // Store for stale threshold (convert ms to seconds)
+        const ttlSeconds = Math.ceil(this.staleThresholdMs / 1000);
         await redisConnection.setex(
           `${this.prefix}${key}`,
-          24 * 60 * 60, // 24 hours
+          ttlSeconds,
           JSON.stringify(entry),
         );
       } catch (_error) {

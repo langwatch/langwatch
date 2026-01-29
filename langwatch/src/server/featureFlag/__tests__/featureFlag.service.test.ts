@@ -39,10 +39,10 @@ describe("FeatureFlagService", () => {
 
       const result = await service.getEnabledFrontendFeatures("user-123");
 
-      expect(result).toContain("ui-simulations-scenarios");
+      expect(result).toContain("release_ui_simulations_menu_enabled");
     });
 
-    it("calls isEnabled with correct arguments including user group", async () => {
+    it("calls isEnabled with correct arguments for user-level check", async () => {
       const isEnabledSpy = vi
         .spyOn(service, "isEnabled")
         .mockResolvedValue(false);
@@ -50,10 +50,9 @@ describe("FeatureFlagService", () => {
       await service.getEnabledFrontendFeatures("user-456");
 
       expect(isEnabledSpy).toHaveBeenCalledWith(
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
         "user-456",
         false,
-        { groups: { user: "user-456" } },
       );
     });
   });
@@ -84,10 +83,10 @@ describe("FeatureFlagService", () => {
         "project-456",
       );
 
-      expect(result).toContain("ui-simulations-scenarios");
+      expect(result).toContain("release_ui_simulations_menu_enabled");
     });
 
-    it("calls isEnabled with user and project group options", async () => {
+    it("calls isEnabled with project personProperties", async () => {
       const isEnabledSpy = vi
         .spyOn(service, "isEnabled")
         .mockResolvedValue(false);
@@ -95,14 +94,14 @@ describe("FeatureFlagService", () => {
       await service.getEnabledProjectFeatures("user-789", "project-abc");
 
       expect(isEnabledSpy).toHaveBeenCalledWith(
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
         "user-789",
         false,
-        { groups: { user: "user-789", project: "project-abc" } },
+        { projectId: "project-abc", organizationId: undefined },
       );
     });
 
-    it("calls isEnabled with user, project, and organization group options", async () => {
+    it("calls isEnabled with project and organization personProperties", async () => {
       const isEnabledSpy = vi
         .spyOn(service, "isEnabled")
         .mockResolvedValue(false);
@@ -110,10 +109,10 @@ describe("FeatureFlagService", () => {
       await service.getEnabledProjectFeatures("user-789", "project-abc", "org-xyz");
 
       expect(isEnabledSpy).toHaveBeenCalledWith(
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
         "user-789",
         false,
-        { groups: { user: "user-789", project: "project-abc", organization: "org-xyz" } },
+        { projectId: "project-abc", organizationId: "org-xyz" },
       );
     });
   });
@@ -128,8 +127,8 @@ describe("FeatureFlagService", () => {
       vi.spyOn(service as any, "service", "get").mockReturnValue(mockService);
     });
 
-    it("forwards options to underlying service", async () => {
-      const options = { groups: { project: "proj-123" } };
+    it("forwards projectId option to underlying service", async () => {
+      const options = { projectId: "proj-123" };
 
       await service.isEnabled("some-flag", "user-1", true, options);
 
@@ -141,8 +140,8 @@ describe("FeatureFlagService", () => {
       );
     });
 
-    it("forwards organization group option", async () => {
-      const options = { groups: { organization: "org-456" } };
+    it("forwards organizationId option to underlying service", async () => {
+      const options = { organizationId: "org-456" };
 
       await service.isEnabled("some-flag", "user-1", false, options);
 
@@ -163,11 +162,11 @@ describe("FeatureFlagService", () => {
     });
 
     it("returns env override when set to 1", async () => {
-      process.env.UI_SIMULATIONS_SCENARIOS = "1";
+      process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "1";
       const service = FeatureFlagService.create();
 
       const result = await service.isEnabled(
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
         "user-123",
         false,
       );
@@ -176,11 +175,11 @@ describe("FeatureFlagService", () => {
     });
 
     it("returns env override when set to 0", async () => {
-      process.env.UI_SIMULATIONS_SCENARIOS = "0";
+      process.env.RELEASE_UI_SIMULATIONS_MENU_ENABLED = "0";
       const service = FeatureFlagService.create();
 
       const result = await service.isEnabled(
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
         "user-123",
         true,
       );
@@ -227,10 +226,10 @@ describe("FeatureFlagService", () => {
         { id: "project-2", team: { organizationId: null } },
       ]);
       vi.spyOn(service, "getEnabledFrontendFeatures").mockResolvedValue([
-        "ui-simulations-scenarios",
+        "release_ui_simulations_menu_enabled",
       ]);
       vi.spyOn(service, "getEnabledProjectFeatures")
-        .mockResolvedValueOnce(["ui-simulations-scenarios"])
+        .mockResolvedValueOnce(["release_ui_simulations_menu_enabled"])
         .mockResolvedValueOnce([]);
 
       const result = await service.getSessionFeatures(
@@ -239,9 +238,9 @@ describe("FeatureFlagService", () => {
       );
 
       expect(result).toEqual({
-        enabledFeatures: ["ui-simulations-scenarios"],
+        enabledFeatures: ["release_ui_simulations_menu_enabled"],
         projectFeatures: {
-          "project-1": ["ui-simulations-scenarios"],
+          "project-1": ["release_ui_simulations_menu_enabled"],
           "project-2": [],
         },
       });

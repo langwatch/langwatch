@@ -2,11 +2,8 @@
  * Options for feature flag evaluation.
  */
 export interface FeatureFlagOptions {
-  groups?: {
-    user?: string;
-    project?: string;
-    organization?: string;
-  };
+  projectId?: string;
+  organizationId?: string;
 }
 
 /**

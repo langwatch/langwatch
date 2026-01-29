@@ -12,9 +12,13 @@ import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureF
 export function useHasFeature() {
   const { data: session } = useSession();
 
+  console.log("session", session);
+
   return (flag: FrontendFeatureFlag, projectId?: string): boolean => {
     if (projectId) {
-      return session?.user?.projectFeatures?.[projectId]?.includes(flag) ?? false;
+      return (
+        session?.user?.projectFeatures?.[projectId]?.includes(flag) ?? false
+      );
     }
     return session?.user?.enabledFeatures?.includes(flag) ?? false;
   };

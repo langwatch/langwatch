@@ -19,14 +19,11 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     "langwatch.posthog-feature-flag-service",
   );
 
-  // Stale-while-revalidate cache: 5 min stale threshold, 30 sec refresh threshold
+  // Cache TTL: 5 seconds for fast kill switch response
   private readonly cache = new StaleWhileRevalidateCache(
-    1 * 60 * 1000,
-    1 * 30 * 1000,
+    5 * 1000,
+    5 * 1000,
   );
-
-  // Track which groups have been identified to avoid redundant calls
-  private readonly identifiedGroups = new Set<string>();
 
   constructor() {
     this.posthog = getPostHogInstance();
@@ -55,8 +52,8 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.key": flagKey,
           "feature.flag.distinct_id": distinctId,
           "feature.flag.default": defaultValue,
-          "feature.flag.project": options?.groups?.project ?? "",
-          "feature.flag.organization": options?.groups?.organization ?? "",
+          "feature.flag.project_id": options?.projectId ?? "",
+          "feature.flag.organization_id": options?.organizationId ?? "",
           "cache.redis_available": this.cache.isRedisAvailable(),
         },
       },
@@ -66,12 +63,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
-        // Register groups in PostHog before any flag check (including cached)
-        this.ensureGroupsIdentified(options);
-
-        const projectKey = options?.groups?.project ?? "";
-        const orgKey = options?.groups?.organization ?? "";
-        const cacheKey = `${flagKey}:${distinctId}:${projectKey}:${orgKey}`;
+        const projectId = options?.projectId ?? "";
+        const orgId = options?.organizationId ?? "";
+        const cacheKey = `${flagKey}:${distinctId}:${projectId}:${orgId}`;
 
         // Check hybrid cache first
         const cachedResult = await this.cache.get(cacheKey);
@@ -86,13 +80,16 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
 
         try {
-          // Fetch from PostHog
+          // Fetch from PostHog with personProperties for flexible targeting
           const isEnabled = await this.posthog.isFeatureEnabled(
             flagKey,
             distinctId,
             {
               disableGeoip: true,
-              groups: options?.groups,
+              personProperties: {
+                project_id: projectId,
+                organization_id: orgId,
+              },
             },
           );
 
@@ -118,28 +115,6 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         }
       },
     );
-  }
-
-  /**
-   * Lazily register groups in PostHog so they exist for flag targeting.
-   * Each group is only identified once per service instance.
-   */
-  private ensureGroupsIdentified(options?: FeatureFlagOptions): void {
-    if (!options?.groups || !this.posthog) return;
-
-    for (const [groupType, groupKey] of Object.entries(options.groups)) {
-      if (!groupKey) continue;
-
-      const cacheKey = `${groupType}:${groupKey}`;
-      if (this.identifiedGroups.has(cacheKey)) continue;
-
-      this.logger.info({ groupType, groupKey }, "Registering group in PostHog");
-      this.posthog.groupIdentify({
-        groupType,
-        groupKey,
-      });
-      this.identifiedGroups.add(cacheKey);
-    }
   }
 
   /**

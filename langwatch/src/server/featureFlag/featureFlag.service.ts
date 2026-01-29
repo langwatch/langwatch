@@ -48,7 +48,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       return envOverride;
     }
     const result = await this.service.isEnabled(flagKey, distinctId, defaultValue, options);
-    this.logger.debug({ flagKey, distinctId, enabled: result, groups: options?.groups }, "Flag checked");
+    this.logger.debug({ flagKey, distinctId, enabled: result, projectId: options?.projectId, organizationId: options?.organizationId }, "Flag checked");
     return result;
   }
 
@@ -83,9 +83,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const results = await Promise.all(
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
-        enabled: await this.isEnabled(flag, userId, false, {
-          groups: { user: userId },
-        }),
+        enabled: await this.isEnabled(flag, userId, false),
       })),
     );
 
@@ -96,7 +94,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
 
   /**
    * Get enabled frontend feature flags for a user within a specific project.
-   * Uses PostHog groups for project-level targeting.
+   * Uses personProperties for flexible targeting by user, project, or organization.
    */
   async getEnabledProjectFeatures(
     userId: string,
@@ -107,7 +105,8 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       FRONTEND_FEATURE_FLAGS.map(async (flag) => ({
         flag,
         enabled: await this.isEnabled(flag, userId, false, {
-          groups: { user: userId, project: projectId, organization: organizationId },
+          projectId,
+          organizationId,
         }),
       })),
     );

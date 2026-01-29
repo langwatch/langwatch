@@ -28,7 +28,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios")).toBe(false);
+      expect(result.current("release_ui_simulations_menu_enabled")).toBe(false);
     });
 
     it("returns false when flag not in enabledFeatures", () => {
@@ -43,13 +43,13 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios")).toBe(false);
+      expect(result.current("release_ui_simulations_menu_enabled")).toBe(false);
     });
 
     it("returns true when flag in enabledFeatures", () => {
       mockUseSession.mockReturnValue({
         data: {
-          user: { id: "1", enabledFeatures: ["ui-simulations-scenarios"] },
+          user: { id: "1", enabledFeatures: ["release_ui_simulations_menu_enabled"] },
           expires: "2025-01-01",
         },
         status: "authenticated",
@@ -58,7 +58,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios")).toBe(true);
+      expect(result.current("release_ui_simulations_menu_enabled")).toBe(true);
     });
   });
 
@@ -72,7 +72,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios", "project-123")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-123")).toBe(
         false,
       );
     });
@@ -89,7 +89,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios", "project-123")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-123")).toBe(
         false,
       );
     });
@@ -109,7 +109,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios", "project-123")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-123")).toBe(
         false,
       );
     });
@@ -120,7 +120,7 @@ describe("useHasFeature", () => {
           user: {
             id: "1",
             projectFeatures: {
-              "project-123": ["ui-simulations-scenarios"],
+              "project-123": ["release_ui_simulations_menu_enabled"],
             },
           },
           expires: "2025-01-01",
@@ -131,7 +131,7 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios", "project-123")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-123")).toBe(
         true,
       );
     });
@@ -142,7 +142,7 @@ describe("useHasFeature", () => {
           user: {
             id: "1",
             projectFeatures: {
-              "project-123": ["ui-simulations-scenarios"],
+              "project-123": ["release_ui_simulations_menu_enabled"],
               "project-456": [],
             },
           },
@@ -154,10 +154,10 @@ describe("useHasFeature", () => {
 
       const { result } = renderHook(() => useHasFeature());
 
-      expect(result.current("ui-simulations-scenarios", "project-123")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-123")).toBe(
         true,
       );
-      expect(result.current("ui-simulations-scenarios", "project-456")).toBe(
+      expect(result.current("release_ui_simulations_menu_enabled", "project-456")).toBe(
         false,
       );
     });

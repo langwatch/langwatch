@@ -69,59 +69,59 @@ async function main() {
   // 5. Check feature flag without groups (distinctId only)
   console.log(`\n--- Step 5: Check flag (distinctId only, no groups) ---`);
   const distinctIdResult = await posthog.isFeatureEnabled(
-    "ui-simulations-scenarios",
+    "release_ui_simulations_menu_enabled",
     testUserId,
     { disableGeoip: true },
   );
-  console.log(`  ui-simulations-scenarios = ${distinctIdResult}`);
+  console.log(`  release_ui_simulations_menu_enabled = ${distinctIdResult}`);
 
   // 6. Check feature flag with user group only
   console.log(`\n--- Step 6: Check flag (with user group only) ---`);
   const userGroupResult = await posthog.isFeatureEnabled(
-    "ui-simulations-scenarios",
+    "release_ui_simulations_menu_enabled",
     testUserId,
     {
       disableGeoip: true,
       groups: { user: testUserId },
     },
   );
-  console.log(`  ui-simulations-scenarios (user=${testUserId}) = ${userGroupResult}`);
+  console.log(`  release_ui_simulations_menu_enabled (user=${testUserId}) = ${userGroupResult}`);
 
   // 7. Check feature flag with project group
   console.log(`\n--- Step 7: Check flag (with user + project groups) ---`);
   const projectResult = await posthog.isFeatureEnabled(
-    "ui-simulations-scenarios",
+    "release_ui_simulations_menu_enabled",
     testUserId,
     {
       disableGeoip: true,
       groups: { user: testUserId, project: testProjectId },
     },
   );
-  console.log(`  ui-simulations-scenarios (user=${testUserId}, project=${testProjectId}) = ${projectResult}`);
+  console.log(`  release_ui_simulations_menu_enabled (user=${testUserId}, project=${testProjectId}) = ${projectResult}`);
 
   // 8. Check feature flag with org only (no project)
   console.log(`\n--- Step 8: Check flag (with user + org groups) ---`);
   const orgResult = await posthog.isFeatureEnabled(
-    "ui-simulations-scenarios",
+    "release_ui_simulations_menu_enabled",
     testUserId,
     {
       disableGeoip: true,
       groups: { user: testUserId, organization: testOrgId },
     },
   );
-  console.log(`  ui-simulations-scenarios (user=${testUserId}, org=${testOrgId}) = ${orgResult}`);
+  console.log(`  release_ui_simulations_menu_enabled (user=${testUserId}, org=${testOrgId}) = ${orgResult}`);
 
   // 9. Check feature flag with all groups (user + project + org)
   console.log(`\n--- Step 9: Check flag (with all groups: user + project + org) ---`);
   const fullResult = await posthog.isFeatureEnabled(
-    "ui-simulations-scenarios",
+    "release_ui_simulations_menu_enabled",
     testUserId,
     {
       disableGeoip: true,
       groups: { user: testUserId, project: testProjectId, organization: testOrgId },
     },
   );
-  console.log(`  ui-simulations-scenarios (user=${testUserId}, project=${testProjectId}, org=${testOrgId}) = ${fullResult}`);
+  console.log(`  release_ui_simulations_menu_enabled (user=${testUserId}, project=${testProjectId}, org=${testOrgId}) = ${fullResult}`);
 
   // 10. Shutdown
   console.log(`\n--- Step 10: Shutdown ---`);
@@ -131,11 +131,11 @@ async function main() {
   console.log(`  - Groups > user > "${testUserId}"`);
   console.log(`  - Groups > project > "${testProjectId}"`);
   console.log(`  - Groups > organization > "${testOrgId}"`);
-  console.log(`  - Feature Flags > ui-simulations-scenarios`);
+  console.log(`  - Feature Flags > release_ui_simulations_menu_enabled`);
 
   if (distinctIdResult === undefined && projectResult === undefined) {
     console.log(
-      `\nNote: All flags returned undefined. The flag "ui-simulations-scenarios"` +
+      `\nNote: All flags returned undefined. The flag "release_ui_simulations_menu_enabled"` +
         ` may not exist in PostHog yet. Create it in the dashboard first.`,
     );
   }
