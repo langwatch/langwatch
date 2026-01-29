@@ -45,6 +45,21 @@ export const tracerMiddleware = (options?: TracerOptions) => {
             c.set("spanId", spanCtx.spanId);
 
             await next();
+
+            // After handler, add context attributes to span if available
+            const organizationId = c.get("organization")?.id;
+            const projectId = c.get("project")?.id;
+            const userId = c.get("user")?.id;
+
+            if (organizationId) {
+              span.setAttribute("organization.id", organizationId);
+            }
+            if (projectId) {
+              span.setAttribute("tenant.id", projectId);
+            }
+            if (userId) {
+              span.setAttribute("user.id", userId);
+            }
           } catch (err) {
             span.recordException(err as Error);
             span.setStatus({ code: SpanStatusCode.ERROR });
