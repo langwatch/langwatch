@@ -1,71 +1,22 @@
-import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { Conversation } from "../../../../components/messages/Conversation";
-import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
-import { isNotFound } from "../../../../utils/trpcError";
+import { useEffect } from "react";
 
-export default function TraceDetails() {
+/**
+ * Redirect page for /[project]/messages/[trace]
+ * Opens the traceDetails drawer on the messages page.
+ */
+export default function TraceDetailsRedirect() {
   const router = useRouter();
-  const { traceId, trace } = useTraceDetailsState(
-    (router.query.trace as string) ?? "",
-  );
-
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const projectSlug = router.query.project as string | undefined;
+  const traceId = router.query.trace as string | undefined;
 
   useEffect(() => {
-    if (trace.data?.metadata.thread_id) {
-      setThreadId(trace.data.metadata.thread_id);
-    }
-  }, [trace.data?.metadata.thread_id]);
+    if (!projectSlug || !traceId || !router.isReady) return;
 
-  if (isNotFound(trace.error)) {
-    return <ErrorPage statusCode={404} />;
-  }
+    void router.replace(
+      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}`
+    );
+  }, [projectSlug, traceId, router, router.isReady]);
 
-  return (
-    <DashboardLayout backgroundColor="gray.100">
-      <VStack
-        maxWidth="1600"
-        paddingY={6}
-        paddingX={12}
-        alignSelf="flex-start"
-        alignItems="flex-start"
-        width="full"
-        gap={10}
-      >
-        <VStack gap={6} alignItems="flex-start" width="full">
-          <HStack
-            gap={5}
-            align={{ base: "start", md: "center" }}
-            flexDirection={{ base: "column", md: "row" }}
-          >
-            <Heading as="h1">Message Details</Heading>
-            <Text color="fg.subtle" fontFamily="mono">
-              (ID: {traceId})
-            </Text>
-          </HStack>
-        </VStack>
-      </VStack>
-      <Box
-        alignSelf="flex-start"
-        alignItems="flex-start"
-        width="100%"
-        maxWidth="1600"
-        marginBottom="48px"
-      >
-        <HStack
-          align="start"
-          width="full"
-          gap={0}
-          alignItems="stretch"
-          height="100%"
-        >
-          <Conversation threadId={threadId} traceId={traceId} />
-        </HStack>
-      </Box>
-    </DashboardLayout>
-  );
+  return null;
 }
