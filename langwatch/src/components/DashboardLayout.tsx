@@ -263,6 +263,7 @@ export const AddProjectButton = ({
         openDrawer("createProject", {
           navigateOnCreate: true,
           defaultTeamId: team.id,
+          organizationId: organization.id,
         })
       }
     >
