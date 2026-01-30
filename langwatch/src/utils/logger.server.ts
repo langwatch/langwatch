@@ -53,10 +53,18 @@ export const createLogger = (
 
   // Try to create transport, fallback to stdout on error
   try {
-    const transport = buildTransport({ isDevMode, otelLogsEnabled, consoleLevel, otelLevel });
+    const transport = buildTransport({
+      isDevMode,
+      otelLogsEnabled,
+      consoleLevel,
+      otelLevel,
+    });
     return pino(pinoOptions, transport);
   } catch (error) {
-    console.error("Failed to create pino transport, falling back to stdout:", error);
+    console.error(
+      "Failed to create pino transport, falling back to stdout:",
+      error,
+    );
     return pino(pinoOptions, process.stdout);
   }
 };
@@ -86,14 +94,14 @@ function buildConsoleTransport(
 ): pino.TransportTargetOptions {
   if (isDevMode) {
     return {
-      target: require.resolve("pino-pretty"),
+      target: "pino-pretty",
       options: { colorize: true, minimumLevel: level },
       level,
     };
   }
 
   return {
-    target: require.resolve("pino/file"),
+    target: "pino/file",
     options: { destination: 1 },
     level,
   };
@@ -101,7 +109,7 @@ function buildConsoleTransport(
 
 function buildOtelTransport(level: string): pino.TransportTargetOptions {
   return {
-    target: require.resolve("pino-opentelemetry-transport"),
+    target: "pino-opentelemetry-transport",
     options: {
       loggerName: "langwatch-backend",
       serviceVersion: process.env.npm_package_version ?? "1.0.0",

@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -11,7 +11,7 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../server/background/workers/collectorWorker";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../server/db";
 import type {
   CollectorRESTParamsValidator,
   CustomMetadata,
@@ -283,7 +283,11 @@ async function handleCollectorRequest(
     });
 
     logger.error(
-      { projectId: project.id, metadata: params.metadata, zodError: error },
+      {
+        projectId: project.id,
+        metadata: params.metadata,
+        zodError: error,
+      },
       "invalid metadata received",
     );
 
@@ -419,9 +423,9 @@ async function handleCollectorRequest(
         "invalid span received",
       );
 
-      return res
-        .status(400)
-        .json({ error: validationError.message + ` at "spans[${index}]"` });
+      return res.status(400).json({
+        error: validationError.message + ` at "spans[${index}]"`,
+      });
     }
 
     if (

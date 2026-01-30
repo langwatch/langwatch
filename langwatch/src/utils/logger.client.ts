@@ -1,5 +1,3 @@
-"use client";
-
 import pino, { type Logger as PinoLogger } from "pino";
 
 /**
