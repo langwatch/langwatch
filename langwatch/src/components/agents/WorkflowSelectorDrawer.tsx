@@ -17,12 +17,8 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { UpgradeModal } from "~/components/UpgradeModal";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -68,9 +64,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+  // License enforcement for agent creation
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -98,12 +93,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       onSave?.(agent);
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "agents") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -163,12 +152,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
-        const limitExceeded = extractLimitExceededInfo(error);
-        if (limitExceeded?.limitType === "workflows") {
-          setLimitInfo(limitExceeded);
-          setShowUpgradeModal(true);
-          return;
-        }
         console.error("Error creating workflow agent:", error);
         toaster.create({
           title: "Error",
@@ -277,7 +260,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               </Button>
               <Button
                 colorPalette="blue"
-                onClick={() => void handleSubmit(onSubmit)()}
+                onClick={() =>
+                  checkAndProceed(() => void handleSubmit(onSubmit)())
+                }
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-agent-button"
@@ -289,13 +274,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         </Drawer.Content>
       </Drawer.Root>
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType={limitInfo?.limitType ?? "agents"}
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
+      {upgradeModal}
     </>
   );
 }

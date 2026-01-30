@@ -544,3 +544,109 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the organization has 3 experiments
     When I create an experiment in project "proj-789"
     Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Agents: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows agent creation when under limit
+    Given the organization has a license with maxAgents 5
+    And the organization has 3 agents across all projects
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Blocks agent creation when at limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents across all projects
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of agents"
+
+  @integration
+  Scenario: Counts agents across all projects in organization
+    Given the organization has a license with maxAgents 3
+    And project "proj-A" has 2 agents
+    And project "proj-B" has 1 agent
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Counts only non-archived agents toward limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 2 active agents
+    And the organization has 2 archived agents
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Updating existing agent does not enforce limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents across all projects
+    And I have an existing agent "agent-123"
+    When I update agent "agent-123" in project "proj-789"
+    Then the agent is updated successfully
+
+  # ============================================================================
+  # Agents: UI Enforcement (Save-time Modal)
+  # ============================================================================
+
+  @unit
+  Scenario: Agent creation drawer opens regardless of limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    When I click "New Agent" on the agents page
+    Then the agent type selector drawer opens
+    And no upgrade modal is shown yet
+
+  @unit
+  Scenario: Clicking Save Agent at limit shows upgrade modal
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    And I have opened the AgentCodeEditorDrawer for a new agent
+    When I fill in the agent details
+    And I click "Create Agent"
+    Then an upgrade modal is displayed
+    And the modal shows "Agents: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Clicking Save Agent when allowed creates the agent
+    Given the organization has a license with maxAgents 5
+    And the organization has 3 agents (under limit)
+    And I have opened the AgentCodeEditorDrawer for a new agent
+    When I fill in the agent details
+    And I click "Create Agent"
+    Then the agent is created successfully
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Editing existing agent bypasses limit check
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    And I am editing an existing agent
+    When I modify the agent details
+    And I click "Save Changes"
+    Then the agent is updated successfully
+    And no upgrade modal is shown
+
+  # ============================================================================
+  # Agents: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited agents when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 agents
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier agent limit
+    Given the organization has an expired license
+    And the organization has 3 agents
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN

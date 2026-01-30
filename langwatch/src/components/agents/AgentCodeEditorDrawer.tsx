@@ -31,13 +31,9 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
-import { UpgradeModal } from "~/components/UpgradeModal";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
   CodeComponentConfig,
@@ -173,9 +169,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+
+  // License enforcement for agent creation
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -209,12 +205,6 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "agents") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -245,6 +235,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     const config = buildCodeConfig(code, inputs, outputs);
 
     if (agentId) {
+      // Editing existing agent - no limit check needed
       updateMutation.mutate({
         id: agentId,
         projectId: project.id,
@@ -252,11 +243,14 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         config,
       });
     } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        type: "code",
-        config,
+      // Creating new agent - check limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: name.trim(),
+          type: "code",
+          config,
+        });
       });
     }
   }, [
@@ -269,6 +263,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     isValid,
     createMutation,
     updateMutation,
+    checkAndProceed,
   ]);
 
   const handleNameChange = (value: string) => {
@@ -468,13 +463,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         onClose={() => setIsCodeModalOpen(false)}
       />
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="agents"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
+      {upgradeModal}
     </>
   );
 }
