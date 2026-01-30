@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.2...langwatch@v2.1.0) (2026-01-30)
+
+
+### Features
+
+* expose feature flags to frontend via session ([#1218](https://github.com/langwatch/langwatch/issues/1218)) ([94beed1](https://github.com/langwatch/langwatch/commit/94beed1ab296d52aa989615ac44139230d479773))
+* re-apply frontend feature flags ([#1257](https://github.com/langwatch/langwatch/issues/1257)) ([50076b7](https://github.com/langwatch/langwatch/commit/50076b7bfe8a5b2bd6e7688917993336935b1f82))
+* replace search bar with new command bar ([#1245](https://github.com/langwatch/langwatch/issues/1245)) ([15d9827](https://github.com/langwatch/langwatch/commit/15d982756e0d2830245c3db146da82aa7a164de7))
+
+
+### Bug Fixes
+
+* improve evaluations empty state and update documentation links ([dca1c14](https://github.com/langwatch/langwatch/commit/dca1c145fb56e503bfeefaf9103d804e0d7d9ada))
+* improve rendering for high limits, render new license button for ourselves for IS_SAAS ([3187333](https://github.com/langwatch/langwatch/commit/31873338672f1058d61c054eb544597fd7e438ad))
+* **projects:** create project in correct organization from dropdown ([#1265](https://github.com/langwatch/langwatch/issues/1265)) ([53b4c84](https://github.com/langwatch/langwatch/commit/53b4c84feb714846698b520a252d3f1eb86a403e))
+* skip command bar on admin and onboarding ([3b653c8](https://github.com/langwatch/langwatch/commit/3b653c8bafe0055ca64ef902687929b7ceb55c5b))
+* **tests:** update license tests to match UI showing formatted numbers ([#1267](https://github.com/langwatch/langwatch/issues/1267)) ([4f62a04](https://github.com/langwatch/langwatch/commit/4f62a0411e7150bf19637028c3d41231318531e5))
+* **traces:** check IS_SAAS before DB calls in checkLimit ([#1251](https://github.com/langwatch/langwatch/issues/1251)) ([55442fb](https://github.com/langwatch/langwatch/commit/55442fbe0d010998d5781a2813c035a167eb757d)), closes [#1249](https://github.com/langwatch/langwatch/issues/1249)
+* **traces:** enforce limits for self-hosted instances with licenses ([#1260](https://github.com/langwatch/langwatch/issues/1260)) ([3f65268](https://github.com/langwatch/langwatch/commit/3f652688ff71fb01b0dc588d04d2a2794c18a4b8))
+
+
+### Miscellaneous
+
+* add more features to command bar, address comments from first pr ([#1255](https://github.com/langwatch/langwatch/issues/1255)) ([ae3819b](https://github.com/langwatch/langwatch/commit/ae3819b982cb87ceaa89697965c7b3e07a929cac))
+
 ## [2.0.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.1...langwatch@v2.0.2) (2026-01-28)
 
 
