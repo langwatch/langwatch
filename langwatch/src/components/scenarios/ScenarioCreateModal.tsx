@@ -4,6 +4,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -46,16 +48,51 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Generate a scenario using AI
+ */
+async function generateScenarioWithAI(
+  prompt: string,
+  projectId: string
+): Promise<{ name: string; situation: string; criteria: string[]; labels: string[] }> {
+  const response = await fetch("/api/scenario/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, currentScenario: null, projectId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to generate scenario");
+  }
+
+  const data = await response.json();
+  if (!data.scenario) {
+    throw new Error("Invalid response: missing scenario data");
+  }
+
+  return data.scenario;
+}
+
+/**
  * Modal for creating a new scenario with AI assistance.
  *
  * Uses AICreateModal with scenario-specific configuration:
- * - onGenerate: Creates an empty scenario, then navigates to editor with initialPrompt
- * - onSkip: Creates an empty scenario, then navigates to editor without initialPrompt
+ * - onGenerate: Generates scenario with AI, creates it, then navigates to editor
+ * - onSkip: Creates an empty scenario, then navigates to editor
  */
 export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
+
+  // Check if the default model has API keys configured
+  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+  const { modelOption } = useModelSelectionOptions(
+    allModelOptions,
+    defaultModel,
+    "chat"
+  );
+  const isModelDisabled = modelOption?.isDisabled ?? false;
 
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: () => {
@@ -63,31 +100,48 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     },
   });
 
-  const createEmptyScenario = useCallback(async () => {
-    if (!project?.id) {
-      throw new Error("No project selected");
-    }
+  const createScenario = useCallback(
+    async (data: { name: string; situation: string; criteria: string[]; labels: string[] }) => {
+      if (!project?.id) {
+        throw new Error("No project selected");
+      }
 
-    return createMutation.mutateAsync({
-      projectId: project.id,
-      name: DEFAULT_SCENARIO_NAME,
-      situation: "",
-      criteria: [],
-      labels: [],
-    });
-  }, [project?.id, createMutation]);
+      return createMutation.mutateAsync({
+        projectId: project.id,
+        name: data.name || DEFAULT_SCENARIO_NAME,
+        situation: data.situation || "",
+        criteria: data.criteria || [],
+        labels: data.labels || [],
+      });
+    },
+    [project?.id, createMutation]
+  );
 
   const handleGenerate = useCallback(
     async (description: string) => {
-      const scenario = await createEmptyScenario();
+      if (!project?.id) {
+        throw new Error("No project selected");
+      }
 
-      // Navigate to editor with initialPrompt
+      // Check if API keys are configured
+      if (isModelDisabled) {
+        throw new Error(
+          "API keys not configured. Please go to Settings → Model Providers to add your API keys."
+        );
+      }
+
+      // Generate scenario with AI
+      const generatedData = await generateScenarioWithAI(description, project.id);
+
+      // Create scenario with generated content
+      const scenario = await createScenario(generatedData);
+
+      // Navigate to editor
       openDrawer(
         "scenarioEditor",
         {
           urlParams: {
             scenarioId: scenario.id,
-            initialPrompt: description,
           },
         },
         { resetStack: true }
@@ -95,14 +149,19 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
 
       onClose();
     },
-    [createEmptyScenario, openDrawer, onClose]
+    [project?.id, isModelDisabled, createScenario, openDrawer, onClose]
   );
 
   const handleSkip = useCallback(async () => {
     try {
-      const scenario = await createEmptyScenario();
+      const scenario = await createScenario({
+        name: DEFAULT_SCENARIO_NAME,
+        situation: "",
+        criteria: [],
+        labels: [],
+      });
 
-      // Navigate to editor without initialPrompt
+      // Navigate to editor
       openDrawer(
         "scenarioEditor",
         {
@@ -123,7 +182,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         meta: { closable: true },
       });
     }
-  }, [createEmptyScenario, openDrawer, onClose]);
+  }, [createScenario, openDrawer, onClose]);
 
   return (
     <AICreateModal

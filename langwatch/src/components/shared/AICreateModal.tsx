@@ -301,7 +301,7 @@ function IdleFooter({ onSkip, onGenerate, isGenerateDisabled }: IdleFooterProps)
   return (
     <HStack gap={2} justify="flex-end">
       <Button variant="ghost" onClick={onSkip}>
-        Skip
+        I'll write it myself
       </Button>
       <Button
         colorPalette="blue"
@@ -324,7 +324,7 @@ function ErrorFooter({ onSkip, onTryAgain }: ErrorFooterProps) {
   return (
     <HStack gap={2} justify="flex-end">
       <Button variant="ghost" onClick={onSkip}>
-        Skip
+        I'll write it myself
       </Button>
       <Button colorPalette="blue" onClick={onTryAgain}>
         Try again
