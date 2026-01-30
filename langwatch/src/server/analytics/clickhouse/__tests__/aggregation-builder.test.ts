@@ -142,6 +142,70 @@ describe("aggregation-builder", () => {
       );
       expect(result.params.previousEnd).toEqual(baseInput.startDate);
     });
+
+    it("should build CTE-based query for pipeline metrics with timeScale 'full'", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Should use CTEs for pipeline metrics
+      expect(result.sql).toContain("WITH");
+      expect(result.sql).toContain("_current AS");
+      expect(result.sql).toContain("_previous AS");
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+    });
+
+    it("should include both simple and pipeline metrics in CTE query", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Should have CTEs for both simple and pipeline metrics
+      expect(result.sql).toContain("WITH");
+      expect(result.sql).toContain("simple_metrics_current AS");
+      expect(result.sql).toContain("simple_metrics_previous AS");
+      expect(result.sql).toContain("UNION ALL");
+    });
+
+    it("should use standard query for pipeline metrics when timeScale is not 'full'", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Should NOT use CTEs for non-full timeScale (filters out pipeline metrics)
+      expect(result.sql).not.toContain("UNION ALL");
+      expect(result.sql).toContain("GROUP BY period, date");
+    });
   });
 
   describe("buildDataForFilterQuery", () => {

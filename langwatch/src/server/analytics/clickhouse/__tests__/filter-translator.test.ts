@@ -93,16 +93,19 @@ describe("filter-translator", () => {
     });
 
     describe("trace filters", () => {
-      it("translates traces.error filter for true", () => {
+      it("translates traces.error filter for true using ContainsErrorStatus", () => {
         const result = translateFilter("traces.error", ["true"]);
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 1");
         expect(result.params).toEqual({});
+        expect(result.requiredJoins).toHaveLength(0);
       });
 
-      it("translates traces.error filter for false", () => {
+      it("translates traces.error filter for false using ContainsErrorStatus", () => {
         const result = translateFilter("traces.error", ["false"]);
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 0");
+        expect(result.whereClause).toContain("IS NULL");
         expect(result.params).toEqual({});
+        expect(result.requiredJoins).toHaveLength(0);
       });
 
       it("returns no-op when both true and false are specified", () => {

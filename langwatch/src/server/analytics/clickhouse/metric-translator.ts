@@ -202,7 +202,7 @@ function translateMetadataMetric(
     case "metadata.user_id":
       return {
         selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['user.id']`,
+          `${ts}.Attributes['langwatch.user_id']`,
           aggregation,
           alias,
         ),
@@ -213,7 +213,7 @@ function translateMetadataMetric(
     case "metadata.thread_id":
       return {
         selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['thread.id']`,
+          `${ts}.Attributes['gen_ai.conversation.id']`,
           aggregation,
           alias,
         ),
@@ -533,7 +533,7 @@ function translateThreadsMetric(
         requiredJoins,
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${ts}.Attributes['thread.id'] AS thread_id, max(${ts}.CreatedAt) - min(${ts}.CreatedAt) AS thread_duration`,
+          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, max(${ts}.CreatedAt) - min(${ts}.CreatedAt) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -576,13 +576,13 @@ export function translatePipelineAggregation(
       pipelineColumn = `${ts}.TraceId`;
       break;
     case "user_id":
-      pipelineColumn = `${ts}.Attributes['user.id']`;
+      pipelineColumn = `${ts}.Attributes['langwatch.user_id']`;
       break;
     case "thread_id":
-      pipelineColumn = `${ts}.Attributes['thread.id']`;
+      pipelineColumn = `${ts}.Attributes['gen_ai.conversation.id']`;
       break;
     case "customer_id":
-      pipelineColumn = `${ts}.Attributes['customer.id']`;
+      pipelineColumn = `${ts}.Attributes['langwatch.customer_id']`;
       break;
     default:
       pipelineColumn = `${ts}.TraceId`;

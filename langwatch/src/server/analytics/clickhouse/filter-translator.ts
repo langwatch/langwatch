@@ -246,6 +246,9 @@ function translatePromptIdsFilter(values: string[]): FilterTranslation {
 
 /**
  * Translate error filter
+ * Uses ContainsErrorStatus from trace_summaries which captures errors from
+ * multiple sources: StatusCode, error attributes, and exception events.
+ * This is more reliable and performant than an EXISTS subquery.
  */
 function translateErrorFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -261,7 +264,7 @@ function translateErrorFilter(values: string[]): FilterTranslation {
     };
   } else if (hasFalse && !hasTrue) {
     return {
-      whereClause: `${ts}.ContainsErrorStatus = 0`,
+      whereClause: `(${ts}.ContainsErrorStatus = 0 OR ${ts}.ContainsErrorStatus IS NULL)`,
       requiredJoins: [],
       params: {},
     };

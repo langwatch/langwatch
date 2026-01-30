@@ -316,6 +316,23 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     );
   }
 
+  // Separate simple and subquery metrics
+  const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
+  const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
+
+  // If we have subquery metrics and timeScale is "full", use CTE-based query
+  if (subqueryMetrics.length > 0 && input.timeScale === "full") {
+    return buildSubqueryTimeseriesQuery(
+      input,
+      simpleMetrics,
+      subqueryMetrics,
+      joinClauses,
+      baseWhere,
+      filterWhere,
+      filterTranslation.params,
+    );
+  }
+
   // Build SELECT expressions for standard query
   const selectExprs: string[] = [];
 
@@ -340,8 +357,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   }
 
   // Add metric expressions
-  // Filter out pipeline metrics that require subqueries for now
-  const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   for (const metric of simpleMetrics) {
     selectExprs.push(metric.selectExpression);
   }
@@ -471,6 +486,139 @@ function buildArrayJoinTimeseriesQuery(
     WHERE period IS NOT NULL
     GROUP BY ${outerGroupBy.join(", ")}
     ORDER BY period${dateTrunc ? ", date" : ""}
+  `;
+
+  return {
+    sql,
+    params: {
+      tenantId: input.projectId,
+      currentStart: input.startDate,
+      currentEnd: input.endDate,
+      previousStart: input.previousPeriodStartDate,
+      previousEnd: input.startDate,
+      ...filterParams,
+    },
+  };
+}
+
+/**
+ * Build a timeseries query using CTEs for subquery (pipeline) metrics.
+ * This handles metrics that require two-level aggregation (e.g., avg threads per user).
+ */
+function buildSubqueryTimeseriesQuery(
+  input: TimeseriesQueryInput,
+  simpleMetrics: MetricTranslation[],
+  subqueryMetrics: MetricTranslation[],
+  joinClauses: string,
+  baseWhere: string,
+  filterWhere: string,
+  filterParams: Record<string, unknown>,
+): BuiltQuery {
+  const ts = tableAliases.trace_summaries;
+  const ctes: string[] = [];
+
+  // Build CTEs for each subquery metric, one for current and one for previous period
+  for (const metric of subqueryMetrics) {
+    const subquery = metric.subquery!;
+
+    // CTE for current period
+    ctes.push(`
+      ${metric.alias}_current AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        FROM (
+          SELECT ${subquery.innerSelect}
+          FROM trace_summaries ${ts} FINAL
+          ${joinClauses}
+          WHERE ${ts}.TenantId = {tenantId:String}
+            AND ${ts}.CreatedAt >= {currentStart:DateTime64(3)}
+            AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)}
+            ${filterWhere}
+          GROUP BY ${subquery.innerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+      )`);
+
+    // CTE for previous period
+    ctes.push(`
+      ${metric.alias}_previous AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        FROM (
+          SELECT ${subquery.innerSelect}
+          FROM trace_summaries ${ts} FINAL
+          ${joinClauses}
+          WHERE ${ts}.TenantId = {tenantId:String}
+            AND ${ts}.CreatedAt >= {previousStart:DateTime64(3)}
+            AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)}
+            ${filterWhere}
+          GROUP BY ${subquery.innerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+      )`);
+  }
+
+  // Build simple metrics query for current period
+  const simpleSelectExprs: string[] = [];
+  for (const metric of simpleMetrics) {
+    simpleSelectExprs.push(metric.selectExpression);
+  }
+
+  // Add subquery metric values from CTEs
+  const subquerySelectExprs: string[] = [];
+  for (const metric of subqueryMetrics) {
+    subquerySelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_current) AS ${metric.alias}`);
+  }
+
+  // CTE for simple metrics current period
+  if (simpleMetrics.length > 0) {
+    ctes.push(`
+      simple_metrics_current AS (
+        SELECT
+          ${simpleSelectExprs.join(",\n          ")}
+        FROM trace_summaries ${ts} FINAL
+        ${joinClauses}
+        WHERE ${ts}.TenantId = {tenantId:String}
+          AND ${ts}.CreatedAt >= {currentStart:DateTime64(3)}
+          AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)}
+          ${filterWhere}
+      )`);
+
+    ctes.push(`
+      simple_metrics_previous AS (
+        SELECT
+          ${simpleSelectExprs.join(",\n          ")}
+        FROM trace_summaries ${ts} FINAL
+        ${joinClauses}
+        WHERE ${ts}.TenantId = {tenantId:String}
+          AND ${ts}.CreatedAt >= {previousStart:DateTime64(3)}
+          AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)}
+          ${filterWhere}
+      )`);
+  }
+
+  // Build final SELECT that combines simple and subquery metrics
+  const currentSelectExprs: string[] = ["'current' AS period"];
+  const previousSelectExprs: string[] = ["'previous' AS period"];
+
+  // Add simple metrics columns
+  for (const metric of simpleMetrics) {
+    if (simpleMetrics.length > 0) {
+      currentSelectExprs.push(`(SELECT coalesce(${metric.alias}, 0) FROM simple_metrics_current) AS ${metric.alias}`);
+      previousSelectExprs.push(`(SELECT coalesce(${metric.alias}, 0) FROM simple_metrics_previous) AS ${metric.alias}`);
+    }
+  }
+
+  // Add subquery metrics columns
+  for (const metric of subqueryMetrics) {
+    currentSelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_current) AS ${metric.alias}`);
+    previousSelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_previous) AS ${metric.alias}`);
+  }
+
+  const sql = `
+    WITH
+      ${ctes.join(",\n      ")}
+    SELECT ${currentSelectExprs.join(", ")}
+    UNION ALL
+    SELECT ${previousSelectExprs.join(", ")}
   `;
 
   return {
