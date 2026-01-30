@@ -249,6 +249,10 @@ describe("useLicenseEnforcement", () => {
       "scenarios",
       "projects",
       "members",
+      "teams",
+      "membersLite",
+      "agents",
+      "experiments",
     ] as const;
 
     limitTypes.forEach((limitType) => {

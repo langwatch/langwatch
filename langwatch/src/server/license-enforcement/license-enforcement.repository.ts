@@ -92,6 +92,7 @@ export interface ILicenseEnforcementRepository {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
   getAgentCount(organizationId: string): Promise<number>;
+  getExperimentCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -377,6 +378,24 @@ export class LicenseEnforcementRepository
       select: { id: true },
     });
     return projects.map((p) => p.id);
+  }
+
+  /**
+   * Counts all experiments for license enforcement.
+   * Experiments do not support archival - all experiments count against limits.
+   *
+   * Note: Experiment model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getExperimentCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.experiment.count({
+      where: {
+        projectId: { in: projectIds },
+      },
+    });
   }
 
   /**

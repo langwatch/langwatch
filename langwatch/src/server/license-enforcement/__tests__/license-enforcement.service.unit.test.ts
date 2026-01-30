@@ -35,6 +35,7 @@ describe("LicenseEnforcementService", () => {
     maxEvaluators: 4,
     maxScenarios: 6,
     maxAgents: 10,
+    maxExperiments: 3,
     evaluationsCredit: 100,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
@@ -47,6 +48,7 @@ describe("LicenseEnforcementService", () => {
       getEvaluatorCount: vi.fn().mockResolvedValue(0),
       getScenarioCount: vi.fn().mockResolvedValue(0),
       getAgentCount: vi.fn().mockResolvedValue(0),
+      getExperimentCount: vi.fn().mockResolvedValue(0),
       getProjectCount: vi.fn().mockResolvedValue(0),
       getTeamCount: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(0),
@@ -138,7 +140,10 @@ describe("LicenseEnforcementService", () => {
         { type: "scenarios", repoMethod: "getScenarioCount", planField: "maxScenarios" },
         { type: "projects", repoMethod: "getProjectCount", planField: "maxProjects" },
         { type: "members", repoMethod: "getMemberCount", planField: "maxMembers" },
+        { type: "teams", repoMethod: "getTeamCount", planField: "maxTeams" },
+        { type: "membersLite", repoMethod: "getMembersLiteCount", planField: "maxMembersLite" },
         { type: "agents", repoMethod: "getAgentCount", planField: "maxAgents" },
+        { type: "experiments", repoMethod: "getExperimentCount", planField: "maxExperiments" },
       ];
 
       it.each(limitTypeTests)(
