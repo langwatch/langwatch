@@ -95,4 +95,3 @@ Workers start via:
 ## References
 
 - Related ADRs: ADR-003 (Logging), ADR-004 (Docker Dev Environment)
-- Feature spec: `specs/workers/worker-startup.feature`
