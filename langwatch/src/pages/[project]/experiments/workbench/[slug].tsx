@@ -43,6 +43,7 @@ export default function ExperimentsWorkbenchPage() {
     isNotFound,
     isError,
     error,
+    reset: resetAutosave,
   } = useAutosaveEvaluationsV3();
 
   // Track loading state for saved datasets
@@ -54,6 +55,7 @@ export default function ExperimentsWorkbenchPage() {
   // Reset store when leaving the page
   useEffect(() => {
     return () => {
+      resetAutosave();
       reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

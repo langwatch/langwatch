@@ -297,6 +297,16 @@ export const useAutosaveEvaluationsV3 = () => {
   // isNotFound: query completed with error AND that error is NOT_FOUND
   const isNotFound = existingExperiment.isError && isNotFoundError;
 
+  const trpcUtils = api.useContext();
+
+  const reset = useCallback(() => {
+    loadedSlugRef.current = null;
+    void trpcUtils.experiments.getEvaluationsV3BySlug.reset({
+      projectId: project?.id ?? "",
+      experimentSlug: routerSlug ?? "",
+    })
+  }, [project?.id, routerSlug, trpcUtils]);
+
   return {
     isLoading: existingExperiment.isLoading,
     isSaving: saveExperiment.isPending,
@@ -305,5 +315,6 @@ export const useAutosaveEvaluationsV3 = () => {
     // Only show isError for non-NOT_FOUND errors (e.g., permission denied)
     isError: existingExperiment.isError && !isNotFoundError,
     error: existingExperiment.error,
+    reset: reset,
   };
 };
