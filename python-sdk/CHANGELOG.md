@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.0...python-sdk@v1.0.0) (2026-01-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Monitors now store evaluation level explicitly in 'level' column
+
+### Features
+
+* **evaluations-v3:** major table performance improvements, prompts to experiment button and other bugfixes ([#1181](https://github.com/langwatch/langwatch/issues/1181)) ([2cbf430](https://github.com/langwatch/langwatch/commit/2cbf4303f670edcd65a81f3af4d7a00a85b13010))
+* new online evaluations and guardrails setup ([#1151](https://github.com/langwatch/langwatch/issues/1151)) ([7c8a804](https://github.com/langwatch/langwatch/commit/7c8a804e265946a9a96e44b110f17266abaafc73))
+* **traces:** add reasoning tokens and effort support for LLM models ([16f1d4a](https://github.com/langwatch/langwatch/commit/16f1d4a80f1425d85c5f700da01287a2415bdd88))
+
+
+### Bug Fixes
+
+* **dspy:** capture full message output including reasoning_content ([8257cae](https://github.com/langwatch/langwatch/commit/8257cae1b9a4dbe8be8e7001fa88d7a0e3de6653))
+
+
+### Documentation
+
+* move TESTING.md to docs/TESTING_PHILOSOPHY.md ([#1157](https://github.com/langwatch/langwatch/issues/1157)) ([c475c86](https://github.com/langwatch/langwatch/commit/c475c8692f461dc737a082ca687db101a74be9fb))
+
 ## [0.10.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.9.0...python-sdk@v0.10.0) (2026-01-21)
 
 
