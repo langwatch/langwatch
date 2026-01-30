@@ -1,7 +1,7 @@
 import { type MutationOptions, useMutation } from "@tanstack/react-query";
 import type { Node } from "@xyflow/react";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 import { invokeLLM, type PromptExecutionResult } from "../utils/invokeLLM";
 
 const logger = createLogger("useInvokePrompt");

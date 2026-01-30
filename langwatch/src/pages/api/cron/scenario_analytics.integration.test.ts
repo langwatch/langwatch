@@ -46,7 +46,9 @@ async function cleanupScenarioEvents(
               ...projectIds.map((id) => ({
                 term: { "metadata.project_id": id },
               })),
-              ...projectIds.map((id) => ({ term: { project_id: id } })),
+              ...projectIds.map((id) => ({
+                term: { project_id: id },
+              })),
             ],
           },
         },
@@ -494,7 +496,11 @@ describe("Scenario Analytics Cron Job", () => {
         batch_run_id: `test-batch-old-${testId}`,
         scenario_set_id: `test-set-old-${testId}`,
         messages: [
-          { id: `msg-old-${testId}`, role: "user", content: "old test" },
+          {
+            id: `msg-old-${testId}`,
+            role: "user",
+            content: "old test",
+          },
         ],
       };
 
@@ -507,7 +513,11 @@ describe("Scenario Analytics Cron Job", () => {
         batch_run_id: `test-batch-future-${testId}`,
         scenario_set_id: `test-set-future-${testId}`,
         messages: [
-          { id: `msg-future-${testId}`, role: "user", content: "future test" },
+          {
+            id: `msg-future-${testId}`,
+            role: "user",
+            content: "future test",
+          },
         ],
       };
 

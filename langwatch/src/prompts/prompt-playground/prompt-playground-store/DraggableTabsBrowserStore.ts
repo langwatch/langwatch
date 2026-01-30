@@ -8,7 +8,7 @@ import { immer } from "zustand/middleware/immer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { chatMessageSchema } from "~/server/tracer/types.generated";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 import { createTabId, createWindowId } from "./utils/id-generators";
 
 const logger = createLogger("DraggableTabsBrowserStore");

@@ -401,14 +401,7 @@ export const useDrawer = () => {
       setFlowCallbacks,
       getFlowCallbacks,
     }),
-    [
-      openDrawer,
-      closeDrawer,
-      drawerOpen,
-      goBack,
-      canGoBack,
-      currentDrawer,
-    ],
+    [openDrawer, closeDrawer, drawerOpen, goBack, canGoBack, currentDrawer],
   );
 };
 

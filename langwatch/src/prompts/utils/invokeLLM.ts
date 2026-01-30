@@ -8,7 +8,7 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 
 const logger = createLogger("invokeLLM");

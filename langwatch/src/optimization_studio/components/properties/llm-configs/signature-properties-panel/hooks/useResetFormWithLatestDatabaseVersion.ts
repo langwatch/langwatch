@@ -5,7 +5,7 @@ import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmPromptConfigUtils";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
   "langwatch:optimization_studio:use-reset-form-with-latest-version",

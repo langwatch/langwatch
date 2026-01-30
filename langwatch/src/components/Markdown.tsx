@@ -1,7 +1,7 @@
 import { memo } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { RenderCode } from "./code/RenderCode";
 import { getProxiedImageUrl } from "./ExternalImage";

@@ -3,7 +3,7 @@ import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/typ
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger.client";
+import { createLogger } from "~/utils/logger";
 import type { Run, RunItem } from "./types";
 
 const logger = createLogger("useSetRunHistorySidebarController");

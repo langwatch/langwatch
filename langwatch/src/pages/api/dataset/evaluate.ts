@@ -12,16 +12,16 @@ import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
 import { createCostChecker } from "../../../server/license-enforcement/license-enforcement.repository";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 import {
-  type DataForEvaluation,
-  runEvaluation,
+    type DataForEvaluation,
+    runEvaluation,
 } from "../../../server/background/workers/evaluationsWorker";
 import { prisma } from "../../../server/db";
 import {
-  AVAILABLE_EVALUATORS,
-  type EvaluationResult,
-  type EvaluatorDefinition,
-  type EvaluatorTypes,
-  type SingleEvaluationResult,
+    AVAILABLE_EVALUATORS,
+    type EvaluationResult,
+    type EvaluatorDefinition,
+    type EvaluatorTypes,
+    type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
 import { createLogger } from "../../../utils/logger";
@@ -29,333 +29,336 @@ import { createLogger } from "../../../utils/logger";
 const logger = createLogger("langwatch:guardrail:evaluate");
 
 const batchEvaluationInputSchema = z.object({
-  evaluation: z.string(),
-  experimentSlug: z.string().optional(),
-  batchId: z.string().optional(),
-  datasetSlug: z.string(),
-  data: z.object({}).passthrough().optional().nullable(),
-  settings: z.object({}).passthrough().optional().nullable(),
+    evaluation: z.string(),
+    experimentSlug: z.string().optional(),
+    batchId: z.string().optional(),
+    datasetSlug: z.string(),
+    data: z.object({}).passthrough().optional().nullable(),
+    settings: z.object({}).passthrough().optional().nullable(),
 });
 
 const defaultEvaluatorInputSchema = z.object({
-  input: z.string().optional().nullable(),
-  output: z.string().optional().nullable(),
-  contexts: z
-    .union([z.array(rAGChunkSchema), z.array(z.string())])
-    .optional()
-    .nullable(),
-  expected_output: z.string().optional().nullable(),
-  expected_contexts: z
-    .union([z.array(rAGChunkSchema), z.array(z.string())])
-    .optional()
-    .nullable(),
-  conversation: z
-    .array(
-      z.object({
-        input: z.string().optional().nullable(),
-        output: z.string().optional().nullable(),
-      }),
-    )
-    .optional()
-    .nullable(),
+    input: z.string().optional().nullable(),
+    output: z.string().optional().nullable(),
+    contexts: z
+        .union([z.array(rAGChunkSchema), z.array(z.string())])
+        .optional()
+        .nullable(),
+    expected_output: z.string().optional().nullable(),
+    expected_contexts: z
+        .union([z.array(rAGChunkSchema), z.array(z.string())])
+        .optional()
+        .nullable(),
+    conversation: z
+        .array(
+            z.object({
+                input: z.string().optional().nullable(),
+                output: z.string().optional().nullable(),
+            }),
+        )
+        .optional()
+        .nullable(),
 });
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
 export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
+    req: NextApiRequest,
+    res: NextApiResponse,
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).end(); // Only accept POST requests
-  }
-
-  const authToken = req.headers["x-auth-token"];
-
-  if (!authToken) {
-    return res
-      .status(401)
-      .json({ message: "X-Auth-Token header is required." });
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
-    include: { team: true },
-  });
-
-  if (!project) {
-    return res.status(401).json({ message: "Invalid auth token." });
-  }
-
-  if (!req.body) {
-    return res.status(400).json({ message: "Bad request" });
-  }
-
-  let params: BatchEvaluationRESTParams;
-
-  try {
-    params = batchEvaluationInputSchema.parse(req.body);
-  } catch (error) {
-    logger.error(
-      { error, body: req.body, projectId: project.id },
-      "invalid evaluation params received",
-    );
-    captureException(error, { extra: { projectId: project.id } });
-
-    const validationError = fromZodError(error as ZodError);
-    return res.status(400).json({ error: validationError.message });
-  }
-
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return res.status(200).json({
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    });
-  }
-
-  const { datasetSlug } = params;
-  const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
-  const evaluation = params.evaluation;
-  let settings = null;
-  let checkType;
-
-  const check = await prisma.monitor.findFirst({
-    where: {
-      projectId: project.id,
-      slug: evaluation,
-    },
-  });
-
-  if (check != null) {
-    checkType = check.checkType;
-    settings = check.parameters;
-  } else {
-    checkType = evaluation;
-  }
-
-  let evaluationRequiredFields: string[] = [];
-
-  const evaluator = await getEvaluatorIncludingCustom(
-    project.id,
-    checkType as EvaluatorTypes,
-  );
-  if (!evaluator) {
-    return res.status(400).json({
-      error: `Evaluator not found: ${checkType}`,
-    });
-  }
-
-  evaluationRequiredFields = evaluator.requiredFields;
-
-  let data: DataForEvaluation;
-  try {
-    data = getEvaluatorDataForParams(
-      checkType,
-      params.data as Record<string, any>,
-    );
-    if (
-      !evaluationRequiredFields.every((field: string) => {
-        return field in data.data;
-      })
-    ) {
-      return res.status(400).json({
-        error: `Missing required field for ${checkType}`,
-        requiredFields: evaluationRequiredFields,
-      });
+    if (req.method !== "POST") {
+        return res.status(405).end(); // Only accept POST requests
     }
-  } catch (error) {
-    logger.error(
-      { error, body: req.body, projectId: project.id },
-      "invalid evaluation data received",
+
+    const authToken = req.headers["x-auth-token"];
+
+    if (!authToken) {
+        return res
+            .status(401)
+            .json({ message: "X-Auth-Token header is required." });
+    }
+
+    const project = await prisma.project.findUnique({
+        where: { apiKey: authToken as string },
+        include: { team: true },
+    });
+
+    if (!project) {
+        return res.status(401).json({ message: "Invalid auth token." });
+    }
+
+    if (!req.body) {
+        return res.status(400).json({ message: "Bad request" });
+    }
+
+    let params: BatchEvaluationRESTParams;
+
+    try {
+        params = batchEvaluationInputSchema.parse(req.body);
+    } catch (error) {
+        logger.error(
+            { error, body: req.body, projectId: project.id },
+            "invalid evaluation params received",
+        );
+        captureException(error, { extra: { projectId: project.id } });
+
+        const validationError = fromZodError(error as ZodError);
+        return res.status(400).json({ error: validationError.message });
+    }
+
+    const costChecker = createCostChecker(prisma);
+    const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
+        project.team.organizationId,
     );
-    captureException(error, { extra: { projectId: project.id } });
+    const getCurrentCost = await costChecker.getCurrentMonthCost(
+        project.team.organizationId,
+    );
 
-    const validationError = fromZodError(error as ZodError);
-    return res.status(400).json({ error: validationError.message });
-  }
+    if (getCurrentCost >= maxMonthlyUsage) {
+        return res.status(200).json({
+            status: "skipped",
+            details: "Monthly usage limit exceeded",
+        });
+    }
 
-  const dataset = await prisma.dataset.findFirst({
-    where: {
-      slug: datasetSlug,
-      projectId: project.id,
-    },
-  });
+    const { datasetSlug } = params;
+    const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
+    const evaluation = params.evaluation;
+    let settings = null;
+    let checkType;
 
-  if (!dataset) {
-    return res.status(404).json({ error: "Dataset not found" });
-  }
-
-  let result: SingleEvaluationResult;
-  try {
-    result = await runEvaluation({
-      projectId: project.id,
-      data,
-      evaluatorType: checkType as EvaluatorTypes,
-      settings: (settings as Record<string, unknown>) ?? {},
+    const check = await prisma.monitor.findFirst({
+        where: {
+            projectId: project.id,
+            slug: evaluation,
+        },
     });
-  } catch (error) {
-    result = {
-      status: "error",
-      error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : "Internal error",
-      traceback: [],
-    };
-  }
 
-  const experiment = await prisma.experiment.findUnique({
-    where: {
-      projectId_slug: {
-        projectId: project.id,
-        slug: experimentSlug,
-      },
-    },
-  });
+    if (check != null) {
+        checkType = check.checkType;
+        settings = check.parameters;
+    } else {
+        checkType = evaluation;
+    }
 
-  if (!experiment) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Experiment not found" });
-  }
+    let evaluationRequiredFields: string[] = [];
 
-  if ("cost" in result && result.cost) {
-    await prisma.cost.create({
-      data: {
-        id: `cost_${nanoid()}`,
-        projectId: project.id,
-        costType: CostType.BATCH_EVALUATION,
-        costName: evaluation,
-        referenceType: CostReferenceType.BATCH,
-        referenceId: experiment.id,
-        amount: result.cost.amount,
-        currency: result.cost.currency,
-      },
+    const evaluator = await getEvaluatorIncludingCustom(
+        project.id,
+        checkType as EvaluatorTypes,
+    );
+    if (!evaluator) {
+        return res.status(400).json({
+            error: `Evaluator not found: ${checkType}`,
+        });
+    }
+
+    evaluationRequiredFields = evaluator.requiredFields;
+
+    let data: DataForEvaluation;
+    try {
+        data = getEvaluatorDataForParams(
+            checkType,
+            params.data as Record<string, any>,
+        );
+        if (
+            !evaluationRequiredFields.every((field: string) => {
+                return field in data.data;
+            })
+        ) {
+            return res.status(400).json({
+                error: `Missing required field for ${checkType}`,
+                requiredFields: evaluationRequiredFields,
+            });
+        }
+    } catch (error) {
+        logger.error(
+            { error, body: req.body, projectId: project.id },
+            "invalid evaluation data received",
+        );
+        captureException(error, { extra: { projectId: project.id } });
+
+        const validationError = fromZodError(error as ZodError);
+        return res.status(400).json({ error: validationError.message });
+    }
+
+    const dataset = await prisma.dataset.findFirst({
+        where: {
+            slug: datasetSlug,
+            projectId: project.id,
+        },
     });
-  }
 
-  const { score, passed, details, cost, status, label } =
-    result as EvaluationResult;
+    if (!dataset) {
+        return res.status(404).json({ error: "Dataset not found" });
+    }
 
-  await prisma.batchEvaluation.create({
-    data: {
-      id: nanoid(),
-      experimentId: experiment.id,
-      projectId: project.id,
-      data: data.data,
-      status: status,
-      score: score ?? 0,
-      passed: passed ?? false,
-      label: label,
-      details: details ?? "",
-      cost: cost?.amount ?? 0,
-      evaluation: evaluation,
-      datasetSlug: datasetSlug,
-      datasetId: dataset.id,
-    },
-  });
+    let result: SingleEvaluationResult;
+    try {
+        result = await runEvaluation({
+            projectId: project.id,
+            data,
+            evaluatorType: checkType as EvaluatorTypes,
+            settings: (settings as Record<string, unknown>) ?? {},
+        });
+    } catch (error) {
+        result = {
+            status: "error",
+            error_type: "INTERNAL_ERROR",
+            details: error instanceof Error ? error.message : "Internal error",
+            traceback: [],
+        };
+    }
 
-  return res.status(200).json(result);
+    const experiment = await prisma.experiment.findUnique({
+        where: {
+            projectId_slug: {
+                projectId: project.id,
+                slug: experimentSlug,
+            },
+        },
+    });
+
+    if (!experiment) {
+        throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Experiment not found",
+        });
+    }
+
+    if ("cost" in result && result.cost) {
+        await prisma.cost.create({
+            data: {
+                id: `cost_${nanoid()}`,
+                projectId: project.id,
+                costType: CostType.BATCH_EVALUATION,
+                costName: evaluation,
+                referenceType: CostReferenceType.BATCH,
+                referenceId: experiment.id,
+                amount: result.cost.amount,
+                currency: result.cost.currency,
+            },
+        });
+    }
+
+    const { score, passed, details, cost, status, label } =
+        result as EvaluationResult;
+
+    await prisma.batchEvaluation.create({
+        data: {
+            id: nanoid(),
+            experimentId: experiment.id,
+            projectId: project.id,
+            data: data.data,
+            status: status,
+            score: score ?? 0,
+            passed: passed ?? false,
+            label: label,
+            details: details ?? "",
+            cost: cost?.amount ?? 0,
+            evaluation: evaluation,
+            datasetSlug: datasetSlug,
+            datasetId: dataset.id,
+        },
+    });
+
+    return res.status(200).json(result);
 }
 
 const autoparseContexts = (
-  contexts: unknown[] | unknown,
+    contexts: unknown[] | unknown,
 ): string[] | undefined => {
-  if (contexts === null || contexts === undefined) {
-    return undefined;
-  }
-  let parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
-
-  return parsedContexts.map((context) => {
-    if (typeof context === "string") {
-      return context;
-    } else {
-      return extractChunkTextualContent(
-        "content" in context ? context.content : context,
-      );
+    if (contexts === null || contexts === undefined) {
+        return undefined;
     }
-  });
+    let parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
+
+    return parsedContexts.map((context) => {
+        if (typeof context === "string") {
+            return context;
+        } else {
+            return extractChunkTextualContent(
+                "content" in context ? context.content : context,
+            );
+        }
+    });
 };
 
 export const getEvaluatorDataForParams = (
-  checkType: string,
-  params: Record<string, any>,
+    checkType: string,
+    params: Record<string, any>,
 ): DataForEvaluation => {
-  if (checkType.startsWith("custom/")) {
+    if (checkType.startsWith("custom/")) {
+        return {
+            type: "custom",
+            data: params,
+        };
+    }
+
+    const data_ = defaultEvaluatorInputSchema.parse({
+        ...params,
+        contexts: autoparseContexts(params.contexts),
+        expected_contexts: autoparseContexts(params.expected_contexts),
+    });
+    const {
+        input,
+        output,
+        contexts,
+        expected_output,
+        conversation,
+        expected_contexts,
+    } = data_;
+
     return {
-      type: "custom",
-      data: params,
+        type: "default",
+        data: {
+            input: input ? input : undefined,
+            output: output ? output : undefined,
+            contexts: JSON.stringify(contexts),
+            expected_output: expected_output ? expected_output : undefined,
+            expected_contexts: JSON.stringify(expected_contexts),
+            conversation: JSON.stringify(
+                conversation?.map((message) => ({
+                    input: message.input ?? undefined,
+                    output: message.output ?? undefined,
+                })) ?? [],
+            ),
+        },
     };
-  }
-
-  const data_ = defaultEvaluatorInputSchema.parse({
-    ...params,
-    contexts: autoparseContexts(params.contexts),
-    expected_contexts: autoparseContexts(params.expected_contexts),
-  });
-  const {
-    input,
-    output,
-    contexts,
-    expected_output,
-    conversation,
-    expected_contexts,
-  } = data_;
-
-  return {
-    type: "default",
-    data: {
-      input: input ? input : undefined,
-      output: output ? output : undefined,
-      contexts: JSON.stringify(contexts),
-      expected_output: expected_output ? expected_output : undefined,
-      expected_contexts: JSON.stringify(expected_contexts),
-      conversation: JSON.stringify(
-        conversation?.map((message) => ({
-          input: message.input ?? undefined,
-          output: message.output ?? undefined,
-        })) ?? [],
-      ),
-    },
-  };
 };
 
 export const getEvaluatorIncludingCustom = async (
-  projectId: string,
-  checkType: EvaluatorTypes,
+    projectId: string,
+    checkType: EvaluatorTypes,
 ): Promise<
-  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
+    EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
 > => {
-  const availableCustomEvaluators = await getCustomEvaluators({
-    projectId: projectId,
-  });
+    const availableCustomEvaluators = await getCustomEvaluators({
+        projectId: projectId,
+    });
 
-  const availableEvaluators = {
-    ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(
-      (availableCustomEvaluators ?? []).map((evaluator) => {
-        const { inputs } = getInputsOutputs(
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[],
-        );
-        const requiredFields = inputs.map((input) => input.identifier);
+    const availableEvaluators = {
+        ...AVAILABLE_EVALUATORS,
+        ...Object.fromEntries(
+            (availableCustomEvaluators ?? []).map((evaluator) => {
+                const { inputs } = getInputsOutputs(
+                    JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+                        ?.edges as Edge[],
+                    JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+                        ?.nodes as JsonArray as unknown[] as Node[],
+                );
+                const requiredFields = inputs.map((input) => input.identifier);
 
-        return [
-          `custom/${evaluator.id}`,
-          {
-            name: evaluator.name,
-            requiredFields: requiredFields,
-          },
-        ];
-      }),
-    ),
-  };
+                return [
+                    `custom/${evaluator.id}`,
+                    {
+                        name: evaluator.name,
+                        requiredFields: requiredFields,
+                    },
+                ];
+            }),
+        ),
+    };
 
-  return availableEvaluators[checkType];
+    return availableEvaluators[checkType];
 };
