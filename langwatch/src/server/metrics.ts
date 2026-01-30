@@ -233,7 +233,9 @@ export const setEventSourcingCheckpointLag = (
   processorType: string,
   lag: number,
 ) =>
-  eventSourcingCheckpointLag.labels(pipelineName, processorName, processorType).set(lag);
+  eventSourcingCheckpointLag
+    .labels(pipelineName, processorName, processorType)
+    .set(lag);
 
 // Counter for lock contention events
 register.removeSingleMetric("event_sourcing_lock_contention_total");
@@ -247,60 +249,3 @@ export const getEventSourcingLockContentionCounter = (
   pipelineName: string,
   processorName: string,
 ) => eventSourcingLockContentionTotal.labels(pipelineName, processorName);
-
-// ============================================================================
-// HTTP Request Metrics
-// ============================================================================
-
-/**
- * Normalizes a URL path to a route pattern to prevent cardinality explosion.
- * Replaces UUIDs, numeric IDs, and other dynamic segments with placeholders.
- *
- * Examples:
- * - /api/projects/abc-123/traces -> /api/projects/:id/traces
- * - /api/collector/trace_123 -> /api/collector/:id
- */
-function normalizePathToRoutePattern(path: string): string {
-  return (
-    path
-      // Replace UUIDs (with or without dashes)
-      .replace(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-        ":id"
-      )
-      .replace(/[0-9a-f]{32}/gi, ":id")
-      // Replace numeric IDs
-      .replace(/\/\d+(?=\/|$)/g, "/:id")
-      // Replace common ID patterns (trace_xxx, span_xxx, etc.)
-      .replace(/\/(trace|span|project|org|user|eval)_[a-zA-Z0-9]+/g, "/$1_:id")
-      // Replace cuid-like patterns (25+ alphanumeric chars)
-      .replace(/\/[a-zA-Z0-9]{25,}(?=\/|$)/g, "/:id")
-  );
-}
-
-/**
- * Converts a status code to a status class (2xx, 3xx, 4xx, 5xx).
- */
-function getStatusClass(statusCode: number): string {
-  const firstDigit = Math.floor(statusCode / 100);
-  return `${firstDigit}xx`;
-}
-
-// Histogram for HTTP request duration with bounded labels
-register.removeSingleMetric("http_request_duration_seconds");
-export const httpRequestDurationHistogram = new Histogram({
-  name: "http_request_duration_seconds",
-  help: "Duration of HTTP requests in seconds",
-  labelNames: ["method", "route_pattern", "status_class"] as const,
-  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-});
-
-export const observeHttpRequestDuration = (
-  method: string,
-  path: string,
-  statusCode: number,
-  durationSeconds: number,
-) =>
-  httpRequestDurationHistogram
-    .labels(method, normalizePathToRoutePattern(path), getStatusClass(statusCode))
-    .observe(durationSeconds);

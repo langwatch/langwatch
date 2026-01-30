@@ -10,7 +10,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.client";
 import type {
   DatasetColumns,
   DatasetRecordEntry,

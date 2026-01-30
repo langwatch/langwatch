@@ -10,7 +10,7 @@ import {
 import { useEffect } from "react";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.client";
 import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
 import { ToolCallMessage } from "./messages/ToolCallMessage";

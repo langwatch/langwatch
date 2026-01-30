@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.client";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 const logger = createLogger("useLocalStorageSelectedDataSetId");
