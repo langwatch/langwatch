@@ -37,6 +37,9 @@ export interface ProjectFormProps {
   isLoading?: boolean;
   error?: string | null;
   defaultTeamId?: string;
+  /** Required for creating projects in a different organization via the dropdown menu.
+   * Ensures teams are fetched from the target organization, not the current context. */
+  organizationId?: string;
 }
 
 export function ProjectForm(props: ProjectFormProps): React.ReactElement {
@@ -45,9 +48,15 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     isLoading = false,
     error,
     defaultTeamId,
+    organizationId: organizationIdProp,
   } = props;
-  const { organization, project } = useOrganizationTeamProject();
+  const { organization: currentOrganization, project } =
+    useOrganizationTeamProject();
   const { url: planManagementUrl } = usePlanManagementUrl();
+
+  // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
+  const effectiveOrganizationId =
+    organizationIdProp ?? currentOrganization?.id;
 
   const {
     register,
@@ -65,14 +74,14 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   const teamId = watch("teamId");
 
   const teams = api.team.getTeamsWithMembers.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
+    { organizationId: effectiveOrganizationId ?? "" },
+    { enabled: !!effectiveOrganizationId },
   );
 
   const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization?.id ?? "" },
+    { organizationId: effectiveOrganizationId ?? "" },
     {
-      enabled: !!organization,
+      enabled: !!effectiveOrganizationId,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
