@@ -6,7 +6,6 @@ import path from "path";
 import { register } from "prom-client";
 import type { Duplex } from "stream";
 import { parse } from "url";
-import { initializeBackgroundWorkers } from "./server/background/init";
 import { getClickHouseClient } from "./server/clickhouse/client";
 import { initializeEventSourcing } from "./server/event-sourcing";
 import { connection as redis } from "./server/redis";
@@ -184,11 +183,6 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
       },
       asciiArt,
     );
-
-    // Initialize background workers
-    initializeBackgroundWorkers().catch((error) => {
-      logger.error({ error }, "Failed to initialize background workers");
-    });
   });
 
   // Global error handlers for uncaught exceptions and unhandled promise rejections
