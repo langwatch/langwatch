@@ -10,7 +10,6 @@ import {
   within,
   fireEvent,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { AICreateModal } from "../AICreateModal";
 
@@ -39,13 +38,11 @@ const defaultExampleTemplates = [
  */
 function getDialogContent() {
   const dialogs = screen.getAllByRole("dialog");
-  // Return the last one as Chakra may render multiple
   return dialogs[dialogs.length - 1]!;
 }
 
 /**
  * Helper to get dialog by data-state attribute.
- * When open=false, Chakra still renders the dialog but with data-state="closed"
  */
 function getDialogByState(state: "open" | "closed") {
   const dialogs = screen.queryAllByRole("dialog");
@@ -53,8 +50,8 @@ function getDialogByState(state: "open" | "closed") {
 }
 
 describe("<AICreateModal/>", () => {
-  describe("when in idle state", () => {
-    it("displays the title", () => {
+  describe("when open", () => {
+    it("displays the provided title", () => {
       render(
         <AICreateModal
           open={true}
@@ -71,7 +68,7 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
     });
 
-    it("displays custom title when provided", () => {
+    it("displays custom title", () => {
       render(
         <AICreateModal
           open={true}
@@ -108,7 +105,7 @@ describe("<AICreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays character counter showing 0 / 500", () => {
+    it("displays character counter at 0 / 500", () => {
       render(
         <AICreateModal
           open={true}
@@ -143,53 +140,6 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).getByText("0 / 300")).toBeInTheDocument();
     });
 
-    it("updates character counter when typing", async () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-
-      // Use fireEvent instead of userEvent due to Chakra's pointer-events handling
-      fireEvent.change(textarea, { target: { value: "Test description" } });
-
-      expect(within(dialog).getByText("16 / 500")).toBeInTheDocument();
-    });
-
-    it("enforces character limit", async () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          maxLength={10}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-
-      // Use fireEvent instead of userEvent
-      fireEvent.change(textarea, { target: { value: "This is a very long description" } });
-
-      // Should be truncated to maxLength
-      expect(textarea).toHaveValue("This is a ");
-      expect(within(dialog).getByText("10 / 10")).toBeInTheDocument();
-    });
-
     it("displays example pills", () => {
       render(
         <AICreateModal
@@ -207,29 +157,6 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
       expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
-    });
-
-    it("fills textarea when clicking example pill", async () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const pillButton = within(dialog).getByText("Customer Support");
-      fireEvent.click(pillButton);
-
-      const textarea = within(dialog).getByRole("textbox");
-      expect(textarea).toHaveValue(
-        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
-      );
     });
 
     it("displays Generate with AI button", () => {
@@ -270,7 +197,96 @@ describe("<AICreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("calls onSkip when Skip button is clicked", async () => {
+    it("displays close button", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByRole("button", { name: /close/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when user types in textarea", () => {
+    it("updates character counter", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const textarea = within(dialog).getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "Test description" } });
+
+      expect(within(dialog).getByText("16 / 500")).toBeInTheDocument();
+    });
+
+    it("truncates text at maxLength", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          maxLength={10}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const textarea = within(dialog).getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "This is a very long description" } });
+
+      expect(textarea).toHaveValue("This is a ");
+      expect(within(dialog).getByText("10 / 10")).toBeInTheDocument();
+    });
+  });
+
+  describe("when user clicks example pill", () => {
+    it("fills textarea with template text", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      fireEvent.click(within(dialog).getByText("Customer Support"));
+
+      const textarea = within(dialog).getByRole("textbox");
+      expect(textarea).toHaveValue(
+        "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
+      );
+    });
+  });
+
+  describe("when user clicks Skip", () => {
+    it("calls onSkip callback", () => {
       const onSkip = vi.fn();
 
       render(
@@ -290,8 +306,10 @@ describe("<AICreateModal/>", () => {
 
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
+  });
 
-    it("calls onGenerate with description when Generate button is clicked", async () => {
+  describe("when user clicks Generate with AI", () => {
+    it("calls onGenerate with description", async () => {
       const onGenerate = vi.fn().mockResolvedValue(undefined);
 
       render(
@@ -318,29 +336,8 @@ describe("<AICreateModal/>", () => {
       });
     });
 
-    it("displays close button", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /close/i })
-      ).toBeInTheDocument();
-    });
-  });
-
-  describe("when in generating state", () => {
-    it("displays spinner and default generating text", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
+    it("displays generating state with spinner", async () => {
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -366,8 +363,8 @@ describe("<AICreateModal/>", () => {
       });
     });
 
-    it("displays custom generating text when provided", async () => {
-      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
+    it("displays custom generating text", async () => {
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -424,7 +421,7 @@ describe("<AICreateModal/>", () => {
     });
   });
 
-  describe("when in error state", () => {
+  describe("when generation fails", () => {
     it("displays error title and message", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API connection failed"));
 
@@ -453,7 +450,7 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).getByText("API connection failed")).toBeInTheDocument();
     });
 
-    it("displays Try again button in error state", async () => {
+    it("displays Try again button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
       render(
@@ -482,7 +479,7 @@ describe("<AICreateModal/>", () => {
       });
     });
 
-    it("displays Skip button in error state", async () => {
+    it("displays Skip button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
       render(
@@ -511,7 +508,7 @@ describe("<AICreateModal/>", () => {
       });
     });
 
-    it("displays close button in error state", async () => {
+    it("displays close button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
       render(
@@ -539,8 +536,10 @@ describe("<AICreateModal/>", () => {
         ).toBeInTheDocument();
       });
     });
+  });
 
-    it("retries generation when Try again is clicked", async () => {
+  describe("when user clicks Try again", () => {
+    it("retries generation", async () => {
       const onGenerate = vi
         .fn()
         .mockRejectedValueOnce(new Error("API error"))
@@ -589,7 +588,7 @@ describe("<AICreateModal/>", () => {
       vi.useRealTimers();
     });
 
-    it("shows timeout error after 60 seconds", async () => {
+    it("displays timeout error after 60 seconds", async () => {
       const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
@@ -611,21 +610,18 @@ describe("<AICreateModal/>", () => {
         within(dialog).getByRole("button", { name: /generate with ai/i })
       );
 
-      // Advance time by 60 seconds and flush promises
       await act(async () => {
         vi.advanceTimersByTime(60000);
-        // Allow microtasks to flush
         await vi.runAllTimersAsync();
       });
 
-      // The timeout should have triggered by now
       expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
       expect(within(dialog).getByText(/timed out/i)).toBeInTheDocument();
     });
   });
 
-  describe("modal visibility", () => {
-    it("renders dialog with data-state=closed when open is false", () => {
+  describe("when open is false", () => {
+    it("renders dialog in closed state", () => {
       const { container } = render(
         <AICreateModal
           open={false}
@@ -638,20 +634,17 @@ describe("<AICreateModal/>", () => {
         { wrapper: Wrapper }
       );
 
-      // Check that dialog is in closed state or not rendered
       const dialogs = container.querySelectorAll('[role="dialog"]');
-      const closedDialogs = Array.from(dialogs).filter(
-        (d) => d.getAttribute("data-state") === "closed"
-      );
       const openDialogs = Array.from(dialogs).filter(
         (d) => d.getAttribute("data-state") === "open"
       );
 
-      // When open=false, either no dialogs or only closed dialogs should exist
       expect(openDialogs.length).toBe(0);
     });
+  });
 
-    it("renders dialog with data-state=open when open is true", () => {
+  describe("when open is true", () => {
+    it("renders dialog in open state", () => {
       render(
         <AICreateModal
           open={true}

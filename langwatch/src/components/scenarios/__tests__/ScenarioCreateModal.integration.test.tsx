@@ -77,8 +77,8 @@ describe("<ScenarioCreateModal/>", () => {
     mockToasterCreate.mockClear();
   });
 
-  describe("configuration", () => {
-    it("displays the correct title", () => {
+  describe("when open", () => {
+    it("displays scenario title", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -88,7 +88,7 @@ describe("<ScenarioCreateModal/>", () => {
       expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
     });
 
-    it("displays the correct placeholder text", () => {
+    it("displays scenario placeholder text", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -102,7 +102,7 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays Customer Support example template", () => {
+    it("displays Customer Support example pill", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -112,7 +112,7 @@ describe("<ScenarioCreateModal/>", () => {
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
     });
 
-    it("displays RAG Q&A example template", () => {
+    it("displays RAG Q&A example pill", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -122,7 +122,7 @@ describe("<ScenarioCreateModal/>", () => {
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
     });
 
-    it("displays Tool-calling Agent example template", () => {
+    it("displays Tool-calling Agent example pill", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -132,7 +132,21 @@ describe("<ScenarioCreateModal/>", () => {
       expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
     });
 
-    it("fills textarea with Customer Support template when clicked", () => {
+    it("displays close button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByRole("button", { name: /close/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when user clicks Customer Support pill", () => {
+    it("fills textarea with template", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -146,8 +160,10 @@ describe("<ScenarioCreateModal/>", () => {
         "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
       );
     });
+  });
 
-    it("fills textarea with RAG Q&A template when clicked", () => {
+  describe("when user clicks RAG Q&A pill", () => {
+    it("fills textarea with template", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -161,8 +177,10 @@ describe("<ScenarioCreateModal/>", () => {
         "A knowledge bot that answers questions from documentation. Test a question that requires combining info from multiple sources."
       );
     });
+  });
 
-    it("fills textarea with Tool-calling Agent template when clicked", () => {
+  describe("when user clicks Tool-calling Agent pill", () => {
+    it("fills textarea with template", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -178,8 +196,8 @@ describe("<ScenarioCreateModal/>", () => {
     });
   });
 
-  describe("onGenerate behavior", () => {
-    it("creates a new scenario and opens drawer with initialPrompt", async () => {
+  describe("when user clicks Generate with AI", () => {
+    it("creates scenario and opens drawer with initialPrompt", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -215,8 +233,8 @@ describe("<ScenarioCreateModal/>", () => {
     });
   });
 
-  describe("onSkip behavior", () => {
-    it("creates a new scenario and opens drawer without initialPrompt", async () => {
+  describe("when user clicks Skip", () => {
+    it("creates scenario and opens drawer without initialPrompt", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -247,8 +265,10 @@ describe("<ScenarioCreateModal/>", () => {
         );
       });
     });
+  });
 
-    it("shows error toast when scenario creation fails", async () => {
+  describe("when scenario creation fails", () => {
+    it("shows error toast with message", async () => {
       const errorMessage = "Network error: Failed to connect";
       mockMutateAsync.mockRejectedValueOnce(new Error(errorMessage));
 
@@ -269,11 +289,10 @@ describe("<ScenarioCreateModal/>", () => {
         });
       });
 
-      // Should not open drawer when creation fails
       expect(mockOpenDrawer).not.toHaveBeenCalled();
     });
 
-    it("shows generic error message for non-Error exceptions", async () => {
+    it("shows generic error for non-Error exceptions", async () => {
       mockMutateAsync.mockRejectedValueOnce("Unknown failure");
 
       render(
@@ -295,8 +314,8 @@ describe("<ScenarioCreateModal/>", () => {
     });
   });
 
-  describe("modal visibility", () => {
-    it("passes open prop to AICreateModal", () => {
+  describe("when open is true", () => {
+    it("renders dialog in open state", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -307,18 +326,6 @@ describe("<ScenarioCreateModal/>", () => {
         (d) => d.getAttribute("data-state") === "open"
       );
       expect(openDialogs.length).toBeGreaterThan(0);
-    });
-
-    it("has a close button visible in idle state", () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /close/i })
-      ).toBeInTheDocument();
     });
   });
 });
