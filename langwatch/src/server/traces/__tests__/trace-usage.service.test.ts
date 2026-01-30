@@ -4,6 +4,7 @@ import {
   clearMonthCountCache,
   TraceUsageService,
 } from "../trace-usage.service";
+import { FREE_PLAN } from "../../../../ee/licensing/constants";
 
 vi.mock("~/env.mjs", () => ({
   env: {
@@ -108,18 +109,42 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when self-hosted (IS_SAAS=false)", () => {
-      it("returns exceeded: false without checking limits", async () => {
+    describe("when self-hosted (IS_SAAS=false) with FREE_PLAN", () => {
+      beforeEach(() => {
+        vi.mocked(
+          mockOrganizationRepository.getOrganizationIdByTeamId,
+        ).mockResolvedValue("org-123");
+        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
+          "proj-1",
+        ]);
+        mockEsClient.count.mockResolvedValue({ count: 5000 }); // Over any limit
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue(FREE_PLAN);
+      });
+
+      it("returns exceeded: false regardless of count", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
         expect(result.exceeded).toBe(false);
+
+        // Reset for other tests
+        vi.mocked(env).IS_SAAS = true;
+      });
+
+      it("still fetches organization and plan to determine if FREE_PLAN", async () => {
+        const { env } = await import("~/env.mjs");
+        vi.mocked(env).IS_SAAS = false;
+
+        await service.checkLimit({ teamId: "team-123" });
+
         expect(
           mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).not.toHaveBeenCalled();
-        expect(mockSubscriptionHandler.getActivePlan).not.toHaveBeenCalled();
+        ).toHaveBeenCalledWith("team-123");
+        expect(mockSubscriptionHandler.getActivePlan).toHaveBeenCalledWith(
+          "org-123",
+        );
 
         // Reset for other tests
         vi.mocked(env).IS_SAAS = true;
