@@ -81,7 +81,7 @@ const checks: IntegrationCheck[] = [
   {
     key: "datasets",
     label: "Create a dataset from the messages",
-    href: () => `https://docs.langwatch.ai/features/datasets`,
+    href: () => `https://docs.langwatch.ai/datasets/overview`,
     event: "integration_checks_first_dataset",
     isExternal: true,
     icon: LuDatabase,

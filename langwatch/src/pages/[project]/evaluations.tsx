@@ -14,33 +14,31 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { Copy, MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
-  LuClock,
   LuPencil,
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
 import { NewEvaluationMenu } from "~/components/evaluations/NewEvaluationMenu";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { Link } from "~/components/ui/link";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import {
-  formatEvaluationSummary,
-  getFinishedAt,
-} from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
 import {
   NavigationFooter,
   useNavigationFooter,
 } from "../../components/NavigationFooter";
 import { OverflownTextWithTooltip } from "../../components/OverflownText";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
-import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -55,6 +53,7 @@ function EvaluationsV2() {
     experimentId: string;
     evaluationName: string;
   } | null>(null);
+  const [newEvaluationMenuOpen, setNewEvaluationMenuOpen] = useState(false);
 
   const navigationFooter = useNavigationFooter();
 
@@ -147,62 +146,102 @@ function EvaluationsV2() {
         <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
-          <NewEvaluationMenu />
+          <NewEvaluationMenu
+            open={newEvaluationMenuOpen}
+            onOpenChange={setNewEvaluationMenuOpen}
+          />
         </HStack>
       </PageLayout.Header>
-      <Container
-        maxW={"calc(min(1440px, 100vw - 200px))"}
-        paddingX={6}
-        paddingTop={4}
-      >
-        <VStack width="fill" gap={4} align="stretch">
-          {monitors.isLoading ? (
-            <Box display="flex" justifyContent="center" py={8}>
-              <Spinner />
-            </Box>
-          ) : monitors.isError ? (
-            <Box>
-              <Text color="red.500">Error loading evaluations</Text>
-            </Box>
-          ) : (
-            <>
-              <MonitorsSection title="Online Evaluations" monitors={monitors} />
-
-              <VStack align="start" gap={1}>
-                <Heading as="h1">Evaluations</Heading>
-                <Text color="fg.muted">
-                  View and analyze your evaluation results
+      {monitors.isLoading || experiments.isLoading ? (
+        <Box display="flex" justifyContent="center" py={8}>
+          <Spinner />
+        </Box>
+      ) : monitors.isError ? (
+        <Box padding={6}>
+          <Text color="red.500">Error loading evaluations</Text>
+        </Box>
+      ) : monitors.data?.length === 0 &&
+        experiments.data?.experiments.length === 0 ? (
+        <PageLayout.Container>
+          <PageLayout.Content>
+            <NoDataInfoBlock
+              title="No evaluations yet"
+              description="Evaluate your LLM outputs with automated checks and custom metrics."
+              icon={<LuSquareCheckBig size={24} />}
+              color="green.500"
+              docsInfo={
+                <Text>
+                  To learn more about evaluations, please visit our{" "}
+                  <Link
+                    color="green.500"
+                    href="https://langwatch.ai/docs/evaluations/overview"
+                    isExternal
+                  >
+                    documentation
+                  </Link>
+                  .
                 </Text>
-              </VStack>
+              }
+            >
+              {hasPermission("evaluations:manage") && (
+                <PageLayout.HeaderButton
+                  onClick={() => setNewEvaluationMenuOpen(true)}
+                  marginTop={4}
+                >
+                  <Plus size={16} /> Create your first evaluation
+                </PageLayout.HeaderButton>
+              )}
+            </NoDataInfoBlock>
+          </PageLayout.Content>
+        </PageLayout.Container>
+      ) : (
+        <Container
+          maxW={"calc(min(1440px, 100vw - 200px))"}
+          paddingX={6}
+          paddingTop={4}
+        >
+          <VStack width="fill" gap={4} align="stretch">
+            {monitors.data && monitors.data.length > 0 && (
+              <MonitorsSection title="Online Evaluations" monitors={monitors} />
+            )}
 
-              <Card.Root overflow="hidden">
-                <Card.Body padding={0} overflowX="auto">
-                  {experiments.data &&
-                  experiments.data.experiments.length == 0 ? (
-                    <EmptyState.Root>
-                      <EmptyState.Content>
-                        <EmptyState.Indicator>
-                          <LuSquareCheckBig size={32} />
-                        </EmptyState.Indicator>
-                        <EmptyState.Title>No evaluations yet</EmptyState.Title>
-                        <EmptyState.Description>
-                          {project && hasPermission("evaluations:manage") && (
-                            <>
-                              {" "}
-                              Click on{" "}
-                              <Link
-                                textDecoration="underline"
-                                href={`/${project.slug}/evaluations/wizard`}
-                              >
-                                New Evaluation
-                              </Link>{" "}
-                              to get started.
-                            </>
-                          )}
-                        </EmptyState.Description>
-                      </EmptyState.Content>
-                    </EmptyState.Root>
-                  ) : (
+            <VStack align="start" gap={1}>
+              <Heading as="h1">Evaluations</Heading>
+              <Text color="fg.muted">
+                View and analyze your evaluation results
+              </Text>
+            </VStack>
+
+            <Card.Root overflow="hidden">
+              <Card.Body padding={0} overflowX="auto">
+                {experiments.data &&
+                experiments.data.experiments.length == 0 ? (
+                  <EmptyState.Root>
+                    <EmptyState.Content>
+                      <EmptyState.Indicator>
+                        <LuSquareCheckBig size={32} />
+                      </EmptyState.Indicator>
+                      <EmptyState.Title>No evaluations yet</EmptyState.Title>
+                      <EmptyState.Description>
+                        {project && hasPermission("evaluations:manage") && (
+                          <>
+                            {" "}
+                            Click on{" "}
+                            <Text
+                              as="span"
+                              textDecoration="underline"
+                              cursor="pointer"
+                              onClick={() => setNewEvaluationMenuOpen(true)}
+                            >
+                              New Evaluation
+                            </Text>{" "}
+                            to get started.
+                          </>
+                        )}
+                      </EmptyState.Description>
+                    </EmptyState.Content>
+                  </EmptyState.Root>
+                ) : (
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
@@ -474,10 +513,9 @@ function EvaluationsV2() {
                     <NavigationFooter {...navigationFooter} />
                   )}
               </Card.Root>
-            </>
-          )}
-        </VStack>
-      </Container>
+          </VStack>
+        </Container>
+      )}
       {copyDialogState && (
         <CopyEvaluationDialog
           open={copyDialogState.open}
