@@ -12,6 +12,7 @@ import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
+import { featureFlagRouter } from "./routers/featureFlag";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
@@ -71,6 +72,7 @@ export const appRouter = createTRPCRouter({
   limits: limitsRouter,
   trigger: triggerRouter,
   experiments: experimentsRouter,
+  featureFlag: featureFlagRouter,
   annotation: annotationRouter,
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
