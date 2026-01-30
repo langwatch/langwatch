@@ -384,6 +384,20 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
   );
 
+  // Check if selected evaluator is a workflow evaluator
+  const isWorkflowEvaluator = selectedEvaluator?.type === "workflow";
+
+  // Load workflow fields for workflow evaluators
+  const workflowFieldsQuery = api.evaluators.getWorkflowFields.useQuery(
+    {
+      id: selectedEvaluator?.id ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!selectedEvaluator?.id && !!project?.id && isWorkflowEvaluator && isOpen,
+    },
+  );
+
   // Create mutation
   const createMutation = api.monitors.create.useMutation({
     onSuccess: () => {
@@ -416,17 +430,49 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         ?.evaluatorType as EvaluatorTypes | undefined)
     : undefined;
 
-  // Compute all fields
-  const allFields = useMemo(() => getAllFields(evaluatorType), [evaluatorType]);
+  // Compute all fields - use workflow fields for workflow evaluators, built-in fields otherwise
+  const allFields = useMemo(() => {
+    if (isWorkflowEvaluator && workflowFieldsQuery.data?.fields) {
+      // For workflow evaluators, use the entry node outputs from the workflow
+      return workflowFieldsQuery.data.fields.map((f) => f.identifier);
+    }
+    // For built-in evaluators, use the AVAILABLE_EVALUATORS definition
+    return getAllFields(evaluatorType);
+  }, [evaluatorType, isWorkflowEvaluator, workflowFieldsQuery.data?.fields]);
 
   // Use shared validation logic (same as evaluations v3)
   // This ensures consistent validation across the platform
   const mappingValidation = useMemo(() => {
+    // For workflow evaluators, validate based on workflow fields
+    if (isWorkflowEvaluator) {
+      if (!workflowFieldsQuery.data?.fields) {
+        // Still loading or no fields - consider valid for now
+        return { isValid: true, hasAnyMapping: false, missingRequiredFields: [] };
+      }
+      // For workflow evaluators, all fields are considered required
+      const workflowFields = workflowFieldsQuery.data.fields.map(
+        (f) => f.identifier,
+      );
+      const mappedFields = Object.keys(mappings).filter((k) => {
+        const mapping = mappings[k];
+        return mapping?.type === "source" && mapping.path?.length > 0;
+      });
+      const missingRequiredFields = workflowFields.filter(
+        (f) => !mappedFields.includes(f),
+      );
+      const hasAnyMapping = mappedFields.length > 0;
+      // Valid if: no missing required fields AND (no fields OR at least one mapped)
+      const isValid =
+        missingRequiredFields.length === 0 &&
+        (workflowFields.length === 0 || hasAnyMapping);
+      return { isValid, hasAnyMapping, missingRequiredFields };
+    }
+    // For built-in evaluators, use the standard validation
     if (!evaluatorType) {
       return { isValid: true, hasAnyMapping: false, missingRequiredFields: [] };
     }
     return validateEvaluatorMappings(evaluatorType, mappings);
-  }, [evaluatorType, mappings]);
+  }, [evaluatorType, isWorkflowEvaluator, workflowFieldsQuery.data?.fields, mappings]);
 
   // For backward compatibility with existing code
   const pendingFields = mappingValidation.missingRequiredFields;
@@ -583,6 +629,44 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       setSelectedEvaluator(evaluatorQuery.data);
     }
   }, [evaluatorQuery.data]);
+
+  // Auto-infer mappings when workflow fields are loaded for a workflow evaluator
+  // This handles the case where a workflow evaluator is selected but mappings are empty
+  // Track whether we've already auto-inferred mappings for the current evaluator
+  const lastAutoInferredEvaluatorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      isWorkflowEvaluator &&
+      selectedEvaluator &&
+      workflowFieldsQuery.data?.fields &&
+      level &&
+      // Only auto-infer if we haven't already done so for this evaluator
+      lastAutoInferredEvaluatorRef.current !== selectedEvaluator.id &&
+      // Only auto-infer if mappings are empty
+      Object.keys(mappings).length === 0
+    ) {
+      lastAutoInferredEvaluatorRef.current = selectedEvaluator.id;
+      const workflowFields = workflowFieldsQuery.data.fields.map(
+        (f) => f.identifier,
+      );
+      const autoMappings = autoInferMappings(workflowFields, level);
+      setMappings(autoMappings);
+
+      // Persist to module-level state
+      if (onlineEvaluationDrawerState) {
+        onlineEvaluationDrawerState = {
+          ...onlineEvaluationDrawerState,
+          mappings: autoMappings,
+        };
+      }
+    }
+  }, [
+    isWorkflowEvaluator,
+    selectedEvaluator,
+    workflowFieldsQuery.data?.fields,
+    level,
+    mappings,
+  ]);
 
   // Load pending evaluator (newly created from the flow)
   useEffect(() => {
@@ -951,12 +1035,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
     if (hasPendingMappings) return;
 
+    // Detect workflow evaluators by checking the evaluator type field
+    const isWorkflowEvaluator = selectedEvaluator.type === "workflow";
+
     const evaluatorConfig = selectedEvaluator.config as {
       evaluatorType?: string;
       settings?: Record<string, unknown>;
     } | null;
 
-    const checkType = evaluatorConfig?.evaluatorType ?? "langevals/basic";
+    // For workflow evaluators, use "workflow" as checkType
+    // For built-in evaluators, use the evaluatorType from config
+    const checkType = isWorkflowEvaluator
+      ? "workflow"
+      : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format

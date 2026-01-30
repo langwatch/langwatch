@@ -55,6 +55,7 @@ export default function ExperimentsWorkbenchPage() {
   // Reset store when leaving the page
   useEffect(() => {
     return () => {
+      alert("resetting autosave");
       resetAutosave();
       reset();
     };

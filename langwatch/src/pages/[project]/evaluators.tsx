@@ -6,7 +6,9 @@ import {
   Spacer,
   VStack,
 } from "@chakra-ui/react";
+import type { Evaluator } from "@prisma/client";
 import { CheckSquare, Plus } from "lucide-react";
+import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -25,6 +27,7 @@ function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
+  const router = useRouter();
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -65,6 +68,12 @@ function Page() {
         id: evaluator.id,
         projectId: project?.id ?? "",
       });
+    }
+  };
+
+  const handleOpenWorkflow = (evaluator: Evaluator) => {
+    if (evaluator.workflowId && project?.slug) {
+      void router.push(`/${project.slug}/studio/${evaluator.workflowId}`);
     }
   };
 
@@ -116,6 +125,11 @@ function Page() {
                 onClick={() => handleEditEvaluator(evaluator)}
                 onEdit={() => handleEditEvaluator(evaluator)}
                 onDelete={() => handleDeleteEvaluator(evaluator)}
+                onOpenWorkflow={
+                  evaluator.type === "workflow"
+                    ? () => handleOpenWorkflow(evaluator)
+                    : undefined
+                }
               />
             ))}
           </Grid>
