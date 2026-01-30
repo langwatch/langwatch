@@ -1,16 +1,18 @@
 import {
   Box,
   Button,
+  Field,
   Heading,
   HStack,
   Input,
-  Spinner,
   Text,
+  Textarea,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
-import { Search, Workflow } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useState } from "react";
+import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -24,6 +26,12 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { trackEvent } from "~/utils/tracking";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import { blankTemplate } from "~/optimization_studio/templates/blank";
+import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
+import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 
 export type WorkflowSelectorDrawerProps = {
   open?: boolean;
@@ -33,18 +41,26 @@ export type WorkflowSelectorDrawerProps = {
   agentName?: string;
 };
 
+type FormData = {
+  name: string;
+  icon: string;
+  description: string;
+};
+
 /**
- * Drawer for selecting a workflow to use as an agent.
+ * Drawer for creating a new workflow-based agent.
  * Features:
- * - Search filter for workflows
- * - Shows workflow name and last updated
- * - Creates agent with workflow reference on selection
+ * - Creates a new workflow from the blank template
+ * - Creates an agent linked to the new workflow
+ * - Navigates to the workflow studio for editing
  */
 export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
+  const router = useRouter();
+  const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -52,36 +68,34 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
-    null,
-  );
-  const [agentName, setAgentName] = useState(props.agentName ?? "");
   // State for upgrade modal when limit is exceeded
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
-  const workflowsQuery = api.workflow.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen },
-  );
+  const [defaultIcon] = useState(getRandomWorkflowIcon());
 
-  const filteredWorkflows = useMemo(() => {
-    if (!workflowsQuery.data) return [];
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<FormData>({
+    defaultValues: {
+      name: props.agentName ?? "Custom Agent",
+      icon: defaultIcon,
+      description: "",
+    },
+  });
 
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return workflowsQuery.data;
+  const icon = watch("icon");
+  const name = watch("name");
 
-    return workflowsQuery.data.filter((workflow) =>
-      workflow.name.toLowerCase().includes(query),
-    );
-  }, [workflowsQuery.data, searchQuery]);
-
-  const createMutation = api.agents.create.useMutation({
+  const createWorkflowMutation = api.workflow.create.useMutation();
+  const createAgentMutation = api.agents.create.useMutation({
     onSuccess: (agent) => {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.(agent);
-      onClose();
     },
     onError: (error) => {
       const limitExceeded = extractLimitExceededInfo(error);
@@ -98,38 +112,82 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     },
   });
 
-  const isSaving = createMutation.isPending;
+  const isSaving =
+    createWorkflowMutation.isPending || createAgentMutation.isPending;
 
-  const handleSelectWorkflow = useCallback(
-    (workflowId: string, workflowName: string) => {
-      setSelectedWorkflowId(workflowId);
-      if (!agentName) {
-        setAgentName(workflowName);
+  const onSubmit = useCallback(
+    async (data: FormData) => {
+      if (!project) return;
+
+      try {
+        // Create workflow from blank template
+        const template = blankTemplate;
+        const newWorkflow: Workflow = {
+          ...template,
+          name: data.name,
+          description: data.description,
+          icon: data.icon ?? defaultIcon,
+          default_llm: {
+            ...template.default_llm,
+            model: project.defaultModel ?? DEFAULT_MODEL,
+          },
+        };
+
+        const createdWorkflow = await createWorkflowMutation.mutateAsync({
+          projectId: project.id,
+          dsl: newWorkflow,
+          commitMessage: "Workflow creation for agent",
+        });
+
+        trackEvent("workflow_create", { project_id: project.id });
+
+        // Build DSL-compatible Custom component config
+        const config = {
+          name: data.name.trim(),
+          isCustom: true,
+          workflow_id: createdWorkflow.workflow.id,
+        };
+
+        // Create agent linked to the new workflow
+        await createAgentMutation.mutateAsync({
+          projectId: project.id,
+          name: data.name.trim(),
+          type: "workflow",
+          config,
+          workflowId: createdWorkflow.workflow.id,
+        });
+
+        // Close drawer and navigate to workflow studio
+        onClose();
+        void router.push(
+          `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
+        );
+      } catch (error) {
+        const limitExceeded = extractLimitExceededInfo(error);
+        if (limitExceeded?.limitType === "workflows") {
+          setLimitInfo(limitExceeded);
+          setShowUpgradeModal(true);
+          return;
+        }
+        console.error("Error creating workflow agent:", error);
+        toaster.create({
+          title: "Error",
+          description: "Failed to create workflow agent",
+          type: "error",
+        });
       }
     },
-    [agentName],
+    [
+      project,
+      defaultIcon,
+      createWorkflowMutation,
+      createAgentMutation,
+      onClose,
+      router,
+    ],
   );
 
-  const handleSave = useCallback(() => {
-    if (!project?.id || !selectedWorkflowId || !agentName.trim()) return;
-
-    // Build DSL-compatible Custom component config
-    const config = {
-      name: agentName.trim(),
-      isCustom: true,
-      workflow_id: selectedWorkflowId,
-    };
-
-    createMutation.mutate({
-      projectId: project.id,
-      name: agentName.trim(),
-      type: "workflow",
-      config,
-      workflowId: selectedWorkflowId,
-    });
-  }, [project?.id, selectedWorkflowId, agentName, createMutation]);
-
-  const isValid = selectedWorkflowId && agentName.trim().length > 0;
+  const isValid = name?.trim().length > 0;
 
   return (
     <>
@@ -138,181 +196,106 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
       >
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Heading>Select Workflow</Heading>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select an existing workflow to use as the agent implementation.
-            </Text>
-
-            {/* Agent name input */}
-            <Box paddingX={6}>
-              <Text fontWeight="medium" fontSize="sm" marginBottom={2}>
-                Agent Name
-              </Text>
-              <Input
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                placeholder="Enter agent name"
-                data-testid="agent-name-input"
-              />
-            </Box>
-
-            {/* Search input */}
-            <Box position="relative" paddingX={6}>
-              <Box
-                position="absolute"
-                left={9}
-                top="50%"
-                transform="translateY(-50%)"
-                color="fg.subtle"
-                zIndex={1}
-              >
-                <Search size={16} />
-              </Box>
-              <Input
-                placeholder="Search workflows..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                paddingLeft={10}
-                data-testid="search-workflows-input"
-              />
-            </Box>
-
-            {/* Workflow list - scrollable */}
-            <VStack
-              gap={2}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingBottom={4}
-            >
-              {workflowsQuery.isLoading ? (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              ) : filteredWorkflows.length === 0 ? (
-                <Box paddingY={8} textAlign="center" color="fg.muted">
-                  {searchQuery
-                    ? "No workflows match your search"
-                    : "No workflows found in this project"}
-                </Box>
-              ) : (
-                filteredWorkflows.map((workflow) => (
-                  <WorkflowCard
-                    key={workflow.id}
-                    name={workflow.name}
-                    updatedAt={workflow.updatedAt}
-                    isSelected={selectedWorkflowId === workflow.id}
-                    onClick={() =>
-                      handleSelectWorkflow(workflow.id, workflow.name)
-                    }
-                  />
-                ))
+        <Drawer.Content>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <HStack gap={2}>
+              {canGoBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  padding={1}
+                  minWidth="auto"
+                  data-testid="back-button"
+                >
+                  <LuArrowLeft size={20} />
+                </Button>
               )}
+              <Heading>Create Workflow Agent</Heading>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            padding={0}
+          >
+            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
+                Create a new workflow to use as a custom agent. You&apos;ll be
+                taken to the workflow editor to configure the agent logic.
+              </Text>
+
+              <Box paddingX={6}>
+                <VStack gap={4} align="stretch">
+                  <Field.Root invalid={!!errors.name}>
+                    <EmojiPickerModal
+                      open={emojiPicker.open}
+                      onClose={emojiPicker.onClose}
+                      onChange={(emoji) => {
+                        setValue("icon", emoji);
+                        emojiPicker.onClose();
+                      }}
+                    />
+                    <Field.Label>Name and Icon</Field.Label>
+                    <HStack>
+                      <Button
+                        variant="outline"
+                        onClick={emojiPicker.onOpen}
+                        fontSize="18px"
+                      >
+                        {icon}
+                      </Button>
+                      <Input
+                        {...register("name", { required: "Name is required" })}
+                        placeholder="Enter agent name"
+                        data-testid="agent-name-input"
+                      />
+                    </HStack>
+                    <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+                  </Field.Root>
+
+                  <Field.Root invalid={!!errors.description}>
+                    <Field.Label>Description (optional)</Field.Label>
+                    <Textarea
+                      {...register("description")}
+                      placeholder="What does this agent do?"
+                    />
+                    <Field.ErrorText>
+                      {errors.description?.message}
+                    </Field.ErrorText>
+                  </Field.Root>
+                </VStack>
+              </Box>
             </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <HStack gap={3}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleSave}
-              disabled={!isValid || isSaving}
-              loading={isSaving}
-              data-testid="save-agent-button"
-            >
-              Create Agent
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+            <HStack gap={3}>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="blue"
+                onClick={() => void handleSubmit(onSubmit)()}
+                disabled={!isValid || isSaving}
+                loading={isSaving}
+                data-testid="save-agent-button"
+              >
+                Create & Open Editor
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
       </Drawer.Root>
 
       <UpgradeModal
         open={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        limitType="agents"
+        limitType={limitInfo?.limitType ?? "agents"}
         current={limitInfo?.current}
         max={limitInfo?.max}
       />
     </>
-  );
-}
-
-// ============================================================================
-// Workflow Card Component
-// ============================================================================
-
-type WorkflowCardProps = {
-  name: string;
-  updatedAt: Date;
-  isSelected: boolean;
-  onClick: () => void;
-};
-
-function WorkflowCard({
-  name,
-  updatedAt,
-  isSelected,
-  onClick,
-}: WorkflowCardProps) {
-  return (
-    <Box
-      as="button"
-      onClick={onClick}
-      padding={4}
-      borderRadius="md"
-      border="2px solid"
-      borderColor={isSelected ? "blue.500" : "border"}
-      bg={isSelected ? "blue.subtle" : "bg.panel"}
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
-      transition="all 0.15s"
-      data-testid={`workflow-card-${name}`}
-    >
-      <HStack gap={3}>
-        <Box color={isSelected ? "blue.600" : "blue.500"}>
-          <Workflow size={20} />
-        </Box>
-        <VStack align="start" gap={0} flex={1}>
-          <Text fontWeight="medium" fontSize="sm">
-            {name}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Updated{" "}
-            {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
   );
 }

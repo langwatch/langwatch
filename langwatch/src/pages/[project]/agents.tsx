@@ -7,6 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
+import { useRouter } from "next/router";
 import { AgentCard } from "~/components/agents/AgentCard";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -27,6 +28,7 @@ function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
+  const router = useRouter();
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -64,6 +66,12 @@ function Page() {
         id: agent.id,
         projectId: project?.id ?? "",
       });
+    }
+  };
+
+  const handleOpenWorkflow = (agent: TypedAgent) => {
+    if (agent.workflowId && project?.slug) {
+      void router.push(`/${project.slug}/studio/${agent.workflowId}`);
     }
   };
 
@@ -119,6 +127,11 @@ function Page() {
                 onClick={() => handleEditAgent(agent)}
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
+                onOpenWorkflow={
+                  agent.type === "workflow"
+                    ? () => handleOpenWorkflow(agent)
+                    : undefined
+                }
               />
             ))}
           </Grid>
