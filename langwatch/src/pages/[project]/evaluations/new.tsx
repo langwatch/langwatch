@@ -1,63 +1,19 @@
-import { Container, Heading, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import CheckConfigForm, {
-  type CheckConfigFormData,
-} from "../../../components/checks/CheckConfigForm";
-import { DashboardLayout } from "../../../components/DashboardLayout";
-import { toaster } from "../../../components/ui/toaster";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../utils/api";
+import { useEffect } from "react";
 
-export default function NewTraceCheckConfig() {
-  const { project } = useOrganizationTeamProject();
+/**
+ * Redirect page for /[project]/evaluations/new
+ * Opens the evaluatorCategorySelector drawer on the evaluations page.
+ */
+export default function NewEvaluationRedirect() {
   const router = useRouter();
-  const createCheck = api.monitors.create.useMutation();
+  const projectSlug = router.query.project as string | undefined;
 
-  const onSubmit = async (data: CheckConfigFormData) => {
-    if (!project || !data.checkType) return;
+  useEffect(() => {
+    if (!projectSlug || !router.isReady) return;
 
-    try {
-      await createCheck.mutateAsync({
-        ...data,
-        checkType: data.checkType,
-        projectId: project.id,
-      });
-      toaster.create({
-        title: "Check created successfully",
-        type: "success",
-        duration: 5000,
-        meta: {
-          closable: true,
-        },
-      });
-      await router.push(`/${project.slug}/evaluations`);
-    } catch {
-      toaster.create({
-        title: "Failed to create check",
-        description: "Please try again",
-        type: "error",
-        duration: 5000,
-        meta: {
-          closable: true,
-        },
-      });
-    }
-  };
+    void router.replace(`/${projectSlug}/evaluations?drawer.open=evaluatorCategorySelector`);
+  }, [projectSlug, router, router.isReady]);
 
-  return (
-    <DashboardLayout>
-      <Container maxWidth="1200" padding={6}>
-        <VStack align="start" gap={4}>
-          <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
-            Setup Evaluation
-          </Heading>
-          <CheckConfigForm
-            onSubmit={onSubmit}
-            defaultValues={{ sample: 1.0 }}
-            loading={createCheck.isLoading}
-          />
-        </VStack>
-      </Container>
-    </DashboardLayout>
-  );
+  return null;
 }

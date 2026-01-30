@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, BookOpen } from "lucide-react";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
 import type { FilteredCommands } from "./useFilteredCommands";
@@ -10,6 +10,7 @@ import {
   RECENT_ITEMS_DISPLAY_LIMIT,
 } from "../constants";
 import type { GroupedRecentItems } from "../useRecentItems";
+import { findEasterEgg } from "../easterEggs";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
@@ -21,11 +22,13 @@ export function useCommandBarItems(
   searchResults: SearchResult[],
   idResult: SearchResult | null,
   groupedItems: GroupedRecentItems,
-  projectSlug: string | undefined
+  projectSlug: string | undefined,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
   searchInTracesItem: ListItem | null;
+  searchInDocsItem: ListItem | null;
+  easterEggItem: ListItem | null;
 } {
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
@@ -59,6 +62,38 @@ export function useCommandBarItems(
     };
   }, [query, projectSlug]);
 
+  // Create "Search in docs" item when query is long enough
+  const searchInDocsItem = useMemo<ListItem | null>(() => {
+    if (!query.trim() || query.trim().length < MIN_SEARCH_QUERY_LENGTH) {
+      return null;
+    }
+    return {
+      type: "command",
+      data: {
+        id: "action-search-docs",
+        label: `Search "${query.trim()}" in docs`,
+        icon: BookOpen,
+        category: "navigation",
+        externalUrl: `https://langwatch.ai/docs/introduction?search=${encodeURIComponent(query.trim())}`,
+      } as Command,
+    };
+  }, [query]);
+
+  // Easter egg item
+  const easterEggItem = useMemo<ListItem | null>(() => {
+    const egg = findEasterEgg(query);
+    if (!egg) return null;
+    return {
+      type: "command",
+      data: {
+        id: egg.id,
+        label: egg.label,
+        icon: egg.icon,
+        category: "actions",
+      } as Command,
+    };
+  }, [query]);
+
   // Build flat list of all items for keyboard navigation
   const allItems = useMemo<ListItem[]>(() => {
     const items: ListItem[] = [];
@@ -74,7 +109,11 @@ export function useCommandBarItems(
         items.push({ type: "command", data: cmd });
       }
     } else {
-      // Add ID result first if detected
+      // Add easter egg item first if found
+      if (easterEggItem) {
+        items.push(easterEggItem);
+      }
+      // Add ID result if detected
       if (idResult) {
         items.push({ type: "search", data: idResult });
       }
@@ -90,6 +129,9 @@ export function useCommandBarItems(
       for (const cmd of filteredCommands.theme) {
         items.push({ type: "command", data: cmd });
       }
+      for (const cmd of filteredCommands.page) {
+        items.push({ type: "command", data: cmd });
+      }
       for (const result of searchResults) {
         items.push({ type: "search", data: result });
       }
@@ -100,18 +142,30 @@ export function useCommandBarItems(
       if (searchInTracesItem) {
         items.push(searchInTracesItem);
       }
+      // Add "Search in docs" after "Search in traces"
+      if (searchInDocsItem) {
+        items.push(searchInDocsItem);
+      }
     }
 
     return items;
   }, [
     query,
     recentItemsLimited,
+    easterEggItem,
     idResult,
     filteredCommands,
     searchResults,
     filteredProjects,
     searchInTracesItem,
+    searchInDocsItem,
   ]);
 
-  return { allItems, recentItemsLimited, searchInTracesItem };
+  return {
+    allItems,
+    recentItemsLimited,
+    searchInTracesItem,
+    searchInDocsItem,
+    easterEggItem,
+  };
 }

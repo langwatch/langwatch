@@ -78,7 +78,8 @@ export function handleCommandSelect(
       openDrawer("agentTypeSelector");
       break;
     case "action-new-evaluation":
-      navigate(`/${projectSlug}/evaluations/new`);
+      ctx.close();
+      openDrawer("evaluatorCategorySelector");
       break;
     case "action-new-prompt":
       ctx.close();

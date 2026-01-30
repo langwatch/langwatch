@@ -164,7 +164,12 @@ function parseDrawerEntity(
  */
 export function useActivityTracker() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  // Disable redirects since activity tracking should work passively without
+  // affecting navigation - routes like /admin don't have project context
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { addRecentItem } = useRecentItems();
 
   // Track last added item to prevent duplicates

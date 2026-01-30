@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useRouter } from "next/router";
 import type { Command } from "../types";
 import {
   actionCommands,
@@ -8,12 +9,15 @@ import {
   themeCommands,
 } from "../command-registry";
 import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
+import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
+import { getPageCommands } from "../pageCommands";
 
 export interface FilteredCommands {
   navigation: Command[];
   actions: Command[];
   support: Command[];
   theme: Command[];
+  page: Command[];
 }
 
 /**
@@ -75,10 +79,16 @@ export function useFilteredCommands(
         kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
     );
 
-    // Filter out "Open Chat" if not SAAS
-    const availableCommands = isSaas
-      ? supportCommands
-      : supportCommands.filter((cmd) => cmd.id !== "action-open-chat");
+    // Filter out "Open Chat" if not SAAS and set dynamic paths
+    const availableCommands = supportCommands
+      .filter((cmd) => isSaas || cmd.id !== "action-open-chat")
+      .map((cmd) => {
+        // Set dynamic path for plans command
+        if (cmd.id === "support-plans") {
+          return { ...cmd, path: getPlanManagementUrl(isSaas ?? false) };
+        }
+        return cmd;
+      });
 
     if (isSearchingCategory) {
       return availableCommands;
@@ -107,10 +117,19 @@ export function useFilteredCommands(
     return filterCommands(themeCommands, query);
   }, [query]);
 
+  // Filter page-specific commands based on current route
+  const router = useRouter();
+  const filteredPage = useMemo(() => {
+    if (!query.trim()) return [];
+    const pageCommands = getPageCommands(router.pathname);
+    return filterCommands(pageCommands, query);
+  }, [query, router.pathname]);
+
   return {
     navigation: filteredNavigation,
     actions: filteredActions,
     support: filteredSupport,
     theme: filteredTheme,
+    page: filteredPage,
   };
 }
