@@ -15,7 +15,7 @@ export function usePlanManagementUrl() {
 
   return {
     url: isSaaS ? "/settings/subscription" : "/settings/license",
-    buttonLabel: isSaaS ? "Change plan" : "Manage license",
+    buttonLabel: isSaaS ? "Upgrade plan" : "Upgrade license",
     isSaaS,
     isLoading: publicEnv.isLoading,
   };

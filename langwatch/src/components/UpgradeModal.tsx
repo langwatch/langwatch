@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "./ui/dialog";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { trackEvent } from "../utils/tracking";
 import { LIMIT_TYPE_LABELS } from "../server/license-enforcement/constants";
 import type { LimitType } from "../server/license-enforcement/types";
@@ -23,13 +24,14 @@ export function UpgradeModal({
 }: UpgradeModalProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const { url: planManagementUrl, buttonLabel } = usePlanManagementUrl();
 
   const handleUpgrade = () => {
     trackEvent("subscription_hook_click", {
       project_id: project?.id,
       hook: `${limitType}_limit_reached`,
     });
-    void router.push("/settings/license");
+    void router.push(planManagementUrl);
     onClose();
   };
 
@@ -65,7 +67,7 @@ export function UpgradeModal({
             Cancel
           </Button>
           <Button colorPalette="blue" onClick={handleUpgrade}>
-            Upgrade Plan
+            {buttonLabel}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
