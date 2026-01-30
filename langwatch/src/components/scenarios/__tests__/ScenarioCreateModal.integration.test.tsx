@@ -40,6 +40,14 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    modelProvider: {
+      getAllForProject: {
+        useQuery: () => ({
+          data: [],
+          isLoading: false,
+        }),
+      },
+    },
     useContext: () => ({
       scenarios: {
         getAll: {
@@ -50,6 +58,14 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+// Mock ModelSelector hooks
+vi.mock("../../ModelSelector", () => ({
+  allModelOptions: [],
+  useModelSelectionOptions: () => ({
+    modelOption: { isDisabled: false },
+  }),
+}));
+
 // Mock toaster
 const mockToasterCreate = vi.fn();
 vi.mock("../../ui/toaster", () => ({
@@ -57,6 +73,14 @@ vi.mock("../../ui/toaster", () => ({
     create: (args: unknown) => mockToasterCreate(args),
   },
 }));
+
+// Mock fetch for AI generation API
+const mockGeneratedScenario = {
+  name: "Generated Scenario",
+  situation: "A generated situation",
+  criteria: ["Criterion 1", "Criterion 2"],
+  labels: ["support"],
+};
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -73,8 +97,14 @@ function getDialogContent() {
 describe("<ScenarioCreateModal/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Untitled" });
+    mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
     mockToasterCreate.mockClear();
+
+    // Mock fetch for AI generation
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ scenario: mockGeneratedScenario }),
+    });
   });
 
   describe("when open", () => {
@@ -197,7 +227,7 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Generate with AI", () => {
-    it("creates scenario and opens drawer with initialPrompt", async () => {
+    it("calls AI generation API and creates scenario with generated content", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -208,23 +238,39 @@ describe("<ScenarioCreateModal/>", () => {
       fireEvent.change(textarea, { target: { value: "My test scenario description" } });
       fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
+      // Verify AI generation API was called
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          "/api/scenario/generate",
+          expect.objectContaining({
+            method: "POST",
+            body: JSON.stringify({
+              prompt: "My test scenario description",
+              currentScenario: null,
+              projectId: "project-123",
+            }),
+          })
+        );
+      });
+
+      // Verify scenario was created with generated content
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
           projectId: "project-123",
-          name: "Untitled",
-          situation: "",
-          criteria: [],
-          labels: [],
+          name: "Generated Scenario",
+          situation: "A generated situation",
+          criteria: ["Criterion 1", "Criterion 2"],
+          labels: ["support"],
         });
       });
 
+      // Verify drawer was opened (without initialPrompt since content is already generated)
       await waitFor(() => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "scenarioEditor",
           expect.objectContaining({
             urlParams: {
               scenarioId: "new-scenario-id",
-              initialPrompt: "My test scenario description",
             },
           }),
           { resetStack: true }
@@ -241,7 +287,7 @@ describe("<ScenarioCreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /skip/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -278,7 +324,7 @@ describe("<ScenarioCreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /skip/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
 
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith({
@@ -301,7 +347,7 @@ describe("<ScenarioCreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /skip/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
 
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith({
@@ -323,7 +369,7 @@ describe("<ScenarioCreateModal/>", () => {
 
       const dialogs = screen.queryAllByRole("dialog");
       const openDialogs = dialogs.filter(
-        (d) => d.getAttribute("data-state") === "open"
+        (d: HTMLElement) => d.getAttribute("data-state") === "open"
       );
       expect(openDialogs.length).toBeGreaterThan(0);
     });

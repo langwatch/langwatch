@@ -193,7 +193,7 @@ describe("<AICreateModal/>", () => {
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /skip/i })
+        within(dialog).getByRole("button", { name: /i'll write it myself/i })
       ).toBeInTheDocument();
     });
 
@@ -302,7 +302,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /skip/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
@@ -503,7 +503,7 @@ describe("<AICreateModal/>", () => {
 
       await waitFor(() => {
         expect(
-          within(dialog).getByRole("button", { name: /skip/i })
+          within(dialog).getByRole("button", { name: /i'll write it myself/i })
         ).toBeInTheDocument();
       });
     });

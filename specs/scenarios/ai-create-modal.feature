@@ -18,7 +18,7 @@ Feature: AI Create Modal for Scenarios
     And I see the title "Create new scenario"
     And I see a textarea with placeholder text
     And I see the "Generate with AI" button
-    And I see the "Skip" button
+    And I see the "I'll write it myself" button
 
   @e2e
   Scenario: Generate scenario with AI using custom description
@@ -47,7 +47,7 @@ Feature: AI Create Modal for Scenarios
   @e2e
   Scenario: Skip AI generation and create blank scenario
     When I click the "New Scenario" button
-    And I click "Skip"
+    And I click "I'll write it myself"
     Then a new empty scenario is created
     And I am navigated to the scenario editor
     And the editor shows empty fields
@@ -121,7 +121,7 @@ Feature: AI Create Modal for Scenarios
     And I see "Something went wrong" title
     And I see the error message from the API
     And I see the "Try again" button
-    And I see the "Skip" button
+    And I see the "I'll write it myself" button
     And the close button is visible
 
   @integration
@@ -144,9 +144,19 @@ Feature: AI Create Modal for Scenarios
     And I enter a description
     And I click "Generate with AI"
     And I see the error state
-    And I click "Skip"
+    And I click "I'll write it myself"
     Then a new empty scenario is created
     And I am navigated to the scenario editor
+
+  @integration
+  Scenario: Display error when API keys not configured
+    Given the user has no API keys configured for the default model
+    When I click the "New Scenario" button
+    And I enter a description
+    And I click "Generate with AI"
+    Then I see the error state
+    And I see "API keys not configured" in the error message
+    And I see guidance to configure API keys in Settings
 
   @integration
   Scenario: Generation times out after 60 seconds
@@ -207,7 +217,7 @@ Feature: AI Create Modal for Scenarios
   @unit
   Scenario: AICreateModal calls onSkip callback
     Given an AICreateModal component with onSkip callback
-    When user clicks Skip
+    When user clicks "I'll write it myself"
     Then the onSkip callback is called
 
   @unit
