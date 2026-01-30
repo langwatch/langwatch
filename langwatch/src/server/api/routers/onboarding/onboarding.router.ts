@@ -4,7 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 import { dependencies } from "../../../../injection/dependencies.server";
-import { skipPermissionCheck } from "../../permission";
+import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 

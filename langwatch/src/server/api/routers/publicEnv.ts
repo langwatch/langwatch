@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
-import { skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
 export const publicEnvRouter = publicProcedure

@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 import React, { useState } from "react";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
@@ -27,7 +26,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasOrganizationPermission, isPublicRoute, organization } =
+  const { project, hasPermission, isPublicRoute, organization } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -257,10 +256,7 @@ export const MainMenu = React.memo(function MainMenu({
 
           <VStack width="full" gap={0.5} align="start">
             <UsageIndicator showLabel={showExpanded} />
-            {(!!hasOrganizationPermission(
-              OrganizationRoleGroup.ORGANIZATION_VIEW,
-            ) ||
-              isPublicRoute) && (
+            {(!!hasPermission("organization:view") || isPublicRoute) && (
               <PageMenuLink
                 path={projectRoutes.settings.path}
                 icon={featureIcons.settings.icon}

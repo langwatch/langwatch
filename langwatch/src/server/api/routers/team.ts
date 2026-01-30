@@ -5,11 +5,7 @@ import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { slugify } from "~/utils/slugify";
-import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-} from "../permission";
-import { checkTeamPermission } from "../rbac";
+import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -52,11 +48,7 @@ const teamMemberRoleSchema = z
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -77,11 +69,7 @@ export const teamRouter = createTRPCRouter({
     }),
   getTeamsWithMembers: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -109,11 +97,7 @@ export const teamRouter = createTRPCRouter({
     }),
   getTeamWithMembers: protectedProcedure
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -362,11 +346,7 @@ export const teamRouter = createTRPCRouter({
         members: z.array(teamMemberRoleSchema),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

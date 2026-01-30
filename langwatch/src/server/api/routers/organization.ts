@@ -33,7 +33,7 @@ import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
-import { skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
 

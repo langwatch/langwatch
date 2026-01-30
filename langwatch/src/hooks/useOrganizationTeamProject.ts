@@ -1,13 +1,6 @@
-import type { OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import {
-  type OrganizationRoleGroup,
-  organizationRolePermissionMapping,
-  type TeamRoleGroup,
-  teamRolePermissionMapping,
-} from "../server/api/permission";
 import {
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
@@ -282,10 +275,6 @@ export const useOrganizationTeamProject = (
     return {
       isLoading: true,
       project: publicShareProject.data,
-      //@deprecated use hasPermission instead
-      hasTeamPermission: () => false,
-      hasOrganizationPermission: () => false,
-      // New RBAC API
       hasPermission: () => false,
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
@@ -296,28 +285,6 @@ export const useOrganizationTeamProject = (
   }
 
   const organizationRole = organization?.members[0]?.role;
-
-  //@deprecated use hasPermission instead
-  const hasOrganizationPermission = (
-    roleGroup: keyof typeof OrganizationRoleGroup,
-  ) => {
-    return !!(
-      organizationRole &&
-      (
-        organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
-      ).includes(organizationRole)
-    );
-  };
-
-  //@deprecated use hasPermission instead
-  const hasTeamPermission = (
-    roleGroup: keyof typeof TeamRoleGroup,
-    team_ = team,
-  ) => {
-    const teamRole = team_?.members[0]?.role;
-    const allowedRoles = teamRolePermissionMapping[roleGroup];
-    return !!(teamRole && allowedRoles && allowedRoles.includes(teamRole));
-  };
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
@@ -418,13 +385,9 @@ export const useOrganizationTeamProject = (
     team,
     project: publicShareProject.data ?? finalProject,
     projectId: finalProject?.id,
-    // Legacy permission API (still supported)
-    hasOrganizationPermission,
-    hasTeamPermission,
-    // New RBAC permission API (preferred)
     hasPermission,
     hasOrgPermission,
-    hasAnyPermission, // Unified API that auto-routes between org and team permissions
+    hasAnyPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,

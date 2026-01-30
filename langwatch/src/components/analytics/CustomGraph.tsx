@@ -72,17 +72,17 @@ export type CustomGraphInput = {
   graphId: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
   graphType:
-    | "line"
-    | "bar"
-    | "horizontal_bar"
-    | "stacked_bar"
-    | "area"
-    | "stacked_area"
-    | "scatter"
-    | "pie"
-    | "donnut"
-    | "summary"
-    | "monitor_graph";
+  | "line"
+  | "bar"
+  | "horizontal_bar"
+  | "stacked_bar"
+  | "area"
+  | "stacked_area"
+  | "scatter"
+  | "pie"
+  | "donnut"
+  | "summary"
+  | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
   groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
@@ -266,13 +266,13 @@ const CustomGraph_ = React.memo(
       input.graphType === "scatter"
         ? currentAndPreviousData
         : fillEmptyData(
-            currentAndPreviousData,
-            expectedKeys,
-            input.graphType === "monitor_graph" &&
-              input.series[0]?.metric.includes("pass_rate")
-              ? 1
-              : 0,
-          );
+          currentAndPreviousData,
+          expectedKeys,
+          input.graphType === "monitor_graph" &&
+            input.series[0]?.metric.includes("pass_rate")
+            ? 1
+            : 0,
+        );
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
@@ -325,18 +325,17 @@ const CustomGraph_ = React.memo(
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
         const groupName = groupKey
-          ? `${
-              hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-            }${groupKey}`
+          ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
+          }${groupKey}`
           : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
             ? uppercaseFirstLetter(groupName)
-                .replace("Evaluation passed passed", "Evaluation Passed")
-                .replace("Evaluation passed failed", "Evaluation Failed")
-                .replace("Contains error", "Traces")
-                .replace(/^Evaluation label /i, "")
+              .replace("Evaluation passed passed", "Evaluation Passed")
+              .replace("Evaluation passed failed", "Evaluation Failed")
+              .replace("Contains error", "Traces")
+              .replace(/^Evaluation label /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -500,9 +499,9 @@ const CustomGraph_ = React.memo(
           .toReversed()
           .map((series) => [
             series.metric +
-              series.aggregation +
-              series.pipeline?.field +
-              series.pipeline?.aggregation,
+            series.aggregation +
+            series.pipeline?.field +
+            series.pipeline?.aggregation,
             series,
           ]),
       );
@@ -822,7 +821,7 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-        JSON.stringify(nextProps.titleProps)
+      JSON.stringify(nextProps.titleProps)
     );
   },
 );
@@ -1085,11 +1084,11 @@ function MonitorGraph({
   const isPassRate = firstKey.includes("pass_rate");
   const allValues = isPassRate
     ? currentAndPreviousDataFilled
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null)
+      ?.map((entry) => entry[firstKey]!)
+      .filter((x) => x !== undefined && x !== null)
     : currentAndPreviousData
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null);
+      ?.map((entry) => entry[firstKey]!)
+      .filter((x) => x !== undefined && x !== null);
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1193,7 +1192,7 @@ function MonitorGraph({
               );
               const periodDays = Math.ceil(
                 (filterParams.endDate - filterParams.startDate) /
-                  (1000 * 60 * 60 * 24),
+                (1000 * 60 * 60 * 24),
               );
 
               // If end date is within one day of today, show "Last X days"
@@ -1219,10 +1218,10 @@ function MonitorGraph({
           margin={
             size === "md"
               ? {
-                  top: 10,
-                  left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
-                  right: 24,
-                }
+                top: 10,
+                left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+                right: 24,
+              }
               : {}
           }
         >

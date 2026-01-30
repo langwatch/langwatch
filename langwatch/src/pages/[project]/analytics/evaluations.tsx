@@ -233,12 +233,12 @@ function EvaluationsContent() {
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           {checks.data
             ? renderGridItems(
-                [...checks.data].sort((a, b) => {
-                  // Enabled items first (true > false when comparing booleans)
-                  if (a.enabled === b.enabled) return 0;
-                  return a.enabled ? -1 : 1;
-                }),
-              )
+              [...checks.data].sort((a, b) => {
+                // Enabled items first (true > false when comparing booleans)
+                if (a.enabled === b.enabled) return 0;
+                return a.enabled ? -1 : 1;
+              }),
+            )
             : null}
         </SimpleGrid>
         <Box padding={3}>

@@ -38,7 +38,6 @@ import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
-import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
 
@@ -71,8 +70,7 @@ function SettingsForm({
   organization: FullyLoadedOrganization;
   project: Project;
 }) {
-  const { hasOrganizationPermission, hasPermission } =
-    useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -150,9 +148,7 @@ function SettingsForm({
                 helper="The name of your organization"
                 invalid={!!getFieldState("name").error}
               >
-                {hasOrganizationPermission(
-                  OrganizationRoleGroup.ORGANIZATION_MANAGE,
-                ) ? (
+                {hasPermission("organization:manage") ? (
                   <>
                     <Input
                       width="full"
@@ -174,9 +170,7 @@ function SettingsForm({
                 label="Slug"
                 helper="The unique ID of your organization"
               >
-                {hasOrganizationPermission(
-                  OrganizationRoleGroup.ORGANIZATION_MANAGE,
-                ) ? (
+                {hasPermission("organization:manage") ? (
                   <Input
                     width="full"
                     disabled
@@ -193,9 +187,7 @@ function SettingsForm({
                   label="S3 Storage"
                   helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
                 >
-                  {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
-                  ) ? (
+                  {hasPermission("organization:manage") ? (
                     <VStack width="full" align="start" gap={3}>
                       <Input
                         width="full"
@@ -236,9 +228,7 @@ function SettingsForm({
                   label="Elasticsearch"
                   helper="Configure your Elasticsearch instance for advanced search capabilities"
                 >
-                  {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
-                  ) ? (
+                  {hasPermission("organization:manage") ? (
                     <VStack width="full" align="start" gap={3}>
                       <Input
                         width="full"

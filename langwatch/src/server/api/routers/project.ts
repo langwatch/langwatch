@@ -19,15 +19,12 @@ import { slugify } from "~/utils/slugify";
 import { env } from "../../../env.mjs";
 import { dependencies } from "../../../injection/dependencies.server";
 import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-  skipPermissionCheck,
-  skipPermissionCheckProjectCreation,
-} from "../permission";
-import {
+  checkOrganizationPermission,
   checkProjectPermission,
   checkTeamPermission,
   hasProjectPermission,
+  skipPermissionCheck,
+  skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
@@ -98,9 +95,11 @@ export const projectRouter = createTRPCRouter({
           next,
         });
       } else if (input.newTeamName) {
-        return checkUserPermissionForOrganization(
-          OrganizationRoleGroup.ORGANIZATION_MANAGE,
-        )({ ctx, input, next });
+        return checkOrganizationPermission("organization:manage")({
+          ctx,
+          input,
+          next,
+        });
       } else {
         throw new TRPCError({
           code: "BAD_REQUEST",

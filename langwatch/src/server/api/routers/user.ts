@@ -3,7 +3,7 @@ import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 
-import { skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 export const userRouter = createTRPCRouter({

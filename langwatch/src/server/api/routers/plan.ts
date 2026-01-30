@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
-import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-} from "../permission";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const planRouter = createTRPCRouter({
@@ -13,11 +10,7 @@ export const planRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       return await dependencies.subscriptionHandler.getActivePlan(
         input.organizationId,
