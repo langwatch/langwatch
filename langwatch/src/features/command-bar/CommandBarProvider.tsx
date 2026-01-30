@@ -4,6 +4,8 @@ import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
 import { useActivityTracker } from "./useActivityTracker";
 import { getIsMac } from "./utils/platform";
+import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 interface CommandBarProviderProps {
   children: React.ReactNode;
@@ -77,11 +79,13 @@ export function CommandBarProvider({ children }: CommandBarProviderProps) {
     [isOpen, open, close, toggle, query]
   );
 
+  const pathname = usePathname();
+
   return (
     <CommandBarContext.Provider value={value}>
       {children}
-      {/* Only render command bar if user is logged in */}
-      {session && <CommandBar />}
+      {/* Only render command bar if user is logged in AND not in /admin or /onboarding pages */}
+      {session && !pathname?.match(/^\/(admin|onboarding)(\/|$)/) && <CommandBar />}
     </CommandBarContext.Provider>
   );
 }
