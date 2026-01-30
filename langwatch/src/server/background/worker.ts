@@ -197,7 +197,6 @@ export const start = (
             ),
           ]);
 
-          logger.info("all workers closed, triggering restart");
           setTimeout(() => {
             reject(
               new WorkersRestart("Max runtime reached, restarting worker"),
@@ -235,8 +234,6 @@ const incrementWorkerRestartCount = () => {
     for (let i = 0; i < restartCount; i++) {
       workerRestartsCounter.inc();
     }
-
-    logger.info({ restartCount }, "worker restart count recorded");
   } catch (error) {
     logger.error({ error }, "error incrementing worker restart count");
   }
