@@ -27,7 +27,7 @@ import { prisma } from "~/server/db";
 import { createLogger } from "../../utils/logger";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import type { PermissionMiddleware } from "./permission";
+import type { PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
