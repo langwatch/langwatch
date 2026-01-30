@@ -26,6 +26,12 @@ describe("pageCommands", () => {
       expect(getPageCommands("/project-b/messages")).toBe(tracesPageCommands);
       expect(getPageCommands("/123/messages")).toBe(tracesPageCommands);
     });
+
+    it("handles trailing slashes in pathname", () => {
+      // Paths with trailing slashes should match the same commands
+      expect(getPageCommands("/my-project/messages/")).toBe(tracesPageCommands);
+      expect(getPageCommands("/project-a/messages/")).toBe(tracesPageCommands);
+    });
   });
 
   describe("tracesPageCommands", () => {

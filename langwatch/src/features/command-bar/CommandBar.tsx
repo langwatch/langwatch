@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
 import { subDays } from "date-fns";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -134,6 +135,7 @@ function handleTracesPageCommand(
  */
 export function CommandBar() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { isOpen, close, query, setQuery } = useCommandBar();
   const { project, organizations } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -161,6 +163,7 @@ export function CommandBar() {
     query,
     organizations,
     project?.slug,
+    session?.user?.id,
   );
 
   // Build flat list of all items for keyboard navigation

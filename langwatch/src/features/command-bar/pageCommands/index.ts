@@ -8,7 +8,9 @@ export const pageCommandRegistry: Record<string, Command[]> = {
 };
 
 export function getPageCommands(pathname: string): Command[] {
+  // Remove trailing slash before normalizing: /foo/messages/ → /foo/messages
+  const trimmed = pathname.replace(/\/$/, "");
   // Match dynamic routes: /foo/messages → /[project]/messages
-  const normalized = pathname.replace(/^\/[^/]+/, "/[project]");
+  const normalized = trimmed.replace(/^\/[^/]+/, "/[project]");
   return pageCommandRegistry[normalized] ?? [];
 }

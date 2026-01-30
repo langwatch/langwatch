@@ -7,11 +7,15 @@ export interface FilteredProject {
   orgTeam: string;
 }
 
+interface TeamMember {
+  userId: string;
+}
+
 interface Organization {
   name: string;
   teams: Array<{
     name: string;
-    members?: Array<unknown>;
+    members?: TeamMember[];
     projects: Array<{
       slug: string;
       name: string;
@@ -22,11 +26,13 @@ interface Organization {
 /**
  * Hook for filtering projects based on search query.
  * Filters by project name, organization name, or team name.
+ * Only includes projects from teams where the current user is a member.
  */
 export function useFilteredProjects(
   query: string,
   organizations: Organization[] | undefined,
-  currentProjectSlug: string | undefined
+  currentProjectSlug: string | undefined,
+  currentUserId: string | undefined
 ): FilteredProject[] {
   return useMemo(() => {
     if (!organizations || !query.trim()) return [];
@@ -50,8 +56,10 @@ export function useFilteredProjects(
 
     for (const org of organizations) {
       for (const team of org.teams) {
-        // Skip teams where user is not a member
-        const isTeamMember = team.members && team.members.length > 0;
+        // Skip teams where current user is not a member
+        const isTeamMember =
+          currentUserId &&
+          team.members?.some((m) => m.userId === currentUserId);
         if (!isTeamMember) continue;
 
         for (const proj of team.projects) {
@@ -73,5 +81,5 @@ export function useFilteredProjects(
     }
 
     return projects;
-  }, [organizations, currentProjectSlug, query]);
+  }, [organizations, currentProjectSlug, currentUserId, query]);
 }
