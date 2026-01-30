@@ -59,6 +59,14 @@ export const start = (
     redisConnection: redis,
   });
 
+  logger.info(
+    {
+      maxRuntimeMs,
+      redisConfigured: !!redis,
+    },
+    "initializing workers",
+  );
+
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
@@ -68,6 +76,21 @@ export const start = (
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
     const eventSourcingWorker = startEventSourcingWorker();
+
+    // Log initialized workers
+    const initializedWorkers = [
+      collectorWorker && "collector",
+      evaluationsWorker && "evaluations",
+      topicClusteringWorker && "topicClustering",
+      trackEventsWorker && "trackEvents",
+      usageStatsWorker && "usageStats",
+      eventSourcingWorker && "eventSourcing",
+    ].filter(Boolean);
+
+    logger.info(
+      { workers: initializedWorkers, count: initializedWorkers.length },
+      "workers initialized",
+    );
 
     startMetricsServer();
     incrementWorkerRestartCount();
@@ -86,7 +109,10 @@ export const start = (
 
     if (maxRuntimeMs) {
       setTimeout(() => {
-        logger.info("max runtime reached, closing worker");
+        logger.info(
+          { maxRuntimeMs, workers: initializedWorkers },
+          "max runtime reached, closing workers",
+        );
 
         void (async () => {
           collectorWorker?.off("closing", closingListener);
@@ -95,15 +121,30 @@ export const start = (
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           eventSourcingWorker?.off("closing", closingListener);
+
+          logger.info("closing all workers gracefully");
           await Promise.all([
-            collectorWorker?.close(),
-            evaluationsWorker?.close(),
-            topicClusteringWorker?.close(),
-            trackEventsWorker?.close(),
-            usageStatsWorker?.close(),
-            eventSourcingWorker?.close(),
+            collectorWorker?.close().then(() => {
+              logger.info({ worker: "collector" }, "worker closed");
+            }),
+            evaluationsWorker?.close().then(() => {
+              logger.info({ worker: "evaluations" }, "worker closed");
+            }),
+            topicClusteringWorker?.close().then(() => {
+              logger.info({ worker: "topicClustering" }, "worker closed");
+            }),
+            trackEventsWorker?.close().then(() => {
+              logger.info({ worker: "trackEvents" }, "worker closed");
+            }),
+            usageStatsWorker?.close().then(() => {
+              logger.info({ worker: "usageStats" }, "worker closed");
+            }),
+            eventSourcingWorker?.close().then(() => {
+              logger.info({ worker: "eventSourcing" }, "worker closed");
+            }),
           ]);
 
+          logger.info("all workers closed, triggering restart");
           setTimeout(() => {
             reject(
               new WorkersRestart("Max runtime reached, restarting worker"),
@@ -140,6 +181,8 @@ const incrementWorkerRestartCount = () => {
     for (let i = 0; i < restartCount; i++) {
       workerRestartsCounter.inc();
     }
+
+    logger.info({ restartCount }, "worker restart count recorded");
   } catch (error) {
     logger.error({ error }, "error incrementing worker restart count");
   }
