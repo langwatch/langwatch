@@ -1,7 +1,7 @@
 import type { TRPCClientError } from "@trpc/client";
 import { useEffect, useRef, useState } from "react";
 import type { AppRouter } from "~/server/api/root";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.client";
 
 const logger = createLogger("langwatch:use-sse-subscription");
 

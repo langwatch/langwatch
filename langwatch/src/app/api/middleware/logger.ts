@@ -20,7 +20,7 @@ export const loggerMiddleware = () => {
 
     return runWithContext(ctx, async () => {
       const start = Date.now();
-      let error: any = c.error;
+      let error: unknown = c.error;
 
       try {
         await next();
@@ -32,12 +32,6 @@ export const loggerMiddleware = () => {
         const { method } = c.req;
         const url = c.req.url;
         const statusCode = c.res.status || getStatusCodeFromError(error);
-
-        // Extract path for metrics (without query params)
-        const urlPath = new URL(url).pathname;
-
-        // Record HTTP request duration metric
-        observeHttpRequestDuration(method, urlPath, statusCode, duration / 1000);
 
         // Log the request
         logHttpRequest(logger, {

@@ -8,7 +8,7 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
 import { api, type RouterOutputs } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.client";
 import { getRoutePath } from "~/utils/routes";
 import {
   TabDataSchema,
