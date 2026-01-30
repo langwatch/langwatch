@@ -69,19 +69,19 @@ export const fieldMappings: Record<string, FieldMapping> = {
   // ===== Metadata Fields (stored in Attributes Map) =====
   "metadata.user_id": {
     table: "trace_summaries",
-    column: "Attributes['user.id']",
+    column: "Attributes['langwatch.user_id']",
     description: "User identifier",
     mapValueType: "string",
   },
   "metadata.thread_id": {
     table: "trace_summaries",
-    column: "Attributes['thread.id']",
+    column: "Attributes['gen_ai.conversation.id']",
     description: "Thread/conversation identifier",
     mapValueType: "string",
   },
   "metadata.customer_id": {
     table: "trace_summaries",
-    column: "Attributes['customer.id']",
+    column: "Attributes['langwatch.customer_id']",
     description: "Customer identifier",
     mapValueType: "string",
   },
