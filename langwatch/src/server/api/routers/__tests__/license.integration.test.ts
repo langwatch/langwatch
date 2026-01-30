@@ -353,6 +353,7 @@ describe("License Router Integration", () => {
       plan: {
         maxMembers: 10,
         maxMembersLite: 5,
+        maxTeams: 10,
         maxProjects: 20,
         maxMessagesPerMonth: 100000,
         evaluationsCredit: 500,
@@ -361,6 +362,7 @@ describe("License Router Integration", () => {
         maxEvaluators: 50,
         maxScenarios: 50,
         maxAgents: 50,
+        maxExperiments: 50,
         canPublish: true,
       },
     });
@@ -429,6 +431,7 @@ describe("License Router Integration", () => {
         plan: {
           maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
           maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
+          maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
           maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
           maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
           evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
@@ -437,6 +440,7 @@ describe("License Router Integration", () => {
           maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
           maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
           maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
+          maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
           canPublish: true,
         },
       });

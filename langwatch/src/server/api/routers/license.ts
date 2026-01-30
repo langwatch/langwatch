@@ -15,6 +15,7 @@ import { getLicenseHandler } from "~/server/subscriptionHandler";
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
   maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
+  maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
   maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
   maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
   evaluationsCredit: z.number().int().positive("Plan limits must be positive numbers"),
@@ -23,6 +24,7 @@ const planLimitsSchema = z.object({
   maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
   maxScenarios: z.number().int().positive("Plan limits must be positive numbers"),
   maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
+  maxExperiments: z.number().int().positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
 });
 
@@ -161,6 +163,7 @@ export const licenseRouter = createTRPCRouter({
           name: planName,
           maxMembers: plan.maxMembers,
           maxMembersLite: plan.maxMembersLite,
+          maxTeams: plan.maxTeams,
           maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
           evaluationsCredit: plan.evaluationsCredit,
@@ -169,6 +172,7 @@ export const licenseRouter = createTRPCRouter({
           maxEvaluators: plan.maxEvaluators,
           maxScenarios: plan.maxScenarios,
           maxAgents: plan.maxAgents,
+          maxExperiments: plan.maxExperiments,
           canPublish: plan.canPublish,
         },
       };

@@ -24,6 +24,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       getProjectCount: vi.fn(),
       getTeamCount: vi.fn(),
       getAgentCount: vi.fn(),
+      getExperimentCount: vi.fn(),
       getEvaluationsCreditUsed: vi.fn(),
       getCurrentMonthCost: vi.fn(),
       getCurrentMonthCostForProjects: vi.fn(),

@@ -213,6 +213,7 @@ export class LicenseHandler {
       currentScenarios,
       currentEvaluators,
       currentAgents,
+      currentExperiments,
       currentMessagesPerMonth,
       currentEvaluationsCredit,
     ] = await Promise.all([
@@ -225,6 +226,7 @@ export class LicenseHandler {
       this.repository.getScenarioCount(organizationId),
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
+      this.repository.getExperimentCount(organizationId),
       messagesCountPromise,
       this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
@@ -248,6 +250,8 @@ export class LicenseHandler {
       maxEvaluators: resolved.maxEvaluators,
       currentAgents,
       maxAgents: resolved.maxAgents,
+      currentExperiments,
+      maxExperiments: resolved.maxExperiments,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       currentEvaluationsCredit,

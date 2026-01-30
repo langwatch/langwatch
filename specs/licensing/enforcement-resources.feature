@@ -1,5 +1,5 @@
 @wip
-Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams)
+Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams, Experiments)
   As a LangWatch self-hosted deployment with a license
   I want resource creation limits to be enforced for workflows, prompts, evaluators, and teams
   So that organizations respect their licensed resource counts
@@ -463,4 +463,84 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Given the organization has an expired license
     And the organization has 2 teams
     When I create a team in the organization
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Experiments: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows experiment creation when under limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 2 experiments across all projects
+    When I create an experiment in project "proj-789"
+    Then the experiment is created successfully
+
+  @integration
+  Scenario: Blocks experiment creation when at limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    When I create an experiment in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of experiments"
+
+  @integration
+  Scenario: Counts experiments across all projects in organization
+    Given the organization has a license with maxExperiments 3
+    And project "proj-A" has 2 experiments
+    And project "proj-B" has 1 experiment
+    When I create an experiment in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Experiment copy enforces limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    When I copy an experiment to project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Updating existing experiment does not enforce limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    And I have an existing experiment "exp-123"
+    When I update experiment "exp-123" in project "proj-789"
+    Then the experiment is updated successfully
+
+  # ============================================================================
+  # Experiments: UI Enforcement
+  # ============================================================================
+
+  @unit
+  Scenario: Create Experiment menu item is always clickable
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments (at limit)
+    When I view the evaluations dashboard
+    Then the "Create Experiment" menu item is enabled
+
+  @unit
+  Scenario: Clicking Create Experiment at limit shows upgrade modal
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments (at limit)
+    When I click the "Create Experiment" menu item
+    Then an upgrade modal is displayed
+    And the modal shows "Experiments: 3 / 3"
+
+  # ============================================================================
+  # Experiments: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited experiments when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 experiments
+    When I create an experiment in project "proj-789"
+    Then the experiment is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier experiment limit
+    Given the organization has an expired license
+    And the organization has 3 experiments
+    When I create an experiment in project "proj-789"
     Then the request fails with FORBIDDEN

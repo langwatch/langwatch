@@ -131,6 +131,7 @@ describe("resolvePlanDefaults", () => {
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
       maxAgents: resolved.maxAgents,
+      maxExperiments: resolved.maxExperiments,
       canPublish: resolved.canPublish,
     };
 
