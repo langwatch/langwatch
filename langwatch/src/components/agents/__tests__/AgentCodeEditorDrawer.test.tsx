@@ -34,6 +34,17 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Mock useLicenseEnforcement
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: (callback: () => void) => callback(),
+    isLoading: false,
+    isAllowed: true,
+    limitInfo: { allowed: true, current: 0, max: 10 },
+    upgradeModal: null,
+  }),
+}));
+
 // Mock components with complex transitive dependencies
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
   CodeEditor: () => null,

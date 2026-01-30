@@ -15,12 +15,8 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { UpgradeModal } from "~/components/UpgradeModal";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
@@ -57,9 +53,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     null,
   );
   const [agentName, setAgentName] = useState(props.agentName ?? "");
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+
+  // License enforcement for agent creation
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
 
   const workflowsQuery = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -84,12 +80,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "agents") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -120,14 +110,17 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       workflow_id: selectedWorkflowId,
     };
 
-    createMutation.mutate({
-      projectId: project.id,
-      name: agentName.trim(),
-      type: "workflow",
-      config,
-      workflowId: selectedWorkflowId,
+    // Creating new agent - check limit first
+    checkAndProceed(() => {
+      createMutation.mutate({
+        projectId: project.id,
+        name: agentName.trim(),
+        type: "workflow",
+        config,
+        workflowId: selectedWorkflowId,
+      });
     });
-  }, [project?.id, selectedWorkflowId, agentName, createMutation]);
+  }, [project?.id, selectedWorkflowId, agentName, createMutation, checkAndProceed]);
 
   const isValid = selectedWorkflowId && agentName.trim().length > 0;
 
@@ -256,13 +249,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       </Drawer.Content>
       </Drawer.Root>
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="agents"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
+      {upgradeModal}
     </>
   );
 }

@@ -15,11 +15,6 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { UpgradeModal } from "~/components/UpgradeModal";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -32,6 +27,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   HttpAuth,
@@ -214,9 +210,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+
+  // License enforcement for agent creation
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
 
   // All variables = fixed + custom
   const variables = useMemo(() => {
@@ -316,12 +312,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "agents") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -368,6 +358,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     );
 
     if (agentId) {
+      // Editing existing agent - no limit check needed
       updateMutation.mutate({
         id: agentId,
         projectId: project.id,
@@ -375,11 +366,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         config,
       });
     } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        type: "http",
-        config,
+      // Creating new agent - check limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: name.trim(),
+          type: "http",
+          config,
+        });
       });
     }
   }, [
@@ -395,6 +389,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     isValid,
     createMutation,
     updateMutation,
+    checkAndProceed,
   ]);
 
   const markDirty = () => setHasUnsavedChanges(true);
@@ -721,13 +716,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       </Drawer.Content>
       </Drawer.Root>
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="agents"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
+      {upgradeModal}
     </>
   );
 }
