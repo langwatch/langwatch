@@ -177,20 +177,14 @@ describe("formatLimitOrUnlimited", () => {
     expect(formatLimitOrUnlimited(Infinity)).toBe("Unlimited");
   });
 
-  it("returns 'Unlimited' for Number.MAX_SAFE_INTEGER", () => {
-    expect(formatLimitOrUnlimited(Number.MAX_SAFE_INTEGER)).toBe("Unlimited");
-  });
-
-  it("returns 'Unlimited' for values at or above 1 million threshold", () => {
-    expect(formatLimitOrUnlimited(1_000_000)).toBe("Unlimited");
-    expect(formatLimitOrUnlimited(10_000_000)).toBe("Unlimited");
-  });
-
-  it("returns formatted number for normal values below threshold", () => {
+  it("returns formatted number for all finite values", () => {
     expect(formatLimitOrUnlimited(100)).toBe("100");
     expect(formatLimitOrUnlimited(1000)).toBe("1,000");
     expect(formatLimitOrUnlimited(50000)).toBe("50,000");
-    expect(formatLimitOrUnlimited(999_999)).toBe("999,999");
+    expect(formatLimitOrUnlimited(1_000_000)).toBe("1,000,000");
+    expect(formatLimitOrUnlimited(Number.MAX_SAFE_INTEGER)).toBe(
+      "9,007,199,254,740,991"
+    );
   });
 });
 
@@ -204,9 +198,11 @@ describe("formatResourceUsage", () => {
     expect(formatResourceUsage(5, Infinity)).toBe("5 / Unlimited");
   });
 
-  it("displays 'Unlimited' for max values at or above threshold", () => {
-    expect(formatResourceUsage(5, 1_000_000)).toBe("5 / Unlimited");
-    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe("5 / Unlimited");
+  it("formats large max values as numbers", () => {
+    expect(formatResourceUsage(5, 1_000_000)).toBe("5 / 1,000,000");
+    expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe(
+      "5 / 9,007,199,254,740,991"
+    );
   });
 });
 
