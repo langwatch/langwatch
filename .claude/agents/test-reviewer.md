@@ -36,10 +36,29 @@ Bad: `thenISeeEmptyStateOrScenarioList` (tests two things)
 Good: `thenISeeEmptyState` or `thenISeeScenarioList`
 
 ### 2. Structure & Organization
-- Consistent use of `test.describe` blocks
-- Related tests grouped logically
+- **BDD-style nesting**: Tests must use `describe("given X")` and `describe("when Y")` blocks, not flat structures with Given/When/Then only in comments
+- Related tests share setup via `beforeEach` in the appropriate `given` block
 - Test file placement matches directory conventions
 - Setup/teardown patterns consistent across files
+
+Bad (flat with comments):
+```typescript
+it("returns error when project not found", () => {
+  // Given: project doesn't exist
+  // When: execute
+  // Then: error
+});
+```
+
+Good (nested describes):
+```typescript
+describe("given project does not exist", () => {
+  beforeEach(() => { /* setup */ });
+  describe("when executing", () => {
+    it("returns error with project not found message", () => { });
+  });
+});
+```
 
 ### 3. Pyramid Placement (Critical)
 Flag tests that should be downgraded:
@@ -74,7 +93,7 @@ E2E tests should verify **meaningful user workflows**, not just that pages rende
 [Specific examples with file:line and suggested renames]
 
 ## Structure Issues
-[Organization problems, inconsistent patterns]
+[Organization problems, missing Given/When describe blocks, flat test structures]
 
 ## Pyramid Violations
 [Tests at wrong level with reasoning and recommended level]
@@ -83,7 +102,7 @@ E2E tests should verify **meaningful user workflows**, not just that pages rende
 [Patterns to maintain]
 
 ## Recommendations
-1) Must fix — Blocking issues
+1) Must fix — Blocking issues (includes missing BDD structure)
 2) Should fix — Important improvements
 3) Consider — Nice-to-haves
 ```

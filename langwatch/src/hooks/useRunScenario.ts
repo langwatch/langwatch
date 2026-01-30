@@ -11,6 +11,12 @@ interface UseRunScenarioOptions {
   projectSlug: string | undefined;
 }
 
+interface RunScenarioParams {
+  scenarioId: string;
+  target: TargetValue;
+  setId?: string;
+}
+
 export function useRunScenario({
   projectId,
   projectSlug,
@@ -21,27 +27,29 @@ export function useRunScenario({
   const [isPolling, setIsPolling] = useState(false);
 
   const runScenario = useCallback(
-    async (scenarioId: string, target: TargetValue) => {
+    async (params: RunScenarioParams) => {
+      const { scenarioId, target, setId } = params;
       if (!projectId || !projectSlug || !target) return;
 
       try {
-        const { setId, batchRunId } = await runMutation.mutateAsync({
+        const { setId: returnedSetId, batchRunId } = await runMutation.mutateAsync({
           projectId,
           scenarioId,
           target: { type: target.type, referenceId: target.id },
+          setId,
         });
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
-          { projectId, scenarioSetId: setId, batchRunId },
+          { projectId, scenarioSetId: returnedSetId, batchRunId },
         );
 
         if (result.success) {
           void router.push(
             buildRoutePath("simulations_run", {
               project: projectSlug,
-              scenarioSetId: setId,
+              scenarioSetId: returnedSetId,
               batchRunId,
               scenarioRunId: result.scenarioRunId,
             }),
@@ -50,7 +58,7 @@ export function useRunScenario({
           const runPath = result.scenarioRunId
             ? buildRoutePath("simulations_run", {
                 project: projectSlug,
-                scenarioSetId: setId,
+                scenarioSetId: returnedSetId,
                 batchRunId,
                 scenarioRunId: result.scenarioRunId,
               })
@@ -76,10 +84,12 @@ export function useRunScenario({
             meta: { closable: true },
           });
         }
-      } catch {
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "An unexpected error occurred";
         toaster.create({
           title: "Failed to start scenario",
-          description: "An error occurred while starting the scenario run.",
+          description: message,
           type: "error",
           meta: { closable: true },
         });
