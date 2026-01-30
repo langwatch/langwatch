@@ -122,7 +122,7 @@ function getDateTruncFunction(
 function getGroupByExpression(
   groupBy: string,
   groupByKey?: string,
-): { column: string; requiredJoins: CHTable[] } {
+): { column: string; requiredJoins: CHTable[]; usesArrayJoin?: boolean } {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const es = tableAliases.evaluation_states;
@@ -133,19 +133,19 @@ function getGroupByExpression(
 
     case "metadata.user_id":
       return {
-        column: `${ts}.Attributes['user.id']`,
+        column: `${ts}.Attributes['langwatch.user_id']`,
         requiredJoins: [],
       };
 
     case "metadata.thread_id":
       return {
-        column: `${ts}.Attributes['thread.id']`,
+        column: `${ts}.Attributes['gen_ai.conversation.id']`,
         requiredJoins: [],
       };
 
     case "metadata.customer_id":
       return {
-        column: `${ts}.Attributes['customer.id']`,
+        column: `${ts}.Attributes['langwatch.customer_id']`,
         requiredJoins: [],
       };
 
@@ -153,6 +153,7 @@ function getGroupByExpression(
       return {
         column: `arrayJoin(JSONExtract(${ts}.Attributes['langwatch.labels'], 'Array(String)'))`,
         requiredJoins: [],
+        usesArrayJoin: true,
       };
 
     case "metadata.model":
@@ -195,6 +196,7 @@ function getGroupByExpression(
       return {
         column: `arrayJoin(${ss}."Events.Name")`,
         requiredJoins: ["stored_spans"],
+        usesArrayJoin: true,
       };
 
     case "sentiment.input_sentiment":
@@ -268,9 +270,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
 
   // Handle groupBy
   let groupByColumn: string | null = null;
+  let usesArrayJoin = false;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
+    usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
@@ -281,7 +285,38 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     .map((table) => buildJoinClause(table))
     .join("\n");
 
-  // Build SELECT expressions
+  // Build WHERE clause
+  const baseWhere = `
+    ${ts}.TenantId = {tenantId:String}
+    AND (
+      (${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)})
+      OR
+      (${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)})
+    )
+  `;
+
+  const filterWhere =
+    filterTranslation.whereClause !== "1=1"
+      ? `AND ${filterTranslation.whereClause}`
+      : "";
+
+  // When using arrayJoin for grouping (like labels), we need a CTE approach to avoid
+  // trace duplication affecting counts. The CTE deduplicates (TraceId, group_key) pairs
+  // and preserves metrics per trace for accurate aggregation.
+  if (usesArrayJoin && groupByColumn) {
+    return buildArrayJoinTimeseriesQuery(
+      input,
+      groupByColumn,
+      metricTranslations,
+      joinClauses,
+      baseWhere,
+      filterWhere,
+      filterTranslation.params,
+      timeZone,
+    );
+  }
+
+  // Build SELECT expressions for standard query
   const selectExprs: string[] = [];
 
   // Add period indicator
@@ -301,7 +336,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Add groupBy column if present
   // Use 'unknown' for null/empty values to match ES behavior (missing: "unknown")
   if (groupByColumn) {
-    selectExprs.push(`if(${groupByColumn} = '' OR ${groupByColumn} IS NULL, 'unknown', ${groupByColumn}) AS group_key`);
+    selectExprs.push(`if(${groupByColumn} IS NULL OR toString(${groupByColumn}) = '', 'unknown', toString(${groupByColumn})) AS group_key`);
   }
 
   // Add metric expressions
@@ -319,21 +354,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   if (groupByColumn) {
     groupByExprs.push("group_key");
   }
-
-  // Build WHERE clause
-  const baseWhere = `
-    ${ts}.TenantId = {tenantId:String}
-    AND (
-      (${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)})
-      OR
-      (${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)})
-    )
-  `;
-
-  const filterWhere =
-    filterTranslation.whereClause !== "1=1"
-      ? `AND ${filterTranslation.whereClause}`
-      : "";
 
   // No HAVING filter needed - empty/null values are converted to 'unknown' above
   // to match ES behavior (missing: "unknown")
@@ -363,6 +383,182 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       ...filterTranslation.params,
     },
   };
+}
+
+/**
+ * Build a timeseries query using CTE for arrayJoin grouping (labels, events).
+ * This prevents trace duplication from affecting aggregate counts.
+ */
+function buildArrayJoinTimeseriesQuery(
+  input: TimeseriesQueryInput,
+  groupByColumn: string,
+  metricTranslations: MetricTranslation[],
+  joinClauses: string,
+  baseWhere: string,
+  filterWhere: string,
+  filterParams: Record<string, unknown>,
+  timeZone: string,
+): BuiltQuery {
+  const ts = tableAliases.trace_summaries;
+
+  // Build date truncation for CTE
+  const dateTrunc =
+    input.timeScale !== "full" && typeof input.timeScale === "number"
+      ? getDateTruncFunction(input.timeScale, timeZone)
+      : null;
+
+  // CTE: Get distinct (TraceId, group_key) pairs with per-trace metrics
+  // This ensures each trace is counted once per group key value
+  const cteSelectExprs: string[] = [
+    `${ts}.TraceId AS trace_id`,
+    `if(${groupByColumn} IS NULL OR toString(${groupByColumn}) = '', 'unknown', toString(${groupByColumn})) AS group_key`,
+    `CASE
+      WHEN ${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)} THEN 'previous'
+    END AS period`,
+  ];
+
+  if (dateTrunc) {
+    cteSelectExprs.push(`${dateTrunc} AS date`);
+  }
+
+  // Add per-trace values for metrics that need aggregation
+  // For count-based metrics, we'll use uniqExact(trace_id) in outer query
+  // For other metrics (sum, avg of TotalCost, etc.), we include the values
+  const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
+
+  // Include metric base columns in CTE for aggregation in outer query
+  // Add common trace-level columns that metrics might need
+  cteSelectExprs.push(`${ts}.TotalCost AS trace_total_cost`);
+  cteSelectExprs.push(`${ts}.TotalDurationMs AS trace_duration_ms`);
+  cteSelectExprs.push(`${ts}.TotalPromptTokenCount AS trace_prompt_tokens`);
+  cteSelectExprs.push(`${ts}.TotalCompletionTokenCount AS trace_completion_tokens`);
+
+  // Build outer SELECT expressions
+  const outerSelectExprs: string[] = ["period"];
+  if (dateTrunc) {
+    outerSelectExprs.push("date");
+  }
+  outerSelectExprs.push("group_key");
+
+  // Transform metrics to work on deduplicated data
+  // count() becomes uniqExact(trace_id), sum/avg work on first value per trace
+  for (const metric of simpleMetrics) {
+    // Transform the metric expression for the deduplicated context
+    const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
+    outerSelectExprs.push(transformedExpr);
+  }
+
+  // Build GROUP BY for outer query
+  const outerGroupBy: string[] = ["period"];
+  if (dateTrunc) {
+    outerGroupBy.push("date");
+  }
+  outerGroupBy.push("group_key");
+
+  const sql = `
+    WITH deduped_traces AS (
+      SELECT DISTINCT
+        ${cteSelectExprs.join(",\n        ")}
+      FROM trace_summaries ${ts} FINAL
+      ${joinClauses}
+      WHERE ${baseWhere}
+        ${filterWhere}
+    )
+    SELECT
+      ${outerSelectExprs.join(",\n      ")}
+    FROM deduped_traces
+    WHERE period IS NOT NULL
+    GROUP BY ${outerGroupBy.join(", ")}
+    ORDER BY period${dateTrunc ? ", date" : ""}
+  `;
+
+  return {
+    sql,
+    params: {
+      tenantId: input.projectId,
+      currentStart: input.startDate,
+      currentEnd: input.endDate,
+      previousStart: input.previousPeriodStartDate,
+      previousEnd: input.startDate,
+      ...filterParams,
+    },
+  };
+}
+
+/**
+ * Transform a metric expression to work with deduplicated trace data.
+ * count() becomes uniqExact(trace_id) to count distinct traces.
+ * Sum/avg of trace-level values use the CTE columns.
+ */
+function transformMetricForDedup(selectExpression: string, alias: string): string {
+  // Match patterns like "count() AS alias" or "count(*) AS alias"
+  if (/\bcount\s*\(\s*\*?\s*\)/.test(selectExpression)) {
+    return `uniqExact(trace_id) AS ${alias}`;
+  }
+
+  // Match "uniq(...)" or "cardinality" - these should become uniqExact(trace_id)
+  if (/\buniq\s*\(/.test(selectExpression) || /\buniqExact\s*\(/.test(selectExpression)) {
+    // For cardinality of trace_id, use uniqExact(trace_id)
+    if (selectExpression.includes("TraceId")) {
+      return `uniqExact(trace_id) AS ${alias}`;
+    }
+  }
+
+  // For sum of TotalCost - use the CTE column
+  // Handle both with and without coalesce wrapper
+  if (selectExpression.includes("TotalCost")) {
+    if (/\bsum\s*\(/.test(selectExpression)) {
+      // Preserve coalesce wrapper if present
+      if (/\bcoalesce\s*\(/.test(selectExpression)) {
+        return `coalesce(sum(trace_total_cost), 0) AS ${alias}`;
+      }
+      return `sum(trace_total_cost) AS ${alias}`;
+    }
+    if (/\bavg\s*\(/.test(selectExpression)) {
+      return `avg(trace_total_cost) AS ${alias}`;
+    }
+  }
+
+  // For duration metrics
+  if (selectExpression.includes("TotalDurationMs")) {
+    if (/\bavg\s*\(/.test(selectExpression)) {
+      return `avg(trace_duration_ms) AS ${alias}`;
+    }
+    if (/\bsum\s*\(/.test(selectExpression)) {
+      if (/\bcoalesce\s*\(/.test(selectExpression)) {
+        return `coalesce(sum(trace_duration_ms), 0) AS ${alias}`;
+      }
+      return `sum(trace_duration_ms) AS ${alias}`;
+    }
+    if (/\bmax\s*\(/.test(selectExpression)) {
+      return `max(trace_duration_ms) AS ${alias}`;
+    }
+    if (/\bmin\s*\(/.test(selectExpression)) {
+      return `min(trace_duration_ms) AS ${alias}`;
+    }
+    // Handle percentile aggregations
+    if (/\bquantileTDigest\s*\(/.test(selectExpression)) {
+      const percentileMatch = selectExpression.match(/quantileTDigest\s*\(\s*([\d.]+)\s*\)/);
+      if (percentileMatch) {
+        return `quantileTDigest(${percentileMatch[1]})(trace_duration_ms) AS ${alias}`;
+      }
+    }
+  }
+
+  // For token metrics
+  if (selectExpression.includes("TotalPromptTokenCount") || selectExpression.includes("TotalCompletionTokenCount")) {
+    if (/\bsum\s*\(/.test(selectExpression)) {
+      const col = selectExpression.includes("TotalPromptTokenCount") ? "trace_prompt_tokens" : "trace_completion_tokens";
+      if (/\bcoalesce\s*\(/.test(selectExpression)) {
+        return `coalesce(sum(${col}), 0) AS ${alias}`;
+      }
+      return `sum(${col}) AS ${alias}`;
+    }
+  }
+
+  // Default: return as-is (may need extension for other metric types)
+  return selectExpression;
 }
 
 /**
@@ -427,15 +623,15 @@ export function buildDataForFilterQuery(
     case "metadata.user_id":
       sql = `
         SELECT
-          ${ts}.Attributes['user.id'] AS field,
-          ${ts}.Attributes['user.id'] AS label,
+          ${ts}.Attributes['langwatch.user_id'] AS field,
+          ${ts}.Attributes['langwatch.user_id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
           AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
-          AND ${ts}.Attributes['user.id'] != ''
-          ${searchQuery ? `AND ${ts}.Attributes['user.id'] ILIKE {searchQuery:String}` : ""}
+          AND ${ts}.Attributes['langwatch.user_id'] != ''
+          ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -445,15 +641,15 @@ export function buildDataForFilterQuery(
     case "metadata.thread_id":
       sql = `
         SELECT
-          ${ts}.Attributes['thread.id'] AS field,
-          ${ts}.Attributes['thread.id'] AS label,
+          ${ts}.Attributes['gen_ai.conversation.id'] AS field,
+          ${ts}.Attributes['gen_ai.conversation.id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
           AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
-          AND ${ts}.Attributes['thread.id'] != ''
-          ${searchQuery ? `AND ${ts}.Attributes['thread.id'] ILIKE {searchQuery:String}` : ""}
+          AND ${ts}.Attributes['gen_ai.conversation.id'] != ''
+          ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
         LIMIT ${MAX_FILTER_OPTIONS}
@@ -524,14 +720,14 @@ export function buildDataForFilterQuery(
     case "traces.error":
       sql = `
         SELECT
-          if(${ts}.ContainsErrorStatus = 1, 'true', 'false') AS field,
-          if(${ts}.ContainsErrorStatus = 1, 'Traces with error', 'Traces without error') AS label,
+          if(toUInt8(coalesce(${ts}.ContainsErrorStatus, 0)) = 1, 'true', 'false') AS field,
+          if(toUInt8(coalesce(${ts}.ContainsErrorStatus, 0)) = 1, 'Traces with error', 'Traces without error') AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
           AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
-        GROUP BY ${ts}.ContainsErrorStatus
+        GROUP BY toUInt8(coalesce(${ts}.ContainsErrorStatus, 0))
         ORDER BY count DESC
       `;
       break;
@@ -584,8 +780,8 @@ export function buildTopDocumentsQuery(
     WITH document_refs AS (
       SELECT
         ${ts}.TraceId,
-        JSONExtractString(context, 'document_id') AS document_id,
-        JSONExtractString(context, 'content') AS content
+        toString(context.document_id) AS document_id,
+        toString(context.content) AS content
       FROM trace_summaries ${ts} FINAL
       JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
@@ -608,7 +804,7 @@ export function buildTopDocumentsQuery(
   `;
 
   const totalSql = `
-    SELECT uniq(JSONExtractString(context, 'document_id')) AS total
+    SELECT uniq(toString(context.document_id)) AS total
     FROM trace_summaries ${ts} FINAL
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
