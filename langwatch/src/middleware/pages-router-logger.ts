@@ -1,6 +1,13 @@
-import { context as otContext, trace } from "@opentelemetry/api";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createLogger } from "../utils/logger";
+import {
+  createContextFromNextApiRequest,
+  runWithContext,
+} from "../server/context/asyncContext";
+import {
+  hasAuthorizationToken,
+  logHttpRequest,
+} from "../server/middleware/requestLogging";
 
 const logger = createLogger("langwatch:pages-router:logger");
 
@@ -11,73 +18,58 @@ export function withPagesRouterLogger(
   ) => Promise<void | NextApiResponse>,
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    const startTime = Date.now();
+    // Create context from Next.js API request and run within it
+    const ctx = createContextFromNextApiRequest(req);
 
-    // Extract basic request info
-    const method = req.method ?? "UNKNOWN";
-    const url = req.url ?? "";
-    const userAgent = req.headers["user-agent"] ?? "unknown";
+    return runWithContext(ctx, async () => {
+      const startTime = Date.now();
 
-    // Extract additional context based on path
-    const additionalContext = extractContextFromPath(req);
+      // Extract basic request info
+      const method = req.method ?? "UNKNOWN";
+      const url = req.url ?? "";
+      const userAgent = req.headers["user-agent"] ?? null;
 
-    let error: Error | null = null;
+      // Extract additional context based on request
+      const extra = extractContextFromRequest(req);
 
-    try {
-      // Execute the handler
-      await handler(req, res);
-    } catch (err) {
-      error = err as Error;
-      throw err;
-    } finally {
-      const duration = Date.now() - startTime;
-      const status = res.statusCode ?? 500;
+      let error: Error | null = null;
 
-      const logData: Record<string, unknown> = {
-        method,
-        url,
-        statusCode: status,
-        duration,
-        userAgent,
-        ...additionalContext,
-        traceId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return span?.spanContext().traceId ?? null;
-        })(),
-        spanId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return span?.spanContext().spanId ?? null;
-        })(),
-      };
+      try {
+        // Execute the handler
+        await handler(req, res);
+      } catch (err) {
+        error = err as Error;
+        throw err;
+      } finally {
+        const duration = Date.now() - startTime;
+        const statusCode = res.statusCode ?? 500;
 
-      if (error) {
-        logData.error = error;
-        logger.error(logData, "error handling request");
-      } else {
-        logger.info(logData, "request handled");
+        // Log the request
+        logHttpRequest(logger, {
+          method,
+          url,
+          statusCode,
+          duration,
+          userAgent,
+          error: error ?? undefined,
+          extra,
+        });
       }
-    }
+    });
   };
 }
 
-function extractContextFromPath(req: NextApiRequest): Record<string, unknown> {
+function extractContextFromRequest(
+  req: NextApiRequest,
+): Record<string, unknown> {
   const url = req.url ?? "";
   const context: Record<string, unknown> = {};
 
-  // Extract auth token for logging (without exposing the full token)
-  const xAuthToken = req.headers["x-auth-token"];
-  const authHeader = req.headers.authorization;
-  const hasAuthToken = !!(
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null)
-  );
-
-  // Note: In Next.js middleware, we don't have access to user/project/org context
-  // like Hono does. These would need to be extracted in the actual route handlers.
-  // For now, we'll include basic auth information.
-  context.hasAuthToken = hasAuthToken;
+  // Check for auth token presence (without exposing the token value)
+  context.hasAuthToken = hasAuthorizationToken({
+    "x-auth-token": req.headers["x-auth-token"] as string | undefined,
+    authorization: req.headers.authorization,
+  });
 
   // Extract context based on path patterns
   if (url.startsWith("/api/collector")) {

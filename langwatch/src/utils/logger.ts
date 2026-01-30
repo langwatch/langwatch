@@ -1,46 +1,42 @@
-import pino, { type LoggerOptions } from "pino";
+import type { Logger as PinoLogger } from "pino";
 
-const isBrowser = typeof window !== "undefined";
-const isNodeDev = !isBrowser && process.env.NODE_ENV !== "production";
-
-let pinoPretty: any;
-if (isNodeDev) {
-  try {
-    pinoPretty = require("pino-pretty");
-  } catch (e) {
-    console.error("Failed to load pino-pretty for server-side logging:", e);
-  }
+export interface CreateLoggerOptions {
+  /**
+   * Disable automatic context injection (traceId, spanId, organizationId, projectId, userId).
+   * Server-only option - ignored in browser.
+   */
+  disableContext?: boolean;
 }
 
-const getDestinationStream = () => {
-  if (isNodeDev && pinoPretty) return pinoPretty({ colorize: true });
-  if (!isBrowser) return process.stdout;
-  return void 0;
-};
+/**
+ * Creates a logger instance with the given name.
+ * Automatically detects browser vs server environment.
+ *
+ * - Browser: Lightweight pino logger with console output
+ * - Server: Full pino with transports, context injection, and optional OTel export
+ *
+ * @param name - Logger name (e.g., "langwatch:api:hono")
+ * @param options - Optional configuration (server-only options ignored in browser)
+ */
+export const createLogger = (
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger => {
+  if (typeof window !== "undefined") {
+    // Browser: use lightweight client logger
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createLogger: createClientLogger } = require("./logger.client") as {
+      createLogger: (name: string) => PinoLogger;
+    };
+    return createClientLogger(name);
+  }
 
-export const createLogger = (name: string) => {
-  const options: LoggerOptions = {
-    name,
-    level: isBrowser
-      ? "info"
-      : (process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "info"),
-    timestamp: isBrowser ? undefined : pino.stdTimeFunctions.isoTime,
-    browser: isBrowser ? { asObject: true } : void 0,
-    serializers: {
-      error: pino.stdSerializers.err,
-    },
-    formatters: {
-      bindings: (bindings) => {
-        return bindings; // TODO(afr): Later, add git commit hash, and other stuff for production Node.js
-      },
-      level: (label) => {
-        return { level: label.toUpperCase() };
-      },
-    },
+  // Server: use the full server logger with transports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createLogger: createServerLogger } = require("./logger.server") as {
+    createLogger: (name: string, options?: CreateLoggerOptions) => PinoLogger;
   };
-
-  const destination = getDestinationStream();
-  return (pino as any).default(options, destination) as ReturnType<typeof pino>;
+  return createServerLogger(name, options);
 };
 
-export type Logger = ReturnType<typeof createLogger>;
+export type Logger = PinoLogger;

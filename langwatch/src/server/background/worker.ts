@@ -31,6 +31,10 @@ import type { EventSourcingJob } from "./types";
 import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { getClickHouseClient } from "../clickhouse/client";
+import {
+  startStorageStatsCollection,
+  stopStorageStatsCollection,
+} from "../clickhouse/metrics";
 import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
 
@@ -54,10 +58,16 @@ export const start = (
   maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
   // Initialize event sourcing with ClickHouse and Redis clients
+  const clickHouseClient = getClickHouseClient();
   initializeEventSourcing({
-    clickHouseClient: getClickHouseClient(),
+    clickHouseClient,
     redisConnection: redis,
   });
+
+  // Start ClickHouse storage metrics collection if ClickHouse is enabled
+  if (clickHouseClient) {
+    startStorageStatsCollection(clickHouseClient);
+  }
 
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();

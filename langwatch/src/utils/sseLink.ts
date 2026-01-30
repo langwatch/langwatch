@@ -105,7 +105,7 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
 
           es.onopen = () => {
             reconnectAttempts = 0;
-            logger.info("SSE connected", { path: endpointUrl.pathname });
+            logger.info({ path: endpointUrl.pathname }, "SSE connected");
 
             if (!closed && !startedSent) {
               startedSent = true;
