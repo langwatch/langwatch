@@ -1,4 +1,5 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { FREE_PLAN } from "../../../ee/licensing/constants";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import { dependencies } from "~/injection/dependencies.server";
@@ -55,10 +56,6 @@ export class TraceUsageService {
     maxMessagesPerMonth?: number;
     planName?: string;
   }> {
-    // Self-hosted = unlimited traces, skip all limit checks
-    if (!env.IS_SAAS) {
-      return { exceeded: false };
-    }
 
     const organizationId =
       await this.organizationRepository.getOrganizationIdByTeamId(teamId);
@@ -70,6 +67,12 @@ export class TraceUsageService {
       this.getCurrentMonthCount({ organizationId }),
       this.subscriptionHandler.getActivePlan(organizationId),
     ]);
+
+    // Self-hosted = unlimited traces
+    // Preventing customers from getting blocked when no license is active
+    if (!env.IS_SAAS && plan === FREE_PLAN) {
+      return { exceeded: false };
+    }
 
     if (count >= plan.maxMessagesPerMonth) {
       return {
