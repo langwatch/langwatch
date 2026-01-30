@@ -324,18 +324,31 @@ const extractTraceAttributes = (
 
     // Thread/User context from span attributes
     // After canonicalization, thread IDs are stored as gen_ai.conversation.id
-    const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
-    const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
-    const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
+    // Check multiple key formats to handle legacy SDKs and different attribute formats
+    const threadId =
+      spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY_ROOT];
 
-    if (typeof threadId === "string" && !attributes["thread.id"]) {
-      attributes["thread.id"] = threadId;
+    const userId =
+      spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY_ROOT];
+
+    const customerId =
+      spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY] ??
+      spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY_ROOT];
+
+    if (typeof threadId === "string" && !attributes["gen_ai.conversation.id"]) {
+      attributes["gen_ai.conversation.id"] = threadId;
     }
-    if (typeof userId === "string" && !attributes["user.id"]) {
-      attributes["user.id"] = userId;
+    if (typeof userId === "string" && !attributes["langwatch.user_id"]) {
+      attributes["langwatch.user_id"] = userId;
     }
-    if (typeof customerId === "string" && !attributes["customer.id"]) {
-      attributes["customer.id"] = customerId;
+    if (typeof customerId === "string" && !attributes["langwatch.customer_id"]) {
+      attributes["langwatch.customer_id"] = customerId;
     }
 
     // LangGraph metadata
