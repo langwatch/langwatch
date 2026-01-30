@@ -1,15 +1,65 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   extractProviderFromModel,
   formHasContent,
   type GeneratedScenario,
+  ScenarioAIGeneration,
   usePromptHistory,
   useScenarioGeneration,
 } from "../ScenarioAIGeneration";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mocks
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Mock useOrganizationTeamProject
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-123", defaultModel: "openai/gpt-4" },
+  }),
+}));
+
+// Mock useDrawerParams - will be configured per test
+let mockDrawerParams: Record<string, string | undefined> = {};
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawerParams: () => mockDrawerParams,
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+    closeDrawer: vi.fn(),
+    drawerOpen: vi.fn().mockReturnValue(false),
+    goBack: vi.fn(),
+    canGoBack: false,
+  }),
+}));
+
+// Mock useModelSelectionOptions
+vi.mock("../../ModelSelector", () => ({
+  allModelOptions: [],
+  useModelSelectionOptions: () => ({
+    modelOption: { isDisabled: false },
+  }),
+}));
+
+// Mock toaster
+vi.mock("../../ui/toaster", () => ({
+  toaster: {
+    create: vi.fn(),
+  },
+}));
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+// Clean up after each test to avoid interference
+afterEach(() => {
+  cleanup();
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
@@ -48,6 +98,53 @@ describe("usePromptHistory", () => {
     });
 
     expect(result.current.history).toEqual(["first", "second", "third"]);
+  });
+
+  it("initializes with initial prompt when provided", () => {
+    const { result } = renderHook(() =>
+      usePromptHistory({ initialPrompt: "seeded prompt" })
+    );
+
+    expect(result.current.history).toEqual(["seeded prompt"]);
+    expect(result.current.hasHistory).toBe(true);
+  });
+
+  it("allows adding prompts after initialization with initial prompt", () => {
+    const { result } = renderHook(() =>
+      usePromptHistory({ initialPrompt: "seeded prompt" })
+    );
+
+    act(() => {
+      result.current.addPrompt("second prompt");
+    });
+
+    expect(result.current.history).toEqual(["seeded prompt", "second prompt"]);
+  });
+
+  it("handles undefined initial prompt", () => {
+    const { result } = renderHook(() =>
+      usePromptHistory({ initialPrompt: undefined })
+    );
+
+    expect(result.current.history).toEqual([]);
+    expect(result.current.hasHistory).toBe(false);
+  });
+
+  it("handles empty string initial prompt", () => {
+    const { result } = renderHook(() =>
+      usePromptHistory({ initialPrompt: "" })
+    );
+
+    expect(result.current.history).toEqual([]);
+    expect(result.current.hasHistory).toBe(false);
+  });
+
+  it("trims whitespace from initial prompt", () => {
+    const { result } = renderHook(() =>
+      usePromptHistory({ initialPrompt: "  trimmed prompt  " })
+    );
+
+    expect(result.current.history).toEqual(["trimmed prompt"]);
   });
 });
 
@@ -285,5 +382,48 @@ describe("extractProviderFromModel", () => {
 
   it("handles multiple separators", () => {
     expect(extractProviderFromModel("provider/model/version")).toBe("provider");
+  });
+});
+
+describe("<ScenarioAIGeneration/>", () => {
+  beforeEach(() => {
+    // Reset mock drawer params by creating a fresh empty object
+    mockDrawerParams = {};
+  });
+
+  it("shows prompt view by default when no initialPrompt", () => {
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    // Should show the "Need Help?" prompt card
+    expect(screen.getByText("Need Help?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+  });
+
+  it("shows input view when initialPrompt is present in URL params", () => {
+    mockDrawerParams.initialPrompt = "Test initial prompt";
+
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    // Should show the AI Generation input view, not the prompt view
+    expect(screen.getByText("AI Generation")).toBeInTheDocument();
+    expect(screen.queryByText("Need Help?")).not.toBeInTheDocument();
+  });
+
+  it("displays initialPrompt in history when provided via URL params", () => {
+    mockDrawerParams.initialPrompt = "My seeded prompt from modal";
+
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    // Should display the initial prompt in the history
+    expect(screen.getByText("My seeded prompt from modal")).toBeInTheDocument();
+  });
+
+  it("does not seed history when initialPrompt is empty string", () => {
+    mockDrawerParams.initialPrompt = "";
+
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    // Should show the default prompt view since there's no valid initial prompt
+    expect(screen.getByText("Need Help?")).toBeInTheDocument();
   });
 });
