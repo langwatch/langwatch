@@ -157,7 +157,7 @@ export function ResourceLimitsDisplay({ limits }: ResourceLimitsDisplayProps) {
       maxWidth="md"
     >
       <VStack align="start" gap={2}>
-        {RESOURCE_ORDER.map((key) => (
+        {RESOURCE_ORDER.filter((key) => key === "messagesPerMonth" || limits[key].max < 99_999).map((key) => (
           <ResourceLimitRow
             key={key}
             label={RESOURCE_LABELS[key]}

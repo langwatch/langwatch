@@ -82,17 +82,11 @@ export function formatLicenseDate(isoDate: string): string {
 }
 
 /**
- * Threshold above which a limit is considered "unlimited" for display purposes.
- * Any value above 1 million is practically unlimited for typical usage.
- */
-const UNLIMITED_THRESHOLD = 1_000_000;
-
-/**
  * Formats a limit value for display.
  * Returns "Unlimited" for very large numbers (1M+) or special values like MAX_SAFE_INTEGER.
  */
 export function formatLimitOrUnlimited(value: number): string {
-  if (!Number.isFinite(value) || value >= UNLIMITED_THRESHOLD) {
+  if (!Number.isFinite(value)) {
     return "Unlimited";
   }
   return value.toLocaleString();
