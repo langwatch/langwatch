@@ -55,21 +55,26 @@ export default function ExperimentsWorkbenchPage() {
   // Reset store when leaving the page
   useEffect(() => {
     return () => {
-      alert("resetting autosave");
       resetAutosave();
       reset();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!project) {
-    return <LoadingScreen />;
-  }
+  // Prevent Crisp chat from showing when loading the workbench to not stay on top of the drawer buttons
+  useEffect(() => {
+    if (typeof window === "undefined" || !("$crisp" in window)) {
+      return;
+    }
 
-  // Show loading while fetching
-  if (isLoadingExperiment) {
-    return <LoadingScreen />;
-  }
+    // @ts-ignore
+    window.$crisp.push(["do", "chat:hide"]);
+
+    return () => {
+      // @ts-ignore
+      window.$crisp.push(["do", "chat:show"]);
+    };
+  }, []);
 
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
