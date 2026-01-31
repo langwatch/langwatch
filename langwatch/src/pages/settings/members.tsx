@@ -30,7 +30,6 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
-import { UpgradeModal } from "../../components/UpgradeModal";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -114,12 +113,8 @@ function MembersList({
   const user = session?.user;
   
   // License enforcement for both member types
-  const { limitInfo: membersLimitInfo } = useLicenseEnforcement("members");
-  const { limitInfo: membersLiteLimitInfo } = useLicenseEnforcement("membersLite");
-  
-  // State to control which upgrade modal to show (based on validation result)
-  const [showMembersLimitModal, setShowMembersLimitModal] = useState(false);
-  const [showMembersLiteLimitModal, setShowMembersLiteLimitModal] = useState(false);
+  const { checkAndProceed: checkMembersLimit, upgradeModal: membersUpgradeModal } = useLicenseEnforcement("members");
+  const { checkAndProceed: checkMembersLiteLimit, upgradeModal: membersLiteUpgradeModal } = useLicenseEnforcement("membersLite");
   
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -164,38 +159,7 @@ function MembersList({
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  const onSubmit: SubmitHandler<MembersForm> = (data) => {
-    // Validate license limits before submitting
-    // Count new invites by member type
-    const newFullMembers = data.invites.filter(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL
-    ).length;
-    const newLiteMembers = data.invites.filter(
-      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL
-    ).length;
-
-    // Check if adding full members would exceed limit
-    if (
-      membersLimitInfo &&
-      !activePlan.overrideAddingLimitations &&
-      newFullMembers > 0 &&
-      membersLimitInfo.current + newFullMembers > membersLimitInfo.max
-    ) {
-      setShowMembersLimitModal(true);
-      return;
-    }
-
-    // Check if adding lite members would exceed limit
-    if (
-      membersLiteLimitInfo &&
-      !activePlan.overrideAddingLimitations &&
-      newLiteMembers > 0 &&
-      membersLiteLimitInfo.current + newLiteMembers > membersLiteLimitInfo.max
-    ) {
-      setShowMembersLiteLimitModal(true);
-      return;
-    }
-
+  const performInviteMutation = (data: MembersForm) => {
     createInvitesMutation.mutate(
       {
         organizationId: organization.id,
@@ -257,6 +221,33 @@ function MembersList({
         },
       },
     );
+  };
+
+  const onSubmit: SubmitHandler<MembersForm> = (data) => {
+    // Count new invites by member type
+    const hasNewFullMembers = data.invites.some(
+      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL
+    );
+    const hasNewLiteMembers = data.invites.some(
+      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL
+    );
+
+    // Chain the limit checks based on what types of members are being added
+    const proceedAfterLiteCheck = () => performInviteMutation(data);
+
+    const proceedAfterMembersCheck = () => {
+      if (hasNewLiteMembers) {
+        checkMembersLiteLimit(proceedAfterLiteCheck);
+      } else {
+        proceedAfterLiteCheck();
+      }
+    };
+
+    if (hasNewFullMembers) {
+      checkMembersLimit(proceedAfterMembersCheck);
+    } else {
+      proceedAfterMembersCheck();
+    }
   };
 
   const deleteMember = (userId: string) => {
@@ -628,23 +619,8 @@ function MembersList({
         </Dialog.Content>
       </Dialog.Root>
 
-      {/* Upgrade modal for full members limit */}
-      <UpgradeModal
-        open={showMembersLimitModal}
-        onClose={() => setShowMembersLimitModal(false)}
-        limitType="members"
-        current={membersLimitInfo?.current ?? 0}
-        max={membersLimitInfo?.max ?? 0}
-      />
-      
-      {/* Upgrade modal for lite members limit */}
-      <UpgradeModal
-        open={showMembersLiteLimitModal}
-        onClose={() => setShowMembersLiteLimitModal(false)}
-        limitType="membersLite"
-        current={membersLiteLimitInfo?.current ?? 0}
-        max={membersLiteLimitInfo?.max ?? 0}
-      />
+      {membersUpgradeModal}
+      {membersLiteUpgradeModal}
     </SettingsLayout>
   );
 }
