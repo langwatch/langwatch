@@ -17,12 +17,8 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { UpgradeModal } from "~/components/UpgradeModal";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -73,9 +69,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+  // License enforcement for evaluator creation
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -107,12 +102,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
       });
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "evaluators") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating evaluator",
         description: error.message,
@@ -166,12 +155,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
-        const limitExceeded = extractLimitExceededInfo(error);
-        if (limitExceeded?.limitType === "workflows") {
-          setLimitInfo(limitExceeded);
-          setShowUpgradeModal(true);
-          return;
-        }
         console.error("Error creating workflow evaluator:", error);
         toaster.create({
           title: "Error",
@@ -281,7 +264,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
               </Button>
               <Button
                 colorPalette="green"
-                onClick={() => void handleSubmit(onSubmit)()}
+                onClick={() =>
+                  checkAndProceed(() => void handleSubmit(onSubmit)())
+                }
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-evaluator-button"
@@ -293,13 +278,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         </Drawer.Content>
       </Drawer.Root>
 
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType={limitInfo?.limitType ?? "evaluators"}
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
+      {upgradeModal}
     </>
   );
 }

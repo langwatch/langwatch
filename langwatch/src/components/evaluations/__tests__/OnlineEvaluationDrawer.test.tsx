@@ -217,6 +217,12 @@ const mockEvaluatorUpdateMutate = vi.fn();
 // Mock tRPC API
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
     evaluators: {
       getAll: {
         useQuery: vi.fn(() => ({

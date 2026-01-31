@@ -220,6 +220,41 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal includes an upgrade call-to-action
 
   @unit
+  Scenario: Clicking Save Prompt in PromptEditorDrawer at limit shows upgrade modal
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I have opened the PromptEditorDrawer for a new prompt
+    When I fill in the prompt details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Prompts: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Creating prompt from scenario editor at limit shows upgrade modal
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I am in the scenario editor drawer
+    When I click "+ Add New Prompt"
+    Then the PromptEditorDrawer opens
+    When I fill in the prompt details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Prompts: 3 / 3"
+    And the API request is NOT made
+
+  @unit
+  Scenario: Editing existing prompt bypasses limit check
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I am editing an existing prompt in PromptEditorDrawer
+    When I modify the prompt details
+    And I click "Save"
+    Then the prompt is updated successfully
+    And no upgrade modal is shown
+
+  @unit
   Scenario: Create Evaluator button is always clickable
     Given the organization has a license with maxEvaluators 3
     And the organization has 3 evaluators (at limit)

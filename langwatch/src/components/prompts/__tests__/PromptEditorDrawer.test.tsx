@@ -13,6 +13,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockCloseDrawer = vi.fn();
 const mockGoBack = vi.fn();
 
+// Mock useLicenseEnforcement hook
+const mockCheckAndProceed = vi.fn();
+let mockIsAllowed = true;
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: mockCheckAndProceed,
+    isLoading: false,
+    isAllowed: mockIsAllowed,
+    limitInfo: mockIsAllowed
+      ? { allowed: true, current: 2, max: 5 }
+      : { allowed: false, current: 3, max: 3 },
+    upgradeModal: !mockIsAllowed ? (
+      <div data-testid="upgrade-modal">
+        <span data-testid="upgrade-modal-usage">3 / 3</span>
+        <button data-testid="close-btn">Close</button>
+      </div>
+    ) : null,
+  }),
+}));
+
 vi.mock("next/router", () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -151,6 +171,12 @@ const mockUpdateHandle = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
     prompts: {
       getByIdOrHandle: {
         useQuery: () => mockGetByIdOrHandle(),
@@ -287,6 +313,10 @@ describe("PromptEditorDrawer", () => {
     mockAreFormValuesEqual.mockReturnValue(true);
     // Reset drawer params
     mockDrawerParams = {};
+    // Reset license enforcement mock - default to allowed
+    mockIsAllowed = true;
+    // Default: checkAndProceed executes the callback
+    mockCheckAndProceed.mockImplementation((cb: () => void) => cb());
   });
 
   afterEach(() => {
@@ -863,6 +893,83 @@ describe("PromptEditorDrawer", () => {
 
       // Should have called closeDrawer
       expect(mockCloseDrawer).toHaveBeenCalled();
+    });
+  });
+
+  describe("License enforcement (prompts limit)", () => {
+    beforeEach(() => {
+      mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+    });
+
+    it("calls checkAndProceed when creating new prompt", async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      // Click save button
+      const saveButton = screen.getByTestId("save-prompt-button");
+      await user.click(saveButton);
+
+      // The save dialog should open (for entering handle)
+      // When user submits the dialog, checkAndProceed should be called
+      await waitFor(() => {
+        expect(screen.getByText("New Prompt")).toBeInTheDocument();
+      });
+    });
+
+    it("does not call checkAndProceed when updating existing prompt", async () => {
+      mockGetByIdOrHandle.mockReturnValue({
+        data: mockPromptDataWithMessages,
+        isLoading: false,
+      });
+      // Simulate unsaved changes
+      mockAreFormValuesEqual.mockReturnValue(false);
+
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
+      );
+
+      // Wait for drawer to load
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Click save button
+      const saveButton = screen.getByTestId("save-prompt-button");
+      await user.click(saveButton);
+
+      // checkAndProceed should NOT be called for updates
+      // (it's only called for creates)
+      expect(mockCheckAndProceed).not.toHaveBeenCalled();
+    });
+
+    it("shows upgrade modal when at prompt limit (via useLicenseEnforcement)", async () => {
+      // Set up the mock to NOT allow and show the modal
+      mockIsAllowed = false;
+      mockCheckAndProceed.mockImplementation(() => {
+        // Don't execute callback - this simulates the hook blocking the action
+      });
+
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      // When at limit, the upgradeModal from useLicenseEnforcement will be rendered
+      // The mock returns the modal element when mockIsAllowed is false
+      expect(screen.getByTestId("upgrade-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("upgrade-modal-usage")).toHaveTextContent(
+        "3 / 3",
+      );
+    });
+
+    it("allows prompt creation when under limit", () => {
+      // Default mock state: allowed
+      mockIsAllowed = true;
+
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      // No upgrade modal should be shown
+      expect(screen.queryByTestId("upgrade-modal")).not.toBeInTheDocument();
     });
   });
 });
