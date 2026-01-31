@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, Lock, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -20,26 +20,24 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
+import { useLicenseEnforcement } from "../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
-import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { RandomColorAvatar } from "./RandomColorAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
-import { Tooltip } from "./ui/tooltip";
 import { CommandBarTrigger } from "../features/command-bar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -87,6 +85,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
   const [open, setOpen] = useState(false);
+  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("projects");
 
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -104,6 +103,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   );
 
   return (
+    <>
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
         <Button
@@ -224,6 +224,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       <AddProjectButton
                         team={projectGroup.team}
                         organization={projectGroup.organization}
+                        onCheckAndProceed={checkAndProceed}
                       />
                     </Menu.ItemGroup>
                   ))}
@@ -233,70 +234,39 @@ export const ProjectSelector = React.memo(function ProjectSelector({
         </Box>
       </Portal>
     </Menu.Root>
+    {upgradeModal}
+  </>
   );
 });
 
 export const AddProjectButton = ({
   team,
   organization,
+  onCheckAndProceed,
 }: {
   team: Team;
   organization: Organization;
+  onCheckAndProceed: (onAllowed: () => void) => void;
 }) => {
-  const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const { url: planManagementUrl } = usePlanManagementUrl();
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization.id },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
 
-  return canAddProjects(usage.data) ? (
+  return (
     <Menu.Item
       value={`new-project-${team.slug}`}
       fontSize="14px"
       onClick={() =>
-        openDrawer("createProject", {
-          navigateOnCreate: true,
-          defaultTeamId: team.id,
-          organizationId: organization.id,
-        })
+        onCheckAndProceed(() =>
+          openDrawer("createProject", {
+            navigateOnCreate: true,
+            defaultTeamId: team.id,
+            organizationId: organization.id,
+          })
+        )
       }
     >
       <Plus />
       New Project
     </Menu.Item>
-  ) : (
-    <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
-      <Link
-        href={planManagementUrl}
-        _hover={{
-          textDecoration: "none",
-        }}
-        onClick={() => {
-          trackEvent("subscription_hook_click", {
-            project_id: project?.id,
-            hook: "new_project",
-          });
-        }}
-      >
-        <Menu.Item
-          value={`new-project-${team.slug}`}
-          fontSize="14px"
-          color="fg.subtle"
-          _hover={{
-            backgroundColor: "transparent",
-          }}
-        >
-          <Lock />
-          New Project
-        </Menu.Item>
-      </Link>
-    </Tooltip>
   );
 };
 

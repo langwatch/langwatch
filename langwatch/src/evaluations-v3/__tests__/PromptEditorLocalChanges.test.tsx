@@ -19,6 +19,17 @@ import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { LocalPromptConfig } from "../types";
 
+// Mock useLicenseEnforcement hook
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: (cb: () => void) => cb(),
+    isLoading: false,
+    isAllowed: true,
+    limitInfo: { allowed: true, current: 2, max: 5 },
+    upgradeModal: null,
+  }),
+}));
+
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect/elementFromPoint properly
 vi.mock("rich-textarea", () => ({
   RichTextarea: forwardRef<
@@ -102,6 +113,12 @@ vi.mock("~/utils/api", () => ({
         getAllVersionsForPrompt: { invalidate: vi.fn() },
       },
     }),
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
     prompts: {
       getByIdOrHandle: {
         useQuery: ({ idOrHandle }: { idOrHandle: string }) => ({

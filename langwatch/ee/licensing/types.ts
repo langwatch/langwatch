@@ -18,6 +18,7 @@ export const LicensePlanLimitsSchema = z.object({
   maxEvaluators: z.number().optional(),
   maxScenarios: z.number().optional(),
   maxAgents: z.number().optional(),
+  maxExperiments: z.number().optional(),
   canPublish: z.boolean(),
 });
 
@@ -89,6 +90,8 @@ type LicenseResourceLimits = {
   maxEvaluators: number;
   currentAgents: number;
   maxAgents: number;
+  currentExperiments: number;
+  maxExperiments: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
   currentEvaluationsCredit: number;
