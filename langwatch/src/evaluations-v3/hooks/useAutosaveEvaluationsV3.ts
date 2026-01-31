@@ -117,8 +117,6 @@ export const useAutosaveEvaluationsV3 = () => {
     experimentSlug !== routerSlug &&
     loadedSlugRef.current !== routerSlug;
 
-  console.log("shouldLoadExisting", shouldLoadExisting);
-
   // Load existing experiment if navigating to one
   const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
     {
@@ -127,8 +125,6 @@ export const useAutosaveEvaluationsV3 = () => {
     },
     { enabled: shouldLoadExisting },
   );
-
-  console.log("existingExperiment", existingExperiment.data);
 
   // Update URL when experiment slug changes (for URL sync after save)
   useEffect(() => {
@@ -142,8 +138,6 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
 
-  console.log("loadState", loadState)
-
   // Load existing experiment data into store
   useEffect(() => {
     if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
@@ -153,8 +147,6 @@ export const useAutosaveEvaluationsV3 = () => {
       // Set experiment ID and slug first
       setExperimentId(existingExperiment.data.id);
       setExperimentSlug(existingExperiment.data.slug);
-
-      console.log("loading state", existingExperiment.data.workbenchState, "loadState", loadState);
 
       // Load the full wizard state if available
       if (existingExperiment.data.workbenchState && loadState) {
