@@ -6,6 +6,8 @@ import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import type { Workflow } from "../../../optimization_studio/types/dsl";
+import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
 
 /**
  * Evaluator type enum for validation
@@ -151,5 +153,63 @@ export const evaluatorsRouter = createTRPCRouter({
         id: input.id,
         projectId: input.projectId,
       });
+    }),
+
+  /**
+   * Gets workflow fields for a workflow-based evaluator.
+   * Returns the entry node outputs from the linked workflow.
+   * These represent the fields that need to be mapped from trace data.
+   */
+  getWorkflowFields: protectedProcedure
+    .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      // Fetch the evaluator with its workflow
+      const evaluator = await ctx.prisma.evaluator.findFirst({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        include: {
+          workflow: {
+            include: {
+              currentVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!evaluator) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Evaluator not found",
+        });
+      }
+
+      // If not a workflow evaluator, return empty fields
+      if (evaluator.type !== "workflow" || !evaluator.workflow) {
+        return {
+          evaluatorId: evaluator.id,
+          evaluatorType: evaluator.type,
+          fields: [],
+        };
+      }
+
+      // Get the workflow DSL from the current version
+      const dsl = evaluator.workflow.currentVersion?.dsl as unknown as
+        | Workflow
+        | undefined;
+
+      // Extract entry node outputs
+      const fields = getWorkflowEntryOutputs(dsl);
+
+      return {
+        evaluatorId: evaluator.id,
+        evaluatorType: evaluator.type,
+        workflowId: evaluator.workflowId,
+        workflowName: evaluator.workflow.name,
+        fields,
+      };
     }),
 });

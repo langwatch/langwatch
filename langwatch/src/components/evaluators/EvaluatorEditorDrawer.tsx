@@ -131,6 +131,18 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
 
+  // Check if this is a workflow evaluator
+  const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
+
+  // Load workflow fields for workflow evaluators
+  const workflowFieldsQuery = api.evaluators.getWorkflowFields.useQuery(
+    { id: evaluatorId ?? "", projectId: project?.id ?? "" },
+    {
+      enabled:
+        !!evaluatorId && !!project?.id && isOpen && isWorkflowEvaluator,
+    },
+  );
+
   // Get evaluatorType from props, URL params, complexProps, or loaded evaluator data
   const loadedEvaluatorType = (
     evaluatorQuery.data?.config as { evaluatorType?: string } | null
@@ -145,6 +157,22 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const evaluatorDef = evaluatorType
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
     : undefined;
+
+  // For workflow evaluators, construct a synthetic evaluator definition from workflow fields
+  // This allows the mappings section to work with workflow fields using the existing structure
+  const effectiveEvaluatorDef = useMemo(() => {
+    if (isWorkflowEvaluator && workflowFieldsQuery.data?.fields) {
+      // All workflow fields are treated as required fields
+      const workflowFields = workflowFieldsQuery.data.fields.map(
+        (f) => f.identifier,
+      );
+      return {
+        requiredFields: workflowFields,
+        optionalFields: [] as string[],
+      };
+    }
+    return evaluatorDef;
+  }, [isWorkflowEvaluator, workflowFieldsQuery.data?.fields, evaluatorDef]);
 
   // Get the schema for this evaluator type
   const settingsSchema = useMemo(() => {
@@ -420,7 +448,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   mappingsConfig.availableSources.length > 0 && (
                     <Box paddingTop={4}>
                       <EvaluatorMappingsSection
-                        evaluatorDef={evaluatorDef}
+                        evaluatorDef={effectiveEvaluatorDef}
                         availableSources={mappingsConfig.availableSources}
                         initialMappings={mappingsConfig.initialMappings}
                         onMappingChange={mappingsConfig.onMappingChange}

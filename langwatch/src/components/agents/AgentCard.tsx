@@ -2,6 +2,7 @@ import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   Bot,
   Code,
+  ExternalLink,
   Globe,
   MessageSquare,
   MoreVertical,
@@ -31,6 +32,7 @@ export type AgentCardProps = {
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onOpenWorkflow?: () => void;
 };
 
 export function AgentCard({
@@ -38,6 +40,7 @@ export function AgentCard({
   onClick,
   onEdit,
   onDelete,
+  onOpenWorkflow,
 }: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
@@ -85,6 +88,19 @@ export function AgentCard({
                     >
                       <LuPencil size={14} />
                       Edit
+                    </Menu.Item>
+                  )}
+                  {agent.type === "workflow" && onOpenWorkflow && (
+                    <Menu.Item
+                      value="open-workflow"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenWorkflow();
+                      }}
+                      data-testid={`agent-open-workflow-${agent.id}`}
+                    >
+                      <ExternalLink size={14} />
+                      Open Workflow
                     </Menu.Item>
                   )}
                   {onDelete && (

@@ -88,6 +88,19 @@ const mockEvaluators = [
     createdAt: new Date("2025-01-09T10:00:00Z"),
     updatedAt: new Date("2025-01-16T10:00:00Z"),
   },
+  // Workflow-based evaluator (custom evaluator from workflow)
+  {
+    id: "evaluator-5",
+    name: "Custom Workflow Scorer",
+    slug: "custom-workflow-scorer-wfl01",
+    type: "workflow",
+    config: {},
+    workflowId: "workflow-123",
+    projectId: "test-project-id",
+    archivedAt: null,
+    createdAt: new Date("2025-01-11T10:00:00Z"),
+    updatedAt: new Date("2025-01-17T10:00:00Z"),
+  },
 ];
 
 // Mock monitor data for edit mode
@@ -219,6 +232,29 @@ vi.mock("~/utils/api", () => ({
           mutate: vi.fn(),
           isPending: false,
         })),
+      },
+      getWorkflowFields: {
+        useQuery: vi.fn(({ id }: { id: string }) => {
+          // Return workflow fields for workflow evaluators
+          const evaluator = mockEvaluators.find((e) => e.id === id);
+          if (evaluator?.type === "workflow") {
+            return {
+              data: {
+                evaluatorId: id,
+                evaluatorType: "workflow",
+                fields: [
+                  { identifier: "input", type: "str" },
+                  { identifier: "output", type: "str" },
+                ],
+              },
+              isLoading: false,
+            };
+          }
+          return {
+            data: null,
+            isLoading: false,
+          };
+        }),
       },
     },
     monitors: {
@@ -1058,6 +1094,76 @@ describe("OnlineEvaluationDrawer", () => {
           screen.queryByPlaceholderText("Enter evaluation name"),
         ).not.toBeInTheDocument();
       });
+    });
+
+    it("saves workflow evaluator with checkType 'workflow' instead of 'langevals/basic'", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      // Select the workflow evaluator (evaluator-5)
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
+      // mockEvaluators[4] is the workflow evaluator
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[4]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
+      });
+
+      await user.click(screen.getByText("Create Online Evaluation"));
+
+      // Verify checkType is "workflow", NOT "langevals/basic"
+      expect(mockCreateMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "test-project-id",
+          name: "Custom Workflow Scorer",
+          checkType: "workflow",
+          evaluatorId: "evaluator-5",
+        }),
+      );
+
+      // Also verify it was NOT called with "langevals/basic"
+      expect(mockCreateMutate).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          checkType: "langevals/basic",
+        }),
+      );
+    });
+
+    it("built-in evaluator still saves with correct checkType from config", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockCreateMutate.mockClear();
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevel(user, "trace");
+
+      // Select the PII Check evaluator (evaluator-1, checkType: presidio/pii_detection)
+      // This evaluator has auto-mappable fields
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+      await vi.advanceTimersByTimeAsync(200);
+
+      await waitFor(() => {
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
+      });
+
+      await user.click(screen.getByText("Create Online Evaluation"));
+
+      // Verify checkType comes from config.evaluatorType
+      expect(mockCreateMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          checkType: "presidio/pii_detection",
+          evaluatorId: "evaluator-1",
+        }),
+      );
     });
   });
 
