@@ -489,8 +489,12 @@ export function EvaluationsV3Table({
         id: `target-${nanoid(8)}`,
       };
       addTarget(newTarget);
+      // Open the prompt editor for the duplicated target if it's a prompt
+      if (newTarget.type === "prompt") {
+        void openTargetEditor(newTarget);
+      }
     },
-    [addTarget],
+    [addTarget, openTargetEditor],
   );
 
   // Handler for opening the add target flow (prompts/agents)
