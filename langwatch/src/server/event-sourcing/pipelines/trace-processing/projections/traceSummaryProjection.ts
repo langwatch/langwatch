@@ -128,7 +128,7 @@ export class TraceSummaryProjectionHandler
 
   handle(
     stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>,
-  ): TraceSummary {
+  ): TraceSummary | null {
     return this.tracer.withActiveSpan(
       "TraceSummaryProjectionHandler.handle",
       {
@@ -146,14 +146,16 @@ export class TraceSummaryProjectionHandler
   private processStream(
     stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>,
     span: Span,
-  ): TraceSummary {
+  ): TraceSummary | null {
     const aggregateId = stream.getAggregateId();
     const tenantId = stream.getTenantId();
 
     const extracted = this.extractDataFromEvents(stream.getEvents());
     span.setAttributes({ "span.count": extracted.normalizedSpans.length });
 
-    this.validateHasSpans(extracted, { tenantId, aggregateId });
+    if (!this.hasSpans(extracted, { tenantId, aggregateId })) {
+      return null;
+    }
 
     span.addEvent("aggregate.start");
     const aggregatedData = traceAggregationService.aggregateTrace(
@@ -248,16 +250,15 @@ export class TraceSummaryProjectionHandler
     );
   }
 
-  private validateHasSpans(
+  private hasSpans(
     extracted: ExtractedEventData,
     context: { tenantId: string; aggregateId: string },
-  ): asserts extracted is ExtractedEventData & {
-    firstSpanEvent: SpanReceivedEvent;
-  } {
+  ): extracted is ExtractedEventData & { firstSpanEvent: SpanReceivedEvent } {
     if (!extracted.firstSpanEvent || extracted.normalizedSpans.length === 0) {
-      this.logger.debug(context, "No spans found for trace");
-      throw new Error("No spans found for trace");
+      this.logger.debug(context, "No spans found for trace, skipping projection");
+      return false;
     }
+    return true;
   }
 
   private setAggregationAttributes(
