@@ -576,36 +576,48 @@ export const storeResults = async (
     });
   }
 
-  // Emit TopicAssignedEvents via command queue
+  // Emit TopicAssignedEvents via command queue (only for ES-enabled projects)
   if (tracesToAssign.length > 0) {
     try {
-      const pipeline = getTraceProcessingPipeline();
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { featureEventSourcingTraceIngestion: true },
+      });
 
-      // Build topic name lookup maps
-      const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
-      const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
+      if (!project?.featureEventSourcingTraceIngestion) {
+        logger.debug(
+          { projectId },
+          "Skipping AssignTopic commands - event sourcing not enabled for project",
+        );
+      } else {
+        const pipeline = getTraceProcessingPipeline();
 
-      // Send commands in parallel (queue handles batching internally)
-      await Promise.all(
-        tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          pipeline.commands.assignTopic.send({
-            tenantId: projectId,
-            traceId: trace_id,
-            topicId: topic_id,
-            topicName: topic_id ? topicNameMap.get(topic_id) ?? null : null,
-            subtopicId: subtopic_id,
-            subtopicName: subtopic_id
-              ? subtopicNameMap.get(subtopic_id) ?? null
-              : null,
-            isIncremental,
-          }),
-        ),
-      );
+        // Build topic name lookup maps
+        const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
+        const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
 
-      logger.info(
-        { projectId, commandsSent: tracesToAssign.length },
-        "Sent AssignTopic commands to queue",
-      );
+        // Send commands in parallel (queue handles batching internally)
+        await Promise.all(
+          tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
+            pipeline.commands.assignTopic.send({
+              tenantId: projectId,
+              traceId: trace_id,
+              topicId: topic_id,
+              topicName: topic_id ? topicNameMap.get(topic_id) ?? null : null,
+              subtopicId: subtopic_id,
+              subtopicName: subtopic_id
+                ? subtopicNameMap.get(subtopic_id) ?? null
+                : null,
+              isIncremental,
+            }),
+          ),
+        );
+
+        logger.info(
+          { projectId, commandsSent: tracesToAssign.length },
+          "Sent AssignTopic commands to queue",
+        );
+      }
     } catch (error) {
       logger.error(
         { projectId, error },
