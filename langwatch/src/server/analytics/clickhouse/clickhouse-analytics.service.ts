@@ -113,6 +113,25 @@ export class ClickHouseAnalyticsService {
 
           const rows = (await result.json()) as Array<Record<string, unknown>>;
 
+          // Debug logging for analytics queries
+          if (process.env.DEBUG_ANALYTICS === "true") {
+            this.logger.info(
+              {
+                series: input.series.map((s, i) => ({
+                  index: i,
+                  metric: s.metric,
+                  aggregation: s.aggregation,
+                  pipeline: s.pipeline,
+                  alias: buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey),
+                })),
+                rowCount: rows.length,
+                sampleRow: rows[0],
+                columnNames: rows[0] ? Object.keys(rows[0]) : [],
+              },
+              "Analytics query debug info",
+            );
+          }
+
           // Parse results into the expected format
           const parsedResult = this.parseTimeseriesResults(
             rows,
@@ -120,6 +139,17 @@ export class ClickHouseAnalyticsService {
             input.groupBy,
             input.timeScale,
           );
+
+          // Debug logging for parsed results
+          if (process.env.DEBUG_ANALYTICS === "true") {
+            this.logger.info(
+              {
+                currentPeriod: parsedResult.currentPeriod,
+                previousPeriod: parsedResult.previousPeriod,
+              },
+              "Analytics parsed results",
+            );
+          }
 
           span.setAttribute("bucket.count", parsedResult.currentPeriod.length);
 
@@ -239,6 +269,11 @@ export class ClickHouseAnalyticsService {
       Math.max(0, previousPeriod.length - currentPeriod.length),
     );
 
+    // Ensure both periods have all expected metrics with default values of 0
+    // This handles cases where ClickHouse returns NULL for pipeline metrics in one period
+    // (e.g., when a subquery returns no results for the previous period)
+    this.normalizeMetricKeys(correctedPrevious, currentPeriod, groupBy);
+
     return {
       previousPeriod: correctedPrevious,
       currentPeriod,
@@ -261,6 +296,38 @@ export class ClickHouseAnalyticsService {
     }
 
     return `${index}/${series.metric}/${aggregation}`;
+  }
+
+  /**
+   * Normalize metric keys across both periods to ensure all buckets have all metrics.
+   * This is necessary because ClickHouse may return NULL for pipeline metrics in one period
+   * (e.g., when a subquery returns no results), causing the metric to be missing entirely.
+   * Without this normalization, the frontend cannot calculate % change for missing metrics.
+   */
+  private normalizeMetricKeys(
+    previousPeriod: TimeseriesBucket[],
+    currentPeriod: TimeseriesBucket[],
+    groupBy?: string,
+  ): void {
+    // Collect all metric keys from both periods
+    const allMetricKeys = new Set<string>();
+
+    for (const bucket of [...previousPeriod, ...currentPeriod]) {
+      for (const key of Object.keys(bucket)) {
+        // Skip 'date' and groupBy keys (those aren't metrics)
+        if (key === "date" || key === groupBy) continue;
+        allMetricKeys.add(key);
+      }
+    }
+
+    // Ensure all buckets have all metric keys with default value of 0
+    for (const bucket of [...previousPeriod, ...currentPeriod]) {
+      for (const key of allMetricKeys) {
+        if (bucket[key] === undefined) {
+          bucket[key] = 0;
+        }
+      }
+    }
   }
 
   /**

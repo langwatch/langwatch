@@ -52,18 +52,23 @@ export const fieldMappings: Record<string, FieldMapping> = {
   // ===== Timestamp Fields =====
   "timestamps.started_at": {
     table: "trace_summaries",
-    column: "CreatedAt",
-    description: "When the trace started",
+    column: "OccurredAt",
+    description: "When the trace started (event time)",
+  },
+  "timestamps.occurred_at": {
+    table: "trace_summaries",
+    column: "OccurredAt",
+    description: "When the trace occurred (event time)",
   },
   "timestamps.inserted_at": {
     table: "trace_summaries",
     column: "CreatedAt",
-    description: "When the trace was inserted (same as created for CH)",
+    description: "When the record was inserted",
   },
   "timestamps.updated_at": {
     table: "trace_summaries",
     column: "LastUpdatedAt",
-    description: "When the trace was last updated",
+    description: "When the record was last updated",
   },
 
   // ===== Metadata Fields (stored in Attributes Map) =====
