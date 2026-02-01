@@ -93,13 +93,10 @@ vi.mock("~/utils/humanReadableId", () => ({
 // License enforcement mock state
 let mockLicenseIsAllowed = true;
 let mockLicenseCallbackExecuted = false;
-let mockLicenseShowUpgradeModal = false;
 const mockCheckAndProceed = vi.fn((callback: () => void) => {
   if (mockLicenseIsAllowed) {
     callback();
     mockLicenseCallbackExecuted = true;
-  } else {
-    mockLicenseShowUpgradeModal = true;
   }
 });
 
@@ -111,12 +108,6 @@ vi.mock("~/hooks/useLicenseEnforcement", () => ({
     limitInfo: mockLicenseIsAllowed
       ? { allowed: true, current: 1, max: 10, limitType: "experiments" }
       : { allowed: false, current: 3, max: 3, limitType: "experiments" },
-    upgradeModal: mockLicenseShowUpgradeModal ? (
-      <div data-testid="upgrade-modal">
-        <span>Upgrade to create more experiments</span>
-        <span data-testid="limit-info">3/3 experiments</span>
-      </div>
-    ) : null,
   }),
 }));
 
@@ -136,7 +127,6 @@ describe("NewEvaluationMenu", () => {
     mockIsPending = false;
     mockLicenseIsAllowed = true;
     mockLicenseCallbackExecuted = false;
-    mockLicenseShowUpgradeModal = false;
     mockCheckAndProceed.mockClear();
     clearDrawerStack();
     clearFlowCallbacks();

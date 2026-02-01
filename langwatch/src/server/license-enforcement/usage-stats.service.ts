@@ -28,6 +28,7 @@ export interface UsageStats {
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
+  teamsCount: number;
   promptsCount: number;
   workflowsCount: number;
   scenariosCount: number;
@@ -85,6 +86,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      teamsCount,
       promptsCount,
       workflowsCount,
       scenariosCount,
@@ -100,6 +102,7 @@ export class UsageStatsService {
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
+      this.repository.getTeamCount(organizationId),
       this.repository.getPromptCount(organizationId),
       this.repository.getWorkflowCount(organizationId),
       this.repository.getScenarioCount(organizationId),
@@ -117,6 +120,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      teamsCount,
       promptsCount,
       workflowsCount,
       scenariosCount,

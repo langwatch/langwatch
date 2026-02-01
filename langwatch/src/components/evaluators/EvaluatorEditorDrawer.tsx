@@ -98,7 +98,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 	const complexProps = getComplexProps();
 	const drawerParams = useDrawerParams();
 	const utils = api.useContext();
-	const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
+	const { checkAndProceed } = useLicenseEnforcement("evaluators");
 
 	const onClose = props.onClose ?? closeDrawer;
 	const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -523,7 +523,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 					</HStack>
 				</Drawer.Footer>
 			</Drawer.Content>
-			{upgradeModal}
 		</Drawer.Root>
 	);
 }

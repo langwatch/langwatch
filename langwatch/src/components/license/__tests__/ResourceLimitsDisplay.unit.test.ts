@@ -31,6 +31,8 @@ describe("mapLicenseStatusToLimits", () => {
     maxEvaluators: 10,
     currentAgents: 7,
     maxAgents: 50,
+    currentExperiments: 10,
+    maxExperiments: 50,
     currentMessagesPerMonth: 1500,
     maxMessagesPerMonth: 10000,
     currentEvaluationsCredit: 50,
@@ -43,12 +45,14 @@ describe("mapLicenseStatusToLimits", () => {
     expect(result).toEqual({
       members: { current: 5, max: 10 },
       membersLite: { current: 2, max: 5 },
+      teams: { current: 2, max: 5 },
       projects: { current: 3, max: 10 },
       prompts: { current: 8, max: 20 },
       workflows: { current: 4, max: 15 },
       scenarios: { current: 6, max: 25 },
       evaluators: { current: 3, max: 10 },
       agents: { current: 7, max: 50 },
+      experiments: { current: 10, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
       evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
@@ -74,6 +78,8 @@ describe("mapLicenseStatusToLimits", () => {
       maxEvaluators: 0,
       currentAgents: 0,
       maxAgents: 0,
+      currentExperiments: 0,
+      maxExperiments: 0,
       currentMessagesPerMonth: 0,
       maxMessagesPerMonth: 0,
       currentEvaluationsCredit: 0,
@@ -106,6 +112,8 @@ describe("mapLicenseStatusToLimits", () => {
       maxEvaluators: 10,
       currentAgents: 7,
       maxAgents: 50,
+      currentExperiments: 10,
+      maxExperiments: 50,
       currentMessagesPerMonth: 1500,
       maxMessagesPerMonth: 10000,
       currentEvaluationsCredit: 50,
@@ -123,12 +131,14 @@ describe("mapUsageToLimits", () => {
   const baseUsage = {
     membersCount: 5,
     membersLiteCount: 2,
+    teamsCount: 2,
     projectsCount: 3,
     promptsCount: 8,
     workflowsCount: 4,
     scenariosCount: 6,
     evaluatorsCount: 3,
     agentsCount: 7,
+    experimentsCount: 10,
     currentMonthMessagesCount: 1500,
     evaluationsCreditUsed: 50,
   };
@@ -159,12 +169,14 @@ describe("mapUsageToLimits", () => {
     expect(result).toEqual({
       members: { current: 5, max: 10 },
       membersLite: { current: 2, max: 5 },
+      teams: { current: 2, max: 5 },
       projects: { current: 3, max: 10 },
       prompts: { current: 8, max: 20 },
       workflows: { current: 4, max: 15 },
       scenarios: { current: 6, max: 25 },
       evaluators: { current: 3, max: 10 },
       agents: { current: 7, max: 50 },
+      experiments: { current: 10, max: 50 },
       messagesPerMonth: { current: 1500, max: 10000 },
       evaluationsCredit: { current: 50, max: 100 },
     } satisfies ResourceLimits);
@@ -174,12 +186,14 @@ describe("mapUsageToLimits", () => {
     const zeroUsage = {
       membersCount: 0,
       membersLiteCount: 0,
+      teamsCount: 0,
       projectsCount: 0,
       promptsCount: 0,
       workflowsCount: 0,
       scenariosCount: 0,
       evaluatorsCount: 0,
       agentsCount: 0,
+      experimentsCount: 0,
       currentMonthMessagesCount: 0,
       evaluationsCreditUsed: 0,
     };
@@ -251,12 +265,14 @@ describe("mapUsageToLimits", () => {
     const overLimitUsage = {
       membersCount: 15, // Exceeds max of 10
       membersLiteCount: 2,
+      teamsCount: 2,
       projectsCount: 20, // Exceeds max of 10
       promptsCount: 8,
       workflowsCount: 4,
       scenariosCount: 6,
       evaluatorsCount: 3,
       agentsCount: 7,
+      experimentsCount: 10,
       currentMonthMessagesCount: 1500,
       evaluationsCreditUsed: 50,
     };
