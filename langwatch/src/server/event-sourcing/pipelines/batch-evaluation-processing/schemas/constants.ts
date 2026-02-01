@@ -116,9 +116,3 @@ export const BATCH_EVALUATION_RUN_STATE_PROJECTION_VERSIONS = [
   BATCH_EVALUATION_PROJECTION_VERSIONS.RUN_STATE,
 ] as const;
 
-/**
- * KSUID resource identifier for batch evaluation results.
- * Used to generate deterministic, K-sortable IDs.
- * Format: lowercase letters only (a-z), no underscores.
- */
-export const BATCH_RESULT_KSUID_RESOURCE = "batchresult" as const;
