@@ -65,3 +65,14 @@ if (spanProcessors.length > 0) {
     ],
   });
 }
+
+// Initialize event sourcing for Next.js server
+// This runs before any API route executes
+import { initializeEventSourcing } from "~/server/event-sourcing";
+import { getClickHouseClient } from "~/server/clickhouse/client";
+import { connection as redis } from "~/server/redis";
+
+initializeEventSourcing({
+  clickHouseClient: getClickHouseClient(),
+  redisConnection: redis,
+});
