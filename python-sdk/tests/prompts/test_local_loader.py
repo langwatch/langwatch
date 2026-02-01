@@ -253,3 +253,76 @@ def test_load_prompt_warns_when_prompt_file_missing():
             assert len(w) == 1
             assert "Prompt file not found" in str(w[0].message)
             assert "langwatch prompts pull" in str(w[0].message)
+
+
+def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json():
+    """
+    GIVEN no base_path is configured (using cwd) and prompts.json doesn't exist
+    WHEN LocalPromptLoader.load_prompt() is called multiple times
+    THEN it warns once about configuring prompts_path via langwatch.setup()
+    """
+    import os
+
+    # Reset the warning flag before test
+    LocalPromptLoader._warned_no_prompts_path = False
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Change to temp directory (no prompts.json exists)
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(temp_dir)
+
+            # Create loader without explicit base_path (will use cwd)
+            loader = LocalPromptLoader()
+
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+
+                # First call should warn
+                result1 = loader.load_prompt("my-prompt")
+                assert result1 is None
+
+                # Second call should NOT warn again
+                result2 = loader.load_prompt("another-prompt")
+                assert result2 is None
+
+                # Only one warning should have been issued
+                prompts_path_warnings = [
+                    warning
+                    for warning in w
+                    if "langwatch.setup(prompts_path=" in str(warning.message)
+                ]
+                assert len(prompts_path_warnings) == 1
+                assert "No prompts.json found" in str(prompts_path_warnings[0].message)
+        finally:
+            os.chdir(original_cwd)
+            # Reset for other tests
+            LocalPromptLoader._warned_no_prompts_path = False
+
+
+def test_load_prompt_does_not_warn_when_base_path_explicitly_set():
+    """
+    GIVEN base_path is explicitly configured but prompts.json doesn't exist
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it does NOT warn about langwatch.setup(prompts_path=...)
+    """
+    # Reset the warning flag before test
+    LocalPromptLoader._warned_no_prompts_path = False
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create loader with explicit base_path (no prompts.json in temp_dir)
+        loader = LocalPromptLoader(Path(temp_dir))
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            result = loader.load_prompt("my-prompt")
+            assert result is None
+
+            # No warning about prompts_path should be issued when path is explicit
+            prompts_path_warnings = [
+                warning
+                for warning in w
+                if "langwatch.setup(prompts_path=" in str(warning.message)
+            ]
+            assert len(prompts_path_warnings) == 0
