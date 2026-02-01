@@ -103,17 +103,22 @@ describe("metric-translator", () => {
 
       it("should translate performance.first_token with p95", () => {
         const result = translateMetric("performance.first_token", "p95", 0);
-        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
+        expect(result.selectExpression).toContain("quantileExact(0.95)");
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
-      it("should translate performance.tokens_per_second", () => {
+      it("should translate performance.tokens_per_second using span-level calculation", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "avg",
           0
         );
-        expect(result.selectExpression).toContain("TokensPerSecond");
+        // Calculates TPS at span level to match ES behavior
+        // Uses canonical OTel attribute: gen_ai.usage.output_tokens
+        expect(result.selectExpression).toContain("avgIf(");
+        expect(result.selectExpression).toContain("gen_ai.usage.output_tokens");
+        expect(result.selectExpression).toContain("DurationMs");
+        expect(result.requiredJoins).toContain("stored_spans");
       });
 
       it("should translate performance.total_tokens", () => {
@@ -221,9 +226,9 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("uniq(");
       });
 
-      it("should use quantileTDigest for percentile aggregations", () => {
+      it("should use quantileExact for percentile aggregations", () => {
         const result = translateMetric("performance.completion_time", "p99", 0);
-        expect(result.selectExpression).toContain("quantileTDigest(0.99)");
+        expect(result.selectExpression).toContain("quantileExact(0.99)");
       });
 
       it("should use correct aggregation for min/max", () => {
