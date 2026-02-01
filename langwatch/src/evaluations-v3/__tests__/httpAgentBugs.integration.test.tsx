@@ -135,6 +135,12 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         })),
       },
+      getRelatedEntities: {
+        useQuery: vi.fn(() => ({
+          data: { workflow: null },
+          isLoading: false,
+        })),
+      },
       create: {
         useMutation: vi.fn(() => ({
           mutate: vi.fn(),
@@ -148,6 +154,12 @@ vi.mock("~/utils/api", () => ({
         })),
       },
       delete: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
+      cascadeArchive: {
         useMutation: vi.fn(() => ({
           mutate: vi.fn(),
           isPending: false,

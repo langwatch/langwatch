@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -61,26 +62,45 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     props.onCreateNew ?? (() => openDrawer("agentTypeSelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
+  // State for tracking which agent is being deleted
+  const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
+
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && isOpen },
   );
 
+  // Query related entities when delete dialog is open
+  const relatedEntitiesQuery = api.agents.getRelatedEntities.useQuery(
+    { id: agentToDelete?.id ?? "", projectId: project?.id ?? "" },
+    { enabled: !!agentToDelete && !!project?.id },
+  );
+
   const deleteMutation = api.agents.delete.useMutation({
     onSuccess: () => {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+    },
+  });
+
+  const cascadeArchiveMutation = api.agents.cascadeArchive.useMutation({
+    onSuccess: (result) => {
+      setAgentToDelete(null);
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+
       toaster.create({
         title: "Agent deleted",
+        description: result.archivedWorkflow
+          ? "Also deleted: 1 workflow"
+          : undefined,
         type: "success",
         meta: { closable: true },
       });
     },
-    onError: (error) => {
+    onError: () => {
       toaster.create({
         title: "Error deleting agent",
-        description: error.message,
+        description: "Please try again later.",
         type: "error",
-        meta: { closable: true },
       });
     },
   });
@@ -104,15 +124,43 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${agent.name}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate({
-        id: agent.id,
-        projectId: project?.id ?? "",
+    setAgentToDelete(agent);
+  };
+
+  const confirmDeleteAgent = () => {
+    if (!agentToDelete || !project) return;
+
+    const hasRelated = !!relatedEntitiesQuery.data?.workflow;
+
+    if (hasRelated) {
+      cascadeArchiveMutation.mutate({
+        id: agentToDelete.id,
+        projectId: project.id,
       });
+    } else {
+      deleteMutation.mutate(
+        {
+          id: agentToDelete.id,
+          projectId: project.id,
+        },
+        {
+          onSuccess: () => {
+            setAgentToDelete(null);
+            toaster.create({
+              title: "Agent deleted",
+              type: "success",
+              meta: { closable: true },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error deleting agent",
+              description: "Please try again later.",
+              type: "error",
+            });
+          },
+        },
+      );
     }
   };
 
@@ -184,6 +232,21 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
           </Button>
         </Drawer.Footer>
       </Drawer.Content>
+
+      <CascadeArchiveDialog
+        open={!!agentToDelete}
+        onClose={() => setAgentToDelete(null)}
+        onConfirm={confirmDeleteAgent}
+        isLoading={cascadeArchiveMutation.isPending || deleteMutation.isPending}
+        isLoadingRelated={relatedEntitiesQuery.isLoading}
+        entityType="agent"
+        entityName={agentToDelete?.name ?? ""}
+        relatedEntities={{
+          workflows: relatedEntitiesQuery.data?.workflow
+            ? [relatedEntitiesQuery.data.workflow]
+            : [],
+        }}
+      />
     </Drawer.Root>
   );
 }
