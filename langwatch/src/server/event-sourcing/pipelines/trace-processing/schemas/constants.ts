@@ -21,9 +21,11 @@ export type TraceProcessingEventType =
   (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
 
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
+export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
+  ASSIGN_TOPIC_COMMAND_TYPE,
 ] as const;
 
 export type TraceProcessingCommandType =
