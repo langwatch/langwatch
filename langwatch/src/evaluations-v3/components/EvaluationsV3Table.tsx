@@ -1,5 +1,8 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
+import type {
+  EvaluatorField,
+  EvaluatorWithFields,
+} from "~/server/evaluators/evaluator.service";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -15,10 +18,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
@@ -302,6 +302,40 @@ export function EvaluationsV3Table({
     [addTarget, closeDrawer],
   );
 
+  // Handler for when an evaluator is selected as a target from the drawer
+  // Uses pre-computed fields from the API (includes type and optional flag)
+  const handleSelectEvaluatorAsTarget = useCallback(
+    (evaluator: EvaluatorWithFields) => {
+      // Convert EvaluatorField[] to Field[] for TargetConfig
+      const inputs: Field[] = evaluator.fields.map((field) => ({
+        identifier: field.identifier,
+        type: field.type as Field["type"],
+        ...(field.optional && { optional: true }),
+      }));
+
+      // Use pre-computed output fields from the API
+      // For workflow evaluators, these come from the End node inputs
+      // For built-in evaluators, these are the standard passed/score/label/details
+      const outputs: Field[] = evaluator.outputFields.map((field) => ({
+        identifier: field.identifier,
+        type: field.type as Field["type"],
+      }));
+
+      const targetConfig: TargetConfig = {
+        id: `target_${Date.now()}`,
+        type: "evaluator",
+        name: evaluator.name,
+        targetEvaluatorId: evaluator.id,
+        inputs,
+        outputs,
+        mappings: {},
+      };
+      addTarget(targetConfig);
+      closeDrawer();
+    },
+    [addTarget, closeDrawer],
+  );
+
   // Handler for when a prompt is selected from the drawer
   // Adds the target and immediately opens the prompt editor for configuration
   const handleSelectPrompt = useCallback(
@@ -382,11 +416,12 @@ export function EvaluationsV3Table({
   );
 
   /**
-   * Helper to add an evaluator to the workbench from a Prisma Evaluator.
+   * Helper to add an evaluator to the workbench from an EvaluatorWithFields.
    * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
+   * Fields are pre-computed by the API including type and optional flag.
    */
   const addEvaluatorToWorkbench = useCallback(
-    (evaluator: Evaluator) => {
+    (evaluator: EvaluatorWithFields) => {
       // Extract evaluator config from the Prisma evaluator
       const config = evaluator.config as EvaluatorDbConfig | null;
 
@@ -400,28 +435,17 @@ export function EvaluationsV3Table({
         return;
       }
 
-      // Get the evaluator definition to derive inputs from requiredFields/optionalFields
-      const evaluatorType = config?.evaluatorType;
-      const evaluatorDef = evaluatorType
-        ? AVAILABLE_EVALUATORS[evaluatorType]
-        : undefined;
-
-      // Derive inputs from evaluator definition's required and optional fields
-      const inputFields = [
-        ...(evaluatorDef?.requiredFields ?? []),
-        ...(evaluatorDef?.optionalFields ?? []),
-      ];
-
-      // Create a new EvaluatorConfig from the Prisma evaluator
+      // Create a new EvaluatorConfig from the evaluator
       // Note: settings are NOT stored in workbench state - always fetched fresh from DB
       const evaluatorConfig: EvaluatorConfig = {
         id: `evaluator_${Date.now()}`,
         evaluatorType: (config?.evaluatorType ??
           "custom/unknown") as EvaluatorConfig["evaluatorType"],
         name: evaluator.name,
-        inputs: inputFields.map((field) => ({
-          identifier: field,
-          type: "str" as const, // Default all evaluator inputs to string
+        inputs: evaluator.fields.map((field) => ({
+          identifier: field.identifier,
+          type: field.type as Field["type"],
+          ...(field.optional && { optional: true }),
         })),
         mappings: {},
         dbEvaluatorId: evaluator.id,
@@ -461,6 +485,7 @@ export function EvaluationsV3Table({
           addEvaluatorToWorkbench(evaluator);
         }
         closeDrawer(); // Close drawer after adding evaluator to workbench
+        return true; // Indicate navigation was handled to prevent default back behavior
       },
     });
 
@@ -605,14 +630,40 @@ export function EvaluationsV3Table({
     setFlowCallbacks("workflowSelector", {
       onSave: handleSelectSavedAgent,
     });
+    setFlowCallbacks("evaluatorList", {
+      onSelect: handleSelectEvaluatorAsTarget,
+    });
+    // Set up flow callback for when a NEW evaluator is created during the target flow
+    // This handles: add comparison > evaluator > create new > category > fill form > create
+    setFlowCallbacks("evaluatorEditor", {
+      onSave: async (savedEvaluator: { id: string; name: string }) => {
+        // Fetch the full evaluator data from DB to get computed fields
+        const evaluator = await trpcUtils.evaluators.getById.fetch({
+          id: savedEvaluator.id,
+          projectId: project?.id ?? "",
+        });
+
+        if (!evaluator) {
+          closeDrawer();
+          return true;
+        }
+
+        // Use handleSelectEvaluatorAsTarget to add the target with proper fields
+        handleSelectEvaluatorAsTarget(evaluator);
+        return true; // Indicate navigation was handled to prevent default back behavior
+      },
+    });
     openDrawer("targetTypeSelector");
   }, [
     buildAvailableSources,
     openDrawer,
     handleSelectPrompt,
     handleSelectSavedAgent,
+    handleSelectEvaluatorAsTarget,
     isDatasetSource,
-    addTarget,
+    closeDrawer,
+    trpcUtils.evaluators.getById,
+    project?.id,
   ]);
 
   // Dataset handlers for drawer integration
@@ -1449,9 +1500,7 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th style={{ width: "auto" }}></th>
-                  {/* Spacer column to match drawer width */}
-                  <th style={{ width: DRAWER_WIDTH }}></th>
+                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
                 </>
               )}
             </tr>

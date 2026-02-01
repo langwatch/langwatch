@@ -87,7 +87,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      name: props.evaluatorName ?? "Custom Evaluator",
+      name: props.evaluatorName ?? "",
       icon: defaultIcon,
       description: "",
     },
@@ -146,6 +146,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
           projectId: project.id,
           dsl: newWorkflow,
           commitMessage: "Workflow creation for evaluator",
+          publish: true, // Auto-publish so the evaluator can run immediately
         });
 
         trackEvent("workflow_create", { project_id: project.id });

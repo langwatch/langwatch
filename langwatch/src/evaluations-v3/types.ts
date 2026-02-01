@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Field } from "~/optimization_studio/types/dsl";
 import {
+  fieldSchema,
   httpAuthSchema,
   httpHeaderSchema,
   HTTP_METHODS,
@@ -91,14 +92,7 @@ export type DatasetReference = {
   savedRecords?: SavedRecord[];
 };
 
-/**
- * Zod schema for field validation (from optimization studio).
- */
-export const fieldSchema = z.object({
-  identifier: z.string(),
-  type: z.string(),
-  value: z.unknown().optional(),
-});
+// fieldSchema is imported from optimization_studio/types/dsl
 
 /**
  * Zod schema for local prompt config validation.
@@ -224,7 +218,7 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
  */
 export const targetConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(["prompt", "agent"]),
+  type: z.enum(["prompt", "agent", "evaluator"]),
   name: z.string(),
   icon: z.string().optional(),
   promptId: z.string().optional(),
@@ -252,12 +246,18 @@ export const targetConfigSchema = z.object({
    * Only set when agentType === "http".
    */
   httpConfig: httpConfigSchema.optional(),
+  /**
+   * Database evaluator ID for evaluator targets.
+   * Used to load evaluator settings from the database at execution time.
+   * Only set when type === "evaluator".
+   */
+  targetEvaluatorId: z.string().optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
 });
-export type TargetType = "prompt" | "agent";
+export type TargetType = "prompt" | "agent" | "evaluator";
 export type TargetConfig = Omit<
   z.infer<typeof targetConfigSchema>,
   "inputs" | "outputs"

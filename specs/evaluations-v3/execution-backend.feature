@@ -390,3 +390,99 @@ Feature: Evaluation execution - Backend
     Given langwatch_nlp is unreachable
     When I execute the workflow
     Then an error event is emitted with network error message
+
+  # ==========================================================================
+  # Workflow Builder - Evaluator Targets
+  # ==========================================================================
+
+  Scenario: Build workflow for evaluator target
+    Given an evaluator target "target-eval-1" with evaluatorType "langevals/sentiment"
+    And dataset entry with output "This is wonderful!"
+    When I build the workflow
+    Then the workflow contains an evaluator node with id "target-eval-1"
+    And the evaluator node has cls "LangWatchEvaluator"
+    And the evaluator node has outputs: passed, score, label
+
+  Scenario: Evaluator target node ID is not composite
+    Given an evaluator target "target-123" with dbEvaluatorId "eval-abc"
+    When I build the workflow
+    Then the evaluator node id is "target-123"
+    And the node id does NOT contain a dot separator
+
+  Scenario: Evaluator target uses evaluators/{id} path
+    Given an evaluator target with dbEvaluatorId "eval-abc"
+    When I build the workflow
+    Then the evaluator node has evaluator path "evaluators/eval-abc"
+
+  Scenario: Build workflow resolves evaluator target input mappings
+    Given an evaluator target with inputs ["output", "expected_output"]
+    And dataset columns ["response", "expected"]
+    And target mappings:
+      | input           | source.column |
+      | output          | response      |
+      | expected_output | expected      |
+    And dataset entry:
+      | response | Hello world |
+      | expected | Hello world |
+    When I build the workflow
+    Then the evaluator node has:
+      | input           | value       |
+      | output          | Hello world |
+      | expected_output | Hello world |
+
+  Scenario: Evaluator target with value mappings
+    Given an evaluator target with input "threshold"
+    And a value mapping for "threshold" = "0.8"
+    When I build the workflow
+    Then the evaluator node has input "threshold" with value "0.8"
+
+  # ==========================================================================
+  # Result Mapper - Evaluator Targets
+  # ==========================================================================
+
+  Scenario: Evaluator target result maps to target_result event
+    Given an NLP event component_state_change for node "target-eval-1"
+    And the node is in the targetNodes set
+    And the event has evaluator output with passed=true, score=0.95, label="positive"
+    When I map the result
+    Then I get a target_result with:
+      | targetId | target-eval-1                                    |
+      | output   | { passed: true, score: 0.95, label: "positive" } |
+
+  Scenario: Evaluator target error maps to target_result with error
+    Given an NLP event component_state_change for node "target-eval-1"
+    And the node is in the targetNodes set
+    And the event has status "error" with error "Invalid input"
+    When I map the result
+    Then I get a target_result with:
+      | targetId | target-eval-1 |
+      | error    | Invalid input |
+
+  # ==========================================================================
+  # Orchestrator - Evaluator Targets with Downstream Evaluators
+  # ==========================================================================
+
+  Scenario: Build workflow with evaluator target and downstream evaluator
+    Given an evaluator target "target-eval-1" with outputs passed, score, label
+    And a downstream evaluator "meta-eval" with input "value"
+    And mapping from "target-eval-1.score" to "meta-eval.value"
+    When I build the workflow
+    Then the workflow contains nodes: entry, target-eval-1, target-eval-1.meta-eval
+    And edge connects "target-eval-1" output "score" to "target-eval-1.meta-eval" input "value"
+
+  Scenario: Downstream evaluator receives evaluator target output
+    Given evaluator target "target-eval-1" completed with score=0.95
+    And downstream evaluator "meta-eval" maps input "value" to target output "score"
+    When the downstream evaluator executes
+    Then it receives input "value" with value 0.95
+
+  # ==========================================================================
+  # Data Loading - Evaluator Targets
+  # ==========================================================================
+
+  Scenario: Load evaluator data for evaluator target
+    Given an evaluator target with dbEvaluatorId "eval-abc"
+    And evaluator "eval-abc" exists in the database with settings
+    When I load execution data
+    Then the loaded data includes the evaluator configuration
+    And the evaluator settings are available for workflow building

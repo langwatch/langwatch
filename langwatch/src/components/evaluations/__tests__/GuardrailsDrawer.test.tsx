@@ -23,7 +23,15 @@ import {
   GuardrailsDrawer,
 } from "../GuardrailsDrawer";
 
-// Mock evaluator data
+// Standard evaluator output fields
+const standardOutputFields = [
+  { identifier: "passed", type: "bool" },
+  { identifier: "score", type: "float" },
+  { identifier: "label", type: "str" },
+  { identifier: "details", type: "str" },
+];
+
+// Mock evaluator data with fields pre-computed (as returned by API)
 const mockEvaluators = [
   {
     id: "evaluator-1",
@@ -39,6 +47,8 @@ const mockEvaluators = [
     archivedAt: null,
     createdAt: new Date("2025-01-10T10:00:00Z"),
     updatedAt: new Date("2025-01-15T10:00:00Z"),
+    fields: [{ identifier: "input", type: "str" }],
+    outputFields: standardOutputFields,
   },
   {
     id: "evaluator-2",
@@ -54,6 +64,11 @@ const mockEvaluators = [
     archivedAt: null,
     createdAt: new Date("2025-01-05T10:00:00Z"),
     updatedAt: new Date("2025-01-12T10:00:00Z"),
+    fields: [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+    ],
+    outputFields: standardOutputFields,
   },
 ];
 

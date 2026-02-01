@@ -142,7 +142,7 @@ export function EvaluatorCategorySelectorDrawer(
                   id="workflow"
                   icon={Workflow}
                   title="Custom (from Workflow)"
-                  description="Use an existing workflow as a custom evaluator"
+                  description="Create a new workflow for custom evaluation logic"
                   onClick={onSelectWorkflow}
                 />
               </Box>

@@ -82,7 +82,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      name: props.agentName ?? "Custom Agent",
+      name: props.agentName ?? "",
       icon: defaultIcon,
       description: "",
     },

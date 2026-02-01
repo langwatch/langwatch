@@ -552,6 +552,7 @@ export async function* runOrchestrator(
       prompt_id: t.promptId ?? null,
       prompt_version: t.promptVersionNumber ?? null,
       agent_id: t.dbAgentId ?? null,
+      evaluator_id: t.targetEvaluatorId ?? null,
       model,
     };
   });

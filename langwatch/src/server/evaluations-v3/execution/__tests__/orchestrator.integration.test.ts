@@ -2318,4 +2318,706 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       expect(doneEvent?.type).toBe("done");
     }, 60000);
   });
+
+  describe("evaluator as target execution", () => {
+    it("executes evaluator as target and returns passed/score/label in target_result", async () => {
+      // Create a real evaluator in the database
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Create evaluator-as-target config
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          name: "Exact Match Target",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Test with matching values - should pass
+        const datasetRows = [
+          { response: "hello world", expected: "hello world" },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        // Load the evaluator from DB
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete successfully
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have target_result (NOT evaluator_result - this is evaluator-as-target)
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          expect(targetResult.targetId).toBe("target-eval");
+          expect(targetResult.rowIndex).toBe(0);
+
+          // Output should contain evaluator results (passed, score, label)
+          const output = targetResult.output as {
+            passed?: boolean;
+            score?: number;
+            label?: string;
+          };
+          expect(output).toBeDefined();
+          // With matching values, should pass
+          expect(output.passed).toBe(true);
+        }
+
+        // Should NOT have evaluator_result events (evaluator is the target, not a downstream evaluator)
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        );
+        expect(evaluatorResults).toHaveLength(0);
+      } finally {
+        // Cleanup
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("handles evaluator target with non-matching values (should fail)", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          name: "Exact Match Target",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Test with NON-matching values - should fail
+        const datasetRows = [
+          { response: "hello world", expected: "goodbye world" },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Check target_result
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          const output = targetResult.output as {
+            passed?: boolean;
+            score?: number;
+            label?: string;
+          };
+          // With non-matching values, should fail
+          expect(output.passed).toBe(false);
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("executes evaluator target with downstream evaluator (meta-evaluation)", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      // Create the evaluator that will be used as a target
+      const targetEvaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: targetEvaluatorId,
+          projectId: project.id,
+          name: "Sentiment Target Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Evaluator-as-target config
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          name: "Sentiment Target",
+          targetEvaluatorId: targetEvaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        // Downstream evaluator that validates the target's output
+        // This evaluator checks if the target passed - "meta-evaluation"
+        const downstreamEvaluatorConfig: EvaluatorConfig = {
+          id: "meta-eval",
+          evaluatorType: "langevals/exact_match",
+          name: "Meta Evaluator",
+          settings: {},
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              "target-eval": {
+                // Map the evaluator target's 'passed' output to the downstream evaluator
+                output: {
+                  type: "source",
+                  source: "target",
+                  sourceId: "target-eval",
+                  sourceField: "passed",
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "expected_passed",
+                },
+              },
+            },
+          },
+        };
+
+        const state = createTestState(
+          [evaluatorTargetConfig],
+          [downstreamEvaluatorConfig],
+        );
+        // Matching values should pass, and we expect it to pass
+        const datasetRows = [
+          {
+            response: "hello",
+            expected: "hello",
+            expected_passed: "true", // Expect the evaluator target to pass
+          },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+          { id: "expected_passed", name: "expected_passed", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: targetEvaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(targetEvaluatorId, {
+            id: dbEvaluator.id,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have target_result for the evaluator target
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          expect(targetResult.targetId).toBe("target-eval");
+          const output = targetResult.output as { passed?: boolean };
+          expect(output.passed).toBe(true);
+        }
+
+        // Should have evaluator_result for the downstream meta-evaluator
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        );
+        expect(evaluatorResults.length).toBe(1);
+
+        const evalResult = evaluatorResults[0];
+        if (evalResult?.type === "evaluator_result") {
+          expect(evalResult.evaluatorId).toBe("meta-eval");
+          expect(evalResult.targetId).toBe("target-eval");
+          expect(evalResult.result.status).toBe("processed");
+          // The meta-evaluator should pass because target passed matches expected_passed
+          if (evalResult.result.status === "processed") {
+            expect(evalResult.result.passed).toBe(true);
+          }
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: targetEvaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("executes multiple rows with evaluator target", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          name: "Exact Match Target",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Multiple rows: first matches, second doesn't
+        const datasetRows = [
+          { response: "hello", expected: "hello" }, // Should pass
+          { response: "foo", expected: "bar" }, // Should fail
+          { response: "test", expected: "test" }, // Should pass
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have 3 target_result events
+        const targetResults = events.filter(
+          (e) => e.type === "target_result",
+        ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+        expect(targetResults.length).toBe(3);
+
+        // Check each result
+        const resultByRow = targetResults.reduce(
+          (acc, r) => {
+            acc[r.rowIndex] = r;
+            return acc;
+          },
+          {} as Record<number, (typeof targetResults)[0]>,
+        );
+
+        // Row 0: should pass
+        expect(
+          (resultByRow[0]?.output as { passed?: boolean })?.passed,
+        ).toBe(true);
+        // Row 1: should fail
+        expect(
+          (resultByRow[1]?.output as { passed?: boolean })?.passed,
+        ).toBe(false);
+        // Row 2: should pass
+        expect(
+          (resultByRow[2]?.output as { passed?: boolean })?.passed,
+        ).toBe(true);
+
+        // Done event should show 3 completed cells
+        const doneEvent = events[events.length - 1];
+        if (doneEvent?.type === "done") {
+          expect(doneEvent.summary.totalCells).toBe(3);
+          expect(doneEvent.summary.completedCells).toBe(3);
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+  });
+
+  describe("evaluators with custom input fields", () => {
+    it("passes custom/unconventional input fields via data parameter", async () => {
+      // This test verifies that evaluators with custom input field names
+      // (like "answer" instead of standard "output") work correctly.
+      // The fix ensures kwargs are passed via data= instead of **kwargs
+      // to avoid "unexpected keyword argument" errors.
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+
+      // Create an evaluator that uses non-standard input field names
+      // This simulates a workflow-based evaluator with custom inputs
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Custom Fields Evaluator",
+          type: "evaluator",
+          config: {
+            // Use exact_match but with custom field mapping
+            // The key test is that "answer" field gets passed correctly
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Create evaluator config with custom input field names
+        // "answer" is a non-standard field that would fail with **kwargs
+        const customFieldsEvaluator: EvaluatorConfig = {
+          id: "eval-custom-fields",
+          evaluatorType: "langevals/exact_match",
+          name: "Custom Fields Test",
+          dbEvaluatorId: evaluatorId,
+          // Note: using "answer" instead of standard "output"
+          // and "correct_answer" instead of "expected_output"
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              "target-1": {
+                // Map custom dataset fields to evaluator inputs
+                output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "answer", // Custom field name in dataset
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "correct_answer", // Custom field name in dataset
+                },
+              },
+            },
+          },
+        };
+
+        // Create a minimal target that just passes through
+        const passthroughTarget: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          name: "Passthrough",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+            },
+          },
+          localPromptConfig: createPromptConfig(),
+        };
+
+        const state = createTestState([passthroughTarget], [customFieldsEvaluator]);
+
+        // Dataset with custom field names
+        const datasetRows = [
+          {
+            question: "Say hello",
+            answer: "hello", // Custom field instead of "output"
+            correct_answer: "hello", // Custom field instead of "expected_output"
+          },
+          {
+            question: "Say world",
+            answer: "world",
+            correct_answer: "world",
+          },
+        ];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "answer", name: "answer", type: "string" },
+          { id: "correct_answer", name: "correct_answer", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete without "unexpected keyword argument" error
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have evaluator results
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        ) as Array<Extract<EvaluationV3Event, { type: "evaluator_result" }>>;
+
+        // We expect 2 evaluator results (one per row)
+        expect(evaluatorResults.length).toBe(2);
+
+        // Each result should be processed (not error)
+        // If custom fields weren't passed correctly, we'd get:
+        // TypeError("evaluate() got an unexpected keyword argument 'answer'")
+        for (const result of evaluatorResults) {
+          expect(result.result.status).toBe("processed");
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+  });
 });

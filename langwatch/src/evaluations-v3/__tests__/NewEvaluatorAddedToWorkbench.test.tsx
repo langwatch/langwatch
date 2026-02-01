@@ -132,6 +132,10 @@ vi.mock("~/utils/api", () => ({
             },
             createdAt: new Date(),
             updatedAt: new Date(),
+            fields: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
           }),
         },
       },

@@ -98,9 +98,14 @@ export type DSPyRunsSummary = {
  * Valid target types for batch evaluations.
  * - prompt: LLM prompt target from Evaluations V3
  * - agent: Agent target from Evaluations V3
+ * - evaluator: Evaluator used as a target (for testing evaluators)
  * - custom: External target from API (Python SDK, etc.)
  */
-export type ESBatchEvaluationTargetType = "prompt" | "agent" | "custom";
+export type ESBatchEvaluationTargetType =
+  | "prompt"
+  | "agent"
+  | "evaluator"
+  | "custom";
 
 /**
  * Target metadata stored in batch evaluation for Evaluations V3.
@@ -117,6 +122,8 @@ export type ESBatchEvaluationTarget = {
   prompt_version?: number | null;
   /** For agent targets: the agent ID */
   agent_id?: string | null;
+  /** For evaluator targets: the evaluator ID */
+  evaluator_id?: string | null;
   /** Model used (for prompt targets) */
   model?: string | null;
   /** Flexible metadata for comparison and analysis (model name, temperature, etc.) */

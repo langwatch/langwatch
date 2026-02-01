@@ -13,6 +13,7 @@ import { memo, useMemo, useState } from "react";
 import {
   LuChevronDown,
   LuCircleAlert,
+  LuCircleCheck,
   LuCode,
   LuCopy,
   LuFileText,
@@ -214,6 +215,9 @@ export const TargetHeader = memo(function TargetHeader({
     if (target.type === "prompt") {
       return <LuFileText size={12} data-testid="icon-file" />;
     }
+    if (target.type === "evaluator") {
+      return <LuCircleCheck size={12} data-testid="icon-evaluator" />;
+    }
     // HTTP agents get a Globe icon
     if (target.type === "agent" && target.agentType === "http") {
       return <LuGlobe size={12} data-testid="icon-globe" />;
@@ -223,10 +227,18 @@ export const TargetHeader = memo(function TargetHeader({
   };
 
   const getTargetColor = () => {
-    return target.type === "prompt" ? "green.emphasized" : "cyan.emphasized";
+    if (target.type === "prompt" || target.type === "evaluator") {
+      return "green.emphasized";
+    }
+    return "cyan.emphasized";
   };
 
-  const editLabel = target.type === "prompt" ? "Edit Prompt" : "Edit Agent";
+  const editLabel =
+    target.type === "prompt"
+      ? "Edit Prompt"
+      : target.type === "evaluator"
+        ? "Edit Evaluator"
+        : "Edit Agent";
 
   return (
     <HStack gap={2} width="full" marginY={-2}>
@@ -252,6 +264,8 @@ export const TargetHeader = memo(function TargetHeader({
               color={getTargetColor()}
               size="xs"
               icon={getTargetIcon()}
+              // For some reason this -2px adjustment is needed to align the icon with the text here for evaluators
+              marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>
               {target.name}

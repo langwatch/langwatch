@@ -260,22 +260,27 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           // Invalidate history query once to enable the History button, but only if
           // there was no history before. If history already exists, no need to invalidate.
           if (!hasInvalidatedHistory.current && project?.id && experimentId) {
-            const cachedHistory =
-              trpcUtils.experiments.getExperimentBatchEvaluationRuns.getData({
-                projectId: project.id,
-                experimentId,
-              });
-            const hasExistingRuns = (cachedHistory?.runs.length ?? 0) > 0;
             // Mark as invalidated so we never check again
             hasInvalidatedHistory.current = true;
-            // Only invalidate if there were no runs before
-            if (!hasExistingRuns) {
-              void trpcUtils.experiments.getExperimentBatchEvaluationRuns.invalidate(
-                {
+            // Check if trpcUtils is available (may be null in tests)
+            try {
+              const cachedHistory =
+                trpcUtils.experiments.getExperimentBatchEvaluationRuns.getData({
                   projectId: project.id,
                   experimentId,
-                },
-              );
+                });
+              const hasExistingRuns = (cachedHistory?.runs.length ?? 0) > 0;
+              // Only invalidate if there were no runs before
+              if (!hasExistingRuns) {
+                void trpcUtils.experiments.getExperimentBatchEvaluationRuns.invalidate(
+                  {
+                    projectId: project.id,
+                    experimentId,
+                  },
+                );
+              }
+            } catch {
+              // trpcUtils may not be available in tests - ignore
             }
           }
           break;
@@ -539,6 +544,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           promptVersionId: t.promptVersionId,
           promptVersionNumber: t.promptVersionNumber,
           dbAgentId: t.dbAgentId,
+          agentType: t.agentType,
+          httpConfig: t.httpConfig,
+          targetEvaluatorId: t.targetEvaluatorId,
           inputs: t.inputs,
           outputs: t.outputs,
           mappings: t.mappings,

@@ -80,6 +80,7 @@ export const buildCellWorkflow = (
     targetConfig,
     loadedData,
     cell,
+    loadedData.evaluators, // Pass evaluators for evaluator-as-target case
   );
 
   // Build evaluator nodes
@@ -179,13 +180,26 @@ const buildEntryNode = (
 // ============================================================================
 
 /**
- * Builds the target node based on whether it's a prompt or agent.
+ * Loaded data for target nodes including prompt, agent, or evaluator.
+ */
+type LoadedTargetData = {
+  prompt?: VersionedPrompt;
+  agent?: TypedAgent;
+  targetEvaluator?: { id: string; config: unknown };
+};
+
+/**
+ * Builds the target node based on whether it's a prompt, agent, or evaluator.
  */
 const buildTargetNode = (
   targetConfig: TargetConfig,
-  loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
+  loadedData: LoadedTargetData,
   cell: ExecutionCell,
-): { targetNode: Node<Signature | Code | HttpNodeData>; targetNodeId: string } => {
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
+): {
+  targetNode: Node<Signature | Code | HttpNodeData | Evaluator>;
+  targetNodeId: string;
+} => {
   const targetNodeId = targetConfig.id;
 
   if (targetConfig.type === "prompt") {
@@ -216,6 +230,17 @@ const buildTargetNode = (
         `Prompt target ${targetConfig.id} has no local config and no loaded prompt`,
       );
     }
+  } else if (targetConfig.type === "evaluator") {
+    // Evaluator target - build evaluator node with target ID
+    return {
+      targetNode: buildEvaluatorTargetNode(
+        targetNodeId,
+        targetConfig,
+        cell,
+        loadedEvaluators,
+      ),
+      targetNodeId,
+    };
   } else {
     // Agent target - dispatch based on agent type
     if (loadedData.agent) {
@@ -260,6 +285,68 @@ const buildTargetNode = (
       throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);
     }
   }
+};
+
+/**
+ * Builds an evaluator node when an evaluator is used as a target.
+ * The node ID is the target ID (not a composite ID like regular evaluators).
+ */
+export const buildEvaluatorTargetNode = (
+  nodeId: string,
+  targetConfig: TargetConfig,
+  cell: ExecutionCell,
+  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
+): Node<Evaluator> => {
+  // Get settings from loaded evaluator (DB) if available
+  const dbEvaluator = targetConfig.targetEvaluatorId
+    ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
+    : undefined;
+  const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
+  const settings = dbConfig?.settings ?? {};
+
+  // Build inputs with value mappings applied
+  const inputs: Field[] = (targetConfig.inputs ?? []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+    value: getInputValue(input.identifier, targetConfig, cell),
+  }));
+
+  // Convert settings to parameters format
+  const parameters: Field[] = Object.entries(settings).map(([key, value]) => ({
+    identifier: key,
+    type: "str" as const,
+    value,
+  }));
+
+  // Evaluator targets must have a DB evaluator ID - just like prompts have promptId
+  // and agents have dbAgentId
+  if (!targetConfig.targetEvaluatorId) {
+    throw new Error(
+      `Evaluator target "${targetConfig.name}" (${nodeId}) has no evaluator ID. ` +
+        `targetEvaluatorId must be set.`,
+    );
+  }
+
+  // Use evaluators/{id} path so langwatch_nlp calls LangWatch API to fetch settings
+  const evaluatorPath = `evaluators/${targetConfig.targetEvaluatorId}`;
+
+  return {
+    id: nodeId, // Use target ID directly (not composite)
+    type: "evaluator",
+    position: { x: 200, y: 0 },
+    data: {
+      name: targetConfig.name,
+      cls: "LangWatchEvaluator",
+      inputs,
+      outputs: [
+        { identifier: "passed", type: "bool" },
+        { identifier: "score", type: "float" },
+        { identifier: "label", type: "str" },
+      ],
+      evaluator: evaluatorPath as Evaluator["evaluator"],
+      parameters,
+    },
+  };
 };
 
 /**

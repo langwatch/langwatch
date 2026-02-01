@@ -53,12 +53,28 @@ export const isEvaluatorNode = (nodeId: string): boolean => {
 };
 
 /**
+ * Checks if outputs are from an evaluator (has passed/score/label fields).
+ */
+const isEvaluatorOutput = (
+  outputs: Record<string, unknown>,
+): outputs is {
+  passed?: boolean;
+  score?: number;
+  label?: string;
+  details?: string;
+} => {
+  return "passed" in outputs || "score" in outputs || "label" in outputs;
+};
+
+/**
  * Extracts target output from execution outputs.
  *
  * Strategy (OCP-compliant - handles new output formats without modification):
- * 1. If outputs.output exists -> return it (backward compatible with prompts/signatures)
- * 2. If outputs has exactly one key -> return that value (single custom field)
- * 3. Otherwise -> return full outputs object (multiple custom fields like {result, reason})
+ * 1. If outputs look like evaluator output (has passed/score/label) -> return as-is
+ *    This handles evaluator-as-target where the evaluator outputs become target output
+ * 2. If outputs.output exists -> return it (backward compatible with prompts/signatures)
+ * 3. If outputs has exactly one key -> return that value (single custom field)
+ * 4. Otherwise -> return full outputs object (multiple custom fields like {result, reason})
  *
  * This allows Code Agents to return any output structure while maintaining
  * backward compatibility with standard signature/prompt targets.
@@ -67,6 +83,21 @@ export const extractTargetOutput = (
   outputs: Record<string, unknown> | undefined,
 ): unknown => {
   if (!outputs) return undefined;
+
+  // Evaluator-as-target: return the full evaluator result object
+  // Only include keys that have non-null/undefined values
+  if (isEvaluatorOutput(outputs)) {
+    const result: Record<string, unknown> = {};
+    if (outputs.passed !== undefined && outputs.passed !== null)
+      result.passed = outputs.passed;
+    if (outputs.score !== undefined && outputs.score !== null)
+      result.score = outputs.score;
+    if (outputs.label !== undefined && outputs.label !== null)
+      result.label = outputs.label;
+    if (outputs.details !== undefined && outputs.details !== null)
+      result.details = outputs.details;
+    return result;
+  }
 
   // Backward compatible: standard "output" field takes precedence
   if ("output" in outputs) return outputs.output;

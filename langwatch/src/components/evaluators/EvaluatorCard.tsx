@@ -1,6 +1,6 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
-import { CheckSquare, Code, ExternalLink, MoreVertical, Workflow } from "lucide-react";
+import { CheckSquare, Code, MoreVertical, Workflow } from "lucide-react";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -23,7 +23,6 @@ export type EvaluatorCardProps = {
   onEdit?: () => void;
   onDelete?: () => void;
   onUseFromApi?: () => void;
-  onOpenWorkflow?: () => void;
 };
 
 export function EvaluatorCard({
@@ -32,7 +31,6 @@ export function EvaluatorCard({
   onEdit,
   onDelete,
   onUseFromApi,
-  onOpenWorkflow,
 }: EvaluatorCardProps) {
   const Icon = evaluatorTypeIcons[evaluator.type] ?? CheckSquare;
   const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
@@ -88,19 +86,6 @@ export function EvaluatorCard({
                     >
                       <LuPencil size={14} />
                       Edit
-                    </Menu.Item>
-                  )}
-                  {evaluator.type === "workflow" && onOpenWorkflow && (
-                    <Menu.Item
-                      value="open-workflow"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenWorkflow();
-                      }}
-                      data-testid={`evaluator-open-workflow-${evaluator.id}`}
-                    >
-                      <ExternalLink size={14} />
-                      Open Workflow
                     </Menu.Item>
                   )}
                   <Menu.Item

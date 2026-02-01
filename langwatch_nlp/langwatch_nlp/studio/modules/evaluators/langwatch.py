@@ -94,5 +94,5 @@ def _cached_langwatch_evaluate(
         name=name,
         settings=settings,
         api_key=api_key,
-        **kwargs,
+        data=kwargs,
     )
