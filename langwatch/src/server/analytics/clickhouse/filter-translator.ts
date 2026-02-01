@@ -1,8 +1,13 @@
 /**
  * Filter Translator - Converts ES filter definitions to ClickHouse WHERE clauses.
  *
- * This module translates the ES query patterns used in analytics filters
- * to equivalent ClickHouse WHERE clause fragments.
+ * WHY REGISTRY PATTERN: ClickHouse requires different WHERE clause patterns
+ * depending on where data is stored (trace_summaries vs stored_spans vs
+ * evaluation_states). Some filters use simple attribute lookups, others need
+ * EXISTS subqueries with JOINs. The registry pattern:
+ * 1. Makes it easy to add new filter types without modifying existing code (OCP)
+ * 2. Centralizes the mapping of filter fields to their translation logic
+ * 3. Provides a clear, testable contract for each filter type
  */
 
 import type { FilterField } from "../../filters/types";
@@ -21,6 +26,15 @@ export interface FilterTranslation {
   /** Whether this filter uses EXISTS subquery pattern */
   usesExistsSubquery?: boolean;
 }
+
+/**
+ * Handler function type for filter translation
+ */
+type FilterHandler = (
+  values: string[],
+  key?: string,
+  subkey?: string,
+) => FilterTranslation;
 
 /**
  * Parameter counter for generating unique parameter names
@@ -42,7 +56,75 @@ function genParamName(prefix: string): string {
 }
 
 /**
- * Translate a filter field and values to CH WHERE clause
+ * Registry of filter handlers by field type.
+ *
+ * WHY: This registry maps filter fields to their translation functions,
+ * eliminating the need for a large switch statement. Each handler knows
+ * how to translate its specific filter type to ClickHouse SQL.
+ */
+const filterHandlers: Partial<Record<FilterField, FilterHandler>> = {
+  // Topic Filters
+  "topics.topics": (values) => translateTopicFilter(values),
+  "topics.subtopics": (values) => translateSubtopicFilter(values),
+
+  // Metadata Filters
+  "metadata.user_id": (values) =>
+    translateMetadataFilter("langwatch.user_id", values),
+  "metadata.thread_id": (values) =>
+    translateMetadataFilter("gen_ai.conversation.id", values),
+  "metadata.customer_id": (values) =>
+    translateMetadataFilter("langwatch.customer_id", values),
+  "metadata.labels": (values) => translateLabelsFilter(values),
+  "metadata.key": (values) => translateMetadataKeyFilter(values),
+  "metadata.value": (values, key) => translateMetadataValueFilter(values, key),
+  "metadata.prompt_ids": (values) => translatePromptIdsFilter(values),
+
+  // Trace Filters
+  "traces.error": (values) => translateErrorFilter(values),
+
+  // Span Filters
+  "spans.type": (values) => translateSpanTypeFilter(values),
+  "spans.model": (values) => translateSpanModelFilter(values),
+
+  // Evaluation Filters
+  "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.guardrails_only": (values) =>
+    translateEvaluatorIdFilter(values),
+  "evaluations.passed": (values, key) =>
+    translateEvaluationPassedFilter(values, key),
+  "evaluations.score": (values, key) =>
+    translateEvaluationScoreFilter(values, key),
+  "evaluations.label": (values, key) =>
+    translateEvaluationLabelFilter(values, key),
+  "evaluations.state": (values, key) =>
+    translateEvaluationStateFilter(values, key),
+
+  // Event Filters
+  "events.event_type": (values) => translateEventTypeFilter(values),
+  "events.metrics.key": (values, key) =>
+    translateEventMetricKeyFilter(values, key),
+  "events.metrics.value": (values, key, subkey) =>
+    translateEventMetricValueFilter(values, key, subkey),
+  "events.event_details.key": (values, key) =>
+    translateEventDetailKeyFilter(values, key),
+
+  // Annotation Filters
+  "annotations.hasAnnotation": (values) => translateAnnotationFilter(values),
+};
+
+/**
+ * Default no-op filter translation
+ */
+const noOpFilter: FilterTranslation = {
+  whereClause: "1=1",
+  requiredJoins: [],
+  params: {},
+};
+
+/**
+ * Translate a filter field and values to CH WHERE clause.
+ *
+ * Uses registry lookup instead of switch statement for better extensibility.
  */
 export function translateFilter(
   field: FilterField,
@@ -50,95 +132,21 @@ export function translateFilter(
   key?: string,
   subkey?: string,
 ): FilterTranslation {
-  const requiredJoins: CHTable[] = [];
-
   if (values.length === 0) {
-    return { whereClause: "1=1", requiredJoins, params: {} };
+    return noOpFilter;
   }
 
-  switch (field) {
-    // ===== Topic Filters =====
-    case "topics.topics":
-      return translateTopicFilter(values);
-
-    case "topics.subtopics":
-      return translateSubtopicFilter(values);
-
-    // ===== Metadata Filters =====
-    case "metadata.user_id":
-      return translateMetadataFilter("langwatch.user_id", values);
-
-    case "metadata.thread_id":
-      return translateMetadataFilter("gen_ai.conversation.id", values);
-
-    case "metadata.customer_id":
-      return translateMetadataFilter("langwatch.customer_id", values);
-
-    case "metadata.labels":
-      return translateLabelsFilter(values);
-
-    case "metadata.key":
-      return translateMetadataKeyFilter(values);
-
-    case "metadata.value":
-      return translateMetadataValueFilter(values, key);
-
-    case "metadata.prompt_ids":
-      return translatePromptIdsFilter(values);
-
-    // ===== Trace Filters =====
-    case "traces.error":
-      return translateErrorFilter(values);
-
-    // ===== Span Filters =====
-    case "spans.type":
-      return translateSpanTypeFilter(values);
-
-    case "spans.model":
-      return translateSpanModelFilter(values);
-
-    // ===== Evaluation Filters =====
-    case "evaluations.evaluator_id":
-    case "evaluations.evaluator_id.guardrails_only":
-      return translateEvaluatorIdFilter(values);
-
-    case "evaluations.passed":
-      return translateEvaluationPassedFilter(values, key);
-
-    case "evaluations.score":
-      return translateEvaluationScoreFilter(values, key);
-
-    case "evaluations.label":
-      return translateEvaluationLabelFilter(values, key);
-
-    case "evaluations.state":
-      return translateEvaluationStateFilter(values, key);
-
-    // ===== Event Filters =====
-    case "events.event_type":
-      return translateEventTypeFilter(values);
-
-    case "events.metrics.key":
-      return translateEventMetricKeyFilter(values, key);
-
-    case "events.metrics.value":
-      return translateEventMetricValueFilter(values, key, subkey);
-
-    case "events.event_details.key":
-      return translateEventDetailKeyFilter(values, key);
-
-    // ===== Annotation Filters =====
-    case "annotations.hasAnnotation":
-      return translateAnnotationFilter(values);
-
-    default:
-      // Unknown filter - return no-op
-      return { whereClause: "1=1", requiredJoins, params: {} };
-  }
+  const handler = filterHandlers[field];
+  return handler ? handler(values, key, subkey) : noOpFilter;
 }
 
 /**
- * Translate topic filter
+ * Translate topic filter.
+ *
+ * WHY PARAMETERIZED QUERIES: All filter translations use parameterized queries
+ * instead of string interpolation to prevent SQL injection attacks. The
+ * parameter names are auto-generated with a counter to ensure uniqueness
+ * when multiple filters of the same type are combined.
  */
 function translateTopicFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -275,7 +283,12 @@ function translateErrorFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate span type filter (requires JOIN)
+ * Translate span type filter (requires JOIN).
+ *
+ * WHY EXISTS SUBQUERY: Span-level filters use EXISTS instead of direct JOINs
+ * because a trace can have multiple spans. A direct JOIN would duplicate the
+ * trace for each matching span, inflating count metrics. EXISTS returns true
+ * once a matching span is found, preserving correct trace counts.
  */
 function translateSpanTypeFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -640,7 +653,12 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Combine multiple filter translations with AND
+ * Combine multiple filter translations with AND.
+ *
+ * WHY FILTER NON-TRIVIAL: "1=1" is the no-op placeholder for empty filters.
+ * We filter these out before combining to avoid bloating the WHERE clause
+ * with unnecessary conditions. This also makes the generated SQL more readable
+ * for debugging and performance analysis.
  */
 export function combineFilters(
   translations: FilterTranslation[],

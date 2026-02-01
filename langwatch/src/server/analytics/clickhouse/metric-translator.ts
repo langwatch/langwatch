@@ -14,6 +14,15 @@ import {
 } from "./field-mappings";
 
 /**
+ * Maximum thread session duration in milliseconds (3 hours).
+ *
+ * WHY: Sessions longer than 3 hours are capped to prevent outliers
+ * (e.g., tabs left open overnight) from skewing average duration metrics.
+ * This matches the Elasticsearch behavior for consistency during migration.
+ */
+const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hours
+
+/**
  * Result of translating an ES metric to CH SQL
  */
 export interface MetricTranslation {
@@ -111,7 +120,13 @@ export function buildMetricAlias(
 }
 
 /**
- * Translate a metric definition to ClickHouse SQL
+ * Translate a metric definition to ClickHouse SQL.
+ *
+ * WHY PREFIX-BASED ROUTING: Metrics are organized by category prefix
+ * (metadata.*, performance.*, evaluations.*, events.*, sentiment.*, threads.*)
+ * to mirror the ES aggregation structure. Each category may require different
+ * JOINs and has different column mappings. The prefix routing ensures each
+ * metric type gets its specialized translation logic.
  */
 export function translateMetric(
   metric: string,
@@ -601,14 +616,13 @@ function translateThreadsMetric(
       // Use trace_summaries.OccurredAt which is the trace's execution time
       // (= earliest span start time, matches ES's timestamps.started_at)
       // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
-      // Cap duration at 10800000ms (3 hours) to match ES behavior
       return {
         selectExpression: `avg(thread_duration) AS ${alias}`,
         alias,
         requiredJoins,
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, 10800000) AS thread_duration`,
+          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -705,8 +719,7 @@ export function translatePipelineAggregation(
           // Use trace_summaries.OccurredAt (= trace's execution start time)
           // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
           // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
-          // Cap duration at 10800000ms (3 hours) to match ES behavior
-          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, 10800000) AS thread_duration`,
+          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
           groupBy: "pipeline_key, thread_id",
           having: `thread_id IS NOT NULL AND toString(thread_id) != '' AND pipeline_key IS NOT NULL AND toString(pipeline_key) != ''`,
         },

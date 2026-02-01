@@ -24,6 +24,17 @@ import { translateAllFilters, type FilterTranslation } from "./filter-translator
 const MAX_FILTER_OPTIONS = 10000;
 
 /**
+ * Time interval constants for date truncation decisions.
+ * WHY: These thresholds determine the optimal date grouping granularity
+ * based on the query time range. Too fine granularity creates too many buckets,
+ * too coarse loses detail.
+ */
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR; // 1440
+const DAYS_PER_WEEK = 7;
+const DAYS_PER_MONTH = 31; // Approximate, triggers month-level grouping
+
+/**
  * Quote an identifier with backticks if it starts with a digit.
  * ClickHouse requires backticks for identifiers starting with numbers.
  */
@@ -66,6 +77,102 @@ export type GroupByField =
   | "error.has_error";
 
 /**
+ * Result of resolving a groupBy field expression
+ */
+interface GroupByExpression {
+  column: string;
+  requiredJoins: CHTable[];
+  usesArrayJoin?: boolean;
+  handlesUnknown?: boolean;
+}
+
+/**
+ * Registry of groupBy expression builders by field type.
+ *
+ * WHY REGISTRY PATTERN: Different groupBy fields require different SQL expressions
+ * and may need JOINs to different tables. Some use arrayJoin for multi-valued fields.
+ * The registry pattern centralizes this complexity and makes it easy to add new
+ * groupBy options without modifying the main query builder.
+ */
+const groupByExpressions: Partial<Record<string, () => GroupByExpression>> = {
+  "topics.topics": () => ({
+    column: `${tableAliases.trace_summaries}.TopicId`,
+    requiredJoins: [],
+  }),
+
+  "metadata.user_id": () => ({
+    column: `${tableAliases.trace_summaries}.Attributes['langwatch.user_id']`,
+    requiredJoins: [],
+  }),
+
+  "metadata.thread_id": () => ({
+    column: `${tableAliases.trace_summaries}.Attributes['gen_ai.conversation.id']`,
+    requiredJoins: [],
+  }),
+
+  "metadata.customer_id": () => ({
+    column: `${tableAliases.trace_summaries}.Attributes['langwatch.customer_id']`,
+    requiredJoins: [],
+  }),
+
+  "metadata.labels": () => ({
+    column: `arrayJoin(JSONExtract(${tableAliases.trace_summaries}.Attributes['langwatch.labels'], 'Array(String)'))`,
+    requiredJoins: [],
+    usesArrayJoin: true,
+  }),
+
+  // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
+  // Instead, we let them be empty and filter via HAVING in the outer query.
+  // This matches ES terms aggregation which excludes empty values.
+  "metadata.model": () => ({
+    column: `${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model']`,
+    requiredJoins: ["stored_spans"],
+    handlesUnknown: false,
+  }),
+
+  "metadata.span_type": () => ({
+    column: `${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type']`,
+    requiredJoins: ["stored_spans"],
+    handlesUnknown: false,
+  }),
+
+  "evaluations.evaluation_passed": () => ({
+    column: `${tableAliases.evaluation_states}.Passed`,
+    requiredJoins: ["evaluation_states"],
+  }),
+
+  "evaluations.evaluation_label": () => ({
+    column: `${tableAliases.evaluation_states}.Label`,
+    requiredJoins: ["evaluation_states"],
+  }),
+
+  "evaluations.evaluation_processing_state": () => ({
+    column: `${tableAliases.evaluation_states}.Status`,
+    requiredJoins: ["evaluation_states"],
+  }),
+
+  "events.event_type": () => ({
+    column: `arrayJoin(${tableAliases.stored_spans}."Events.Name")`,
+    requiredJoins: ["stored_spans"],
+    usesArrayJoin: true,
+  }),
+
+  "sentiment.input_sentiment": () => ({
+    column: `multiIf(
+      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) >= 0.1, 'positive',
+      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) <= -0.1, 'negative',
+      'neutral'
+    )`,
+    requiredJoins: [],
+  }),
+
+  "error.has_error": () => ({
+    column: `if(${tableAliases.stored_spans}.StatusCode = 2, 'with error', 'without error')`,
+    requiredJoins: ["stored_spans"],
+  }),
+};
+
+/**
  * Query input for building a timeseries query
  */
 export interface TimeseriesQueryInput {
@@ -97,7 +204,12 @@ export interface BuiltQuery {
 }
 
 /**
- * Get the ClickHouse date truncation function for a time scale
+ * Get the ClickHouse date truncation function for a time scale.
+ *
+ * WHY: Different time ranges require different grouping granularities.
+ * Short ranges (hours) need minute-level precision for detail.
+ * Medium ranges (days) use hourly buckets to avoid too many data points.
+ * Long ranges (weeks/months) use day/week/month buckets for performance.
  */
 function getDateTruncFunction(
   timeScaleMinutes: number,
@@ -106,20 +218,19 @@ function getDateTruncFunction(
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
     return `toStartOfMinute(ts.OccurredAt, '${timeZone}')`;
-  } else if (timeScaleMinutes <= 60) {
+  } else if (timeScaleMinutes <= MINUTES_PER_HOUR) {
     return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${timeZone}')`;
-  } else if (timeScaleMinutes <= 1440) {
-    // Up to 1 day
-    const hours = Math.floor(timeScaleMinutes / 60);
+  } else if (timeScaleMinutes <= MINUTES_PER_DAY) {
+    const hours = Math.floor(timeScaleMinutes / MINUTES_PER_HOUR);
     return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${timeZone}')`;
   } else {
     // Days
-    const days = Math.floor(timeScaleMinutes / 1440);
+    const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
     if (days === 1) {
       return `toStartOfDay(ts.OccurredAt, '${timeZone}')`;
-    } else if (days <= 7) {
+    } else if (days <= DAYS_PER_WEEK) {
       return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${timeZone}')`;
-    } else if (days <= 31) {
+    } else if (days <= DAYS_PER_MONTH) {
       return `toStartOfWeek(ts.OccurredAt, 1, '${timeZone}')`;
     } else {
       return `toStartOfMonth(ts.OccurredAt, '${timeZone}')`;
@@ -128,119 +239,34 @@ function getDateTruncFunction(
 }
 
 /**
- * Get the groupBy column expression for a group field
+ * Default fallback groupBy expression (by TraceId)
+ */
+const defaultGroupByExpression: GroupByExpression = {
+  column: `${tableAliases.trace_summaries}.TraceId`,
+  requiredJoins: [],
+};
+
+/**
+ * Get the groupBy column expression for a group field.
+ *
+ * Uses registry lookup instead of switch statement for better extensibility.
+ * When adding new groupBy fields, simply add an entry to groupByExpressions.
  */
 function getGroupByExpression(
   groupBy: string,
-  groupByKey?: string,
-): { column: string; requiredJoins: CHTable[]; usesArrayJoin?: boolean; handlesUnknown?: boolean } {
-  const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
-  const es = tableAliases.evaluation_states;
-
-  switch (groupBy) {
-    case "topics.topics":
-      return { column: `${ts}.TopicId`, requiredJoins: [] };
-
-    case "metadata.user_id":
-      return {
-        column: `${ts}.Attributes['langwatch.user_id']`,
-        requiredJoins: [],
-      };
-
-    case "metadata.thread_id":
-      return {
-        column: `${ts}.Attributes['gen_ai.conversation.id']`,
-        requiredJoins: [],
-      };
-
-    case "metadata.customer_id":
-      return {
-        column: `${ts}.Attributes['langwatch.customer_id']`,
-        requiredJoins: [],
-      };
-
-    case "metadata.labels":
-      return {
-        column: `arrayJoin(JSONExtract(${ts}.Attributes['langwatch.labels'], 'Array(String)'))`,
-        requiredJoins: [],
-        usesArrayJoin: true,
-      };
-
-    case "metadata.model":
-      // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
-      // Instead, we let them be empty and filter via HAVING in the outer query.
-      // This matches ES terms aggregation which excludes empty values.
-      return {
-        column: `${ss}.SpanAttributes['gen_ai.request.model']`,
-        requiredJoins: ["stored_spans"],
-        handlesUnknown: false,
-      };
-
-    case "metadata.span_type":
-      // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
-      // Instead, we let them be empty and filter via HAVING in the outer query.
-      // This matches ES terms aggregation which excludes empty values.
-      return {
-        column: `${ss}.SpanAttributes['langwatch.span.type']`,
-        requiredJoins: ["stored_spans"],
-        handlesUnknown: false,
-      };
-
-    case "evaluations.evaluation_passed": {
-      const evaluatorCondition = groupByKey
-        ? `AND ${es}.EvaluatorId = '${groupByKey.replace(/'/g, "''")}'`
-        : "";
-      return {
-        column: `${es}.Passed`,
-        requiredJoins: ["evaluation_states"],
-      };
-    }
-
-    case "evaluations.evaluation_label": {
-      return {
-        column: `${es}.Label`,
-        requiredJoins: ["evaluation_states"],
-      };
-    }
-
-    case "evaluations.evaluation_processing_state": {
-      return {
-        column: `${es}.Status`,
-        requiredJoins: ["evaluation_states"],
-      };
-    }
-
-    case "events.event_type":
-      return {
-        column: `arrayJoin(${ss}."Events.Name")`,
-        requiredJoins: ["stored_spans"],
-        usesArrayJoin: true,
-      };
-
-    case "sentiment.input_sentiment":
-      return {
-        column: `multiIf(
-          toFloat64OrNull(${ts}.Attributes['langwatch.input.satisfaction_score']) >= 0.1, 'positive',
-          toFloat64OrNull(${ts}.Attributes['langwatch.input.satisfaction_score']) <= -0.1, 'negative',
-          'neutral'
-        )`,
-        requiredJoins: [],
-      };
-
-    case "error.has_error":
-      return {
-        column: `if(${ss}.StatusCode = 2, 'with error', 'without error')`,
-        requiredJoins: ["stored_spans"],
-      };
-
-    default:
-      return { column: `${ts}.TraceId`, requiredJoins: [] };
-  }
+  _groupByKey?: string,
+): GroupByExpression {
+  const builder = groupByExpressions[groupBy];
+  return builder ? builder() : defaultGroupByExpression;
 }
 
 /**
- * Build the complete timeseries query
+ * Build the complete timeseries query.
+ *
+ * WHY SINGLE QUERY FOR BOTH PERIODS: Instead of running separate queries for
+ * current and previous periods, we include both in a single query using a
+ * CASE expression to tag rows by period. This halves the number of ClickHouse
+ * round trips and allows the database to optimize the scan across both date ranges.
  */
 export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const ts = tableAliases.trace_summaries;

@@ -103,65 +103,107 @@ export class AnalyticsService {
   }
 
   /**
-   * Get timeseries analytics data
+   * Execute an analytics operation with routing logic.
+   *
+   * WHY THIS METHOD EXISTS: Four different analytics operations (getTimeseries,
+   * getDataForFilter, getTopUsedDocuments, getFeedbacks) all share identical routing
+   * logic: check feature flags, route to the correct backend, and optionally run
+   * comparison mode. Extracting this logic into a single method:
+   * 1. Eliminates ~50 lines of duplication per method
+   * 2. Ensures consistent behavior across all operations
+   * 3. Makes it easy to add new routing features in one place
    */
-  async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
+  private async executeWithRouting<TResult>(
+    operationName: string,
+    projectId: string,
+    input: unknown,
+    esCall: () => Promise<TResult>,
+    chCall: () => Promise<TResult>,
+  ): Promise<TResult> {
     return this.tracer.withActiveSpan(
-      "AnalyticsService.getTimeseries",
-      { attributes: { "tenant.id": input.projectId } },
+      `AnalyticsService.${operationName}`,
+      { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
+        const useClickHouse = await this.isClickHouseEnabled(projectId);
         const comparisonMode = this.isComparisonModeEnabled();
 
         span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
         span.setAttribute("comparison.mode", comparisonMode);
 
         if (comparisonMode && this.chService.isAvailable()) {
-          // Run both queries in parallel and compare
-          const [esResult, chResult] = await Promise.allSettled([
-            this.esService.getTimeseries(input),
-            this.chService.getTimeseries(input),
-          ]);
-
-          const esData =
-            esResult.status === "fulfilled" ? esResult.value : undefined;
-          const chData =
-            chResult.status === "fulfilled" ? chResult.value : undefined;
-
-          if (esData && chData) {
-            this.comparator.compare("getTimeseries", input, esData, chData);
-          } else {
-            if (esResult.status === "rejected") {
-              this.logger.error(
-                { error: esResult.reason },
-                "ES timeseries query failed in comparison mode",
-              );
-            }
-            if (chResult.status === "rejected") {
-              this.logger.error(
-                { error: chResult.reason },
-                "CH timeseries query failed in comparison mode",
-              );
-            }
-          }
-
-          // Return the appropriate result based on feature flag
-          if (useClickHouse && chData) {
-            return chData;
-          }
-          if (esData) {
-            return esData;
-          }
-          // If both failed, throw
-          throw new Error("Both ES and CH timeseries queries failed");
+          return this.runComparison(
+            operationName,
+            input,
+            esCall,
+            chCall,
+            useClickHouse,
+          );
         }
 
-        // Normal mode: use the appropriate service
-        if (useClickHouse) {
-          return this.chService.getTimeseries(input);
-        }
-        return this.esService.getTimeseries(input);
+        return useClickHouse ? chCall() : esCall();
       },
+    );
+  }
+
+  /**
+   * Run both ES and CH queries in comparison mode, log discrepancies, and return
+   * the appropriate result based on the feature flag.
+   */
+  private async runComparison<TResult>(
+    operationName: string,
+    input: unknown,
+    esCall: () => Promise<TResult>,
+    chCall: () => Promise<TResult>,
+    useClickHouse: boolean,
+  ): Promise<TResult> {
+    const [esResult, chResult] = await Promise.allSettled([esCall(), chCall()]);
+
+    const esData = esResult.status === "fulfilled" ? esResult.value : undefined;
+    const chData = chResult.status === "fulfilled" ? chResult.value : undefined;
+
+    if (esData && chData) {
+      this.comparator.compare(operationName, input, esData, chData);
+    } else {
+      this.logComparisonErrors(operationName, esResult, chResult);
+    }
+
+    if (useClickHouse && chData) return chData;
+    if (esData) return esData;
+    throw new Error(`Both ES and CH ${operationName} queries failed`);
+  }
+
+  /**
+   * Log errors from comparison mode when one or both backends fail.
+   */
+  private logComparisonErrors<TResult>(
+    operationName: string,
+    esResult: PromiseSettledResult<TResult>,
+    chResult: PromiseSettledResult<TResult>,
+  ): void {
+    if (esResult.status === "rejected") {
+      this.logger.error(
+        { error: esResult.reason },
+        `ES ${operationName} query failed in comparison mode`,
+      );
+    }
+    if (chResult.status === "rejected") {
+      this.logger.error(
+        { error: chResult.reason },
+        `CH ${operationName} query failed in comparison mode`,
+      );
+    }
+  }
+
+  /**
+   * Get timeseries analytics data
+   */
+  async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
+    return this.executeWithRouting(
+      "getTimeseries",
+      input.projectId,
+      input,
+      () => this.esService.getTimeseries(input),
+      () => this.chService.getTimeseries(input),
     );
   }
 
@@ -185,76 +227,12 @@ export class AnalyticsService {
     subkey?: string,
     searchQuery?: string,
   ): Promise<FilterDataResult> {
-    return this.tracer.withActiveSpan(
-      "AnalyticsService.getDataForFilter",
-      { attributes: { "tenant.id": projectId, "filter.field": field } },
-      async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        const comparisonMode = this.isComparisonModeEnabled();
-
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
-        span.setAttribute("comparison.mode", comparisonMode);
-
-        if (comparisonMode && this.chService.isAvailable()) {
-          const [esResult, chResult] = await Promise.allSettled([
-            this.esService.getDataForFilter(
-              projectId,
-              field,
-              startDate,
-              endDate,
-              filters,
-              key,
-              subkey,
-              searchQuery,
-            ),
-            this.chService.getDataForFilter(
-              projectId,
-              field,
-              startDate,
-              endDate,
-              filters,
-              key,
-              subkey,
-              searchQuery,
-            ),
-          ]);
-
-          const esData =
-            esResult.status === "fulfilled" ? esResult.value : undefined;
-          const chData =
-            chResult.status === "fulfilled" ? chResult.value : undefined;
-
-          if (esData && chData) {
-            this.comparator.compare(
-              "getDataForFilter",
-              { projectId, field, startDate, endDate },
-              esData,
-              chData,
-            );
-          }
-
-          if (useClickHouse && chData) {
-            return chData;
-          }
-          if (esData) {
-            return esData;
-          }
-          throw new Error("Both ES and CH dataForFilter queries failed");
-        }
-
-        if (useClickHouse) {
-          return this.chService.getDataForFilter(
-            projectId,
-            field,
-            startDate,
-            endDate,
-            filters,
-            key,
-            subkey,
-            searchQuery,
-          );
-        }
-        return this.esService.getDataForFilter(
+    return this.executeWithRouting(
+      "getDataForFilter",
+      projectId,
+      { projectId, field, startDate, endDate },
+      () =>
+        this.esService.getDataForFilter(
           projectId,
           field,
           startDate,
@@ -263,8 +241,18 @@ export class AnalyticsService {
           key,
           subkey,
           searchQuery,
-        );
-      },
+        ),
+      () =>
+        this.chService.getDataForFilter(
+          projectId,
+          field,
+          startDate,
+          endDate,
+          filters,
+          key,
+          subkey,
+          searchQuery,
+        ),
     );
   }
 
@@ -284,70 +272,14 @@ export class AnalyticsService {
       >
     >,
   ): Promise<TopDocumentsResult> {
-    return this.tracer.withActiveSpan(
-      "AnalyticsService.getTopUsedDocuments",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        const comparisonMode = this.isComparisonModeEnabled();
-
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
-        span.setAttribute("comparison.mode", comparisonMode);
-
-        if (comparisonMode && this.chService.isAvailable()) {
-          const [esResult, chResult] = await Promise.allSettled([
-            this.esService.getTopUsedDocuments(
-              projectId,
-              startDate,
-              endDate,
-              filters,
-            ),
-            this.chService.getTopUsedDocuments(
-              projectId,
-              startDate,
-              endDate,
-              filters,
-            ),
-          ]);
-
-          const esData =
-            esResult.status === "fulfilled" ? esResult.value : undefined;
-          const chData =
-            chResult.status === "fulfilled" ? chResult.value : undefined;
-
-          if (esData && chData) {
-            this.comparator.compare(
-              "getTopUsedDocuments",
-              { projectId, startDate, endDate },
-              esData,
-              chData,
-            );
-          }
-
-          if (useClickHouse && chData) {
-            return chData;
-          }
-          if (esData) {
-            return esData;
-          }
-          throw new Error("Both ES and CH topUsedDocuments queries failed");
-        }
-
-        if (useClickHouse) {
-          return this.chService.getTopUsedDocuments(
-            projectId,
-            startDate,
-            endDate,
-            filters,
-          );
-        }
-        return this.esService.getTopUsedDocuments(
-          projectId,
-          startDate,
-          endDate,
-          filters,
-        );
-      },
+    return this.executeWithRouting(
+      "getTopUsedDocuments",
+      projectId,
+      { projectId, startDate, endDate },
+      () =>
+        this.esService.getTopUsedDocuments(projectId, startDate, endDate, filters),
+      () =>
+        this.chService.getTopUsedDocuments(projectId, startDate, endDate, filters),
     );
   }
 
@@ -367,50 +299,12 @@ export class AnalyticsService {
       >
     >,
   ): Promise<FeedbacksResult> {
-    return this.tracer.withActiveSpan(
-      "AnalyticsService.getFeedbacks",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        const comparisonMode = this.isComparisonModeEnabled();
-
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
-        span.setAttribute("comparison.mode", comparisonMode);
-
-        if (comparisonMode && this.chService.isAvailable()) {
-          const [esResult, chResult] = await Promise.allSettled([
-            this.esService.getFeedbacks(projectId, startDate, endDate, filters),
-            this.chService.getFeedbacks(projectId, startDate, endDate, filters),
-          ]);
-
-          const esData =
-            esResult.status === "fulfilled" ? esResult.value : undefined;
-          const chData =
-            chResult.status === "fulfilled" ? chResult.value : undefined;
-
-          if (esData && chData) {
-            this.comparator.compare(
-              "getFeedbacks",
-              { projectId, startDate, endDate },
-              esData,
-              chData,
-            );
-          }
-
-          if (useClickHouse && chData) {
-            return chData;
-          }
-          if (esData) {
-            return esData;
-          }
-          throw new Error("Both ES and CH feedbacks queries failed");
-        }
-
-        if (useClickHouse) {
-          return this.chService.getFeedbacks(projectId, startDate, endDate, filters);
-        }
-        return this.esService.getFeedbacks(projectId, startDate, endDate, filters);
-      },
+    return this.executeWithRouting(
+      "getFeedbacks",
+      projectId,
+      { projectId, startDate, endDate },
+      () => this.esService.getFeedbacks(projectId, startDate, endDate, filters),
+      () => this.chService.getFeedbacks(projectId, startDate, endDate, filters),
     );
   }
 }
