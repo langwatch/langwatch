@@ -1,4 +1,4 @@
-import { Box, Portal, Textarea } from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Textarea } from "@chakra-ui/react";
 import {
   type KeyboardEvent,
   useCallback,
@@ -31,6 +31,60 @@ const JSON_LIKE_TYPES: DatasetColumnType[] = [
   "annotations",
   "evaluations",
 ];
+
+/**
+ * Validate and normalize a boolean value.
+ * Accepts: 0, 1, true, false (case insensitive)
+ * Returns: { valid: true, normalized: "true"|"false" } or { valid: false }
+ */
+const validateBoolean = (
+  value: string,
+): { valid: true; normalized: string } | { valid: false } => {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === "" || trimmed === "true" || trimmed === "1") {
+    return { valid: true, normalized: trimmed === "" ? "" : "true" };
+  }
+  if (trimmed === "false" || trimmed === "0") {
+    return { valid: true, normalized: "false" };
+  }
+  return { valid: false };
+};
+
+/**
+ * Validate a number value.
+ * Accepts: integers, floats, and locale-specific decimal separators (comma or period).
+ * Returns: { valid: true, normalized: string } or { valid: false }
+ */
+const validateNumber = (
+  value: string,
+): { valid: true; normalized: string } | { valid: false } => {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return { valid: true, normalized: "" };
+  }
+
+  // Normalize the string: replace comma with period for decimal separator
+  // This handles both "1,5" (European) and "1.5" (US) formats
+  let normalized = trimmed;
+  if (trimmed.includes(",") && !trimmed.includes(".")) {
+    // Single comma without period - treat comma as decimal separator
+    normalized = trimmed.replace(",", ".");
+  }
+
+  // Validate that the entire string is a valid number
+  // Using a regex to ensure we're not accepting partial parses like "1abc"
+  const numberRegex = /^-?\d+(\.\d+)?$/;
+  if (!numberRegex.test(normalized)) {
+    return { valid: false };
+  }
+
+  const parsed = parseFloat(normalized);
+  if (!isNaN(parsed) && isFinite(parsed)) {
+    return { valid: true, normalized: String(parsed) };
+  }
+
+  return { valid: false };
+};
 
 /**
  * Try to parse and format a value as JSON.
@@ -108,12 +162,14 @@ export function EditableCell({
 
   const [editValue, setEditValue] = useState(value);
   const [editorStyle, setEditorStyle] = useState<React.CSSProperties>({});
+  const [validationError, setValidationError] = useState(false);
   const cellRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Reset edit value when entering edit mode, formatting JSON if applicable
+  // Reset edit value and validation state when entering edit mode, formatting JSON if applicable
   useEffect(() => {
     if (isEditing) {
+      setValidationError(false);
       // For JSON-like types, format the value for easier editing
       const isJsonType = dataType && JSON_LIKE_TYPES.includes(dataType);
       if (isJsonType) {
@@ -168,12 +224,40 @@ export function EditableCell({
   }, [isEditing]);
 
   const handleSave = useCallback(() => {
+    // Validate boolean columns
+    if (dataType === "boolean") {
+      const result = validateBoolean(editValue);
+      if (!result.valid) {
+        setValidationError(true);
+        return;
+      }
+      setCellValue(datasetId, row, columnId, result.normalized);
+      setValidationError(false);
+      setEditingCell(undefined);
+      return;
+    }
+
+    // Validate number columns
+    if (dataType === "number") {
+      const result = validateNumber(editValue);
+      if (!result.valid) {
+        setValidationError(true);
+        return;
+      }
+      setCellValue(datasetId, row, columnId, result.normalized);
+      setValidationError(false);
+      setEditingCell(undefined);
+      return;
+    }
+
+    // Other types: save as-is
     setCellValue(datasetId, row, columnId, editValue);
     setEditingCell(undefined);
-  }, [datasetId, row, columnId, editValue, setCellValue, setEditingCell]);
+  }, [datasetId, row, columnId, editValue, dataType, setCellValue, setEditingCell]);
 
   const handleCancel = useCallback(() => {
     setEditValue(value);
+    setValidationError(false);
     setEditingCell(undefined);
   }, [value, setEditingCell]);
 
@@ -199,10 +283,11 @@ export function EditableCell({
 
   const handleBlur = useCallback(() => {
     // Small delay to allow click events to register first
+    // On blur, cancel without saving (user must press Enter to save)
     setTimeout(() => {
-      handleSave();
+      handleCancel();
     }, 100);
-  }, [handleSave]);
+  }, [handleCancel]);
 
   // Format and truncate display value
   const displayValue = useMemo(() => {
@@ -462,13 +547,21 @@ export function EditableCell({
             style={editorStyle}
             bg="bg.panel"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow={
+              validationError
+                ? "0 0 0 2px var(--chakra-colors-red-solid), 0 4px 12px rgba(0,0,0,0.15)"
+                : "0 0 0 2px var(--chakra-colors-blue-solid), 0 4px 12px rgba(0,0,0,0.15)"
+            }
             overflow="hidden"
+            position="relative"
           >
             <Textarea
               ref={textareaRef}
               value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
+              onChange={(e) => {
+                setEditValue(e.target.value);
+                setValidationError(false);
+              }}
               onKeyDown={handleKeyDown}
               onBlur={handleBlur}
               minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
@@ -479,16 +572,57 @@ export function EditableCell({
               padding={2}
               _focus={{ outline: "none", boxShadow: "none" }}
             />
+            {dataType === "boolean" && (
+              <HStack
+                position="absolute"
+                bottom="32px"
+                left={2}
+                gap={1}
+              >
+                <Button
+                  size="xs"
+                  variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
+                  colorPalette="green"
+                  onClick={() => {
+                    setCellValue(datasetId, row, columnId, "true");
+                    setEditingCell(undefined);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  true
+                </Button>
+                <Button
+                  size="xs"
+                  variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
+                  colorPalette="red"
+                  onClick={() => {
+                    setCellValue(datasetId, row, columnId, "false");
+                    setEditingCell(undefined);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  false
+                </Button>
+              </HStack>
+            )}
             <Box
               paddingX={2}
               paddingY={1}
               fontSize="10px"
-              color="fg.muted"
+              color={validationError ? "red.fg" : "fg.muted"}
               borderTop="1px solid"
-              borderColor="border.muted"
-              bg="bg.subtle"
+              borderColor={validationError ? "red.muted" : "border.muted"}
+              bg={validationError ? "red.subtle" : "bg.subtle"}
             >
-              Enter to save • Escape to cancel • Shift+Enter for newline
+              {validationError ? (
+                dataType === "boolean" ? (
+                  "Invalid value. Use: true, false, 1, or 0"
+                ) : (
+                  "Invalid number"
+                )
+              ) : (
+                "Enter to save • Escape to cancel • Shift+Enter for newline"
+              )}
             </Box>
           </Box>
         </Portal>

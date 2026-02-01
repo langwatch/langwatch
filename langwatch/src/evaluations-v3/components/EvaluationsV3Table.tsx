@@ -250,6 +250,22 @@ export function EvaluationsV3Table({
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
+  // Track target being switched (null when adding new, target ID when switching)
+  const switchingTargetIdRef = useRef<string | null>(null);
+
+  // Wrapper that handles both add and replace (for switch functionality)
+  const addOrReplaceTarget = useCallback(
+    (targetConfig: TargetConfig) => {
+      if (switchingTargetIdRef.current) {
+        // Switch mode: remove old target first, then add new one
+        removeTarget(switchingTargetIdRef.current);
+        switchingTargetIdRef.current = null;
+      }
+      addTarget(targetConfig);
+    },
+    [addTarget, removeTarget],
+  );
+
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
     (savedAgent: TypedAgent) => {
@@ -296,10 +312,10 @@ export function EvaluationsV3Table({
         mappings: {},
         httpConfig, // Only set for HTTP agents
       };
-      addTarget(targetConfig);
+      addOrReplaceTarget(targetConfig);
       closeDrawer();
     },
-    [addTarget, closeDrawer],
+    [addOrReplaceTarget, closeDrawer],
   );
 
   // Handler for when an evaluator is selected as a target from the drawer
@@ -330,10 +346,10 @@ export function EvaluationsV3Table({
         outputs,
         mappings: {},
       };
-      addTarget(targetConfig);
+      addOrReplaceTarget(targetConfig);
       closeDrawer();
     },
-    [addTarget, closeDrawer],
+    [addOrReplaceTarget, closeDrawer],
   );
 
   // Handler for when a prompt is selected from the drawer
@@ -371,8 +387,8 @@ export function EvaluationsV3Table({
         })),
         mappings: {},
       };
-      // addTarget will auto-map based on the real inputs
-      addTarget(targetConfig);
+      // addOrReplaceTarget will auto-map based on the real inputs (and handle switch mode)
+      addOrReplaceTarget(targetConfig);
 
       // Set up flow callbacks for the prompt editor using the centralized helper
       // This ensures we never forget a required callback
@@ -407,7 +423,7 @@ export function EvaluationsV3Table({
       });
     },
     [
-      addTarget,
+      addOrReplaceTarget,
       openDrawer,
       updateTarget,
       setTargetMapping,
@@ -527,6 +543,7 @@ export function EvaluationsV3Table({
   const handleAddTarget = useCallback(() => {
     // Clear any pending mappings from previous flows
     pendingMappingsRef.current = {};
+    // Note: Don't clear switchingTargetIdRef here - it's set by handleSwitchTarget before calling this
 
     // Build available sources for variable mapping (for new prompts)
     const availableSources = buildAvailableSources();
@@ -612,7 +629,7 @@ export function EvaluationsV3Table({
               ? { [currentActiveDatasetId]: storeMappings }
               : {},
         };
-        addTarget(targetConfig);
+        addOrReplaceTarget(targetConfig);
 
         // Clear pending mappings
         pendingMappingsRef.current = {};
@@ -664,7 +681,38 @@ export function EvaluationsV3Table({
     closeDrawer,
     trpcUtils.evaluators.getById,
     project?.id,
+    addOrReplaceTarget,
   ]);
+
+  // Handler for switching a target (replace with another prompt/agent/evaluator)
+  // Opens the specific drawer based on target type
+  const handleSwitchTarget = useCallback(
+    (target: TargetConfig) => {
+      // Store the target ID being switched - will be removed when new target is added
+      switchingTargetIdRef.current = target.id;
+
+      // Set up flow callbacks (same as handleAddTarget but we open specific drawer)
+      setFlowCallbacks("promptList", {
+        onSelect: handleSelectPrompt,
+      });
+      setFlowCallbacks("agentList", {
+        onSelect: handleSelectSavedAgent,
+      });
+      setFlowCallbacks("evaluatorList", {
+        onSelect: handleSelectEvaluatorAsTarget,
+      });
+
+      // Open the specific drawer based on target type
+      if (target.type === "prompt") {
+        openDrawer("promptList");
+      } else if (target.type === "agent") {
+        openDrawer("agentList");
+      } else if (target.type === "evaluator") {
+        openDrawer("evaluatorList");
+      }
+    },
+    [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
+  );
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
@@ -963,6 +1011,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       // Execution handlers
@@ -990,6 +1039,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       handleRunTarget,

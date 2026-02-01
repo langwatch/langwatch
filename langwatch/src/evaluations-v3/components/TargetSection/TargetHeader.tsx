@@ -11,6 +11,7 @@ import {
 import { keyframes } from "@emotion/react";
 import { memo, useMemo, useState } from "react";
 import {
+  LuArrowLeftRight,
   LuChevronDown,
   LuCircleAlert,
   LuCircleCheck,
@@ -48,6 +49,7 @@ type TargetHeaderProps = {
   target: TargetConfig;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
+  onSwitch?: (target: TargetConfig) => void;
   onRemove?: (targetId: string) => void;
   onRun?: (target: TargetConfig) => void;
   onStop?: () => void;
@@ -72,6 +74,7 @@ export const TargetHeader = memo(function TargetHeader({
   target,
   onEdit,
   onDuplicate,
+  onSwitch,
   onRemove,
   onRun,
   onStop,
@@ -240,6 +243,13 @@ export const TargetHeader = memo(function TargetHeader({
         ? "Edit Evaluator"
         : "Edit Agent";
 
+  const switchLabel =
+    target.type === "prompt"
+      ? "Switch Prompt"
+      : target.type === "evaluator"
+        ? "Switch Evaluator"
+        : "Switch Agent";
+
   return (
     <HStack gap={2} width="full" marginY={-2}>
       <Menu.Root
@@ -337,6 +347,12 @@ export const TargetHeader = memo(function TargetHeader({
             <HStack gap={2}>
               <LuCopy size={14} />
               <Text>Duplicate</Text>
+            </HStack>
+          </Menu.Item>
+          <Menu.Item value="switch" onClick={() => onSwitch?.(target)}>
+            <HStack gap={2}>
+              <LuArrowLeftRight size={14} />
+              <Text>{switchLabel}</Text>
             </HStack>
           </Menu.Item>
           <Box borderTopWidth="1px" borderColor="border" my={1} />

@@ -20,6 +20,7 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { parseLLMError } from "~/utils/formatLLMError";
+import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
@@ -179,11 +180,13 @@ export function TargetCellContent({
           })),
         });
       }
+      // Use local config outputs if available (unsaved changes), fallback to saved outputs
+      const effectiveOutputs = target.localPromptConfig?.outputs ?? target.outputs;
       availableSources.push({
         id: target.id,
         name: target.name,
         type: "signature" as const,
-        fields: target.outputs.map((o) => ({
+        fields: effectiveOutputs.map((o) => ({
           name: o.identifier,
           type: o.type as "str" | "float" | "bool",
         })),
@@ -233,12 +236,11 @@ export function TargetCellContent({
     ],
   );
 
-  const rawOutput =
-    output === null || output === undefined
-      ? ""
-      : typeof output === "object"
-        ? JSON.stringify(output, null, 2)
-        : String(output);
+  // Use shared utility for consistent output formatting
+  // Handles the "single output key" unwrap rule:
+  // - {output: "hello"} -> "hello"
+  // - {pizza: false} -> '{"pizza": false}' (formatted JSON)
+  const rawOutput = formatTargetOutput(output);
 
   // Truncate for performance (but keep full text for expanded view)
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;

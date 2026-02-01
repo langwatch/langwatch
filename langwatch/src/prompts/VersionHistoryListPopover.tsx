@@ -6,6 +6,7 @@ import {
   HStack,
   Separator,
   Spacer,
+  Spinner,
   Tag,
   Text,
   useDisclosure,
@@ -179,6 +180,29 @@ function VersionHistoryList({
   /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
   currentVersionId?: string;
 }) {
+  // Show loading state
+  if (isLoading) {
+    return (
+      <VStack align="center" width="full" padding={8}>
+        <Spinner size="md" />
+        <Text fontSize="sm" color="fg.muted">
+          Loading versions...
+        </Text>
+      </VStack>
+    );
+  }
+
+  // Show empty state
+  if (versions.length === 0) {
+    return (
+      <VStack align="center" width="full" padding={8}>
+        <Text fontSize="sm" color="fg.muted">
+          No version history available
+        </Text>
+      </VStack>
+    );
+  }
+
   return (
     <VStack
       align="start"

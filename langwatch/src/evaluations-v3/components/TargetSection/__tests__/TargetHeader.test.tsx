@@ -41,6 +41,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe("TargetHeader", () => {
   const mockOnEdit = vi.fn();
   const mockOnDuplicate = vi.fn();
+  const mockOnSwitch = vi.fn();
   const mockOnRemove = vi.fn();
 
   beforeEach(() => {
@@ -165,6 +166,46 @@ describe("TargetHeader", () => {
       await user.click(screen.getByText("Remove from Workbench"));
 
       expect(mockOnRemove).toHaveBeenCalledWith(promptTarget.id);
+    });
+
+    it("shows Switch Prompt option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Prompt")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Prompt", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Prompt")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Prompt"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(promptTarget);
     });
   });
 
@@ -307,6 +348,123 @@ describe("TargetHeader", () => {
       await user.click(screen.getByText("Edit Agent"));
 
       expect(mockOnEdit).toHaveBeenCalledWith(agentTarget);
+    });
+
+    it("shows Switch Agent option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={agentTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Agent")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Agent", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={agentTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Agent")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Agent"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(agentTarget);
+    });
+  });
+
+  describe("Evaluator target", () => {
+    const evaluatorTarget: TargetConfig = {
+      id: "target-3",
+      name: "Quality Checker",
+      type: "evaluator",
+      targetEvaluatorId: "evaluator-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    it("renders evaluator target with name", () => {
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByText("Quality Checker")).toBeInTheDocument();
+    });
+
+    it("shows Edit Evaluator option for evaluators", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Edit Evaluator")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Switch Evaluator option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Evaluator")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Evaluator", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Evaluator"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(evaluatorTarget);
     });
   });
 
