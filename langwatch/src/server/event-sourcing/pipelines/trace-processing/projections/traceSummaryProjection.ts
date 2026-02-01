@@ -85,8 +85,9 @@ export interface TraceSummaryData {
   Attributes: Record<string, string>;
 
   // Timestamps
-  CreatedAt: number;
-  LastUpdatedAt: number;
+  OccurredAt: number; // trace execution start time
+  CreatedAt: number; // record creation time
+  LastUpdatedAt: number; // record update time (used by RMT for versioning)
 }
 
 /**

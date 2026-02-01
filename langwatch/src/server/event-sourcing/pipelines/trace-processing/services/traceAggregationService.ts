@@ -298,6 +298,7 @@ const extractTraceAttributes = (
   spans: NormalizedSpan[],
 ): Record<string, string> => {
   const attributes: Record<string, string> = {};
+  let foundUserId = false;
 
   for (const span of spans) {
     const spanAttrs = span.spanAttributes;
@@ -346,9 +347,31 @@ const extractTraceAttributes = (
     }
     if (typeof userId === "string" && !attributes["langwatch.user_id"]) {
       attributes["langwatch.user_id"] = userId;
+      foundUserId = true;
     }
     if (typeof customerId === "string" && !attributes["langwatch.customer_id"]) {
       attributes["langwatch.customer_id"] = customerId;
+    }
+
+    // Diagnostic logging: if this span has user-related keys but we haven't found userId yet
+    if (
+      !foundUserId &&
+      Object.keys(spanAttrs).some((k) => k.toLowerCase().includes("user"))
+    ) {
+      logger.debug(
+        {
+          traceId: span.traceId,
+          spanName: span.name,
+          userRelatedKeys: Object.keys(spanAttrs).filter((k) =>
+            k.toLowerCase().includes("user"),
+          ),
+          langwatchUserId: spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID],
+          langwatchUserIdLegacy: spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY],
+          langwatchUserIdLegacyRoot:
+            spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY_ROOT],
+        },
+        "Span has user-related keys but no userId extracted yet",
+      );
     }
 
     // LangGraph metadata
@@ -405,6 +428,18 @@ const extractTraceAttributes = (
         // Ignore parse errors
       }
     }
+  }
+
+  // Diagnostic: log if no user_id found after checking all spans
+  if (!foundUserId && spans.length > 0) {
+    logger.debug(
+      {
+        traceId: spans[0]?.traceId,
+        spanCount: spans.length,
+        extractedAttributeKeys: Object.keys(attributes),
+      },
+      "No user_id found in any span for trace",
+    );
   }
 
   return attributes;
