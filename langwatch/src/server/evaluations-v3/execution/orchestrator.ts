@@ -19,6 +19,13 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import { getBatchEvaluationProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import type {
+  CompleteBatchEvaluationCommandData,
+  RecordEvaluatorResultCommandData,
+  RecordTargetResultCommandData,
+  StartBatchEvaluationCommandData,
+} from "~/server/event-sourcing/pipelines/batch-evaluation-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -53,6 +60,78 @@ const DEFAULT_CONCURRENCY = parseInt(
   process.env.EVAL_V3_CONCURRENCY ?? "10",
   10,
 );
+
+/**
+ * Dispatches start batch evaluation command to ClickHouse via event sourcing.
+ * Fire-and-forget - errors are logged but don't affect the main execution.
+ */
+const dispatchStartBatchEvaluation = async (
+  payload: StartBatchEvaluationCommandData,
+): Promise<void> => {
+  try {
+    const pipeline = getBatchEvaluationProcessingPipeline();
+    await pipeline.commands.startBatchEvaluation.send(payload);
+  } catch (error) {
+    logger.warn(
+      { error, runId: payload.runId },
+      "Failed to dispatch start batch evaluation event to ClickHouse",
+    );
+  }
+};
+
+/**
+ * Dispatches record target result command to ClickHouse via event sourcing.
+ * Fire-and-forget - errors are logged but don't affect the main execution.
+ */
+const dispatchRecordTargetResult = async (
+  payload: RecordTargetResultCommandData,
+): Promise<void> => {
+  try {
+    const pipeline = getBatchEvaluationProcessingPipeline();
+    await pipeline.commands.recordTargetResult.send(payload);
+  } catch (error) {
+    logger.warn(
+      { error, runId: payload.runId },
+      "Failed to dispatch record target result event to ClickHouse",
+    );
+  }
+};
+
+/**
+ * Dispatches record evaluator result command to ClickHouse via event sourcing.
+ * Fire-and-forget - errors are logged but don't affect the main execution.
+ */
+const dispatchRecordEvaluatorResult = async (
+  payload: RecordEvaluatorResultCommandData,
+): Promise<void> => {
+  try {
+    const pipeline = getBatchEvaluationProcessingPipeline();
+    await pipeline.commands.recordEvaluatorResult.send(payload);
+  } catch (error) {
+    logger.warn(
+      { error, runId: payload.runId },
+      "Failed to dispatch record evaluator result event to ClickHouse",
+    );
+  }
+};
+
+/**
+ * Dispatches complete batch evaluation command to ClickHouse via event sourcing.
+ * Fire-and-forget - errors are logged but don't affect the main execution.
+ */
+const dispatchCompleteBatchEvaluation = async (
+  payload: CompleteBatchEvaluationCommandData,
+): Promise<void> => {
+  try {
+    const pipeline = getBatchEvaluationProcessingPipeline();
+    await pipeline.commands.completeBatchEvaluation.send(payload);
+  } catch (error) {
+    logger.warn(
+      { error, runId: payload.runId },
+      "Failed to dispatch complete batch evaluation event to ClickHouse",
+    );
+  }
+};
 
 /**
  * Input data required to run the orchestrator.
@@ -582,6 +661,16 @@ export async function* runOrchestrator(
       total: totalCells,
       targets: targetMetadata,
     });
+
+    // Dispatch event to ClickHouse for dual-write
+    void dispatchStartBatchEvaluation({
+      tenantId: projectId,
+      runId,
+      experimentId,
+      workflowVersionId: workflowVersionId ?? null,
+      total: totalCells,
+      targets: targetMetadata,
+    });
   }
 
   // Helper to save pending results
@@ -614,7 +703,7 @@ export async function* runOrchestrator(
 
   // Helper to process event for storage
   const processEventForStorage = (event: EvaluationV3Event) => {
-    if (!repository) return;
+    if (!repository || !experimentId) return;
 
     if (event.type === "target_result") {
       // Get the dataset row entry for this row index
@@ -630,6 +719,21 @@ export async function* runOrchestrator(
         duration: event.duration ?? null,
         error: event.error ?? null,
         trace_id: event.traceId ?? null,
+      });
+
+      // Dispatch event to ClickHouse for dual-write
+      void dispatchRecordTargetResult({
+        tenantId: projectId,
+        runId,
+        experimentId,
+        index: event.rowIndex,
+        targetId: event.targetId,
+        entry: datasetEntry,
+        predicted: event.output ? { output: event.output } : null,
+        cost: event.cost ?? null,
+        duration: event.duration ?? null,
+        error: event.error ?? null,
+        traceId: event.traceId ?? null,
       });
     } else if (event.type === "error") {
       // Store error events as dataset entries with the error message
@@ -647,6 +751,21 @@ export async function* runOrchestrator(
           error: event.message,
           trace_id: null,
         });
+
+        // Dispatch error as target result to ClickHouse
+        void dispatchRecordTargetResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          entry: datasetEntry,
+          predicted: null,
+          cost: null,
+          duration: null,
+          error: event.message,
+          traceId: null,
+        });
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
@@ -662,6 +781,31 @@ export async function* runOrchestrator(
         name: dbEvaluator?.name ?? null,
         target_id: event.targetId,
         index: event.rowIndex,
+        status: result.status,
+        score: result.status === "processed" ? result.score : null,
+        label: result.status === "processed" ? result.label : null,
+        passed: result.status === "processed" ? result.passed : null,
+        details:
+          result.status === "error"
+            ? result.details
+            : result.status === "processed"
+              ? result.details
+              : null,
+        cost:
+          result.status === "processed" && result.cost
+            ? result.cost.amount
+            : null,
+      });
+
+      // Dispatch event to ClickHouse for dual-write
+      void dispatchRecordEvaluatorResult({
+        tenantId: projectId,
+        runId,
+        experimentId,
+        index: event.rowIndex,
+        targetId: event.targetId,
+        evaluatorId: event.evaluatorId,
+        evaluatorName: evaluatorConfig?.name ?? null,
         status: result.status,
         score: result.status === "processed" ? result.score : null,
         label: result.status === "processed" ? result.label : null,
@@ -903,6 +1047,14 @@ export async function* runOrchestrator(
           runId,
           finishedAt: aborted ? undefined : finishedAt,
           stoppedAt: aborted ? finishedAt : undefined,
+        });
+
+        // Dispatch completion event to ClickHouse for dual-write
+        void dispatchCompleteBatchEvaluation({
+          tenantId: projectId,
+          runId,
+          finishedAt: aborted ? null : finishedAt,
+          stoppedAt: aborted ? finishedAt : null,
         });
       } catch (error) {
         logger.error(
