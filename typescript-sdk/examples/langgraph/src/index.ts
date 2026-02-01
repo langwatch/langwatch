@@ -2,10 +2,7 @@ import { setupObservability } from "langwatch/observability/node";
 import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
 import { getLangWatchTracer } from "langwatch";
 import { ChatOpenAI } from "@langchain/openai";
-import {
-  HumanMessage,
-  SystemMessage,
-} from "@langchain/core/messages";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { StateGraph, END, START } from "@langchain/langgraph";
 import { MemorySaver } from "@langchain/langgraph";
 import * as readline from "readline";
@@ -51,7 +48,6 @@ async function main() {
   // Initialize LangChain components
   const chatModel = new ChatOpenAI({
     modelName: "gpt-5",
-    temperature: 0.3,
   });
 
   // Mock search tool for demo purposes
@@ -77,14 +73,12 @@ async function main() {
     Respond with just "YES" if web search is needed, "NO" if general knowledge is sufficient.
     `;
 
-    const result = await chatModel.invoke(
-      [
-        new SystemMessage(
-          "You are a question analyzer. Respond with only YES or NO."
-        ),
-        new HumanMessage(prompt),
-      ],
-    );
+    const result = await chatModel.invoke([
+      new SystemMessage(
+        "You are a question analyzer. Respond with only YES or NO.",
+      ),
+      new HumanMessage(prompt),
+    ]);
 
     const needsSearch = (result.content as string)
       .toUpperCase()
@@ -122,14 +116,12 @@ async function main() {
     Provide a thorough analysis of this question, considering multiple perspectives and available information.
     `;
 
-    const result = await chatModel.invoke(
-      [
-        new SystemMessage(
-          "You are an expert analyst. Provide comprehensive analysis."
-        ),
-        new HumanMessage(prompt),
-      ],
-    );
+    const result = await chatModel.invoke([
+      new SystemMessage(
+        "You are an expert analyst. Provide comprehensive analysis.",
+      ),
+      new HumanMessage(prompt),
+    ]);
 
     return {
       current_step: "analysis_completed",
@@ -151,14 +143,12 @@ async function main() {
     Based on the analysis and available information, provide a comprehensive, well-structured answer.
     `;
 
-    const result = await chatModel.invoke(
-      [
-        new SystemMessage(
-          "You are a helpful assistant. Provide clear, comprehensive answers."
-        ),
-        new HumanMessage(prompt),
-      ],
-    );
+    const result = await chatModel.invoke([
+      new SystemMessage(
+        "You are a helpful assistant. Provide clear, comprehensive answers.",
+      ),
+      new HumanMessage(prompt),
+    ]);
 
     return {
       current_step: "answer_generated",
@@ -259,7 +249,7 @@ async function main() {
           "langwatch.tags": ["langgraph", "research-agent", "multi-step"],
         },
       },
-      async span => {
+      async (span) => {
         span.setType("workflow");
 
         try {
@@ -285,7 +275,7 @@ async function main() {
 
           console.log("🤖 Processing through LangGraph research workflow...");
           console.log(
-            "📊 Graph nodes: analyze_question → [search?] → analyze → generate_answer → quality_control"
+            "📊 Graph nodes: analyze_question → [search?] → analyze → generate_answer → quality_control",
           );
           console.log("---");
 
@@ -338,14 +328,14 @@ async function main() {
                   code: "green",
                   blockquote: "yellow",
                 },
-              })
+              }),
             );
           }
 
           // Show workflow statistics
           console.log(`\n📈 Workflow Statistics:`);
           console.log(
-            `   Search performed: ${finalState.needs_search ? "Yes" : "No"}`
+            `   Search performed: ${finalState.needs_search ? "Yes" : "No"}`,
           );
           console.log(`   Total iterations: ${finalState.iterations}`);
           console.log(`   Final step: ${finalState.current_step}`);
@@ -354,7 +344,7 @@ async function main() {
           console.error("❌ Error:", error);
           console.log("Please try again.");
         }
-      }
+      },
     );
 
     if (finish) {
