@@ -5,6 +5,10 @@
  */
 
 import {
+  BATCH_EVALUATION_PROCESSING_COMMAND_TYPES,
+  BATCH_EVALUATION_PROCESSING_EVENT_TYPES,
+} from "../pipelines/batch-evaluation-processing/schemas/constants";
+import {
   EVALUATION_PROCESSING_COMMAND_TYPES,
   EVALUATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/evaluation-processing/schemas/constants";
@@ -25,6 +29,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
+  ...BATCH_EVALUATION_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -34,6 +39,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
+  ...BATCH_EVALUATION_PROCESSING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -50,5 +56,6 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
 export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trace",
   "evaluation",
+  "batch_evaluation_run",
   TEST_AGGREGATE_TYPE,
 ] as const;

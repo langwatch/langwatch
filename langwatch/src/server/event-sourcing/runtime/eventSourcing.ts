@@ -9,6 +9,7 @@ import type {
   StaticPipelineDefinition,
 } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
+import { batchEvaluationProcessingPipelineDefinition } from "../pipelines/batch-evaluation-processing/pipeline";
 import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
@@ -335,4 +336,12 @@ export const getTraceProcessingPipeline = createLazyPipeline(() =>
  */
 export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(evaluationProcessingPipelineDefinition),
+);
+
+/**
+ * Returns the batch evaluation processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export const getBatchEvaluationProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(batchEvaluationProcessingPipelineDefinition),
 );
