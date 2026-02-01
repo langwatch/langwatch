@@ -1,5 +1,7 @@
+import type { PIIRedactionLevel, PrismaClient } from "@prisma/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
 import {
@@ -7,6 +9,7 @@ import {
   defineCommandSchema,
   EventUtils,
 } from "../../../library";
+import type { OtlpSpan } from "../schemas/otlp";
 import type { RecordSpanCommandData } from "../schemas/commands";
 import { recordSpanCommandDataSchema } from "../schemas/commands";
 import {
@@ -15,7 +18,23 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
+import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
+
+/**
+ * Dependencies for RecordSpanCommand that can be injected for testing.
+ */
+export interface RecordSpanCommandDependencies {
+  prisma: Pick<PrismaClient, "project">;
+  piiRedactionService: {
+    redactSpan: (span: OtlpSpan, level: PIIRedactionLevel) => Promise<void>;
+  };
+}
+
+const defaultDependencies: RecordSpanCommandDependencies = {
+  prisma: defaultPrisma,
+  piiRedactionService: new OtlpSpanPiiRedactionService(),
+};
 
 /**
  * Command handler for recording spans in the trace processing pipeline.
@@ -35,6 +54,11 @@ export class RecordSpanCommand
   private readonly logger = createLogger(
     "langwatch:trace-processing:record-span",
   );
+  private readonly deps: RecordSpanCommandDependencies;
+
+  constructor(deps: Partial<RecordSpanCommandDependencies> = {}) {
+    this.deps = { ...defaultDependencies, ...deps };
+  }
 
   async handle(
     command: Command<RecordSpanCommandData>,
@@ -63,6 +87,21 @@ export class RecordSpanCommand
             spanId,
           },
           "Handling record span command",
+        );
+
+        // Fetch project's PII redaction level and apply redaction before creating event
+        // The service handles DISABLE_PII_REDACTION env var and DISABLED level checks
+        const project = await this.deps.prisma.project.findUnique({
+          where: { id: tenantIdStr },
+          select: { piiRedactionLevel: true },
+        });
+
+        // Default to ESSENTIAL if project not found (defensive behavior)
+        const piiRedactionLevel = project?.piiRedactionLevel ?? "ESSENTIAL";
+
+        await this.deps.piiRedactionService.redactSpan(
+          commandData.span,
+          piiRedactionLevel,
         );
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
