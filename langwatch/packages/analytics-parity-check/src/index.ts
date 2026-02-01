@@ -13,6 +13,7 @@ import { executeStructuredQueries, pollUntilTracesReady } from "./analytics-clie
 import {
   compareAllResults,
   formatComparisonReport,
+  formatDebugReport,
   generateSummary,
 } from "./comparator.js";
 import type { Config, VerificationReport } from "./types.js";
@@ -51,12 +52,25 @@ function loadConfig(): Config {
 }
 
 /**
+ * Check if verbose mode is enabled via CLI flags
+ */
+function isVerboseMode(): boolean {
+  return process.argv.includes("--verbose") || process.argv.includes("-v") || process.argv.includes("--debug");
+}
+
+/**
  * Main execution function
  */
 async function main(): Promise<void> {
+  const verbose = isVerboseMode();
+
   console.log("\n========================================");
   console.log("   ANALYTICS PARITY CHECK");
   console.log("========================================\n");
+
+  if (verbose) {
+    console.log("  [Verbose mode enabled]");
+  }
 
   const config = loadConfig();
 
@@ -180,12 +194,43 @@ async function main(): Promise<void> {
     summary,
   };
 
+  // Add debug information to report when verbose mode is enabled
+  if (verbose) {
+    report.debug = {
+      esQueries: esResults.queries.map((q) => ({
+        name: q.name,
+        type: q.type,
+        input: q.input,
+        result: q.result,
+        rawResponse: q.rawResponse,
+        error: q.error,
+      })),
+      chQueries: chResults.queries.map((q) => ({
+        name: q.name,
+        type: q.type,
+        input: q.input,
+        result: q.result,
+        rawResponse: q.rawResponse,
+        error: q.error,
+      })),
+    };
+  }
+
   console.log(formatComparisonReport(comparisons));
+
+  // Show debug report for failed queries when verbose
+  if (verbose && !summary.overallPassed) {
+    console.log(formatDebugReport(comparisons, esResults, chResults));
+  }
 
   const reportPath = `parity-report-${runPrefix}.json`;
   const fs = await import("node:fs/promises");
   await fs.writeFile(reportPath, JSON.stringify(report, null, 2));
   console.log(`\nFull report saved to: ${reportPath}`);
+
+  if (verbose) {
+    console.log(`\n  [Verbose mode: Full query details included in JSON report]`);
+  }
 
   process.exit(summary.overallPassed ? 0 : 1);
 }

@@ -114,6 +114,21 @@ export interface VerificationReport {
     passedQueries: number;
     failedQueries: number;
   };
+  // Debug information (included when verbose mode is enabled)
+  debug?: {
+    esQueries: StructuredQueryDetail[];
+    chQueries: StructuredQueryDetail[];
+  };
+}
+
+// Enhanced query detail for debugging
+export interface StructuredQueryDetail {
+  name: string;
+  type: "timeseries" | "filter" | "documents" | "feedbacks";
+  input: unknown;
+  result: unknown;
+  rawResponse?: unknown;
+  error: string | null;
 }
 
 // CLI configuration

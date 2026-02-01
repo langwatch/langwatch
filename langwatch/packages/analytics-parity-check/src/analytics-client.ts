@@ -25,6 +25,7 @@ interface AnalyticsQueryResult {
 interface TrpcQueryResult<T> {
   data: T | null;
   error: string | null;
+  rawResponse?: unknown;
 }
 
 /**
@@ -53,11 +54,11 @@ async function executeTrpcQuery<T>(
       const text = await response.text();
       const errorMsg = `HTTP ${response.status}: ${text.slice(0, 200)}`;
       console.error(`tRPC query failed for ${procedure}: ${errorMsg}`);
-      return { data: null, error: errorMsg };
+      return { data: null, error: errorMsg, rawResponse: { status: response.status, body: text.slice(0, 500) } };
     }
 
     const result = await response.json() as { result?: { data?: { json?: T } } };
-    return { data: result.result?.data?.json ?? null, error: null };
+    return { data: result.result?.data?.json ?? null, error: null, rawResponse: result };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`tRPC query error for ${procedure}:`, errorMsg);
@@ -89,12 +90,12 @@ export async function queryTimeseries(
       const text = await response.text();
       const errorMsg = `HTTP ${response.status}: ${text.slice(0, 200)}`;
       console.error(`REST analytics query failed: ${errorMsg}`);
-      return { data: null, error: errorMsg };
+      return { data: null, error: errorMsg, rawResponse: { status: response.status, body: text.slice(0, 500) } };
     }
 
     // REST endpoint returns the result directly (not wrapped like tRPC)
     const result = await response.json() as TimeseriesResult;
-    return { data: result, error: null };
+    return { data: result, error: null, rawResponse: result };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`REST analytics query error:`, errorMsg);
@@ -424,6 +425,7 @@ export interface StructuredQueryResults {
     type: "timeseries" | "filter" | "documents" | "feedbacks";
     input: unknown;
     result: unknown;
+    rawResponse?: unknown;
     error: string | null;
   }[];
   totalQueries: number;
@@ -463,6 +465,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: traceCountInput,
     result: traceCountResult.data,
+    rawResponse: traceCountResult.rawResponse,
     error: traceCountResult.error,
   });
 
@@ -478,6 +481,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: userCountInput,
     result: userCountResult.data,
+    rawResponse: userCountResult.rawResponse,
     error: userCountResult.error,
   });
 
@@ -493,6 +497,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: costSumInput,
     result: costSumResult.data,
+    rawResponse: costSumResult.rawResponse,
     error: costSumResult.error,
   });
 
@@ -511,6 +516,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: tokenCountInput,
     result: tokenCountResult.data,
+    rawResponse: tokenCountResult.rawResponse,
     error: tokenCountResult.error,
   });
 
@@ -526,6 +532,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: avgTimeInput,
     result: avgTimeResult.data,
+    rawResponse: avgTimeResult.rawResponse,
     error: avgTimeResult.error,
   });
 
@@ -541,6 +548,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: p99TimeInput,
     result: p99TimeResult.data,
+    rawResponse: p99TimeResult.rawResponse,
     error: p99TimeResult.error,
   });
 
@@ -560,6 +568,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: threadCountInput,
     result: threadCountResult.data,
+    rawResponse: threadCountResult.rawResponse,
     error: threadCountResult.error,
   });
 
@@ -575,6 +584,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: firstTokenAvgInput,
     result: firstTokenAvgResult.data,
+    rawResponse: firstTokenAvgResult.rawResponse,
     error: firstTokenAvgResult.error,
   });
 
@@ -590,6 +600,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: firstTokenP99Input,
     result: firstTokenP99Result.data,
+    rawResponse: firstTokenP99Result.rawResponse,
     error: firstTokenP99Result.error,
   });
 
@@ -605,6 +616,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: medianTimeInput,
     result: medianTimeResult.data,
+    rawResponse: medianTimeResult.rawResponse,
     error: medianTimeResult.error,
   });
 
@@ -620,6 +632,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: p90TimeInput,
     result: p90TimeResult.data,
+    rawResponse: p90TimeResult.rawResponse,
     error: p90TimeResult.error,
   });
 
@@ -635,6 +648,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: p95TimeInput,
     result: p95TimeResult.data,
+    rawResponse: p95TimeResult.rawResponse,
     error: p95TimeResult.error,
   });
 
@@ -650,6 +664,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: minTimeInput,
     result: minTimeResult.data,
+    rawResponse: minTimeResult.rawResponse,
     error: minTimeResult.error,
   });
 
@@ -665,6 +680,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: maxTimeInput,
     result: maxTimeResult.data,
+    rawResponse: maxTimeResult.rawResponse,
     error: maxTimeResult.error,
   });
 
@@ -680,6 +696,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: totalTokensInput,
     result: totalTokensResult.data,
+    rawResponse: totalTokensResult.rawResponse,
     error: totalTokensResult.error,
   });
 
@@ -695,6 +712,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: tokensPerSecondInput,
     result: tokensPerSecondResult.data,
+    rawResponse: tokensPerSecondResult.rawResponse,
     error: tokensPerSecondResult.error,
   });
 
@@ -715,6 +733,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: groupByUserInput,
     result: groupByUserResult.data,
+    rawResponse: groupByUserResult.rawResponse,
     error: groupByUserResult.error,
   });
 
@@ -734,6 +753,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: groupByModelInput,
     result: groupByModelResult.data,
+    rawResponse: groupByModelResult.rawResponse,
     error: groupByModelResult.error,
   });
 
@@ -750,6 +770,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: groupByLabelsInput,
     result: groupByLabelsResult.data,
+    rawResponse: groupByLabelsResult.rawResponse,
     error: groupByLabelsResult.error,
   });
 
@@ -766,6 +787,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: groupBySpanTypeInput,
     result: groupBySpanTypeResult.data,
+    rawResponse: groupBySpanTypeResult.rawResponse,
     error: groupBySpanTypeResult.error,
   });
 
@@ -791,6 +813,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: filterByLLMInput,
     result: filterByLLMResult.data,
+    rawResponse: filterByLLMResult.rawResponse,
     error: filterByLLMResult.error,
   });
 
@@ -812,6 +835,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: filterByLabelInput,
     result: filterByLabelResult.data,
+    rawResponse: filterByLabelResult.rawResponse,
     error: filterByLabelResult.error,
   });
 
@@ -830,6 +854,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: filterByErrorInput,
     result: filterByErrorResult.data,
+    rawResponse: filterByErrorResult.rawResponse,
     error: filterByErrorResult.error,
   });
 
@@ -848,6 +873,7 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: filterByRAGInput,
     result: filterByRAGResult.data,
+    rawResponse: filterByRAGResult.rawResponse,
     error: filterByRAGResult.error,
   });
 
@@ -869,7 +895,188 @@ export async function executeStructuredQueries(
     type: "timeseries",
     input: filterByModelInput,
     result: filterByModelResult.data,
+    rawResponse: filterByModelResult.rawResponse,
     error: filterByModelResult.error,
+  });
+
+  // =====================================================
+  // USER THREADS PANEL QUERIES
+  // =====================================================
+
+  // Average threads per user (pipeline aggregation)
+  const avgThreadsPerUserInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+      pipeline: { field: "user_id", aggregation: "avg" }
+    }],
+    timeScale: "full",  // Required for pipeline aggregations
+    timeZone: "UTC",
+  };
+  const avgThreadsPerUserResult = await queryTimeseries(baseUrl, apiKey, avgThreadsPerUserInput);
+  queries.push({
+    name: "timeseries_avg_threads_per_user",
+    type: "timeseries",
+    input: avgThreadsPerUserInput,
+    result: avgThreadsPerUserResult.data,
+    rawResponse: avgThreadsPerUserResult.rawResponse,
+    error: avgThreadsPerUserResult.error,
+  });
+
+  // Average thread duration
+  const avgThreadDurationInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{ metric: "threads.average_duration_per_thread", aggregation: "avg" }],
+    timeScale: "full",  // Required for special subquery metrics
+    timeZone: "UTC",
+  };
+  const avgThreadDurationResult = await queryTimeseries(baseUrl, apiKey, avgThreadDurationInput);
+  queries.push({
+    name: "timeseries_avg_thread_duration",
+    type: "timeseries",
+    input: avgThreadDurationInput,
+    result: avgThreadDurationResult.data,
+    rawResponse: avgThreadDurationResult.rawResponse,
+    error: avgThreadDurationResult.error,
+  });
+
+  // Average messages per user (pipeline aggregation)
+  const avgMessagesPerUserInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: { field: "user_id", aggregation: "avg" }
+    }],
+    timeScale: "full",  // Required for pipeline aggregations
+    timeZone: "UTC",
+  };
+  const avgMessagesPerUserResult = await queryTimeseries(baseUrl, apiKey, avgMessagesPerUserInput);
+  queries.push({
+    name: "timeseries_avg_messages_per_user",
+    type: "timeseries",
+    input: avgMessagesPerUserInput,
+    result: avgMessagesPerUserResult.data,
+    rawResponse: avgMessagesPerUserResult.rawResponse,
+    error: avgMessagesPerUserResult.error,
+  });
+
+  // Average thread duration per user (3-level pipeline aggregation)
+  const avgThreadDurationPerUserInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
+      pipeline: { field: "user_id", aggregation: "avg" }
+    }],
+    timeScale: "full",  // Required for pipeline aggregations
+    timeZone: "UTC",
+  };
+  const avgThreadDurationPerUserResult = await queryTimeseries(baseUrl, apiKey, avgThreadDurationPerUserInput);
+  queries.push({
+    name: "timeseries_avg_thread_duration_per_user",
+    type: "timeseries",
+    input: avgThreadDurationPerUserInput,
+    result: avgThreadDurationPerUserResult.data,
+    rawResponse: avgThreadDurationPerUserResult.rawResponse,
+    error: avgThreadDurationPerUserResult.error,
+  });
+
+  // Full User Threads panel (all 4 metrics together as used in UI)
+  const userThreadsPanelInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [
+      { metric: "metadata.thread_id", aggregation: "cardinality" },
+      { metric: "metadata.thread_id", aggregation: "cardinality", pipeline: { field: "user_id", aggregation: "avg" } },
+      { metric: "threads.average_duration_per_thread", aggregation: "avg", pipeline: { field: "user_id", aggregation: "avg" } },
+      { metric: "metadata.trace_id", aggregation: "cardinality", pipeline: { field: "user_id", aggregation: "avg" } },
+    ],
+    timeScale: "full",
+    timeZone: "UTC",
+  };
+  const userThreadsPanelResult = await queryTimeseries(baseUrl, apiKey, userThreadsPanelInput);
+  queries.push({
+    name: "user_threads_panel_full",
+    type: "timeseries",
+    input: userThreadsPanelInput,
+    result: userThreadsPanelResult.data,
+    rawResponse: userThreadsPanelResult.rawResponse,
+    error: userThreadsPanelResult.error,
+  });
+
+  // =====================================================
+  // SUMMARY PANEL QUERIES
+  // =====================================================
+
+  // Mean tokens per message
+  const meanTokensInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{ metric: "performance.total_tokens", aggregation: "avg" }],
+    timeZone: "UTC",
+  };
+  const meanTokensResult = await queryTimeseries(baseUrl, apiKey, meanTokensInput);
+  queries.push({
+    name: "timeseries_mean_tokens_per_message",
+    type: "timeseries",
+    input: meanTokensInput,
+    result: meanTokensResult.data,
+    rawResponse: meanTokensResult.rawResponse,
+    error: meanTokensResult.error,
+  });
+
+  // Mean cost per message
+  const meanCostInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{ metric: "performance.total_cost", aggregation: "avg" }],
+    timeZone: "UTC",
+  };
+  const meanCostResult = await queryTimeseries(baseUrl, apiKey, meanCostInput);
+  queries.push({
+    name: "timeseries_mean_cost_per_message",
+    type: "timeseries",
+    input: meanCostInput,
+    result: meanCostResult.data,
+    rawResponse: meanCostResult.rawResponse,
+    error: meanCostResult.error,
+  });
+
+  // P90 time to first token
+  const p90FirstTokenInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [{ metric: "performance.first_token", aggregation: "p90" }],
+    timeZone: "UTC",
+  };
+  const p90FirstTokenResult = await queryTimeseries(baseUrl, apiKey, p90FirstTokenInput);
+  queries.push({
+    name: "timeseries_p90_first_token",
+    type: "timeseries",
+    input: p90FirstTokenInput,
+    result: p90FirstTokenResult.data,
+    rawResponse: p90FirstTokenResult.rawResponse,
+    error: p90FirstTokenResult.error,
+  });
+
+  // Full LLM Summary panel (all 4 metrics together as used in UI)
+  const llmSummaryPanelInput: TimeseriesInput = {
+    ...sharedInput,
+    series: [
+      { metric: "performance.total_tokens", aggregation: "avg" },
+      { metric: "performance.total_cost", aggregation: "avg" },
+      { metric: "performance.first_token", aggregation: "p90" },
+      { metric: "performance.completion_time", aggregation: "p90" },
+    ],
+    timeScale: "full",
+    timeZone: "UTC",
+  };
+  const llmSummaryPanelResult = await queryTimeseries(baseUrl, apiKey, llmSummaryPanelInput);
+  queries.push({
+    name: "llm_summary_panel_full",
+    type: "timeseries",
+    input: llmSummaryPanelInput,
+    result: llmSummaryPanelResult.data,
+    rawResponse: llmSummaryPanelResult.rawResponse,
+    error: llmSummaryPanelResult.error,
   });
 
   // NOTE: Filter, Document, and Feedback queries require session auth (tRPC)

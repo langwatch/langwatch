@@ -656,3 +656,118 @@ function formatValue(value: unknown): string {
   }
   return String(value);
 }
+
+/**
+ * Format debug report with full query details for failed comparisons
+ */
+export function formatDebugReport(
+  comparisons: ComparisonResult[],
+  esResults: StructuredQueryResults,
+  chResults: StructuredQueryResults,
+): string {
+  const lines: string[] = [];
+  const failedComparisons = comparisons.filter((c) => !c.passed);
+
+  if (failedComparisons.length === 0) {
+    return "";
+  }
+
+  lines.push("");
+  lines.push("=".repeat(70));
+  lines.push("DEBUG REPORT - FAILED QUERY DETAILS");
+  lines.push("=".repeat(70));
+
+  // Build lookup maps for quick access
+  const esQueryMap = new Map(esResults.queries.map((q) => [q.name, q]));
+  const chQueryMap = new Map(chResults.queries.map((q) => [q.name, q]));
+
+  for (const comparison of failedComparisons) {
+    const esQuery = esQueryMap.get(comparison.queryName);
+    const chQuery = chQueryMap.get(comparison.queryName);
+
+    lines.push("");
+    lines.push("-".repeat(70));
+    lines.push(`QUERY: ${comparison.queryName}`);
+    lines.push("-".repeat(70));
+
+    // Show query input
+    if (esQuery?.input) {
+      lines.push("");
+      lines.push("Query Input:");
+      lines.push(formatJsonIndented(esQuery.input, 2));
+    }
+
+    // Show ES raw response
+    lines.push("");
+    lines.push("ES Raw Response:");
+    if (esQuery?.error) {
+      lines.push(`  ERROR: ${esQuery.error}`);
+    } else if (esQuery?.rawResponse) {
+      lines.push(formatJsonIndented(esQuery.rawResponse, 2));
+    } else {
+      lines.push("  (no response)");
+    }
+
+    // Show CH raw response
+    lines.push("");
+    lines.push("CH Raw Response:");
+    if (chQuery?.error) {
+      lines.push(`  ERROR: ${chQuery.error}`);
+    } else if (chQuery?.rawResponse) {
+      lines.push(formatJsonIndented(chQuery.rawResponse, 2));
+    } else {
+      lines.push("  (no response)");
+    }
+
+    // Show discrepancies summary
+    if (comparison.discrepancies.length > 0) {
+      lines.push("");
+      lines.push("Discrepancies:");
+      for (const disc of comparison.discrepancies.slice(0, 10)) {
+        const percentStr = disc.percentDiff !== undefined
+          ? ` (${(disc.percentDiff * 100).toFixed(1)}% diff)`
+          : "";
+        lines.push(`  - ${disc.path}:`);
+        lines.push(`      ES: ${formatJsonCompact(disc.esValue)}`);
+        lines.push(`      CH: ${formatJsonCompact(disc.chValue)}${percentStr}`);
+      }
+      if (comparison.discrepancies.length > 10) {
+        lines.push(`  ... and ${comparison.discrepancies.length - 10} more discrepancies`);
+      }
+    }
+  }
+
+  lines.push("");
+  lines.push("=".repeat(70));
+
+  return lines.join("\n");
+}
+
+/**
+ * Format JSON with indentation for readability
+ */
+function formatJsonIndented(value: unknown, indent: number): string {
+  const prefix = " ".repeat(indent);
+  try {
+    const json = JSON.stringify(value, null, 2);
+    return json.split("\n").map((line) => prefix + line).join("\n");
+  } catch {
+    return prefix + String(value);
+  }
+}
+
+/**
+ * Format JSON compactly for inline display
+ */
+function formatJsonCompact(value: unknown): string {
+  try {
+    const json = JSON.stringify(value);
+    // Truncate very long values
+    if (json.length > 200) {
+      return json.slice(0, 200) + "...";
+    }
+    return json;
+  } catch {
+    return String(value);
+  }
+}

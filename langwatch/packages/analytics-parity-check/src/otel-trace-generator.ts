@@ -6,7 +6,11 @@
  */
 
 import { getLangWatchTracer, type LangWatchSpan } from "langwatch/observability";
-import { ATTR_GEN_AI_SYSTEM } from "@opentelemetry/semantic-conventions/incubating";
+import {
+  ATTR_GEN_AI_SYSTEM,
+  ATTR_GEN_AI_USAGE_PROMPT_TOKENS,
+  ATTR_GEN_AI_USAGE_COMPLETION_TOKENS,
+} from "@opentelemetry/semantic-conventions/incubating";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { nanoid } from "nanoid";
 
@@ -91,6 +95,9 @@ async function generateLLMTraces(
       span.setRequestModel(model);
       span.setResponseModel(model);
       span.setAttribute(ATTR_GEN_AI_SYSTEM, vendor);
+      // Set GenAI semconv token attributes directly for ClickHouse compatibility
+      span.setAttribute(ATTR_GEN_AI_USAGE_PROMPT_TOKENS, promptTokens);
+      span.setAttribute(ATTR_GEN_AI_USAGE_COMPLETION_TOKENS, completionTokens);
       span.setMetrics({
         promptTokens,
         completionTokens,
@@ -171,6 +178,9 @@ async function generateRAGTraces(
         llmSpan.setRequestModel(model);
         llmSpan.setResponseModel(model);
         llmSpan.setAttribute(ATTR_GEN_AI_SYSTEM, vendor);
+        // Set GenAI semconv token attributes directly for ClickHouse compatibility
+        llmSpan.setAttribute(ATTR_GEN_AI_USAGE_PROMPT_TOKENS, promptTokens);
+        llmSpan.setAttribute(ATTR_GEN_AI_USAGE_COMPLETION_TOKENS, completionTokens);
         llmSpan.setMetrics({ promptTokens, completionTokens, cost });
         await sleep(50 + Math.floor(Math.random() * 100));
       });
@@ -230,6 +240,9 @@ async function generateChainToolTraces(
         llmSpan.setRequestModel(model);
         llmSpan.setResponseModel(model);
         llmSpan.setAttribute(ATTR_GEN_AI_SYSTEM, vendor);
+        // Set GenAI semconv token attributes directly for ClickHouse compatibility
+        llmSpan.setAttribute(ATTR_GEN_AI_USAGE_PROMPT_TOKENS, promptTokens);
+        llmSpan.setAttribute(ATTR_GEN_AI_USAGE_COMPLETION_TOKENS, completionTokens);
         llmSpan.setMetrics({ promptTokens, completionTokens, cost });
         await sleep(50 + Math.floor(Math.random() * 100));
       });
@@ -270,6 +283,9 @@ async function generateMetadataVariationTraces(
       span.setRequestModel(model);
       span.setResponseModel(model);
       span.setAttribute(ATTR_GEN_AI_SYSTEM, vendor);
+      // Set GenAI semconv token attributes directly for ClickHouse compatibility
+      span.setAttribute(ATTR_GEN_AI_USAGE_PROMPT_TOKENS, promptTokens);
+      span.setAttribute(ATTR_GEN_AI_USAGE_COMPLETION_TOKENS, completionTokens);
       span.setMetrics({ promptTokens, completionTokens, cost });
 
       // Extensive metadata variations
@@ -349,6 +365,9 @@ async function generateEvaluationTraces(
       span.setRequestModel(model);
       span.setResponseModel(model);
       span.setAttribute(ATTR_GEN_AI_SYSTEM, vendor);
+      // Set GenAI semconv token attributes directly for ClickHouse compatibility
+      span.setAttribute(ATTR_GEN_AI_USAGE_PROMPT_TOKENS, promptTokens);
+      span.setAttribute(ATTR_GEN_AI_USAGE_COMPLETION_TOKENS, completionTokens);
       span.setMetrics({ promptTokens, completionTokens, cost });
 
       // Set metadata
