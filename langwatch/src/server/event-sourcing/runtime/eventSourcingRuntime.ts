@@ -326,9 +326,8 @@ export function initializeEventSourcing(
   options: InitializeEventSourcingOptions,
 ): void {
   if (_runtime) {
-    throw new Error(
-      "Event sourcing already initialized. Call resetEventSourcingRuntime() first if re-initializing.",
-    );
+    logger.debug("Event sourcing already initialized, skipping");
+    return;
   }
   _runtime = new EventSourcingRuntime(
     createEventSourcingConfig({
