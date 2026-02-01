@@ -190,7 +190,6 @@ describe("Navigation and autosave interaction", () => {
             {
               id: "my-target",
               type: "prompt",
-              name: "GPT-4 Target",
               promptId: "prompt-123",
             },
           ],
@@ -206,7 +205,7 @@ describe("Navigation and autosave interaction", () => {
         expect(state.experimentId).toBe("existing-experiment-id");
         expect(state.name).toBe("My Important Evaluation");
         expect(state.targets.length).toBe(1);
-        expect(state.targets[0]?.name).toBe("GPT-4 Target");
+        expect(state.targets[0]?.id).toBe("my-target");
       });
     });
   });
@@ -304,8 +303,8 @@ describe("Navigation and autosave interaction", () => {
           activeDatasetId: null,
           evaluators: [],
           targets: [
-            { id: "target-1", type: "prompt", name: "My Target" },
-            { id: "target-2", type: "agent", name: "My Agent" },
+            { id: "target-1", type: "prompt" },
+            { id: "target-2", type: "agent" },
           ],
         },
       };
@@ -373,7 +372,6 @@ describe("Navigation and autosave interaction", () => {
           {
             id: "t1",
             type: "prompt",
-            name: "My Target",
             mappings: {},
             inputs: [],
             outputs: [],
@@ -415,7 +413,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "t1", type: "prompt", name: "My Target" }],
+          targets: [{ id: "t1", type: "prompt" }],
         },
       };
 
@@ -482,7 +480,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "t1", type: "prompt", name: "Target 1" }],
+          targets: [{ id: "t1", type: "prompt" }],
         },
       };
 
@@ -589,7 +587,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "b-target", type: "prompt", name: "B Target" }],
+          targets: [{ id: "b-target", type: "prompt" }],
         },
       };
 
@@ -602,7 +600,7 @@ describe("Navigation and autosave interaction", () => {
           expect(state.experimentId).toBe("eval-b-id");
           expect(state.experimentSlug).toBe("eval-b");
           expect(state.targets.length).toBe(1);
-          expect(state.targets[0]?.name).toBe("B Target");
+          expect(state.targets[0]?.id).toBe("b-target");
         },
         { timeout: 3000 },
       );

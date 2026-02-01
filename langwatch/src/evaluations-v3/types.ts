@@ -163,7 +163,6 @@ export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
-  name: z.string(),
   /** @deprecated Settings are fetched from DB at execution time, not from workbench state */
   settings: z.record(z.string(), z.unknown()).optional(),
   inputs: z.array(fieldSchema),
@@ -219,7 +218,6 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
 export const targetConfigSchema = z.object({
   id: z.string(),
   type: z.enum(["prompt", "agent", "evaluator"]),
-  name: z.string(),
   icon: z.string().optional(),
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),

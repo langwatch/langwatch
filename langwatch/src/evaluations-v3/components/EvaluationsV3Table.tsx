@@ -303,7 +303,6 @@ export function EvaluationsV3Table({
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
-        name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
         inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
@@ -340,7 +339,6 @@ export function EvaluationsV3Table({
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`,
         type: "evaluator",
-        name: evaluator.name,
         targetEvaluatorId: evaluator.id,
         inputs,
         outputs,
@@ -369,7 +367,6 @@ export function EvaluationsV3Table({
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
-        name: prompt.name,
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
         promptVersionNumber: prompt.version,
@@ -457,7 +454,6 @@ export function EvaluationsV3Table({
         id: `evaluator_${Date.now()}`,
         evaluatorType: (config?.evaluatorType ??
           "custom/unknown") as EvaluatorConfig["evaluatorType"],
-        name: evaluator.name,
         inputs: evaluator.fields.map((field) => ({
           identifier: field.identifier,
           type: field.type as Field["type"],
@@ -608,7 +604,6 @@ export function EvaluationsV3Table({
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",
-          name: savedPrompt.name,
           promptId: savedPrompt.id,
           promptVersionId: savedPrompt.versionId,
           promptVersionNumber: savedPrompt.version,

@@ -212,7 +212,6 @@ describe("Prompt Editor Local Changes", () => {
         {
           id: "target-1",
           type: "prompt",
-          name: "test-prompt",
           promptId: "prompt-1",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
@@ -381,7 +380,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }], // Only input, no wtf!
             outputs: [{ identifier: "output", type: "str" }],
@@ -523,7 +521,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -674,7 +671,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-A",
             type: "prompt",
-            name: "test-prompt-A",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -684,7 +680,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-B",
             type: "prompt",
-            name: "test-prompt-B",
             promptId: "prompt-1", // Same prompt!
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

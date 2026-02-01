@@ -58,7 +58,6 @@ const createHttpAgentTarget = (
   id,
   type: "agent",
   agentType: "http",
-  name: `HTTP Agent ${id}`,
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
   outputs: [{ identifier: "output", type: "str" }],
   mappings,
@@ -274,7 +273,6 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
         id: targetId,
         type: "agent",
         agentType: "http",
-        name: "HTTP Agent",
         inputs: [
           { identifier: "thread_id", type: "str" },
           { identifier: "input", type: "str" },
@@ -334,7 +332,6 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
         id: targetId,
         type: "agent",
         agentType: "http",
-        name: "HTTP Agent",
         inputs: [
           { identifier: "custom_field", type: "str" },
         ],
@@ -481,7 +478,6 @@ describe("HTTP agent has different validation than code agent", () => {
       id: "code-target",
       type: "agent",
       agentType: "code",
-      name: "Code Agent",
       inputs: [
         { identifier: "input", type: "str" },
         { identifier: "context", type: "str" },
@@ -522,7 +518,6 @@ describe("HTTP agent has different validation than code agent", () => {
       id: "code-target",
       type: "agent",
       agentType: "code",
-      name: "Code Agent",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},

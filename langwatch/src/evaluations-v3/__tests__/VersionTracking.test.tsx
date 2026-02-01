@@ -68,7 +68,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-2", // Pinned to v2
             promptVersionNumber: 2,
@@ -122,7 +121,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-2",
             promptVersionNumber: 2,
@@ -166,7 +164,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-2",
             promptVersionNumber: 2,
@@ -223,7 +220,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-3",
             promptVersionNumber: 3,
@@ -274,7 +270,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-2",
             promptVersionNumber: 2,
@@ -306,7 +301,6 @@ describe("Version Tracking in Evaluations V3", () => {
 
       act(() => {
         updateTarget("target-1", {
-          name: savedPrompt.name,
           promptId: savedPrompt.id,
           promptVersionId: savedPrompt.versionId,
           promptVersionNumber: savedPrompt.version,
@@ -337,7 +331,6 @@ describe("Version Tracking in Evaluations V3", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             promptVersionId: "version-2",
             promptVersionNumber: 2,
@@ -403,7 +396,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const newTarget: TargetConfig = {
         id: "target-new",
         type: "prompt",
-        name: "new-prompt",
         promptId: "prompt-2",
         promptVersionId: "version-5",
         promptVersionNumber: 5,
@@ -458,7 +450,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const target: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 5,
         inputs: [{ identifier: "input", type: "str" as const }],
@@ -481,7 +472,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const target: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 5,
         localPromptConfig: {
@@ -512,7 +502,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const targetA: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 5,
         inputs: [{ identifier: "input", type: "str" as const }],
@@ -523,7 +512,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const targetB: TargetConfig & { type: "prompt" } = {
         id: "target-2",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         // No promptVersionNumber = "latest"
         inputs: [{ identifier: "input", type: "str" as const }],
@@ -561,7 +549,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const targetA: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 3,
         inputs: [{ identifier: "input", type: "str" as const }],
@@ -572,7 +559,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const targetB: TargetConfig & { type: "prompt" } = {
         id: "target-2",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 5,
         inputs: [{ identifier: "input", type: "str" as const }],
@@ -609,7 +595,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const target: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 3,
         localPromptConfig: {
@@ -639,7 +624,6 @@ describe("Version Tracking in Evaluations V3", () => {
       const target: TargetConfig & { type: "prompt" } = {
         id: "target-1",
         type: "prompt",
-        name: "test-prompt",
         promptId: "prompt-1",
         promptVersionNumber: 6,
         // No localPromptConfig - no local changes
@@ -684,7 +668,6 @@ describe("Version Tracking in Evaluations V3", () => {
         useEvaluationsV3Store.getState().addTarget({
           id: targetId,
           type: "prompt",
-          name: "test-prompt",
           promptId: "prompt-1",
           promptVersionId: "version-3",
           promptVersionNumber: 3,

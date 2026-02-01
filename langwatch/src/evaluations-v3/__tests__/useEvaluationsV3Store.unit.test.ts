@@ -170,7 +170,6 @@ describe("useEvaluationsV3Store", () => {
       store.addTarget({
         id: "target-1",
         type: "prompt",
-        name: "Target 1",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [],
         // Per-dataset mappings: datasetId -> inputField -> FieldMapping
@@ -199,7 +198,6 @@ describe("useEvaluationsV3Store", () => {
       store.addEvaluator({
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Evaluator 1",
         inputs: [],
         // Per-dataset, per-target mappings: datasetId -> targetId -> inputField -> FieldMapping
         mappings: {
@@ -248,7 +246,6 @@ describe("useEvaluationsV3Store", () => {
     const createTestTarget = (id: string): TargetConfig => ({
       id,
       type: "prompt",
-      name: `Target ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -260,16 +257,16 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.targets).toHaveLength(1);
-      expect(state.targets[0]?.name).toBe("Target target-1");
+      expect(state.targets[0]?.id).toBe("target-1");
     });
 
     it("updates a target", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
-      store.updateTarget("target-1", { name: "Updated Target" });
+      store.updateTarget("target-1", { inputs: [{ identifier: "updated_input", type: "str" }] });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.targets[0]?.name).toBe("Updated Target");
+      expect(state.targets[0]?.inputs[0]?.identifier).toBe("updated_input");
     });
 
     it("cleans up mappings when inputs are removed", () => {
@@ -396,7 +393,6 @@ describe("useEvaluationsV3Store", () => {
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
       id,
       evaluatorType: "langevals/exact_match",
-      name: `Evaluator ${id}`,
       inputs: [{ identifier: "output", type: "str" }],
       mappings: {},
     });
@@ -407,16 +403,16 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators).toHaveLength(1);
-      expect(state.evaluators[0]?.name).toBe("Evaluator eval-1");
+      expect(state.evaluators[0]?.id).toBe("eval-1");
     });
 
     it("updates a global evaluator", () => {
       const store = useEvaluationsV3Store.getState();
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.updateEvaluator("eval-1", { name: "Updated Evaluator" });
+      store.updateEvaluator("eval-1", { inputs: [{ identifier: "updated_output", type: "str" }] });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
+      expect(state.evaluators[0]?.inputs[0]?.identifier).toBe("updated_output");
     });
 
     it("removes a global evaluator", () => {
@@ -424,7 +420,6 @@ describe("useEvaluationsV3Store", () => {
       store.addTarget({
         id: "target-1",
         type: "prompt",
-        name: "Target 1",
         inputs: [],
         outputs: [],
         mappings: {},
@@ -441,7 +436,6 @@ describe("useEvaluationsV3Store", () => {
     const createTestTarget = (id: string): TargetConfig => ({
       id,
       type: "prompt",
-      name: `Target ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -450,7 +444,6 @@ describe("useEvaluationsV3Store", () => {
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
       id,
       evaluatorType: "langevals/exact_match",
-      name: `Evaluator ${id}`,
       inputs: [{ identifier: "output", type: "str" }],
       mappings: {},
     });
@@ -681,7 +674,6 @@ describe("useEvaluationsV3Store", () => {
       store.addTarget({
         id: "target-1",
         type: "prompt",
-        name: "Target",
         inputs: [],
         outputs: [],
         mappings: {},
@@ -769,7 +761,6 @@ describe("useEvaluationsV3Store", () => {
 const createTestEvaluator = (id: string): EvaluatorConfig => ({
   id,
   evaluatorType: "langevals/exact_match",
-  name: `Evaluator ${id}`,
   inputs: [{ identifier: "output", type: "str" }],
   mappings: {},
 });

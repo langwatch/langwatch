@@ -172,7 +172,6 @@ describe("Add Evaluator Button", () => {
         {
           id: "target-1",
           type: "prompt",
-          name: "Test Target",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},

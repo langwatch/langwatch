@@ -176,7 +176,6 @@ export type LoadedExecutionData = {
  */
 type TargetForLoading = {
   type: string;
-  name: string;
   promptId?: string;
   promptVersionNumber?: number;
   dbAgentId?: string;
@@ -227,7 +226,7 @@ export const loadExecutionData = async (
             ? ` version ${target.promptVersionNumber}`
             : "";
           return {
-            error: `Prompt "${target.name}"${versionInfo} not found`,
+            error: `Prompt "${target.promptId}"${versionInfo} not found`,
             status: 404,
           };
         }
@@ -244,7 +243,7 @@ export const loadExecutionData = async (
           "Failed to load prompt for target",
         );
         return {
-          error: `Failed to load prompt "${target.name}"${versionInfo}: ${(promptError as Error).message}`,
+          error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
           status: 404,
         };
       }

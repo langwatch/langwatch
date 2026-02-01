@@ -539,7 +539,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         targets: targets.map((t) => ({
           id: t.id,
           type: t.type,
-          name: t.name,
           promptId: t.promptId,
           promptVersionId: t.promptVersionId,
           promptVersionNumber: t.promptVersionNumber,
@@ -555,7 +554,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         evaluators: evaluators.map((e) => ({
           id: e.id,
           evaluatorType: e.evaluatorType,
-          name: e.name,
           inputs: e.inputs,
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,

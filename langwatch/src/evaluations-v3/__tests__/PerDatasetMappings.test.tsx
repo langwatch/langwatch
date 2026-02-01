@@ -39,7 +39,6 @@ const createTestDataset = (
 const createTestTarget = (id: string): TargetConfig => ({
   id,
   type: "prompt",
-  name: `Target ${id}`,
   inputs: [
     { identifier: "question", type: "str" },
     { identifier: "context", type: "str" },
@@ -308,7 +307,6 @@ describe("Per-Dataset Mappings", () => {
       store.addEvaluator({
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Exact Match",
         inputs: [{ identifier: "output", type: "str" }],
         mappings: {},
       });
@@ -355,7 +353,6 @@ describe("Per-Dataset Mappings", () => {
       store.addEvaluator({
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Exact Match",
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected", type: "str" },
@@ -417,7 +414,6 @@ describe("Per-Dataset Mappings", () => {
       store.addTarget({
         id: "target-1",
         type: "prompt",
-        name: "Test Target",
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
@@ -429,9 +425,9 @@ describe("Per-Dataset Mappings", () => {
         value: "hardcoded value",
       });
 
-      // Update target name (doesn't touch inputs)
+      // Update target (doesn't touch inputs)
       store.updateTarget("target-1", {
-        name: "Updated Target",
+        type: "prompt",
       });
 
       const state = useEvaluationsV3Store.getState();
@@ -439,7 +435,7 @@ describe("Per-Dataset Mappings", () => {
 
       // Existing mapping should be preserved
       expect(target?.mappings["ds-1"]?.question?.type).toBe("value");
-      expect(target?.name).toBe("Updated Target");
+      expect(target?.id).toBe("target-1");
     });
   });
 });

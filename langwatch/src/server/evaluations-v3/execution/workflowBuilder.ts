@@ -64,7 +64,7 @@ export const buildCellWorkflow = (
   loadedData: {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
-    evaluators?: Map<string, { id: string; config: unknown }>;
+    evaluators?: Map<string, { id: string; name: string; config: unknown }>;
   },
 ): WorkflowBuilderOutput => {
   const { cell, datasetColumns } = input;
@@ -195,7 +195,7 @@ const buildTargetNode = (
   targetConfig: TargetConfig,
   loadedData: LoadedTargetData,
   cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): {
   targetNode: Node<Signature | Code | HttpNodeData | Evaluator>;
   targetNodeId: string;
@@ -205,10 +205,15 @@ const buildTargetNode = (
   if (targetConfig.type === "prompt") {
     // Use local config if available, otherwise use loaded prompt
     if (targetConfig.localPromptConfig) {
+      // Get name from loaded prompt if available, fall back to target ID
+      const name =
+        loadedData.prompt?.handle ??
+        loadedData.prompt?.name ??
+        targetConfig.id;
       return {
         targetNode: buildSignatureNodeFromLocalConfig(
           targetNodeId,
-          targetConfig.name,
+          name,
           targetConfig.localPromptConfig,
           targetConfig,
           cell,
@@ -295,7 +300,7 @@ export const buildEvaluatorTargetNode = (
   nodeId: string,
   targetConfig: TargetConfig,
   cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): Node<Evaluator> => {
   // Get settings from loaded evaluator (DB) if available
   const dbEvaluator = targetConfig.targetEvaluatorId
@@ -322,7 +327,7 @@ export const buildEvaluatorTargetNode = (
   // and agents have dbAgentId
   if (!targetConfig.targetEvaluatorId) {
     throw new Error(
-      `Evaluator target "${targetConfig.name}" (${nodeId}) has no evaluator ID. ` +
+      `Evaluator target "${nodeId}" has no evaluator ID. ` +
         `targetEvaluatorId must be set.`,
     );
   }
@@ -330,12 +335,15 @@ export const buildEvaluatorTargetNode = (
   // Use evaluators/{id} path so langwatch_nlp calls LangWatch API to fetch settings
   const evaluatorPath = `evaluators/${targetConfig.targetEvaluatorId}`;
 
+  // Get name from loaded evaluator
+  const evaluatorName = dbEvaluator?.name ?? nodeId;
+
   return {
     id: nodeId, // Use target ID directly (not composite)
     type: "evaluator",
     position: { x: 200, y: 0 },
     data: {
-      name: targetConfig.name,
+      name: evaluatorName,
       cls: "LangWatchEvaluator",
       inputs,
       outputs: [
@@ -800,7 +808,7 @@ const buildEvaluatorNodes = (
   evaluatorConfigs: EvaluatorConfig[],
   targetId: string,
   cell: ExecutionCell,
-  loadedEvaluators?: Map<string, { id: string; config: unknown }>,
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): {
   evaluatorNodes: Array<Node<Evaluator>>;
   evaluatorNodeIds: Record<string, string>;
@@ -820,6 +828,9 @@ const buildEvaluatorNodes = (
     const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
     const settings = dbConfig?.settings ?? {};
 
+    // Get name from loaded evaluator, fall back to evaluator ID
+    const evaluatorName = dbEvaluator?.name ?? evaluator.id;
+
     const node = buildEvaluatorNode(
       evaluator,
       nodeId,
@@ -828,6 +839,7 @@ const buildEvaluatorNodes = (
       index,
       settings,
       evaluator.dbEvaluatorId, // Pass dbEvaluatorId to use evaluators/{id} path
+      evaluatorName,
     );
     evaluatorNodes.push(node);
   });
@@ -839,6 +851,7 @@ const buildEvaluatorNodes = (
  * Builds a single evaluator node.
  * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
  * @param dbEvaluatorId - Database evaluator ID for using evaluators/{id} path
+ * @param name - Display name for the evaluator (from loaded DB evaluator)
  */
 export const buildEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -848,6 +861,7 @@ export const buildEvaluatorNode = (
   index: number,
   settings: Record<string, unknown> = {},
   dbEvaluatorId?: string,
+  name?: string,
 ): Node<Evaluator> => {
   // Get evaluator definition to know what inputs it expects
   const _evaluatorDef =
@@ -881,7 +895,7 @@ export const buildEvaluatorNode = (
     type: "evaluator",
     position: { x: 400, y: index * 100 },
     data: {
-      name: evaluator.name,
+      name: name ?? evaluator.id,
       cls: "LangWatchEvaluator",
       inputs,
       outputs: [

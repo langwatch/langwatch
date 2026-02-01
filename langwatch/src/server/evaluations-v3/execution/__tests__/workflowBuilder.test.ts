@@ -18,7 +18,6 @@ describe("buildEvaluatorNode", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match",
-    name: "Exact Match",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },
@@ -49,7 +48,6 @@ describe("buildEvaluatorNode", () => {
     targetConfig: {
       id: "target-1",
       type: "prompt",
-      name: "Test Target",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -66,7 +64,6 @@ describe("buildEvaluatorNode", () => {
     const evaluator: EvaluatorConfig = {
       ...createBasicEvaluatorConfig(),
       evaluatorType: "langevals/llm_score",
-      name: "Custom LLM Score",
     };
     const cell = createBasicCell();
 
@@ -236,7 +233,6 @@ describe("buildSignatureNodeFromAgent", () => {
   const createTargetConfig = (): TargetConfig => ({
     id: "target-1",
     type: "agent",
-    name: "Signature Agent Target",
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -397,7 +393,6 @@ describe("buildHttpNodeFromAgent", () => {
   const createTargetConfig = (): TargetConfig => ({
     id: "target-1",
     type: "agent",
-    name: "HTTP Agent Target",
     inputs: [
       { identifier: "input", type: "str" },
       { identifier: "threadId", type: "str" },
@@ -509,7 +504,6 @@ describe("buildEvaluatorTargetNode", () => {
   const createEvaluatorTargetConfig = (): TargetConfig => ({
     id: "target-eval-1",
     type: "evaluator",
-    name: "Sentiment Evaluator",
     targetEvaluatorId: "eval-abc-123",
     inputs: [
       { identifier: "output", type: "str" },
@@ -656,6 +650,7 @@ describe("buildEvaluatorTargetNode", () => {
         "eval-abc-123",
         {
           id: "eval-abc-123",
+          name: "Sentiment Evaluator",
           config: {
             evaluatorType: "langevals/sentiment",
             settings: {

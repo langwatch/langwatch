@@ -215,7 +215,6 @@ const setupStoreWithConfiguredEvaluation = () => {
     targets: [
       {
         id: "target-1",
-        name: "My Prompt",
         type: "prompt",
         promptId: "prompt-123",
         inputs: [{ identifier: "input", type: "str" }],
@@ -236,7 +235,6 @@ const setupStoreWithConfiguredEvaluation = () => {
       {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Exact Match",
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -577,7 +575,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Other Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -845,7 +842,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -899,7 +895,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -970,7 +965,6 @@ describe("Evaluation Execution", () => {
         targets: [
           {
             id: "target-1",
-            name: "Test Target",
             type: "prompt",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -1037,7 +1031,6 @@ describe("Evaluation Execution", () => {
         targets: [
           {
             id: "target-1",
-            name: "Test Target",
             type: "prompt",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -1169,7 +1162,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],

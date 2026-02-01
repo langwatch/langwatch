@@ -32,6 +32,7 @@ import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/ut
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import { computeTargetAggregates } from "../../utils/computeAggregates";
 import { isRowEmpty } from "../../utils/emptyRowDetection";
@@ -103,6 +104,9 @@ export const TargetHeader = memo(function TargetHeader({
     (state) => state.activeDatasetId,
   );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
+
+  // Get the display name for this target
+  const targetName = useTargetName(target);
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -278,7 +282,7 @@ export const TargetHeader = memo(function TargetHeader({
               marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>
-              {target.name}
+              {targetName}
             </Text>
             {showVersionBadge && target.promptVersionNumber !== undefined && (
               <Box flexShrink={0}>
@@ -369,7 +373,11 @@ export const TargetHeader = memo(function TargetHeader({
 
       {/* Summary statistics (positioned on the right before play button) */}
       {hasAggregates && (
-        <TargetSummary aggregates={aggregates} isRunning={isRunning} />
+        <TargetSummary
+          aggregates={aggregates}
+          evaluators={evaluators}
+          isRunning={isRunning}
+        />
       )}
 
       {/* Play/Stop button on far right */}

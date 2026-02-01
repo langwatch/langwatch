@@ -17,7 +17,6 @@ const createEvaluator = (
   overrides: Partial<EvaluatorConfig> = {},
 ): EvaluatorConfig => ({
   id: "eval-1",
-  name: "Exact Match",
   evaluatorType: "langevals/exact_match",
   dbEvaluatorId: "db-eval-1",
   mappings: {},

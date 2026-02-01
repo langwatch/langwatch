@@ -112,7 +112,6 @@ const createAgentTarget = (
   dbAgentId: string,
 ): TargetConfig & { type: "agent" } => ({
   id,
-  name: "Test Agent",
   type: "agent",
   dbAgentId,
   inputs: [{ identifier: "input", type: "str" }],
@@ -264,7 +263,6 @@ describe("useOpenTargetEditor", () => {
       // Arrange: Create target without dbAgentId
       const target: TargetConfig = {
         id: "target-4",
-        name: "Agent Without DB ID",
         type: "agent",
         dbAgentId: undefined,
         inputs: [],

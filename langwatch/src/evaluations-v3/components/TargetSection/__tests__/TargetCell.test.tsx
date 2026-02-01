@@ -34,7 +34,6 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 const createTarget = (overrides: Partial<TargetConfig> = {}): TargetConfig => ({
   id: "target-1",
-  name: "Test Target",
   type: "prompt",
   inputs: [{ identifier: "input", type: "str" }],
   outputs: [{ identifier: "output", type: "str" }],

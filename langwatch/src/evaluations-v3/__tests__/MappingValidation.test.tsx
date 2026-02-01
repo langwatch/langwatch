@@ -56,7 +56,6 @@ const createTestTarget = (
 ): TargetConfig => ({
   id,
   type: "prompt",
-  name: `Target ${id}`,
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
   outputs: [{ identifier: "output", type: "str" }],
   mappings,
@@ -398,7 +397,6 @@ describe("Validation edge cases", () => {
     const target: TargetConfig = {
       id: "r1",
       type: "prompt",
-      name: "Test Target",
       // Original target.inputs - only has "input"
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
@@ -535,7 +533,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }], // Initial placeholder
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -595,7 +592,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -680,7 +676,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "Test Target",
         inputs: [
           { identifier: "my_custom_var", type: "str" }, // No matching column at all!
         ],
@@ -735,7 +730,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "my-first-prompt",
         promptId: "some-prompt-id",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -813,7 +807,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
@@ -875,7 +868,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
@@ -937,7 +929,6 @@ describe("Target header alert icon integration", () => {
       store.addTarget({
         id: targetId,
         type: "prompt",
-        name: "test-prompt",
         inputs: undefined as any, // Simulating the bug - inputs is undefined
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
@@ -976,7 +967,6 @@ describe("Target header alert icon integration", () => {
     const targetConfig: TargetConfig = {
       id: targetId,
       type: "prompt",
-      name: "my-first-prompt",
       promptId: "some-prompt-id",
       inputs: [{ identifier: "input", type: "str" }], // Placeholder
       outputs: [{ identifier: "output", type: "str" }],
@@ -1037,7 +1027,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "my-first-prompt",
         promptId: "some-prompt-id",
         inputs: [
           { identifier: "foobar", type: "str" },
@@ -1102,7 +1091,6 @@ describe("Target header alert icon integration", () => {
       useEvaluationsV3Store.getState().addTarget({
         id: targetId,
         type: "prompt",
-        name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {},
@@ -1236,7 +1224,6 @@ const createTestEvaluator = (
 ): EvaluatorConfig => ({
   id,
   evaluatorType: evaluatorType as EvaluatorConfig["evaluatorType"],
-  name: `Evaluator ${id}`,
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
   mappings,
 });

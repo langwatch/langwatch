@@ -15,7 +15,6 @@ describe("mappingValidation", () => {
     ): TargetConfig => ({
       id: "target-eval-1",
       type: "evaluator",
-      name: "LLM Answer Match",
       targetEvaluatorId: "eval-db-123",
       inputs: [
         { identifier: "output", type: "str" },
@@ -190,7 +189,6 @@ describe("mappingValidation", () => {
       const target: TargetConfig = {
         id: "target-eval-2",
         type: "evaluator",
-        name: "LLM Boolean Judge",
         targetEvaluatorId: "eval-db-456",
         inputs: [
           { identifier: "input", type: "str", optional: true },
@@ -226,7 +224,6 @@ describe("mappingValidation", () => {
       const target: TargetConfig = {
         id: "target-eval-2",
         type: "evaluator",
-        name: "LLM Boolean Judge",
         targetEvaluatorId: "eval-db-456",
         inputs: [
           { identifier: "input", type: "str", optional: true },

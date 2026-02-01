@@ -439,7 +439,6 @@ describe("Target duplication", () => {
     useEvaluationsV3Store.getState().addTarget({
       id: "original-target",
       type: "prompt",
-      name: "My Prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
       promptVersionNumber: 13,
@@ -454,7 +453,7 @@ describe("Target duplication", () => {
 
     // Wait for target to render
     await waitFor(() => {
-      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+      expect(screen.getByTestId("target-header-button")).toBeInTheDocument();
     });
 
     // Click on the target header to open menu
@@ -476,7 +475,6 @@ describe("Target duplication", () => {
     const duplicate = targets[1];
     expect(duplicate).toBeDefined();
     expect(duplicate!.id).not.toBe("original-target");
-    expect(duplicate!.name).toBe("My Prompt"); // Same name
     expect(duplicate!.type).toBe("prompt");
 
     // Version should be preserved (not cleared)
@@ -495,7 +493,6 @@ describe("Target duplication", () => {
     store.addTarget({
       id: "original-target",
       type: "prompt",
-      name: "My Prompt",
       promptId: "prompt-123",
       inputs: [],
       outputs: [],
@@ -506,7 +503,7 @@ describe("Target duplication", () => {
 
     // Wait for target to render
     await waitFor(() => {
-      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+      expect(screen.getByTestId("target-header-button")).toBeInTheDocument();
     });
 
     // Open menu and duplicate
@@ -516,10 +513,10 @@ describe("Target duplication", () => {
     });
     await user.click(screen.getByText("Duplicate"));
 
-    // Both targets should be visible (same name appears twice)
+    // Both targets should be visible (two header buttons)
     await waitFor(() => {
-      const targetNames = screen.getAllByText("My Prompt");
-      expect(targetNames.length).toBe(2);
+      const targetHeaders = screen.getAllByTestId("target-header-button");
+      expect(targetHeaders.length).toBe(2);
     });
   });
 });
@@ -541,7 +538,6 @@ describe("TargetHeader stability", () => {
     store.addTarget({
       id: "test-target",
       type: "prompt",
-      name: "Test Prompt",
       inputs: [],
       outputs: [],
       mappings: {},
@@ -588,7 +584,6 @@ describe("TargetHeader stability", () => {
     store.addTarget({
       id: "test-target-2",
       type: "prompt",
-      name: "Test Prompt 2",
       inputs: [],
       outputs: [],
       mappings: {},

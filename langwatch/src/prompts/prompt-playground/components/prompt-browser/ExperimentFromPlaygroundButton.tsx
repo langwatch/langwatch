@@ -130,10 +130,6 @@ const convertTabToTarget = (
 ): TargetConfig => {
   const configId = tabData.form.currentValues.configId;
   const versionId = tabData.form.currentValues.versionMetadata?.versionId;
-  const name =
-    tabData.meta.title ??
-    tabData.form.currentValues.handle ??
-    `Prompt ${index + 1}`;
 
   const configData = tabData.form.currentValues.version?.configData;
   const inputs: Field[] = (configData?.inputs ?? [])
@@ -157,7 +153,6 @@ const convertTabToTarget = (
   const targetWithoutMappings: TargetConfig = {
     id: targetId,
     type: "prompt",
-    name,
     // Always reference the saved prompt if it exists (for version tracking)
     promptId: configId ?? undefined,
     promptVersionId: versionId ?? undefined,

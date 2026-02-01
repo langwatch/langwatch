@@ -144,7 +144,6 @@ const setupStoreWithConfiguredEvaluation = () => {
     targets: [
       {
         id: "target-1",
-        name: "My Prompt",
         type: "prompt",
         promptId: "prompt-123",
         inputs: [{ identifier: "input", type: "str" }],
@@ -165,7 +164,6 @@ const setupStoreWithConfiguredEvaluation = () => {
       {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Exact Match",
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },

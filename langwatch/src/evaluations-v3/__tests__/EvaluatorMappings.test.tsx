@@ -147,7 +147,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const createTestTarget = (overrides?: Partial<TargetConfig>): TargetConfig => ({
   id: "target-1",
   type: "prompt",
-  name: "Test Target",
   inputs: [{ identifier: "input", type: "str" }],
   outputs: [{ identifier: "output", type: "str" }],
   mappings: {},
@@ -179,7 +178,6 @@ const createTestEvaluator = (
 ): EvaluatorConfig => ({
   id: "evaluator-1",
   evaluatorType: "langevals/exact_match",
-  name: "Exact Match",
   inputs: [
     { identifier: "output", type: "str" },
     { identifier: "expected_output", type: "str" },
@@ -355,7 +353,6 @@ describe("Evaluator Mappings", () => {
           {
             id: "evaluator-1",
             evaluatorType: "langevals/llm_answer_match" as const,
-            name: "LLM Answer Match",
             inputs: [
               { identifier: "output", type: "str" as const },
               { identifier: "expected_output", type: "str" as const },

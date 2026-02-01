@@ -249,7 +249,6 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     const httpAgentTarget: TargetConfig = {
       id: "http-target-1",
       type: "agent",
-      name: "My HTTP Agent",
       agentType: "http",
       httpConfig: {
         url: "https://api.example.com/chat",
@@ -265,7 +264,6 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     const codeAgentTarget: TargetConfig = {
       id: "code-target-1",
       type: "agent",
-      name: "My Code Agent",
       agentType: "code",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
@@ -315,7 +313,6 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     const promptTarget: TargetConfig = {
       id: "prompt-target-1",
       type: "prompt",
-      name: "My Prompt",
       promptId: "prompt-123",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],

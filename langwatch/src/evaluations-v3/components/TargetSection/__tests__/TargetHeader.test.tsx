@@ -54,8 +54,7 @@ describe("TargetHeader", () => {
 
   describe("Prompt target", () => {
     const promptTarget: TargetConfig = {
-      id: "target-1",
-      name: "my-assistant",
+      id: "my-assistant",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -211,8 +210,7 @@ describe("TargetHeader", () => {
 
   describe("Unpublished modifications indicator", () => {
     const promptTargetWithLocalConfig: TargetConfig = {
-      id: "target-3",
-      name: "modified-prompt",
+      id: "modified-prompt",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -228,8 +226,7 @@ describe("TargetHeader", () => {
     };
 
     const promptTargetWithoutLocalConfig: TargetConfig = {
-      id: "target-4",
-      name: "published-prompt",
+      id: "published-prompt",
       type: "prompt",
       promptId: "prompt-456",
       promptVersionId: "version-789",
@@ -266,8 +263,7 @@ describe("TargetHeader", () => {
 
     it("does not show orange dot for agent targets even with localPromptConfig", () => {
       const agentWithLocalConfig: TargetConfig = {
-        id: "target-5",
-        name: "Agent",
+        id: "Agent",
         type: "agent",
         dbAgentId: "agent-123",
         // Even if this were somehow set, agents shouldn't show it
@@ -292,8 +288,7 @@ describe("TargetHeader", () => {
 
   describe("Agent target", () => {
     const agentTarget: TargetConfig = {
-      id: "target-2",
-      name: "Python Processor",
+      id: "Python Processor",
       type: "agent",
       dbAgentId: "agent-123",
       inputs: [],
@@ -391,8 +386,7 @@ describe("TargetHeader", () => {
 
   describe("Evaluator target", () => {
     const evaluatorTarget: TargetConfig = {
-      id: "target-3",
-      name: "Quality Checker",
+      id: "Quality Checker",
       type: "evaluator",
       targetEvaluatorId: "evaluator-123",
       inputs: [],
@@ -470,8 +464,7 @@ describe("TargetHeader", () => {
 
   describe("Target Summary with saved datasets (page refresh scenario)", () => {
     const targetWithResults: TargetConfig = {
-      id: "target-1",
-      name: "test-prompt",
+      id: "test-prompt",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -490,7 +483,6 @@ describe("TargetHeader", () => {
           {
             id: "evaluator-1",
             dbEvaluatorId: "db-evaluator-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/llm_score",
             inputs: [],
             mappings: {},

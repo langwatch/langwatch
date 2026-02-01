@@ -23,6 +23,7 @@ import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
 import {
@@ -77,6 +78,7 @@ export function TargetCellContent({
   onRerunEvaluator,
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
+  const targetName = useTargetName(target);
   const {
     evaluators,
     activeDatasetId,
@@ -184,7 +186,7 @@ export function TargetCellContent({
       const effectiveOutputs = target.localPromptConfig?.outputs ?? target.outputs;
       availableSources.push({
         id: target.id,
-        name: target.name,
+        name: targetName,
         type: "signature" as const,
         fields: effectiveOutputs.map((o) => ({
           name: o.identifier,

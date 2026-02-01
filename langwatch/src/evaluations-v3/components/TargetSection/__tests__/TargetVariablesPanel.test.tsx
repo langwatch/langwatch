@@ -34,7 +34,6 @@ const ACTIVE_DATASET_ID = "dataset-1";
 const mockTarget: TargetConfig = {
   id: "target-1",
   type: "prompt",
-  name: "GPT-4o Prompt",
   inputs: [
     { identifier: "question", type: "str" },
     { identifier: "context", type: "str" },
@@ -71,7 +70,6 @@ const mockTarget: TargetConfig = {
 const mockOtherTarget: TargetConfig = {
   id: "target-2",
   type: "prompt",
-  name: "Web Search",
   inputs: [{ identifier: "query", type: "str" }],
   outputs: [{ identifier: "search_results", type: "str" }],
   mappings: {},

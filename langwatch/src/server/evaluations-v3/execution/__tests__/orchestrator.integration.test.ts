@@ -65,10 +65,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   });
 
   // Helper to create a target config
-  const createTargetConfig = (id: string, name: string): TargetConfig => ({
+  const createTargetConfig = (id: string): TargetConfig => ({
     id,
     type: "prompt",
-    name,
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -88,7 +87,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   const createEvaluatorConfig = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match",
-    name: "Exact Match",
     settings: {},
     inputs: [
       { identifier: "output", type: "str" },
@@ -162,7 +160,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("single target execution", () => {
     it("executes single row with single target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -208,7 +206,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes multiple rows with single target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -251,7 +249,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("includes duration and traceId in target_result events", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -295,8 +293,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("multi-target execution", () => {
     it("executes single row with multiple targets", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -335,8 +333,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes multiple rows with multiple targets in parallel", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -376,7 +374,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("partial execution scopes", () => {
     it("executes only specified rows", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
@@ -419,8 +417,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes only specified target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -462,8 +460,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes single cell", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -504,7 +502,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("re-runs single evaluator with pre-computed target output", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "Target 1")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [
@@ -577,7 +575,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("re-runs single evaluator without pre-computed output (executes target too)", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "Target 1")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -629,7 +627,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const badTarget: TargetConfig = {
         id: "target-bad",
         type: "prompt",
-        name: "Bad Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -655,7 +652,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState([
-        createTargetConfig("target-1", "Good Target"),
+        createTargetConfig("target-1"),
         badTarget,
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -700,7 +697,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("evaluator execution", () => {
     it("executes evaluators after target and returns evaluator_result events", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()], // Add exact_match evaluator
       );
       const datasetRows = [
@@ -753,7 +750,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // exact_match is a binary evaluator, its score (0 or 1) should be stripped
       // as it's redundant with the passed field
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -798,7 +795,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const evaluatorWithBadMapping: EvaluatorConfig = {
         id: "eval-bad",
         evaluatorType: "langevals/exact_match",
-        name: "Bad Evaluator",
         settings: {},
         inputs: [
           { identifier: "output", type: "str" },
@@ -820,7 +816,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [evaluatorWithBadMapping],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -854,7 +850,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const invalidEvaluator: EvaluatorConfig = {
         id: "eval-invalid",
         evaluatorType: "langevals/this_evaluator_does_not_exist" as any,
-        name: "Invalid Evaluator",
         settings: {},
         inputs: [
           { identifier: "output", type: "str" },
@@ -881,7 +876,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [invalidEvaluator],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -950,7 +945,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const dbEvaluatorConfig: EvaluatorConfig = {
           id: "eval-from-db",
           evaluatorType: "langevals/exact_match",
-          name: "DB Evaluator",
           dbEvaluatorId: evaluatorId, // Reference to database evaluator
           inputs: [
             { identifier: "output", type: "str" },
@@ -977,7 +971,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         };
 
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [dbEvaluatorConfig],
         );
         const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -989,7 +983,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Load the evaluator from DB (simulates what the API route does)
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -997,6 +991,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -1070,7 +1065,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const dbEvaluatorConfig: EvaluatorConfig = {
           id: "eval-db-settings",
           evaluatorType: "langevals/exact_match",
-          name: "DB Settings Test",
           dbEvaluatorId: evaluatorId,
           // Note: No settings here - they should come from DB
           inputs: [
@@ -1098,7 +1092,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         };
 
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [dbEvaluatorConfig],
         );
         // Use "Hello" vs "hello" - with case_sensitive: false, these should match
@@ -1111,7 +1105,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Load the evaluator from DB
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -1119,6 +1113,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -1163,7 +1158,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("execution summary", () => {
     it("provides accurate summary with duration", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -1209,7 +1204,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     it("stops execution when abort flag is set and emits stopped event", async () => {
       // Create state with multiple rows to ensure we can abort mid-execution
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
@@ -1268,7 +1263,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("preserves partial results when aborted", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say alpha", expected: "alpha" },
@@ -1328,7 +1323,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     it("stops quickly even with many rows when abort is requested immediately", async () => {
       // This test verifies that abort is responsive even with many pending cells
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       // Create 20 rows - without abort this would take a long time
       const datasetRows = Array.from({ length: 20 }, (_, i) => ({
@@ -1387,7 +1382,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("empty row handling", () => {
     it("skips completely empty rows in full execution", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" }, // row 0 - non-empty
@@ -1441,8 +1436,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("skips empty rows in target scope execution", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
-        createTargetConfig("target-2", "GPT-4o Mini 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" }, // row 0 - non-empty
@@ -1485,7 +1480,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // This test verifies the behavior - currently we skip empty rows in all scopes
       // If we want to change this behavior for explicit cell execution, we can adjust
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "", expected: "" }, // row 0 - empty
@@ -1516,7 +1511,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("handles dataset with all empty rows", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "", expected: "" },
@@ -1578,7 +1573,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       try {
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [createEvaluatorConfig()],
         );
         const datasetRows = [
@@ -1711,7 +1706,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       try {
         const state = createTestState([
-          createTargetConfig("target-1", "GPT-4o Mini"),
+          createTargetConfig("target-1"),
         ]);
         const datasetRows = [{ question: "Say hello", expected: "hello" }];
         const datasetColumns = [
@@ -1782,7 +1777,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const targetWithoutLocalConfig: TargetConfig = {
           id: "target-1",
           type: "prompt",
-          name: "Saved Prompt Target",
           promptId: promptId, // Reference to saved prompt
           promptVersionId: "version-1",
           promptVersionNumber: 1,
@@ -1928,7 +1922,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const targetConfig: TargetConfig = {
           id: "target-1",
           type: "prompt",
-          name: "Failing Target",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {
@@ -2121,7 +2114,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const httpAgentTarget: TargetConfig = {
         id: "target_http",
         type: "agent",
-        name: "HTTP Agent",
         agentType: "http",
         inputs: [
           { identifier: "messages", type: "chat_messages" as "str" },
@@ -2251,7 +2243,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const targetWithNameMapping: TargetConfig = {
         id: "target-1",
         type: "prompt",
-        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -2344,7 +2335,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const evaluatorTargetConfig: TargetConfig = {
           id: "target-eval",
           type: "evaluator",
-          name: "Exact Match Target",
           targetEvaluatorId: evaluatorId,
           
           inputs: [
@@ -2387,7 +2377,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Load the evaluator from DB
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -2395,6 +2385,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -2470,7 +2461,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const evaluatorTargetConfig: TargetConfig = {
           id: "target-eval",
           type: "evaluator",
-          name: "Exact Match Target",
           targetEvaluatorId: evaluatorId,
           
           inputs: [
@@ -2512,7 +2502,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -2520,6 +2510,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -2585,7 +2576,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const evaluatorTargetConfig: TargetConfig = {
           id: "target-eval",
           type: "evaluator",
-          name: "Sentiment Target",
           targetEvaluatorId: targetEvaluatorId,
           
           inputs: [
@@ -2620,7 +2610,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const downstreamEvaluatorConfig: EvaluatorConfig = {
           id: "meta-eval",
           evaluatorType: "langevals/exact_match",
-          name: "Meta Evaluator",
           settings: {},
           inputs: [
             { identifier: "output", type: "str" },
@@ -2667,7 +2656,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: targetEvaluatorId, projectId: project.id },
@@ -2675,6 +2664,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(targetEvaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -2751,7 +2741,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const evaluatorTargetConfig: TargetConfig = {
           id: "target-eval",
           type: "evaluator",
-          name: "Exact Match Target",
           targetEvaluatorId: evaluatorId,
           
           inputs: [
@@ -2795,7 +2784,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -2803,6 +2792,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -2899,7 +2889,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const customFieldsEvaluator: EvaluatorConfig = {
           id: "eval-custom-fields",
           evaluatorType: "langevals/exact_match",
-          name: "Custom Fields Test",
           dbEvaluatorId: evaluatorId,
           // Note: using "answer" instead of standard "output"
           // and "correct_answer" instead of "expected_output"
@@ -2932,7 +2921,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const passthroughTarget: TargetConfig = {
           id: "target-1",
           type: "prompt",
-          name: "Passthrough",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {
@@ -2971,7 +2959,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -2979,6 +2967,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }

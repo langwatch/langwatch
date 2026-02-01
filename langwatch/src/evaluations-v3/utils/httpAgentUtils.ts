@@ -92,11 +92,10 @@ export const buildInputsFromBodyTemplate = (
  */
 export const buildHttpAgentTarget = (params: {
   id: string;
-  name: string;
   dbAgentId?: string;
   httpConfig: HttpConfig;
 }): TargetConfig => {
-  const { id, name, dbAgentId, httpConfig } = params;
+  const { id, dbAgentId, httpConfig } = params;
 
   // Extract inputs from body template
   const inputs = buildInputsFromBodyTemplate(httpConfig.bodyTemplate);
@@ -105,7 +104,6 @@ export const buildHttpAgentTarget = (params: {
     id,
     type: "agent",
     agentType: "http",
-    name,
     dbAgentId,
     inputs,
     outputs: [{ identifier: "output", type: "str" }],
