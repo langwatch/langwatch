@@ -74,9 +74,10 @@ describe("EventSourcingService - Projection Flows", () => {
       );
 
       // updateProjectionByName now returns { projection, events }
+      expect(result).not.toBeNull();
       expect(result).toHaveProperty("projection");
       expect(result).toHaveProperty("events");
-      expect(result.projection).toEqual(expectedProjection);
+      expect(result!.projection).toEqual(expectedProjection);
       expect(eventStore.getEvents).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         context,

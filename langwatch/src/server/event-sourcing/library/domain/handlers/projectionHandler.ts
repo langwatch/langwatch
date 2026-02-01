@@ -4,10 +4,12 @@ import type { Event, Projection } from "../types";
 /**
  * Result type for projection handler execution.
  * Handlers can return a projection directly or as a promise.
+ * Returning null indicates the handler cannot produce a projection yet
+ * (e.g., waiting for more events) - the events are stored but no projection is written.
  */
 export type ProjectionHandlerResult<
   ProjectionType extends Projection = Projection,
-> = Promise<ProjectionType> | ProjectionType;
+> = Promise<ProjectionType | null> | ProjectionType | null;
 
 /**
  * Handler that processes a stream of events to build or update a projection.

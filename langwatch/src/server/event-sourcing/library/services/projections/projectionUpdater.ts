@@ -666,10 +666,9 @@ export class ProjectionUpdater<
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<{
-    projection: ProjectionTypes[ProjectionName];
-    events: readonly EventType[];
-  }> {
+  ): Promise<
+    { projection: ProjectionTypes[ProjectionName]; events: readonly EventType[] } | null
+  > {
     // Always validate the event-store read context
     EventUtils.validateTenantId(context, "updateProjectionByName");
 
@@ -797,6 +796,15 @@ export class ProjectionUpdater<
           span.addEvent("event_handler.handle.start");
           const projection = await projectionDef.handler.handle(stream);
           span.addEvent("event_handler.handle.complete");
+
+          // Skip storage if handler returns null (e.g., no spans yet for trace)
+          if (projection === null) {
+            this.logger.debug(
+              { projectionName, aggregateId: String(aggregateId) },
+              "Projection handler returned null, skipping storage",
+            );
+            return null;
+          }
 
           span.setAttributes({
             "projection.id": projection.id,
