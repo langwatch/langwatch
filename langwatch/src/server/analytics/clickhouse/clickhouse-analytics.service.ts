@@ -39,17 +39,6 @@ const MS_PER_MINUTE = 1000 * 60;
 export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksResult };
 
 /**
- * Factory function type for creating ClickHouse clients.
- *
- * WHY: Dependency Injection Pattern - by accepting a factory function instead
- * of directly calling getClickHouseClient(), we enable:
- * 1. Unit testing with mock clients without module mocking
- * 2. Different client configurations per environment
- * 3. Easier client lifecycle management
- */
-export type ClickHouseClientFactory = () => ClickHouseClient | null;
-
-/**
  * ClickHouse Analytics Service
  *
  * Provides analytics queries using ClickHouse.
@@ -59,8 +48,8 @@ export class ClickHouseAnalyticsService {
   private readonly logger = createLogger("langwatch:analytics:clickhouse");
   private readonly tracer = getLangWatchTracer("langwatch.analytics.clickhouse");
 
-  constructor(clientFactory: ClickHouseClientFactory = getClickHouseClient) {
-    this.clickHouseClient = clientFactory();
+  constructor() {
+    this.clickHouseClient = getClickHouseClient();
   }
 
   /**
@@ -608,23 +597,11 @@ export class ClickHouseAnalyticsService {
 let clickHouseAnalyticsService: ClickHouseAnalyticsService | null = null;
 
 /**
- * Get the ClickHouse analytics service instance.
- *
- * @param clientFactory - Optional factory for creating the ClickHouse client.
- *                        Only used on first call; subsequent calls return the existing instance.
+ * Get the ClickHouse analytics service instance
  */
-export function getClickHouseAnalyticsService(
-  clientFactory?: ClickHouseClientFactory,
-): ClickHouseAnalyticsService {
+export function getClickHouseAnalyticsService(): ClickHouseAnalyticsService {
   if (!clickHouseAnalyticsService) {
-    clickHouseAnalyticsService = new ClickHouseAnalyticsService(clientFactory);
+    clickHouseAnalyticsService = new ClickHouseAnalyticsService();
   }
   return clickHouseAnalyticsService;
-}
-
-/**
- * Reset the singleton (for testing)
- */
-export function resetClickHouseAnalyticsService(): void {
-  clickHouseAnalyticsService = null;
 }
