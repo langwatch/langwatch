@@ -137,8 +137,10 @@ export class BatchEvaluationRunStateProjectionHandler
 
         if (event.data.error) {
           failedCells.add(cellKey);
+          completedCells.delete(cellKey);
         } else {
           completedCells.add(cellKey);
+          failedCells.delete(cellKey);
         }
 
         if (event.data.cost !== undefined && event.data.cost !== null) {
