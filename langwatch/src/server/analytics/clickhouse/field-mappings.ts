@@ -193,14 +193,14 @@ export const fieldMappings: Record<string, FieldMapping> = {
   },
   "spans.metrics.completion_tokens": {
     table: "stored_spans",
-    column: "SpanAttributes['gen_ai.usage.completion_tokens']",
-    description: "Completion tokens for the span",
+    column: "SpanAttributes['gen_ai.usage.output_tokens']",
+    description: "Completion/output tokens for the span (canonical OTel name)",
     mapValueType: "number",
   },
   "spans.metrics.prompt_tokens": {
     table: "stored_spans",
-    column: "SpanAttributes['gen_ai.usage.prompt_tokens']",
-    description: "Prompt tokens for the span",
+    column: "SpanAttributes['gen_ai.usage.input_tokens']",
+    description: "Prompt/input tokens for the span (canonical OTel name)",
     mapValueType: "number",
   },
   "spans.contexts.document_id": {
