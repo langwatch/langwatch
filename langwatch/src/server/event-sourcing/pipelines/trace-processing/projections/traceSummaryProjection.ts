@@ -12,7 +12,7 @@ import type {
   SpanReceivedEvent,
   TraceProcessingEvent,
 } from "../schemas/events";
-import { isSpanReceivedEvent } from "../schemas/events";
+import { isSpanReceivedEvent, isTopicAssignedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { SpanNormalizationPipelineService } from "../services";
 import { traceAggregationService } from "../services/traceAggregationService";
@@ -125,6 +125,10 @@ export class TraceSummaryProjectionHandler
         let lastUpdatedAt = Date.now();
         let firstSpanReceivedEvent: SpanReceivedEvent | null = null;
 
+        // Track topic assignments from TopicAssignedEvents
+        let topicId: string | null = null;
+        let subtopicId: string | null = null;
+
         for (const event of events) {
           if (isSpanReceivedEvent(event)) {
             if (!firstSpanReceivedEvent) firstSpanReceivedEvent = event;
@@ -154,6 +158,21 @@ export class TraceSummaryProjectionHandler
               createdAt = event.timestamp;
             }
             lastUpdatedAt = event.timestamp;
+          } else if (isTopicAssignedEvent(event)) {
+            topicId = event.data.topicId;
+            subtopicId = event.data.subtopicId;
+            lastUpdatedAt = event.timestamp;
+
+            this.logger.debug(
+              {
+                topicId,
+                subtopicId,
+                topicName: event.data.topicName,
+                subtopicName: event.data.subtopicName,
+                isIncremental: event.data.isIncremental,
+              },
+              "Processing TopicAssignedEvent in projection",
+            );
           }
         }
 
@@ -238,9 +257,9 @@ export class TraceSummaryProjectionHandler
             TotalPromptTokenCount: aggregatedData.totalPromptTokenCount,
             TotalCompletionTokenCount: aggregatedData.totalCompletionTokenCount,
 
-            // These are populated by async processes later
-            TopicId: null,
-            SubTopicId: null,
+            // Topics assigned via TopicAssignedEvent
+            TopicId: topicId,
+            SubTopicId: subtopicId,
             HasAnnotation: null,
 
             Attributes: aggregatedData.attributes,
