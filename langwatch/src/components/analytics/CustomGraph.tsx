@@ -494,6 +494,11 @@ const CustomGraph_ = React.memo(
         nameForSeries,
       );
 
+      // Create a map for key-based lookup to match current with previous values correctly
+      const previousByKey = Object.fromEntries(
+        summaryData.previous.map((p) => [p.key, p]),
+      );
+
       const seriesSet = Object.fromEntries(
         input.series
           .toReversed()
@@ -528,12 +533,12 @@ const CustomGraph_ = React.memo(
                   titleProps={titleProps}
                 />
               ))}
-            {summaryData.current.slice(0, 10).map((entry, index) => (
+            {summaryData.current.slice(0, 10).map((entry) => (
               <SummaryMetric
                 key={entry.key}
                 label={entry.name}
                 current={entry.value}
-                previous={summaryData.previous[index]?.value}
+                previous={previousByKey[entry.key]?.value}
                 format={entry.metric?.format}
                 increaseIs={entry.metric?.increaseIs}
                 titleProps={titleProps}
