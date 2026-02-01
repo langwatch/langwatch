@@ -86,7 +86,9 @@ function translateSimpleAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        return `quantileTDigest(${percentile})(${columnExpr}) AS ${alias}`;
+        // Use quantileExact for accurate percentiles (matching ES behavior)
+        // quantileTDigest is faster but has ±5% error at distribution extremes
+        return `quantileExact(${percentile})(${columnExpr}) AS ${alias}`;
       }
       return `count(${columnExpr}) AS ${alias}`;
   }
@@ -276,6 +278,7 @@ function translatePerformanceMetric(
   requiredJoins: CHTable[],
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
+  const ss = tableAliases.stored_spans;
 
   switch (metric) {
     case "performance.completion_time":
@@ -345,24 +348,41 @@ function translatePerformanceMetric(
         requiredJoins,
       };
 
-    case "performance.tokens_per_second":
-      // Pre-computed in trace_summaries
-      return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TokensPerSecond`,
-          aggregation,
+    case "performance.tokens_per_second": {
+      // Calculate per-span TPS matching ES behavior:
+      // ES computes TPS for each LLM span individually, then averages them.
+      // Only include spans that have output_tokens > 0 (ES returns null for 0 tokens)
+      // TPS = output_tokens / (DurationMs / 1000)
+      //
+      // Note: Uses canonical OTel attribute name (gen_ai.usage.output_tokens)
+      // which is canonicalized from legacy gen_ai.usage.completion_tokens
+      requiredJoins.push("stored_spans");
+      const outputTokens = `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`;
+      const spanTps = `${outputTokens} / nullIf(${ss}.DurationMs / 1000.0, 0)`;
+      const hasTokens = `${outputTokens} > 0 AND ${ss}.DurationMs > 0`;
+
+      if (isPercentileAggregation(aggregation)) {
+        const percentile = percentileToPercent[aggregation];
+        return {
+          selectExpression: `quantileExactIf(${percentile})(${spanTps}, ${hasTokens}) AS ${alias}`,
           alias,
-        ),
+          requiredJoins,
+        };
+      }
+      return {
+        selectExpression: `${aggregation}If(${spanTps}, ${hasTokens}) AS ${alias}`,
         alias,
         requiredJoins,
       };
+    }
 
     case "spans.metrics.prompt_tokens":
       // Span-level prompt tokens (for grouping by span-level attributes like model)
+      // Uses canonical OTel name: gen_ai.usage.input_tokens
       requiredJoins.push("stored_spans");
       return {
         selectExpression: translateSimpleAggregation(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.prompt_tokens'])`,
+          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`,
           aggregation,
           alias,
         ),
@@ -372,10 +392,11 @@ function translatePerformanceMetric(
 
     case "spans.metrics.completion_tokens":
       // Span-level completion tokens (for grouping by span-level attributes like model)
+      // Uses canonical OTel name: gen_ai.usage.output_tokens
       requiredJoins.push("stored_spans");
       return {
         selectExpression: translateSimpleAggregation(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.completion_tokens'])`,
+          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`,
           aggregation,
           alias,
         ),
@@ -415,7 +436,7 @@ function translateEvaluationMetric(
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
         return {
-          selectExpression: `quantileTDigestIf(${percentile})(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+          selectExpression: `quantileExactIf(${percentile})(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
         };
@@ -431,7 +452,7 @@ function translateEvaluationMetric(
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
         return {
-          selectExpression: `quantileTDigestIf(${percentile})(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+          selectExpression: `quantileExactIf(${percentile})(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
         };
