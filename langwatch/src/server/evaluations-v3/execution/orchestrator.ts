@@ -18,6 +18,7 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 import { getBatchEvaluationProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
 import type {
@@ -60,6 +61,20 @@ const DEFAULT_CONCURRENCY = parseInt(
   process.env.EVAL_V3_CONCURRENCY ?? "10",
   10,
 );
+
+/**
+ * Checks if ClickHouse dual-write is enabled for batch evaluations.
+ * Uses the featureClickHouseDataSourceEvaluations project flag.
+ */
+const isClickHouseEvaluationsEnabled = async (
+  projectId: string,
+): Promise<boolean> => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { featureClickHouseDataSourceEvaluations: true },
+  });
+  return project?.featureClickHouseDataSourceEvaluations === true;
+};
 
 /**
  * Dispatches start batch evaluation command to ClickHouse via event sourcing.
@@ -465,7 +480,7 @@ export async function* executeCell(
         } catch (evalError) {
           // Yield error for this evaluator but continue with others
           logger.warn(
-            { error: evalError, evaluatorId, cell },
+            { error: evalError, evaluatorId, rowIndex: cell.rowIndex, targetId: cell.targetId },
             "Evaluator execution failed",
           );
           yield {
@@ -484,7 +499,10 @@ export async function* executeCell(
       }
     }
   } catch (error) {
-    logger.error({ error, cell }, "Cell execution failed");
+    logger.error(
+      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
+      "Cell execution failed",
+    );
     yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
   }
 }
@@ -594,6 +612,9 @@ export async function* runOrchestrator(
   // Set running flag
   await abortManager.setRunning(runId);
 
+  // Check if ClickHouse dual-write is enabled for this project
+  const clickHouseEnabled = await isClickHouseEvaluationsEnabled(projectId);
+
   // Get repository and initialize storage if enabled
   const repository =
     saveToEs && experimentId ? getDefaultBatchEvaluationRepository() : null;
@@ -662,15 +683,17 @@ export async function* runOrchestrator(
       targets: targetMetadata,
     });
 
-    // Dispatch event to ClickHouse for dual-write
-    void dispatchStartBatchEvaluation({
-      tenantId: projectId,
-      runId,
-      experimentId,
-      workflowVersionId: workflowVersionId ?? null,
-      total: totalCells,
-      targets: targetMetadata,
-    });
+    // Dispatch event to ClickHouse for dual-write (if enabled)
+    if (clickHouseEnabled) {
+      void dispatchStartBatchEvaluation({
+        tenantId: projectId,
+        runId,
+        experimentId,
+        workflowVersionId: workflowVersionId ?? null,
+        total: totalCells,
+        targets: targetMetadata,
+      });
+    }
   }
 
   // Helper to save pending results
@@ -721,20 +744,22 @@ export async function* runOrchestrator(
         trace_id: event.traceId ?? null,
       });
 
-      // Dispatch event to ClickHouse for dual-write
-      void dispatchRecordTargetResult({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        index: event.rowIndex,
-        targetId: event.targetId,
-        entry: datasetEntry,
-        predicted: event.output ? { output: event.output } : null,
-        cost: event.cost ?? null,
-        duration: event.duration ?? null,
-        error: event.error ?? null,
-        traceId: event.traceId ?? null,
-      });
+      // Dispatch event to ClickHouse for dual-write (if enabled)
+      if (clickHouseEnabled) {
+        void dispatchRecordTargetResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          entry: datasetEntry,
+          predicted: event.output ? { output: event.output } : null,
+          cost: event.cost ?? null,
+          duration: event.duration ?? null,
+          error: event.error ?? null,
+          traceId: event.traceId ?? null,
+        });
+      }
     } else if (event.type === "error") {
       // Store error events as dataset entries with the error message
       // This captures errors that occur during cell execution (e.g., network errors)
@@ -752,20 +777,22 @@ export async function* runOrchestrator(
           trace_id: null,
         });
 
-        // Dispatch error as target result to ClickHouse
-        void dispatchRecordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted: null,
-          cost: null,
-          duration: null,
-          error: event.message,
-          traceId: null,
-        });
+        // Dispatch error as target result to ClickHouse (if enabled)
+        if (clickHouseEnabled) {
+          void dispatchRecordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+          });
+        }
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
@@ -797,30 +824,32 @@ export async function* runOrchestrator(
             : null,
       });
 
-      // Dispatch event to ClickHouse for dual-write
-      void dispatchRecordEvaluatorResult({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        index: event.rowIndex,
-        targetId: event.targetId,
-        evaluatorId: event.evaluatorId,
-        evaluatorName: evaluatorConfig?.name ?? null,
-        status: result.status,
-        score: result.status === "processed" ? result.score : null,
-        label: result.status === "processed" ? result.label : null,
-        passed: result.status === "processed" ? result.passed : null,
-        details:
-          result.status === "error"
-            ? result.details
-            : result.status === "processed"
+      // Dispatch event to ClickHouse for dual-write (if enabled)
+      if (clickHouseEnabled) {
+        void dispatchRecordEvaluatorResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          evaluatorId: event.evaluatorId,
+          evaluatorName: evaluatorConfig?.name ?? null,
+          status: result.status,
+          score: result.status === "processed" ? result.score : null,
+          label: result.status === "processed" ? result.label : null,
+          passed: result.status === "processed" ? result.passed : null,
+          details:
+            result.status === "error"
               ? result.details
+              : result.status === "processed"
+                ? result.details
+                : null,
+          cost:
+            result.status === "processed" && result.cost
+              ? result.cost.amount
               : null,
-        cost:
-          result.status === "processed" && result.cost
-            ? result.cost.amount
-            : null,
-      });
+        });
+      }
     } else if (event.type === "progress") {
       pendingProgress = event.completed;
     }
@@ -1049,13 +1078,15 @@ export async function* runOrchestrator(
           stoppedAt: aborted ? finishedAt : undefined,
         });
 
-        // Dispatch completion event to ClickHouse for dual-write
-        void dispatchCompleteBatchEvaluation({
-          tenantId: projectId,
-          runId,
-          finishedAt: aborted ? null : finishedAt,
-          stoppedAt: aborted ? finishedAt : null,
-        });
+        // Dispatch completion event to ClickHouse for dual-write (if enabled)
+        if (clickHouseEnabled) {
+          void dispatchCompleteBatchEvaluation({
+            tenantId: projectId,
+            runId,
+            finishedAt: aborted ? null : finishedAt,
+            stoppedAt: aborted ? finishedAt : null,
+          });
+        }
       } catch (error) {
         logger.error(
           { error, runId },
