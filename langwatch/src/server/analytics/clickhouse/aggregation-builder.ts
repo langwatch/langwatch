@@ -24,6 +24,17 @@ import { translateAllFilters, type FilterTranslation } from "./filter-translator
 const MAX_FILTER_OPTIONS = 10000;
 
 /**
+ * Quote an identifier with backticks if it starts with a digit.
+ * ClickHouse requires backticks for identifiers starting with numbers.
+ */
+function quoteIdentifier(identifier: string): string {
+  if (/^\d/.test(identifier)) {
+    return `\`${identifier}\``;
+  }
+  return identifier;
+}
+
+/**
  * Date grouping options
  */
 export type DateGrouping =
@@ -94,24 +105,24 @@ function getDateTruncFunction(
 ): string {
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
-    return `toStartOfMinute(ts.CreatedAt, '${timeZone}')`;
+    return `toStartOfMinute(ts.OccurredAt, '${timeZone}')`;
   } else if (timeScaleMinutes <= 60) {
-    return `toStartOfInterval(ts.CreatedAt, INTERVAL ${timeScaleMinutes} MINUTE, '${timeZone}')`;
+    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${timeZone}')`;
   } else if (timeScaleMinutes <= 1440) {
     // Up to 1 day
     const hours = Math.floor(timeScaleMinutes / 60);
-    return `toStartOfInterval(ts.CreatedAt, INTERVAL ${hours} HOUR, '${timeZone}')`;
+    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${timeZone}')`;
   } else {
     // Days
     const days = Math.floor(timeScaleMinutes / 1440);
     if (days === 1) {
-      return `toStartOfDay(ts.CreatedAt, '${timeZone}')`;
+      return `toStartOfDay(ts.OccurredAt, '${timeZone}')`;
     } else if (days <= 7) {
-      return `toStartOfInterval(ts.CreatedAt, INTERVAL ${days} DAY, '${timeZone}')`;
+      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${timeZone}')`;
     } else if (days <= 31) {
-      return `toStartOfWeek(ts.CreatedAt, 1, '${timeZone}')`;
+      return `toStartOfWeek(ts.OccurredAt, 1, '${timeZone}')`;
     } else {
-      return `toStartOfMonth(ts.CreatedAt, '${timeZone}')`;
+      return `toStartOfMonth(ts.OccurredAt, '${timeZone}')`;
     }
   }
 }
@@ -122,7 +133,7 @@ function getDateTruncFunction(
 function getGroupByExpression(
   groupBy: string,
   groupByKey?: string,
-): { column: string; requiredJoins: CHTable[]; usesArrayJoin?: boolean } {
+): { column: string; requiredJoins: CHTable[]; usesArrayJoin?: boolean; handlesUnknown?: boolean } {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const es = tableAliases.evaluation_states;
@@ -157,15 +168,23 @@ function getGroupByExpression(
       };
 
     case "metadata.model":
+      // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
+      // Instead, we let them be empty and filter via HAVING in the outer query.
+      // This matches ES terms aggregation which excludes empty values.
       return {
         column: `${ss}.SpanAttributes['gen_ai.request.model']`,
         requiredJoins: ["stored_spans"],
+        handlesUnknown: false,
       };
 
     case "metadata.span_type":
+      // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
+      // Instead, we let them be empty and filter via HAVING in the outer query.
+      // This matches ES terms aggregation which excludes empty values.
       return {
         column: `${ss}.SpanAttributes['langwatch.span.type']`,
         requiredJoins: ["stored_spans"],
+        handlesUnknown: false,
       };
 
     case "evaluations.evaluation_passed": {
@@ -271,10 +290,14 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Handle groupBy
   let groupByColumn: string | null = null;
   let usesArrayJoin = false;
+  let groupByHandlesUnknown = false;
+  let groupByRequiresSpans = false;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
     usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
+    groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
+    groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
@@ -289,9 +312,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const baseWhere = `
     ${ts}.TenantId = {tenantId:String}
     AND (
-      (${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)})
+      (${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)})
       OR
-      (${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)})
+      (${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)})
     )
   `;
 
@@ -300,13 +323,15 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       ? `AND ${filterTranslation.whereClause}`
       : "";
 
-  // When using arrayJoin for grouping (like labels), we need a CTE approach to avoid
-  // trace duplication affecting counts. The CTE deduplicates (TraceId, group_key) pairs
-  // and preserves metrics per trace for accurate aggregation.
-  if (usesArrayJoin && groupByColumn) {
+  // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
+  // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
+  // (TraceId, group_key) pairs and preserves metrics per trace for accurate aggregation.
+  // Without this, joining stored_spans causes each trace to be counted once per span.
+  if ((usesArrayJoin || groupByRequiresSpans) && groupByColumn) {
     return buildArrayJoinTimeseriesQuery(
       input,
       groupByColumn,
+      groupByHandlesUnknown,
       metricTranslations,
       joinClauses,
       baseWhere,
@@ -320,8 +345,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // If we have subquery metrics and timeScale is "full", use CTE-based query
-  if (subqueryMetrics.length > 0 && input.timeScale === "full") {
+  // For timeScale "full" (summary queries), always use CTE-based query to ensure
+  // both current and previous periods return data (even if one is empty)
+  if (input.timeScale === "full") {
     return buildSubqueryTimeseriesQuery(
       input,
       simpleMetrics,
@@ -339,21 +365,28 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Add period indicator
   selectExprs.push(`
     CASE
-      WHEN ${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period
   `);
 
-  // Add date grouping if not "full"
-  if (input.timeScale !== "full" && typeof input.timeScale === "number") {
+  // Add date grouping (timeScale "full" already handled above via CTE query)
+  if (typeof input.timeScale === "number") {
     const dateTrunc = getDateTruncFunction(input.timeScale, timeZone);
     selectExprs.push(`${dateTrunc} AS date`);
   }
 
   // Add groupBy column if present
-  // Use 'unknown' for null/empty values to match ES behavior (missing: "unknown")
+  // - If handlesUnknown is true, the column expression already handles NULL/empty -> 'unknown'
+  // - Otherwise, exclude empty strings via HAVING (ES terms excludes them)
   if (groupByColumn) {
-    selectExprs.push(`if(${groupByColumn} IS NULL OR toString(${groupByColumn}) = '', 'unknown', toString(${groupByColumn})) AS group_key`);
+    if (groupByHandlesUnknown) {
+      // Column already handles 'unknown' conversion, just use as group_key
+      selectExprs.push(`${groupByColumn} AS group_key`);
+    } else {
+      // Convert NULL to 'unknown' for ES `missing: "unknown"` behavior
+      selectExprs.push(`if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`);
+    }
   }
 
   // Add metric expressions
@@ -363,16 +396,16 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
 
   // Build GROUP BY
   const groupByExprs: string[] = ["period"];
-  if (input.timeScale !== "full" && typeof input.timeScale === "number") {
+  if (typeof input.timeScale === "number") {
     groupByExprs.push("date");
   }
   if (groupByColumn) {
     groupByExprs.push("group_key");
   }
 
-  // No HAVING filter needed - empty/null values are converted to 'unknown' above
-  // to match ES behavior (missing: "unknown")
-  const havingClause = "";
+  // Filter out empty groupBy values to match ES terms aggregation behavior
+  // Skip HAVING if column already handles 'unknown' conversion (those already excluded empty strings)
+  const havingClause = groupByColumn && !groupByHandlesUnknown ? "HAVING group_key != ''" : "";
 
   // Build the complete SQL
   const sql = `
@@ -384,7 +417,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
-    ORDER BY period${input.timeScale !== "full" && typeof input.timeScale === "number" ? ", date" : ""}
+    ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
   `;
 
   return {
@@ -401,12 +434,14 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
 }
 
 /**
- * Build a timeseries query using CTE for arrayJoin grouping (labels, events).
+ * Build a timeseries query using CTE for arrayJoin grouping (labels, events)
+ * or span-level grouping (model, span_type).
  * This prevents trace duplication from affecting aggregate counts.
  */
 function buildArrayJoinTimeseriesQuery(
   input: TimeseriesQueryInput,
   groupByColumn: string,
+  groupByHandlesUnknown: boolean,
   metricTranslations: MetricTranslation[],
   joinClauses: string,
   baseWhere: string,
@@ -424,12 +459,17 @@ function buildArrayJoinTimeseriesQuery(
 
   // CTE: Get distinct (TraceId, group_key) pairs with per-trace metrics
   // This ensures each trace is counted once per group key value
+  // If groupByColumn already handles 'unknown' conversion (like model, span_type),
+  // just use it directly. Otherwise, wrap with if(...IS NULL, 'unknown', ...).
+  const groupKeyExpr = groupByHandlesUnknown
+    ? `${groupByColumn} AS group_key`
+    : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`;
   const cteSelectExprs: string[] = [
     `${ts}.TraceId AS trace_id`,
-    `if(${groupByColumn} IS NULL OR toString(${groupByColumn}) = '', 'unknown', toString(${groupByColumn})) AS group_key`,
+    groupKeyExpr,
     `CASE
-      WHEN ${ts}.CreatedAt >= {currentStart:DateTime64(3)} AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ts}.CreatedAt >= {previousStart:DateTime64(3)} AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period`,
   ];
 
@@ -485,6 +525,7 @@ function buildArrayJoinTimeseriesQuery(
     FROM deduped_traces
     WHERE period IS NOT NULL
     GROUP BY ${outerGroupBy.join(", ")}
+    HAVING group_key != ''
     ORDER BY period${dateTrunc ? ", date" : ""}
   `;
 
@@ -518,54 +559,108 @@ function buildSubqueryTimeseriesQuery(
   const ctes: string[] = [];
 
   // Build CTEs for each subquery metric, one for current and one for previous period
+  // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
   for (const metric of subqueryMetrics) {
     const subquery = metric.subquery!;
+    const cteName = `cte_${metric.alias}`;
 
-    // CTE for current period
-    ctes.push(`
-      ${metric.alias}_current AS (
+    // Check if this is a nested subquery (3-level aggregation)
+    if (subquery.nestedSubquery) {
+      const nested = subquery.nestedSubquery;
+      const havingClause = nested.having ? `HAVING ${nested.having}` : "";
+
+      // CTE for current period with nested subquery
+      ctes.push(`
+      ${cteName}_current AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        FROM (
+          SELECT ${subquery.innerSelect}
+          FROM (
+            SELECT ${nested.select}
+            FROM trace_summaries ${ts} FINAL
+            ${joinClauses}
+            WHERE ${ts}.TenantId = {tenantId:String}
+              AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
+              AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+              ${filterWhere}
+            GROUP BY ${nested.groupBy}
+            ${havingClause}
+          ) thread_data
+          GROUP BY ${subquery.innerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+      )`);
+
+      // CTE for previous period with nested subquery
+      ctes.push(`
+      ${cteName}_previous AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        FROM (
+          SELECT ${subquery.innerSelect}
+          FROM (
+            SELECT ${nested.select}
+            FROM trace_summaries ${ts} FINAL
+            ${joinClauses}
+            WHERE ${ts}.TenantId = {tenantId:String}
+              AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
+              AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+              ${filterWhere}
+            GROUP BY ${nested.groupBy}
+            ${havingClause}
+          ) thread_data
+          GROUP BY ${subquery.innerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+      )`);
+    } else {
+      // Standard 2-level aggregation
+      // CTE for current period
+      ctes.push(`
+      ${cteName}_current AS (
         SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
           SELECT ${subquery.innerSelect}
           FROM trace_summaries ${ts} FINAL
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
-            AND ${ts}.CreatedAt >= {currentStart:DateTime64(3)}
-            AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)}
+            AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
+            AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
             ${filterWhere}
           GROUP BY ${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
       )`);
 
-    // CTE for previous period
-    ctes.push(`
-      ${metric.alias}_previous AS (
+      // CTE for previous period
+      ctes.push(`
+      ${cteName}_previous AS (
         SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
           SELECT ${subquery.innerSelect}
           FROM trace_summaries ${ts} FINAL
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
-            AND ${ts}.CreatedAt >= {previousStart:DateTime64(3)}
-            AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)}
+            AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
+            AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
             ${filterWhere}
           GROUP BY ${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
       )`);
+    }
   }
 
   // Build simple metrics query for current period
+  // Quote aliases that start with digits for ClickHouse compatibility
   const simpleSelectExprs: string[] = [];
   for (const metric of simpleMetrics) {
-    simpleSelectExprs.push(metric.selectExpression);
-  }
-
-  // Add subquery metric values from CTEs
-  const subquerySelectExprs: string[] = [];
-  for (const metric of subqueryMetrics) {
-    subquerySelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_current) AS ${metric.alias}`);
+    // Replace unquoted alias with quoted alias in the selectExpression
+    const quotedAlias = quoteIdentifier(metric.alias);
+    const quotedExpression = metric.selectExpression.replace(
+      ` AS ${metric.alias}`,
+      ` AS ${quotedAlias}`
+    );
+    simpleSelectExprs.push(quotedExpression);
   }
 
   // CTE for simple metrics current period
@@ -577,8 +672,8 @@ function buildSubqueryTimeseriesQuery(
         FROM trace_summaries ${ts} FINAL
         ${joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {currentStart:DateTime64(3)}
-          AND ${ts}.CreatedAt < {currentEnd:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
+          AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
           ${filterWhere}
       )`);
 
@@ -589,8 +684,8 @@ function buildSubqueryTimeseriesQuery(
         FROM trace_summaries ${ts} FINAL
         ${joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {previousStart:DateTime64(3)}
-          AND ${ts}.CreatedAt < {previousEnd:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
+          AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
           ${filterWhere}
       )`);
   }
@@ -599,18 +694,23 @@ function buildSubqueryTimeseriesQuery(
   const currentSelectExprs: string[] = ["'current' AS period"];
   const previousSelectExprs: string[] = ["'previous' AS period"];
 
-  // Add simple metrics columns
+  // Add simple metrics columns (quote aliases that start with digits)
+  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
   for (const metric of simpleMetrics) {
     if (simpleMetrics.length > 0) {
-      currentSelectExprs.push(`(SELECT coalesce(${metric.alias}, 0) FROM simple_metrics_current) AS ${metric.alias}`);
-      previousSelectExprs.push(`(SELECT coalesce(${metric.alias}, 0) FROM simple_metrics_previous) AS ${metric.alias}`);
+      const quotedAlias = quoteIdentifier(metric.alias);
+      currentSelectExprs.push(`coalesce((SELECT ${quotedAlias} FROM simple_metrics_current), 0) AS ${quotedAlias}`);
+      previousSelectExprs.push(`coalesce((SELECT ${quotedAlias} FROM simple_metrics_previous), 0) AS ${quotedAlias}`);
     }
   }
 
-  // Add subquery metrics columns
+  // Add subquery metrics columns (use cte_ prefix to match CTE names, quote aliases)
+  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
   for (const metric of subqueryMetrics) {
-    currentSelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_current) AS ${metric.alias}`);
-    previousSelectExprs.push(`(SELECT coalesce(metric_value, 0) FROM ${metric.alias}_previous) AS ${metric.alias}`);
+    const cteName = `cte_${metric.alias}`;
+    const quotedAlias = quoteIdentifier(metric.alias);
+    currentSelectExprs.push(`coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`);
+    previousSelectExprs.push(`coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`);
   }
 
   const sql = `
@@ -738,8 +838,8 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.TopicId IS NOT NULL
           AND ${ts}.TopicId != ''
           ${searchQuery ? `AND ${ts}.TopicId ILIKE {searchQuery:String}` : ""}
@@ -757,8 +857,8 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.SubTopicId IS NOT NULL
           AND ${ts}.SubTopicId != ''
           ${searchQuery ? `AND ${ts}.SubTopicId ILIKE {searchQuery:String}` : ""}
@@ -776,8 +876,8 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['langwatch.user_id'] != ''
           ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
@@ -794,8 +894,8 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['gen_ai.conversation.id'] != ''
           ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
@@ -814,8 +914,8 @@ export function buildDataForFilterQuery(
         FROM trace_summaries ${ts} FINAL
         ${joins}
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['gen_ai.request.model'] != ''
           ${searchQuery ? `AND ${ss}.SpanAttributes['gen_ai.request.model'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
@@ -834,8 +934,8 @@ export function buildDataForFilterQuery(
         FROM trace_summaries ${ts} FINAL
         ${joins}
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['langwatch.span.type'] != ''
           ${searchQuery ? `AND ${ss}.SpanAttributes['langwatch.span.type'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
@@ -855,8 +955,8 @@ export function buildDataForFilterQuery(
         FROM trace_summaries ${ts} FINAL
         ${joins}
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           ${field === "evaluations.evaluator_id.guardrails_only" ? `AND ${es}.IsGuardrail = 1` : ""}
           ${searchQuery ? `AND ${es}.EvaluatorName ILIKE {searchQuery:String}` : ""}
         GROUP BY ${es}.EvaluatorId, ${es}.EvaluatorName, ${es}.EvaluatorType
@@ -873,8 +973,8 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         WHERE ${ts}.TenantId = {tenantId:String}
-          AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-          AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+          AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+          AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
         GROUP BY toUInt8(coalesce(${ts}.ContainsErrorStatus, 0))
         ORDER BY count DESC
       `;
@@ -934,8 +1034,8 @@ export function buildTopDocumentsQuery(
       JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
-        AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-        AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+        AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+        AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
         AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
         ${filterWhere}
     )
@@ -957,8 +1057,8 @@ export function buildTopDocumentsQuery(
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
     WHERE ${ts}.TenantId = {tenantId:String}
-      AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-      AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
       AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
       ${filterWhere}
   `;
@@ -1016,8 +1116,8 @@ export function buildFeedbacksQuery(
       ${ss}."Events.Name" AS event_name,
       ${ss}."Events.Attributes" AS event_attrs
     WHERE ${ts}.TenantId = {tenantId:String}
-      AND ${ts}.CreatedAt >= {startDate:DateTime64(3)}
-      AND ${ts}.CreatedAt < {endDate:DateTime64(3)}
+      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'feedback')
       ${filterWhere}

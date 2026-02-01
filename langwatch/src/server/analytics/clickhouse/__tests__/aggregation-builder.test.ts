@@ -157,10 +157,10 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Should use CTEs for pipeline metrics
+      // Should use CTEs for pipeline metrics with cte_ prefix to avoid starting with digit
       expect(result.sql).toContain("WITH");
-      expect(result.sql).toContain("_current AS");
-      expect(result.sql).toContain("_previous AS");
+      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_current AS");
+      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_previous AS");
       expect(result.sql).toContain("UNION ALL");
       expect(result.sql).toContain("'current' AS period");
       expect(result.sql).toContain("'previous' AS period");
@@ -186,6 +186,30 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("simple_metrics_current AS");
       expect(result.sql).toContain("simple_metrics_previous AS");
       expect(result.sql).toContain("UNION ALL");
+    });
+
+    it("should use CTE query for simple metrics when timeScale is 'full' (no pipeline)", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Should use CTE query even with only simple metrics
+      expect(result.sql).toContain("WITH");
+      expect(result.sql).toContain("simple_metrics_current AS");
+      expect(result.sql).toContain("simple_metrics_previous AS");
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+
+      // Column aliases starting with digits should be quoted with backticks
+      expect(result.sql).toContain("`0__metadata_trace_id__cardinality`");
+      expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
     it("should use standard query for pipeline metrics when timeScale is not 'full'", () => {
