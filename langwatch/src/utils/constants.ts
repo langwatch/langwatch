@@ -17,8 +17,10 @@ export const MIN_MAX_TOKENS = 256;
 export const FALLBACK_MAX_TOKENS = 4096;
 
 export const KSUID_RESOURCES = {
+  BATCH_RESULT: "batchresult",
   COST: "cost",
   EVALUATION: "eval",
+  EVALUATION_STATE: "evalstate",
   EVENT: "event",
   EXPERIMENT: "experiment",
   MONITOR: "monitor",
