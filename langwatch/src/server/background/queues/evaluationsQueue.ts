@@ -381,7 +381,11 @@ export const updateEvaluationStatusInES = async ({
             error: error
               ? error instanceof Error
                 ? error.message
-                : String(error)
+                : typeof error === "object" &&
+                    error !== null &&
+                    "message" in error
+                  ? String(error.message)
+                  : String(error)
               : undefined,
           });
         }
