@@ -4,7 +4,10 @@ import type { EventStore } from "../library";
 import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../library/utils/distributedLock";
 import { RedisDistributedLock } from "../library/utils/distributedLock";
-import type { EventSourcingConfig } from "./config";
+import type {
+  EventSourcingConfig,
+  EventSourcingConfigOptions,
+} from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
 import { DefaultQueueProcessorFactory } from "./queue";
@@ -17,6 +20,8 @@ import { CheckpointRepositoryClickHouse } from "./stores/repositories/checkpoint
 import { CheckpointRepositoryMemory } from "./stores/repositories/checkpointRepositoryMemory";
 import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
+import { getClickHouseClient } from "../../clickhouse/client";
+import { connection as redisConnection } from "../../redis";
 
 const logger = createLogger("langwatch:event-sourcing:runtime");
 
@@ -295,12 +300,15 @@ export class EventSourcingRuntime {
   }
 }
 
-// Singleton instance
-let _runtime: EventSourcingRuntime | null = null;
+// Singleton instance stored in globalThis to survive module context isolation
+// (turbopack bundles API routes separately, creating different module instances)
+const globalForEventSourcing = globalThis as unknown as {
+  eventSourcingRuntime: EventSourcingRuntime | null;
+};
 
-export interface InitializeEventSourcingOptions {
-  clickHouseClient?: ClickHouseClient | null;
-  redisConnection?: import("ioredis").default | import("ioredis").Cluster | null;
+// Initialize to null if not already set
+if (globalForEventSourcing.eventSourcingRuntime === undefined) {
+  globalForEventSourcing.eventSourcingRuntime = null;
 }
 
 /**
@@ -323,13 +331,13 @@ export interface InitializeEventSourcingOptions {
  * ```
  */
 export function initializeEventSourcing(
-  options: InitializeEventSourcingOptions,
+  options: EventSourcingConfigOptions,
 ): void {
-  if (_runtime) {
+  if (globalForEventSourcing.eventSourcingRuntime) {
     logger.debug("Event sourcing already initialized, skipping");
     return;
   }
-  _runtime = new EventSourcingRuntime(
+  globalForEventSourcing.eventSourcingRuntime = new EventSourcingRuntime(
     createEventSourcingConfig({
       clickHouseClient: options.clickHouseClient ?? undefined,
       redisConnection: options.redisConnection ?? undefined,
@@ -351,10 +359,10 @@ export function initializeEventSourcing(
  * ```
  */
 export function initializeEventSourcingForTesting(): void {
-  if (_runtime) {
+  if (globalForEventSourcing.eventSourcingRuntime) {
     resetEventSourcingRuntime();
   }
-  _runtime = new EventSourcingRuntime(
+  globalForEventSourcing.eventSourcingRuntime = new EventSourcingRuntime(
     createEventSourcingConfig({
       clickHouseClient: null,
       redisConnection: null,
@@ -365,18 +373,19 @@ export function initializeEventSourcingForTesting(): void {
 
 /**
  * Returns the singleton EventSourcingRuntime instance.
- *
- * @throws Error if not initialized. Call initializeEventSourcing() during app startup
- *         or initializeEventSourcingForTesting() in tests.
+ * Auto-initializes lazily if not already initialized.
  */
 export function getEventSourcingRuntime(): EventSourcingRuntime {
-  if (!_runtime) {
-    throw new Error(
-      "Event sourcing not initialized. Call initializeEventSourcing() during app startup " +
-        "or initializeEventSourcingForTesting() in tests.",
+  if (!globalForEventSourcing.eventSourcingRuntime) {
+    globalForEventSourcing.eventSourcingRuntime = new EventSourcingRuntime(
+      createEventSourcingConfig({
+        clickHouseClient: getClickHouseClient() ?? undefined,
+        redisConnection: redisConnection ?? undefined,
+      }),
     );
+    logger.info("Event sourcing auto-initialized via getEventSourcingRuntime()");
   }
-  return _runtime;
+  return globalForEventSourcing.eventSourcingRuntime;
 }
 
 /**
@@ -384,12 +393,12 @@ export function getEventSourcingRuntime(): EventSourcingRuntime {
  * Use this when you want to check if event sourcing is available without throwing.
  */
 export function getEventSourcingRuntimeOrNull(): EventSourcingRuntime | null {
-  return _runtime;
+  return globalForEventSourcing.eventSourcingRuntime;
 }
 
 /**
  * Resets the singleton instance. Only use in tests.
  */
 export function resetEventSourcingRuntime(): void {
-  _runtime = null;
+  globalForEventSourcing.eventSourcingRuntime = null;
 }
