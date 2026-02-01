@@ -10,7 +10,6 @@
  * 6. Checks abort flags between executions
  */
 
-import { nanoid } from "nanoid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/evaluations-v3/types";
 import { isRowEmpty } from "~/evaluations-v3/utils/emptyRowDetection";
@@ -33,7 +32,6 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import type {
-  BatchEvaluationRepository,
   DatasetEntry,
   EvaluationEntry,
 } from "../repositories/batchEvaluation.repository";
@@ -71,9 +69,9 @@ const isClickHouseEvaluationsEnabled = async (
 ): Promise<boolean> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { featureClickHouseDataSourceEvaluations: true },
+    select: { featureEventSourcingEvaluationIngestion: true },
   });
-  return project?.featureClickHouseDataSourceEvaluations === true;
+  return project?.featureEventSourcingEvaluationIngestion === true;
 };
 
 /**
@@ -480,7 +478,12 @@ export async function* executeCell(
         } catch (evalError) {
           // Yield error for this evaluator but continue with others
           logger.warn(
-            { error: evalError, evaluatorId, rowIndex: cell.rowIndex, targetId: cell.targetId },
+            {
+              error: evalError,
+              evaluatorId,
+              rowIndex: cell.rowIndex,
+              targetId: cell.targetId,
+            },
             "Evaluator execution failed",
           );
           yield {
