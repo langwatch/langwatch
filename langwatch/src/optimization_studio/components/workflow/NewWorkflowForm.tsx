@@ -169,7 +169,7 @@ export const NewWorkflowForm = ({
   );
 
   // License enforcement for workflow creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("workflows");
+  const { checkAndProceed } = useLicenseEnforcement("workflows");
 
   const {
     register,
@@ -295,7 +295,6 @@ export const NewWorkflowForm = ({
           </Button>
         </Dialog.Footer>
       </form>
-      {upgradeModal}
     </>
   );
 };

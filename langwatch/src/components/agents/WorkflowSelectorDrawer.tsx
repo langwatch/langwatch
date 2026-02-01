@@ -65,7 +65,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   // License enforcement for agent creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
+  const { checkAndProceed } = useLicenseEnforcement("agents");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -273,8 +273,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           </Drawer.Footer>
         </Drawer.Content>
       </Drawer.Root>
-
-      {upgradeModal}
     </>
   );
 }

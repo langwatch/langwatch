@@ -461,7 +461,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 										<Link
 											href={`/${project?.slug}/studio/${evaluatorQuery.data.workflowId}`}
 											data-testid="open-workflow-link"
-                      target="_blank"
+											target="_blank"
 										>
 											<WorkflowCardDisplay
 												name={evaluatorQuery.data.workflowName ?? "Workflow"}

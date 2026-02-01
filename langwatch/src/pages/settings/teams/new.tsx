@@ -42,7 +42,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
   const router = useRouter();
 
   // License enforcement for teams
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("teams");
+  const { checkAndProceed } = useLicenseEnforcement("teams");
 
   const createTeam = api.team.createTeamWithMembers.useMutation();
 
@@ -98,7 +98,6 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
         onSubmit={onSubmit}
         isLoading={createTeam.isLoading}
       />
-      {upgradeModal}
     </SettingsLayout>
   );
 }

@@ -113,8 +113,8 @@ function MembersList({
   const user = session?.user;
   
   // License enforcement for both member types
-  const { checkAndProceed: checkMembersLimit, upgradeModal: membersUpgradeModal } = useLicenseEnforcement("members");
-  const { checkAndProceed: checkMembersLiteLimit, upgradeModal: membersLiteUpgradeModal } = useLicenseEnforcement("membersLite");
+  const { checkAndProceed: checkMembersLimit } = useLicenseEnforcement("members");
+  const { checkAndProceed: checkMembersLiteLimit } = useLicenseEnforcement("membersLite");
   
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -618,9 +618,6 @@ function MembersList({
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
-
-      {membersUpgradeModal}
-      {membersLiteUpgradeModal}
     </SettingsLayout>
   );
 }

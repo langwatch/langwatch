@@ -24,7 +24,7 @@ export function NewEvaluationMenu({ open, onOpenChange }: NewEvaluationMenuProps
   const router = useRouter();
   const [isCreatingExperiment, setIsCreatingExperiment] = useState(false);
   const utils = api.useContext();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("experiments");
+  const { checkAndProceed } = useLicenseEnforcement("experiments");
 
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
@@ -132,7 +132,6 @@ export function NewEvaluationMenu({ open, onOpenChange }: NewEvaluationMenuProps
           </Menu.Item>
         </Menu.Content>
       </Menu.Root>
-      {upgradeModal}
     </>
   );
 }

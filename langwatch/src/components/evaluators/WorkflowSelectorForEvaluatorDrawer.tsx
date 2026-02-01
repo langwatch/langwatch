@@ -70,7 +70,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
   const isOpen = props.open !== false && props.open !== undefined;
 
   // License enforcement for evaluator creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
+  const { checkAndProceed } = useLicenseEnforcement("evaluators");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -277,8 +277,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
           </Drawer.Footer>
         </Drawer.Content>
       </Drawer.Root>
-
-      {upgradeModal}
     </>
   );
 }

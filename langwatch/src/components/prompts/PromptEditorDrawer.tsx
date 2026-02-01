@@ -165,7 +165,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const utils = api.useContext();
 
   // License enforcement for prompt creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("prompts");
+  const { checkAndProceed } = useLicenseEnforcement("prompts");
 
   // Check if we're in evaluations context (targetId in URL params)
   const targetId = drawerParams.targetId as string | undefined;
@@ -1115,7 +1115,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           </Drawer.Footer>
         )}
       </Drawer.Content>
-      {upgradeModal}
     </Drawer.Root>
   );
 }

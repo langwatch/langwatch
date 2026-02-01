@@ -212,7 +212,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
   // License enforcement for agent creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
+  const { checkAndProceed } = useLicenseEnforcement("agents");
 
   // All variables = fixed + custom
   const variables = useMemo(() => {
@@ -715,8 +715,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
       </Drawer.Root>
-
-      {upgradeModal}
     </>
   );
 }

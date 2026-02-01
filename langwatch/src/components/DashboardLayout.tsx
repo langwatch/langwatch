@@ -20,8 +20,10 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
-import { useLicenseEnforcement } from "../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+import { UpgradeModal } from "./UpgradeModal";
+import type { LimitType } from "../server/license-enforcement";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -85,7 +87,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
   const [open, setOpen] = useState(false);
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("projects");
 
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -103,7 +104,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   );
 
   return (
-    <>
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
         <Button
@@ -224,7 +224,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       <AddProjectButton
                         team={projectGroup.team}
                         organization={projectGroup.organization}
-                        onCheckAndProceed={checkAndProceed}
                       />
                     </Menu.ItemGroup>
                   ))}
@@ -234,19 +233,15 @@ export const ProjectSelector = React.memo(function ProjectSelector({
         </Box>
       </Portal>
     </Menu.Root>
-    {upgradeModal}
-  </>
   );
 });
 
 export const AddProjectButton = ({
   team,
   organization,
-  onCheckAndProceed,
 }: {
   team: Team;
   organization: Organization;
-  onCheckAndProceed: (onAllowed: () => void) => void;
 }) => {
   const { openDrawer } = useDrawer();
 
@@ -255,13 +250,11 @@ export const AddProjectButton = ({
       value={`new-project-${team.slug}`}
       fontSize="14px"
       onClick={() =>
-        onCheckAndProceed(() =>
-          openDrawer("createProject", {
-            navigateOnCreate: true,
-            defaultTeamId: team.id,
-            organizationId: organization.id,
-          })
-        )
+        openDrawer("createProject", {
+          navigateOnCreate: true,
+          defaultTeamId: team.id,
+          organizationId: organization.id,
+        })
       }
     >
       <Plus />
@@ -615,6 +608,23 @@ export const DashboardLayout = ({
           </VStack>
         </Box>
       </HStack>
+      <GlobalUpgradeModal />
     </Box>
   );
 };
+
+function GlobalUpgradeModal() {
+  const { isOpen, limitType, current, max, close } = useUpgradeModalStore();
+
+  if (!limitType) return null;
+
+  return (
+    <UpgradeModal
+      open={isOpen}
+      onClose={close}
+      limitType={limitType as LimitType}
+      current={current ?? undefined}
+      max={max ?? undefined}
+    />
+  );
+}

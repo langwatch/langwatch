@@ -171,7 +171,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   // License enforcement for agent creation
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("agents");
+  const { checkAndProceed } = useLicenseEnforcement("agents");
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -462,8 +462,6 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         open={isCodeModalOpen}
         onClose={() => setIsCodeModalOpen(false)}
       />
-
-      {upgradeModal}
     </>
   );
 }

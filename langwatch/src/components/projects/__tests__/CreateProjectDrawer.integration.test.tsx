@@ -48,6 +48,15 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
   })),
 }));
 
+vi.mock("../../../hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: vi.fn(() => ({
+    checkAndProceed: (callback: () => void) => callback(),
+    isLoading: false,
+    isAllowed: true,
+    limitInfo: { allowed: true, current: 1, max: 10 },
+  })),
+}));
+
 vi.mock("../../../hooks/useDrawer", () => ({
   useDrawer: vi.fn(() => ({
     closeDrawer: mockCloseDrawer,

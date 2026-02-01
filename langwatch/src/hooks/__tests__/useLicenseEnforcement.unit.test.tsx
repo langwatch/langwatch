@@ -25,38 +25,17 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-// Mock UpgradeModal - it's a component, we just need to verify it renders
-vi.mock("~/components/UpgradeModal", () => ({
-  UpgradeModal: ({
-    open,
-    onClose,
-    limitType,
-    current,
-    max,
-  }: {
-    open: boolean;
-    onClose: () => void;
-    limitType: string;
-    current: number;
-    max: number;
-  }) => {
-    if (!open) return null;
-    return (
-      <div data-testid="upgrade-modal">
-        <span data-testid="limit-type">{limitType}</span>
-        <span data-testid="current">{current}</span>
-        <span data-testid="max">{max}</span>
-        <button data-testid="close-btn" onClick={onClose}>
-          Close
-        </button>
-      </div>
-    );
-  },
+// Mock the upgrade modal store
+const mockOpenUpgradeModal = vi.fn();
+vi.mock("~/stores/upgradeModalStore", () => ({
+  useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) =>
+    selector({ open: mockOpenUpgradeModal }),
 }));
 
 describe("useLicenseEnforcement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOpenUpgradeModal.mockClear();
   });
 
   afterEach(() => {
@@ -162,8 +141,8 @@ describe("useLicenseEnforcement", () => {
     });
   });
 
-  describe("upgradeModal", () => {
-    it("renders upgrade modal when blocked", () => {
+  describe("upgrade modal store integration", () => {
+    it("opens upgrade modal via store when blocked", () => {
       mockUseQuery.mockReturnValue({
         data: { allowed: false, current: 10, max: 10 },
         isLoading: false,
@@ -175,16 +154,12 @@ describe("useLicenseEnforcement", () => {
         result.current.checkAndProceed(() => {});
       });
 
-      // The upgradeModal is a React element - we verify it exists and has correct structure
-      const modalElement = result.current.upgradeModal;
-      expect(modalElement).toBeDefined();
-      expect(modalElement.props.open).toBe(true);
-      expect(modalElement.props.limitType).toBe("workflows");
-      expect(modalElement.props.current).toBe(10);
-      expect(modalElement.props.max).toBe(10);
+      // Verify the store's open function was called with correct parameters
+      expect(mockOpenUpgradeModal).toHaveBeenCalledTimes(1);
+      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("workflows", 10, 10);
     });
 
-    it("does not show upgrade modal when allowed", () => {
+    it("does not open upgrade modal when allowed", () => {
       mockUseQuery.mockReturnValue({
         data: { allowed: true, current: 3, max: 10 },
         isLoading: false,
@@ -199,8 +174,8 @@ describe("useLicenseEnforcement", () => {
 
       // Callback should have been called (allowed)
       expect(callback).toHaveBeenCalled();
-      // Modal should not be open
-      expect(result.current.upgradeModal.props.open).toBe(false);
+      // Modal store should not have been called
+      expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
     });
   });
 
@@ -268,7 +243,7 @@ describe("useLicenseEnforcement", () => {
           result.current.checkAndProceed(() => {});
         });
 
-        expect(result.current.upgradeModal.props.limitType).toBe(limitType);
+        expect(mockOpenUpgradeModal).toHaveBeenCalledWith(limitType, 5, 5);
       });
     });
   });

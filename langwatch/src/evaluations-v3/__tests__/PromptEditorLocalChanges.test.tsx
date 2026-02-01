@@ -34,7 +34,6 @@ vi.mock("~/hooks/useLicenseEnforcement", () => ({
     isLoading: false,
     isAllowed: true,
     limitInfo: { allowed: true, current: 2, max: 5 },
-    upgradeModal: null,
   }),
 }));
 
