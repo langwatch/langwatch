@@ -69,7 +69,8 @@ describe("metric-translator", () => {
 
       it("should translate metadata.user_id", () => {
         const result = translateMetric("metadata.user_id", "cardinality", 0);
-        expect(result.selectExpression).toContain("uniq(");
+        // Uses uniqIf to filter out empty user_ids to match ES behavior
+        expect(result.selectExpression).toContain("uniqIf(");
         expect(result.selectExpression).toContain(
           "Attributes['langwatch.user_id']"
         );
@@ -78,6 +79,8 @@ describe("metric-translator", () => {
 
       it("should translate metadata.thread_id", () => {
         const result = translateMetric("metadata.thread_id", "cardinality", 0);
+        // Uses uniqIf to filter out empty thread_ids to match ES behavior
+        expect(result.selectExpression).toContain("uniqIf(");
         expect(result.selectExpression).toContain(
           "Attributes['gen_ai.conversation.id']"
         );
@@ -295,6 +298,28 @@ describe("metric-translator", () => {
         "eval-123"
       );
       expect(result.requiredJoins).toContain("evaluation_states");
+    });
+
+    it("should handle threads.average_duration_per_thread with pipeline using nested subquery", () => {
+      // threads.average_duration_per_thread with a pipeline requires 3-level aggregation:
+      // 1. Group by (user_id, thread_id), compute thread duration
+      // 2. Group by user_id, compute avg thread duration per user
+      // 3. Compute avg across users
+      const result = translatePipelineAggregation(
+        "threads.average_duration_per_thread",
+        "avg",
+        "user_id",
+        "avg",
+        0
+      );
+
+      // Should return a subquery with nested structure
+      expect(result.requiresSubquery).toBe(true);
+      expect(result.subquery).toBeDefined();
+      expect(result.subquery?.nestedSubquery).toBeDefined();
+      expect(result.subquery?.nestedSubquery?.select).toContain("thread_duration");
+      expect(result.subquery?.innerSelect).toContain("avg(thread_duration)");
+      expect(result.selectExpression).toContain("avg(user_avg_duration)");
     });
   });
 });

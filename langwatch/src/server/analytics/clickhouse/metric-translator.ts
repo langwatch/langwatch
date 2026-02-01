@@ -32,6 +32,12 @@ export interface MetricTranslation {
     innerSelect: string;
     innerGroupBy: string;
     outerAggregation: string;
+    /** For 3-level aggregations (e.g., avg thread duration per user) */
+    nestedSubquery?: {
+      select: string;
+      groupBy: string;
+      having?: string;
+    };
   };
 }
 
@@ -200,6 +206,14 @@ function translateMetadataMetric(
       };
 
     case "metadata.user_id":
+      // For cardinality, filter out empty/null user_ids to match ES terms aggregation behavior
+      if (aggregation === "cardinality") {
+        return {
+          selectExpression: `uniqIf(${ts}.Attributes['langwatch.user_id'], ${ts}.Attributes['langwatch.user_id'] != '') AS ${alias}`,
+          alias,
+          requiredJoins,
+        };
+      }
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.Attributes['langwatch.user_id']`,
@@ -211,6 +225,14 @@ function translateMetadataMetric(
       };
 
     case "metadata.thread_id":
+      // For cardinality, filter out empty/null thread_ids to match ES terms aggregation behavior
+      if (aggregation === "cardinality") {
+        return {
+          selectExpression: `uniqIf(${ts}.Attributes['gen_ai.conversation.id'], ${ts}.Attributes['gen_ai.conversation.id'] != '') AS ${alias}`,
+          alias,
+          requiredJoins,
+        };
+      }
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.Attributes['gen_ai.conversation.id']`,
@@ -223,10 +245,11 @@ function translateMetadataMetric(
 
     case "metadata.span_type":
       // Requires JOIN with stored_spans
+      // Count distinct traces (not spans) to match ES behavior
       requiredJoins.push("stored_spans");
       return {
         selectExpression: translateSimpleAggregation(
-          `${ss}.SpanId`,
+          `${ts}.TraceId`,
           "cardinality",
           alias,
         ),
@@ -327,6 +350,32 @@ function translatePerformanceMetric(
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.TokensPerSecond`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+      };
+
+    case "spans.metrics.prompt_tokens":
+      // Span-level prompt tokens (for grouping by span-level attributes like model)
+      requiredJoins.push("stored_spans");
+      return {
+        selectExpression: translateSimpleAggregation(
+          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.prompt_tokens'])`,
+          aggregation,
+          alias,
+        ),
+        alias,
+        requiredJoins,
+      };
+
+    case "spans.metrics.completion_tokens":
+      // Span-level completion tokens (for grouping by span-level attributes like model)
+      requiredJoins.push("stored_spans");
+      return {
+        selectExpression: translateSimpleAggregation(
+          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.completion_tokens'])`,
           aggregation,
           alias,
         ),
@@ -523,17 +572,22 @@ function translateThreadsMetric(
   requiredJoins: CHTable[],
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
+  const ss = tableAliases.stored_spans;
 
   switch (metric) {
     case "threads.average_duration_per_thread":
       // This requires a subquery: first compute duration per thread, then average
+      // Use trace_summaries.OccurredAt which is the trace's execution time
+      // (= earliest span start time, matches ES's timestamps.started_at)
+      // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
+      // Cap duration at 10800000ms (3 hours) to match ES behavior
       return {
         selectExpression: `avg(thread_duration) AS ${alias}`,
         alias,
         requiredJoins,
         requiresSubquery: true,
         subquery: {
-          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, max(${ts}.CreatedAt) - min(${ts}.CreatedAt) AS thread_duration`,
+          innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, 10800000) AS thread_duration`,
           innerGroupBy: "thread_id",
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
@@ -570,6 +624,8 @@ export function translatePipelineAggregation(
   );
 
   // Get the pipeline field expression
+  // ES terms aggregation excludes null/missing values, so we just use the column directly
+  // and filter out empty values via HAVING clause
   let pipelineColumn: string;
   switch (pipelineField) {
     case "trace_id":
@@ -591,6 +647,63 @@ export function translatePipelineAggregation(
   // Get the inner metric translation
   const innerMetric = translateMetric(metric, aggregation, index, key, subkey);
 
+  // Special handling for threads.average_duration_per_thread with pipeline
+  // This requires a 3-level aggregation:
+  // 1. Group by (user_id, thread_id), compute thread duration
+  // 2. Group by user_id, compute avg thread duration per user
+  // 3. Compute avg across users
+  if (metric === "threads.average_duration_per_thread" && innerMetric.requiresSubquery) {
+    const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
+    const outerAgg =
+      pipelineAggregation === "sum"
+        ? "sum"
+        : pipelineAggregation === "avg"
+          ? "avg"
+          : pipelineAggregation === "min"
+            ? "min"
+            : "max";
+
+    // Build a nested subquery for 3-level aggregation
+    // Use trace_summaries.OccurredAt which is set to the trace's execution start time
+    // This matches ES's timestamps.started_at at the trace level
+    return {
+      selectExpression: `${outerAgg}(user_avg_duration) AS ${alias}`,
+      alias,
+      requiredJoins: innerMetric.requiredJoins,
+      requiresSubquery: true,
+      subquery: {
+        // Inner: compute avg thread duration per user
+        innerSelect: `
+          pipeline_key,
+          avg(thread_duration) AS user_avg_duration
+        `,
+        innerGroupBy: "pipeline_key",
+        outerAggregation: `${outerAgg}(user_avg_duration) AS ${alias}`,
+        // Custom nested CTE for thread duration calculation
+        nestedSubquery: {
+          // Use trace_summaries.OccurredAt (= trace's execution start time)
+          // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
+          // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
+          // Cap duration at 10800000ms (3 hours) to match ES behavior
+          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, 10800000) AS thread_duration`,
+          groupBy: "pipeline_key, thread_id",
+          having: `thread_id IS NOT NULL AND toString(thread_id) != '' AND pipeline_key IS NOT NULL AND toString(pipeline_key) != ''`,
+        },
+      },
+    };
+  }
+
+  // If inner metric already requires a subquery (e.g., other nested metrics),
+  // we can't nest it in a pipeline aggregation. Return null as a fallback.
+  if (innerMetric.requiresSubquery) {
+    return {
+      selectExpression: `NULL AS ${alias}`,
+      alias,
+      requiredJoins: innerMetric.requiredJoins,
+      requiresSubquery: false, // Don't add to subquery metrics list
+    };
+  }
+
   // Map pipeline aggregation to CH function
   const outerAgg =
     pipelineAggregation === "sum"
@@ -607,6 +720,7 @@ export function translatePipelineAggregation(
     requiredJoins: innerMetric.requiredJoins,
     requiresSubquery: true,
     subquery: {
+      // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
       innerSelect: `${pipelineColumn} AS pipeline_key, ${innerMetric.selectExpression.replace(` AS ${alias}`, "")} AS inner_value`,
       innerGroupBy: "pipeline_key",
       outerAggregation: `${outerAgg}(inner_value) AS ${alias}`,
