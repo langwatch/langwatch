@@ -25,7 +25,7 @@ describe("aggregation-builder", () => {
       timeScale: 60, // 1 hour
     };
 
-    it("should build a basic timeseries query", () => {
+    it("builds a basic timeseries query", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("SELECT");
@@ -36,7 +36,7 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe("test-project");
     });
 
-    it("should include period case statement", () => {
+    it("includes period case statement", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("CASE");
@@ -44,28 +44,28 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'previous'");
     });
 
-    it("should include date truncation for timescale", () => {
+    it("includes date truncation for timescale", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("AS date");
       expect(result.sql).toContain("toStartOfInterval");
     });
 
-    it("should handle 'full' timeScale without date grouping", () => {
+    it("handles 'full' timeScale without date grouping", () => {
       const input = { ...baseInput, timeScale: "full" as const };
       const result = buildTimeseriesQuery(input);
 
       expect(result.sql).not.toContain("AS date");
     });
 
-    it("should add metric expressions", () => {
+    it("adds metric expressions", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("uniq(");
       expect(result.sql).toContain("TraceId");
     });
 
-    it("should handle multiple metrics", () => {
+    it("handles multiple metrics", () => {
       const input = {
         ...baseInput,
         series: [
@@ -80,7 +80,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("TotalCost");
     });
 
-    it("should add JOINs when metrics require them", () => {
+    it("adds JOINs when metrics require them", () => {
       const input = {
         ...baseInput,
         series: [
@@ -95,7 +95,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("JOIN evaluation_states");
     });
 
-    it("should add filters to WHERE clause with parameterized values", () => {
+    it("adds filters to WHERE clause with parameterized values", () => {
       const input = {
         ...baseInput,
         filters: {
@@ -109,7 +109,7 @@ describe("aggregation-builder", () => {
       expect(result.params).toHaveProperty("topicIds_0", ["topic-1", "topic-2"]);
     });
 
-    it("should handle groupBy parameter", () => {
+    it("handles groupBy parameter", () => {
       const input = {
         ...baseInput,
         groupBy: "topics.topics",
@@ -121,7 +121,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("GROUP BY period, date, group_key");
     });
 
-    it("should add JOINs for groupBy that requires them", () => {
+    it("adds JOINs for groupBy that requires them", () => {
       const input = {
         ...baseInput,
         groupBy: "metadata.model",
@@ -132,7 +132,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("gen_ai.request.model");
     });
 
-    it("should include all date parameters", () => {
+    it("includes all date parameters", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.params.currentStart).toEqual(baseInput.startDate);
@@ -143,7 +143,7 @@ describe("aggregation-builder", () => {
       expect(result.params.previousEnd).toEqual(baseInput.startDate);
     });
 
-    it("should build CTE-based query for pipeline metrics with timeScale 'full'", () => {
+    it("builds CTE-based query for pipeline metrics with timeScale 'full'", () => {
       const input = {
         ...baseInput,
         timeScale: "full" as const,
@@ -157,7 +157,7 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Should use CTEs for pipeline metrics with cte_ prefix to avoid starting with digit
+      // Uses CTEs for pipeline metrics with cte_ prefix to avoid starting with digit
       expect(result.sql).toContain("WITH");
       expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_current AS");
       expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality_previous AS");
@@ -166,7 +166,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'previous' AS period");
     });
 
-    it("should include both simple and pipeline metrics in CTE query", () => {
+    it("includes both simple and pipeline metrics in CTE query", () => {
       const input = {
         ...baseInput,
         timeScale: "full" as const,
@@ -181,14 +181,14 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Should have CTEs for both simple and pipeline metrics
+      // Has CTEs for both simple and pipeline metrics
       expect(result.sql).toContain("WITH");
       expect(result.sql).toContain("simple_metrics_current AS");
       expect(result.sql).toContain("simple_metrics_previous AS");
       expect(result.sql).toContain("UNION ALL");
     });
 
-    it("should use CTE query for simple metrics when timeScale is 'full' (no pipeline)", () => {
+    it("uses CTE query for simple metrics when timeScale is 'full' (no pipeline)", () => {
       const input = {
         ...baseInput,
         timeScale: "full" as const,
@@ -199,7 +199,7 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Should use CTE query even with only simple metrics
+      // Uses CTE query even with only simple metrics
       expect(result.sql).toContain("WITH");
       expect(result.sql).toContain("simple_metrics_current AS");
       expect(result.sql).toContain("simple_metrics_previous AS");
@@ -207,12 +207,12 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'current' AS period");
       expect(result.sql).toContain("'previous' AS period");
 
-      // Column aliases starting with digits should be quoted with backticks
+      // Column aliases starting with digits are quoted with backticks
       expect(result.sql).toContain("`0__metadata_trace_id__cardinality`");
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
-    it("should use standard query for pipeline metrics when timeScale is not 'full'", () => {
+    it("uses standard query for pipeline metrics when timeScale is not 'full'", () => {
       const input = {
         ...baseInput,
         timeScale: 60,
@@ -226,7 +226,7 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Should NOT use CTEs for non-full timeScale (filters out pipeline metrics)
+      // Does NOT use CTEs for non-full timeScale (filters out pipeline metrics)
       expect(result.sql).not.toContain("UNION ALL");
       expect(result.sql).toContain("GROUP BY period, date");
     });
@@ -237,7 +237,7 @@ describe("aggregation-builder", () => {
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
-    it("should build query for topics.topics", () => {
+    it("builds query for topics.topics", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "topics.topics",
@@ -252,7 +252,7 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("should build query for topics.subtopics", () => {
+    it("builds query for topics.subtopics", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "topics.subtopics",
@@ -263,7 +263,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("ts.SubTopicId AS field");
     });
 
-    it("should build query for metadata.user_id", () => {
+    it("builds query for metadata.user_id", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "metadata.user_id",
@@ -274,7 +274,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("Attributes['langwatch.user_id']");
     });
 
-    it("should build query for metadata.thread_id", () => {
+    it("builds query for metadata.thread_id", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "metadata.thread_id",
@@ -285,7 +285,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("Attributes['gen_ai.conversation.id']");
     });
 
-    it("should build query for spans.model with JOIN", () => {
+    it("builds query for spans.model with JOIN", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "spans.model",
@@ -297,7 +297,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("gen_ai.request.model");
     });
 
-    it("should build query for spans.type with JOIN", () => {
+    it("builds query for spans.type with JOIN", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "spans.type",
@@ -309,7 +309,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("langwatch.span.type");
     });
 
-    it("should build query for evaluations.evaluator_id with JOIN", () => {
+    it("builds query for evaluations.evaluator_id with JOIN", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "evaluations.evaluator_id",
@@ -321,7 +321,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("es.EvaluatorId AS field");
     });
 
-    it("should filter guardrails only for evaluations.evaluator_id.guardrails_only", () => {
+    it("filters guardrails only for evaluations.evaluator_id.guardrails_only", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "evaluations.evaluator_id.guardrails_only",
@@ -332,7 +332,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("es.IsGuardrail = 1");
     });
 
-    it("should build query for traces.error", () => {
+    it("builds query for traces.error", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "traces.error",
@@ -345,7 +345,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'Traces without error'");
     });
 
-    it("should add search query filter when provided", () => {
+    it("adds search query filter when provided", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "topics.topics",
@@ -360,7 +360,7 @@ describe("aggregation-builder", () => {
       expect(result.params.searchQuery).toBe("%search-term%");
     });
 
-    it("should return empty result for unknown field", () => {
+    it("returns empty result for unknown field", () => {
       const result = buildDataForFilterQuery(
         projectId,
         "unknown.field" as any,
@@ -377,7 +377,7 @@ describe("aggregation-builder", () => {
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
-    it("should build query for top documents", () => {
+    it("builds query for top documents", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("documentId");
@@ -388,13 +388,13 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("should include JOIN with stored_spans", () => {
+    it("includes JOIN with stored_spans", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("JOIN stored_spans");
     });
 
-    it("should include query for total unique documents", () => {
+    it("includes query for total unique documents", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
       // Query has two parts separated by semicolon
@@ -403,7 +403,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("AS total");
     });
 
-    it("should include filters when provided", () => {
+    it("includes filters when provided", () => {
       const filters = {
         "topics.topics": ["topic-1"],
       };
@@ -417,7 +417,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("ts.TopicId IN");
     });
 
-    it("should limit results to top 10", () => {
+    it("limits results to top 10", () => {
       const result = buildTopDocumentsQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("LIMIT 10");
@@ -429,7 +429,7 @@ describe("aggregation-builder", () => {
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
 
-    it("should build query for feedbacks", () => {
+    it("builds query for feedbacks", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("trace_id");
@@ -440,19 +440,19 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe(projectId);
     });
 
-    it("should filter for thumbs_up_down events", () => {
+    it("filters for thumbs_up_down events", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("event_name = 'thumbs_up_down'");
     });
 
-    it("should filter for events with feedback", () => {
+    it("filters for events with feedback", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("mapContains(event_attrs, 'feedback')");
     });
 
-    it("should include ARRAY JOIN for event arrays", () => {
+    it("includes ARRAY JOIN for event arrays", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ARRAY JOIN");
@@ -461,7 +461,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain('Events.Attributes"');
     });
 
-    it("should include filters when provided with parameterized values", () => {
+    it("includes filters when provided with parameterized values", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
       };
@@ -478,13 +478,13 @@ describe("aggregation-builder", () => {
       expect(result.params).toHaveProperty("metaValues_0", ["user-1"]);
     });
 
-    it("should limit results to 100", () => {
+    it("limits results to 100", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("LIMIT 100");
     });
 
-    it("should order by timestamp descending", () => {
+    it("orders by timestamp descending", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");

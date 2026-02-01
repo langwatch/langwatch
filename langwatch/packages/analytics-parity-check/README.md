@@ -88,7 +88,7 @@ The script generates traces covering:
 
 ### Example Output
 
-```
+```text
 ========================================
 ANALYTICS PARITY CHECK RESULTS
 ========================================

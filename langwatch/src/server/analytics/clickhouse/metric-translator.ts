@@ -70,6 +70,23 @@ export function isPercentileAggregation(
 }
 
 /**
+ * Get the ClickHouse conditional aggregation function name.
+ * Maps ES aggregation names to their CH "*If" counterparts.
+ * Special cases:
+ * - cardinality -> uniqIf (cardinalityIf doesn't exist)
+ * - terms -> uniqIf (terms is also a cardinality operation)
+ */
+function getConditionalAggregation(aggregation: AggregationTypes): string {
+  switch (aggregation) {
+    case "cardinality":
+    case "terms":
+      return "uniqIf";
+    default:
+      return `${aggregation}If`;
+  }
+}
+
+/**
  * Translate a simple numeric aggregation (avg, sum, min, max)
  */
 function translateSimpleAggregation(
@@ -385,7 +402,7 @@ function translatePerformanceMetric(
         };
       }
       return {
-        selectExpression: `${aggregation}If(${spanTps}, ${hasTokens}) AS ${alias}`,
+        selectExpression: `${getConditionalAggregation(aggregation)}(${spanTps}, ${hasTokens}) AS ${alias}`,
         alias,
         requiredJoins,
       };
@@ -457,7 +474,7 @@ function translateEvaluationMetric(
         };
       }
       return {
-        selectExpression: `${aggregation}If(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+        selectExpression: `${getConditionalAggregation(aggregation)}(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
         alias,
         requiredJoins,
       };
@@ -473,7 +490,7 @@ function translateEvaluationMetric(
         };
       }
       return {
-        selectExpression: `${aggregation}If(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+        selectExpression: `${getConditionalAggregation(aggregation)}(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
         alias,
         requiredJoins,
       };

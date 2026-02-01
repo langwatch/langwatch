@@ -19,19 +19,29 @@ import {
 import type { Config, VerificationReport } from "./types.js";
 
 /**
+ * Parse a numeric environment variable with validation.
+ * Returns the default value if parsing fails or results in NaN.
+ */
+function parseNumericEnv(value: string | undefined, defaultValue: number): number {
+  if (!value) return defaultValue;
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
+/**
  * Load configuration from environment variables
  */
 function loadConfig(): Config {
   const config: Config = {
     baseUrl: process.env["BASE_URL"] ?? "http://localhost:3000",
-    esProjectId: process.env["ES_PROJECT_ID"] ?? "",
-    esApiKey: process.env["ES_API_KEY"] ?? "",
-    chProjectId: process.env["CH_PROJECT_ID"] ?? "",
     chApiKey: process.env["CH_API_KEY"] ?? "",
+    chProjectId: process.env["CH_PROJECT_ID"] ?? "",
+    esApiKey: process.env["ES_API_KEY"] ?? "",
+    esProjectId: process.env["ES_PROJECT_ID"] ?? "",
     prodApiKey: process.env["PROD_API_KEY"] ?? null,
-    tolerance: parseFloat(process.env["TOLERANCE"] ?? "0.05"),
-    traceCount: parseInt(process.env["TRACE_COUNT"] ?? "20", 10),
-    waitTimeMs: parseInt(process.env["WAIT_TIME_MS"] ?? "120000", 10), // 2 minutes default
+    tolerance: parseNumericEnv(process.env["TOLERANCE"], 0.05),
+    traceCount: Math.floor(parseNumericEnv(process.env["TRACE_COUNT"], 20)),
+    waitTimeMs: Math.floor(parseNumericEnv(process.env["WAIT_TIME_MS"], 120000)), // 2 minutes default
   };
 
   // Validate required config

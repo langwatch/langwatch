@@ -35,6 +35,20 @@ const DAYS_PER_WEEK = 7;
 const DAYS_PER_MONTH = 31; // Approximate, triggers month-level grouping
 
 /**
+ * Validate timezone string against IANA timezone database.
+ * Falls back to UTC if invalid to prevent SQL injection.
+ */
+function validateTimeZone(timeZone: string): string {
+  try {
+    // Use Intl.DateTimeFormat to validate - it throws for invalid timezones
+    Intl.DateTimeFormat(undefined, { timeZone });
+    return timeZone;
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
  * Quote an identifier with backticks if it starts with a digit.
  * ClickHouse requires backticks for identifiers starting with numbers.
  */
@@ -166,6 +180,12 @@ const groupByExpressions: Partial<Record<string, () => GroupByExpression>> = {
     requiredJoins: [],
   }),
 
+  "sentiment.thumbs_up_down": () => ({
+    column: `arrayJoin(arrayFilter(x -> x = 'thumbs_up_down', ${tableAliases.stored_spans}."Events.Name"))`,
+    requiredJoins: ["stored_spans"] as CHTable[],
+    usesArrayJoin: true,
+  }),
+
   "error.has_error": () => ({
     column: `if(${tableAliases.stored_spans}.StatusCode = 2, 'with error', 'without error')`,
     requiredJoins: ["stored_spans"],
@@ -215,25 +235,28 @@ function getDateTruncFunction(
   timeScaleMinutes: number,
   timeZone: string,
 ): string {
+  // Validate timezone to prevent SQL injection
+  const validatedTimeZone = validateTimeZone(timeZone);
+
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
-    return `toStartOfMinute(ts.OccurredAt, '${timeZone}')`;
+    return `toStartOfMinute(ts.OccurredAt, '${validatedTimeZone}')`;
   } else if (timeScaleMinutes <= MINUTES_PER_HOUR) {
-    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${timeZone}')`;
+    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${validatedTimeZone}')`;
   } else if (timeScaleMinutes <= MINUTES_PER_DAY) {
     const hours = Math.floor(timeScaleMinutes / MINUTES_PER_HOUR);
-    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${timeZone}')`;
+    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
   } else {
     // Days
     const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
     if (days === 1) {
-      return `toStartOfDay(ts.OccurredAt, '${timeZone}')`;
+      return `toStartOfDay(ts.OccurredAt, '${validatedTimeZone}')`;
     } else if (days <= DAYS_PER_WEEK) {
-      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${timeZone}')`;
+      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${days} DAY, '${validatedTimeZone}')`;
     } else if (days <= DAYS_PER_MONTH) {
-      return `toStartOfWeek(ts.OccurredAt, 1, '${timeZone}')`;
+      return `toStartOfWeek(ts.OccurredAt, 1, '${validatedTimeZone}')`;
     } else {
-      return `toStartOfMonth(ts.OccurredAt, '${timeZone}')`;
+      return `toStartOfMonth(ts.OccurredAt, '${validatedTimeZone}')`;
     }
   }
 }
@@ -370,6 +393,16 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Separate simple and subquery metrics
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
+
+  // Warn if pipeline metrics will be dropped (only supported with timeScale "full")
+  if (subqueryMetrics.length > 0 && input.timeScale !== "full") {
+    // Pipeline metrics require CTEs and are only fully supported in "full" timeScale mode.
+    // When timeScale is numeric, they're omitted from the query. This is a known limitation.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[aggregation-builder] Pipeline metrics (${subqueryMetrics.map((m) => m.alias).join(", ")}) dropped: only supported with timeScale="full"`,
+    );
+  }
 
   // For timeScale "full" (summary queries), always use CTE-based query to ensure
   // both current and previous periods return data (even if one is empty)
@@ -846,10 +879,28 @@ export function buildDataForFilterQuery(
   key?: string,
   subkey?: string,
   searchQuery?: string,
+  filters?: Partial<
+    Record<
+      FilterField,
+      | string[]
+      | Record<string, string[]>
+      | Record<string, Record<string, string[]>>
+    >
+  >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const es = tableAliases.evaluation_states;
+
+  // Translate filters if provided
+  const filterTranslation = translateAllFilters(filters ?? {});
+  const filterWhere =
+    filterTranslation.whereClause !== "1=1"
+      ? `AND ${filterTranslation.whereClause}`
+      : "";
+  const filterJoins = Array.from(filterTranslation.requiredJoins)
+    .map((table) => buildJoinClause(table))
+    .join("\n");
 
   let sql: string;
   let joins = "";
@@ -863,11 +914,13 @@ export function buildDataForFilterQuery(
           ${ts}.TopicId AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.TopicId IS NOT NULL
           AND ${ts}.TopicId != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ts}.TopicId ILIKE {searchQuery:String}` : ""}
         GROUP BY ${ts}.TopicId
         ORDER BY count DESC
@@ -882,11 +935,13 @@ export function buildDataForFilterQuery(
           ${ts}.SubTopicId AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.SubTopicId IS NOT NULL
           AND ${ts}.SubTopicId != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ts}.SubTopicId ILIKE {searchQuery:String}` : ""}
         GROUP BY ${ts}.SubTopicId
         ORDER BY count DESC
@@ -901,10 +956,12 @@ export function buildDataForFilterQuery(
           ${ts}.Attributes['langwatch.user_id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['langwatch.user_id'] != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ts}.Attributes['langwatch.user_id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
@@ -919,10 +976,12 @@ export function buildDataForFilterQuery(
           ${ts}.Attributes['gen_ai.conversation.id'] AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ts}.Attributes['gen_ai.conversation.id'] != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ts}.Attributes['gen_ai.conversation.id'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
@@ -939,10 +998,12 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         ${joins}
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['gen_ai.request.model'] != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ss}.SpanAttributes['gen_ai.request.model'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
@@ -959,10 +1020,12 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         ${joins}
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           AND ${ss}.SpanAttributes['langwatch.span.type'] != ''
+          ${filterWhere}
           ${searchQuery ? `AND ${ss}.SpanAttributes['langwatch.span.type'] ILIKE {searchQuery:String}` : ""}
         GROUP BY field
         ORDER BY count DESC
@@ -980,10 +1043,12 @@ export function buildDataForFilterQuery(
           count() AS count
         FROM trace_summaries ${ts} FINAL
         ${joins}
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
           ${field === "evaluations.evaluator_id.guardrails_only" ? `AND ${es}.IsGuardrail = 1` : ""}
+          ${filterWhere}
           ${searchQuery ? `AND ${es}.EvaluatorName ILIKE {searchQuery:String}` : ""}
         GROUP BY ${es}.EvaluatorId, ${es}.EvaluatorName, ${es}.EvaluatorType
         ORDER BY count DESC
@@ -998,9 +1063,11 @@ export function buildDataForFilterQuery(
           if(toUInt8(coalesce(${ts}.ContainsErrorStatus, 0)) = 1, 'Traces with error', 'Traces without error') AS label,
           count() AS count
         FROM trace_summaries ${ts} FINAL
+        ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
           AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+          ${filterWhere}
         GROUP BY toUInt8(coalesce(${ts}.ContainsErrorStatus, 0))
         ORDER BY count DESC
       `;
@@ -1018,6 +1085,7 @@ export function buildDataForFilterQuery(
       startDate,
       endDate,
       searchQuery: searchQuery ? `%${searchQuery}%` : undefined,
+      ...filterTranslation.params,
     },
   };
 }

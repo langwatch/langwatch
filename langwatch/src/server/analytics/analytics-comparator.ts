@@ -42,7 +42,7 @@ export class AnalyticsComparator {
       this.logger.warn(
         {
           operation,
-          input,
+          inputSummary: this.summarizeInput(input),
           discrepancyCount: discrepancies.length,
           discrepancies: discrepancies.slice(0, MAX_LOGGED_DISCREPANCIES),
           esResultSample: this.summarize(esResult),
@@ -116,6 +116,40 @@ export class AnalyticsComparator {
         }
       }
     }
+
+    // Compare previousPeriod buckets
+    if (esResult.previousPeriod.length !== chResult.previousPeriod.length) {
+      discrepancies.push(
+        `Previous period bucket count: ES=${esResult.previousPeriod.length}, CH=${chResult.previousPeriod.length}`,
+      );
+    }
+
+    const previousMinLength = Math.min(
+      esResult.previousPeriod.length,
+      chResult.previousPeriod.length,
+    );
+
+    for (let i = 0; i < previousMinLength; i++) {
+      const esBucket = esResult.previousPeriod[i];
+      const chBucket = chResult.previousPeriod[i];
+
+      if (!esBucket || !chBucket) continue;
+
+      for (const key of Object.keys(esBucket)) {
+        if (key === "date") continue;
+
+        const esValue = esBucket[key];
+        const chValue = chBucket[key];
+
+        if (typeof esValue === "number" && typeof chValue === "number") {
+          if (!this.valuesMatch(esValue, chValue)) {
+            discrepancies.push(
+              `Previous bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`,
+            );
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -180,6 +214,26 @@ export class AnalyticsComparator {
       "options" in value &&
       Array.isArray((value as FilterDataResult).options)
     );
+  }
+
+  /**
+   * Summarize input for logging without exposing PII.
+   * Only logs structural information, not actual values.
+   */
+  private summarizeInput(input: unknown): unknown {
+    if (typeof input !== "object" || input === null) {
+      return { type: typeof input };
+    }
+
+    const obj = input as Record<string, unknown>;
+    return {
+      keys: Object.keys(obj),
+      projectId: obj.projectId ? "[redacted]" : undefined,
+      hasFilters: obj.filters !== undefined,
+      seriesCount: Array.isArray(obj.series) ? obj.series.length : undefined,
+      groupBy: obj.groupBy,
+      timeScale: obj.timeScale,
+    };
   }
 
   /**

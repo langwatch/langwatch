@@ -309,22 +309,59 @@ export class ClickHouseAnalyticsService {
     currentPeriod: TimeseriesBucket[],
     groupBy?: string,
   ): void {
-    // Collect all metric keys from both periods
+    // Collect all metric keys from both periods (including nested grouped metrics)
     const allMetricKeys = new Set<string>();
+    const allGroupedMetricKeys = new Map<string, Set<string>>(); // groupBy key -> metric keys
 
     for (const bucket of [...previousPeriod, ...currentPeriod]) {
       for (const key of Object.keys(bucket)) {
-        // Skip 'date' and groupBy keys (those aren't metrics)
-        if (key === "date" || key === groupBy) continue;
-        allMetricKeys.add(key);
+        // Skip 'date' key
+        if (key === "date") continue;
+
+        const value = bucket[key];
+
+        // Handle grouped metrics (nested objects)
+        if (groupBy && key === groupBy && typeof value === "object" && value !== null) {
+          const groupData = value as Record<string, Record<string, number>>;
+          for (const [groupKey, metrics] of Object.entries(groupData)) {
+            if (!allGroupedMetricKeys.has(groupKey)) {
+              allGroupedMetricKeys.set(groupKey, new Set());
+            }
+            const keySet = allGroupedMetricKeys.get(groupKey)!;
+            for (const metricKey of Object.keys(metrics)) {
+              keySet.add(metricKey);
+            }
+          }
+        } else {
+          allMetricKeys.add(key);
+        }
       }
     }
 
     // Ensure all buckets have all metric keys with default value of 0
     for (const bucket of [...previousPeriod, ...currentPeriod]) {
+      // Normalize top-level metrics
       for (const key of allMetricKeys) {
         if (bucket[key] === undefined) {
           bucket[key] = 0;
+        }
+      }
+
+      // Normalize grouped metrics
+      if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
+        const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
+
+        // Ensure all group keys exist
+        for (const [groupKey, metricKeys] of allGroupedMetricKeys) {
+          if (!groupData[groupKey]) {
+            groupData[groupKey] = {};
+          }
+          // Ensure all metric keys exist within each group
+          for (const metricKey of metricKeys) {
+            if (groupData[groupKey]![metricKey] === undefined) {
+              groupData[groupKey]![metricKey] = 0;
+            }
+          }
         }
       }
     }
@@ -366,6 +403,7 @@ export class ClickHouseAnalyticsService {
           key,
           subkey,
           searchQuery,
+          _filters,
         );
 
         this.logger.debug({ sql, params }, "Executing dataForFilter query");

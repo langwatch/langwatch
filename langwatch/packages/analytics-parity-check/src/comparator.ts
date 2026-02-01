@@ -20,11 +20,12 @@ function isNumeric(value: unknown): value is number {
 }
 
 /**
- * Calculate percent difference between two numbers
+ * Calculate percent difference between two numbers.
+ * Returns Infinity when dividing by zero (a=0 but b≠0).
  */
 function percentDiff(a: number, b: number): number {
   if (a === 0 && b === 0) return 0;
-  if (a === 0) return Math.abs(b);
+  if (a === 0) return Infinity;
   return Math.abs((a - b) / a);
 }
 
