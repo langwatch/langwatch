@@ -934,23 +934,27 @@ model Agent {
 }
 
 model Evaluator {
-    id         String    @id @default(nanoid())
-    projectId  String
-    project    Project   @relation(fields: [projectId], references: [id])
-    name       String
-    slug       String? // Human-readable identifier for guardrails API
-    type       String // "evaluator" (built-in) | "workflow" (custom)
-    config     Json // Settings for built-in, or empty for workflow
-    workflowId String? // For "workflow" type - top level for joins
-    workflow   Workflow? @relation(fields: [workflowId], references: [id])
-    monitors   Monitor[] // Monitors using this evaluator
-    archivedAt DateTime?
-    createdAt  DateTime  @default(now())
-    updatedAt  DateTime  @default(now()) @updatedAt
+    id                    String     @id @default(nanoid())
+    projectId             String
+    project               Project    @relation(fields: [projectId], references: [id])
+    name                  String
+    slug                  String? // Human-readable identifier for guardrails API
+    type                  String // "evaluator" (built-in) | "workflow" (custom)
+    config                Json // Settings for built-in, or empty for workflow
+    workflowId            String? // For "workflow" type - top level for joins
+    workflow              Workflow?  @relation(fields: [workflowId], references: [id])
+    copiedFromEvaluatorId String?
+    copiedFrom            Evaluator? @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
+    monitors              Monitor[] // Monitors using this evaluator
+    archivedAt            DateTime?
+    createdAt             DateTime   @default(now())
+    updatedAt             DateTime   @default(now()) @updatedAt
 
     @@unique([projectId, slug])
     @@index([projectId])
     @@index([workflowId])
+    @@index([copiedFromEvaluatorId])
 }
 
 model Scenario {

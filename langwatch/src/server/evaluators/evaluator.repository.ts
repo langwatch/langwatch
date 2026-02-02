@@ -53,10 +53,12 @@ export class EvaluatorRepository {
   }
 
   /**
-   * Finds all evaluators for a project.
+   * Finds all evaluators for a project with copy-count for replica UI.
    * Excludes archived evaluators. Orders by most recently updated.
    */
-  async findAll(input: { projectId: string }): Promise<Evaluator[]> {
+  async findAll(input: {
+    projectId: string;
+  }): Promise<(Evaluator & { _count: { copiedEvaluators: number } })[]> {
     return await this.prisma.evaluator.findMany({
       where: {
         projectId: input.projectId,
@@ -64,6 +66,9 @@ export class EvaluatorRepository {
       },
       orderBy: {
         updatedAt: "desc",
+      },
+      include: {
+        _count: { select: { copiedEvaluators: true } },
       },
     });
   }
