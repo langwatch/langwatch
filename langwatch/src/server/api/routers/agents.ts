@@ -300,7 +300,21 @@ export const agentsRouter = createTRPCRouter({
           },
         },
       });
-      return copies.map((c) => ({
+
+      const authorizedCopies = await Promise.all(
+        copies.map(async (c) => ({
+          copy: c,
+          hasPermission: await hasProjectPermission(
+            ctx,
+            c.projectId,
+            "evaluations:view",
+          ),
+        })),
+      ).then((results) =>
+        results.filter((r) => r.hasPermission).map((r) => r.copy),
+      );
+
+      return authorizedCopies.map((c) => ({
         id: c.id,
         name: c.name,
         projectId: c.projectId,
@@ -501,12 +515,26 @@ export const agentsRouter = createTRPCRouter({
 
       const source = await ctx.prisma.agent.findFirst({
         where: { id: copy.copiedFromAgentId, archivedAt: null },
+        select: { projectId: true, name: true, config: true },
       });
 
       if (!source) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Source agent has been deleted",
+        });
+      }
+
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        source.projectId,
+        "evaluations:manage",
+      );
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to manage evaluations in the source project",
         });
       }
 

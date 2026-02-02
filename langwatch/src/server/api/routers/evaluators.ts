@@ -363,7 +363,21 @@ export const evaluatorsRouter = createTRPCRouter({
           },
         },
       });
-      return copies.map((c) => ({
+
+      const authorizedCopies = await Promise.all(
+        copies.map(async (c) => ({
+          copy: c,
+          hasPermission: await hasProjectPermission(
+            ctx,
+            c.projectId,
+            "evaluations:view",
+          ),
+        })),
+      ).then((results) =>
+        results.filter((r) => r.hasPermission).map((r) => r.copy),
+      );
+
+      return authorizedCopies.map((c) => ({
         id: c.id,
         name: c.name,
         projectId: c.projectId,
@@ -441,7 +455,10 @@ export const evaluatorsRouter = createTRPCRouter({
         projectId: input.projectId,
         name: source.name,
         type: source.type,
-        config: source.config as Prisma.InputJsonValue,
+        config:
+          source.config === null
+            ? Prisma.JsonNull
+            : (source.config as Prisma.InputJsonValue),
         workflowId: newWorkflowId ?? undefined,
       });
 
@@ -566,6 +583,19 @@ export const evaluatorsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Source evaluator has been deleted",
+        });
+      }
+
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        source.projectId,
+        "evaluations:manage",
+      );
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "You do not have permission to read from the source evaluator's project",
         });
       }
 
