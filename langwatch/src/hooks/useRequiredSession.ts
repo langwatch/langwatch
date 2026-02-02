@@ -61,6 +61,9 @@ export const noOrgBouncerRoutes = [
   "/",
 ];
 
+// Auth routes should not trigger redirect loops
+const authRoutes = ["/auth/signin", "/auth/signup", "/auth/error"];
+
 export const useRequiredSession = (
   { required = true }: { required?: boolean } = { required: true },
 ) => {
@@ -71,6 +74,8 @@ export const useRequiredSession = (
     onUnauthenticated: required
       ? () => {
           if (publicRoutes.includes(router.route)) return;
+          // Don't redirect on auth pages - prevents infinite loop
+          if (authRoutes.includes(router.route)) return;
           if (navigator.onLine) {
             // Redirect to /auth/signin which detects the configured auth
             // provider from publicEnv.NEXTAUTH_PROVIDER and either shows
