@@ -626,7 +626,7 @@ export async function* runOrchestrator(
         index: event.rowIndex,
         target_id: event.targetId,
         entry: datasetEntry,
-        predicted: event.output ? { output: event.output } : undefined,
+        predicted: event.output !== undefined ? { output: event.output } : undefined,
         cost: event.cost ?? null,
         duration: event.duration ?? null,
         error: event.error ?? null,
