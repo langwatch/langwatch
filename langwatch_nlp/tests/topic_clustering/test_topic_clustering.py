@@ -25,6 +25,10 @@ def client():
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    not os.path.exists("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv"),
+    reason="Test CSV data file not available"
+)
 class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
     async def test_it_does_batch_clustering(self, client, httpx_mock: HTTPXMock):
