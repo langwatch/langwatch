@@ -5,7 +5,7 @@ import {
   getEvaluatorId,
 } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
-import { captureError } from "../../../utils/captureError";
+import { captureError, extractErrorMessage } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
@@ -378,11 +378,7 @@ export const updateEvaluationStatusInES = async ({
             passed,
             label,
             details,
-            error: error
-              ? error instanceof Error
-                ? error.message
-                : String(error)
-              : undefined,
+            error: extractErrorMessage(error),
           });
         }
       }
