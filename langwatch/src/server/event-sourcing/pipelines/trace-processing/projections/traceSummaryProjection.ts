@@ -321,6 +321,7 @@ export class TraceSummaryProjectionHandler implements ProjectionHandler<
         SubTopicId: topicAssignment.subtopicId,
         HasAnnotation: null,
         Attributes: aggregatedData.attributes,
+        OccurredAt: aggregatedData.startTimeUnixMs,
         CreatedAt: timestamps.createdAt ?? timestamps.lastUpdatedAt,
         LastUpdatedAt: timestamps.lastUpdatedAt,
       },
