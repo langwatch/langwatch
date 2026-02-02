@@ -37,6 +37,8 @@ const baseResourceFields = {
   maxAgents: 10,
   currentExperiments: 2,
   maxExperiments: 10,
+  currentOnlineEvaluations: 2,
+  maxOnlineEvaluations: 10,
   currentMessagesPerMonth: 500,
   maxMessagesPerMonth: 10000,
   currentEvaluationsCredit: 25,

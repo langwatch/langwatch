@@ -23,6 +23,7 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   membersLite: "lite members",
   agents: "agents",
   experiments: "experiments",
+  onlineEvaluations: "online evaluations",
 } as const;
 
 /**
@@ -46,4 +47,5 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   membersLite: "Lite Members",
   agents: "Agents",
   experiments: "Experiments",
+  onlineEvaluations: "Online Evaluations",
 } as const;

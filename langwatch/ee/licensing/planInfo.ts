@@ -24,6 +24,7 @@ export type PlanInfo = {
   maxScenarios: number;
   maxAgents: number;
   maxExperiments: number;
+  maxOnlineEvaluations: number;
   canPublish: boolean;
   userPrice?: {
     USD: number;

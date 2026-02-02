@@ -93,6 +93,7 @@ export interface ILicenseEnforcementRepository {
   getMembersLiteCount(organizationId: string): Promise<number>;
   getAgentCount(organizationId: string): Promise<number>;
   getExperimentCount(organizationId: string): Promise<number>;
+  getOnlineEvaluationCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -392,6 +393,24 @@ export class LicenseEnforcementRepository
     if (projectIds.length === 0) return 0;
 
     return this.prisma.experiment.count({
+      where: {
+        projectId: { in: projectIds },
+      },
+    });
+  }
+
+  /**
+   * Counts all online evaluations (monitors) for license enforcement.
+   * All monitors count against the license limit regardless of enabled state.
+   *
+   * Note: Monitor model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getOnlineEvaluationCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.monitor.count({
       where: {
         projectId: { in: projectIds },
       },

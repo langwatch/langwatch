@@ -22,6 +22,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     maxScenarios: resolved.maxScenarios,
     maxAgents: resolved.maxAgents,
     maxExperiments: resolved.maxExperiments,
+    maxOnlineEvaluations: resolved.maxOnlineEvaluations,
     canPublish: resolved.canPublish,
     prices: {
       USD: 0,

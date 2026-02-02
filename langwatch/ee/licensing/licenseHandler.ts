@@ -211,6 +211,7 @@ export class LicenseHandler {
       currentEvaluators,
       currentAgents,
       currentExperiments,
+      currentOnlineEvaluations,
       currentMessagesPerMonth,
       currentEvaluationsCredit,
     ] = await Promise.all([
@@ -224,6 +225,7 @@ export class LicenseHandler {
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
+      this.repository.getOnlineEvaluationCount(organizationId),
       messagesCountPromise,
       this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
@@ -249,6 +251,8 @@ export class LicenseHandler {
       maxAgents: resolved.maxAgents,
       currentExperiments,
       maxExperiments: resolved.maxExperiments,
+      currentOnlineEvaluations,
+      maxOnlineEvaluations: resolved.maxOnlineEvaluations,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       currentEvaluationsCredit,

@@ -1,7 +1,7 @@
 @wip
-Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams, Experiments)
+Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams, Experiments, Agents, Online Evaluations)
   As a LangWatch self-hosted deployment with a license
-  I want resource creation limits to be enforced for workflows, prompts, evaluators, and teams
+  I want resource creation limits to be enforced for workflows, prompts, evaluators, teams, and online evaluations
   So that organizations respect their licensed resource counts
 
   Background:
@@ -684,4 +684,110 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Given the organization has an expired license
     And the organization has 3 agents
     When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Online Evaluations: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows online evaluation creation when under limit
+    Given the organization has a license with maxOnlineEvaluations 5
+    And the organization has 3 online evaluations across all projects
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Blocks online evaluation creation when at limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations across all projects
+    When I create an online evaluation in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of online evaluations"
+
+  @integration
+  Scenario: Counts online evaluations across all projects in organization
+    Given the organization has a license with maxOnlineEvaluations 3
+    And project "proj-A" has 2 online evaluations
+    And project "proj-B" has 1 online evaluation
+    When I create an online evaluation in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Counts only enabled online evaluations toward limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 2 enabled online evaluations
+    And the organization has 2 disabled online evaluations
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Updating existing online evaluation does not enforce limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations across all projects
+    And I have an existing online evaluation "monitor-123"
+    When I update online evaluation "monitor-123" in project "proj-789"
+    Then the online evaluation is updated successfully
+
+  # ============================================================================
+  # Online Evaluations: UI Enforcement (Save-time Modal)
+  # ============================================================================
+
+  @unit
+  Scenario: Online evaluation drawer opens regardless of limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    When I click "New Online Evaluation" on the evaluations page
+    Then the OnlineEvaluationDrawer opens
+    And no upgrade modal is shown yet
+
+  @unit
+  Scenario: Clicking Save Online Evaluation at limit shows upgrade modal
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    And I have opened the OnlineEvaluationDrawer for a new online evaluation
+    When I fill in the online evaluation details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Online Evaluations: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Clicking Save Online Evaluation when allowed creates the online evaluation
+    Given the organization has a license with maxOnlineEvaluations 5
+    And the organization has 3 online evaluations (under limit)
+    And I have opened the OnlineEvaluationDrawer for a new online evaluation
+    When I fill in the online evaluation details
+    And I click "Save"
+    Then the online evaluation is created successfully
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Editing existing online evaluation bypasses limit check
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    And I am editing an existing online evaluation
+    When I modify the online evaluation details
+    And I click "Save"
+    Then the online evaluation is updated successfully
+    And no upgrade modal is shown
+
+  # ============================================================================
+  # Online Evaluations: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited online evaluations when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 online evaluations
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier online evaluation limit
+    Given the organization has an expired license
+    And the organization has 3 online evaluations
+    When I create an online evaluation in project "proj-789"
     Then the request fails with FORBIDDEN
