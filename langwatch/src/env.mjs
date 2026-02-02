@@ -104,10 +104,6 @@ export const env = createEnv({
     // ClickHouse Migration Configuration
     CLICKHOUSE_CLUSTER: z.string().optional(),
 
-    // License Enforcement (COSS-0226)
-    // LICENSE_ENFORCEMENT_DISABLED=true disables license enforcement (returns UNLIMITED_PLAN)
-    // Default: false (license enforcement is enabled by default)
-    LICENSE_ENFORCEMENT_DISABLED: z.boolean().optional(),
     LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
   },
 
@@ -209,9 +205,6 @@ export const env = createEnv({
       process.env.ENABLE_CLICKHOUSE === "true" ||
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
     CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
-    LICENSE_ENFORCEMENT_DISABLED:
-      process.env.LICENSE_ENFORCEMENT_DISABLED === "1" ||
-      process.env.LICENSE_ENFORCEMENT_DISABLED?.toLowerCase() === "true",
     LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
   },
   /**

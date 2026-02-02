@@ -25,10 +25,7 @@ interface LicenseHandlerConfig {
 /**
  * Manages license validation and storage for self-hosted deployments.
  *
- * This handler is only called when LICENSE_ENFORCEMENT_DISABLED=false (the default).
- * When enforcement is disabled, SubscriptionHandler returns UNLIMITED_PLAN directly.
- *
- * Key behaviors (when enforcement is enabled):
+ * Key behaviors:
  * - No license stored = FREE_PLAN (restricted access)
  * - Valid license = license-based limits
  * - Invalid/expired license = FREE_PLAN (restricted fallback)

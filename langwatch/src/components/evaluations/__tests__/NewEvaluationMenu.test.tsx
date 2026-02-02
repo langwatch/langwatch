@@ -93,10 +93,13 @@ vi.mock("~/utils/humanReadableId", () => ({
 // License enforcement mock state
 let mockLicenseIsAllowed = true;
 let mockLicenseCallbackExecuted = false;
+let mockLicenseShowUpgradeModal = false;
 const mockCheckAndProceed = vi.fn((callback: () => void) => {
   if (mockLicenseIsAllowed) {
     callback();
     mockLicenseCallbackExecuted = true;
+  } else {
+    mockLicenseShowUpgradeModal = true;
   }
 });
 
@@ -127,6 +130,7 @@ describe("NewEvaluationMenu", () => {
     mockIsPending = false;
     mockLicenseIsAllowed = true;
     mockLicenseCallbackExecuted = false;
+    mockLicenseShowUpgradeModal = false;
     mockCheckAndProceed.mockClear();
     clearDrawerStack();
     clearFlowCallbacks();
