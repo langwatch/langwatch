@@ -1,0 +1,1576 @@
+{
+  "timestamp": "2026-02-02T00:28:25.879Z",
+  "runId": "parity-JThH5H95",
+  "tracesGenerated": 105,
+  "tracesSent": {
+    "es": 105,
+    "ch": 105
+  },
+  "comparisons": [
+    {
+      "passed": true,
+      "queryName": "timeseries_trace_count",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 105
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 105
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:21.943Z",
+          "0/metadata.trace_id/cardinality": 105
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:21.943Z",
+          "0/metadata.trace_id/cardinality": 105
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_user_count",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.user_id/cardinality": 15
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.user_id/cardinality": 15
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.059Z",
+          "0/metadata.user_id/cardinality": 15
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.059Z",
+          "0/metadata.user_id/cardinality": 15
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_cost_sum",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_cost/sum": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_cost/sum": 0
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.172Z",
+          "0/performance.total_cost/sum": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.172Z",
+          "0/performance.total_cost/sum": 0
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_token_counts",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.prompt_tokens/sum": 31334,
+          "1/performance.completion_tokens/sum": 14859
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.prompt_tokens/sum": 31334,
+          "1/performance.completion_tokens/sum": 14859
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.279Z",
+          "0/performance.prompt_tokens/sum": 31334,
+          "1/performance.completion_tokens/sum": 14859
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.279Z",
+          "0/performance.prompt_tokens/sum": 31334,
+          "1/performance.completion_tokens/sum": 14859
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_avg_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/avg": 142.28571428571428
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/avg": 142.28571428571428
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.374Z",
+          "0/performance.completion_time/avg": 142.1809523809524
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.374Z",
+          "0/performance.completion_time/avg": 142.1809523809524
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_p99_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p99": 282.79999999999995
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p99": 282.79999999999995
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.477Z",
+          "0/performance.completion_time/p99": 283
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.477Z",
+          "0/performance.completion_time/p99": 283
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_thread_count",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.thread_id/cardinality": 13
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.thread_id/cardinality": 13
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.585Z",
+          "0/metadata.thread_id/cardinality": 13
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.585Z",
+          "0/metadata.thread_id/cardinality": 13
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_first_token_avg",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/avg": null
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/avg": null
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.692Z"
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.692Z"
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_first_token_p99",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/p99": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/p99": 0
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.800Z"
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.800Z"
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_median_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/median": 134
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/median": 134
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:22.909Z",
+          "0/performance.completion_time/median": 134
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:22.909Z",
+          "0/performance.completion_time/median": 134
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_p90_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p90": 215.60000000000002
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p90": 215.60000000000002
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.018Z",
+          "0/performance.completion_time/p90": 216
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.018Z",
+          "0/performance.completion_time/p90": 216
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_p95_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p95": 244
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/p95": 244
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.126Z",
+          "0/performance.completion_time/p95": 245
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.126Z",
+          "0/performance.completion_time/p95": 245
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_min_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/min": 21
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/min": 21
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.226Z",
+          "0/performance.completion_time/min": 21
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.226Z",
+          "0/performance.completion_time/min": 21
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_max_completion_time",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/max": 307
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.completion_time/max": 307
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.332Z",
+          "0/performance.completion_time/max": 307
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.332Z",
+          "0/performance.completion_time/max": 307
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_total_tokens",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_tokens/sum": 46193
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_tokens/sum": 46193
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.448Z",
+          "0/performance.total_tokens/sum": 46193
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.448Z",
+          "0/performance.total_tokens/sum": 46193
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_tokens_per_second",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.tokens_per_second/avg": 1488.6427401906549
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.tokens_per_second/avg": 1488.6427401906549
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.572Z",
+          "0/performance.tokens_per_second/avg": 1488.6427401906542
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.572Z",
+          "0/performance.tokens_per_second/avg": 1488.6427401906542
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "grouped_by_user_trace_count",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.user_id": {
+            "user-1": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-2": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-3": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-4": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-5": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-6": {
+              "0/metadata.trace_id/cardinality": 11
+            },
+            "user-7": {
+              "0/metadata.trace_id/cardinality": 7
+            },
+            "user-8": {
+              "0/metadata.trace_id/cardinality": 5
+            },
+            "user-10": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-9": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-11": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-12": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-13": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-14": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-15": {
+              "0/metadata.trace_id/cardinality": 1
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.user_id": {
+            "user-1": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-2": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-3": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-4": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-5": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-6": {
+              "0/metadata.trace_id/cardinality": 11
+            },
+            "user-7": {
+              "0/metadata.trace_id/cardinality": 7
+            },
+            "user-8": {
+              "0/metadata.trace_id/cardinality": 5
+            },
+            "user-10": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-9": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-11": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-12": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-13": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-14": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-15": {
+              "0/metadata.trace_id/cardinality": 1
+            }
+          }
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.686Z",
+          "metadata.user_id": {
+            "user-15": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-11": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-10": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-7": {
+              "0/metadata.trace_id/cardinality": 7
+            },
+            "user-6": {
+              "0/metadata.trace_id/cardinality": 11
+            },
+            "user-2": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-3": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-14": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-5": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-4": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-13": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-12": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-1": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-9": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-8": {
+              "0/metadata.trace_id/cardinality": 5
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.686Z",
+          "metadata.user_id": {
+            "user-15": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-11": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-10": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-7": {
+              "0/metadata.trace_id/cardinality": 7
+            },
+            "user-6": {
+              "0/metadata.trace_id/cardinality": 11
+            },
+            "user-2": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-3": {
+              "0/metadata.trace_id/cardinality": 14
+            },
+            "user-14": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-5": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-4": {
+              "0/metadata.trace_id/cardinality": 13
+            },
+            "user-13": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-12": {
+              "0/metadata.trace_id/cardinality": 1
+            },
+            "user-1": {
+              "0/metadata.trace_id/cardinality": 15
+            },
+            "user-9": {
+              "0/metadata.trace_id/cardinality": 3
+            },
+            "user-8": {
+              "0/metadata.trace_id/cardinality": 5
+            }
+          }
+        }
+      }
+    },
+    {
+      "passed": false,
+      "queryName": "grouped_by_model_tokens",
+      "discrepancies": [
+        {
+          "path": "currentPeriod[0].metadata.model.unknown",
+          "esValue": {
+            "0/performance.prompt_tokens/sum": 0,
+            "1/performance.completion_tokens/sum": 0
+          }
+        }
+      ],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.model": {
+            "claude-3-opus": {
+              "0/performance.prompt_tokens/sum": 6039,
+              "1/performance.completion_tokens/sum": 3083
+            },
+            "claude-3-sonnet": {
+              "0/performance.prompt_tokens/sum": 5924,
+              "1/performance.completion_tokens/sum": 2878
+            },
+            "gpt-3.5-turbo": {
+              "0/performance.prompt_tokens/sum": 5413,
+              "1/performance.completion_tokens/sum": 3350
+            },
+            "gpt-4": {
+              "0/performance.prompt_tokens/sum": 7141,
+              "1/performance.completion_tokens/sum": 3013
+            },
+            "gpt-4-turbo": {
+              "0/performance.prompt_tokens/sum": 6817,
+              "1/performance.completion_tokens/sum": 2535
+            },
+            "unknown": {
+              "0/performance.prompt_tokens/sum": 0,
+              "1/performance.completion_tokens/sum": 0
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.model": {
+            "claude-3-opus": {
+              "0/performance.prompt_tokens/sum": 6039,
+              "1/performance.completion_tokens/sum": 3083
+            },
+            "claude-3-sonnet": {
+              "0/performance.prompt_tokens/sum": 5924,
+              "1/performance.completion_tokens/sum": 2878
+            },
+            "gpt-3.5-turbo": {
+              "0/performance.prompt_tokens/sum": 5413,
+              "1/performance.completion_tokens/sum": 3350
+            },
+            "gpt-4": {
+              "0/performance.prompt_tokens/sum": 7141,
+              "1/performance.completion_tokens/sum": 3013
+            },
+            "gpt-4-turbo": {
+              "0/performance.prompt_tokens/sum": 6817,
+              "1/performance.completion_tokens/sum": 2535
+            },
+            "unknown": {
+              "0/performance.prompt_tokens/sum": 0,
+              "1/performance.completion_tokens/sum": 0
+            }
+          }
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:23.896Z",
+          "metadata.model": {
+            "claude-3-sonnet": {
+              "0/performance.prompt_tokens/sum": 5924,
+              "1/performance.completion_tokens/sum": 2878
+            },
+            "gpt-4": {
+              "0/performance.prompt_tokens/sum": 7141,
+              "1/performance.completion_tokens/sum": 3013
+            },
+            "gpt-4-turbo": {
+              "0/performance.prompt_tokens/sum": 6817,
+              "1/performance.completion_tokens/sum": 2535
+            },
+            "claude-3-opus": {
+              "0/performance.prompt_tokens/sum": 6039,
+              "1/performance.completion_tokens/sum": 3083
+            },
+            "gpt-3.5-turbo": {
+              "0/performance.prompt_tokens/sum": 5413,
+              "1/performance.completion_tokens/sum": 3350
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:23.896Z",
+          "metadata.model": {
+            "claude-3-sonnet": {
+              "0/performance.prompt_tokens/sum": 5924,
+              "1/performance.completion_tokens/sum": 2878
+            },
+            "gpt-4": {
+              "0/performance.prompt_tokens/sum": 7141,
+              "1/performance.completion_tokens/sum": 3013
+            },
+            "gpt-4-turbo": {
+              "0/performance.prompt_tokens/sum": 6817,
+              "1/performance.completion_tokens/sum": 2535
+            },
+            "claude-3-opus": {
+              "0/performance.prompt_tokens/sum": 6039,
+              "1/performance.completion_tokens/sum": 3083
+            },
+            "gpt-3.5-turbo": {
+              "0/performance.prompt_tokens/sum": 5413,
+              "1/performance.completion_tokens/sum": 3350
+            }
+          }
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "grouped_by_labels_cost",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.labels": {
+            "staging": {
+              "0/performance.total_cost/sum": 0
+            },
+            "agent": {
+              "0/performance.total_cost/sum": 0
+            },
+            "evaluated": {
+              "0/performance.total_cost/sum": 0
+            },
+            "production": {
+              "0/performance.total_cost/sum": 0
+            },
+            "rag": {
+              "0/performance.total_cost/sum": 0
+            },
+            "test": {
+              "0/performance.total_cost/sum": 0
+            },
+            "chatbot": {
+              "0/performance.total_cost/sum": 0
+            },
+            "search": {
+              "0/performance.total_cost/sum": 0
+            },
+            "support": {
+              "0/performance.total_cost/sum": 0
+            },
+            "error": {
+              "0/performance.total_cost/sum": 0
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.labels": {
+            "staging": {
+              "0/performance.total_cost/sum": 0
+            },
+            "agent": {
+              "0/performance.total_cost/sum": 0
+            },
+            "evaluated": {
+              "0/performance.total_cost/sum": 0
+            },
+            "production": {
+              "0/performance.total_cost/sum": 0
+            },
+            "rag": {
+              "0/performance.total_cost/sum": 0
+            },
+            "test": {
+              "0/performance.total_cost/sum": 0
+            },
+            "chatbot": {
+              "0/performance.total_cost/sum": 0
+            },
+            "search": {
+              "0/performance.total_cost/sum": 0
+            },
+            "support": {
+              "0/performance.total_cost/sum": 0
+            },
+            "error": {
+              "0/performance.total_cost/sum": 0
+            }
+          }
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.052Z",
+          "metadata.labels": {
+            "staging": {
+              "0/performance.total_cost/sum": 0
+            },
+            "production": {
+              "0/performance.total_cost/sum": 0
+            },
+            "agent": {
+              "0/performance.total_cost/sum": 0
+            },
+            "test": {
+              "0/performance.total_cost/sum": 0
+            },
+            "search": {
+              "0/performance.total_cost/sum": 0
+            },
+            "chatbot": {
+              "0/performance.total_cost/sum": 0
+            },
+            "rag": {
+              "0/performance.total_cost/sum": 0
+            },
+            "support": {
+              "0/performance.total_cost/sum": 0
+            },
+            "error": {
+              "0/performance.total_cost/sum": 0
+            },
+            "evaluated": {
+              "0/performance.total_cost/sum": 0
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.052Z",
+          "metadata.labels": {
+            "staging": {
+              "0/performance.total_cost/sum": 0
+            },
+            "production": {
+              "0/performance.total_cost/sum": 0
+            },
+            "agent": {
+              "0/performance.total_cost/sum": 0
+            },
+            "test": {
+              "0/performance.total_cost/sum": 0
+            },
+            "search": {
+              "0/performance.total_cost/sum": 0
+            },
+            "chatbot": {
+              "0/performance.total_cost/sum": 0
+            },
+            "rag": {
+              "0/performance.total_cost/sum": 0
+            },
+            "support": {
+              "0/performance.total_cost/sum": 0
+            },
+            "error": {
+              "0/performance.total_cost/sum": 0
+            },
+            "evaluated": {
+              "0/performance.total_cost/sum": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "grouped_by_span_type",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.span_type": {
+            "llm": {
+              "0/metadata.trace_id/cardinality": 105
+            },
+            "tool": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "chain": {
+              "0/metadata.trace_id/cardinality": 40
+            },
+            "evaluation": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "rag": {
+              "0/metadata.trace_id/cardinality": 20
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "metadata.span_type": {
+            "llm": {
+              "0/metadata.trace_id/cardinality": 105
+            },
+            "tool": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "chain": {
+              "0/metadata.trace_id/cardinality": 40
+            },
+            "evaluation": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "rag": {
+              "0/metadata.trace_id/cardinality": 20
+            }
+          }
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.183Z",
+          "metadata.span_type": {
+            "chain": {
+              "0/metadata.trace_id/cardinality": 40
+            },
+            "evaluation": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "llm": {
+              "0/metadata.trace_id/cardinality": 105
+            },
+            "rag": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "tool": {
+              "0/metadata.trace_id/cardinality": 20
+            }
+          }
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.183Z",
+          "metadata.span_type": {
+            "chain": {
+              "0/metadata.trace_id/cardinality": 40
+            },
+            "evaluation": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "llm": {
+              "0/metadata.trace_id/cardinality": 105
+            },
+            "rag": {
+              "0/metadata.trace_id/cardinality": 20
+            },
+            "tool": {
+              "0/metadata.trace_id/cardinality": 20
+            }
+          }
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "filtered_by_llm_span_type",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 105,
+          "1/performance.total_cost/sum": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 105,
+          "1/performance.total_cost/sum": 0
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.307Z",
+          "0/metadata.trace_id/cardinality": 105,
+          "1/performance.total_cost/sum": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.307Z",
+          "0/metadata.trace_id/cardinality": 105,
+          "1/performance.total_cost/sum": 0
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "filtered_by_production_label",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.prompt_tokens/sum": 6164
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.prompt_tokens/sum": 6164
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.414Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.prompt_tokens/sum": 6164
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.414Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.prompt_tokens/sum": 6164
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "filtered_by_error",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 5
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 5
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.528Z",
+          "0/metadata.trace_id/cardinality": 5
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.528Z",
+          "0/metadata.trace_id/cardinality": 5
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "filtered_by_rag_span_type",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.646Z",
+          "0/metadata.trace_id/cardinality": 20
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.646Z",
+          "0/metadata.trace_id/cardinality": 20
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "filtered_by_gpt4_model",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.completion_time/avg": 143.8
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.completion_time/avg": 143.8
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:24.764Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.completion_time/avg": 143.8
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:24.764Z",
+          "0/metadata.trace_id/cardinality": 20,
+          "1/performance.completion_time/avg": 143.8
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_avg_threads_per_user",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.thread_id/cardinality/user_id/avg": 3
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.thread_id/cardinality/user_id/avg": 3
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/metadata.thread_id/cardinality/user_id/avg": 3
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/metadata.thread_id/cardinality/user_id/avg": 3
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_avg_thread_duration",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/threads.average_duration_per_thread/avg": 5302.153846153846
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/threads.average_duration_per_thread/avg": 5302.153846153846
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/threads.average_duration_per_thread/avg": 5302.153846153846
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/threads.average_duration_per_thread/avg": 5302.153846153846
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_avg_messages_per_user",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.trace_id/cardinality/user_id/avg": 7
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.trace_id/cardinality/user_id/avg": 7
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/metadata.trace_id/cardinality/user_id/avg": 6.933333333333334
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/metadata.trace_id/cardinality/user_id/avg": 6.933333333333334
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_avg_thread_duration_per_user",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "user_threads_panel_full",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.thread_id/cardinality": 13,
+          "1/metadata.thread_id/cardinality/user_id/avg": 3,
+          "2/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667,
+          "3/metadata.trace_id/cardinality/user_id/avg": 7
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/metadata.thread_id/cardinality": 13,
+          "1/metadata.thread_id/cardinality/user_id/avg": 3,
+          "2/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667,
+          "3/metadata.trace_id/cardinality/user_id/avg": 7
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/metadata.thread_id/cardinality": 13,
+          "1/metadata.thread_id/cardinality/user_id/avg": 3,
+          "2/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667,
+          "3/metadata.trace_id/cardinality/user_id/avg": 6.933333333333334
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/metadata.thread_id/cardinality": 13,
+          "1/metadata.thread_id/cardinality/user_id/avg": 3,
+          "2/threads.average_duration_per_thread/avg/user_id/avg": 816.1366666666667,
+          "3/metadata.trace_id/cardinality/user_id/avg": 6.933333333333334
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_mean_tokens_per_message",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_tokens/avg": 439.93333333333334
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_tokens/avg": 439.93333333333334
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:25.516Z",
+          "0/performance.total_tokens/avg": 439.93333333333334
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:25.516Z",
+          "0/performance.total_tokens/avg": 439.93333333333334
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_mean_cost_per_message",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_cost/avg": null
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.total_cost/avg": null
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:25.620Z"
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:25.620Z"
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "timeseries_p90_first_token",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/p90": 0
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:00:00.000Z",
+          "0/performance.first_token/p90": 0
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:28:25.726Z"
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:28:25.726Z"
+        }
+      }
+    },
+    {
+      "passed": true,
+      "queryName": "llm_summary_panel_full",
+      "discrepancies": [],
+      "esResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/performance.total_tokens/avg": 439.93333333333334,
+          "1/performance.total_cost/avg": null,
+          "2/performance.first_token/p90": 0,
+          "3/performance.completion_time/p90": 215.60000000000002
+        },
+        "lastBucket": {
+          "date": "2026-02-02T00:25:54.461Z",
+          "0/performance.total_tokens/avg": 439.93333333333334,
+          "1/performance.total_cost/avg": null,
+          "2/performance.first_token/p90": 0,
+          "3/performance.completion_time/p90": 215.60000000000002
+        }
+      },
+      "chResultSummary": {
+        "type": "timeseries",
+        "currentPeriodBuckets": 1,
+        "previousPeriodBuckets": 1,
+        "firstBucket": {
+          "date": "full",
+          "0/performance.total_tokens/avg": 439.93333333333334,
+          "1/performance.total_cost/avg": 0,
+          "2/performance.first_token/p90": 0,
+          "3/performance.completion_time/p90": 216
+        },
+        "lastBucket": {
+          "date": "full",
+          "0/performance.total_tokens/avg": 439.93333333333334,
+          "1/performance.total_cost/avg": 0,
+          "2/performance.first_token/p90": 0,
+          "3/performance.completion_time/p90": 216
+        }
+      }
+    }
+  ],
+  "overallPassed": false,
+  "summary": {
+    "totalQueries": 34,
+    "passedQueries": 33,
+    "failedQueries": 1,
+    "overallPassed": false
+  }
+}
