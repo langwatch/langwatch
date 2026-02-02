@@ -66,6 +66,7 @@ export async function givenIAmOnTheSimulationsPage(page: Page) {
     throw new Error("Could not extract project slug from Home link");
   }
 
+  // Navigate directly to simulations page (Runs)
   await page.goto(`/${projectSlug}/simulations`);
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
@@ -166,11 +167,9 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Criteria appear as textbox inputs with the criterion as their value
-  const criterionInput = page
-    .getByRole("textbox")
-    .filter({ hasText: criterion })
-    .last();
+  // Criteria appear as input elements with the criterion as their value
+  // Use a locator that finds inputs by their value attribute
+  const criterionInput = page.locator(`input[value="${criterion}"]`).last();
   await expect(criterionInput).toBeVisible({ timeout: 5000 });
 }
 
@@ -189,7 +188,16 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete by checking dialog closes or list updates
+  // Wait for save to complete - the drawer shows a success toast
+  // Note: The drawer stays open after save (by design), so we wait for the toast
+  const successToast = page.getByText(/scenario (created|updated)/i);
+  await expect(successToast).toBeVisible({ timeout: 10000 });
+
+  // Close the drawer by clicking the close button
+  const closeButton = page.getByRole("button", { name: "Close" }).last();
+  await closeButton.click();
+
+  // Wait for drawer to close
   await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
@@ -271,9 +279,11 @@ export async function thenISeeScenarioTable(page: Page) {
  * Then I see the simulations page content
  */
 export async function thenISeeSimulationsPageContent(page: Page) {
-  // Either empty state or simulation results
-  const emptyStateHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
-  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+  // Either empty state heading or simulation sets heading
+  // Empty state: "Scenario: Agentic Simulations"
+  // With data: "Simulation Sets"
+  const emptyStateHeading = page.getByRole("heading", { name: "Scenario: Agentic Simulations" });
+  const simulationSetsHeading = page.getByRole("heading", { name: "Simulation Sets" });
 
   await expect(emptyStateHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
 }
