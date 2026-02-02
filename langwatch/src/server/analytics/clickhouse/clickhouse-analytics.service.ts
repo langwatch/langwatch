@@ -588,12 +588,19 @@ export class ClickHouseAnalyticsService {
                 : row.started_at;
 
             // Parse attributes into metrics and event_details
+            // Handle both plain keys (vote, score) and namespaced keys (event.metrics.vote, metrics.vote)
             const metrics: Array<{ key: string; value: number }> = [];
             const eventDetails: Array<{ key: string; value: string }> = [];
 
             for (const [key, value] of Object.entries(row.attributes)) {
-              if (key === "vote" || key === "score") {
-                metrics.push({ key, value: parseFloat(value) || 0 });
+              // Check for metric keys - both plain and namespaced forms
+              const isVoteKey = key === "vote" || key === "metrics.vote" || key === "event.metrics.vote";
+              const isScoreKey = key === "score" || key === "metrics.score" || key === "event.metrics.score";
+
+              if (isVoteKey || isScoreKey) {
+                // Use the plain key name for consistency with ES format
+                const metricKey = isVoteKey ? "vote" : "score";
+                metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
               } else {
                 eventDetails.push({ key, value });
               }

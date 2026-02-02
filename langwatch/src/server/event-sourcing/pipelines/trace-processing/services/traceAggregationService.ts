@@ -195,15 +195,15 @@ const extractStatusInfo = (spans: NormalizedSpan[]): StatusInfo => {
     }
 
     // Check span events for exception events (OTEL recordException)
-    if (!info.containsError && span.events?.length) {
+    // Run when errorMessage is missing - even if containsError is already true from status,
+    // we still want to extract the exception message from events
+    if (!info.errorMessage && span.events?.length) {
       for (const event of span.events) {
         if (event.name === "exception") {
           info.containsError = true;
-          if (!info.errorMessage) {
-            const exceptionMessage = event.attributes?.["exception.message"];
-            if (typeof exceptionMessage === "string") {
-              info.errorMessage = exceptionMessage;
-            }
+          const exceptionMessage = event.attributes?.["exception.message"];
+          if (typeof exceptionMessage === "string") {
+            info.errorMessage = exceptionMessage;
           }
           break;
         }
