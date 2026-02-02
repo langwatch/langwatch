@@ -390,6 +390,12 @@ export function startScenarioProcessor(
     // If job failed, ensure failure events are emitted to Elasticsearch
     // so the frontend can show the error instead of timing out
     if (result && !result.success) {
+      // Log the failure explicitly - even when result.error is undefined
+      logger.error(
+        { jobId: job.id, scenarioId: job.data.scenarioId, error: result.error ?? "No error provided" },
+        "Scenario job failed",
+      );
+
       try {
         await handleFailedJobResult(job.data, result.error, deps);
         logger.info(

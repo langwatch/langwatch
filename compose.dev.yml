@@ -146,7 +146,7 @@ services:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       NODE_ENV: development
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env (shared dev elastic or local opensearch)
+      # ELASTICSEARCH_NODE_URL comes from .env
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
@@ -294,3 +294,5 @@ volumes:
   pnpm_store:
     name: langwatch-pnpm-store  # Shared across all worktrees
   bullboard_modules:
+  pnpm_store:
+    name: langwatch-pnpm-store  # Shared across all worktrees

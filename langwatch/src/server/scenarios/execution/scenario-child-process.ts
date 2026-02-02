@@ -109,18 +109,28 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
   );
 
-  // Log the result but don't exit with error code for failed tests
+  // Log the result to stderr (human-readable) but don't exit with error code for failed tests
   // A failed test is still a successful execution - results are reported via SDK
   if (result.success) {
-    console.log(`Scenario passed`);
+    console.error(`Scenario passed`);
   } else {
-    console.log(`Scenario failed: ${result.reasoning}`);
+    console.error(`Scenario failed: ${result.reasoning}`);
   }
 
   // Flush OTEL traces before exiting
   // The scenario SDK doesn't expose the observability handle, so we access
   // the global TracerProvider directly and call forceFlush/shutdown
   await flushOtelTraces();
+
+  // Output JSON result to stdout for parent process to parse
+  // Only stdout contains the JSON result; all other output goes to stderr
+  const outputResult: { success: boolean; reasoning?: string; error?: string } = {
+    success: result.success,
+  };
+  if (result.reasoning) {
+    outputResult.reasoning = result.reasoning;
+  }
+  process.stdout.write(JSON.stringify(outputResult) + "\n");
 }
 
 /**
@@ -138,23 +148,26 @@ async function flushOtelTraces(): Promise<void> {
 
     // Try forceFlush first (preferred), then shutdown
     if (concreteProvider.forceFlush) {
-      console.log("Flushing OTEL traces...");
+      console.error("Flushing OTEL traces...");
       await concreteProvider.forceFlush();
-      console.log("OTEL traces flushed");
+      console.error("OTEL traces flushed");
     } else if (concreteProvider.shutdown) {
-      console.log("Shutting down OTEL provider...");
+      console.error("Shutting down OTEL provider...");
       await concreteProvider.shutdown();
-      console.log("OTEL provider shutdown complete");
+      console.error("OTEL provider shutdown complete");
     }
   } catch (error) {
     // Don't fail the scenario if OTEL flush fails
-    console.warn(`OTEL flush warning: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`OTEL flush warning: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 main().catch(async (error) => {
-  console.error(`Scenario execution failed: ${error instanceof Error ? error.message : String(error)}`);
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  console.error(`Scenario execution failed: ${errorMessage}`);
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();
+  // Output JSON error result to stdout for parent process to parse
+  process.stdout.write(JSON.stringify({ success: false, error: errorMessage }) + "\n");
   process.exit(1);
 });
