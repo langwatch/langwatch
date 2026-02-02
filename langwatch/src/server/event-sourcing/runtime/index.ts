@@ -2,7 +2,7 @@ import { EventSourcingPipeline } from "./pipeline";
 
 export { EventSourcingPipeline };
 
-export type { EventSourcingConfig } from "./config";
+export type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 export { createEventSourcingConfig } from "./config";
 export { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 export type { EventSourcing } from "./eventSourcing";
@@ -20,7 +20,6 @@ export {
   initializeEventSourcingForTesting,
   resetEventSourcingRuntime,
 } from "./eventSourcingRuntime";
-export type { InitializeEventSourcingOptions } from "./eventSourcingRuntime";
 export type { PipelineBuilderOptions } from "./pipeline/builder";
 export { PipelineBuilder } from "./pipeline/builder";
 export type {

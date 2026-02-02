@@ -33,7 +33,6 @@ export {
   getEventSourcingRuntimeOrNull,
   resetEventSourcingRuntime,
 } from "./runtime";
-export type { InitializeEventSourcingOptions } from "./runtime";
 
 // Re-export commonly used types and classes from runtime
 export {
@@ -47,6 +46,7 @@ export {
 } from "./runtime";
 export type {
   EventSourcingConfig,
+  EventSourcingConfigOptions,
   PipelineBuilderOptions,
   EventSourcingPipelineDefinition,
   PipelineMetadata,

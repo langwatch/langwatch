@@ -44,7 +44,7 @@ export function createEventSourcingConfig(
 
   // Only check explicit disable flag - lazy init handles build-time safety
   const enabled = process.env.ENABLE_EVENT_SOURCING !== "false";
-  const clickHouseEnabled = process.env.ENABLE_CLICKHOUSE !== "false";
+  const clickHouseEnabled = process.env.ENABLE_CLICKHOUSE === "true";
   const forceClickHouseInTests =
     process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true";
 

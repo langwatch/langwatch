@@ -89,6 +89,11 @@ class LangWatchClientProtocol(Protocol):
         """Get whether OpenTelemetry setup is skipped."""
         ...
 
+    @property
+    def prompts_path(self) -> Optional[str]:
+        """Get the base path for local prompt files."""
+        ...
+
     # Regular attributes (not properties)
     base_attributes: BaseAttributes
     tracer_provider: Optional[TracerProvider]

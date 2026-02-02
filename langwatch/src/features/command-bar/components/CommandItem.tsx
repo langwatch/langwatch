@@ -43,7 +43,7 @@ export function CommandItem({
   return (
     <HStack
       data-index={index}
-      px={4}
+      px={2}
       py={1.5}
       cursor="pointer"
       borderRadius="md"

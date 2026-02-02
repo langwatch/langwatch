@@ -21,7 +21,10 @@ check_env_files() {
   if [ $missing -eq 1 ]; then
     echo ""
     read -p "Continue anyway? [y/N]: " confirm
-    [[ ! $confirm =~ ^[Yy]$ ]] && exit 1
+    case "$confirm" in
+      [yY]|[yY]es) ;;
+      *) exit 1 ;;
+    esac
   fi
 }
 

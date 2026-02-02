@@ -62,15 +62,15 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 };
 
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
-  // Initialize event sourcing with ClickHouse and Redis clients
+  const dev = process.env.NODE_ENV !== "production";
+  const env = process.env.ENVIRONMENT ?? "local";
+  setEnvironment(env);
+
+  // Initialize event sourcing before handling requests
   initializeEventSourcing({
     clickHouseClient: getClickHouseClient(),
     redisConnection: redis,
   });
-
-  const dev = process.env.NODE_ENV !== "production";
-  const env = process.env.ENVIRONMENT ?? "local";
-  setEnvironment(env);
 
   const hostname = "0.0.0.0";
   const port = parseInt(process.env.PORT ?? "5560");

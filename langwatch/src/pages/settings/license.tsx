@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { LicenseStatus } from "../../components/LicenseStatus";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 export default function License() {
   const { organization } = useOrganizationTeamProject();
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
+  const publicEnv = usePublicEnv();
 
   return (
     <SettingsLayout>
@@ -16,12 +18,14 @@ export default function License() {
         <HStack width="full">
           <Heading>License</Heading>
           <Spacer />
-          {/* <PageLayout.HeaderButton
-            onClick={() => setIsGeneratorOpen(true)}
-          >
-            <Plus size={20} />
-            New License
-          </PageLayout.HeaderButton> */}
+          {publicEnv.data?.IS_SAAS && (
+            <PageLayout.HeaderButton
+              onClick={() => setIsGeneratorOpen(true)}
+            >
+              <Plus size={20} />
+              New License
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         <Text color="fg.muted">
           Manage your LangWatch license for self-hosted deployments. A valid

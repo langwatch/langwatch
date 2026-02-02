@@ -20,6 +20,9 @@ import type {
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:event-sourcing:register");
 
 /**
  * Type helper to convert registered commands union to a record of queue processors.
@@ -171,6 +174,16 @@ export class EventSourcing {
           !this.runtime.eventStore ||
           !this.runtime.distributedLock
         ) {
+          // Log detailed reason for disabled state
+          logger.warn(
+            {
+              pipeline: definition.metadata.name,
+              isEnabled: this.runtime.isEnabled,
+              hasEventStore: !!this.runtime.eventStore,
+              hasDistributedLock: !!this.runtime.distributedLock,
+            },
+            "Returning DisabledPipeline - commands will be silently dropped",
+          );
           this.runtime.logDisabledWarning({
             pipeline: definition.metadata.name,
           });

@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 class LocalPromptLoader:
     """Loads prompts from local files in CLI format."""
 
+    _warned_no_prompts_path: bool = False
+
     def __init__(self, base_path: Optional[Path] = None):
         """Initialize with base path (defaults to current working directory at load time)."""
         self._base_path = base_path
@@ -43,6 +45,16 @@ class LocalPromptLoader:
             # Check if prompts.json exists
             prompts_json_path = self.base_path / "prompts.json"
             if not prompts_json_path.exists():
+                # Warn once if no prompts_path was configured and prompts.json doesn't exist
+                if self._base_path is None and not LocalPromptLoader._warned_no_prompts_path:
+                    LocalPromptLoader._warned_no_prompts_path = True
+                    warnings.warn(
+                        f"No prompts.json found at {prompts_json_path}. "
+                        f"If you have local prompt files, configure the path with "
+                        f"langwatch.setup(prompts_path='/path/to/prompts') or ensure "
+                        f"prompts.json is in the current working directory.",
+                        UserWarning,
+                    )
                 logger.debug(
                     f"No prompts.json found at {prompts_json_path}, falling back to API"
                 )

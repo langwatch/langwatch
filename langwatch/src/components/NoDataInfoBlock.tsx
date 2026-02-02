@@ -5,16 +5,20 @@ export const NoDataInfoBlock = ({
   description,
   icon,
   docsInfo,
+  color = "orange.400",
+  children,
 }: {
   title: string;
   description: string;
   icon: React.ReactNode;
   docsInfo?: React.ReactNode;
+  color?: string;
+  children?: React.ReactNode;
 }) => {
   return (
     <VStack paddingY={"128px"}>
       <Box
-        backgroundColor={"orange.400"}
+        backgroundColor={color}
         borderRadius={"50%"}
         padding={4}
         width={"fit-content"}
@@ -27,6 +31,7 @@ export const NoDataInfoBlock = ({
       </Text>
       <Text>{description}</Text>
       {docsInfo}
+      {children}
     </VStack>
   );
 };

@@ -7,6 +7,7 @@ import {
   defineCommandSchema,
   EventUtils,
 } from "../../../library";
+import type { OtlpSpan } from "../schemas/otlp";
 import type { RecordSpanCommandData } from "../schemas/commands";
 import { recordSpanCommandDataSchema } from "../schemas/commands";
 import {
@@ -15,7 +16,30 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
+import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
+
+/**
+ * Dependencies for RecordSpanCommand that can be injected for testing.
+ */
+export interface RecordSpanCommandDependencies {
+  /** Service for redacting PII from spans. Handles project settings lookup internally. */
+  piiRedactionService: {
+    redactSpanForTenant: (span: OtlpSpan, tenantId: string) => Promise<void>;
+  };
+}
+
+/** Cached default dependencies, lazily initialized */
+let cachedDefaultDependencies: RecordSpanCommandDependencies | null = null;
+
+function getDefaultDependencies(): RecordSpanCommandDependencies {
+  if (!cachedDefaultDependencies) {
+    cachedDefaultDependencies = {
+      piiRedactionService: new OtlpSpanPiiRedactionService(),
+    };
+  }
+  return cachedDefaultDependencies;
+}
 
 /**
  * Command handler for recording spans in the trace processing pipeline.
@@ -35,6 +59,11 @@ export class RecordSpanCommand
   private readonly logger = createLogger(
     "langwatch:trace-processing:record-span",
   );
+  private readonly deps: RecordSpanCommandDependencies;
+
+  constructor(deps: Partial<RecordSpanCommandDependencies> = {}) {
+    this.deps = { ...getDefaultDependencies(), ...deps };
+  }
 
   async handle(
     command: Command<RecordSpanCommandData>,
@@ -65,6 +94,14 @@ export class RecordSpanCommand
           "Handling record span command",
         );
 
+        // Clone span before redaction to preserve command immutability
+        // The service handles project settings lookup, env var checks, and redaction
+        const spanToRedact = structuredClone(commandData.span);
+        await this.deps.piiRedactionService.redactSpanForTenant(
+          spanToRedact,
+          tenantIdStr,
+        );
+
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
           "trace",
           traceId,
@@ -72,7 +109,7 @@ export class RecordSpanCommand
           SPAN_RECEIVED_EVENT_TYPE,
           SPAN_RECEIVED_EVENT_VERSION_LATEST,
           {
-            span: commandData.span,
+            span: spanToRedact,
             resource: commandData.resource,
             instrumentationScope: commandData.instrumentationScope,
           },

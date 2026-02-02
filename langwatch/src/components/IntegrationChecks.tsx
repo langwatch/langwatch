@@ -178,7 +178,7 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link href="https://docs.langwatch.ai/features/datasets" isExternal>
+          <Link href="https://docs.langwatch.ai/datasets/overview" isExternal>
             <List.Indicator
               asChild
               color={

@@ -14,13 +14,21 @@ export function CreateProjectDrawer({
   onClose,
   navigateOnCreate = false,
   defaultTeamId,
+  organizationId: organizationIdProp,
 }: {
   open?: boolean;
   onClose?: () => void;
   navigateOnCreate?: boolean;
   defaultTeamId?: string;
+  /** Required for creating projects in a different organization via the dropdown menu.
+   * When the user clicks "New Project" under Org B while viewing Org A, this ensures
+   * the project is created in Org B instead of the current context. */
+  organizationId?: string;
 }): React.ReactElement {
-  const { organization } = useOrganizationTeamProject();
+  const { organization: currentOrganization } = useOrganizationTeamProject();
+
+  const effectiveOrganizationId =
+    organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
 
@@ -37,11 +45,11 @@ export function CreateProjectDrawer({
   const handleSubmit = (
     data: ProjectFormData & { language: string; framework: string },
   ) => {
-    if (!organization) return;
+    if (!effectiveOrganizationId) return;
 
     createProject.mutate(
       {
-        organizationId: organization.id,
+        organizationId: effectiveOrganizationId,
         name: data.name,
         teamId: data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId,
         newTeamName: data.newTeamName,
@@ -110,6 +118,7 @@ export function CreateProjectDrawer({
             isLoading={createProject.isLoading}
             error={createProject.error?.message}
             defaultTeamId={defaultTeamId}
+            organizationId={effectiveOrganizationId}
           />
         </Drawer.Body>
       </Drawer.Content>

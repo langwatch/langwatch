@@ -8,6 +8,7 @@ or when API is unavailable.
 
 Follows the facade pattern to coordinate between LocalPromptLoader and PromptApiService.
 """
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 import time
 from langwatch.generated.langwatch_rest_api_client.client import (
@@ -35,10 +36,16 @@ class PromptsFacade:
     work even when offline or when API is unavailable.
     """
 
-    def __init__(self, rest_api_client: LangWatchRestApiClient):
+    def __init__(
+        self,
+        rest_api_client: LangWatchRestApiClient,
+        prompts_path: Optional[str] = None,
+    ):
         """Initialize the prompt service facade with dependencies."""
         self._api_service = PromptApiService(rest_api_client)
-        self._local_loader = LocalPromptLoader()
+        self._local_loader = LocalPromptLoader(
+            base_path=Path(prompts_path) if prompts_path else None
+        )
         self._cache: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
@@ -50,7 +57,7 @@ class PromptsFacade:
             raise RuntimeError(
                 "LangWatch client has not been initialized. Call setup() first."
             )
-        return cls(instance.rest_api_client)
+        return cls(instance.rest_api_client, prompts_path=instance.prompts_path)
 
     def get(
         self,

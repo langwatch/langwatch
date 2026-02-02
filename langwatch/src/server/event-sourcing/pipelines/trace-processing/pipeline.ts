@@ -1,4 +1,5 @@
 import { definePipeline } from "../../library";
+import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import { SpanStorageEventHandler } from "./handlers";
 import { TraceSummaryProjectionHandler } from "./projections";
@@ -36,4 +37,5 @@ export const traceProcessingPipelineDefinition =
     //   // delay: 200,
     // })
     .withCommand("recordSpan", RecordSpanCommand)
+    .withCommand("assignTopic", AssignTopicCommand)
     .build();

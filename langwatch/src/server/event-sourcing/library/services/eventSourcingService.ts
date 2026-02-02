@@ -578,10 +578,9 @@ export class EventSourcingService<
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<{
-    projection: ProjectionTypes[ProjectionName];
-    events: readonly EventType[];
-  }> {
+  ): Promise<
+    { projection: ProjectionTypes[ProjectionName]; events: readonly EventType[] } | null
+  > {
     return await this.projectionUpdater.updateProjectionByName(
       projectionName,
       aggregateId,
