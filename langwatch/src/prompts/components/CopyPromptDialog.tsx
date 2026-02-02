@@ -20,11 +20,13 @@ import { api } from "../../utils/api";
 export const CopyPromptDialog = ({
   open,
   onClose,
+  onSuccess,
   promptId,
   promptName,
 }: {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   promptId: string;
   promptName: string;
 }) => {
@@ -97,6 +99,7 @@ export const CopyPromptDialog = ({
         type: "success",
       });
 
+      onSuccess?.();
       onClose();
     } catch (error) {
       toaster.create({
