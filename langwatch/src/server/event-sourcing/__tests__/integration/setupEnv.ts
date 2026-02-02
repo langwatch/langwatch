@@ -23,3 +23,6 @@ if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
   process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
   process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
 }
+
+// Disable license enforcement for integration tests
+process.env.DISABLE_LICENSE_ENFORCEMENT = "true";

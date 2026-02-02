@@ -5,20 +5,11 @@
  * Tests the evaluator creation/update when publishing workflow evaluators.
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-// Mock license enforcement to avoid limits during tests
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
-  };
-});
 
 describe("Optimization Publish - Evaluator Integration", () => {
   const projectId = "test-project-id";

@@ -5,20 +5,11 @@
  * Tests the actual saveEvaluationsV3 and getEvaluationsV3BySlug endpoints.
  */
 import { ExperimentType } from "@prisma/client";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-// Mock license enforcement to avoid limits during tests
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
-  };
-});
 
 // Helper to create a valid persisted state
 const createValidState = (overrides: Record<string, unknown> = {}) => ({
