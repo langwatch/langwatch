@@ -4,7 +4,7 @@
  * Integration tests for cascade archive functionality.
  * Tests the cascading archive/delete behavior for workflows, evaluators, and agents.
  */
-import { beforeAll, afterAll, describe, expect, it, beforeEach } from "vitest";
+import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -36,18 +36,31 @@ describe("Cascade Archive", () => {
   afterAll(async () => {
     // Cleanup in reverse order of creation
     for (const id of createdMonitorIds) {
-      await prisma.monitor.delete({ where: { id } }).catch(() => {});
+      await prisma.monitor
+        .delete({ where: { id, projectId } })
+        .catch(() => {});
     }
     for (const id of createdEvaluatorIds) {
-      await prisma.evaluator.delete({ where: { id } }).catch(() => {});
+      await prisma.evaluator
+        .delete({ where: { id, projectId } })
+        .catch(() => {});
     }
     for (const id of createdAgentIds) {
-      await prisma.agent.delete({ where: { id } }).catch(() => {});
+      await prisma.agent.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdWorkflowIds) {
-      // First delete workflow versions
-      await prisma.workflowVersion.deleteMany({ where: { workflowId: id } });
-      await prisma.workflow.delete({ where: { id } }).catch(() => {});
+      // First clear the version references to break the required relations
+      await prisma.workflow
+        .update({
+          where: { id, projectId },
+          data: { currentVersionId: null, latestVersionId: null },
+        })
+        .catch(() => {});
+      // Then delete workflow versions
+      await prisma.workflowVersion.deleteMany({
+        where: { workflowId: id, projectId },
+      });
+      await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});
     }
   });
 
@@ -298,7 +311,7 @@ describe("Cascade Archive", () => {
 
       // Verify monitor was deleted (hard delete)
       const deletedMonitor = await prisma.monitor.findUnique({
-        where: { id: monitor.id },
+        where: { id: monitor.id, projectId },
       });
       expect(deletedMonitor).toBeNull();
 
@@ -391,7 +404,7 @@ describe("Cascade Archive", () => {
 
       // Verify monitor was deleted
       const deletedMonitor = await prisma.monitor.findUnique({
-        where: { id: monitor.id },
+        where: { id: monitor.id, projectId },
       });
       expect(deletedMonitor).toBeNull();
 
