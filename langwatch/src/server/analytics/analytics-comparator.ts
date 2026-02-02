@@ -7,7 +7,12 @@
  */
 
 import { createLogger } from "../../utils/logger";
-import type { TimeseriesResult, FilterDataResult } from "./types";
+import type {
+  TimeseriesResult,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+} from "./types";
 
 /** Tolerance for numeric comparison (5% or at least 1) */
 const DEFAULT_TOLERANCE_PERCENT = 0.05;
@@ -66,10 +71,26 @@ export class AnalyticsComparator {
 
     if (this.isTimeseriesResult(esResult) && this.isTimeseriesResult(chResult)) {
       this.compareTimeseriesResults(esResult, chResult, discrepancies);
-    }
-
-    if (this.isFilterDataResult(esResult) && this.isFilterDataResult(chResult)) {
+    } else if (
+      this.isFilterDataResult(esResult) &&
+      this.isFilterDataResult(chResult)
+    ) {
       this.compareFilterDataResults(esResult, chResult, discrepancies);
+    } else if (
+      this.isTopDocumentsResult(esResult) &&
+      this.isTopDocumentsResult(chResult)
+    ) {
+      this.compareTopDocumentsResults(esResult, chResult, discrepancies);
+    } else if (
+      this.isFeedbacksResult(esResult) &&
+      this.isFeedbacksResult(chResult)
+    ) {
+      this.compareFeedbacksResults(esResult, chResult, discrepancies);
+    } else {
+      this.logger.warn(
+        { esResultType: typeof esResult, chResultType: typeof chResult },
+        "Unknown result type for comparison",
+      );
     }
 
     return discrepancies;
@@ -214,6 +235,103 @@ export class AnalyticsComparator {
       "options" in value &&
       Array.isArray((value as FilterDataResult).options)
     );
+  }
+
+  /**
+   * Type guard for top documents results
+   */
+  private isTopDocumentsResult(value: unknown): value is TopDocumentsResult {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      "topDocuments" in value &&
+      Array.isArray((value as TopDocumentsResult).topDocuments)
+    );
+  }
+
+  /**
+   * Type guard for feedbacks results
+   */
+  private isFeedbacksResult(value: unknown): value is FeedbacksResult {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      "events" in value &&
+      Array.isArray((value as FeedbacksResult).events)
+    );
+  }
+
+  /**
+   * Compare top documents results
+   */
+  private compareTopDocumentsResults(
+    esResult: TopDocumentsResult,
+    chResult: TopDocumentsResult,
+    discrepancies: string[],
+  ): void {
+    if (esResult.topDocuments.length !== chResult.topDocuments.length) {
+      discrepancies.push(
+        `Top documents count: ES=${esResult.topDocuments.length}, CH=${chResult.topDocuments.length}`,
+      );
+    }
+
+    if (
+      !this.valuesMatch(
+        esResult.totalUniqueDocuments,
+        chResult.totalUniqueDocuments,
+      )
+    ) {
+      discrepancies.push(
+        `Total unique documents: ES=${esResult.totalUniqueDocuments}, CH=${chResult.totalUniqueDocuments}`,
+      );
+    }
+
+    // Compare counts for matching document IDs
+    const esDocMap = new Map(
+      esResult.topDocuments.map((d) => [d.documentId, d.count]),
+    );
+
+    for (const chDoc of chResult.topDocuments) {
+      const esCount = esDocMap.get(chDoc.documentId);
+      if (esCount !== undefined && !this.valuesMatch(esCount, chDoc.count)) {
+        discrepancies.push(
+          `Document ${chDoc.documentId}: ES=${esCount}, CH=${chDoc.count}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Compare feedbacks results
+   */
+  private compareFeedbacksResults(
+    esResult: FeedbacksResult,
+    chResult: FeedbacksResult,
+    discrepancies: string[],
+  ): void {
+    if (esResult.events.length !== chResult.events.length) {
+      discrepancies.push(
+        `Feedback events count: ES=${esResult.events.length}, CH=${chResult.events.length}`,
+      );
+    }
+
+    // Compare event IDs to ensure same events are returned
+    const esEventIds = new Set(esResult.events.map((e) => e.event_id));
+    const chEventIds = new Set(chResult.events.map((e) => e.event_id));
+
+    const missingInCH = [...esEventIds].filter((id) => !chEventIds.has(id));
+    const extraInCH = [...chEventIds].filter((id) => !esEventIds.has(id));
+
+    if (missingInCH.length > 0) {
+      discrepancies.push(
+        `Events missing in CH: ${missingInCH.slice(0, 5).join(", ")}${missingInCH.length > 5 ? "..." : ""}`,
+      );
+    }
+    if (extraInCH.length > 0) {
+      discrepancies.push(
+        `Extra events in CH: ${extraInCH.slice(0, 5).join(", ")}${extraInCH.length > 5 ? "..." : ""}`,
+      );
+    }
   }
 
   /**

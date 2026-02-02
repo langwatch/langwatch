@@ -429,6 +429,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       joinClauses,
       baseWhere,
       filterWhere,
+      groupByAdditionalWhere,
       filterTranslation.params,
       timeZone,
     );
@@ -511,7 +512,13 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
 
   // Filter out empty groupBy values to match ES terms aggregation behavior
   // Skip HAVING if column already handles 'unknown' conversion (those already excluded empty strings)
-  const havingClause = groupByColumn && !groupByHandlesUnknown ? "HAVING group_key != ''" : "";
+  // Skip HAVING for boolean fields like evaluations.evaluation_passed (which use 0/1, not empty strings)
+  const havingClause =
+    groupByColumn &&
+    !groupByHandlesUnknown &&
+    input.groupBy !== "evaluations.evaluation_passed"
+      ? "HAVING group_key != ''"
+      : "";
 
   // Build the complete SQL
   const sql = `
@@ -553,6 +560,7 @@ function buildArrayJoinTimeseriesQuery(
   joinClauses: string,
   baseWhere: string,
   filterWhere: string,
+  groupByAdditionalWhere: string | undefined,
   filterParams: Record<string, unknown>,
   timeZone: string,
 ): BuiltQuery {
@@ -618,6 +626,13 @@ function buildArrayJoinTimeseriesQuery(
   }
   outerGroupBy.push("group_key");
 
+  // Build HAVING clause - only apply for string-type fields that don't handle unknown
+  // Skip for boolean fields like evaluations.evaluation_passed (which use 0/1, not empty strings)
+  const havingClause =
+    !groupByHandlesUnknown && input.groupBy !== "evaluations.evaluation_passed"
+      ? "HAVING group_key != ''"
+      : "";
+
   const sql = `
     WITH deduped_traces AS (
       SELECT DISTINCT
@@ -626,13 +641,14 @@ function buildArrayJoinTimeseriesQuery(
       ${joinClauses}
       WHERE ${baseWhere}
         ${filterWhere}
+        ${groupByAdditionalWhere ? `AND ${groupByAdditionalWhere}` : ""}
     )
     SELECT
       ${outerSelectExprs.join(",\n      ")}
     FROM deduped_traces
     WHERE period IS NOT NULL
     GROUP BY ${outerGroupBy.join(", ")}
-    HAVING group_key != ''
+    ${havingClause}
     ORDER BY period${dateTrunc ? ", date" : ""}
   `;
 

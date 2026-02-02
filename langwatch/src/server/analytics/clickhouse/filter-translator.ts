@@ -523,6 +523,9 @@ function translateEventTypeFilter(values: string[]): FilterTranslation {
 
 /**
  * Translate event metric key filter
+ *
+ * Uses paired arrayExists to correlate Events.Name with Events.Attributes at the same index.
+ * This prevents false positives where event type matches at one index but key matches at another.
  */
 function translateEventMetricKeyFilter(
   values: string[],
@@ -533,23 +536,34 @@ function translateEventMetricKeyFilter(
   const keysParam = genParamName("metricKeys");
 
   const params: Record<string, unknown> = { [keysParam]: values };
-  let eventCondition = "";
-
-  if (eventType) {
-    const eventTypeParam = genParamName("eventType");
-    eventCondition = `AND has(${ss}."Events.Name", {${eventTypeParam}:String})`;
-    params[eventTypeParam] = eventType;
-  }
 
   // Events.Attributes is Array(Map(String, String))
-  // Check if any attribute map contains any of the metric keys
+  // Use paired arrayExists to check name and attributes at the same index
+  let metricKeyCondition: string;
+  if (eventType) {
+    const eventTypeParam = genParamName("eventType");
+    params[eventTypeParam] = eventType;
+    // Correlate event name and attributes at the same array index
+    metricKeyCondition = `arrayExists(
+      (name, attrs) -> name = {${eventTypeParam}:String}
+        AND arrayExists(k -> mapContains(attrs, k), {${keysParam}:Array(String)}),
+      ${ss}."Events.Name",
+      ${ss}."Events.Attributes"
+    )`;
+  } else {
+    // No event type filter, just check attributes
+    metricKeyCondition = `arrayExists(
+      x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}),
+      ${ss}."Events.Attributes"
+    )`;
+  }
+
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
-        ${eventCondition}
-        AND arrayExists(x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}), ${ss}."Events.Attributes")
+        AND ${metricKeyCondition}
     )`,
     requiredJoins: [],
     params,
@@ -559,6 +573,9 @@ function translateEventMetricKeyFilter(
 
 /**
  * Translate event metric value filter (numeric range)
+ *
+ * Uses paired arrayExists to correlate Events.Name with Events.Attributes at the same index.
+ * This prevents false positives where event type matches at one index but value matches at another.
  */
 function translateEventMetricValueFilter(
   values: string[],
@@ -585,27 +602,34 @@ function translateEventMetricValueFilter(
     [minParam]: minValue,
     [maxParam]: maxValue,
   };
-  let eventCondition = "";
 
+  // Use paired arrayExists to check name and value at the same index
+  let valueCondition: string;
   if (eventType) {
     const eventTypeParam = genParamName("eventType");
-    eventCondition = `AND has(${ss}."Events.Name", {${eventTypeParam}:String})`;
     params[eventTypeParam] = eventType;
+    // Correlate event name and attribute value at the same array index
+    valueCondition = `arrayExists(
+      (name, attrs) -> name = {${eventTypeParam}:String}
+        AND toFloat64OrNull(attrs[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
+        AND toFloat64OrNull(attrs[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
+      ${ss}."Events.Name",
+      ${ss}."Events.Attributes"
+    )`;
+  } else {
+    // No event type filter, just check attribute value range
+    valueCondition = `arrayExists(
+      x -> toFloat64OrNull(x[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
+        AND toFloat64OrNull(x[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
+      ${ss}."Events.Attributes"
+    )`;
   }
-
-  // Check if any event's attribute matches the key and value is in range
-  const valueCondition = `arrayExists(
-    x -> toFloat64OrNull(x[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
-      AND toFloat64OrNull(x[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
-    ${ss}."Events.Attributes"
-  )`;
 
   return {
     whereClause: `EXISTS (
       SELECT 1 FROM stored_spans ${ss}
       WHERE ${ss}.TenantId = ${ts}.TenantId
         AND ${ss}.TraceId = ${ts}.TraceId
-        ${eventCondition}
         AND ${valueCondition}
     )`,
     requiredJoins: [],

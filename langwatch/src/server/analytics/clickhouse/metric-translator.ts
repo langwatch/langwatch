@@ -121,6 +121,43 @@ function translateSimpleAggregation(
 }
 
 /**
+ * Translate aggregation for array expressions.
+ * Uses ClickHouse array functions (arraySum, arrayAvg, etc.)
+ * to aggregate values extracted from arrays.
+ */
+function translateArrayAggregation(
+  arrayExpr: string,
+  aggregation: AggregationTypes,
+  alias: string,
+): string {
+  switch (aggregation) {
+    case "avg":
+      // Flatten arrays across rows and compute average
+      return `avgArray(${arrayExpr}) AS ${alias}`;
+    case "sum":
+      // Sum all values from arrays across rows
+      return `coalesce(sumArray(${arrayExpr}), 0) AS ${alias}`;
+    case "min":
+      return `minArray(${arrayExpr}) AS ${alias}`;
+    case "max":
+      return `maxArray(${arrayExpr}) AS ${alias}`;
+    case "cardinality":
+      // Count distinct values across all arrays
+      return `uniqArray(${arrayExpr}) AS ${alias}`;
+    case "terms":
+      return `uniqArray(${arrayExpr}) AS ${alias}`;
+    default:
+      if (isPercentileAggregation(aggregation)) {
+        const percentile = percentileToPercent[aggregation];
+        // Use quantilesExactArray for percentiles on arrays
+        return `quantileExactArray(${percentile})(${arrayExpr}) AS ${alias}`;
+      }
+      // Default to counting array elements
+      return `sum(length(${arrayExpr})) AS ${alias}`;
+  }
+}
+
+/**
  * Build alias for a metric aggregation
  */
 export function buildMetricAlias(
@@ -279,12 +316,12 @@ function translateMetadataMetric(
 
     case "metadata.span_type":
       // Requires JOIN with stored_spans
-      // Count distinct traces (not spans) to match ES behavior
+      // Use the requested aggregation on TraceId to match ES behavior
       requiredJoins.push("stored_spans");
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.TraceId`,
-          "cardinality",
+          aggregation,
           alias,
         ),
         alias,
@@ -540,17 +577,36 @@ function translateEventMetric(
     }
 
     case "events.event_score": {
-      // This is complex - events are in arrays within stored_spans
-      // We need to use arrayFilter and extract metrics from Events.Attributes
-      // For now, return a simplified version
-      const eventCondition = eventType
-        ? `has(${ss}."Events.Name", '${eventType.replace(/'/g, "''")}')`
-        : "1=1";
+      // Extract score values from Events.Attributes and apply aggregation
+      // Events.Attributes is Array(Map(String, String))
+      // Score is stored in 'event.metrics.score' key
+      // Use paired arrayFilter to correlate event type with its attributes
+      const scoreKey = metricKey ?? "event.metrics.score";
+      let scoreExtraction: string;
 
-      // Events.Attributes is Array(Map(String, String)) - need to extract metric value
-      // This is a simplified implementation
+      if (eventType) {
+        // Filter to specific event type and extract scores at matching indices
+        const escapedEventType = eventType.replace(/'/g, "''");
+        scoreExtraction = `arrayFilter(
+          x -> x IS NOT NULL,
+          arrayMap(
+            (n, a) -> if(n = '${escapedEventType}', toFloat64OrNull(a['${scoreKey}']), NULL),
+            ${ss}."Events.Name",
+            ${ss}."Events.Attributes"
+          )
+        )`;
+      } else {
+        // Extract all scores
+        scoreExtraction = `arrayFilter(
+          x -> x IS NOT NULL,
+          arrayMap(a -> toFloat64OrNull(a['${scoreKey}']), ${ss}."Events.Attributes")
+        )`;
+      }
+
+      // Apply aggregation to the extracted scores array
+      const aggExpr = translateArrayAggregation(scoreExtraction, aggregation, alias);
       return {
-        selectExpression: `countIf(${eventCondition}) AS ${alias}`,
+        selectExpression: aggExpr,
         alias,
         requiredJoins,
       };
@@ -765,6 +821,14 @@ export function translatePipelineAggregation(
           ? "min"
           : "max";
 
+  // Remove alias from selectExpression using regex anchored to end of string
+  // Escape special regex characters in alias to prevent injection issues
+  const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const selectWithoutAlias = innerMetric.selectExpression.replace(
+    new RegExp(` AS ${escapedAlias}$`),
+    "",
+  );
+
   return {
     selectExpression: `${outerAgg}(inner_value) AS ${alias}`,
     alias,
@@ -772,7 +836,7 @@ export function translatePipelineAggregation(
     requiresSubquery: true,
     subquery: {
       // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
-      innerSelect: `${pipelineColumn} AS pipeline_key, ${innerMetric.selectExpression.replace(` AS ${alias}`, "")} AS inner_value`,
+      innerSelect: `${pipelineColumn} AS pipeline_key, ${selectWithoutAlias} AS inner_value`,
       innerGroupBy: "pipeline_key",
       outerAggregation: `${outerAgg}(inner_value) AS ${alias}`,
     },

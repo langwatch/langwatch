@@ -375,7 +375,7 @@ export class ClickHouseAnalyticsService {
     field: FilterField,
     startDate: number,
     endDate: number,
-    _filters?: Partial<
+    filters?: Partial<
       Record<
         FilterField,
         | string[]
@@ -403,7 +403,7 @@ export class ClickHouseAnalyticsService {
           key,
           subkey,
           searchQuery,
-          _filters,
+          filters,
         );
 
         this.logger.debug({ sql, params }, "Executing dataForFilter query");
