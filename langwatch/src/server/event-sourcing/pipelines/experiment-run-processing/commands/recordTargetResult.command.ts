@@ -7,9 +7,9 @@ import { defineCommandSchema } from "../../../library";
 import type { RecordTargetResultCommandData } from "../schemas/commands";
 import { recordTargetResultCommandDataSchema } from "../schemas/commands";
 import {
-  RECORD_TARGET_RESULT_COMMAND_TYPE,
-  TARGET_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_VERSION_LATEST,
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../schemas/constants";
 import type {
   ExperimentRunProcessingEvent,
@@ -26,8 +26,8 @@ const config: ExperimentRunCommandConfig<
   RecordTargetResultCommandData,
   TargetResultEventData
 > = {
-  eventType: TARGET_RESULT_EVENT_TYPE,
-  eventVersion: TARGET_RESULT_EVENT_VERSION_LATEST,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
   loggerName: "record-target-result",
   handleLogMessage: "Handling record target result command",
   emitLogMessage: "Emitting target result event",
@@ -62,7 +62,7 @@ export class RecordTargetResultCommand
     >
 {
   static readonly schema = defineCommandSchema(
-    RECORD_TARGET_RESULT_COMMAND_TYPE,
+    EXPERIMENT_RUN_COMMAND_TYPES.RECORD_TARGET_RESULT,
     recordTargetResultCommandDataSchema,
     "Command to record a target result",
   );

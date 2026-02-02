@@ -5,25 +5,22 @@ import { RecordTargetResultCommand } from "./commands/recordTargetResult.command
 import { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
 import { ExperimentRunResultStorageHandler } from "./handlers";
 import { ExperimentRunStateProjectionHandler } from "./projections";
-import {
-  EVALUATOR_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_TYPE,
-} from "./schemas/constants";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "./schemas/constants";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 /**
  * Experiment run processing pipeline definition (static, no runtime dependencies).
  *
  * This pipeline uses experiment_run aggregates (aggregateId = runId).
- * It tracks the lifecycle of experiment runs (evaluations-v3 feature):
+ * It tracks the lifecycle of experiment runs:
  * - started -> target results received -> evaluator results received -> completed
  *
  * Projection: experimentRunState
  * - Computes summary statistics (progress, costs, scores, pass rate)
- * - Stored in batch_evaluation_runs ClickHouse table
+ * - Stored in experiment_runs ClickHouse table
  *
  * Event Handler: experimentRunResultStorage
- * - Writes individual results to batch_evaluation_results for query-optimized access
+ * - Writes individual results to experiment_run_results for query-optimized access
  * - Enables efficient filtering/sorting of detailed results
  *
  * Commands:
@@ -31,30 +28,23 @@ import type { ExperimentRunProcessingEvent } from "./schemas/events";
  * - recordTargetResult: Emits TargetResultEvent per row/target
  * - recordEvaluatorResult: Emits EvaluatorResultEvent per row/evaluator
  * - completeExperimentRun: Emits ExperimentRunCompletedEvent when run finishes
- *
- * This is a static definition that can be safely imported without triggering
- * ClickHouse/Redis connections. It gets registered with the runtime in
- * the eventSourcing.ts file.
  */
 export const experimentRunProcessingPipelineDefinition =
   definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withProjection(
-      "experimentRunState",
-      ExperimentRunStateProjectionHandler,
-      {
-        // Dedupe by aggregate to process only the latest event per run
-        deduplication: "aggregate",
-        // Balance of real-time feel + batching; projection is lightweight
-        delay: 500,
-      },
-    )
+    .withProjection("experimentRunState", ExperimentRunStateProjectionHandler, {
+      deduplication: "aggregate",
+      delay: 500,
+    })
     .withEventHandler(
       "experimentRunResultStorage",
       ExperimentRunResultStorageHandler,
       {
-        eventTypes: [TARGET_RESULT_EVENT_TYPE, EVALUATOR_RESULT_EVENT_TYPE],
+        eventTypes: [
+          EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+          EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+        ],
       },
     )
     .withCommand("startExperimentRun", StartExperimentRunCommand)

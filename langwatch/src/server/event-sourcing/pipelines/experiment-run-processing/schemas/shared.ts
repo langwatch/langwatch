@@ -2,7 +2,6 @@ import { z } from "zod";
 
 /**
  * Target configuration for experiment run commands and events.
- * Matches ESBatchEvaluationTarget type from ~/server/experiments/types.
  */
 export const targetSchema = z.object({
   id: z.string(),

@@ -8,8 +8,8 @@ import type {
   StaticPipelineDefinition,
 } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
-import { experimentRunProcessingPipelineDefinition } from "../pipelines/experiment-run-processing/pipeline";
 import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
+import { experimentRunProcessingPipelineDefinition } from "../pipelines/experiment-run-processing/pipeline";
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";

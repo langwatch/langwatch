@@ -5,7 +5,7 @@ import type {
   ProjectionHandler,
 } from "../../../library";
 import { getExperimentRunStateRepository } from "../repositories";
-import { EXPERIMENT_RUN_STATE_PROJECTION_VERSION_LATEST } from "../schemas/constants";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import {
   isExperimentRunCompletedEvent,
@@ -18,10 +18,6 @@ const logger = createLogger(
   "langwatch:experiment-run-processing:run-state-projection",
 );
 
-/**
- * Target configuration stored in the projection.
- * Matches ESBatchEvaluationTarget type from ~/server/experiments/types.
- */
 export interface ExperimentRunTarget {
   id: string;
   name: string;
@@ -33,10 +29,6 @@ export interface ExperimentRunTarget {
   metadata?: Record<string, string | number | boolean> | null;
 }
 
-/**
- * State data for an experiment run.
- * Matches the batch_evaluation_runs ClickHouse table schema.
- */
 export interface ExperimentRunStateData {
   RunId: string;
   ExperimentId: string;
@@ -49,29 +41,17 @@ export interface ExperimentRunStateData {
   TotalDurationMs: number | null;
   AvgScore: number | null;
   PassRate: number | null;
-  Targets: string; // JSON array
+  Targets: string;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
   StoppedAt: number | null;
 }
 
-/**
- * Projection for experiment run state.
- */
 export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
 }
 
-/**
- * Projection handler that computes experiment run state from events.
- *
- * Processes events in order:
- * - ExperimentRunStartedEvent -> Initialize run with targets and total
- * - TargetResultEvent -> Track progress, costs, durations, errors
- * - EvaluatorResultEvent -> Track scores and pass/fail
- * - ExperimentRunCompletedEvent -> Mark as finished or stopped
- */
 export class ExperimentRunStateProjectionHandler
   implements
     ProjectionHandler<ExperimentRunProcessingEvent, ExperimentRunState>
@@ -90,7 +70,6 @@ export class ExperimentRunStateProjectionHandler
     const aggregateId = stream.getAggregateId();
     const tenantId = stream.getTenantId();
 
-    // Initialize state
     let runId = aggregateId;
     let experimentId = "";
     let workflowVersionId: string | null = null;
@@ -101,22 +80,18 @@ export class ExperimentRunStateProjectionHandler
     let finishedAt: number | null = null;
     let stoppedAt: number | null = null;
 
-    // Track unique completed cells (by rowIndex + targetId)
     const completedCells = new Set<string>();
     const failedCells = new Set<string>();
 
-    // Track costs and durations from target results
     let totalCost = 0;
     let totalDurationMs = 0;
     let hasCostData = false;
     let hasDurationData = false;
 
-    // Track scores from evaluator results
     const scores: number[] = [];
     let passedCount = 0;
     let evaluatorResultCount = 0;
 
-    // Process events in order to build current state
     for (const event of events) {
       if (isExperimentRunStartedEvent(event)) {
         runId = event.data.runId;
@@ -126,14 +101,9 @@ export class ExperimentRunStateProjectionHandler
         targets = event.data.targets;
         createdAt = event.timestamp;
         updatedAt = event.timestamp;
-
-        logger.debug(
-          { runId, experimentId, total },
-          "Processing ExperimentRunStartedEvent",
-        );
+        logger.debug({ runId, experimentId, total }, "Processing ExperimentRunStartedEvent");
       } else if (isTargetResultEvent(event)) {
         const cellKey = `${event.data.index}:${event.data.targetId}`;
-
         if (event.data.error) {
           failedCells.add(cellKey);
           completedCells.delete(cellKey);
@@ -141,108 +111,56 @@ export class ExperimentRunStateProjectionHandler
           completedCells.add(cellKey);
           failedCells.delete(cellKey);
         }
-
         if (event.data.cost !== undefined && event.data.cost !== null) {
           totalCost += event.data.cost;
           hasCostData = true;
         }
-
         if (event.data.duration !== undefined && event.data.duration !== null) {
           totalDurationMs += event.data.duration;
           hasDurationData = true;
         }
-
         updatedAt = event.timestamp;
-
-        logger.debug(
-          {
-            runId: event.data.runId,
-            index: event.data.index,
-            targetId: event.data.targetId,
-          },
-          "Processing TargetResultEvent",
-        );
+        logger.debug({ runId: event.data.runId, index: event.data.index, targetId: event.data.targetId },
+          "Processing TargetResultEvent");
       } else if (isEvaluatorResultEvent(event)) {
         evaluatorResultCount++;
-
-        if (
-          event.data.status === "processed" &&
-          event.data.score !== undefined &&
-          event.data.score !== null
-        ) {
+        if (event.data.status === "processed" && event.data.score !== undefined && event.data.score !== null) {
           scores.push(event.data.score);
         }
-
-        if (
-          event.data.status === "processed" &&
-          event.data.passed !== undefined &&
-          event.data.passed !== null
-        ) {
-          if (event.data.passed) {
-            passedCount++;
-          }
+        if (event.data.status === "processed" && event.data.passed !== undefined && event.data.passed !== null) {
+          if (event.data.passed) passedCount++;
         }
-
-        // Also track cost from evaluator results
         if (event.data.cost !== undefined && event.data.cost !== null) {
           totalCost += event.data.cost;
           hasCostData = true;
         }
-
         updatedAt = event.timestamp;
-
-        logger.debug(
-          {
-            runId: event.data.runId,
-            index: event.data.index,
-            evaluatorId: event.data.evaluatorId,
-            status: event.data.status,
-          },
-          "Processing EvaluatorResultEvent",
-        );
+        logger.debug({ runId: event.data.runId, index: event.data.index, evaluatorId: event.data.evaluatorId, status: event.data.status },
+          "Processing EvaluatorResultEvent");
       } else if (isExperimentRunCompletedEvent(event)) {
         finishedAt = event.data.finishedAt ?? null;
         stoppedAt = event.data.stoppedAt ?? null;
         updatedAt = event.timestamp;
-
-        logger.debug(
-          { runId: event.data.runId, finishedAt, stoppedAt },
-          "Processing ExperimentRunCompletedEvent",
-        );
+        logger.debug({ runId: event.data.runId, finishedAt, stoppedAt }, "Processing ExperimentRunCompletedEvent");
       }
     }
 
-    // Calculate derived metrics
     const progress = completedCells.size + failedCells.size;
     const completedCount = completedCells.size;
     const failedCount = failedCells.size;
-    const avgScore =
-      scores.length > 0
-        ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-        : null;
-    const passRate =
-      evaluatorResultCount > 0 ? passedCount / evaluatorResultCount : null;
+    const avgScore = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : null;
+    const passRate = evaluatorResultCount > 0 ? passedCount / evaluatorResultCount : null;
 
-    // Generate deterministic projection ID
     const projectionId = `experiment_run_state:${tenantId}:${runId}`;
 
-    logger.debug(
-      {
-        tenantId,
-        runId,
-        progress,
-        completedCount,
-        failedCount,
-        eventCount: events.length,
-      },
-      "Computed experiment run state from events",
-    );
+    logger.debug({ tenantId, runId, progress, completedCount, failedCount, eventCount: events.length },
+      "Computed experiment run state from events");
 
     return {
       id: projectionId,
       aggregateId,
       tenantId,
-      version: EXPERIMENT_RUN_STATE_PROJECTION_VERSION_LATEST,
+      version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
       data: {
         RunId: runId,
         ExperimentId: experimentId,

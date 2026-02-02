@@ -7,9 +7,9 @@ import { defineCommandSchema } from "../../../library";
 import type { StartExperimentRunCommandData } from "../schemas/commands";
 import { startExperimentRunCommandDataSchema } from "../schemas/commands";
 import {
-  EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
-  START_EXPERIMENT_RUN_COMMAND_TYPE,
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../schemas/constants";
 import type {
   ExperimentRunProcessingEvent,
@@ -26,8 +26,8 @@ const config: ExperimentRunCommandConfig<
   StartExperimentRunCommandData,
   ExperimentRunStartedEventData
 > = {
-  eventType: EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  eventVersion: EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
   loggerName: "start-experiment-run",
   handleLogMessage: "Handling start experiment run command",
   emitLogMessage: "Emitting experiment run started event",
@@ -56,7 +56,7 @@ export class StartExperimentRunCommand
     >
 {
   static readonly schema = defineCommandSchema(
-    START_EXPERIMENT_RUN_COMMAND_TYPE,
+    EXPERIMENT_RUN_COMMAND_TYPES.START,
     startExperimentRunCommandDataSchema,
     "Command to start an experiment run",
   );

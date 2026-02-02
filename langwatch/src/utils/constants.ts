@@ -23,6 +23,7 @@ export const KSUID_RESOURCES = {
   EVALUATION_STATE: "evalstate",
   EVENT: "event",
   EXPERIMENT: "experiment",
+  EXPERIMENT_RUN_RESULT: "exprunresult",
   MONITOR: "monitor",
   ORGANIZATION: "organization",
   PROJECT: "project",

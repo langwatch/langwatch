@@ -6,9 +6,6 @@ import type {
 } from "../../../library";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
-/**
- * Base class for in-memory projection stores.
- */
 abstract class BaseMemoryProjectionStore<T extends Projection = Projection>
   implements ProjectionStore<T>
 {
@@ -33,10 +30,6 @@ abstract class BaseMemoryProjectionStore<T extends Projection = Projection>
   }
 }
 
-/**
- * In-memory repository for experiment run states.
- * Useful for testing and development.
- */
 export class ExperimentRunStateRepositoryMemory<
     ProjectionType extends Projection = Projection,
   >
