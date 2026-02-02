@@ -76,6 +76,9 @@ describe("Agents Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+
+    // Clean up any leftover data from previous test runs
+    await prisma.agent.deleteMany({ where: { projectId } });
   });
 
   afterAll(async () => {
