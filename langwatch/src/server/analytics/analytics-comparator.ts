@@ -231,29 +231,36 @@ export class AnalyticsComparator {
       projectId: obj.projectId ? "[redacted]" : undefined,
       hasFilters: obj.filters !== undefined,
       seriesCount: Array.isArray(obj.series) ? obj.series.length : undefined,
-      groupBy: obj.groupBy,
+      groupBy: obj.groupBy ? `[${typeof obj.groupBy}]` : undefined,
       timeScale: obj.timeScale,
     };
   }
 
   /**
-   * Summarize a result for logging
+   * Summarize a result for logging without exposing PII.
+   * Only logs structure and counts, not actual values.
    */
   private summarize<T>(result: T): unknown {
     if (this.isTimeseriesResult(result)) {
+      const firstBucket = result.currentPeriod[0];
       return {
         currentPeriodBuckets: result.currentPeriod.length,
         previousPeriodBuckets: result.previousPeriod.length,
-        firstCurrentBucket: result.currentPeriod[0],
+        firstCurrentBucket: firstBucket
+          ? { date: firstBucket.date, keys: Object.keys(firstBucket) }
+          : undefined,
       };
     }
     if (this.isFilterDataResult(result)) {
       return {
         optionCount: result.options.length,
-        firstOptions: result.options.slice(0, 3),
+        firstOptions: result.options.slice(0, 3).map((opt) => ({
+          field: opt.field,
+          countBucket: opt.count > 100 ? "100+" : opt.count > 10 ? "10-100" : "<10",
+        })),
       };
     }
-    return result;
+    return { type: typeof result };
   }
 }
 
