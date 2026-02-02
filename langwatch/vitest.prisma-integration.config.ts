@@ -13,6 +13,9 @@ export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts"],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
+    env: {
+      DISABLE_LICENSE_ENFORCEMENT: "true",
+    },
     exclude: [
       ...configDefaults.exclude,
       ".next/**/*",
