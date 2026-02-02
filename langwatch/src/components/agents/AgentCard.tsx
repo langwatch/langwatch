@@ -1,17 +1,21 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
+  ArrowUp,
   Bot,
   Code,
+  Copy,
   ExternalLink,
   Globe,
   MessageSquare,
   MoreVertical,
+  RefreshCw,
   Workflow,
 } from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
+import { Tooltip } from "../ui/tooltip";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -33,6 +37,10 @@ export type AgentCardProps = {
   onEdit?: () => void;
   onDelete?: () => void;
   onOpenWorkflow?: () => void;
+  onReplicate?: () => void;
+  onPushToCopies?: () => void;
+  onSyncFromSource?: () => void;
+  hasEvaluationsManagePermission?: boolean;
 };
 
 export function AgentCard({
@@ -41,9 +49,17 @@ export function AgentCard({
   onEdit,
   onDelete,
   onOpenWorkflow,
+  onReplicate,
+  onPushToCopies,
+  onSyncFromSource,
+  hasEvaluationsManagePermission = false,
 }: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
+
+  const isCopiedAgent = !!(agent as { copiedFromAgentId?: string | null })
+    .copiedFromAgentId;
+  const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking within menu
@@ -102,6 +118,87 @@ export function AgentCard({
                       <ExternalLink size={14} />
                       Open Workflow
                     </Menu.Item>
+                  )}
+                  {isCopiedAgent && onSyncFromSource && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to sync from source"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="sync"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onSyncFromSource();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <RefreshCw size={16} /> Update from source
+                      </Menu.Item>
+                    </Tooltip>
+                  )}
+                  {hasCopies && onPushToCopies && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to push to replicas"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="push"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onPushToCopies();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <ArrowUp size={16} /> Push to replicas
+                      </Menu.Item>
+                    </Tooltip>
+                  )}
+                  {onReplicate && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to replicate agents"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="replicate"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onReplicate();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <Copy size={16} /> Replicate to another project
+                      </Menu.Item>
+                    </Tooltip>
                   )}
                   {onDelete && (
                     <Menu.Item

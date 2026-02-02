@@ -917,20 +917,24 @@ model Notification {
 }
 
 model Agent {
-    id         String    @id @default(nanoid())
-    projectId  String
-    project    Project   @relation(fields: [projectId], references: [id])
-    name       String
-    type       String // "signature" | "code" | "workflow"
-    config     Json // Node configuration (model, prompt, code, etc.)
-    workflowId String? // For "workflow" type - top level for joins
-    workflow   Workflow? @relation(fields: [workflowId], references: [id])
-    archivedAt DateTime?
-    createdAt  DateTime  @default(now())
-    updatedAt  DateTime  @default(now()) @updatedAt
+    id                 String    @id @default(nanoid())
+    projectId          String
+    project            Project   @relation(fields: [projectId], references: [id])
+    name               String
+    type               String // "signature" | "code" | "workflow"
+    config             Json // Node configuration (model, prompt, code, etc.)
+    workflowId         String? // For "workflow" type - top level for joins
+    workflow           Workflow? @relation(fields: [workflowId], references: [id])
+    copiedFromAgentId  String?
+    copiedFrom         Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedAgents       Agent[]   @relation("AgentCopies")
+    archivedAt         DateTime?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @default(now()) @updatedAt
 
     @@index([projectId])
     @@index([workflowId])
+    @@index([copiedFromAgentId])
 }
 
 model Evaluator {

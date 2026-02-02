@@ -63,23 +63,29 @@ const validateConfig = (
 };
 
 /**
- * Typed agent with parsed config matching DSL node data types
+ * Typed agent with parsed config matching DSL node data types.
+ * May include _count for copy/replica UI.
  */
 export type TypedAgent = Omit<Agent, "config" | "type"> & {
   type: AgentType;
   config: AgentComponentConfig;
+  _count?: { copiedAgents: number };
 };
 
 /**
- * Parse a raw agent from database into typed agent
+ * Parse a raw agent from database into typed agent.
+ * Preserves _count when present (for copy/replica UI).
  */
-const parseAgent = (agent: Agent): TypedAgent => {
+const parseAgent = (
+  agent: Agent & { _count?: { copiedAgents: number } },
+): TypedAgent => {
   const type = agentTypeSchema.parse(agent.type);
   const config = validateConfig(type, agent.config);
   return {
     ...agent,
     type,
     config,
+    ...(agent._count && { _count: agent._count }),
   };
 };
 
@@ -142,7 +148,7 @@ export class AgentRepository {
   }
 
   /**
-   * Finds all agents for a project.
+   * Finds all agents for a project with copy-count for replica UI.
    * Excludes archived agents. Orders by most recently updated.
    * Returns typed agents with parsed config.
    */
@@ -154,6 +160,9 @@ export class AgentRepository {
       },
       orderBy: {
         updatedAt: "desc",
+      },
+      include: {
+        _count: { select: { copiedAgents: true } },
       },
     });
 
