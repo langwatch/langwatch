@@ -180,11 +180,13 @@ export default function ProjectOnboarding() {
             <Button
               colorPalette="orange"
               type="submit"
-              disabled={createProject.isLoading}
+              disabled={createProject.isLoading || createProject.isSuccess}
             >
-              {createProject.isLoading || createProject.isSuccess
-                ? "Loading..."
-                : "Next"}
+              {createProject.isSuccess
+                ? "Created"
+                : createProject.isLoading
+                  ? "Loading..."
+                  : "Next"}
             </Button>
           </HStack>
         </VStack>
