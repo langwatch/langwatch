@@ -1,5 +1,18 @@
 import type { ErrorCapture } from "../server/tracer/types";
 
+/**
+ * Extracts an error message from an unknown error value.
+ * Handles Error instances, objects with message property, and primitives.
+ */
+export function extractErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return String(error);
+}
+
 export const captureError = (error: unknown): ErrorCapture => {
   if (error instanceof Error) {
     return {

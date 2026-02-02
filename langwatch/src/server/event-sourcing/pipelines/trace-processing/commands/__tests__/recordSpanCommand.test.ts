@@ -1,4 +1,3 @@
-import type { PIIRedactionLevel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId, type Command } from "../../../../library";
 import type { RecordSpanCommandData } from "../../schemas/commands";
@@ -6,7 +5,6 @@ import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
-import type { OtlpSpan } from "../../schemas/otlp";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
@@ -51,120 +49,67 @@ function createMockCommand(
 
 function createMockDependencies(): {
   deps: RecordSpanCommandDependencies;
-  mockFindUnique: ReturnType<typeof vi.fn>;
-  mockRedactSpan: ReturnType<typeof vi.fn>;
+  mockRedactSpanForTenant: ReturnType<typeof vi.fn>;
 } {
-  const mockFindUnique = vi.fn();
-  const mockRedactSpan = vi.fn();
+  const mockRedactSpanForTenant = vi.fn();
 
   return {
     deps: {
-      prisma: {
-        project: {
-          findUnique: mockFindUnique,
-        },
-      } as unknown as RecordSpanCommandDependencies["prisma"],
       piiRedactionService: {
-        redactSpan: mockRedactSpan,
+        redactSpanForTenant: mockRedactSpanForTenant,
       },
     },
-    mockFindUnique,
-    mockRedactSpan,
+    mockRedactSpanForTenant,
   };
 }
 
 describe("RecordSpanCommand", () => {
   let handler: RecordSpanCommand;
-  let mockFindUnique: ReturnType<typeof vi.fn>;
-  let mockRedactSpan: ReturnType<typeof vi.fn>;
+  let mockRedactSpanForTenant: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const { deps, mockFindUnique: mfu, mockRedactSpan: mrs } =
-      createMockDependencies();
-    mockFindUnique = mfu;
-    mockRedactSpan = mrs;
+    const { deps, mockRedactSpanForTenant: mock } = createMockDependencies();
+    mockRedactSpanForTenant = mock;
     handler = new RecordSpanCommand(deps);
   });
 
   describe("handle", () => {
     describe("PII redaction", () => {
-      it("fetches project piiRedactionLevel from database", async () => {
+      it("calls PII redaction service with tenantId", async () => {
         const tenantId = "project-123";
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "STRICT" });
-        const command = createMockCommand(tenantId, "trace-1", "span-1");
-
-        await handler.handle(command);
-
-        expect(mockFindUnique).toHaveBeenCalledWith({
-          where: { id: tenantId },
-          select: { piiRedactionLevel: true },
-        });
-      });
-
-      it("calls PII redaction service when level is STRICT", async () => {
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "STRICT" });
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
+        const command = createMockCommand(tenantId, "trace-1", "span-1", [
           { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
         ]);
 
         await handler.handle(command);
 
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          command.data.span,
-          "STRICT",
+        expect(mockRedactSpanForTenant).toHaveBeenCalledWith(
+          expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
+          tenantId,
         );
       });
 
-      it("calls PII redaction service when level is ESSENTIAL", async () => {
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "ESSENTIAL" });
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+      it("delegates project settings lookup to the service", async () => {
+        const command = createMockCommand("project-456", "trace-1", "span-1");
 
         await handler.handle(command);
 
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          command.data.span,
-          "ESSENTIAL",
-        );
-      });
-
-      it("calls PII redaction service with DISABLED level (service handles skip)", async () => {
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "DISABLED" });
-        const command = createMockCommand("project-123", "trace-1", "span-1");
-
-        await handler.handle(command);
-
-        // The command always calls redactSpan; the service handles the DISABLED check
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          command.data.span,
-          "DISABLED",
-        );
-      });
-
-      it("defaults to ESSENTIAL when project is not found", async () => {
-        mockFindUnique.mockResolvedValue(null);
-        const command = createMockCommand("project-123", "trace-1", "span-1");
-
-        await handler.handle(command);
-
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          command.data.span,
-          "ESSENTIAL",
+        // Service receives tenantId and handles project lookup internally
+        expect(mockRedactSpanForTenant).toHaveBeenCalledWith(
+          expect.any(Object),
+          "project-456",
         );
       });
     });
 
     describe("event creation", () => {
       it("creates SpanReceivedEvent with redacted span data", async () => {
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "STRICT" });
-        // Mock redactSpan to mutate the span (simulating redaction)
-        mockRedactSpan.mockImplementation(
-          async (
-            span: {
-              attributes: Array<{ key: string; value: { stringValue?: string } }>;
-            },
-            _level: PIIRedactionLevel,
-          ) => {
+        // Mock redactSpanForTenant to mutate the span (simulating redaction)
+        mockRedactSpanForTenant.mockImplementation(
+          async (span: {
+            attributes: Array<{ key: string; value: { stringValue?: string } }>;
+          }) => {
             const attr = span.attributes.find(
               (a) => a.key === "gen_ai.prompt",
             );
@@ -190,7 +135,6 @@ describe("RecordSpanCommand", () => {
       });
 
       it("creates valid SpanReceivedEvent structure", async () => {
-        mockFindUnique.mockResolvedValue({ piiRedactionLevel: "DISABLED" });
         const command = createMockCommand(
           "project-123",
           "trace-abc",
@@ -207,6 +151,22 @@ describe("RecordSpanCommand", () => {
         expect(event.data).toHaveProperty("span");
         expect(event.data).toHaveProperty("resource");
         expect(event.data).toHaveProperty("instrumentationScope");
+      });
+
+      it("does not mutate the original command data", async () => {
+        mockRedactSpanForTenant.mockImplementation(
+          async (span: { name: string }) => {
+            span.name = "[REDACTED]";
+          },
+        );
+
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const originalName = command.data.span.name;
+
+        await handler.handle(command);
+
+        // Original command data should be unchanged
+        expect(command.data.span.name).toBe(originalName);
       });
     });
   });

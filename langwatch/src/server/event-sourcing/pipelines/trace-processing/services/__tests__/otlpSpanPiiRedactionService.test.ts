@@ -1,10 +1,13 @@
-import type { PIIRedactionLevel } from "@prisma/client";
+import type { PIIRedactionLevel, PrismaClient } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PIICheckOptions } from "~/server/background/workers/collector/piiCheck";
 import type { OtlpKeyValue, OtlpSpan } from "../../schemas/otlp";
 import {
+  DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+  DEFAULT_PII_REDACTION_LEVEL,
   OtlpSpanPiiRedactionService,
   type ClearPIIFunction,
+  type OtlpSpanPiiRedactionServiceDependencies,
 } from "../otlpSpanPiiRedactionService";
 
 // Use a mutable reference to allow tests to change NODE_ENV behavior
@@ -407,6 +410,125 @@ describe("OtlpSpanPiiRedactionService", () => {
       // Note: Testing enforced=true for production requires module isolation
       // which is complex with vitest. The behavior is verified by code review:
       // env.NODE_ENV === "production" sets enforced: true
+    });
+
+    describe("error handling", () => {
+      it("propagates errors from clearPII", async () => {
+        const errorClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
+        const errorService = new OtlpSpanPiiRedactionService({
+          clearPII: errorClearPII,
+          piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+        });
+        const span = createMockOtlpSpan([
+          { key: "gen_ai.prompt", value: { stringValue: "test" } },
+        ]);
+
+        await expect(errorService.redactSpan(span, "STRICT")).rejects.toThrow(
+          "PII service unavailable",
+        );
+      });
+    });
+  });
+
+  describe("redactSpanForTenant", () => {
+    it("fetches project settings and applies redaction with project level", async () => {
+      const mockFindUnique = vi.fn().mockResolvedValue({ piiRedactionLevel: "STRICT" });
+      const { mockClearPII, clearPIISpy } = createMockClearPII();
+
+      const serviceWithPrisma = new OtlpSpanPiiRedactionService({
+        prisma: {
+          project: { findUnique: mockFindUnique },
+        } as unknown as OtlpSpanPiiRedactionServiceDependencies["prisma"],
+        clearPII: mockClearPII,
+        piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+      });
+
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: "test data" } },
+      ]);
+
+      await serviceWithPrisma.redactSpanForTenant(span, "project-123");
+
+      expect(mockFindUnique).toHaveBeenCalledWith({
+        where: { id: "project-123" },
+        select: { piiRedactionLevel: true },
+      });
+      expect(clearPIISpy).toHaveBeenCalled();
+      const options = clearPIISpy.mock.calls[0]?.[2] as PIICheckOptions;
+      expect(options.piiRedactionLevel).toBe("STRICT");
+    });
+
+    it("defaults to ESSENTIAL when project is not found", async () => {
+      const mockFindUnique = vi.fn().mockResolvedValue(null);
+      const { mockClearPII, clearPIISpy } = createMockClearPII();
+
+      const serviceWithPrisma = new OtlpSpanPiiRedactionService({
+        prisma: {
+          project: { findUnique: mockFindUnique },
+        } as unknown as OtlpSpanPiiRedactionServiceDependencies["prisma"],
+        clearPII: mockClearPII,
+        piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+      });
+
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: "test data" } },
+      ]);
+
+      await serviceWithPrisma.redactSpanForTenant(span, "unknown-project");
+
+      expect(clearPIISpy).toHaveBeenCalled();
+      const options = clearPIISpy.mock.calls[0]?.[2] as PIICheckOptions;
+      expect(options.piiRedactionLevel).toBe(DEFAULT_PII_REDACTION_LEVEL);
+    });
+
+    it("propagates database errors", async () => {
+      const mockFindUnique = vi.fn().mockRejectedValue(new Error("Database unavailable"));
+      const { mockClearPII } = createMockClearPII();
+
+      const serviceWithPrisma = new OtlpSpanPiiRedactionService({
+        prisma: {
+          project: { findUnique: mockFindUnique },
+        } as unknown as OtlpSpanPiiRedactionServiceDependencies["prisma"],
+        clearPII: mockClearPII,
+        piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+      });
+
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: "test" } },
+      ]);
+
+      await expect(
+        serviceWithPrisma.redactSpanForTenant(span, "project-123"),
+      ).rejects.toThrow("Database unavailable");
+    });
+  });
+
+  describe("configurable PII-bearing attribute keys", () => {
+    it("uses custom attribute keys when provided", async () => {
+      const customKeys = new Set(["custom.pii.field"]);
+      const { mockClearPII, clearPIISpy } = createMockClearPII();
+
+      const customService = new OtlpSpanPiiRedactionService({
+        clearPII: mockClearPII,
+        piiBearingAttributeKeys: customKeys,
+      });
+
+      const span = createMockOtlpSpan([
+        { key: "custom.pii.field", value: { stringValue: "sensitive" } },
+        { key: "gen_ai.prompt", value: { stringValue: "should not be scanned" } },
+      ]);
+
+      await customService.redactSpan(span, "STRICT");
+
+      // Only custom key should be scanned
+      expect(clearPIISpy).toHaveBeenCalledTimes(1);
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(span.attributes[1]!.value.stringValue).toBe("should not be scanned");
+    });
+
+    it("exports default keys for extension", () => {
+      expect(DEFAULT_PII_BEARING_ATTRIBUTE_KEYS).toContain("gen_ai.prompt");
+      expect(DEFAULT_PII_BEARING_ATTRIBUTE_KEYS).toContain("langwatch.input");
     });
   });
 });
