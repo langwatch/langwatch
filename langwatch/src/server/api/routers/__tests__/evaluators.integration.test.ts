@@ -4,7 +4,7 @@
  * Integration tests for Evaluators tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -29,6 +29,13 @@ describe("Evaluators Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+  });
+
+  afterEach(async () => {
+    // Clean up evaluators after each test to stay under FREE tier limits
+    await prisma.evaluator.deleteMany({
+      where: { projectId },
+    });
   });
 
   describe("create", () => {

@@ -5,7 +5,7 @@
  * Tests the actual CRUD operations through the tRPC layer.
  * Config formats must be DSL-compatible for direct execution.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -73,6 +73,13 @@ describe("Agents Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+  });
+
+  afterEach(async () => {
+    // Clean up agents after each test to stay under FREE tier limits
+    await prisma.agent.deleteMany({
+      where: { projectId },
+    });
   });
 
   describe("create", () => {
