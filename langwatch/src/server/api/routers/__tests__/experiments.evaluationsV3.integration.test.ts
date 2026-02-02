@@ -6,27 +6,19 @@
  */
 import { ExperimentType } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
-// Mock license enforcement BEFORE importing modules that use it
-vi.mock("../../../license-enforcement", () => ({
-  enforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
-  createLicenseEnforcementService: vi.fn(),
-  LicenseEnforcementService: vi.fn(),
-  LimitExceededError: class LimitExceededError extends Error {},
-  ProjectNotFoundError: class ProjectNotFoundError extends Error {},
-  limitTypes: ["agents", "evaluators", "experiments", "onlineEvaluations"],
-  limitTypeSchema: {},
-  LIMIT_TYPE_LABELS: {},
-  LIMIT_TYPE_DISPLAY_LABELS: {},
-  getOrganizationIdForProject: vi.fn(),
-  assertMemberTypeLimitNotExceeded: vi.fn(),
-  LICENSE_LIMIT_ERRORS: {},
-}));
-
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+// Mock license enforcement to avoid limits during tests
+vi.mock("../../../license-enforcement", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  return {
+    ...actual,
+    enforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 // Helper to create a valid persisted state
 const createValidState = (overrides: Record<string, unknown> = {}) => ({
