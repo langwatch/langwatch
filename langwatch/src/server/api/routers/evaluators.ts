@@ -460,14 +460,10 @@ export const evaluatorsRouter = createTRPCRouter({
             ? Prisma.JsonNull
             : (source.config as Prisma.InputJsonValue),
         workflowId: newWorkflowId ?? undefined,
+        copiedFromEvaluatorId: source.id,
       });
 
-      await ctx.prisma.evaluator.update({
-        where: { id: copied.id },
-        data: { copiedFromEvaluatorId: source.id },
-      });
-
-      return { ...copied, copiedFromEvaluatorId: source.id };
+      return copied;
     }),
 
   /**

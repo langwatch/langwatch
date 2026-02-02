@@ -12,6 +12,7 @@ export type CreateEvaluatorInput = {
   type: string; // "evaluator" (built-in) | "workflow" (custom)
   config: Prisma.InputJsonValue;
   workflowId?: string;
+  copiedFromEvaluatorId?: string;
 };
 
 /**
