@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
 import { vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
+import { initializeEventSourcingForTesting } from "~/server/event-sourcing";
 
 dotenv.config({ path: ".env" });
 
@@ -47,6 +48,8 @@ vi.mock("recharts", () => {
 // Set TEST_PUBLIC_KEY for license verification in integration tests.
 // This allows test licenses (signed with TEST_PRIVATE_KEY) to validate correctly.
 process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
+
+initializeEventSourcingForTesting();
 
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {

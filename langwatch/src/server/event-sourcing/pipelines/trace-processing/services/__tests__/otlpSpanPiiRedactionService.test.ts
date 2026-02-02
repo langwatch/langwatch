@@ -302,9 +302,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
 
         // Should not throw
-        await expect(
-          service.redactSpan(span, "STRICT"),
-        ).resolves.not.toThrow();
+        await expect(service.redactSpan(span, "STRICT")).resolves.not.toThrow();
         // clearPII should not be called for null stringValue
         expect(clearPIISpy).not.toHaveBeenCalled();
       });
@@ -419,7 +417,9 @@ describe("OtlpSpanPiiRedactionService", () => {
 
     describe("error handling", () => {
       it("propagates errors from clearPII", async () => {
-        const errorClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
+        const errorClearPII = vi
+          .fn()
+          .mockRejectedValue(new Error("PII service unavailable"));
         const errorService = new OtlpSpanPiiRedactionService({
           clearPII: errorClearPII,
           piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
@@ -447,7 +447,10 @@ describe("OtlpSpanPiiRedactionService", () => {
 
       const span = createMockOtlpSpan([
         { key: "custom.pii.field", value: { stringValue: "sensitive" } },
-        { key: "gen_ai.prompt", value: { stringValue: "should not be scanned" } },
+        {
+          key: "gen_ai.prompt",
+          value: { stringValue: "should not be scanned" },
+        },
       ]);
 
       await customService.redactSpan(span, "STRICT");
@@ -455,7 +458,9 @@ describe("OtlpSpanPiiRedactionService", () => {
       // Only custom key should be scanned
       expect(clearPIISpy).toHaveBeenCalledTimes(1);
       expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
-      expect(span.attributes[1]!.value.stringValue).toBe("should not be scanned");
+      expect(span.attributes[1]!.value.stringValue).toBe(
+        "should not be scanned",
+      );
     });
 
     it("exports default keys for extension", () => {
