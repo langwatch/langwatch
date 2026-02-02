@@ -21,7 +21,7 @@ import { api } from "~/utils/api";
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("scenarios");
+  const { checkAndProceed } = useLicenseEnforcement("scenarios");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const {
@@ -103,7 +103,6 @@ function ScenarioLibraryPage() {
         open={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
       />
-      {upgradeModal}
     </DashboardLayout>
   );
 }

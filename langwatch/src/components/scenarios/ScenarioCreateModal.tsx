@@ -6,6 +6,7 @@ import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
+import { generateScenarioWithAI } from "./services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -46,32 +47,6 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Generate a scenario using AI
- */
-async function generateScenarioWithAI(
-  prompt: string,
-  projectId: string
-): Promise<{ name: string; situation: string; criteria: string[]; labels: string[] }> {
-  const response = await fetch("/api/scenario/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, currentScenario: null, projectId }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to generate scenario");
-  }
-
-  const data = await response.json();
-  if (!data.scenario) {
-    throw new Error("Invalid response: missing scenario data");
-  }
-
-  return data.scenario;
-}
 
 /**
  * Modal for creating a new scenario with AI assistance.
