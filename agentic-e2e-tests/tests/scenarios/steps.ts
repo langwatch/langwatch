@@ -144,11 +144,9 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Criteria appear as textbox inputs with the criterion as their value
-  const criterionInput = page
-    .getByRole("textbox")
-    .filter({ hasText: criterion })
-    .last();
+  // Criteria appear as input elements with the criterion as their value
+  // Use a locator that finds inputs by their value attribute
+  const criterionInput = page.locator(`input[value="${criterion}"]`).last();
   await expect(criterionInput).toBeVisible({ timeout: 5000 });
 }
 
@@ -167,7 +165,16 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete by checking dialog closes or list updates
+  // Wait for save to complete - the drawer shows a success toast
+  // Note: The drawer stays open after save (by design), so we wait for the toast
+  const successToast = page.getByText(/scenario (created|updated)/i);
+  await expect(successToast).toBeVisible({ timeout: 10000 });
+
+  // Close the drawer by clicking the close button
+  const closeButton = page.getByRole("button", { name: "Close" }).last();
+  await closeButton.click();
+
+  // Wait for drawer to close
   await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
