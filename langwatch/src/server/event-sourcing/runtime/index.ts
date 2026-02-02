@@ -10,7 +10,7 @@ export {
   getEventSourcing,
   getTraceProcessingPipeline,
   getEvaluationProcessingPipeline,
-  getBatchEvaluationProcessingPipeline,
+  getExperimentRunProcessingPipeline,
 } from "./eventSourcing";
 
 export {

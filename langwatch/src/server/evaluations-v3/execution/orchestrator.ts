@@ -19,13 +19,13 @@ import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import { getBatchEvaluationProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import { getExperimentRunProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
 import type {
-  CompleteBatchEvaluationCommandData,
+  CompleteExperimentRunCommandData,
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
-  StartBatchEvaluationCommandData,
-} from "~/server/event-sourcing/pipelines/batch-evaluation-processing/schemas/commands";
+  StartExperimentRunCommandData,
+} from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -75,19 +75,19 @@ const isClickHouseEvaluationsEnabled = async (
 };
 
 /**
- * Dispatches start batch evaluation command to ClickHouse via event sourcing.
+ * Dispatches start experiment run command to ClickHouse via event sourcing.
  * Fire-and-forget - errors are logged but don't affect the main execution.
  */
-const dispatchStartBatchEvaluation = async (
-  payload: StartBatchEvaluationCommandData,
+const dispatchStartExperimentRun = async (
+  payload: StartExperimentRunCommandData,
 ): Promise<void> => {
   try {
-    const pipeline = getBatchEvaluationProcessingPipeline();
-    await pipeline.commands.startBatchEvaluation.send(payload);
+    const pipeline = getExperimentRunProcessingPipeline();
+    await pipeline.commands.startExperimentRun.send(payload);
   } catch (error) {
     logger.warn(
       { error, runId: payload.runId },
-      "Failed to dispatch start batch evaluation event to ClickHouse",
+      "Failed to dispatch start experiment run event to ClickHouse",
     );
   }
 };
@@ -100,7 +100,7 @@ const dispatchRecordTargetResult = async (
   payload: RecordTargetResultCommandData,
 ): Promise<void> => {
   try {
-    const pipeline = getBatchEvaluationProcessingPipeline();
+    const pipeline = getExperimentRunProcessingPipeline();
     await pipeline.commands.recordTargetResult.send(payload);
   } catch (error) {
     logger.warn(
@@ -118,7 +118,7 @@ const dispatchRecordEvaluatorResult = async (
   payload: RecordEvaluatorResultCommandData,
 ): Promise<void> => {
   try {
-    const pipeline = getBatchEvaluationProcessingPipeline();
+    const pipeline = getExperimentRunProcessingPipeline();
     await pipeline.commands.recordEvaluatorResult.send(payload);
   } catch (error) {
     logger.warn(
@@ -129,19 +129,19 @@ const dispatchRecordEvaluatorResult = async (
 };
 
 /**
- * Dispatches complete batch evaluation command to ClickHouse via event sourcing.
+ * Dispatches complete experiment run command to ClickHouse via event sourcing.
  * Fire-and-forget - errors are logged but don't affect the main execution.
  */
-const dispatchCompleteBatchEvaluation = async (
-  payload: CompleteBatchEvaluationCommandData,
+const dispatchCompleteExperimentRun = async (
+  payload: CompleteExperimentRunCommandData,
 ): Promise<void> => {
   try {
-    const pipeline = getBatchEvaluationProcessingPipeline();
-    await pipeline.commands.completeBatchEvaluation.send(payload);
+    const pipeline = getExperimentRunProcessingPipeline();
+    await pipeline.commands.completeExperimentRun.send(payload);
   } catch (error) {
     logger.warn(
       { error, runId: payload.runId },
-      "Failed to dispatch complete batch evaluation event to ClickHouse",
+      "Failed to dispatch complete experiment run event to ClickHouse",
     );
   }
 };
@@ -688,7 +688,7 @@ export async function* runOrchestrator(
 
     // Dispatch event to ClickHouse for dual-write (if enabled)
     if (clickHouseEnabled) {
-      void dispatchStartBatchEvaluation({
+      void dispatchStartExperimentRun({
         tenantId: projectId,
         runId,
         experimentId,
@@ -1083,7 +1083,7 @@ export async function* runOrchestrator(
 
         // Dispatch completion event to ClickHouse for dual-write (if enabled)
         if (clickHouseEnabled) {
-          void dispatchCompleteBatchEvaluation({
+          void dispatchCompleteExperimentRun({
             tenantId: projectId,
             runId,
             finishedAt: aborted ? null : finishedAt,
