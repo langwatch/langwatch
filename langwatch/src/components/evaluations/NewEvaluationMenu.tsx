@@ -11,7 +11,12 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import { Menu } from "../ui/menu";
 
-export function NewEvaluationMenu() {
+type NewEvaluationMenuProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export function NewEvaluationMenu({ open, onOpenChange }: NewEvaluationMenuProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const enabled = !!project && hasPermission("evaluations:manage");
   const { openDrawer } = useDrawer();
@@ -67,7 +72,7 @@ export function NewEvaluationMenu() {
   };
 
   return (
-    <Menu.Root>
+    <Menu.Root open={open} onOpenChange={(e) => onOpenChange?.(e.open)}>
       <Menu.Trigger asChild>
         <PageLayout.HeaderButton>
           <Plus size={16} />

@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-1;
-
 import { EventSchema } from "../../../library/domain/types";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./constants";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+} from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 /**
@@ -49,6 +50,47 @@ export function isSpanReceivedEvent(
 }
 
 /**
+ * Zod schema for TopicAssignedEvent metadata.
+ */
+export const topicAssignedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for TopicAssignedEvent data.
+ */
+export const topicAssignedEventDataSchema = z.object({
+  topicId: z.string().nullable(),
+  topicName: z.string().nullable(),
+  subtopicId: z.string().nullable(),
+  subtopicName: z.string().nullable(),
+  isIncremental: z.boolean(),
+});
+
+export const topicAssignedEventSchema = EventSchema.extend({
+  type: z.literal(TOPIC_ASSIGNED_EVENT_TYPE),
+  data: topicAssignedEventDataSchema,
+  metadata: topicAssignedEventMetadataSchema,
+});
+
+export type TopicAssignedEventMetadata = z.infer<
+  typeof topicAssignedEventMetadataSchema
+>;
+export type TopicAssignedEventData = z.infer<typeof topicAssignedEventDataSchema>;
+export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
+
+/**
+ * Type guard for TopicAssignedEvent.
+ */
+export function isTopicAssignedEvent(
+  event: TraceProcessingEvent,
+): event is TopicAssignedEvent {
+  return event.type === TOPIC_ASSIGNED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
-export type TraceProcessingEvent = SpanReceivedEvent;
+export type TraceProcessingEvent = SpanReceivedEvent | TopicAssignedEvent;

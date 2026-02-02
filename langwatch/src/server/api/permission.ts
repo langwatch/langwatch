@@ -280,25 +280,94 @@ export const backendHasOrganizationPermission = async (
   );
 };
 
-export const skipPermissionCheck = ({
-  ctx,
-  next,
-  input,
-}: PermissionMiddlewareParams<object>) => {
-  ctx.permissionChecked = true;
+const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"] as const;
+type SensitiveKey = (typeof SENSITIVE_KEYS)[number];
+type SkipPermissionCheckOptions = { allow?: Partial<Record<SensitiveKey, string>> };
 
-  const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"];
+function isMiddlewareParams(value: unknown): value is PermissionMiddlewareParams<object> {
+  return typeof value === "object" && value !== null && "ctx" in value;
+}
 
-  for (const key of SENSITIVE_KEYS) {
-    if (key in input) {
-      throw new Error(
-        `${key} is not allowed to be used without permission check`,
-      );
+/**
+ * Permission middleware for endpoints that need authentication but not resource-level access.
+ *
+ * Use this when:
+ * - User must be logged in (via `protectedProcedure`)
+ * - No project/team/org-scoped data is accessed
+ * - Examples: user preferences, feature flags, global settings
+ *
+ * By default, blocks `projectId`, `organizationId`, and `teamId` in the input
+ * to prevent accidental resource access without permission checks.
+ *
+ * @param options.allow - Map of keys to reasons explaining why they're allowed
+ *
+ * @example
+ * ```typescript
+ * // Auth-only endpoint (no resource IDs)
+ * myEndpoint: protectedProcedure
+ *   .input(z.object({ userId: z.string() }))
+ *   .use(skipPermissionCheck)
+ *   .query(...)
+ *
+ * // Allow projectId for targeting (not permission)
+ * featureFlag: protectedProcedure
+ *   .input(z.object({ flag: z.string(), projectId: z.string().optional() }))
+ *   .use(skipPermissionCheck({
+ *     allow: {
+ *       projectId: "for PostHog targeting, not resource access",
+ *       organizationId: "for PostHog targeting, not resource access",
+ *     },
+ *   }))
+ *   .query(...)
+ *
+ * // Will throw - use checkUserPermissionForProject instead
+ * badEndpoint: protectedProcedure
+ *   .input(z.object({ projectId: z.string() }))
+ *   .use(skipPermissionCheck)  // Error: projectId not allowed
+ *   .query(...)
+ * ```
+ */
+export function skipPermissionCheck(
+  options?: SkipPermissionCheckOptions,
+): (params: PermissionMiddlewareParams<object>) => ReturnType<typeof params.next>;
+export function skipPermissionCheck(
+  params: PermissionMiddlewareParams<object>,
+): ReturnType<typeof params.next>;
+export function skipPermissionCheck(
+  paramsOrOptions?: PermissionMiddlewareParams<object> | SkipPermissionCheckOptions,
+) {
+  // Called directly as middleware (backward compat)
+  if (isMiddlewareParams(paramsOrOptions)) {
+    const { ctx, next, input } = paramsOrOptions;
+    ctx.permissionChecked = true;
+
+    for (const key of SENSITIVE_KEYS) {
+      if (key in input) {
+        throw new Error(
+          `${key} is not allowed to be used without permission check`,
+        );
+      }
     }
+
+    return next();
   }
 
-  return next();
-};
+  // Called with options: return middleware function
+  const allowedKeys = Object.keys(paramsOrOptions?.allow ?? {});
+  return ({ ctx, next, input }: PermissionMiddlewareParams<object>) => {
+    ctx.permissionChecked = true;
+
+    for (const key of SENSITIVE_KEYS) {
+      if (key in input && !allowedKeys.includes(key)) {
+        throw new Error(
+          `${key} is not allowed to be used without permission check`,
+        );
+      }
+    }
+
+    return next();
+  };
+}
 
 export const skipPermissionCheckProjectCreation = ({
   ctx,

@@ -313,24 +313,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                 );
               })}
             </SimpleGrid>
-            {monitors.data?.length === 0 && (
-              <Text color="fg.muted">
-                No real-time monitors or guardrails set up yet.
-                {project && hasPermission("evaluations:manage") && (
-                  <>
-                    {" "}
-                    Click on{" "}
-                    <Link
-                      textDecoration="underline"
-                      href={`/${project.slug}/evaluations/wizard`}
-                    >
-                      New Evaluation
-                    </Link>{" "}
-                    to get started.
-                  </>
-                )}
-              </Text>
-            )}
           </>
         )}
       </Card.Body>

@@ -50,7 +50,16 @@ Demand evidence of test-first development:
 - **Duplication**: The root of all evil in software. DRY without mercy.
 - **Complexity**: Cyclomatic complexity should be low. Nested conditionals are a code smell.
 
-### 4. TypeScript-Specific Standards
+### 4. Documentation Alignment Check
+Documentation that contradicts implementation is worse than no documentation:
+- **ADRs**: Check `docs/adr/` for relevant ADRs. Does implementation match documented decisions?
+- **JSDoc/Typedocs**: Are public APIs documented? Do docs match actual behavior?
+- **README**: If feature affects usage, is README updated?
+- **CLAUDE.md/AGENTS.md**: If new patterns introduced, are they documented?
+
+"Working software over comprehensive documentation—but documentation that lies actively harms the next engineer."
+
+### 5. TypeScript-Specific Standards
 - Prefer interfaces over classes for type definitions
 - Enforce strict typing—`any` is surrender
 - Favor pure functions over stateful methods
@@ -71,6 +80,12 @@ For every review, structure your response as:
 
 ### 2. [Next violation...]
 ...
+
+## Documentation Status
+- [ ] ADRs match implementation
+- [ ] Public APIs have JSDoc
+- [ ] README updated (if applicable)
+- [List any documentation issues found]
 
 ## The Path Forward
 [Summary of refactoring priority and craftsmanship guidance]
@@ -97,6 +112,9 @@ For every review, structure your response as:
 - The word 'Manager', 'Processor', or 'Handler' in a class name (usually indicates SRP violation)
 - `any` types in TypeScript
 - Mutable shared state
+- ADRs that contradict implementation
+- Missing documentation for public APIs
+- Stale or outdated docs (check file dates against code changes)
 
 ## Your Mission
 

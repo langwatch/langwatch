@@ -24,10 +24,14 @@ class DisabledQueueProcessor<Payload>
     private readonly commandName: string,
   ) {}
 
-  async send(_payload: Payload): Promise<void> {
+  async send(payload: Payload): Promise<void> {
     logger.warn(
-      { pipeline: this.pipelineName, command: this.commandName },
-      "Command ignored: event sourcing is disabled (ENABLE_EVENT_SOURCING=false)",
+      {
+        pipeline: this.pipelineName,
+        command: this.commandName,
+        payloadKeys: Object.keys(payload as object),
+      },
+      "Command DROPPED: event sourcing is disabled. Check ENABLE_EVENT_SOURCING env var and Redis/ClickHouse availability.",
     );
   }
 

@@ -56,6 +56,7 @@ export class TraceUsageService {
     maxMessagesPerMonth?: number;
     planName?: string;
   }> {
+
     const organizationId =
       await this.organizationRepository.getOrganizationIdByTeamId(teamId);
     if (!organizationId) {
@@ -68,6 +69,7 @@ export class TraceUsageService {
     ]);
 
     // Self-hosted = unlimited traces
+    // Preventing customers from getting blocked when no license is active
     if (!env.IS_SAAS && plan === FREE_PLAN) {
       return { exceeded: false };
     }

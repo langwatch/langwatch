@@ -444,10 +444,10 @@ describe("ProjectionUpdater", () => {
       expect(projectionStore.storeProjection).toHaveBeenCalled();
       expect(distributedLock.release).toHaveBeenCalledWith(lockHandle);
       // updateProjectionByName now returns both projection and events
-      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
       expect(result).toHaveProperty("projection");
       expect(result).toHaveProperty("events");
-      expect(result.events).toEqual(events);
+      expect(result!.events).toEqual(events);
     });
 
     it("throws when projection name not found", async () => {

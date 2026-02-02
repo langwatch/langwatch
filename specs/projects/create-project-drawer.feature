@@ -21,6 +21,25 @@ Feature: Create Project Drawer
     Then the CreateProjectDrawer opens
     And the dropdown closes
 
+  @e2e
+  Scenario: Create project in different organization from dropdown
+    Given I am a member of organizations "Org A" and "Org B"
+    And I am currently viewing a project in "Org A"
+    When I open the project selector dropdown
+    And I click "New Project" under "Org B"
+    And I fill in the project details
+    And I submit the form
+    Then the project is created in "Org B"
+    And I am navigated to the new project in "Org B"
+
+  @integration
+  Scenario: Drawer receives correct organization when opened from different org
+    Given I am a member of organizations "Org A" and "Org B"
+    And I am currently viewing a project in "Org A"
+    When I click "New Project" under "Org B" in the dropdown
+    Then the CreateProjectDrawer opens with organizationId for "Org B"
+    And the form submission uses "Org B" organizationId
+
   Scenario: Open drawer from team settings page
     Given I am on the team settings page
     When I click the "Add new project" button

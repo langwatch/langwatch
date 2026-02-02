@@ -191,7 +191,7 @@ function DatasetsPage() {
                   To learn more about datasets, please visit our{" "}
                   <Link
                     color="orange.400"
-                    href="https://docs.langwatch.ai/features/datasets"
+                    href="https://docs.langwatch.ai/datasets/overview"
                     isExternal
                   >
                     documentation

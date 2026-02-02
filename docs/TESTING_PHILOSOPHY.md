@@ -15,6 +15,39 @@ Use present tense, active voice. Describe expected behavior directly.
 | `it("should sign up a user")` | `it("signs up a user")` |
 | `it("should redirect guests")` | `it("redirects guest users")` |
 
+### Describe Block Naming
+
+Use MDN-style naming for the unit under test:
+
+| Type | Format | Example |
+|------|--------|---------|
+| Function | `name()` | `describe("transformData()", ...)` |
+| Class | `Name` | `describe("Analytics", ...)` |
+| Component | `<Name/>` | `describe("<DatePicker/>", ...)` |
+| Hook | `useName()` | `describe("useFeatureFlag()", ...)` |
+
+### Nested Describe for Context
+
+Use nested `describe` blocks to group tests by context/condition. The outer `describe` names the unit under test, inner `describe` blocks specify the "when" condition, and `it` blocks describe the behavior.
+
+```typescript
+describe("useFeatureFlag()", () => {
+  describe("when flag is enabled", () => {
+    it("returns true", () => {
+      // ...
+    });
+  });
+
+  describe("when query is loading", () => {
+    it("returns false", () => {
+      // ...
+    });
+  });
+});
+```
+
+See [bettertests.js.org](https://bettertests.js.org/) for more patterns.
+
 ### Single Expectation Per Test
 
 Isolating assertions makes failures immediately clear. When multiple behaviors need testing, create separate tests.

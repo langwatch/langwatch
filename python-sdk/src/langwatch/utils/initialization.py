@@ -3,14 +3,16 @@
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import List, Optional, Sequence
-from opentelemetry.sdk.trace import TracerProvider
+
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
 
-from langwatch.state import get_instance, set_instance
 from langwatch.client import Client
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
+from langwatch.state import get_instance, set_instance
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ def setup(
     span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
     debug: Optional[bool] = None,
     skip_open_telemetry_setup: Optional[bool] = None,
+    prompts_path: Optional[str] = None,
 ) -> Client:
     """
     Initialize the LangWatch client.
@@ -54,6 +57,7 @@ def setup(
         span_exclude_rules: Optional. A list of rules that will be applied to spans processed by the exporter.
         debug: Whether to enable debug logging for the LangWatch client.
         skip_open_telemetry_setup: Whether to skip setting up the OpenTelemetry tracer provider. If this is skipped, instrumentors will be added to the global tracer provider.
+        prompts_path: The base path for local prompt files. If not set, defaults to the current working directory.
     Returns:
         The LangWatch client.
     """
@@ -61,6 +65,11 @@ def setup(
 
     if debug:
         logger.info("Setting up LangWatch client...")
+
+    if prompts_path is not None:
+        prompts_path = str(
+            Path(prompts_path).resolve()
+        )  # Convert to absolute path asap
 
     # Get existing client to check if we're changing the API key
     existing_client = get_instance()
@@ -87,6 +96,7 @@ def setup(
         span_exclude_rules=span_exclude_rules,
         ignore_global_tracer_provider_override_warning=changed_api_key,
         skip_open_telemetry_setup=skip_open_telemetry_setup,
+        prompts_path=prompts_path,
     )
 
     if debug:

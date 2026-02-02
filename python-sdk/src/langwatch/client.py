@@ -50,6 +50,7 @@ class Client(LangWatchClientProtocol):
     _registered_instrumentors: ClassVar[
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
     ] = {}
+    _prompts_path: ClassVar[Optional[str]] = None
 
     # Regular attributes for protocol compatibility
     base_attributes: BaseAttributes
@@ -69,6 +70,7 @@ class Client(LangWatchClientProtocol):
         span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
         ignore_global_tracer_provider_override_warning: Optional[bool] = None,
         skip_open_telemetry_setup: Optional[bool] = None,
+        prompts_path: Optional[str] = None,
     ) -> "Client":
         """Ensure only one instance of Client exists (singleton pattern)."""
         if cls._instance is None:
@@ -88,6 +90,7 @@ class Client(LangWatchClientProtocol):
         span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
         ignore_global_tracer_provider_override_warning: Optional[bool] = None,
         skip_open_telemetry_setup: Optional[bool] = None,
+        prompts_path: Optional[str] = None,
     ):
         """
         Initialize the LangWatch tracing client.
@@ -140,6 +143,8 @@ class Client(LangWatchClientProtocol):
                 )
             if skip_open_telemetry_setup is not None:
                 Client._skip_open_telemetry_setup = skip_open_telemetry_setup
+            if prompts_path is not None:
+                Client._prompts_path = prompts_path
             if base_attributes is not None:
                 Client._base_attributes = base_attributes
                 # Ensure required SDK attributes remain present after reconfiguration
@@ -215,6 +220,9 @@ class Client(LangWatchClientProtocol):
         if skip_open_telemetry_setup is not None:
             Client._skip_open_telemetry_setup = skip_open_telemetry_setup
 
+        if prompts_path is not None:
+            Client._prompts_path = prompts_path
+
         if base_attributes is not None:
             Client._base_attributes = base_attributes
         elif not Client._base_attributes:
@@ -284,6 +292,7 @@ class Client(LangWatchClientProtocol):
         span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
         ignore_global_tracer_provider_override_warning: Optional[bool] = None,
         skip_open_telemetry_setup: Optional[bool] = None,
+        prompts_path: Optional[str] = None,
     ) -> "Client":
         """Create or get the singleton instance of the LangWatch client. Internal use only."""
         if cls._instance is None:
@@ -299,6 +308,7 @@ class Client(LangWatchClientProtocol):
                 span_exclude_rules=span_exclude_rules,
                 ignore_global_tracer_provider_override_warning=ignore_global_tracer_provider_override_warning,
                 skip_open_telemetry_setup=skip_open_telemetry_setup,
+                prompts_path=prompts_path,
             )
         return cls._instance
 
@@ -327,6 +337,7 @@ class Client(LangWatchClientProtocol):
         cls._skip_open_telemetry_setup = False
         cls._tracer_provider = None
         cls._rest_api_client = None
+        cls._prompts_path = None
         cls._registered_instrumentors.clear()
 
     @classmethod
@@ -415,6 +426,11 @@ class Client(LangWatchClientProtocol):
     def skip_open_telemetry_setup(self) -> bool:
         """Get whether OpenTelemetry setup is skipped."""
         return Client._skip_open_telemetry_setup
+
+    @property
+    def prompts_path(self) -> Optional[str]:
+        """Get the base path for local prompt files."""
+        return Client._prompts_path
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:

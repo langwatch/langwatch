@@ -134,7 +134,7 @@ const dlpCheck = async (
   return response.result?.findings ?? [];
 };
 
-const clearPII = async (
+export const clearPII = async (
   object: Record<string | number, any>,
   keysPath: (string | number)[],
   options: PIICheckOptions,
@@ -200,7 +200,7 @@ const clearPII = async (
   }
 };
 
-const googleDLPClearPII = async (
+export const googleDLPClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel,
@@ -227,7 +227,7 @@ const googleDLPClearPII = async (
   }
 };
 
-const presidioClearPII = async (
+export const presidioClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel,
@@ -297,7 +297,7 @@ const presidioClearPII = async (
   }
 };
 
-type PIICheckOptions = {
+export type PIICheckOptions = {
   piiRedactionLevel: PIIRedactionLevel;
   enforced?: boolean;
   mainMethod?: "google_dlp" | "presidio";
