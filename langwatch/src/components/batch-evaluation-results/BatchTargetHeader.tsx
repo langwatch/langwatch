@@ -7,6 +7,7 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import {
   LuChevronRight,
+  LuCircleCheck,
   LuClock,
   LuCode,
   LuFileText,
@@ -340,6 +341,9 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
     if (target.type === "agent") {
       return <LuCode size={12} />;
     }
+    if (target.type === "evaluator") {
+      return <LuCircleCheck size={12} />;
+    }
     // Legacy type - use generic icon
     return <LuFileText size={12} />;
   };
@@ -347,6 +351,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
   const getTargetColor = () => {
     if (target.type === "prompt") return "green.emphasized";
     if (target.type === "agent") return "cyan.emphasized";
+    if (target.type === "evaluator") return "green.emphasized";
     return "gray.emphasized";
   };
 

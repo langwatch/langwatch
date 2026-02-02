@@ -24,6 +24,10 @@ Work should be tied to a GitHub issue. If requirements are unclear:
 - Use `gh issue view <number>` to fetch full context
 - The issue description and acceptance criteria are the source of truth
 
+## Build on Existing Patterns
+
+Before specifying new functionality, search for existing patterns and systems in the codebase. Extend what exists rather than building from scratch.
+
 ## Output Location
 Write to `specs/features/<feature-name>.feature`
 
