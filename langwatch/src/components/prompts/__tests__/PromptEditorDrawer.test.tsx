@@ -303,6 +303,13 @@ vi.mock("~/prompts/utils/areFormValuesEqual", () => ({
   areFormValuesEqual: () => mockAreFormValuesEqual(),
 }));
 
+// Mock usePromptHandleCheck for ChangeHandleDialog validation
+vi.mock("~/hooks/prompts/usePromptHandleCheck", () => ({
+  usePromptHandleCheck: () => ({
+    checkHandleUniqueness: vi.fn().mockResolvedValue(true),
+  }),
+}));
+
 // Import after mocks
 import { PromptEditorDrawer } from "../PromptEditorDrawer";
 
@@ -909,19 +916,42 @@ describe("PromptEditorDrawer", () => {
     });
 
     it("calls checkAndProceed when creating new prompt", async () => {
+      // For new prompts, hasUnsavedChanges is true when messages have content
+      // Set message content so save button is enabled
+      const originalContent =
+        mockDefaultFormValues.version.configData.messages[0]!.content;
+      mockDefaultFormValues.version.configData.messages[0]!.content =
+        "You are a helpful assistant.";
+
       const user = userEvent.setup();
 
       renderWithProviders(<PromptEditorDrawer open={true} />);
 
-      // Click save button
+      // Click save button to open the dialog
       const saveButton = screen.getByTestId("save-prompt-button");
       await user.click(saveButton);
 
-      // The save dialog should open (for entering handle)
-      // When user submits the dialog, checkAndProceed should be called
+      // Wait for the "Save Prompt" dialog to appear
       await waitFor(() => {
-        expect(screen.getByText("New Prompt")).toBeInTheDocument();
+        expect(screen.getByText("Save Prompt")).toBeInTheDocument();
       });
+
+      // Type a handle in the input field
+      const handleInput = screen.getByPlaceholderText("prompt-name");
+      await user.type(handleInput, "test-handle");
+
+      // Click the Save button in the dialog
+      const dialogSaveButton = screen.getByRole("button", { name: "Save" });
+      await user.click(dialogSaveButton);
+
+      // Verify checkAndProceed was called
+      await waitFor(() => {
+        expect(mockCheckAndProceed).toHaveBeenCalledTimes(1);
+      });
+
+      // Restore original content for other tests
+      mockDefaultFormValues.version.configData.messages[0]!.content =
+        originalContent;
     });
 
     it("does not call checkAndProceed when updating existing prompt", async () => {

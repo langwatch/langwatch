@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { Button, Text, VStack } from "@chakra-ui/react";
+import { Crown } from "lucide-react";
 import { Dialog } from "./ui/dialog";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -40,6 +41,7 @@ export function UpgradeModal({
       <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
+          <Crown />
           <Dialog.Title>Upgrade Required</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>

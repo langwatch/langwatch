@@ -216,15 +216,20 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      const isNewExperiment = !input.experimentId;
+      const experimentId =
+        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
+
+      // Check if experiment actually exists in DB to determine if this is a create or update
+      const existing = await prisma.experiment.findUnique({
+        where: { id: experimentId, projectId: input.projectId },
+        select: { slug: true },
+      });
+      const isNewExperiment = !existing;
 
       // Enforce experiment limit only when creating new experiments
       if (isNewExperiment) {
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
       }
-
-      const experimentId =
-        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
       // For new experiments, use the ID as the slug (guaranteed unique)
       // For existing experiments, keep the same slug to avoid breaking URLs
@@ -237,12 +242,8 @@ export const experimentsRouter = createTRPCRouter({
         // otherwise use last 8 chars of the ID for a shorter, cleaner URL
         slug = input.state.experimentSlug ?? experimentId.slice(-8);
       } else {
-        // Existing experiment: fetch the current slug to keep it unchanged
-        const existing = await prisma.experiment.findUnique({
-          where: { id: experimentId, projectId: input.projectId },
-          select: { slug: true },
-        });
-        slug = existing?.slug ?? experimentId.slice(-8);
+        // Existing experiment: keep the same slug to avoid breaking URLs
+        slug = existing.slug;
       }
 
       // Convert to plain JSON for Prisma storage
