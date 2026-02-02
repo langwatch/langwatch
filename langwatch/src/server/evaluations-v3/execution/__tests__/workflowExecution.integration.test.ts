@@ -65,7 +65,6 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
   ): TargetConfig => ({
     id: "target-1",
     type: "prompt",
-    name: "Test Prompt",
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -85,7 +84,6 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
   const createExactMatchEvaluator = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match", // Use full evaluator type
-    name: "Exact Match",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },

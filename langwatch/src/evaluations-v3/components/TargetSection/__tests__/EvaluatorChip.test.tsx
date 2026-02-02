@@ -9,6 +9,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "../../../types";
 import { EvaluatorChip } from "../EvaluatorChip";
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -17,7 +22,6 @@ const createEvaluator = (
   overrides: Partial<EvaluatorConfig> = {},
 ): EvaluatorConfig => ({
   id: "eval-1",
-  name: "Exact Match",
   evaluatorType: "langevals/exact_match",
   dbEvaluatorId: "db-eval-1",
   mappings: {},

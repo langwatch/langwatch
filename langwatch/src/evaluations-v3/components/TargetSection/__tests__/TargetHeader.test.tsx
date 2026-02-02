@@ -34,6 +34,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: (target: { id: string }) => target.id,
+}));
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 };
@@ -41,6 +49,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe("TargetHeader", () => {
   const mockOnEdit = vi.fn();
   const mockOnDuplicate = vi.fn();
+  const mockOnSwitch = vi.fn();
   const mockOnRemove = vi.fn();
 
   beforeEach(() => {
@@ -53,8 +62,7 @@ describe("TargetHeader", () => {
 
   describe("Prompt target", () => {
     const promptTarget: TargetConfig = {
-      id: "target-1",
-      name: "my-assistant",
+      id: "my-assistant",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -166,12 +174,51 @@ describe("TargetHeader", () => {
 
       expect(mockOnRemove).toHaveBeenCalledWith(promptTarget.id);
     });
+
+    it("shows Switch Prompt option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Prompt")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Prompt", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Prompt")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Prompt"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(promptTarget);
+    });
   });
 
   describe("Unpublished modifications indicator", () => {
     const promptTargetWithLocalConfig: TargetConfig = {
-      id: "target-3",
-      name: "modified-prompt",
+      id: "modified-prompt",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -187,8 +234,7 @@ describe("TargetHeader", () => {
     };
 
     const promptTargetWithoutLocalConfig: TargetConfig = {
-      id: "target-4",
-      name: "published-prompt",
+      id: "published-prompt",
       type: "prompt",
       promptId: "prompt-456",
       promptVersionId: "version-789",
@@ -225,8 +271,7 @@ describe("TargetHeader", () => {
 
     it("does not show orange dot for agent targets even with localPromptConfig", () => {
       const agentWithLocalConfig: TargetConfig = {
-        id: "target-5",
-        name: "Agent",
+        id: "Agent",
         type: "agent",
         dbAgentId: "agent-123",
         // Even if this were somehow set, agents shouldn't show it
@@ -251,8 +296,7 @@ describe("TargetHeader", () => {
 
   describe("Agent target", () => {
     const agentTarget: TargetConfig = {
-      id: "target-2",
-      name: "Python Processor",
+      id: "Python Processor",
       type: "agent",
       dbAgentId: "agent-123",
       inputs: [],
@@ -308,12 +352,127 @@ describe("TargetHeader", () => {
 
       expect(mockOnEdit).toHaveBeenCalledWith(agentTarget);
     });
+
+    it("shows Switch Agent option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={agentTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Agent")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Agent", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={agentTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Agent")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Agent"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(agentTarget);
+    });
+  });
+
+  describe("Evaluator target", () => {
+    const evaluatorTarget: TargetConfig = {
+      id: "Quality Checker",
+      type: "evaluator",
+      targetEvaluatorId: "evaluator-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    it("renders evaluator target with name", () => {
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByText("Quality Checker")).toBeInTheDocument();
+    });
+
+    it("shows Edit Evaluator option for evaluators", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Edit Evaluator")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Switch Evaluator option in menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Evaluator")).toBeInTheDocument();
+      });
+    });
+
+    it("calls onSwitch when clicking Switch Evaluator", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={evaluatorTarget}
+          onEdit={mockOnEdit}
+          onSwitch={mockOnSwitch}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Switch Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Evaluator"));
+
+      expect(mockOnSwitch).toHaveBeenCalledWith(evaluatorTarget);
+    });
   });
 
   describe("Target Summary with saved datasets (page refresh scenario)", () => {
     const targetWithResults: TargetConfig = {
-      id: "target-1",
-      name: "test-prompt",
+      id: "test-prompt",
       type: "prompt",
       promptId: "prompt-123",
       promptVersionId: "version-456",
@@ -332,7 +491,6 @@ describe("TargetHeader", () => {
           {
             id: "evaluator-1",
             dbEvaluatorId: "db-evaluator-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/llm_score",
             inputs: [],
             mappings: {},
@@ -371,17 +529,17 @@ describe("TargetHeader", () => {
           status: "idle",
           targetOutputs: {
             // Results ARE persisted from previous execution
-            "target-1": ["Output 1", "Output 2", "Output 3"],
+            "test-prompt": ["Output 1", "Output 2", "Output 3"],
           },
           targetMetadata: {
-            "target-1": [
+            "test-prompt": [
               { duration: 1000, cost: 0.001 },
               { duration: 1200, cost: 0.002 },
               { duration: 800, cost: 0.001 },
             ],
           },
           evaluatorResults: {
-            "target-1": {
+            "test-prompt": {
               "evaluator-1": [
                 { status: "passed", passed: true },
                 { status: "passed", passed: true },

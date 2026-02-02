@@ -7,7 +7,6 @@ import { DashboardLayout } from "../../../components/DashboardLayout";
 import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
 // Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification
 import { DSPyExperiment } from "../../../components/experiments/DSPyExperiment";
-import { LoadingScreen } from "../../../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { isNotFound } from "../../../utils/trpcError";
@@ -34,12 +33,8 @@ export default function ExperimentPage() {
   // Check for other errors
   const isError = experiment.isError && !experimentNotFound;
 
-  if (!project || experiment.isLoading) {
-    return <LoadingScreen />;
-  }
-
   // Show error states inside DashboardLayout so user can navigate away
-  if (experimentNotFound || !experiment.data) {
+  if (experimentNotFound) {
     return (
       <DashboardLayout>
         <Box padding={6}>
@@ -75,11 +70,11 @@ export default function ExperimentPage() {
 
   return (
     <DashboardLayout>
-      {experiment.data.type === ExperimentType.DSPY ? (
+      {project && experiment.data?.type === ExperimentType.DSPY ? (
         <DSPyExperiment project={project} experiment={experiment.data} />
-      ) : experiment.data.type === ExperimentType.BATCH_EVALUATION ? (
+      ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
         <BatchEvaluation project={project} experiment={experiment.data} />
-      ) : experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
+      ) : !project || experiment.data === undefined || experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
         experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
         <BatchEvaluationResults
           project={project}

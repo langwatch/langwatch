@@ -35,6 +35,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 let mockStoreValues = {
   experimentId: null as string | null,
   experimentSlug: null as string | null,
+  ui: { hasRunThisSession: false },
 };
 vi.mock("~/evaluations-v3/hooks/useEvaluationsV3Store", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +71,7 @@ describe("HistoryButton", () => {
     mockStoreValues = {
       experimentId: null,
       experimentSlug: null,
+      ui: { hasRunThisSession: false },
     };
 
     // Default mock for project
@@ -178,6 +180,7 @@ describe("HistoryButton", () => {
         selector({
           experimentId: "exp-123",
           experimentSlug: "my-custom-slug",
+          ui: { hasRunThisSession: false },
         }),
     );
 

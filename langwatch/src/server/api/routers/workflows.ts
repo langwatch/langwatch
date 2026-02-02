@@ -30,6 +30,7 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         dsl: workflowJsonSchema,
         commitMessage: z.string(),
+        publish: z.boolean().optional(), // Auto-publish the first version (useful for evaluator workflows)
       }),
     )
     .use(checkProjectPermission("workflows:create"))
@@ -60,6 +61,17 @@ export const workflowRouter = createTRPCRouter({
         autoSaved: false,
         commitMessage: input.commitMessage,
       });
+
+      // Auto-publish the first version if requested
+      if (input.publish) {
+        await ctx.prisma.workflow.update({
+          where: { id: workflow.id, projectId: input.projectId },
+          data: {
+            publishedId: version.id,
+            publishedById: ctx.session.user.id,
+          },
+        });
+      }
 
       return { workflow, version };
     }),
@@ -843,6 +855,129 @@ export const workflowRouter = createTRPCRouter({
         selectedCopies: copiesToPush.length,
         results,
       };
+    }),
+
+  /**
+   * Gets entities related to a workflow for cascade archive warning.
+   * Returns linked evaluators, agents, and monitors that would be affected.
+   */
+  getRelatedEntities: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:view"))
+    .query(async ({ ctx, input }) => {
+      // Find evaluators linked to this workflow
+      const evaluators = await ctx.prisma.evaluator.findMany({
+        where: {
+          workflowId: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        select: { id: true, name: true },
+      });
+
+      // Find agents linked to this workflow
+      const agents = await ctx.prisma.agent.findMany({
+        where: {
+          workflowId: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        select: { id: true, name: true },
+      });
+
+      // Find monitors linked to those evaluators
+      const evaluatorIds = evaluators.map((e) => e.id);
+      const monitors =
+        evaluatorIds.length > 0
+          ? await ctx.prisma.monitor.findMany({
+              where: {
+                evaluatorId: { in: evaluatorIds },
+                projectId: input.projectId,
+              },
+              select: { id: true, name: true, evaluatorId: true },
+            })
+          : [];
+
+      return { evaluators, agents, monitors };
+    }),
+
+  /**
+   * Archives a workflow and all related entities in a transaction.
+   * - Archives linked evaluators
+   * - Archives linked agents
+   * - Deletes monitors linked to evaluators (hard delete)
+   */
+  cascadeArchive: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+        unarchive: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:delete"))
+    .mutation(async ({ ctx, input }) => {
+      const now = input.unarchive ? null : new Date();
+
+      return ctx.prisma.$transaction(async (tx) => {
+        // 1. Find all evaluators linked to this workflow
+        const evaluators = await tx.evaluator.findMany({
+          where: {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+            archivedAt: null,
+          },
+          select: { id: true },
+        });
+        const evaluatorIds = evaluators.map((e) => e.id);
+
+        // 2. Delete monitors linked to those evaluators (hard delete)
+        const deletedMonitors =
+          evaluatorIds.length > 0
+            ? await tx.monitor.deleteMany({
+                where: {
+                  evaluatorId: { in: evaluatorIds },
+                  projectId: input.projectId,
+                },
+              })
+            : { count: 0 };
+
+        // 3. Archive evaluators linked to this workflow
+        const archivedEvaluators = await tx.evaluator.updateMany({
+          where: {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+          },
+          data: { archivedAt: now },
+        });
+
+        // 4. Archive agents linked to this workflow
+        const archivedAgents = await tx.agent.updateMany({
+          where: {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+          },
+          data: { archivedAt: now },
+        });
+
+        // 5. Archive the workflow itself
+        const workflow = await tx.workflow.update({
+          where: { id: input.workflowId, projectId: input.projectId },
+          data: { archivedAt: now },
+        });
+
+        return {
+          workflow,
+          archivedEvaluatorsCount: archivedEvaluators.count,
+          archivedAgentsCount: archivedAgents.count,
+          deletedMonitorsCount: deletedMonitors.count,
+        };
+      });
     }),
 
   archive: protectedProcedure

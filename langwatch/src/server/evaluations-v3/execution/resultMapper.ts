@@ -53,32 +53,65 @@ export const isEvaluatorNode = (nodeId: string): boolean => {
 };
 
 /**
+ * Checks if outputs are from an evaluator (has passed/score/label fields).
+ */
+const isEvaluatorOutput = (
+  outputs: Record<string, unknown>,
+): outputs is {
+  passed?: boolean;
+  score?: number;
+  label?: string;
+  details?: string;
+} => {
+  return "passed" in outputs || "score" in outputs || "label" in outputs;
+};
+
+/**
  * Extracts target output from execution outputs.
  *
  * Strategy (OCP-compliant - handles new output formats without modification):
- * 1. If outputs.output exists -> return it (backward compatible with prompts/signatures)
- * 2. If outputs has exactly one key -> return that value (single custom field)
- * 3. Otherwise -> return full outputs object (multiple custom fields like {result, reason})
+ * 1. If outputs look like evaluator output (has passed/score/label) -> return as-is
+ *    This handles evaluator-as-target where the evaluator outputs become target output
+ * 2. If outputs has exactly one key named "output" -> return its value (backward compatible)
+ * 3. Otherwise -> return full outputs object (preserves structure for custom fields)
  *
- * This allows Code Agents to return any output structure while maintaining
- * backward compatibility with standard signature/prompt targets.
+ * The client-side formatTargetOutput utility handles display formatting.
+ * This ensures structured outputs like {pizza: false} are preserved for display.
  */
 export const extractTargetOutput = (
   outputs: Record<string, unknown> | undefined,
 ): unknown => {
   if (!outputs) return undefined;
 
-  // Backward compatible: standard "output" field takes precedence
-  if ("output" in outputs) return outputs.output;
+  // Evaluator-as-target: return the full evaluator result object
+  // Only include keys that have non-null/undefined values
+  if (isEvaluatorOutput(outputs)) {
+    const result: Record<string, unknown> = {};
+    if (outputs.passed !== undefined && outputs.passed !== null)
+      result.passed = outputs.passed;
+    if (outputs.score !== undefined && outputs.score !== null)
+      result.score = outputs.score;
+    if (outputs.label !== undefined && outputs.label !== null)
+      result.label = outputs.label;
+    if (outputs.details !== undefined && outputs.details !== null)
+      result.details = outputs.details;
+    return result;
+  }
 
   // Empty outputs
   const keys = Object.keys(outputs);
   if (keys.length === 0) return undefined;
 
-  // Single custom field: unwrap the value for cleaner display
-  if (keys.length === 1) return outputs[keys[0]!];
+  // Only unwrap if there's exactly one key named "output"
+  // This maintains backward compatibility with standard prompts/signatures
+  // while preserving structured outputs like {pizza: false} for display
+  if (keys.length === 1 && keys[0] === "output") {
+    return outputs.output;
+  }
 
-  // Multiple fields: return full object (e.g., {result, reason})
+  // Return full object for all other cases:
+  // - Multiple fields like {result, reason}
+  // - Single field with non-"output" name like {pizza: false}
   return outputs;
 };
 

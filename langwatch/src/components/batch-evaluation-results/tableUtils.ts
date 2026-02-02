@@ -63,6 +63,7 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
  */
 export const inferColumnType = (value: unknown): string => {
   if (value === null || value === undefined) return "string";
+  if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";
   if (typeof value === "object") {
     // Must verify first element is actually an object before using 'in' operator

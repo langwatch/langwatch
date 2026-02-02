@@ -59,14 +59,18 @@ describe("resultMapper", () => {
       expect(extractTargetOutput({ output: "hello world" })).toBe("hello world");
     });
 
-    it("returns output field even when other fields present", () => {
-      expect(extractTargetOutput({ output: "main", extra: "ignored" })).toBe(
-        "main",
-      );
+    it("returns full object when output field is present with other fields", () => {
+      // When there are multiple keys, we return the full object even if "output" is present
+      // Client-side formatting will handle display
+      const outputs = { output: "main", extra: "ignored" };
+      expect(extractTargetOutput(outputs)).toEqual(outputs);
     });
 
-    it("returns single custom field value unwrapped", () => {
-      expect(extractTargetOutput({ result: "my title" })).toBe("my title");
+    it("returns full object for single custom field (non-output key)", () => {
+      // Only unwrap when the single key is exactly "output"
+      // For other field names like "result", "pizza", etc., preserve the structure
+      const outputs = { result: "my title" };
+      expect(extractTargetOutput(outputs)).toEqual(outputs);
     });
 
     it("returns full object for multiple custom fields", () => {

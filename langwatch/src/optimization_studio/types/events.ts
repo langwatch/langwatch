@@ -29,6 +29,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       inputs: z.array(z.record(z.string(), z.any())).optional(),
       manual_execution_mode: z.boolean().optional(),
       do_not_trace: z.boolean().optional(),
+      run_evaluations: z.boolean().optional(),
     }),
   }),
   z.object({

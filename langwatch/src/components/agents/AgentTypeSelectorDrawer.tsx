@@ -35,7 +35,7 @@ const agentTypes: Array<{
     type: "workflow",
     icon: Workflow,
     title: "Workflow Agent",
-    description: "Use an existing workflow as the agent implementation",
+    description: "Create a new workflow for custom agent logic",
   },
   {
     type: "http",

@@ -61,7 +61,19 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      getRelatedEntities: {
+        useQuery: () => ({
+          data: { workflow: null },
+          isLoading: false,
+        }),
+      },
       delete: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          isPending: false,
+        }),
+      },
+      cascadeArchive: {
         useMutation: () => ({
           mutate: vi.fn(),
           isPending: false,

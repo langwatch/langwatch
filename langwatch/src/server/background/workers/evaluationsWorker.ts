@@ -79,6 +79,12 @@ export async function runEvaluationJob(
       check.parameters)
     : check.parameters;
 
+  // For workflow evaluators, get the workflowId from the evaluator
+  const workflowId =
+    check.evaluator?.type === "workflow"
+      ? check.evaluator.workflowId
+      : undefined;
+
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
     traceId: job.data.trace.trace_id,
@@ -87,6 +93,7 @@ export async function runEvaluationJob(
     mappings: check.mappings as MappingState | null,
     level: check.level as "trace" | "thread",
     protections,
+    workflowId,
   });
 }
 
@@ -267,7 +274,7 @@ export type EvaluationResultWithThreadId = SingleEvaluationResult & {
 };
 
 const buildDataForEvaluation = async (
-  evaluatorType: EvaluatorTypes,
+  evaluatorType: EvaluatorTypes | "workflow",
   trace: Trace,
   mappings: MappingState | null,
   isThreadLevel: boolean,
@@ -312,7 +319,9 @@ const buildDataForEvaluation = async (
     data = mappedData;
   }
 
-  if (evaluatorType.startsWith("custom/")) {
+  // Workflow evaluators and custom evaluators pass data through as-is
+  // (they handle their own field mappings)
+  if (evaluatorType.startsWith("custom/") || evaluatorType === "workflow") {
     return {
       type: "custom",
       data,
@@ -339,14 +348,16 @@ export const runEvaluationForTrace = async ({
   mappings,
   level,
   protections,
+  workflowId,
 }: {
   projectId: string;
   traceId: string;
-  evaluatorType: EvaluatorTypes;
+  evaluatorType: EvaluatorTypes | "workflow";
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState | null;
   level?: "trace" | "thread"; // New: explicit level from monitor, falls back to mapping detection for backward compat
   protections: Protections;
+  workflowId?: string | null; // For workflow evaluators, the actual workflow ID
 }): Promise<EvaluationResultWithThreadId> => {
   const trace = await getTraceById({
     connConfig: { projectId },
@@ -391,6 +402,7 @@ export const runEvaluationForTrace = async ({
     data,
     settings: settings && typeof settings === "object" ? settings : undefined,
     trace,
+    workflowId,
   });
 
   return {
@@ -406,13 +418,15 @@ export const runEvaluation = async ({
   data,
   settings,
   trace,
+  workflowId,
   retries = 1,
 }: {
   projectId: string;
-  evaluatorType: EvaluatorTypes;
+  evaluatorType: EvaluatorTypes | "workflow";
   data: DataForEvaluation;
   settings?: Record<string, unknown>;
   trace?: Trace;
+  workflowId?: string | null;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
@@ -437,10 +451,12 @@ export const runEvaluation = async ({
   }
 
   if (data.type === "custom") {
-    return customEvaluation(projectId, evaluatorType, data.data, trace);
+    return customEvaluation(projectId, evaluatorType, data.data, trace, workflowId);
   }
 
-  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+  // At this point, evaluatorType is a built-in evaluator (not "workflow" or "custom/*")
+  const builtInEvaluatorType = evaluatorType as EvaluatorTypes;
+  const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
   if (!evaluator) {
     throw new Error(`Evaluator ${evaluatorType} not found`);
@@ -519,7 +535,7 @@ export const runEvaluation = async ({
     settings &&
     "model" in settings &&
     typeof settings.model === "string" &&
-    evaluatorType !== "openai/moderation"
+    builtInEvaluatorType !== "openai/moderation"
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
@@ -543,7 +559,7 @@ export const runEvaluation = async ({
   let response;
   try {
     response = await fetch(
-      `${env.LANGEVALS_ENDPOINT}/${evaluatorType}/evaluate`,
+      `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
       {
         method: "POST",
         headers: {
@@ -579,20 +595,20 @@ export const runEvaluation = async ({
   }
 
   const duration = performance.now() - startTime;
-  evaluationDurationHistogram.labels(evaluatorType).observe(duration);
+  evaluationDurationHistogram.labels(builtInEvaluatorType).observe(duration);
 
   if (!response.ok) {
     if (response.status >= 500 && retries > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       return runEvaluation({
         projectId,
-        evaluatorType: evaluatorType,
+        evaluatorType: builtInEvaluatorType,
         data,
         settings,
         retries: retries - 1,
       });
     } else {
-      getEvaluationStatusCounter(evaluatorType, "error").inc();
+      getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
@@ -605,11 +621,11 @@ export const runEvaluation = async ({
 
   const result = ((await response.json()) as BatchEvaluationResult)[0];
   if (!result) {
-    getEvaluationStatusCounter(evaluatorType, "error").inc();
+    getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
     throw "Unexpected response: empty results";
   }
 
-  getEvaluationStatusCounter(evaluatorType, result.status).inc();
+  getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
   return result;
 };
@@ -763,11 +779,14 @@ export const startEvaluationsWorker = (
 
 const customEvaluation = async (
   projectId: string,
-  evaluatorType: EvaluatorTypes,
+  evaluatorType: EvaluatorTypes | "workflow",
   data: Record<string, any>,
   trace?: Trace,
+  workflowId?: string | null,
 ): Promise<SingleEvaluationResult> => {
-  const workflowId = evaluatorType.split("/")[1];
+  // For workflow evaluators (checkType "workflow"), workflowId comes from the evaluator record
+  // For custom evaluators (checkType "custom/<workflowId>"), workflowId is parsed from the type
+  const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
   const project = await prisma.project.findUnique({
     where: { id: projectId, archivedAt: null },
@@ -783,12 +802,12 @@ const customEvaluation = async (
     ...data,
   };
 
-  if (!workflowId) {
+  if (!resolvedWorkflowId) {
     throw new Error("Workflow ID is required");
   }
 
   const response = await runEvaluationWorkflow(
-    workflowId,
+    resolvedWorkflowId,
     project.id,
     requestBody,
   );

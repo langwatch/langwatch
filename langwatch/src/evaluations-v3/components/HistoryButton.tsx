@@ -3,9 +3,12 @@
  *
  * Shows a button in the V3 workbench header that links to the experiment
  * history page showing all past runs stored in Elasticsearch.
+ *
+ * Enabled when:
+ * - User has run an evaluation this session, OR
+ * - There are existing runs from a previous session (checked on page load)
  */
 import { Button } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { Clock } from "react-feather";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -18,34 +21,32 @@ type HistoryButtonProps = {
 };
 
 export function HistoryButton({ disabled = false }: HistoryButtonProps) {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
-  // Get the actual experiment ID from the store (set when experiment is loaded/created)
-  const { experimentId, experimentSlug } = useEvaluationsV3Store((state) => ({
-    experimentId: state.experimentId,
-    experimentSlug: state.experimentSlug,
-  }));
+  // Get experiment info and whether we've run this session
+  const { experimentId, experimentSlug, hasRunThisSession } =
+    useEvaluationsV3Store((state) => ({
+      experimentId: state.experimentId,
+      experimentSlug: state.experimentSlug,
+      hasRunThisSession: state.ui.hasRunThisSession,
+    }));
 
-  // Check if there are any runs for this experiment
-  // Use the actual experimentId, not the slug!
+  // Check if there are any runs from previous sessions (only on page load)
   const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
     {
       projectId: project?.id ?? "",
       experimentId: experimentId ?? "",
     },
     {
-      enabled: !!project && !!experimentId,
+      enabled: !!project && !!experimentId && !hasRunThisSession,
     },
   );
 
-  const hasRuns = (runsQuery.data?.runs.length ?? 0) > 0;
-  const isLoading = runsQuery.isLoading;
+  const hasExistingRuns = (runsQuery.data?.runs.length ?? 0) > 0;
+  const isLoading = runsQuery.isLoading && !hasRunThisSession;
 
-  const handleClick = () => {
-    if (!project || !experimentSlug) return;
-    void router.push(`/${project.slug}/experiments/${experimentSlug}`);
-  };
+  // Enable if we've run this session OR there are existing runs
+  const hasRuns = hasRunThisSession || hasExistingRuns;
 
   // Don't show if no project or experimentId
   if (!project || !experimentId) return null;

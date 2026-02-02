@@ -75,13 +75,15 @@ export type BatchResultRow = {
 export type BatchTargetColumn = {
   id: string;
   name: string;
-  type: "prompt" | "agent" | "custom" | "legacy";
+  type: "prompt" | "agent" | "evaluator" | "custom" | "legacy";
   /** For prompts: the config ID */
   promptId?: string | null;
   /** For prompts: the version used */
   promptVersion?: number | null;
   /** For agents: the agent ID */
   agentId?: string | null;
+  /** For evaluator targets: the evaluator ID */
+  evaluatorId?: string | null;
   /** Model used */
   model?: string | null;
   /** Flexible metadata for comparison and analysis */
@@ -180,6 +182,7 @@ export const transformBatchEvaluationData = (
       promptId: target.prompt_id,
       promptVersion: target.prompt_version,
       agentId: target.agent_id,
+      evaluatorId: target.evaluator_id,
       model: target.model,
       metadata: target.metadata,
       outputFields: detectOutputFields(dataset, target.id),

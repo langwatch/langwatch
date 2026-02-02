@@ -12,6 +12,7 @@ import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
 import { formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "./types";
 
@@ -20,25 +21,6 @@ const MAX_DISPLAY_CHARS = 10000;
 
 // Max height for collapsed output
 const OUTPUT_MAX_HEIGHT = 120;
-
-/**
- * Unwrap output if it's an object with only a single "output" key
- * e.g., {"output": "lorem ipsum"} -> "lorem ipsum"
- */
-const unwrapSingleOutputField = (
-  output: Record<string, unknown> | null,
-): unknown => {
-  if (output === null || output === undefined) return output;
-  if (typeof output !== "object") return output;
-
-  const keys = Object.keys(output);
-  // Only unwrap if there's exactly one key and it's "output"
-  if (keys.length === 1 && keys[0] === "output") {
-    return output.output;
-  }
-
-  return output;
-};
 
 type BatchTargetCellProps = {
   /** Target output data for this row */
@@ -115,16 +97,11 @@ export function BatchTargetCell({
     }
   }, []);
 
-  // Format output for display
-  // If output is an object with only an "output" key, unwrap it
-  const unwrappedOutput = unwrapSingleOutputField(targetOutput.output);
-
-  const rawOutput =
-    unwrappedOutput === null || unwrappedOutput === undefined
-      ? ""
-      : typeof unwrappedOutput === "object"
-        ? JSON.stringify(unwrappedOutput, null, 2)
-        : String(unwrappedOutput);
+  // Use shared utility for consistent output formatting
+  // Handles the "single output key" unwrap rule:
+  // - {output: "hello"} -> "hello"
+  // - {pizza: false} -> '{"pizza": false}' (formatted JSON)
+  const rawOutput = formatTargetOutput(targetOutput.output);
 
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
   const displayOutput = isTruncated

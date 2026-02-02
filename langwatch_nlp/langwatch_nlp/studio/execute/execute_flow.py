@@ -80,7 +80,7 @@ async def execute_flow(
             until_node_id=until_node_id,
             do_not_trace=do_not_trace,
         ) as (Module, module_inputs):
-            module = Module(run_evaluations=True)
+            module = Module(run_evaluations=event.run_evaluations)
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
             entry_node = cast(

@@ -19,6 +19,14 @@ import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { LocalPromptConfig } from "../types";
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "Test Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect/elementFromPoint properly
 vi.mock("rich-textarea", () => ({
   RichTextarea: forwardRef<
@@ -212,7 +220,6 @@ describe("Prompt Editor Local Changes", () => {
         {
           id: "target-1",
           type: "prompt",
-          name: "test-prompt",
           promptId: "prompt-1",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
@@ -381,7 +388,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }], // Only input, no wtf!
             outputs: [{ identifier: "output", type: "str" }],
@@ -523,7 +529,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-1",
             type: "prompt",
-            name: "test-prompt",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -674,7 +679,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-A",
             type: "prompt",
-            name: "test-prompt-A",
             promptId: "prompt-1",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -684,7 +688,6 @@ describe("Prompt Editor Local Changes", () => {
           {
             id: "target-B",
             type: "prompt",
-            name: "test-prompt-B",
             promptId: "prompt-1", // Same prompt!
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

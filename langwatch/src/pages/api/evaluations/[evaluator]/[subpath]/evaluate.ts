@@ -5,6 +5,8 @@ import type { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
+import type { Workflow } from "../../../../../optimization_studio/types/dsl";
+import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 import {
@@ -75,6 +77,7 @@ export async function handleEvaluatorCall(
   let evaluatorSettings: Record<string, unknown> | undefined;
   let evaluatorName: string | undefined;
   let savedEvaluatorId: string | undefined; // ID from Evaluator table when using evaluators/ path
+  let workflowEvaluatorDef: { name: string; requiredFields: string[] } | undefined; // For workflow evaluators from Evaluator table
 
   // Check if using the new evaluators/slug or evaluators/id format
   if (evaluatorSlug.startsWith("evaluators/")) {
@@ -93,7 +96,34 @@ export async function handleEvaluatorCall(
         evaluatorType?: string;
         settings?: Record<string, unknown>;
       } | null;
-      checkType = config?.evaluatorType ?? evaluatorSlug;
+
+      // For workflow evaluators, use the custom/{workflowId} format and look up the workflow directly
+      if (savedEvaluator.type === "workflow" && savedEvaluator.workflowId) {
+        checkType = `custom/${savedEvaluator.workflowId}`;
+
+        // Look up the workflow directly to get required fields
+        const workflow = await prisma.workflow.findUnique({
+          where: { id: savedEvaluator.workflowId },
+          include: { currentVersion: true },
+        });
+
+        if (!workflow) {
+          return res.status(404).json({
+            error: `Workflow not found for evaluator: ${slugOrId}`,
+          });
+        }
+
+        // Build evaluator definition from workflow DSL
+        const dsl = workflow.currentVersion?.dsl as unknown as Workflow | undefined;
+        const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
+        workflowEvaluatorDef = {
+          name: savedEvaluator.name,
+          requiredFields: entryOutputs.map((o) => o.identifier),
+        };
+      } else {
+        checkType = config?.evaluatorType ?? evaluatorSlug;
+      }
+
       evaluatorSettings = config?.settings;
       evaluatorName = savedEvaluator.name;
       savedEvaluatorId = savedEvaluator.id; // Capture the evaluator ID
@@ -136,10 +166,10 @@ export async function handleEvaluatorCall(
       })
     : null;
 
-  const evaluatorDefinition = await getEvaluatorIncludingCustom(
-    project.id,
-    checkType as EvaluatorTypes,
-  );
+  // Use pre-computed workflow evaluator definition, or look up from AVAILABLE_EVALUATORS/custom evaluators
+  const evaluatorDefinition =
+    workflowEvaluatorDef ??
+    (await getEvaluatorIncludingCustom(project.id, checkType as EvaluatorTypes));
   if (!evaluatorDefinition) {
     return res.status(404).json({
       error: `Evaluator not found: ${checkType}`,
@@ -193,8 +223,12 @@ export async function handleEvaluatorCall(
     >) ?? {};
 
   try {
+    // Only parse settings for built-in evaluators (workflowEvaluatorDef means it's a workflow evaluator)
     settings = evaluatorSettingSchema?.parse({
-      ...getEvaluatorDefaultSettings(evaluatorDefinition),
+      // Default settings only apply to full evaluator definitions (not workflow evaluators)
+      ...(!workflowEvaluatorDef
+        ? getEvaluatorDefaultSettings(evaluatorDefinition as any)
+        : {}),
       // Use evaluatorSettings from saved Evaluator, or fall back to monitor parameters
       ...(evaluatorSettings ??
         (monitor ? (monitor.parameters as object) : {})),

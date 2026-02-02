@@ -53,6 +53,7 @@ class ExecuteFlowPayload(BaseModel):
     inputs: Optional[List[Dict[str, Any]]] = None
     manual_execution_mode: Optional[bool] = None
     do_not_trace: bool = False
+    run_evaluations: bool = True
 
 
 class ExecuteFlow(BaseModel):

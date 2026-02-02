@@ -12,6 +12,7 @@ import {
   Card,
   Heading,
   HStack,
+  Skeleton,
   Spacer,
   Text,
   VStack,
@@ -40,13 +41,12 @@ import {
 import { useComparisonMode } from "./useComparisonMode";
 import {
   RUN_COLORS,
-  type RunWithColor,
   useMultiRunData,
 } from "./useMultiRunData";
 
 type BatchEvaluationResultsProps = {
-  project: Project;
-  experiment: Experiment;
+  project?: Project;
+  experiment?: Experiment;
   /** Size variant */
   size?: "sm" | "md";
   /** External run ID selection (for controlled mode) */
@@ -121,8 +121,8 @@ export function BatchEvaluationResults({
   // Fetch runs list
   const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
     {
-      projectId: project.id,
-      experimentId: experiment.id,
+      projectId: project?.id ?? "",
+      experimentId: experiment?.id ?? "",
     },
     {
       refetchInterval: isSomeRunning ? 3000 : 10000,
@@ -184,6 +184,7 @@ export function BatchEvaluationResults({
   }, [isFinished, finishedAt]);
 
   // Reset finishedAt when selected run changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: its on purpose
   useEffect(() => {
     setFinishedAt(null);
   }, [selectedRunId]);
@@ -230,8 +231,8 @@ export function BatchEvaluationResults({
   // Fetch selected run data
   const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
-      projectId: project.id,
-      experimentId: experiment.id,
+      projectId: project?.id ?? "",
+      experimentId: experiment?.id ?? "",
       runId: selectedRunId ?? "",
     },
     {
@@ -331,6 +332,7 @@ export function BatchEvaluationResults({
   const stableRunColorMap = useMemo(() => {
     const colorMap: Record<string, string> = {};
     runIds.forEach((runId, idx) => {
+      // biome-ignore lint/style/noNonNullAssertion: its safe
       colorMap[runId] = RUN_COLORS[idx % RUN_COLORS.length]!;
     });
     return colorMap;
@@ -351,8 +353,8 @@ export function BatchEvaluationResults({
 
   // Fetch multiple runs when in compare mode
   const multiRunData = useMultiRunData({
-    projectId: project.id,
-    experimentId: experiment.id,
+    projectId: project?.id ?? "",
+    experimentId: experiment?.id ?? "",
     runIds: selectedRunIds,
     enabled: compareMode && selectedRunIds.length > 0,
     runColorMap: stableRunColorMap,
@@ -383,6 +385,7 @@ export function BatchEvaluationResults({
   const [chartsVisible, setChartsVisible] = useState(defaultChartsVisible);
 
   // Update charts visibility when charts become available/unavailable
+  // biome-ignore lint/correctness/useExhaustiveDependencies: we don't want to re-render when canShowCharts changes
   useEffect(() => {
     if (canShowCharts && !chartsVisible) {
       setChartsVisible(true);
@@ -426,9 +429,9 @@ export function BatchEvaluationResults({
 
   // CSV download - using the new V3 export that properly handles multi-target data
   const handleDownloadCSV = useCallback(() => {
-    if (!transformedData) return;
+    if (!transformedData || !experiment) return;
     downloadCsv(transformedData, experiment.name ?? experiment.slug);
-  }, [transformedData, experiment.name, experiment.slug]);
+  }, [transformedData, experiment]);
 
   const isDownloadCSVEnabled =
     !!transformedData && transformedData.rows.length > 0;
@@ -472,7 +475,13 @@ export function BatchEvaluationResults({
       <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch">
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
-          <Heading>{experiment.name ?? experiment.slug}</Heading>
+          <Heading>
+            {experiment ? (
+              (experiment.name ?? experiment.slug)
+            ) : (
+              <Skeleton width="100%" height="28px" />
+            )}
+          </Heading>
           <Spacer />
           {/* Charts toggle - show when charts are available */}
           {canShowCharts && (
@@ -501,10 +510,10 @@ export function BatchEvaluationResults({
           >
             <Download size={16} /> Export to CSV
           </Button>
-          {experiment.workflowId && (
+          {experiment?.workflowId && (
             <Link
               target="_blank"
-              href={`/${project.slug}/studio/${experiment.workflowId}`}
+              href={`/${project?.slug}/studio/${experiment?.workflowId}`}
               asChild
             >
               <Button size="sm" variant="outline" textDecoration="none">
@@ -512,9 +521,9 @@ export function BatchEvaluationResults({
               </Button>
             </Link>
           )}
-          {experiment.type === ExperimentType.EVALUATIONS_V3 && (
+          {experiment?.type === ExperimentType.EVALUATIONS_V3 && (
             <Link
-              href={`/${project.slug}/experiments/workbench/${experiment.slug}`}
+              href={`/${project?.slug}/experiments/workbench/${experiment?.slug}`}
               asChild
             >
               <Button size="sm" variant="outline" textDecoration="none">

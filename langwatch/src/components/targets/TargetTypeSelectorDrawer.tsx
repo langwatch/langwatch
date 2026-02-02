@@ -1,5 +1,5 @@
-import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Bot, FileText } from "lucide-react";
+import { Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Bot, CheckCircle, FileText } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -33,6 +33,12 @@ const targetTypes: Array<{
     title: "Agent",
     description: "Integrate with your existing agent or create a workflow",
   },
+  {
+    type: "evaluator",
+    icon: CheckCircle,
+    title: "Evaluator",
+    description: "Test an evaluator against a dataset",
+  },
 ];
 
 /**
@@ -60,6 +66,8 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
         openDrawer("promptList", {}, { replace: true });
       } else if (type === "agent") {
         openDrawer("agentList", {}, { replace: true });
+      } else if (type === "evaluator") {
+        openDrawer("evaluatorList", {}, { replace: true });
       }
     }
   };
@@ -142,40 +150,56 @@ function TargetTypeCard({
   description,
   onClick,
 }: TargetTypeCardProps) {
-  const iconColor = type === "prompt" ? "green" : "blue";
-  const iconBg = type === "prompt" ? "green.subtle" : "blue.subtle";
+  const iconColor =
+    type === "prompt" ? "green" : type === "evaluator" ? "green" : "blue";
+  const iconBg =
+    type === "prompt"
+      ? "green.subtle"
+      : type === "evaluator"
+        ? "green.subtle"
+        : "blue.subtle";
 
   return (
-    <Box
-      as="button"
-      onClick={onClick}
-      padding={5}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="border"
-      bg="bg.panel"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: `${iconColor}.muted`, bg: `${iconColor}.subtle` }}
-      transition="all 0.15s"
-      data-testid={`target-type-${type}`}
-    >
-      <HStack gap={4} align="start">
-        <Box
-          padding={1}
-          borderRadius="md"
-          bg={iconBg}
-          color={`${iconColor}.fg`}
-        >
-          <Icon size={16} />
-        </Box>
-        <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="medium">{title}</Text>
-          <Text fontSize="13px" color="fg.muted">
-            {description}
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
+    <VStack align="start">
+      {type === "evaluator" && (
+        <Text fontSize="13px" color="fg.muted">
+          Or evaluate an evaluator:
+        </Text>
+      )}
+      <Box
+        as="button"
+        onClick={onClick}
+        padding={5}
+        borderRadius="lg"
+        border="1px solid"
+        borderColor="border"
+        bg="bg.panel"
+        textAlign="left"
+        width="full"
+        _hover={{
+          borderColor: `${iconColor}.muted`,
+          bg: `${iconColor}.subtle`,
+        }}
+        transition="all 0.15s"
+        data-testid={`target-type-${type}`}
+      >
+        <HStack gap={4} align="start">
+          <Box
+            padding={1}
+            borderRadius="md"
+            bg={iconBg}
+            color={`${iconColor}.fg`}
+          >
+            <Icon size={16} />
+          </Box>
+          <VStack align="start" gap={1} flex={1}>
+            <Text fontWeight="medium">{title}</Text>
+            <Text fontSize="13px" color="fg.muted">
+              {description}
+            </Text>
+          </VStack>
+        </HStack>
+      </Box>
+    </VStack>
   );
 }
