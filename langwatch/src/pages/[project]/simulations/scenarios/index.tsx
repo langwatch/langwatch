@@ -19,7 +19,7 @@ import { api } from "~/utils/api";
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("scenarios");
+  const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   const {
     data: scenarios,
@@ -96,7 +96,6 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
-      {upgradeModal}
     </DashboardLayout>
   );
 }

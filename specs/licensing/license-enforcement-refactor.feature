@@ -1,65 +1,10 @@
-Feature: License Enforcement Refactor
+Feature: License Enforcement
   As a self-hosted LangWatch administrator
-  I want license enforcement to be enabled by default
-  So that the system is secure out of the box and I can disable it explicitly when needed
+  I want license enforcement to manage plan limits
+  So that the system enforces appropriate limits based on organization licenses
 
   Background:
     Given the system is a self-hosted deployment
-
-  # ============================================================================
-  # Environment Variable Inversion (LICENSE_ENFORCEMENT_DISABLED)
-  # ============================================================================
-
-  @unit
-  Scenario: License enforcement is enabled by default when no env var is set
-    Given LICENSE_ENFORCEMENT_DISABLED is not set
-    When the subscription handler checks the active plan
-    Then license enforcement should be active
-
-  @unit
-  Scenario: License enforcement is disabled when env var is set to true
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "true"
-    When the subscription handler checks the active plan
-    Then license enforcement should be disabled
-    And the UNLIMITED_PLAN should be returned
-
-  @unit
-  Scenario: License enforcement is enabled when env var is set to false
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "false"
-    When the subscription handler checks the active plan
-    Then license enforcement should be active
-
-  @unit
-  Scenario: Env var accepts "1" as truthy value for disabled
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "1"
-    When the subscription handler checks the active plan
-    Then license enforcement should be disabled
-
-  # ============================================================================
-  # Truly Unlimited Plan (Infinity instead of 999_999)
-  # ============================================================================
-
-  @unit
-  Scenario: UNLIMITED_PLAN uses Number.MAX_SAFE_INTEGER for limits when enforcement is disabled
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "true"
-    When the subscription handler returns the UNLIMITED_PLAN
-    Then maxMessagesPerMonth should be Number.MAX_SAFE_INTEGER
-    And maxMembers should be Number.MAX_SAFE_INTEGER
-    And maxProjects should be Number.MAX_SAFE_INTEGER
-    And maxWorkflows should be Number.MAX_SAFE_INTEGER
-    And maxPrompts should be Number.MAX_SAFE_INTEGER
-    And maxEvaluators should be Number.MAX_SAFE_INTEGER
-    And maxScenarios should be Number.MAX_SAFE_INTEGER
-    And evaluationsCredit should be Number.MAX_SAFE_INTEGER
-    # Note: We use Number.MAX_SAFE_INTEGER instead of Infinity because
-    # JSON.stringify(Infinity) returns null, causing silent failures in tRPC
-
-  @integration
-  Scenario: Trace ingestion accepts unlimited traces when enforcement is disabled
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "true"
-    And an organization exists
-    When 1,000,000 traces are ingested
-    Then all traces should be accepted without limit errors
 
   # ============================================================================
   # maxMembersLite in License Schema
@@ -87,8 +32,7 @@ Feature: License Enforcement Refactor
 
   @integration
   Scenario: License with maxMembersLite is stored and retrieved correctly
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "false"
-    And a valid license key with maxMembersLite set to 3
+    Given a valid license key with maxMembersLite set to 3
     When the license is uploaded to an organization
     Then the stored license should include maxMembersLite
     And the active plan should show maxMembersLite as 3
@@ -145,8 +89,7 @@ Feature: License Enforcement Refactor
 
   @integration
   Scenario: License status API returns all limit fields
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "false"
-    And an organization with a valid license
+    Given an organization with a valid license
     When the license status is requested
     Then the response should include currentMembers and maxMembers
     And the response should include currentMembersLite and maxMembersLite
@@ -192,28 +135,9 @@ Feature: License Enforcement Refactor
   # Backward Compatibility
   # ============================================================================
 
-  @unit
-  Scenario: Old LICENSE_ENFORCEMENT_ENABLED env var is no longer recognized
-    Given LICENSE_ENFORCEMENT_ENABLED is set to "true"
-    And LICENSE_ENFORCEMENT_DISABLED is not set
-    When the subscription handler checks the active plan
-    Then license enforcement should be active
-    And LICENSE_ENFORCEMENT_ENABLED should have no effect
-
   @integration
   Scenario: Existing licenses without maxMembersLite remain valid
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "false"
-    And an existing license without maxMembersLite field
+    Given an existing license without maxMembersLite field
     When the license is validated
     Then the license should be valid
     And maxMembersLite should default to 1
-
-  # ============================================================================
-  # Error Handling
-  # ============================================================================
-
-  @unit
-  Scenario: Invalid LICENSE_ENFORCEMENT_DISABLED value defaults to false
-    Given LICENSE_ENFORCEMENT_DISABLED is set to "invalid"
-    When the subscription handler checks the active plan
-    Then license enforcement should be active

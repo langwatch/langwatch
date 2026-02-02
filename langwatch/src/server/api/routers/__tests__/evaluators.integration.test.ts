@@ -4,7 +4,7 @@
  * Integration tests for Evaluators tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -15,12 +15,6 @@ describe("Evaluators Endpoints", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
-    // Clean up any existing test evaluators before running tests
-    // This ensures we always start with a clean state
-    await prisma.evaluator.deleteMany({
-      where: { projectId },
-    });
-
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: {
@@ -29,9 +23,27 @@ describe("Evaluators Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+
+    // Clean up any leftover data from previous test runs
+    // Must delete monitors first due to foreign key constraint on evaluatorId
+    await prisma.monitor.deleteMany({ where: { projectId } });
+    await prisma.evaluator.deleteMany({ where: { projectId } });
+  });
+
+  afterAll(async () => {
+    // Final cleanup - monitors first due to FK constraint
+    await prisma.monitor.deleteMany({ where: { projectId } });
+    await prisma.evaluator.deleteMany({ where: { projectId } });
   });
 
   describe("create", () => {
+    beforeEach(async () => {
+      // Clean up before each test to stay under FREE tier limits (max 3 evaluators)
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+    });
+
     it("creates a built-in evaluator with config", async () => {
       const result = await caller.evaluators.create({
         projectId,
@@ -145,11 +157,36 @@ describe("Evaluators Endpoints", () => {
   });
 
   describe("getAll", () => {
+    beforeEach(async () => {
+      // Clean up and create fresh evaluators for getAll tests
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+      // Create 3 evaluators for testing (within FREE tier limit)
+      await caller.evaluators.create({
+        projectId,
+        name: "Evaluator 1",
+        type: "evaluator",
+        config: { evaluatorType: "test1" },
+      });
+      await caller.evaluators.create({
+        projectId,
+        name: "Evaluator 2",
+        type: "evaluator",
+        config: { evaluatorType: "test2" },
+      });
+      await caller.evaluators.create({
+        projectId,
+        name: "Evaluator 3",
+        type: "evaluator",
+        config: { evaluatorType: "test3" },
+      });
+    });
+
     it("returns all non-archived evaluators for project", async () => {
       const result = await caller.evaluators.getAll({ projectId });
 
-      // Should have at least the evaluators we created above
-      expect(result.length).toBeGreaterThanOrEqual(3);
+      expect(result.length).toBe(3);
       expect(result.every((e) => e.projectId === projectId)).toBe(true);
       expect(result.every((e) => e.archivedAt === null)).toBe(true);
     });
@@ -167,6 +204,12 @@ describe("Evaluators Endpoints", () => {
   });
 
   describe("getById", () => {
+    beforeEach(async () => {
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+    });
+
     it("returns evaluator by id", async () => {
       // First create an evaluator
       const created = await caller.evaluators.create({
@@ -196,6 +239,12 @@ describe("Evaluators Endpoints", () => {
   });
 
   describe("getBySlug", () => {
+    beforeEach(async () => {
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+    });
+
     it("returns evaluator by slug", async () => {
       const created = await caller.evaluators.create({
         projectId,
@@ -248,6 +297,12 @@ describe("Evaluators Endpoints", () => {
   });
 
   describe("update", () => {
+    beforeEach(async () => {
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+    });
+
     it("updates evaluator name", async () => {
       const created = await caller.evaluators.create({
         projectId,
@@ -285,6 +340,12 @@ describe("Evaluators Endpoints", () => {
   });
 
   describe("delete (soft delete)", () => {
+    beforeEach(async () => {
+      // Must delete monitors first due to foreign key constraint on evaluatorId
+      await prisma.monitor.deleteMany({ where: { projectId } });
+      await prisma.evaluator.deleteMany({ where: { projectId } });
+    });
+
     it("soft deletes an evaluator by setting archivedAt", async () => {
       const created = await caller.evaluators.create({
         projectId,

@@ -1,7 +1,7 @@
 @wip
-Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams)
+Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams, Experiments, Agents, Online Evaluations)
   As a LangWatch self-hosted deployment with a license
-  I want resource creation limits to be enforced for workflows, prompts, evaluators, and teams
+  I want resource creation limits to be enforced for workflows, prompts, evaluators, teams, and online evaluations
   So that organizations respect their licensed resource counts
 
   Background:
@@ -218,6 +218,41 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then an upgrade modal is displayed
     And the modal shows "Prompts: 3 / 3"
     And the modal includes an upgrade call-to-action
+
+  @unit
+  Scenario: Clicking Save Prompt in PromptEditorDrawer at limit shows upgrade modal
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I have opened the PromptEditorDrawer for a new prompt
+    When I fill in the prompt details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Prompts: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Creating prompt from scenario editor at limit shows upgrade modal
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I am in the scenario editor drawer
+    When I click "+ Add New Prompt"
+    Then the PromptEditorDrawer opens
+    When I fill in the prompt details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Prompts: 3 / 3"
+    And the API request is NOT made
+
+  @unit
+  Scenario: Editing existing prompt bypasses limit check
+    Given the organization has a license with maxPrompts 3
+    And the organization has 3 prompts (at limit)
+    And I am editing an existing prompt in PromptEditorDrawer
+    When I modify the prompt details
+    And I click "Save"
+    Then the prompt is updated successfully
+    And no upgrade modal is shown
 
   @unit
   Scenario: Create Evaluator button is always clickable
@@ -463,4 +498,296 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Given the organization has an expired license
     And the organization has 2 teams
     When I create a team in the organization
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Experiments: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows experiment creation when under limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 2 experiments across all projects
+    When I create an experiment in project "proj-789"
+    Then the experiment is created successfully
+
+  @integration
+  Scenario: Blocks experiment creation when at limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    When I create an experiment in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of experiments"
+
+  @integration
+  Scenario: Counts experiments across all projects in organization
+    Given the organization has a license with maxExperiments 3
+    And project "proj-A" has 2 experiments
+    And project "proj-B" has 1 experiment
+    When I create an experiment in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Experiment copy enforces limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    When I copy an experiment to project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Updating existing experiment does not enforce limit
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments across all projects
+    And I have an existing experiment "exp-123"
+    When I update experiment "exp-123" in project "proj-789"
+    Then the experiment is updated successfully
+
+  # ============================================================================
+  # Experiments: UI Enforcement
+  # ============================================================================
+
+  @unit
+  Scenario: Create Experiment menu item is always clickable
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments (at limit)
+    When I view the evaluations dashboard
+    Then the "Create Experiment" menu item is enabled
+
+  @unit
+  Scenario: Clicking Create Experiment at limit shows upgrade modal
+    Given the organization has a license with maxExperiments 3
+    And the organization has 3 experiments (at limit)
+    When I click the "Create Experiment" menu item
+    Then an upgrade modal is displayed
+    And the modal shows "Experiments: 3 / 3"
+
+  # ============================================================================
+  # Experiments: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited experiments when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 experiments
+    When I create an experiment in project "proj-789"
+    Then the experiment is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier experiment limit
+    Given the organization has an expired license
+    And the organization has 3 experiments
+    When I create an experiment in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Agents: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows agent creation when under limit
+    Given the organization has a license with maxAgents 5
+    And the organization has 3 agents across all projects
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Blocks agent creation when at limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents across all projects
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of agents"
+
+  @integration
+  Scenario: Counts agents across all projects in organization
+    Given the organization has a license with maxAgents 3
+    And project "proj-A" has 2 agents
+    And project "proj-B" has 1 agent
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Counts only non-archived agents toward limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 2 active agents
+    And the organization has 2 archived agents
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Updating existing agent does not enforce limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents across all projects
+    And I have an existing agent "agent-123"
+    When I update agent "agent-123" in project "proj-789"
+    Then the agent is updated successfully
+
+  # ============================================================================
+  # Agents: UI Enforcement (Save-time Modal)
+  # ============================================================================
+
+  @unit
+  Scenario: Agent creation drawer opens regardless of limit
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    When I click "New Agent" on the agents page
+    Then the agent type selector drawer opens
+    And no upgrade modal is shown yet
+
+  @unit
+  Scenario: Clicking Save Agent at limit shows upgrade modal
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    And I have opened the AgentCodeEditorDrawer for a new agent
+    When I fill in the agent details
+    And I click "Create Agent"
+    Then an upgrade modal is displayed
+    And the modal shows "Agents: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Clicking Save Agent when allowed creates the agent
+    Given the organization has a license with maxAgents 5
+    And the organization has 3 agents (under limit)
+    And I have opened the AgentCodeEditorDrawer for a new agent
+    When I fill in the agent details
+    And I click "Create Agent"
+    Then the agent is created successfully
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Editing existing agent bypasses limit check
+    Given the organization has a license with maxAgents 3
+    And the organization has 3 agents (at limit)
+    And I am editing an existing agent
+    When I modify the agent details
+    And I click "Save Changes"
+    Then the agent is updated successfully
+    And no upgrade modal is shown
+
+  # ============================================================================
+  # Agents: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited agents when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 agents
+    When I create an agent in project "proj-789"
+    Then the agent is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier agent limit
+    Given the organization has an expired license
+    And the organization has 3 agents
+    When I create an agent in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  # ============================================================================
+  # Online Evaluations: Backend Enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: Allows online evaluation creation when under limit
+    Given the organization has a license with maxOnlineEvaluations 5
+    And the organization has 3 online evaluations across all projects
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Blocks online evaluation creation when at limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations across all projects
+    When I create an online evaluation in project "proj-789"
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of online evaluations"
+
+  @integration
+  Scenario: Counts online evaluations across all projects in organization
+    Given the organization has a license with maxOnlineEvaluations 3
+    And project "proj-A" has 2 online evaluations
+    And project "proj-B" has 1 online evaluation
+    When I create an online evaluation in project "proj-789"
+    Then the request fails with FORBIDDEN
+
+  @integration
+  Scenario: Counts only enabled online evaluations toward limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 2 enabled online evaluations
+    And the organization has 2 disabled online evaluations
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Updating existing online evaluation does not enforce limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations across all projects
+    And I have an existing online evaluation "monitor-123"
+    When I update online evaluation "monitor-123" in project "proj-789"
+    Then the online evaluation is updated successfully
+
+  # ============================================================================
+  # Online Evaluations: UI Enforcement (Save-time Modal)
+  # ============================================================================
+
+  @unit
+  Scenario: Online evaluation drawer opens regardless of limit
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    When I click "New Online Evaluation" on the evaluations page
+    Then the OnlineEvaluationDrawer opens
+    And no upgrade modal is shown yet
+
+  @unit
+  Scenario: Clicking Save Online Evaluation at limit shows upgrade modal
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    And I have opened the OnlineEvaluationDrawer for a new online evaluation
+    When I fill in the online evaluation details
+    And I click "Save"
+    Then an upgrade modal is displayed
+    And the modal shows "Online Evaluations: 3 / 3"
+    And the modal includes an upgrade call-to-action
+    And the API request is NOT made
+
+  @unit
+  Scenario: Clicking Save Online Evaluation when allowed creates the online evaluation
+    Given the organization has a license with maxOnlineEvaluations 5
+    And the organization has 3 online evaluations (under limit)
+    And I have opened the OnlineEvaluationDrawer for a new online evaluation
+    When I fill in the online evaluation details
+    And I click "Save"
+    Then the online evaluation is created successfully
+    And no upgrade modal is shown
+
+  @unit
+  Scenario: Editing existing online evaluation bypasses limit check
+    Given the organization has a license with maxOnlineEvaluations 3
+    And the organization has 3 online evaluations (at limit)
+    And I am editing an existing online evaluation
+    When I modify the online evaluation details
+    And I click "Save"
+    Then the online evaluation is updated successfully
+    And no upgrade modal is shown
+
+  # ============================================================================
+  # Online Evaluations: No License / Enforcement Disabled
+  # ============================================================================
+
+  @integration
+  Scenario: No license allows unlimited online evaluations when enforcement disabled
+    Given LICENSE_ENFORCEMENT_ENABLED is "false"
+    And the organization has no license
+    And the organization has 100 online evaluations
+    When I create an online evaluation in project "proj-789"
+    Then the online evaluation is created successfully
+
+  @integration
+  Scenario: Expired license enforces FREE tier online evaluation limit
+    Given the organization has an expired license
+    And the organization has 3 online evaluations
+    When I create an online evaluation in project "proj-789"
     Then the request fails with FORBIDDEN

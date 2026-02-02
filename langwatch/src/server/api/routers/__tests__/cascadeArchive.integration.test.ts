@@ -4,21 +4,12 @@
  * Integration tests for cascade archive functionality.
  * Tests the cascading archive/delete behavior for workflows, evaluators, and agents.
  */
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterAll, beforeEach, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-// Mock license enforcement to avoid limits during tests
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn(),
-  };
-});
 
 describe("Cascade Archive", () => {
   const projectId = "test-project-id";
@@ -42,23 +33,27 @@ describe("Cascade Archive", () => {
     caller = appRouter.createCaller(ctx);
   });
 
+  beforeEach(async () => {
+    // Clean up before each test to stay under FREE tier limits
+    await prisma.monitor.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.evaluator.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.agent.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.workflowVersion.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.workflow.deleteMany({ where: { projectId } }).catch(() => {});
+    // Reset tracking arrays
+    createdWorkflowIds.length = 0;
+    createdEvaluatorIds.length = 0;
+    createdAgentIds.length = 0;
+    createdMonitorIds.length = 0;
+  });
+
   afterAll(async () => {
-    // Cleanup in reverse order of creation
-    for (const id of createdMonitorIds) {
-      await prisma.monitor.delete({ where: { id, projectId } }).catch(() => {});
-    }
-    for (const id of createdEvaluatorIds) {
-      await prisma.evaluator.delete({ where: { id, projectId } }).catch(() => {});
-    }
-    for (const id of createdAgentIds) {
-      await prisma.agent.delete({ where: { id, projectId } }).catch(() => {});
-    }
-    for (const id of createdWorkflowIds) {
-      // Clear currentVersionId first, then delete versions, then workflow
-      await prisma.workflow.update({ where: { id, projectId }, data: { currentVersionId: null } }).catch(() => {});
-      await prisma.workflowVersion.deleteMany({ where: { workflowId: id, projectId } }).catch(() => {});
-      await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});
-    }
+    // Final cleanup
+    await prisma.monitor.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.evaluator.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.agent.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.workflowVersion.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.workflow.deleteMany({ where: { projectId } }).catch(() => {});
   });
 
   // Helper to create a workflow

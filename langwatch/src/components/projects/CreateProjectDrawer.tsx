@@ -1,6 +1,7 @@
 import { Heading, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
@@ -31,6 +32,7 @@ export function CreateProjectDrawer({
     organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
+  const { checkAndProceed } = useLicenseEnforcement("projects");
 
   const createProject = api.project.create.useMutation();
 
@@ -47,53 +49,55 @@ export function CreateProjectDrawer({
   ) => {
     if (!effectiveOrganizationId) return;
 
-    createProject.mutate(
-      {
-        organizationId: effectiveOrganizationId,
-        name: data.name,
-        teamId: data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId,
-        newTeamName: data.newTeamName,
-        language: data.language,
-        framework: data.framework,
-      },
-      {
-        onSuccess: (result) => {
-          // Invalidate queries so project appears immediately in lists
-          void queryClient.organization.getAll.invalidate();
-          void queryClient.limits.getUsage.invalidate();
-          void queryClient.team.getTeamsWithMembers.invalidate();
-
-          trackEvent("project_created", {
-            project_slug: result.projectSlug,
-            language: data.language,
-            framework: data.framework,
-          });
-
-          toaster.create({
-            title: "Project Created",
-            description: `Successfully created ${result.projectSlug}`,
-            type: "success",
-            meta: { closable: true },
-          });
-
-          if (navigateOnCreate) {
-            // Use hard redirect to ensure fresh data after project creation
-            window.location.href = `/${result.projectSlug}`;
-            return;
-          }
-
-          handleClose();
+    checkAndProceed(() => {
+      createProject.mutate(
+        {
+          organizationId: effectiveOrganizationId,
+          name: data.name,
+          teamId: data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId,
+          newTeamName: data.newTeamName,
+          language: data.language,
+          framework: data.framework,
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Error creating project",
-            description: error.message,
-            type: "error",
-            meta: { closable: true },
-          });
+        {
+          onSuccess: (result) => {
+            // Invalidate queries so project appears immediately in lists
+            void queryClient.organization.getAll.invalidate();
+            void queryClient.limits.getUsage.invalidate();
+            void queryClient.team.getTeamsWithMembers.invalidate();
+
+            trackEvent("project_created", {
+              project_slug: result.projectSlug,
+              language: data.language,
+              framework: data.framework,
+            });
+
+            toaster.create({
+              title: "Project Created",
+              description: `Successfully created ${result.projectSlug}`,
+              type: "success",
+              meta: { closable: true },
+            });
+
+            if (navigateOnCreate) {
+              // Use hard redirect to ensure fresh data after project creation
+              window.location.href = `/${result.projectSlug}`;
+              return;
+            }
+
+            handleClose();
+          },
+          onError: (error) => {
+            toaster.create({
+              title: "Error creating project",
+              description: error.message,
+              type: "error",
+              meta: { closable: true },
+            });
+          },
         },
-      },
-    );
+      );
+    });
   };
 
   return (

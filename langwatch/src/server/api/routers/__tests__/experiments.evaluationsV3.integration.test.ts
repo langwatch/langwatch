@@ -48,6 +48,9 @@ describe("Evaluations V3 Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+
+    // Clean up any leftover experiments from previous test runs
+    await prisma.experiment.deleteMany({ where: { projectId } });
   });
 
   afterAll(async () => {

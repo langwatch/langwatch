@@ -15,7 +15,7 @@ interface AddPromptButtonProps {
  */
 export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("prompts");
+  const { checkAndProceed } = useLicenseEnforcement("prompts");
 
   const handleClick = () => {
     checkAndProceed(() => {
@@ -24,14 +24,11 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   };
 
   return (
-    <>
-      <Tooltip content="New Prompt" disabled={!iconOnly}>
-        <PageLayout.HeaderButton onClick={handleClick}>
-          <LuPlus size={14} />
-          {!iconOnly && "New Prompt"}
-        </PageLayout.HeaderButton>
-      </Tooltip>
-      {upgradeModal}
-    </>
+    <Tooltip content="New Prompt" disabled={!iconOnly}>
+      <PageLayout.HeaderButton onClick={handleClick}>
+        <LuPlus size={14} />
+        {!iconOnly && "New Prompt"}
+      </PageLayout.HeaderButton>
+    </Tooltip>
   );
 }

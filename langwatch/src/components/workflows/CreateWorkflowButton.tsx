@@ -11,7 +11,7 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
   const hasWorkflowsCreatePermission = hasPermission("workflows:create");
 
   const { open, onClose, onOpen } = useDisclosure();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("workflows");
+  const { checkAndProceed } = useLicenseEnforcement("workflows");
 
   const handleClick = () => {
     checkAndProceed(() => {
@@ -49,7 +49,6 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
         Create Workflow
       </Button>
       <NewWorkflowModal open={open} onClose={onClose} />
-      {upgradeModal}
     </>
   );
 };

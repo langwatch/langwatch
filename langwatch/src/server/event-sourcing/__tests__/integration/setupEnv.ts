@@ -19,11 +19,10 @@ if (process.env.CI && process.env.CI_REDIS_URL) {
   delete process.env.BUILD_TIME;
 }
 
-// Disable license enforcement for integration tests
-// This allows tests to create resources without hitting license limits
-process.env.LICENSE_ENFORCEMENT_DISABLED = "true";
-
 if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
   process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
   process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
 }
+
+// Disable license enforcement for integration tests
+process.env.DISABLE_LICENSE_ENFORCEMENT = "true";

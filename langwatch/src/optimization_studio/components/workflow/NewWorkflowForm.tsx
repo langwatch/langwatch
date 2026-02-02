@@ -12,15 +12,11 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
-import { UpgradeModal } from "../../../components/UpgradeModal";
+import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { trackEvent } from "../../../utils/tracking";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "../../../utils/trpcError";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 
@@ -172,9 +168,8 @@ export const NewWorkflowForm = ({
       : getRandomWorkflowIcon(),
   );
 
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
+  // License enforcement for workflow creation
+  const { checkAndProceed } = useLicenseEnforcement("workflows");
 
   const {
     register,
@@ -195,52 +190,42 @@ export const NewWorkflowForm = ({
   const onSubmit = async (data: FormData) => {
     if (!project) return;
 
-    try {
-      const newWorkflow: Workflow = {
-        ...template,
-        name: data.name,
-        description: data.description,
-        icon: data.icon ?? defaultIcon,
-        default_llm: {
-          ...template.default_llm,
-          model: project?.defaultModel ?? DEFAULT_MODEL,
-        },
-      };
-      const createdWorkflow = await createWorkflowMutation.mutateAsync(
+    const newWorkflow: Workflow = {
+      ...template,
+      name: data.name,
+      description: data.description,
+      icon: data.icon ?? defaultIcon,
+      default_llm: {
+        ...template.default_llm,
+        model: project?.defaultModel ?? DEFAULT_MODEL,
+      },
+    };
+
+    checkAndProceed(() => {
+      createWorkflowMutation.mutate(
         {
           projectId: project.id,
           dsl: newWorkflow,
           commitMessage: "Workflow creation",
         },
         {
-          onError: () => {
+          onSuccess: (createdWorkflow) => {
+            trackEvent("workflow_create", { project_id: project?.id });
+            onClose();
+            void router.push(
+              `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
+            );
+          },
+          onError: (error) => {
             toaster.create({
-              title: "Error",
-              description: "Failed to create workflow",
+              title: "Error creating workflow",
+              description: error.message,
               type: "error",
-              meta: {
-                closable: true,
-              },
             });
           },
         },
       );
-
-      trackEvent("workflow_create", { project_id: project?.id });
-
-      onClose();
-      void router.push(
-        `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
-      );
-    } catch (error) {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "workflows") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
-      console.error("Error creating workflow:", error);
-    }
+    });
   };
 
   const nameRef = useRef<HTMLInputElement>(null);
@@ -310,13 +295,6 @@ export const NewWorkflowForm = ({
           </Button>
         </Dialog.Footer>
       </form>
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="workflows"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
     </>
   );
 };

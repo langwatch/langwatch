@@ -42,6 +42,7 @@ interface FormData {
   planType: PlanType;
   maxMembers: number;
   maxMembersLite: number;
+  maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
   evaluationsCredit: number;
@@ -50,6 +51,7 @@ interface FormData {
   maxEvaluators: number;
   maxScenarios: number;
   maxAgents: number;
+  maxExperiments: number;
   canPublish: boolean;
 }
 
@@ -69,6 +71,7 @@ const defaultFormData: FormData = {
   planType: "ENTERPRISE",
   maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
   maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
+  maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
   maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
   evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
@@ -77,6 +80,7 @@ const defaultFormData: FormData = {
   maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
   maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
   maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
+  maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
 };
 
@@ -227,6 +231,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         plan: {
           maxMembers: formData.maxMembers,
           maxMembersLite: formData.maxMembersLite,
+          maxTeams: formData.maxTeams,
           maxProjects: formData.maxProjects,
           maxMessagesPerMonth: formData.maxMessagesPerMonth,
           evaluationsCredit: formData.evaluationsCredit,
@@ -235,6 +240,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxEvaluators: formData.maxEvaluators,
           maxScenarios: formData.maxScenarios,
           maxAgents: formData.maxAgents,
+          maxExperiments: formData.maxExperiments,
           canPublish: formData.canPublish,
         },
       });
@@ -483,7 +489,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 onChange={(value) => handleInputChange("maxMembers", value)}
               />
               <NumberField
-                label="Max Members Lite"
+                label="Max Lite Members"
                 value={formData.maxMembersLite}
                 onChange={(value) => handleInputChange("maxMembersLite", value)}
               />

@@ -5,7 +5,7 @@
  * Tests the actual CRUD operations through the tRPC layer.
  * Config formats must be DSL-compatible for direct execution.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -59,12 +59,6 @@ describe("Agents Endpoints", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
-    // Clean up any existing test agents before running tests
-    // This ensures we always start with a clean state
-    await prisma.agent.deleteMany({
-      where: { projectId },
-    });
-
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: {
@@ -73,9 +67,24 @@ describe("Agents Endpoints", () => {
       },
     });
     caller = appRouter.createCaller(ctx);
+
+    // Clean up any leftover data from previous test runs
+    await prisma.agent.deleteMany({ where: { projectId } });
+  });
+
+  afterAll(async () => {
+    // Final cleanup
+    await prisma.agent.deleteMany({
+      where: { projectId },
+    });
   });
 
   describe("create", () => {
+    beforeEach(async () => {
+      // Clean up before each test to stay under FREE tier limits (max 3 agents)
+      await prisma.agent.deleteMany({ where: { projectId } });
+    });
+
     it("creates a signature agent with DSL-compatible config", async () => {
       const result = await caller.agents.create({
         projectId,
@@ -151,11 +160,35 @@ describe("Agents Endpoints", () => {
   });
 
   describe("getAll", () => {
+    beforeEach(async () => {
+      // Clean up and create fresh agents for getAll tests
+      await prisma.agent.deleteMany({ where: { projectId } });
+      // Create 3 agents for testing (within FREE tier limit)
+      await caller.agents.create({
+        projectId,
+        name: "Agent 1",
+        type: "signature",
+        config: signatureConfig,
+      });
+      await caller.agents.create({
+        projectId,
+        name: "Agent 2",
+        type: "code",
+        config: codeConfig,
+      });
+      await caller.agents.create({
+        projectId,
+        name: "Agent 3",
+        type: "workflow",
+        config: workflowConfig,
+        workflowId: "workflow_test_123",
+      });
+    });
+
     it("returns all non-archived agents for project", async () => {
       const result = await caller.agents.getAll({ projectId });
 
-      // Should have at least the agents we created above
-      expect(result.length).toBeGreaterThanOrEqual(3);
+      expect(result.length).toBe(3);
       expect(result.every((a) => a.projectId === projectId)).toBe(true);
       expect(result.every((a) => a.archivedAt === null)).toBe(true);
     });
@@ -173,6 +206,10 @@ describe("Agents Endpoints", () => {
   });
 
   describe("getById", () => {
+    beforeEach(async () => {
+      await prisma.agent.deleteMany({ where: { projectId } });
+    });
+
     it("returns agent by id", async () => {
       // First create an agent
       const created = await caller.agents.create({
@@ -202,6 +239,10 @@ describe("Agents Endpoints", () => {
   });
 
   describe("update", () => {
+    beforeEach(async () => {
+      await prisma.agent.deleteMany({ where: { projectId } });
+    });
+
     it("updates agent name", async () => {
       const created = await caller.agents.create({
         projectId,
@@ -271,6 +312,10 @@ describe("Agents Endpoints", () => {
   });
 
   describe("delete (soft delete)", () => {
+    beforeEach(async () => {
+      await prisma.agent.deleteMany({ where: { projectId } });
+    });
+
     it("soft deletes an agent by setting archivedAt", async () => {
       const created = await caller.agents.create({
         projectId,

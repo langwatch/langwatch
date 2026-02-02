@@ -30,6 +30,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
@@ -283,6 +284,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
+
+  // License enforcement for online evaluation creation
+  const { checkAndProceed } = useLicenseEnforcement("onlineEvaluations");
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -1033,19 +1037,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
       });
     } else {
-      // Create new monitor
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        checkType,
-        preconditions,
-        settings,
-        mappings: mappingState,
-        sample,
-        executionMode: EvaluationExecutionMode.ON_MESSAGE,
-        evaluatorId: selectedEvaluator.id,
-        level: level ?? "trace",
-        threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
+      // Create new monitor - check limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: name.trim(),
+          checkType,
+          preconditions,
+          settings,
+          mappings: mappingState,
+          sample,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+          evaluatorId: selectedEvaluator.id,
+          level: level ?? "trace",
+          threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
+        });
       });
     }
   }, [
@@ -1061,6 +1067,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     createMutation,
     level,
     threadIdleTimeout,
+    checkAndProceed,
   ]);
 
   const isLoading = createMutation.isPending || updateMutation.isPending;

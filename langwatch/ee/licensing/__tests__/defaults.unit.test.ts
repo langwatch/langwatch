@@ -43,6 +43,7 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxEvaluators).toBe(DEFAULT_LIMIT);
     expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
     expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
+    expect(resolved.maxOnlineEvaluations).toBe(DEFAULT_LIMIT);
   });
 
   it("preserves explicitly set optional fields", () => {
@@ -131,6 +132,8 @@ describe("resolvePlanDefaults", () => {
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
       maxAgents: resolved.maxAgents,
+      maxExperiments: resolved.maxExperiments,
+      maxOnlineEvaluations: resolved.maxOnlineEvaluations,
       canPublish: resolved.canPublish,
     };
 

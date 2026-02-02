@@ -1,7 +1,6 @@
-import { LicenseHandler, PUBLIC_KEY, UNLIMITED_PLAN } from "../../ee/licensing";
+import { LicenseHandler, PUBLIC_KEY } from "../../ee/licensing";
 import type { PlanInfo } from "../../ee/licensing/planInfo";
 import { createLicenseHandler } from "../../ee/licensing/server";
-import { env } from "../env.mjs";
 import { prisma } from "./db";
 
 // Re-export PlanInfo from canonical location for backward compatibility
@@ -31,12 +30,6 @@ export abstract class SubscriptionHandler {
     },
     handler: LicenseHandler = getLicenseHandler(),
   ): Promise<PlanInfo> {
-    // When license enforcement is disabled, return unlimited plan
-    if (env.LICENSE_ENFORCEMENT_DISABLED) {
-      return UNLIMITED_PLAN;
-    }
-
-    // Default: enforce license limits (enabled by default)
     return handler.getActivePlan(organizationId);
   }
 }
