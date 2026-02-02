@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Field } from "~/optimization_studio/types/dsl";
 import {
+  fieldSchema,
   httpAuthSchema,
   httpHeaderSchema,
   HTTP_METHODS,
@@ -91,14 +92,7 @@ export type DatasetReference = {
   savedRecords?: SavedRecord[];
 };
 
-/**
- * Zod schema for field validation (from optimization studio).
- */
-export const fieldSchema = z.object({
-  identifier: z.string(),
-  type: z.string(),
-  value: z.unknown().optional(),
-});
+// fieldSchema is imported from optimization_studio/types/dsl
 
 /**
  * Zod schema for local prompt config validation.
@@ -169,7 +163,6 @@ export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
-  name: z.string(),
   /** @deprecated Settings are fetched from DB at execution time, not from workbench state */
   settings: z.record(z.string(), z.unknown()).optional(),
   inputs: z.array(fieldSchema),
@@ -224,8 +217,7 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
  */
 export const targetConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(["prompt", "agent"]),
-  name: z.string(),
+  type: z.enum(["prompt", "agent", "evaluator"]),
   icon: z.string().optional(),
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),
@@ -252,12 +244,18 @@ export const targetConfigSchema = z.object({
    * Only set when agentType === "http".
    */
   httpConfig: httpConfigSchema.optional(),
+  /**
+   * Database evaluator ID for evaluator targets.
+   * Used to load evaluator settings from the database at execution time.
+   * Only set when type === "evaluator".
+   */
+  targetEvaluatorId: z.string().optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
 });
-export type TargetType = "prompt" | "agent";
+export type TargetType = "prompt" | "agent" | "evaluator";
 export type TargetConfig = Omit<
   z.infer<typeof targetConfigSchema>,
   "inputs" | "outputs"
@@ -372,6 +370,8 @@ export type UIState = {
   autosaveStatus: AutosaveStatus;
   // Concurrency limit for parallel execution (default 10)
   concurrency: number;
+  // Whether an evaluation has been run this session (enables History button)
+  hasRunThisSession: boolean;
 };
 
 // ============================================================================
@@ -588,6 +588,7 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
+  handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
   // Execution handlers
@@ -681,6 +682,7 @@ export const createInitialUIState = (): UIState => ({
     dataset: "idle",
   },
   concurrency: DEFAULT_CONCURRENCY,
+  hasRunThisSession: false,
 });
 
 export const createInitialState = (): EvaluationsV3State => ({

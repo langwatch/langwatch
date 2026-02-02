@@ -89,7 +89,7 @@ describe("AgentTypeSelectorDrawer", () => {
         ).toBeInTheDocument();
         expect(
           screen.getByText(
-            "Use an existing workflow as the agent implementation",
+            "Create a new workflow for custom agent logic",
           ),
         ).toBeInTheDocument();
       });

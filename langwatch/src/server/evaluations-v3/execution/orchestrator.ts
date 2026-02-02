@@ -67,8 +67,8 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
-  /** Evaluators loaded from DB - settings are fetched fresh from here */
-  loadedEvaluators?: Map<string, { id: string; config: unknown }>;
+  /** Evaluators loaded from DB - settings and names are fetched fresh from here */
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   /** Enable saving results to Elasticsearch */
   saveToEs?: boolean;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
@@ -191,7 +191,7 @@ export async function* executeCell(
   loadedData: {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
-    evaluators?: Map<string, { id: string; config: unknown }>;
+    evaluators?: Map<string, { id: string; name: string; config: unknown }>;
   },
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
@@ -531,8 +531,11 @@ export async function* runOrchestrator(
 
   // Build target metadata for storage
   // For model: first check localPromptConfig, then fall back to loadedPrompts
+  // For name: get from loaded entity (prompt, agent, or evaluator)
   const targetMetadata: ESBatchEvaluationTarget[] = state.targets.map((t) => {
     let model: string | null = null;
+    let name: string | null = null;
+
     // First check local prompt config (for edited prompts)
     if (t.localPromptConfig?.llm?.model) {
       model = t.localPromptConfig.llm.model;
@@ -545,13 +548,23 @@ export async function* runOrchestrator(
       }
     }
 
+    // Get name from loaded entity
+    if (t.type === "prompt" && t.promptId) {
+      name = loadedPrompts.get(t.promptId)?.name ?? null;
+    } else if (t.type === "agent" && t.dbAgentId) {
+      name = loadedAgents.get(t.dbAgentId)?.name ?? null;
+    } else if (t.type === "evaluator" && t.targetEvaluatorId) {
+      name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
+    }
+
     return {
       id: t.id,
-      name: t.name,
+      name: name ?? t.id,
       type: t.type,
       prompt_id: t.promptId ?? null,
       prompt_version: t.promptVersionNumber ?? null,
       agent_id: t.dbAgentId ?? null,
+      evaluator_id: t.targetEvaluatorId ?? null,
       model,
     };
   });
@@ -613,7 +626,7 @@ export async function* runOrchestrator(
         index: event.rowIndex,
         target_id: event.targetId,
         entry: datasetEntry,
-        predicted: event.output ? { output: event.output } : undefined,
+        predicted: event.output !== undefined ? { output: event.output } : undefined,
         cost: event.cost ?? null,
         duration: event.duration ?? null,
         error: event.error ?? null,
@@ -638,13 +651,16 @@ export async function* runOrchestrator(
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
-      // Find the evaluator config to get the human-readable name
+      // Find the evaluator config to get the DB evaluator ID, then look up name
       const evaluatorConfig = state.evaluators.find(
         (e) => e.id === event.evaluatorId,
       );
+      const dbEvaluator = evaluatorConfig?.dbEvaluatorId
+        ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+        : null;
       pendingEvaluations.push({
         evaluator: event.evaluatorId,
-        name: evaluatorConfig?.name ?? null,
+        name: dbEvaluator?.name ?? null,
         target_id: event.targetId,
         index: event.rowIndex,
         status: result.status,

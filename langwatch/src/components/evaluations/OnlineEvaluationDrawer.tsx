@@ -11,7 +11,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode, type Evaluator } from "@prisma/client";
+import { EvaluationExecutionMode } from "@prisma/client";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -21,7 +22,7 @@ import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import { validateEvaluatorMappings } from "~/evaluations-v3/utils/mappingValidation";
+import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
   navigateToDrawer,
@@ -30,10 +31,7 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
 import {
   type MappingState,
@@ -202,15 +200,14 @@ function getThreadAvailableSources(): AvailableSource[] {
 }
 
 /**
- * Get all fields (required + optional) from an evaluator definition.
+ * Get all field identifiers from an evaluator.
+ * Fields are pre-computed by the API for both built-in and workflow evaluators.
  */
-function getAllFields(evaluatorType: EvaluatorTypes | undefined): string[] {
-  if (!evaluatorType) return [];
-  const def = AVAILABLE_EVALUATORS[evaluatorType];
-  if (!def) return [];
-  const required = def.requiredFields ?? ["input", "output"];
-  const optional = def.optionalFields ?? [];
-  return [...required, ...optional];
+function getEvaluatorFieldIds(
+  evaluator: EvaluatorWithFields | null | undefined,
+): string[] {
+  if (!evaluator?.fields) return [];
+  return evaluator.fields.map((f) => f.identifier);
 }
 
 /**
@@ -263,7 +260,7 @@ const fieldOptions: Record<string, string> = {
 let onlineEvaluationDrawerState: {
   level: EvaluationLevel; // Can be null (no selection), "trace", or "thread"
   name: string;
-  selectedEvaluator: Evaluator | null;
+  selectedEvaluator: EvaluatorWithFields | null;
   sample: number;
   mappings: Record<string, UIFieldMapping>;
   preconditions: CheckPrecondition[];
@@ -329,9 +326,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const threadIdleTimeout = form.watch("threadIdleTimeout");
 
   // These are managed separately due to complex interactions with drawer system
-  const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
-    () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
-  );
+  const [selectedEvaluator, setSelectedEvaluator] =
+    useState<EvaluatorWithFields | null>(
+      () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
+    );
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     () => onlineEvaluationDrawerState?.mappings ?? {},
   );
@@ -384,6 +382,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
   );
 
+  // Check if selected evaluator is a workflow evaluator (for checkType determination)
+  const isWorkflowEvaluator = selectedEvaluator?.type === "workflow";
+
   // Create mutation
   const createMutation = api.monitors.create.useMutation({
     onSuccess: () => {
@@ -416,17 +417,31 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         ?.evaluatorType as EvaluatorTypes | undefined)
     : undefined;
 
-  // Compute all fields
-  const allFields = useMemo(() => getAllFields(evaluatorType), [evaluatorType]);
+  // Compute all fields from the evaluator (pre-computed by API for both built-in and workflow)
+  const allFields = useMemo(
+    () => getEvaluatorFieldIds(selectedEvaluator),
+    [selectedEvaluator],
+  );
 
   // Use shared validation logic (same as evaluations v3)
-  // This ensures consistent validation across the platform
+  // Fields include required/optional flag from the API
   const mappingValidation = useMemo(() => {
-    if (!evaluatorType) {
+    if (!selectedEvaluator?.fields) {
       return { isValid: true, hasAnyMapping: false, missingRequiredFields: [] };
     }
-    return validateEvaluatorMappings(evaluatorType, mappings);
-  }, [evaluatorType, mappings]);
+    // Extract required and optional fields from the evaluator
+    const requiredFields = selectedEvaluator.fields
+      .filter((f) => !f.optional)
+      .map((f) => f.identifier);
+    const optionalFields = selectedEvaluator.fields
+      .filter((f) => f.optional)
+      .map((f) => f.identifier);
+    return validateEvaluatorMappingsWithFields(
+      requiredFields,
+      optionalFields,
+      mappings,
+    );
+  }, [selectedEvaluator, mappings]);
 
   // For backward compatibility with existing code
   const pendingFields = mappingValidation.missingRequiredFields;
@@ -584,6 +599,33 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     }
   }, [evaluatorQuery.data]);
 
+  // Auto-infer mappings when evaluator with fields is selected but mappings are empty
+  // This handles all evaluator types (built-in and workflow) since fields are pre-computed
+  const lastAutoInferredEvaluatorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      selectedEvaluator?.fields &&
+      level &&
+      // Only auto-infer if we haven't already done so for this evaluator
+      lastAutoInferredEvaluatorRef.current !== selectedEvaluator.id &&
+      // Only auto-infer if mappings are empty
+      Object.keys(mappings).length === 0
+    ) {
+      lastAutoInferredEvaluatorRef.current = selectedEvaluator.id;
+      const fields = getEvaluatorFieldIds(selectedEvaluator);
+      const autoMappings = autoInferMappings(fields, level);
+      setMappings(autoMappings);
+
+      // Persist to module-level state
+      if (onlineEvaluationDrawerState) {
+        onlineEvaluationDrawerState = {
+          ...onlineEvaluationDrawerState,
+          mappings: autoMappings,
+        };
+      }
+    }
+  }, [selectedEvaluator, level, mappings]);
+
   // Load pending evaluator (newly created from the flow)
   useEffect(() => {
     if (pendingEvaluatorQuery.data && pendingEvaluatorId) {
@@ -596,10 +638,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         form.setValue("name", evaluator.name);
       }
 
-      // Get evaluator type and auto-infer mappings
-      const evalType = (evaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined;
-      const fields = getAllFields(evalType);
+      // Auto-infer mappings using pre-computed fields from the API
+      const fields = getEvaluatorFieldIds(evaluator);
       const autoMappings = autoInferMappings(fields, level);
       setMappings(autoMappings);
 
@@ -688,7 +728,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // Set up the flow callback for if user wants to change evaluator from the list
     // (accessible via "back" button in evaluator editor)
     setFlowCallbacks("evaluatorList", {
-      onSelect: (evaluator: Evaluator) => {
+      onSelect: (evaluator: EvaluatorWithFields) => {
         const newName = name || evaluator.name;
         setSelectedEvaluator(evaluator);
         setHasUnsavedChanges(true); // User selected a different evaluator
@@ -696,10 +736,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           form.setValue("name", newName);
         }
 
-        // Get evaluator type and all fields (required + optional)
-        const evalType = (evaluator.config as { evaluatorType?: string } | null)
-          ?.evaluatorType as EvaluatorTypes | undefined;
-        const fields = getAllFields(evalType);
+        // Auto-infer mappings using pre-computed fields from the API
+        const fields = getEvaluatorFieldIds(evaluator);
         const autoMappings = autoInferMappings(fields, level);
         setMappings(autoMappings);
 
@@ -763,7 +801,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   const handleSelectEvaluator = useCallback(() => {
     // Helper function to handle evaluator selection (used by both existing and new evaluators)
-    const selectEvaluatorAndOpenEditor = (evaluator: Evaluator) => {
+    const selectEvaluatorAndOpenEditor = (evaluator: EvaluatorWithFields) => {
       const newName = name || evaluator.name;
       setSelectedEvaluator(evaluator);
       setHasUnsavedChanges(true); // User selected an evaluator
@@ -773,12 +811,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         form.setValue("name", newName);
       }
 
-      // Get evaluator type and all fields (required + optional)
-      const evalType = (evaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined;
-      const fields = getAllFields(evalType);
-
-      // Auto-infer mappings for all fields (required + optional)
+      // Auto-infer mappings using pre-computed fields from the API
+      const fields = getEvaluatorFieldIds(evaluator);
       const autoMappings = autoInferMappings(fields, level);
 
       setMappings(autoMappings);
@@ -951,12 +985,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
     if (hasPendingMappings) return;
 
+    // Detect workflow evaluators by checking the evaluator type field
+    const isWorkflowEvaluator = selectedEvaluator.type === "workflow";
+
     const evaluatorConfig = selectedEvaluator.config as {
       evaluatorType?: string;
       settings?: Record<string, unknown>;
     } | null;
 
-    const checkType = evaluatorConfig?.evaluatorType ?? "langevals/basic";
+    // For workflow evaluators, use "workflow" as checkType
+    // For built-in evaluators, use the evaluatorType from config
+    const checkType = isWorkflowEvaluator
+      ? "workflow"
+      : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format

@@ -63,7 +63,6 @@ export const computeMetricStats = (values: number[]): MetricStats | null => {
  */
 export type EvaluatorAggregate = {
   evaluatorId: string;
-  evaluatorName: string;
   /** Total results processed (not pending) */
   total: number;
   /** Number of passed evaluations */
@@ -115,7 +114,7 @@ export type TargetAggregate = {
 export const computeTargetAggregates = (
   targetId: string,
   results: EvaluationResults,
-  evaluators: Array<{ id: string; name: string }>,
+  evaluators: Array<{ id: string }>,
   rowCount: number,
 ): TargetAggregate => {
   const targetOutputs = results.targetOutputs[targetId] ?? [];
@@ -213,7 +212,6 @@ export const computeTargetAggregates = (
 
       return {
         evaluatorId: evaluator.id,
-        evaluatorName: evaluator.name,
         total,
         passed,
         failed,

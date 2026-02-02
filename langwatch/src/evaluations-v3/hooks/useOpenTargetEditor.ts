@@ -305,6 +305,52 @@ export const useOpenTargetEditor = () => {
         } catch (error) {
           console.error("Failed to fetch agent:", error);
         }
+      } else if (target.type === "evaluator" && target.targetEvaluatorId) {
+        // Evaluator target - open evaluator editor drawer with mappings config
+        const availableSources = buildAvailableSources();
+        const uiMappings = buildUIMappings(target, activeDatasetId);
+
+        // Build mappings config for the evaluator editor
+        const mappingsConfig = {
+          availableSources,
+          initialMappings: uiMappings,
+          onMappingChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
+            const currentActiveDatasetId =
+              useEvaluationsV3Store.getState().activeDatasetId;
+            const currentDatasets = useEvaluationsV3Store.getState().datasets;
+            const checkIsDatasetSource = (sourceId: string) =>
+              currentDatasets.some((d) => d.id === sourceId);
+
+            if (mapping) {
+              setTargetMapping(
+                target.id,
+                currentActiveDatasetId,
+                identifier,
+                convertFromUIMapping(mapping, checkIsDatasetSource),
+              );
+            } else {
+              removeTargetMapping(
+                target.id,
+                currentActiveDatasetId,
+                identifier,
+              );
+            }
+          },
+        };
+
+        openDrawer("evaluatorEditor", {
+          evaluatorId: target.targetEvaluatorId,
+          mappingsConfig,
+          urlParams: { targetId: target.id },
+        });
+
+        // Scroll to position the target column next to the drawer
+        requestAnimationFrame(() => {
+          scrollToTargetColumn(target.id);
+        });
       }
     },
     [

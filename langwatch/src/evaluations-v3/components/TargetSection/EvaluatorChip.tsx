@@ -25,6 +25,7 @@ import {
   parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import { parseLLMError } from "~/utils/formatLLMError";
+import { useEvaluatorName } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
 
 // Pulsing animation for alert icon
@@ -55,6 +56,7 @@ export function EvaluatorChip({
   onRemove,
   onRerun,
 }: EvaluatorChipProps) {
+  const evaluatorName = useEvaluatorName(evaluator);
   const parsed = parseEvaluationResult(result);
 
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
@@ -132,7 +134,7 @@ export function EvaluatorChip({
                 whiteSpace: "nowrap",
               }}
             >
-              {evaluator.name}
+              {evaluatorName}
             </Text>
             {/* Inline result (score, label, or error icon) */}
             {status !== "running" && getInlineResult()}

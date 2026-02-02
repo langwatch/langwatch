@@ -48,6 +48,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "My Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
@@ -172,7 +180,6 @@ describe("Add Evaluator Button", () => {
         {
           id: "target-1",
           type: "prompt",
-          name: "Test Target",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},

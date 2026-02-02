@@ -54,7 +54,6 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
   ): TargetConfig => ({
     id: "http-target-1",
     type: "agent",
-    name: "Test HTTP Agent",
     agentType: "http",
     httpConfig,
     inputs: [{ identifier: "input", type: "str" }],

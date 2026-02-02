@@ -133,7 +133,6 @@ describe("DSL Adapter", () => {
             {
               id: "target-1",
               type: "agent",
-              name: "Code Target",
               inputs: [
                 { identifier: "question", type: "str" },
                 { identifier: "context", type: "str" },
@@ -184,7 +183,6 @@ describe("DSL Adapter", () => {
             {
               id: "target-1",
               type: "agent",
-              name: "Code Target",
               inputs: [
                 { identifier: "question", type: "str" },
                 { identifier: "context", type: "str" },
@@ -223,7 +221,6 @@ describe("DSL Adapter", () => {
             {
               id: "target-1",
               type: "agent",
-              name: "Code Target",
               inputs: [{ identifier: "question", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
               // Per-dataset mappings
@@ -243,7 +240,6 @@ describe("DSL Adapter", () => {
             {
               id: "eval-1",
               evaluatorType: "langevals/exact_match",
-              name: "Exact Match",
               inputs: [
                 { identifier: "output", type: "str" },
                 { identifier: "expected", type: "str" },
@@ -305,7 +301,6 @@ describe("DSL Adapter", () => {
             {
               id: "http-target-1",
               type: "agent",
-              name: "My HTTP Agent",
               agentType: "http",
               httpConfig,
               inputs: [{ identifier: "messages", type: "str" }],
@@ -374,7 +369,6 @@ describe("DSL Adapter", () => {
             {
               id: "http-target-1",
               type: "agent",
-              name: "My HTTP Agent",
               agentType: "http",
               httpConfig,
               inputs: [
@@ -443,7 +437,6 @@ describe("DSL Adapter", () => {
             {
               id: "http-target-1",
               type: "agent",
-              name: "My HTTP Agent",
               agentType: "http",
               httpConfig,
               inputs: [{ identifier: "messages", type: "str" }],
@@ -492,7 +485,6 @@ describe("DSL Adapter", () => {
             {
               id: "http-target-1",
               type: "agent",
-              name: "My HTTP Agent",
               agentType: "http",
               httpConfig,
               inputs: [{ identifier: "messages", type: "str" }],
@@ -542,7 +534,6 @@ describe("DSL Adapter", () => {
             {
               id: "http-target-1",
               type: "agent",
-              name: "My HTTP Agent",
               agentType: "http",
               httpConfig,
               inputs: [{ identifier: "messages", type: "str" }],
@@ -566,7 +557,6 @@ describe("DSL Adapter", () => {
             {
               id: "code-target-1",
               type: "agent",
-              name: "Code Agent",
               agentType: "code",
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
@@ -589,7 +579,6 @@ describe("DSL Adapter", () => {
             {
               id: "legacy-target-1",
               type: "agent",
-              name: "Legacy Agent",
               // No agentType specified - should default to code node
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],

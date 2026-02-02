@@ -65,10 +65,9 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   });
 
   // Helper to create a target config
-  const createTargetConfig = (id: string, name: string): TargetConfig => ({
+  const createTargetConfig = (id: string): TargetConfig => ({
     id,
     type: "prompt",
-    name,
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -88,7 +87,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   const createEvaluatorConfig = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match",
-    name: "Exact Match",
     settings: {},
     inputs: [
       { identifier: "output", type: "str" },
@@ -162,7 +160,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("single target execution", () => {
     it("executes single row with single target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -208,7 +206,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes multiple rows with single target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -251,7 +249,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("includes duration and traceId in target_result events", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -295,8 +293,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("multi-target execution", () => {
     it("executes single row with multiple targets", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -335,8 +333,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes multiple rows with multiple targets in parallel", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -376,7 +374,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("partial execution scopes", () => {
     it("executes only specified rows", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
@@ -419,8 +417,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes only specified target", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -462,8 +460,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("executes single cell", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
-        createTargetConfig("target-2", "Target 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
@@ -504,7 +502,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("re-runs single evaluator with pre-computed target output", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "Target 1")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [
@@ -577,7 +575,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("re-runs single evaluator without pre-computed output (executes target too)", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "Target 1")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -629,7 +627,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const badTarget: TargetConfig = {
         id: "target-bad",
         type: "prompt",
-        name: "Bad Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -655,7 +652,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState([
-        createTargetConfig("target-1", "Good Target"),
+        createTargetConfig("target-1"),
         badTarget,
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -700,7 +697,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("evaluator execution", () => {
     it("executes evaluators after target and returns evaluator_result events", async () => {
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()], // Add exact_match evaluator
       );
       const datasetRows = [
@@ -753,7 +750,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // exact_match is a binary evaluator, its score (0 or 1) should be stripped
       // as it's redundant with the passed field
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [createEvaluatorConfig()],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -798,7 +795,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const evaluatorWithBadMapping: EvaluatorConfig = {
         id: "eval-bad",
         evaluatorType: "langevals/exact_match",
-        name: "Bad Evaluator",
         settings: {},
         inputs: [
           { identifier: "output", type: "str" },
@@ -820,7 +816,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [evaluatorWithBadMapping],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -854,7 +850,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const invalidEvaluator: EvaluatorConfig = {
         id: "eval-invalid",
         evaluatorType: "langevals/this_evaluator_does_not_exist" as any,
-        name: "Invalid Evaluator",
         settings: {},
         inputs: [
           { identifier: "output", type: "str" },
@@ -881,7 +876,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       };
 
       const state = createTestState(
-        [createTargetConfig("target-1", "GPT-4o Mini")],
+        [createTargetConfig("target-1")],
         [invalidEvaluator],
       );
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -950,7 +945,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const dbEvaluatorConfig: EvaluatorConfig = {
           id: "eval-from-db",
           evaluatorType: "langevals/exact_match",
-          name: "DB Evaluator",
           dbEvaluatorId: evaluatorId, // Reference to database evaluator
           inputs: [
             { identifier: "output", type: "str" },
@@ -977,7 +971,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         };
 
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [dbEvaluatorConfig],
         );
         const datasetRows = [{ question: "Say hello", expected: "hello" }];
@@ -989,7 +983,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Load the evaluator from DB (simulates what the API route does)
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -997,6 +991,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -1070,7 +1065,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const dbEvaluatorConfig: EvaluatorConfig = {
           id: "eval-db-settings",
           evaluatorType: "langevals/exact_match",
-          name: "DB Settings Test",
           dbEvaluatorId: evaluatorId,
           // Note: No settings here - they should come from DB
           inputs: [
@@ -1098,7 +1092,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         };
 
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [dbEvaluatorConfig],
         );
         // Use "Hello" vs "hello" - with case_sensitive: false, these should match
@@ -1111,7 +1105,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Load the evaluator from DB
         const loadedEvaluators = new Map<
           string,
-          { id: string; config: unknown }
+          { id: string; name: string; config: unknown }
         >();
         const dbEvaluator = await prisma.evaluator.findFirst({
           where: { id: evaluatorId, projectId: project.id },
@@ -1119,6 +1113,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         if (dbEvaluator) {
           loadedEvaluators.set(evaluatorId, {
             id: dbEvaluator.id,
+            name: dbEvaluator.name,
             config: dbEvaluator.config,
           });
         }
@@ -1163,7 +1158,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("execution summary", () => {
     it("provides accurate summary with duration", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
@@ -1209,7 +1204,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     it("stops execution when abort flag is set and emits stopped event", async () => {
       // Create state with multiple rows to ensure we can abort mid-execution
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
@@ -1268,7 +1263,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("preserves partial results when aborted", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "Target 1"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say alpha", expected: "alpha" },
@@ -1328,7 +1323,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
     it("stops quickly even with many rows when abort is requested immediately", async () => {
       // This test verifies that abort is responsive even with many pending cells
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       // Create 20 rows - without abort this would take a long time
       const datasetRows = Array.from({ length: 20 }, (_, i) => ({
@@ -1387,7 +1382,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
   describe("empty row handling", () => {
     it("skips completely empty rows in full execution", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" }, // row 0 - non-empty
@@ -1441,8 +1436,8 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("skips empty rows in target scope execution", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
-        createTargetConfig("target-2", "GPT-4o Mini 2"),
+        createTargetConfig("target-1"),
+        createTargetConfig("target-2"),
       ]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" }, // row 0 - non-empty
@@ -1485,7 +1480,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       // This test verifies the behavior - currently we skip empty rows in all scopes
       // If we want to change this behavior for explicit cell execution, we can adjust
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "", expected: "" }, // row 0 - empty
@@ -1516,7 +1511,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
     it("handles dataset with all empty rows", async () => {
       const state = createTestState([
-        createTargetConfig("target-1", "GPT-4o Mini"),
+        createTargetConfig("target-1"),
       ]);
       const datasetRows = [
         { question: "", expected: "" },
@@ -1578,7 +1573,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       try {
         const state = createTestState(
-          [createTargetConfig("target-1", "GPT-4o Mini")],
+          [createTargetConfig("target-1")],
           [createEvaluatorConfig()],
         );
         const datasetRows = [
@@ -1633,9 +1628,10 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(storedRun?.project_id).toBe(project.id);
 
         // Verify targets were stored
+        // Note: target name falls back to target ID when no loadedPrompt is provided
         expect(storedRun?.targets).toBeDefined();
         expect(storedRun?.targets?.length).toBeGreaterThanOrEqual(1);
-        expect(storedRun?.targets?.[0]?.name).toBe("GPT-4o Mini");
+        expect(storedRun?.targets?.[0]?.name).toBe("target-1");
 
         // Verify dataset entries were stored with actual input values
         expect(storedRun?.dataset).toBeDefined();
@@ -1656,10 +1652,12 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         expect(storedRun?.evaluations).toBeDefined();
         expect(storedRun?.evaluations?.length).toBe(2); // 2 rows, 1 evaluator each
 
-        // Verify evaluator name is stored (human-readable, not just ID)
+        // Verify evaluator ID is stored
+        // Note: evaluator name is null when using built-in evaluators without dbEvaluatorId
+        // (name is only populated when evaluator is loaded from DB via loadedEvaluators)
         const firstEvaluation = storedRun?.evaluations?.[0];
         expect(firstEvaluation?.evaluator).toBe("eval-1");
-        expect(firstEvaluation?.name).toBe("Exact Match");
+        expect(firstEvaluation?.name).toBeNull();
 
         // Verify timestamps
         expect(storedRun?.timestamps.created_at).toBeDefined();
@@ -1711,7 +1709,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
 
       try {
         const state = createTestState([
-          createTargetConfig("target-1", "GPT-4o Mini"),
+          createTargetConfig("target-1"),
         ]);
         const datasetRows = [{ question: "Say hello", expected: "hello" }];
         const datasetColumns = [
@@ -1782,7 +1780,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const targetWithoutLocalConfig: TargetConfig = {
           id: "target-1",
           type: "prompt",
-          name: "Saved Prompt Target",
           promptId: promptId, // Reference to saved prompt
           promptVersionId: "version-1",
           promptVersionNumber: 1,
@@ -1811,7 +1808,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         // Create a mock VersionedPrompt with a model
         const mockVersionedPrompt: VersionedPrompt = {
           id: promptId,
-          name: "Test Prompt",
+          name: "Saved Prompt Target",
           handle: "test-prompt",
           scope: "PROJECT",
           version: 1,
@@ -1905,6 +1902,180 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       }
     }, 120000);
 
+    it("stores falsy output values (false, null) to Elasticsearch correctly", async () => {
+      // This test verifies the fix for storing falsy outputs like {output: false}
+      // Previously, the check `event.output ? {...}` would skip falsy values
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import(
+        "../../repositories/elasticsearchBatchEvaluation.repository"
+      );
+
+      const experimentId = `exp_${nanoid()}`;
+      const evaluatorId = `evaluator_${nanoid()}`;
+
+      // Create experiment
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "Falsy Output Storage Test",
+          slug: `falsy-output-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      // Create evaluator (exact_match returns passed: false for non-matching)
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Exact Match for Falsy Test",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Use evaluator as target - it returns boolean `passed` field
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          targetEvaluatorId: evaluatorId,
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Non-matching values will produce passed: false
+        const datasetRows = [
+          { response: "hello", expected: "world" }, // Will return passed: false
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        // Load the evaluator
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        loadedEvaluators.set(evaluatorId, {
+          id: evaluatorId,
+          name: "Exact Match for Falsy Test",
+          config: { evaluatorType: "langevals/exact_match", settings: {} },
+        });
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+          saveToEs: true,
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+
+        // Verify target_result has passed: false
+        const targetResult = events.find((e) => e.type === "target_result");
+        expect(targetResult).toBeDefined();
+        if (targetResult?.type === "target_result") {
+          const output = targetResult.output as { passed?: boolean };
+          expect(output.passed).toBe(false); // This is the falsy value we're testing
+        }
+
+        // Get run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started")
+          throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify the falsy output was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        expect(storedRun).not.toBeNull();
+        expect(storedRun?.dataset).toBeDefined();
+        expect(storedRun?.dataset?.length).toBe(1);
+
+        // CRITICAL: Verify predicted field is stored even with falsy output
+        const datasetEntry = storedRun?.dataset?.[0];
+        expect(datasetEntry?.predicted).toBeDefined();
+        expect(datasetEntry?.predicted?.output).toBeDefined();
+        // The output should contain passed: false (not be undefined/missing)
+        expect((datasetEntry?.predicted?.output as any)?.passed).toBe(false);
+
+        // Clean up ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import(
+          "~/server/elasticsearch"
+        );
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        // Clean up
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        await prisma.experiment.delete({
+          where: { id: experimentId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
     it("stores errors to Elasticsearch when cell execution fails", async () => {
       const { prisma } = await import("~/server/db");
       const { nanoid } = await import("nanoid");
@@ -1928,7 +2099,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
         const targetConfig: TargetConfig = {
           id: "target-1",
           type: "prompt",
-          name: "Failing Target",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {
@@ -2121,7 +2291,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const httpAgentTarget: TargetConfig = {
         id: "target_http",
         type: "agent",
-        name: "HTTP Agent",
         agentType: "http",
         inputs: [
           { identifier: "messages", type: "chat_messages" as "str" },
@@ -2251,7 +2420,6 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const targetWithNameMapping: TargetConfig = {
         id: "target-1",
         type: "prompt",
-        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -2317,5 +2485,705 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
       const doneEvent = events[events.length - 1];
       expect(doneEvent?.type).toBe("done");
     }, 60000);
+  });
+
+  describe("evaluator as target execution", () => {
+    it("executes evaluator as target and returns passed/score/label in target_result", async () => {
+      // Create a real evaluator in the database
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Create evaluator-as-target config
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Test with matching values - should pass
+        const datasetRows = [
+          { response: "hello world", expected: "hello world" },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        // Load the evaluator from DB
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete successfully
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have target_result (NOT evaluator_result - this is evaluator-as-target)
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          expect(targetResult.targetId).toBe("target-eval");
+          expect(targetResult.rowIndex).toBe(0);
+
+          // Output should contain evaluator results (passed, score, label)
+          const output = targetResult.output as {
+            passed?: boolean;
+            score?: number;
+            label?: string;
+          };
+          expect(output).toBeDefined();
+          // With matching values, should pass
+          expect(output.passed).toBe(true);
+        }
+
+        // Should NOT have evaluator_result events (evaluator is the target, not a downstream evaluator)
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        );
+        expect(evaluatorResults).toHaveLength(0);
+      } finally {
+        // Cleanup
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("handles evaluator target with non-matching values (should fail)", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Test with NON-matching values - should fail
+        const datasetRows = [
+          { response: "hello world", expected: "goodbye world" },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Check target_result
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          const output = targetResult.output as {
+            passed?: boolean;
+            score?: number;
+            label?: string;
+          };
+          // With non-matching values, should fail
+          expect(output.passed).toBe(false);
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("executes evaluator target with downstream evaluator (meta-evaluation)", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      // Create the evaluator that will be used as a target
+      const targetEvaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: targetEvaluatorId,
+          projectId: project.id,
+          name: "Sentiment Target Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Evaluator-as-target config
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          targetEvaluatorId: targetEvaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        // Downstream evaluator that validates the target's output
+        // This evaluator checks if the target passed - "meta-evaluation"
+        const downstreamEvaluatorConfig: EvaluatorConfig = {
+          id: "meta-eval",
+          evaluatorType: "langevals/exact_match",
+          settings: {},
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              "target-eval": {
+                // Map the evaluator target's 'passed' output to the downstream evaluator
+                output: {
+                  type: "source",
+                  source: "target",
+                  sourceId: "target-eval",
+                  sourceField: "passed",
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "expected_passed",
+                },
+              },
+            },
+          },
+        };
+
+        const state = createTestState(
+          [evaluatorTargetConfig],
+          [downstreamEvaluatorConfig],
+        );
+        // Matching values should pass, and we expect it to pass
+        const datasetRows = [
+          {
+            response: "hello",
+            expected: "hello",
+            expected_passed: "true", // Expect the evaluator target to pass
+          },
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+          { id: "expected_passed", name: "expected_passed", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: targetEvaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(targetEvaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have target_result for the evaluator target
+        const targetResults = events.filter((e) => e.type === "target_result");
+        expect(targetResults.length).toBe(1);
+
+        const targetResult = targetResults[0];
+        if (targetResult?.type === "target_result") {
+          expect(targetResult.targetId).toBe("target-eval");
+          const output = targetResult.output as { passed?: boolean };
+          expect(output.passed).toBe(true);
+        }
+
+        // Should have evaluator_result for the downstream meta-evaluator
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        );
+        expect(evaluatorResults.length).toBe(1);
+
+        const evalResult = evaluatorResults[0];
+        if (evalResult?.type === "evaluator_result") {
+          expect(evalResult.evaluatorId).toBe("meta-eval");
+          expect(evalResult.targetId).toBe("target-eval");
+          expect(evalResult.result.status).toBe("processed");
+          // The meta-evaluator should pass because target passed matches expected_passed
+          if (evalResult.result.status === "processed") {
+            expect(evalResult.result.passed).toBe(true);
+          }
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: targetEvaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+
+    it("executes multiple rows with evaluator target", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Test Exact Match Evaluator",
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        const evaluatorTargetConfig: TargetConfig = {
+          id: "target-eval",
+          type: "evaluator",
+          targetEvaluatorId: evaluatorId,
+          
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+            { identifier: "label", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "response",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          },
+        };
+
+        const state = createTestState([evaluatorTargetConfig]);
+        // Multiple rows: first matches, second doesn't
+        const datasetRows = [
+          { response: "hello", expected: "hello" }, // Should pass
+          { response: "foo", expected: "bar" }, // Should fail
+          { response: "test", expected: "test" }, // Should pass
+        ];
+        const datasetColumns = [
+          { id: "response", name: "response", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have 3 target_result events
+        const targetResults = events.filter(
+          (e) => e.type === "target_result",
+        ) as Array<Extract<EvaluationV3Event, { type: "target_result" }>>;
+        expect(targetResults.length).toBe(3);
+
+        // Check each result
+        const resultByRow = targetResults.reduce(
+          (acc, r) => {
+            acc[r.rowIndex] = r;
+            return acc;
+          },
+          {} as Record<number, (typeof targetResults)[0]>,
+        );
+
+        // Row 0: should pass
+        expect(
+          (resultByRow[0]?.output as { passed?: boolean })?.passed,
+        ).toBe(true);
+        // Row 1: should fail
+        expect(
+          (resultByRow[1]?.output as { passed?: boolean })?.passed,
+        ).toBe(false);
+        // Row 2: should pass
+        expect(
+          (resultByRow[2]?.output as { passed?: boolean })?.passed,
+        ).toBe(true);
+
+        // Done event should show 3 completed cells
+        const doneEvent = events[events.length - 1];
+        if (doneEvent?.type === "done") {
+          expect(doneEvent.summary.totalCells).toBe(3);
+          expect(doneEvent.summary.completedCells).toBe(3);
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
+  });
+
+  describe("evaluators with custom input fields", () => {
+    it("passes custom/unconventional input fields via data parameter", async () => {
+      // This test verifies that evaluators with custom input field names
+      // (like "answer" instead of standard "output") work correctly.
+      // The fix ensures kwargs are passed via data= instead of **kwargs
+      // to avoid "unexpected keyword argument" errors.
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+
+      const evaluatorId = `evaluator_${nanoid()}`;
+
+      // Create an evaluator that uses non-standard input field names
+      // This simulates a workflow-based evaluator with custom inputs
+      await prisma.evaluator.create({
+        data: {
+          id: evaluatorId,
+          projectId: project.id,
+          name: "Custom Fields Evaluator",
+          type: "evaluator",
+          config: {
+            // Use exact_match but with custom field mapping
+            // The key test is that "answer" field gets passed correctly
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+          },
+        },
+      });
+
+      try {
+        // Create evaluator config with custom input field names
+        // "answer" is a non-standard field that would fail with **kwargs
+        const customFieldsEvaluator: EvaluatorConfig = {
+          id: "eval-custom-fields",
+          evaluatorType: "langevals/exact_match",
+          dbEvaluatorId: evaluatorId,
+          // Note: using "answer" instead of standard "output"
+          // and "correct_answer" instead of "expected_output"
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          mappings: {
+            "dataset-1": {
+              "target-1": {
+                // Map custom dataset fields to evaluator inputs
+                output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "answer", // Custom field name in dataset
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-1",
+                  sourceField: "correct_answer", // Custom field name in dataset
+                },
+              },
+            },
+          },
+        };
+
+        // Create a minimal target that just passes through
+        const passthroughTarget: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+            },
+          },
+          localPromptConfig: createPromptConfig(),
+        };
+
+        const state = createTestState([passthroughTarget], [customFieldsEvaluator]);
+
+        // Dataset with custom field names
+        const datasetRows = [
+          {
+            question: "Say hello",
+            answer: "hello", // Custom field instead of "output"
+            correct_answer: "hello", // Custom field instead of "expected_output"
+          },
+          {
+            question: "Say world",
+            answer: "world",
+            correct_answer: "world",
+          },
+        ];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "answer", name: "answer", type: "string" },
+          { id: "correct_answer", name: "correct_answer", type: "string" },
+        ];
+
+        const loadedEvaluators = new Map<
+          string,
+          { id: string; name: string; config: unknown }
+        >();
+        const dbEvaluator = await prisma.evaluator.findFirst({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+        if (dbEvaluator) {
+          loadedEvaluators.set(evaluatorId, {
+            id: dbEvaluator.id,
+            name: dbEvaluator.name,
+            config: dbEvaluator.config,
+          });
+        }
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators,
+        };
+
+        const events = await collectEvents(input);
+
+        // Should complete without "unexpected keyword argument" error
+        expect(events[events.length - 1]?.type).toBe("done");
+
+        // Should have evaluator results
+        const evaluatorResults = events.filter(
+          (e) => e.type === "evaluator_result",
+        ) as Array<Extract<EvaluationV3Event, { type: "evaluator_result" }>>;
+
+        // We expect 2 evaluator results (one per row)
+        expect(evaluatorResults.length).toBe(2);
+
+        // Each result should be processed (not error)
+        // If custom fields weren't passed correctly, we'd get:
+        // TypeError("evaluate() got an unexpected keyword argument 'answer'")
+        for (const result of evaluatorResults) {
+          expect(result.result.status).toBe("processed");
+        }
+      } finally {
+        await prisma.evaluator.delete({
+          where: { id: evaluatorId, projectId: project.id },
+        });
+      }
+    }, 120000);
   });
 });

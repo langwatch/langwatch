@@ -1,5 +1,8 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
+import type {
+  EvaluatorField,
+  EvaluatorWithFields,
+} from "~/server/evaluators/evaluator.service";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -15,10 +18,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
@@ -250,6 +250,22 @@ export function EvaluationsV3Table({
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
+  // Track target being switched (null when adding new, target ID when switching)
+  const switchingTargetIdRef = useRef<string | null>(null);
+
+  // Wrapper that handles both add and replace (for switch functionality)
+  const addOrReplaceTarget = useCallback(
+    (targetConfig: TargetConfig) => {
+      if (switchingTargetIdRef.current) {
+        // Switch mode: remove old target first, then add new one
+        removeTarget(switchingTargetIdRef.current);
+        switchingTargetIdRef.current = null;
+      }
+      addTarget(targetConfig);
+    },
+    [addTarget, removeTarget],
+  );
+
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
     (savedAgent: TypedAgent) => {
@@ -287,7 +303,6 @@ export function EvaluationsV3Table({
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
-        name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
         inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
@@ -296,10 +311,43 @@ export function EvaluationsV3Table({
         mappings: {},
         httpConfig, // Only set for HTTP agents
       };
-      addTarget(targetConfig);
+      addOrReplaceTarget(targetConfig);
       closeDrawer();
     },
-    [addTarget, closeDrawer],
+    [addOrReplaceTarget, closeDrawer],
+  );
+
+  // Handler for when an evaluator is selected as a target from the drawer
+  // Uses pre-computed fields from the API (includes type and optional flag)
+  const handleSelectEvaluatorAsTarget = useCallback(
+    (evaluator: EvaluatorWithFields) => {
+      // Convert EvaluatorField[] to Field[] for TargetConfig
+      const inputs: Field[] = evaluator.fields.map((field) => ({
+        identifier: field.identifier,
+        type: field.type as Field["type"],
+        ...(field.optional && { optional: true }),
+      }));
+
+      // Use pre-computed output fields from the API
+      // For workflow evaluators, these come from the End node inputs
+      // For built-in evaluators, these are the standard passed/score/label/details
+      const outputs: Field[] = evaluator.outputFields.map((field) => ({
+        identifier: field.identifier,
+        type: field.type as Field["type"],
+      }));
+
+      const targetConfig: TargetConfig = {
+        id: `target_${Date.now()}`,
+        type: "evaluator",
+        targetEvaluatorId: evaluator.id,
+        inputs,
+        outputs,
+        mappings: {},
+      };
+      addOrReplaceTarget(targetConfig);
+      closeDrawer();
+    },
+    [addOrReplaceTarget, closeDrawer],
   );
 
   // Handler for when a prompt is selected from the drawer
@@ -319,7 +367,6 @@ export function EvaluationsV3Table({
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
-        name: prompt.name,
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
         promptVersionNumber: prompt.version,
@@ -337,8 +384,8 @@ export function EvaluationsV3Table({
         })),
         mappings: {},
       };
-      // addTarget will auto-map based on the real inputs
-      addTarget(targetConfig);
+      // addOrReplaceTarget will auto-map based on the real inputs (and handle switch mode)
+      addOrReplaceTarget(targetConfig);
 
       // Set up flow callbacks for the prompt editor using the centralized helper
       // This ensures we never forget a required callback
@@ -373,7 +420,7 @@ export function EvaluationsV3Table({
       });
     },
     [
-      addTarget,
+      addOrReplaceTarget,
       openDrawer,
       updateTarget,
       setTargetMapping,
@@ -382,11 +429,12 @@ export function EvaluationsV3Table({
   );
 
   /**
-   * Helper to add an evaluator to the workbench from a Prisma Evaluator.
+   * Helper to add an evaluator to the workbench from an EvaluatorWithFields.
    * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
+   * Fields are pre-computed by the API including type and optional flag.
    */
   const addEvaluatorToWorkbench = useCallback(
-    (evaluator: Evaluator) => {
+    (evaluator: EvaluatorWithFields) => {
       // Extract evaluator config from the Prisma evaluator
       const config = evaluator.config as EvaluatorDbConfig | null;
 
@@ -400,28 +448,16 @@ export function EvaluationsV3Table({
         return;
       }
 
-      // Get the evaluator definition to derive inputs from requiredFields/optionalFields
-      const evaluatorType = config?.evaluatorType;
-      const evaluatorDef = evaluatorType
-        ? AVAILABLE_EVALUATORS[evaluatorType]
-        : undefined;
-
-      // Derive inputs from evaluator definition's required and optional fields
-      const inputFields = [
-        ...(evaluatorDef?.requiredFields ?? []),
-        ...(evaluatorDef?.optionalFields ?? []),
-      ];
-
-      // Create a new EvaluatorConfig from the Prisma evaluator
+      // Create a new EvaluatorConfig from the evaluator
       // Note: settings are NOT stored in workbench state - always fetched fresh from DB
       const evaluatorConfig: EvaluatorConfig = {
         id: `evaluator_${Date.now()}`,
         evaluatorType: (config?.evaluatorType ??
           "custom/unknown") as EvaluatorConfig["evaluatorType"],
-        name: evaluator.name,
-        inputs: inputFields.map((field) => ({
-          identifier: field,
-          type: "str" as const, // Default all evaluator inputs to string
+        inputs: evaluator.fields.map((field) => ({
+          identifier: field.identifier,
+          type: field.type as Field["type"],
+          ...(field.optional && { optional: true }),
         })),
         mappings: {},
         dbEvaluatorId: evaluator.id,
@@ -461,6 +497,7 @@ export function EvaluationsV3Table({
           addEvaluatorToWorkbench(evaluator);
         }
         closeDrawer(); // Close drawer after adding evaluator to workbench
+        return true; // Indicate navigation was handled to prevent default back behavior
       },
     });
 
@@ -489,8 +526,12 @@ export function EvaluationsV3Table({
         id: `target-${nanoid(8)}`,
       };
       addTarget(newTarget);
+      // Open the prompt editor for the duplicated target if it's a prompt
+      if (newTarget.type === "prompt") {
+        void openTargetEditor(newTarget);
+      }
     },
-    [addTarget],
+    [addTarget, openTargetEditor],
   );
 
   // Handler for opening the add target flow (prompts/agents)
@@ -498,6 +539,7 @@ export function EvaluationsV3Table({
   const handleAddTarget = useCallback(() => {
     // Clear any pending mappings from previous flows
     pendingMappingsRef.current = {};
+    // Note: Don't clear switchingTargetIdRef here - it's set by handleSwitchTarget before calling this
 
     // Build available sources for variable mapping (for new prompts)
     const availableSources = buildAvailableSources();
@@ -562,7 +604,6 @@ export function EvaluationsV3Table({
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",
-          name: savedPrompt.name,
           promptId: savedPrompt.id,
           promptVersionId: savedPrompt.versionId,
           promptVersionNumber: savedPrompt.version,
@@ -583,7 +624,7 @@ export function EvaluationsV3Table({
               ? { [currentActiveDatasetId]: storeMappings }
               : {},
         };
-        addTarget(targetConfig);
+        addOrReplaceTarget(targetConfig);
 
         // Clear pending mappings
         pendingMappingsRef.current = {};
@@ -601,15 +642,72 @@ export function EvaluationsV3Table({
     setFlowCallbacks("workflowSelector", {
       onSave: handleSelectSavedAgent,
     });
+    setFlowCallbacks("evaluatorList", {
+      onSelect: handleSelectEvaluatorAsTarget,
+    });
+    // Set up flow callback for when a NEW evaluator is created during the target flow
+    // This handles: add comparison > evaluator > create new > category > fill form > create
+    setFlowCallbacks("evaluatorEditor", {
+      onSave: async (savedEvaluator: { id: string; name: string }) => {
+        // Fetch the full evaluator data from DB to get computed fields
+        const evaluator = await trpcUtils.evaluators.getById.fetch({
+          id: savedEvaluator.id,
+          projectId: project?.id ?? "",
+        });
+
+        if (!evaluator) {
+          closeDrawer();
+          return true;
+        }
+
+        // Use handleSelectEvaluatorAsTarget to add the target with proper fields
+        handleSelectEvaluatorAsTarget(evaluator);
+        return true; // Indicate navigation was handled to prevent default back behavior
+      },
+    });
     openDrawer("targetTypeSelector");
   }, [
     buildAvailableSources,
     openDrawer,
     handleSelectPrompt,
     handleSelectSavedAgent,
+    handleSelectEvaluatorAsTarget,
     isDatasetSource,
-    addTarget,
+    closeDrawer,
+    trpcUtils.evaluators.getById,
+    project?.id,
+    addOrReplaceTarget,
   ]);
+
+  // Handler for switching a target (replace with another prompt/agent/evaluator)
+  // Opens the specific drawer based on target type
+  const handleSwitchTarget = useCallback(
+    (target: TargetConfig) => {
+      // Store the target ID being switched - will be removed when new target is added
+      switchingTargetIdRef.current = target.id;
+
+      // Set up flow callbacks (same as handleAddTarget but we open specific drawer)
+      setFlowCallbacks("promptList", {
+        onSelect: handleSelectPrompt,
+      });
+      setFlowCallbacks("agentList", {
+        onSelect: handleSelectSavedAgent,
+      });
+      setFlowCallbacks("evaluatorList", {
+        onSelect: handleSelectEvaluatorAsTarget,
+      });
+
+      // Open the specific drawer based on target type
+      if (target.type === "prompt") {
+        openDrawer("promptList");
+      } else if (target.type === "agent") {
+        openDrawer("agentList");
+      } else if (target.type === "evaluator") {
+        openDrawer("evaluatorList");
+      }
+    },
+    [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
+  );
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
@@ -908,6 +1006,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       // Execution handlers
@@ -935,6 +1034,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       handleRunTarget,
@@ -1445,9 +1545,7 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th style={{ width: "auto" }}></th>
-                  {/* Spacer column to match drawer width */}
-                  <th style={{ width: DRAWER_WIDTH }}></th>
+                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
                 </>
               )}
             </tr>

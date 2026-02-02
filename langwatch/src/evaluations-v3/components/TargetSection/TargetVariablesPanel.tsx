@@ -69,7 +69,7 @@ const buildAvailableSources = (
     const sourceType = target.type === "prompt" ? "signature" : "code";
     sources.push({
       id: target.id,
-      name: target.name,
+      name: target.id, // Name will be resolved by the panel component
       type: sourceType,
       fields: target.outputs.map((output) => ({
         name: output.identifier,

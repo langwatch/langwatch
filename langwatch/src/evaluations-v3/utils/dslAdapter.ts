@@ -165,7 +165,7 @@ const createTargetNode = (
 ): Node<Code> | Node<HttpComponentConfig> => {
   if (target.agentType === "http") {
     if (!target.httpConfig) {
-      throw new Error(`HTTP target "${target.name}" is missing httpConfig`);
+      throw new Error(`HTTP target "${target.id}" is missing httpConfig`);
     }
     return createHttpNode(target, activeDatasetId, index);
   }
@@ -201,7 +201,7 @@ const createCodeNode = (
     id: target.id,
     type: "code",
     data: {
-      name: target.name,
+      name: target.id, // Name is fetched from DB at execution time
       inputs,
       outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
@@ -238,7 +238,7 @@ const createHttpNode = (
     id: target.id,
     type: "http",
     data: {
-      name: target.name,
+      name: target.id, // Name is fetched from DB at execution time
       inputs: inputs as HttpComponentConfig["inputs"],
       outputs: (target.outputs ?? [{ identifier: "output", type: "str" }]) as HttpComponentConfig["outputs"],
       // HTTP-specific config
@@ -283,7 +283,7 @@ const createEvaluatorNode = (
     id: `${targetId}.${evaluator.id}`,
     type: "evaluator",
     data: {
-      name: `${evaluator.name}`,
+      name: evaluator.id, // Name is fetched from DB at execution time
       cls: "LangWatchEvaluator",
       inputs,
       outputs: [{ identifier: "passed", type: "bool" }],

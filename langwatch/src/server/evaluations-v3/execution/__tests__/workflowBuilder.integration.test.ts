@@ -36,7 +36,6 @@ describe("WorkflowBuilder", () => {
   ): TargetConfig => ({
     id: "target-1",
     type: "prompt",
-    name: "Test Prompt",
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -56,7 +55,6 @@ describe("WorkflowBuilder", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match",
-    name: "Exact Match",
     settings: {},
     inputs: [
       { identifier: "output", type: "str" },
@@ -445,7 +443,6 @@ describe("WorkflowBuilder", () => {
       const evaluator2: EvaluatorConfig = {
         id: "eval-2",
         evaluatorType: "ragas/faithfulness",
-        name: "Faithfulness",
         settings: {},
         inputs: [{ identifier: "output", type: "str" }],
         mappings: {

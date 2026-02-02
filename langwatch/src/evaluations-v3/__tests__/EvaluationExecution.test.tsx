@@ -48,6 +48,15 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: (target: { id: string }) =>
+    target.id === "target-1" ? "My Prompt" : "Other Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
@@ -215,7 +224,6 @@ const setupStoreWithConfiguredEvaluation = () => {
     targets: [
       {
         id: "target-1",
-        name: "My Prompt",
         type: "prompt",
         promptId: "prompt-123",
         inputs: [{ identifier: "input", type: "str" }],
@@ -236,7 +244,6 @@ const setupStoreWithConfiguredEvaluation = () => {
       {
         id: "eval-1",
         evaluatorType: "langevals/exact_match",
-        name: "Exact Match",
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -280,6 +287,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         dataset: "idle",
       },
       concurrency: 10,
+      hasRunThisSession: false,
     },
   });
 };
@@ -577,7 +585,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Other Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -845,7 +852,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -899,7 +905,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],
@@ -970,7 +975,6 @@ describe("Evaluation Execution", () => {
         targets: [
           {
             id: "target-1",
-            name: "Test Target",
             type: "prompt",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -999,6 +1003,7 @@ describe("Evaluation Execution", () => {
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
           concurrency: 10,
+          hasRunThisSession: false,
         },
       });
 
@@ -1037,7 +1042,6 @@ describe("Evaluation Execution", () => {
         targets: [
           {
             id: "target-1",
-            name: "Test Target",
             type: "prompt",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -1063,6 +1067,7 @@ describe("Evaluation Execution", () => {
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
           concurrency: 10,
+          hasRunThisSession: false,
         },
       });
 
@@ -1169,7 +1174,6 @@ describe("Evaluation Execution", () => {
           ...currentState.targets,
           {
             id: "target-2",
-            name: "Second Prompt",
             type: "prompt",
             promptId: "prompt-456",
             inputs: [{ identifier: "input", type: "str" }],

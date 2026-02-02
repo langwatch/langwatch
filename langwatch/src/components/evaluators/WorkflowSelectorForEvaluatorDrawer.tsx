@@ -1,16 +1,18 @@
 import {
   Box,
   Button,
+  Field,
   Heading,
   HStack,
   Input,
-  Spinner,
   Text,
+  Textarea,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { formatDistanceToNow } from "date-fns";
-import { Search, Workflow } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useState } from "react";
+import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -23,6 +25,12 @@ import {
 } from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { DEFAULT_MODEL } from "~/utils/constants";
+import { trackEvent } from "~/utils/tracking";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
+import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
+import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {
   open?: boolean;
@@ -36,12 +44,18 @@ export type WorkflowSelectorForEvaluatorDrawerProps = {
   evaluatorName?: string;
 };
 
+type FormData = {
+  name: string;
+  icon: string;
+  description: string;
+};
+
 /**
- * Drawer for selecting a workflow to use as an evaluator.
+ * Drawer for creating a new workflow-based evaluator.
  * Features:
- * - Search filter for workflows
- * - Shows workflow name and last updated
- * - Creates evaluator with workflow reference on selection
+ * - Creates a new workflow from the custom_evaluator template
+ * - Creates an evaluator linked to the new workflow
+ * - Navigates to the workflow studio for editing
  */
 export function WorkflowSelectorForEvaluatorDrawer(
   props: WorkflowSelectorForEvaluatorDrawerProps,
@@ -50,6 +64,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
+  const router = useRouter();
+  const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -57,48 +73,31 @@ export function WorkflowSelectorForEvaluatorDrawer(
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
-    null,
-  );
-  const [evaluatorName, setEvaluatorName] = useState(props.evaluatorName ?? "");
   // State for upgrade modal when limit is exceeded
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
-  const workflowsQuery = api.workflow.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen },
-  );
+  const [defaultIcon] = useState(getRandomWorkflowIcon());
 
-  // Get existing evaluators to check which workflows already have one
-  const evaluatorsQuery = api.evaluators.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen },
-  );
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<FormData>({
+    defaultValues: {
+      name: props.evaluatorName ?? "",
+      icon: defaultIcon,
+      description: "",
+    },
+  });
 
-  // Set of workflow IDs that already have an evaluator
-  const workflowsWithEvaluator = useMemo(() => {
-    if (!evaluatorsQuery.data) return new Set<string>();
-    return new Set(
-      evaluatorsQuery.data
-        .filter((e) => e.workflowId)
-        .map((e) => e.workflowId as string),
-    );
-  }, [evaluatorsQuery.data]);
+  const icon = watch("icon");
+  const name = watch("name");
 
-  const filteredWorkflows = useMemo(() => {
-    if (!workflowsQuery.data) return [];
-
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return workflowsQuery.data;
-
-    return workflowsQuery.data.filter((workflow) =>
-      workflow.name.toLowerCase().includes(query),
-    );
-  }, [workflowsQuery.data, searchQuery]);
-
-  const createMutation = api.evaluators.create.useMutation({
+  const createWorkflowMutation = api.workflow.create.useMutation();
+  const createEvaluatorMutation = api.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.({
@@ -106,7 +105,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
         name: evaluator.name,
         workflowId: evaluator.workflowId ?? "",
       });
-      onClose();
     },
     onError: (error) => {
       const limitExceeded = extractLimitExceededInfo(error);
@@ -123,46 +121,76 @@ export function WorkflowSelectorForEvaluatorDrawer(
     },
   });
 
-  const isSaving = createMutation.isPending;
+  const isSaving =
+    createWorkflowMutation.isPending || createEvaluatorMutation.isPending;
 
-  const handleSelectWorkflow = useCallback(
-    (workflowId: string, workflowName: string) => {
-      // Don't allow selecting workflows that already have an evaluator
-      if (workflowsWithEvaluator.has(workflowId)) return;
+  const onSubmit = useCallback(
+    async (data: FormData) => {
+      if (!project) return;
 
-      setSelectedWorkflowId(workflowId);
-      if (!evaluatorName) {
-        setEvaluatorName(workflowName);
+      try {
+        // Create workflow from custom_evaluator template
+        const template = customEvaluatorTemplate;
+        const newWorkflow: Workflow = {
+          ...template,
+          name: data.name,
+          description: data.description,
+          icon: data.icon ?? defaultIcon,
+          default_llm: {
+            ...template.default_llm,
+            model: project.defaultModel ?? DEFAULT_MODEL,
+          },
+        };
+
+        const createdWorkflow = await createWorkflowMutation.mutateAsync({
+          projectId: project.id,
+          dsl: newWorkflow,
+          commitMessage: "Workflow creation for evaluator",
+          publish: true, // Auto-publish so the evaluator can run immediately
+        });
+
+        trackEvent("workflow_create", { project_id: project.id });
+
+        // Create evaluator linked to the new workflow
+        await createEvaluatorMutation.mutateAsync({
+          projectId: project.id,
+          name: data.name.trim(),
+          type: "workflow",
+          config: {},
+          workflowId: createdWorkflow.workflow.id,
+        });
+
+        // Close drawer and navigate to workflow studio
+        onClose();
+        void router.push(
+          `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
+        );
+      } catch (error) {
+        const limitExceeded = extractLimitExceededInfo(error);
+        if (limitExceeded?.limitType === "workflows") {
+          setLimitInfo(limitExceeded);
+          setShowUpgradeModal(true);
+          return;
+        }
+        console.error("Error creating workflow evaluator:", error);
+        toaster.create({
+          title: "Error",
+          description: "Failed to create workflow evaluator",
+          type: "error",
+        });
       }
     },
-    [evaluatorName, workflowsWithEvaluator],
+    [
+      project,
+      defaultIcon,
+      createWorkflowMutation,
+      createEvaluatorMutation,
+      onClose,
+      router,
+    ],
   );
 
-  const handleSave = useCallback(() => {
-    if (!project?.id || !selectedWorkflowId || !evaluatorName.trim()) return;
-
-    // Double-check: prevent creating if workflow already has evaluator
-    if (workflowsWithEvaluator.has(selectedWorkflowId)) return;
-
-    createMutation.mutate({
-      projectId: project.id,
-      name: evaluatorName.trim(),
-      type: "workflow",
-      config: {},
-      workflowId: selectedWorkflowId,
-    });
-  }, [
-    project?.id,
-    selectedWorkflowId,
-    evaluatorName,
-    createMutation,
-    workflowsWithEvaluator,
-  ]);
-
-  const isValid =
-    selectedWorkflowId &&
-    evaluatorName.trim().length > 0 &&
-    !workflowsWithEvaluator.has(selectedWorkflowId);
+  const isValid = name?.trim().length > 0;
 
   return (
     <>
@@ -173,202 +201,105 @@ export function WorkflowSelectorForEvaluatorDrawer(
       >
         <Drawer.Content>
           <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Heading>Select Workflow</Heading>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select an existing workflow to use as a custom evaluator.
-            </Text>
-
-            {/* Evaluator name input */}
-            <Box paddingX={6}>
-              <Text fontWeight="medium" fontSize="sm" marginBottom={2}>
-                Evaluator Name
-              </Text>
-              <Input
-                value={evaluatorName}
-                onChange={(e) => setEvaluatorName(e.target.value)}
-                placeholder="Enter evaluator name"
-                data-testid="evaluator-name-input"
-              />
-            </Box>
-
-            {/* Search input */}
-            <Box position="relative" paddingX={6}>
-              <Box
-                position="absolute"
-                left={9}
-                top="50%"
-                transform="translateY(-50%)"
-                color="fg.subtle"
-                zIndex={1}
-              >
-                <Search size={16} />
-              </Box>
-              <Input
-                placeholder="Search workflows..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                paddingLeft={10}
-                data-testid="search-workflows-input"
-              />
-            </Box>
-
-            {/* Workflow list - scrollable */}
-            <VStack
-              gap={2}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingBottom={4}
-            >
-              {workflowsQuery.isLoading ? (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              ) : filteredWorkflows.length === 0 ? (
-                <Box paddingY={8} textAlign="center" color="fg.muted">
-                  {searchQuery
-                    ? "No workflows match your search"
-                    : "No workflows found in this project"}
-                </Box>
-              ) : (
-                filteredWorkflows.map((workflow) => (
-                  <WorkflowCard
-                    key={workflow.id}
-                    name={workflow.name}
-                    updatedAt={workflow.updatedAt}
-                    isSelected={selectedWorkflowId === workflow.id}
-                    hasExistingEvaluator={workflowsWithEvaluator.has(
-                      workflow.id,
-                    )}
-                    onClick={() =>
-                      handleSelectWorkflow(workflow.id, workflow.name)
-                    }
-                  />
-                ))
+          <Drawer.Header>
+            <HStack gap={2}>
+              {canGoBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  padding={1}
+                  minWidth="auto"
+                  data-testid="back-button"
+                >
+                  <LuArrowLeft size={20} />
+                </Button>
               )}
+              <Heading>Create Workflow Evaluator</Heading>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            padding={0}
+          >
+            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
+                Create a new workflow to use as a custom evaluator. You&apos;ll
+                be taken to the workflow editor to configure the evaluation
+                logic.
+              </Text>
+
+              <Box paddingX={6}>
+                <VStack gap={4} align="stretch">
+                  <Field.Root invalid={!!errors.name}>
+                    <EmojiPickerModal
+                      open={emojiPicker.open}
+                      onClose={emojiPicker.onClose}
+                      onChange={(emoji) => {
+                        setValue("icon", emoji);
+                        emojiPicker.onClose();
+                      }}
+                    />
+                    <Field.Label>Name and Icon</Field.Label>
+                    <HStack>
+                      <Button
+                        variant="outline"
+                        onClick={emojiPicker.onOpen}
+                        fontSize="18px"
+                      >
+                        {icon}
+                      </Button>
+                      <Input
+                        {...register("name", { required: "Name is required" })}
+                        placeholder="Enter evaluator name"
+                        data-testid="evaluator-name-input"
+                      />
+                    </HStack>
+                    <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+                  </Field.Root>
+
+                  <Field.Root invalid={!!errors.description}>
+                    <Field.Label>Description (optional)</Field.Label>
+                    <Textarea
+                      {...register("description")}
+                      placeholder="What does this evaluator check?"
+                    />
+                    <Field.ErrorText>
+                      {errors.description?.message}
+                    </Field.ErrorText>
+                  </Field.Root>
+                </VStack>
+              </Box>
             </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <HStack gap={3}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="green"
-              onClick={handleSave}
-              disabled={!isValid || isSaving}
-              loading={isSaving}
-              data-testid="save-evaluator-button"
-            >
-              Create Evaluator
-            </Button>
-          </HStack>
-        </Drawer.Footer>
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+            <HStack gap={3}>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="green"
+                onClick={() => void handleSubmit(onSubmit)()}
+                disabled={!isValid || isSaving}
+                loading={isSaving}
+                data-testid="save-evaluator-button"
+              >
+                Create & Open Editor
+              </Button>
+            </HStack>
+          </Drawer.Footer>
         </Drawer.Content>
       </Drawer.Root>
 
       <UpgradeModal
         open={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        limitType="evaluators"
+        limitType={limitInfo?.limitType ?? "evaluators"}
         current={limitInfo?.current}
         max={limitInfo?.max}
       />
     </>
-  );
-}
-
-// ============================================================================
-// Workflow Card Component
-// ============================================================================
-
-type WorkflowCardProps = {
-  name: string;
-  updatedAt: Date;
-  isSelected: boolean;
-  hasExistingEvaluator?: boolean;
-  onClick: () => void;
-};
-
-function WorkflowCard({
-  name,
-  updatedAt,
-  isSelected,
-  hasExistingEvaluator = false,
-  onClick,
-}: WorkflowCardProps) {
-  const isDisabled = hasExistingEvaluator;
-
-  return (
-    <Box
-      as="button"
-      onClick={isDisabled ? undefined : onClick}
-      padding={4}
-      borderRadius="md"
-      border="2px solid"
-      borderColor={isSelected ? "green.500" : "border"}
-      bg={isDisabled ? "bg.muted" : isSelected ? "green.subtle" : "bg.panel"}
-      textAlign="left"
-      width="full"
-      opacity={isDisabled ? 0.6 : 1}
-      cursor={isDisabled ? "not-allowed" : "pointer"}
-      _hover={isDisabled ? {} : { borderColor: "green.400", bg: "green.50" }}
-      transition="all 0.15s"
-      data-testid={`workflow-card-${name}`}
-    >
-      <HStack gap={3}>
-        <Box
-          color={
-            isDisabled ? "fg.muted" : isSelected ? "green.600" : "green.500"
-          }
-        >
-          <Workflow size={20} />
-        </Box>
-        <VStack align="start" gap={0} flex={1}>
-          <Text
-            fontWeight="medium"
-            fontSize="sm"
-            color={isDisabled ? "fg.muted" : undefined}
-          >
-            {name}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {hasExistingEvaluator ? (
-              "Already has an evaluator"
-            ) : (
-              <>
-                Updated{" "}
-                {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
-              </>
-            )}
-          </Text>
-        </VStack>
-      </HStack>
-    </Box>
   );
 }

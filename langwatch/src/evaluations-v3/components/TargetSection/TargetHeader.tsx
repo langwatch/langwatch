@@ -11,8 +11,10 @@ import {
 import { keyframes } from "@emotion/react";
 import { memo, useMemo, useState } from "react";
 import {
+  LuArrowLeftRight,
   LuChevronDown,
   LuCircleAlert,
+  LuCircleCheck,
   LuCode,
   LuCopy,
   LuFileText,
@@ -30,6 +32,7 @@ import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/ut
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import { computeTargetAggregates } from "../../utils/computeAggregates";
 import { isRowEmpty } from "../../utils/emptyRowDetection";
@@ -47,6 +50,7 @@ type TargetHeaderProps = {
   target: TargetConfig;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
+  onSwitch?: (target: TargetConfig) => void;
   onRemove?: (targetId: string) => void;
   onRun?: (target: TargetConfig) => void;
   onStop?: () => void;
@@ -71,6 +75,7 @@ export const TargetHeader = memo(function TargetHeader({
   target,
   onEdit,
   onDuplicate,
+  onSwitch,
   onRemove,
   onRun,
   onStop,
@@ -99,6 +104,9 @@ export const TargetHeader = memo(function TargetHeader({
     (state) => state.activeDatasetId,
   );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
+
+  // Get the display name for this target
+  const targetName = useTargetName(target);
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -210,23 +218,58 @@ export const TargetHeader = memo(function TargetHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Determine icon based on target type
+  // Note: Lucide icons don't forward data-testid, so we wrap in span for testing
   const getTargetIcon = () => {
     if (target.type === "prompt") {
-      return <LuFileText size={12} data-testid="icon-file" />;
+      return (
+        <span data-testid="icon-file">
+          <LuFileText size={12} />
+        </span>
+      );
+    }
+    if (target.type === "evaluator") {
+      return (
+        <span data-testid="icon-evaluator">
+          <LuCircleCheck size={12} />
+        </span>
+      );
     }
     // HTTP agents get a Globe icon
     if (target.type === "agent" && target.agentType === "http") {
-      return <LuGlobe size={12} data-testid="icon-globe" />;
+      return (
+        <span data-testid="icon-globe">
+          <LuGlobe size={12} />
+        </span>
+      );
     }
     // Other agents (code, workflow, signature) get Code icon
-    return <LuCode size={12} data-testid="icon-code" />;
+    return (
+      <span data-testid="icon-code">
+        <LuCode size={12} />
+      </span>
+    );
   };
 
   const getTargetColor = () => {
-    return target.type === "prompt" ? "green.emphasized" : "cyan.emphasized";
+    if (target.type === "prompt" || target.type === "evaluator") {
+      return "green.emphasized";
+    }
+    return "cyan.emphasized";
   };
 
-  const editLabel = target.type === "prompt" ? "Edit Prompt" : "Edit Agent";
+  const editLabel =
+    target.type === "prompt"
+      ? "Edit Prompt"
+      : target.type === "evaluator"
+        ? "Edit Evaluator"
+        : "Edit Agent";
+
+  const switchLabel =
+    target.type === "prompt"
+      ? "Switch Prompt"
+      : target.type === "evaluator"
+        ? "Switch Evaluator"
+        : "Switch Agent";
 
   return (
     <HStack gap={2} width="full" marginY={-2}>
@@ -252,9 +295,11 @@ export const TargetHeader = memo(function TargetHeader({
               color={getTargetColor()}
               size="xs"
               icon={getTargetIcon()}
+              // For some reason this -2px adjustment is needed to align the icon with the text here for evaluators
+              marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>
-              {target.name}
+              {targetName}
             </Text>
             {showVersionBadge && target.promptVersionNumber !== undefined && (
               <Box flexShrink={0}>
@@ -325,6 +370,12 @@ export const TargetHeader = memo(function TargetHeader({
               <Text>Duplicate</Text>
             </HStack>
           </Menu.Item>
+          <Menu.Item value="switch" onClick={() => onSwitch?.(target)}>
+            <HStack gap={2}>
+              <LuArrowLeftRight size={14} />
+              <Text>{switchLabel}</Text>
+            </HStack>
+          </Menu.Item>
           <Box borderTopWidth="1px" borderColor="border" my={1} />
           <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
             <HStack gap={2} color="red.fg">
@@ -339,7 +390,11 @@ export const TargetHeader = memo(function TargetHeader({
 
       {/* Summary statistics (positioned on the right before play button) */}
       {hasAggregates && (
-        <TargetSummary aggregates={aggregates} isRunning={isRunning} />
+        <TargetSummary
+          aggregates={aggregates}
+          evaluators={evaluators}
+          isRunning={isRunning}
+        />
       )}
 
       {/* Play/Stop button on far right */}

@@ -326,9 +326,13 @@ export const monitorsRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
+  // Allow workflow evaluators (they use "workflow" as checkType)
+  const isWorkflowEvaluator = checkType === "workflow";
+
   if (
     AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
-    !checkType.startsWith("custom/")
+    !checkType.startsWith("custom/") &&
+    !isWorkflowEvaluator
   ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -336,7 +340,9 @@ const validateCheckSettings = (checkType: string, parameters: any) => {
     });
   }
 
-  if (!checkType.startsWith("custom/")) {
+  // Skip settings validation for workflow evaluators and custom evaluators
+  // (they don't have schema-based settings)
+  if (!checkType.startsWith("custom/") && !isWorkflowEvaluator) {
     const checkType_ = checkType as EvaluatorTypes;
     try {
       evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);

@@ -116,7 +116,8 @@ export async function runEvaluationWorkflow(
       projectId,
       inputs,
       versionId,
-      true,
+      true, // do_not_trace
+      false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
     );
 
     // Process the result
@@ -159,6 +160,7 @@ export async function runWorkflow(
   inputs: Record<string, string>,
   versionId?: string,
   do_not_trace?: boolean,
+  run_evaluations?: boolean,
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -206,6 +208,7 @@ export async function runWorkflow(
           : typeof inputs.do_not_trace === "boolean"
             ? inputs.do_not_trace
             : false,
+      ...(typeof run_evaluations === "boolean" && { run_evaluations }),
     },
   };
 

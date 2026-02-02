@@ -78,7 +78,7 @@ export const useEvaluatorMappings = (
     if (target) {
       sources.push({
         id: target.id,
-        name: target.name,
+        name: target.id, // Name will be resolved by the caller
         type: "signature" as const,
         fields: target.outputs.map((output) => ({
           name: output.identifier,
