@@ -2,11 +2,11 @@ import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";
+import { ProjectRepository } from "../repositories/project.repository";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
 import { ScenarioService } from "./scenario.service";
@@ -35,10 +35,12 @@ interface ExecuteParams {
 export class SimulationRunnerService {
   private readonly scenarioService: ScenarioService;
   private readonly promptService: PromptService;
+  private readonly projectRepository: ProjectRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.scenarioService = ScenarioService.create(prisma);
     this.promptService = new PromptService(prisma);
+    this.projectRepository = new ProjectRepository(prisma);
   }
 
   /**
@@ -60,19 +62,16 @@ export class SimulationRunnerService {
         return;
       }
 
-      // 2. Fetch project config
-      // TODO: We should use the project service or repository instead of prisma directly
-      const project = await this.prisma.project.findUnique({
-        where: { id: projectId },
-        select: { apiKey: true, defaultModel: true },
-      });
+      // 2. Fetch project config with resolved defaults
+      const projectConfig =
+        await this.projectRepository.getProjectConfig(projectId);
 
-      if (!project?.apiKey) {
-        throw new Error(`Project ${projectId} not found or has no API key`);
+      if (!projectConfig) {
+        throw new Error(`Project ${projectId} not found`);
       }
 
       // 3. Get project's default model for simulator and judge agents
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
+      const { defaultModel, apiKey } = projectConfig;
       const simulatorModel = await getVercelAIModel(projectId, defaultModel);
       const judgeModel = await getVercelAIModel(projectId, defaultModel);
 
@@ -132,7 +131,7 @@ export class SimulationRunnerService {
           batchRunId,
           langwatch: {
             endpoint: this.getLangWatchEndpoint(),
-            apiKey: project.apiKey,
+            apiKey,
           },
         },
       );

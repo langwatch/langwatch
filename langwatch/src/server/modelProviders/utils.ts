@@ -1,22 +1,30 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "../../env.mjs";
-import { DEFAULT_MODEL } from "../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
 import { prisma } from "../db";
+import { ProjectRepository } from "../repositories/project.repository";
 
-export const getVercelAIModel = async (projectId: string, model?: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
+/**
+ * Default ProjectRepository instance for backwards compatibility.
+ * New code should pass a ProjectRepository instance explicitly.
+ */
+const defaultProjectRepository = ProjectRepository.create(prisma);
 
-  if (!project) {
+export const getVercelAIModel = async (
+  projectId: string,
+  model?: string,
+  projectRepository: ProjectRepository = defaultProjectRepository,
+) => {
+  const projectConfig = await projectRepository.getProjectConfig(projectId);
+
+  if (!projectConfig) {
     throw new Error("Project not found");
   }
 
-  const model_ = model ?? project.defaultModel ?? DEFAULT_MODEL;
+  const model_ = model ?? projectConfig.defaultModel;
 
   const providerKey = model_.split("/")[0] as keyof typeof modelProviders;
   const modelProviders = await getProjectModelProviders(projectId);
