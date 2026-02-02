@@ -54,53 +54,6 @@ describe("usePromptHistory", () => {
 
     expect(result.current.history).toEqual(["first", "second", "third"]);
   });
-
-  it("initializes with initial prompt when provided", () => {
-    const { result } = renderHook(() =>
-      usePromptHistory({ initialPrompt: "seeded prompt" })
-    );
-
-    expect(result.current.history).toEqual(["seeded prompt"]);
-    expect(result.current.hasHistory).toBe(true);
-  });
-
-  it("allows adding prompts after initialization with initial prompt", () => {
-    const { result } = renderHook(() =>
-      usePromptHistory({ initialPrompt: "seeded prompt" })
-    );
-
-    act(() => {
-      result.current.addPrompt("second prompt");
-    });
-
-    expect(result.current.history).toEqual(["seeded prompt", "second prompt"]);
-  });
-
-  it("handles undefined initial prompt", () => {
-    const { result } = renderHook(() =>
-      usePromptHistory({ initialPrompt: undefined })
-    );
-
-    expect(result.current.history).toEqual([]);
-    expect(result.current.hasHistory).toBe(false);
-  });
-
-  it("handles empty string initial prompt", () => {
-    const { result } = renderHook(() =>
-      usePromptHistory({ initialPrompt: "" })
-    );
-
-    expect(result.current.history).toEqual([]);
-    expect(result.current.hasHistory).toBe(false);
-  });
-
-  it("trims whitespace from initial prompt", () => {
-    const { result } = renderHook(() =>
-      usePromptHistory({ initialPrompt: "  trimmed prompt  " })
-    );
-
-    expect(result.current.history).toEqual(["trimmed prompt"]);
-  });
 });
 
 describe("useScenarioGeneration", () => {

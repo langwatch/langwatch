@@ -10,9 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { useDrawerParams } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
@@ -45,20 +44,8 @@ export type { GeneratedScenario } from "./services/scenarioGeneration";
 // Custom Hooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type UsePromptHistoryOptions = {
-  initialPrompt?: string;
-};
-
-export function usePromptHistory(options?: UsePromptHistoryOptions) {
-  const { initialPrompt } = options ?? {};
-
-  // Initialize with trimmed initial prompt if provided and non-empty
-  const getInitialHistory = (): string[] => {
-    const trimmed = initialPrompt?.trim();
-    return trimmed ? [trimmed] : [];
-  };
-
-  const [history, setHistory] = useState<string[]>(getInitialHistory);
+export function usePromptHistory() {
+  const [history, setHistory] = useState<string[]>([]);
 
   const addPrompt = useCallback((prompt: string) => {
     setHistory((prev) => [...prev, prompt]);
@@ -133,23 +120,11 @@ const TOAST_DURATION_MS = 5000;
 
 export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { project } = useOrganizationTeamProject();
-  const drawerParams = useDrawerParams();
 
-  // Read initialPrompt from URL params (passed from ScenarioCreateModal)
-  // Use ref to capture the initial value and prevent re-initialization on URL changes
-  const initialPromptRef = useRef(drawerParams.initialPrompt);
-  const initialPrompt = initialPromptRef.current;
-  const hasInitialPrompt = Boolean(initialPrompt?.trim());
-
-  // Auto-switch to input view when there's an initial prompt
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    hasInitialPrompt ? "input" : "prompt"
-  );
+  const [viewMode, setViewMode] = useState<ViewMode>("prompt");
   const [input, setInput] = useState("");
 
-  const { history, addPrompt, hasHistory } = usePromptHistory({
-    initialPrompt,
-  });
+  const { history, addPrompt, hasHistory } = usePromptHistory();
   const { generate, status } = useScenarioGeneration(project?.id);
 
   // Check if the default model is enabled
