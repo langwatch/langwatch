@@ -19,6 +19,9 @@ import {
   translatePipelineAggregation,
 } from "./metric-translator";
 import { translateAllFilters, type FilterTranslation } from "./filter-translator";
+import { createLogger } from "../../../utils/logger";
+
+const logger = createLogger("langwatch:analytics:aggregation-builder");
 
 /** Maximum number of filter options returned by filter queries */
 const MAX_FILTER_OPTIONS = 10000;
@@ -98,6 +101,7 @@ interface GroupByExpression {
   requiredJoins: CHTable[];
   usesArrayJoin?: boolean;
   handlesUnknown?: boolean;
+  additionalWhere?: string;
 }
 
 /**
@@ -107,8 +111,10 @@ interface GroupByExpression {
  * and may need JOINs to different tables. Some use arrayJoin for multi-valued fields.
  * The registry pattern centralizes this complexity and makes it easy to add new
  * groupBy options without modifying the main query builder.
+ *
+ * @param groupByKey - Optional key to filter results (e.g., specific evaluator ID)
  */
-const groupByExpressions: Partial<Record<string, () => GroupByExpression>> = {
+const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupByExpression>> = {
   "topics.topics": () => ({
     column: `${tableAliases.trace_summaries}.TopicId`,
     requiredJoins: [],
@@ -135,24 +141,36 @@ const groupByExpressions: Partial<Record<string, () => GroupByExpression>> = {
     usesArrayJoin: true,
   }),
 
-  // For span-level grouping, we DON'T convert empty/missing to 'unknown'.
-  // Instead, we let them be empty and filter via HAVING in the outer query.
-  // This matches ES terms aggregation which excludes empty values.
+  // For span-level grouping, convert empty/missing to 'unknown' to match
+  // ES terms aggregation with `missing: "unknown"` configuration.
   "metadata.model": () => ({
-    column: `${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model']`,
+    column: `if(
+      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model'] = '' OR
+      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model'] IS NULL,
+      'unknown',
+      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model']
+    )`,
     requiredJoins: ["stored_spans"],
-    handlesUnknown: false,
+    handlesUnknown: true,
   }),
 
   "metadata.span_type": () => ({
-    column: `${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type']`,
+    column: `if(
+      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type'] = '' OR
+      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type'] IS NULL,
+      'unknown',
+      ${tableAliases.stored_spans}.SpanAttributes['langwatch.span.type']
+    )`,
     requiredJoins: ["stored_spans"],
-    handlesUnknown: false,
+    handlesUnknown: true,
   }),
 
-  "evaluations.evaluation_passed": () => ({
+  "evaluations.evaluation_passed": (groupByKey) => ({
     column: `${tableAliases.evaluation_states}.Passed`,
     requiredJoins: ["evaluation_states"],
+    additionalWhere: groupByKey
+      ? `${tableAliases.evaluation_states}.EvaluatorId = {groupByKey:String}`
+      : undefined,
   }),
 
   "evaluations.evaluation_label": () => ({
@@ -181,7 +199,23 @@ const groupByExpressions: Partial<Record<string, () => GroupByExpression>> = {
   }),
 
   "sentiment.thumbs_up_down": () => ({
-    column: `arrayJoin(arrayFilter(x -> x = 'thumbs_up_down', ${tableAliases.stored_spans}."Events.Name"))`,
+    // Extract the vote value from Events.Attributes where event name is 'thumbs_up_down'
+    // and convert to 'thumbs_up' (vote=1) or 'thumbs_down' (vote=-1)
+    // Events.Name and Events.Attributes are parallel arrays, so we zip them to filter
+    column: `arrayJoin(
+      arrayMap(
+        (n, a) -> multiIf(
+          toInt32OrNull(a['event.metrics.vote']) = 1, 'thumbs_up',
+          toInt32OrNull(a['event.metrics.vote']) = -1, 'thumbs_down',
+          ''
+        ),
+        arrayFilter(
+          (n, a) -> n = 'thumbs_up_down' AND mapContains(a, 'event.metrics.vote'),
+          ${tableAliases.stored_spans}."Events.Name",
+          ${tableAliases.stored_spans}."Events.Attributes"
+        )
+      )
+    )`,
     requiredJoins: ["stored_spans"] as CHTable[],
     usesArrayJoin: true,
   }),
@@ -274,13 +308,16 @@ const defaultGroupByExpression: GroupByExpression = {
  *
  * Uses registry lookup instead of switch statement for better extensibility.
  * When adding new groupBy fields, simply add an entry to groupByExpressions.
+ *
+ * @param groupBy - The field to group by
+ * @param groupByKey - Optional key to filter results (e.g., specific evaluator ID)
  */
 function getGroupByExpression(
   groupBy: string,
-  _groupByKey?: string,
+  groupByKey?: string,
 ): GroupByExpression {
   const builder = groupByExpressions[groupBy];
-  return builder ? builder() : defaultGroupByExpression;
+  return builder ? builder(groupByKey) : defaultGroupByExpression;
 }
 
 /**
@@ -341,12 +378,14 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   let usesArrayJoin = false;
   let groupByHandlesUnknown = false;
   let groupByRequiresSpans = false;
+  let groupByAdditionalWhere: string | undefined;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
     usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
     groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
     groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
+    groupByAdditionalWhere = groupByExpr.additionalWhere;
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
@@ -367,10 +406,15 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     )
   `;
 
-  const filterWhere =
+  let filterWhere =
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
+
+  // Add groupBy additional WHERE clause if present (e.g., for filtering by specific evaluator)
+  if (groupByAdditionalWhere) {
+    filterWhere += ` AND ${groupByAdditionalWhere}`;
+  }
 
   // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
   // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
@@ -398,9 +442,12 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   if (subqueryMetrics.length > 0 && input.timeScale !== "full") {
     // Pipeline metrics require CTEs and are only fully supported in "full" timeScale mode.
     // When timeScale is numeric, they're omitted from the query. This is a known limitation.
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[aggregation-builder] Pipeline metrics (${subqueryMetrics.map((m) => m.alias).join(", ")}) dropped: only supported with timeScale="full"`,
+    logger.warn(
+      {
+        droppedMetrics: subqueryMetrics.map((m) => m.alias),
+        timeScale: input.timeScale,
+      },
+      "Pipeline metrics require timeScale='full' and will be omitted",
     );
   }
 
@@ -488,6 +535,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterTranslation.params,
+      ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
 }
@@ -597,6 +645,7 @@ function buildArrayJoinTimeseriesQuery(
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterParams,
+      ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
 }
@@ -789,6 +838,7 @@ function buildSubqueryTimeseriesQuery(
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterParams,
+      ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
 }
@@ -1213,7 +1263,7 @@ export function buildFeedbacksQuery(
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
       AND event_name = 'thumbs_up_down'
-      AND mapContains(event_attrs, 'feedback')
+      AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
     ORDER BY event_timestamp DESC
     LIMIT 100

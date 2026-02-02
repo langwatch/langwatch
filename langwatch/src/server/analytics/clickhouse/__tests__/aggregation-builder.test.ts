@@ -446,10 +446,10 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("event_name = 'thumbs_up_down'");
     });
 
-    it("filters for events with feedback", () => {
+    it("filters for thumbs_up_down events with vote metric", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
-      expect(result.sql).toContain("mapContains(event_attrs, 'feedback')");
+      expect(result.sql).toContain("mapContains(event_attrs, 'event.metrics.vote')");
     });
 
     it("includes ARRAY JOIN for event arrays", () => {
