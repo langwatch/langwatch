@@ -23,15 +23,15 @@ def client():
     return TestClient(app)
 
 
-CSV_DATA_PATH = Path("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
+CSV_DATA_PATH: Path = Path("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
 
 
 class TestTopicClusteringIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
     @pytest.mark.skipif(
-        not CSV_DATA_PATH.exists(),
-        reason="Test data CSV file not available (notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv)"
+        not CSV_DATA_PATH.exists() or not os.getenv("AZURE_OPENAI_ENDPOINT") or not os.getenv("OPENAI_API_KEY"),
+        reason="Test data CSV file or required environment variables (AZURE_OPENAI_ENDPOINT, OPENAI_API_KEY) not available"
     )
     # NOTE: disable httpx_mock to see it working fully integrated
     async def test_it_does_batch_clustering(self, client):
