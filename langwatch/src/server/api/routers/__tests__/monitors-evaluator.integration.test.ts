@@ -7,11 +7,20 @@
  * Requires: PostgreSQL database (Prisma)
  */
 import { EvaluationExecutionMode } from "@prisma/client";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+// Mock license enforcement to avoid limits during tests
+vi.mock("../../../license-enforcement", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  return {
+    ...actual,
+    enforceLicenseLimit: vi.fn(),
+  };
+});
 
 // Skip when running with testcontainers only (no PostgreSQL)
 // TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure

@@ -4,11 +4,20 @@
  * Integration tests for Evaluators tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+// Mock license enforcement to avoid limits during tests
+vi.mock("../../../license-enforcement", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  return {
+    ...actual,
+    enforceLicenseLimit: vi.fn(),
+  };
+});
 
 describe("Evaluators Endpoints", () => {
   const projectId = "test-project-id";
