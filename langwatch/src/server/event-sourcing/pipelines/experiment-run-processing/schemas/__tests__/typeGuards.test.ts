@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../library/domain/tenantId";
 import {
-  EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
-  EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
-  EVALUATOR_RESULT_EVENT_TYPE,
-  EVALUATOR_RESULT_EVENT_VERSION_LATEST,
-  TARGET_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_VERSION_LATEST,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../constants";
 import type { ExperimentRunProcessingEvent } from "../events";
 import {
@@ -33,8 +27,8 @@ describe("typeGuards", () => {
     it("returns true for ExperimentRunStartedEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-        version: EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
         data: {
           runId: "run-123",
           experimentId: "exp-1",
@@ -49,8 +43,8 @@ describe("typeGuards", () => {
     it("returns false for other event types", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: TARGET_RESULT_EVENT_TYPE,
-        version: TARGET_RESULT_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
         data: {
           runId: "run-123",
           experimentId: "exp-1",
@@ -68,8 +62,8 @@ describe("typeGuards", () => {
     it("returns true for TargetResultEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: TARGET_RESULT_EVENT_TYPE,
-        version: TARGET_RESULT_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
         data: {
           runId: "run-123",
           experimentId: "exp-1",
@@ -85,8 +79,8 @@ describe("typeGuards", () => {
     it("returns false for other event types", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-        version: EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
         data: {
           runId: "run-123",
           experimentId: "exp-1",
@@ -103,8 +97,8 @@ describe("typeGuards", () => {
     it("returns true for EvaluatorResultEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EVALUATOR_RESULT_EVENT_TYPE,
-        version: EVALUATOR_RESULT_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
         data: {
           runId: "run-123",
           experimentId: "exp-1",
@@ -121,8 +115,8 @@ describe("typeGuards", () => {
     it("returns false for other event types", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-        version: EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
         data: {
           runId: "run-123",
           finishedAt: 1000,
@@ -137,8 +131,8 @@ describe("typeGuards", () => {
     it("returns true for ExperimentRunCompletedEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-        version: EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
         data: {
           runId: "run-123",
           finishedAt: 1000,
@@ -151,8 +145,8 @@ describe("typeGuards", () => {
     it("returns false for other event types", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
-        type: EVALUATOR_RESULT_EVENT_TYPE,
-        version: EVALUATOR_RESULT_EVENT_VERSION_LATEST,
+        type: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
         data: {
           runId: "run-123",
           experimentId: "exp-1",

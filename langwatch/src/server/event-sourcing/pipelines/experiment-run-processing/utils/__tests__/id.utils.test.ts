@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { IdUtils } from "../id.utils";
 
 describe("IdUtils", () => {
-  describe("generateDeterministicBatchResultId", () => {
+  describe("generateDeterministicResultId", () => {
     it("generates deterministic IDs (same input = same output)", () => {
-      const id1 = IdUtils.generateDeterministicBatchResultId(
+      const id1 = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -13,7 +13,7 @@ describe("IdUtils", () => {
         null,
         1000000,
       );
-      const id2 = IdUtils.generateDeterministicBatchResultId(
+      const id2 = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -37,10 +37,10 @@ describe("IdUtils", () => {
         1000000,
       ] as const;
 
-      const baseId = IdUtils.generateDeterministicBatchResultId(...baseArgs);
+      const baseId = IdUtils.generateDeterministicResultId(...baseArgs);
 
       // Different tenant
-      const differentTenant = IdUtils.generateDeterministicBatchResultId(
+      const differentTenant = IdUtils.generateDeterministicResultId(
         "tenant-2",
         "run-123",
         0,
@@ -52,7 +52,7 @@ describe("IdUtils", () => {
       expect(differentTenant).not.toBe(baseId);
 
       // Different run
-      const differentRun = IdUtils.generateDeterministicBatchResultId(
+      const differentRun = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-456",
         0,
@@ -64,7 +64,7 @@ describe("IdUtils", () => {
       expect(differentRun).not.toBe(baseId);
 
       // Different index
-      const differentIndex = IdUtils.generateDeterministicBatchResultId(
+      const differentIndex = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         1,
@@ -76,7 +76,7 @@ describe("IdUtils", () => {
       expect(differentIndex).not.toBe(baseId);
 
       // Different target
-      const differentTarget = IdUtils.generateDeterministicBatchResultId(
+      const differentTarget = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -89,7 +89,7 @@ describe("IdUtils", () => {
     });
 
     it("generates different IDs for target vs evaluator results", () => {
-      const targetId = IdUtils.generateDeterministicBatchResultId(
+      const targetId = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -99,7 +99,7 @@ describe("IdUtils", () => {
         1000000,
       );
 
-      const evaluatorId = IdUtils.generateDeterministicBatchResultId(
+      const evaluatorId = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -113,7 +113,7 @@ describe("IdUtils", () => {
     });
 
     it("generates different IDs for different evaluators", () => {
-      const eval1Id = IdUtils.generateDeterministicBatchResultId(
+      const eval1Id = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -123,7 +123,7 @@ describe("IdUtils", () => {
         1000000,
       );
 
-      const eval2Id = IdUtils.generateDeterministicBatchResultId(
+      const eval2Id = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
@@ -137,7 +137,7 @@ describe("IdUtils", () => {
     });
 
     it("returns a string ID", () => {
-      const id = IdUtils.generateDeterministicBatchResultId(
+      const id = IdUtils.generateDeterministicResultId(
         "tenant-1",
         "run-123",
         0,
