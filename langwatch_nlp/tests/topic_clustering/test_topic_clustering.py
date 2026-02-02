@@ -8,9 +8,7 @@ from fastapi.testclient import TestClient
 import httpx
 import pandas as pd
 import pytest
-from dotenv import load_dotenv
 
-load_dotenv()
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
 
@@ -18,15 +16,22 @@ from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
 from pytest_httpx import HTTPXMock
 
 
-app = FastAPI()
-client = TestClient(app)
-batch_clustering.setup_endpoints(app)
-incremental_clustering.setup_endpoints(app)
+@pytest.fixture(scope="module")
+def client():
+    app = FastAPI()
+    batch_clustering.setup_endpoints(app)
+    incremental_clustering.setup_endpoints(app)
+    return TestClient(app)
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.path.exists("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv"),
+    reason="Test CSV data file not available"
+)
 class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
-    async def test_it_does_batch_clustering(self, httpx_mock: HTTPXMock):
+    async def test_it_does_batch_clustering(self, client, httpx_mock: HTTPXMock):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
         df["embeddings"] = df["embeddings"].apply(
@@ -81,7 +86,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "traces": traces,
             },
@@ -102,7 +107,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "topics": result["topics"],
                 "subtopics": result["subtopics"],
@@ -121,7 +126,7 @@ class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
     @pytest.mark.skip  # uncomment to run this test, it intentionally throws errors multiple times before succeeding to test retry and error handling
     async def test_it_works_even_if_azure_throws_error_for_certain_requests(
-        self, httpx_mock: HTTPXMock
+        self, client, httpx_mock: HTTPXMock
     ):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
@@ -185,7 +190,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "traces": traces,
             },

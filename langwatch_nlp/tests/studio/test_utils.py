@@ -455,9 +455,9 @@ class TestTranslateModelIdForLitellm:
         assert result == "anthropic/claude-3-7-sonnet"
 
     def test_translates_anthropic_claude_3_5_sonnet(self):
-        """Translates anthropic/claude-3.5-sonnet to anthropic/claude-3-5-sonnet."""
+        """Translates anthropic/claude-3.5-sonnet to anthropic/claude-3-5-sonnet-20240620 (alias expansion)."""
         result = translate_model_id_for_litellm("anthropic/claude-3.5-sonnet")
-        assert result == "anthropic/claude-3-5-sonnet"
+        assert result == "anthropic/claude-3-5-sonnet-20240620"
 
     def test_preserves_openai_gpt_5(self):
         """Preserves openai/gpt-5 unchanged."""
