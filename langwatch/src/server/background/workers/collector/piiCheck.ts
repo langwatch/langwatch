@@ -18,11 +18,27 @@ import type {
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
-// Instantiates a client using the environment variable
-const credentials = env.GOOGLE_APPLICATION_CREDENTIALS
-  ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
-  : undefined;
-const dlp = new DlpServiceClient({ credentials });
+// Lazy initialization - env vars accessed only when getCredentials() is called
+let cachedCredentials: { project_id: string } | undefined | null = null; // null = not yet initialized
+
+function getCredentials(): { project_id: string } | undefined {
+  if (cachedCredentials === null) {
+    cachedCredentials = env.GOOGLE_APPLICATION_CREDENTIALS
+      ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
+      : undefined;
+  }
+  return cachedCredentials;
+}
+
+// Lazy DLP client - created only when getDlpClient() is called
+let dlpClient: DlpServiceClient | undefined;
+
+function getDlpClient(): DlpServiceClient {
+  if (!dlpClient) {
+    dlpClient = new DlpServiceClient({ credentials: getCredentials() });
+  }
+  return dlpClient;
+}
 
 const strictInfoTypes = {
   google_dlp: [
@@ -112,8 +128,8 @@ const dlpCheck = async (
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
-  const [response] = await dlp.inspectContent({
-    parent: `projects/${credentials.project_id}/locations/global`,
+  const [response] = await getDlpClient().inspectContent({
+    parent: `projects/${getCredentials()!.project_id}/locations/global`,
     inspectConfig: {
       infoTypes: (piiRedactionLevel === "ESSENTIAL"
         ? essentialInfoTypes
@@ -170,7 +186,7 @@ export const clearPII = async (
   } catch (e) {
     if (
       secondMethod === "google_dlp"
-        ? !credentials
+        ? !getCredentials()
         : !process.env.LANGEVALS_ENDPOINT
     ) {
       if (enforced) {
@@ -311,7 +327,7 @@ export const cleanupPIIs = async (
   return await startSpan({ name: "cleanupPIIs" }, async () => {
     const { enforced, mainMethod } = options;
 
-    if (!credentials && mainMethod === "google_dlp") {
+    if (!getCredentials() && mainMethod === "google_dlp") {
       if (enforced) {
         throw new Error(
           "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed",
