@@ -19,13 +19,39 @@ import {
 import type { Config, VerificationReport } from "./types.js";
 
 /**
- * Parse a numeric environment variable with validation.
- * Returns the default value if parsing fails or results in NaN.
+ * Parse a numeric environment variable with validation and bounds checking.
+ * Returns the default value if parsing fails, results in NaN, or is out of bounds.
  */
-function parseNumericEnv(value: string | undefined, defaultValue: number): number {
+function parseNumericEnv(
+  value: string | undefined,
+  defaultValue: number,
+  options?: { min?: number; max?: number; name?: string },
+): number {
   if (!value) return defaultValue;
+
   const parsed = parseFloat(value);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
+  if (!Number.isFinite(parsed)) {
+    console.warn(
+      `Warning: Invalid ${options?.name ?? "env"}: "${value}", using default: ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+
+  if (options?.min !== undefined && parsed < options.min) {
+    console.warn(
+      `Warning: ${options?.name ?? "env"} below minimum (${parsed} < ${options.min}), using default: ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+
+  if (options?.max !== undefined && parsed > options.max) {
+    console.warn(
+      `Warning: ${options?.name ?? "env"} above maximum (${parsed} > ${options.max}), using default: ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+
+  return parsed;
 }
 
 /**
@@ -39,9 +65,23 @@ function loadConfig(): Config {
     esApiKey: process.env["ES_API_KEY"] ?? "",
     esProjectId: process.env["ES_PROJECT_ID"] ?? "",
     prodApiKey: process.env["PROD_API_KEY"] ?? null,
-    tolerance: parseNumericEnv(process.env["TOLERANCE"], 0.05),
-    traceCount: Math.floor(parseNumericEnv(process.env["TRACE_COUNT"], 20)),
-    waitTimeMs: Math.floor(parseNumericEnv(process.env["WAIT_TIME_MS"], 120000)), // 2 minutes default
+    tolerance: parseNumericEnv(process.env["TOLERANCE"], 0.05, {
+      min: 0,
+      max: 1,
+      name: "TOLERANCE",
+    }),
+    traceCount: Math.floor(
+      parseNumericEnv(process.env["TRACE_COUNT"], 20, {
+        min: 1,
+        name: "TRACE_COUNT",
+      }),
+    ),
+    waitTimeMs: Math.floor(
+      parseNumericEnv(process.env["WAIT_TIME_MS"], 120000, {
+        min: 1000,
+        name: "WAIT_TIME_MS",
+      }),
+    ), // 2 minutes default
   };
 
   // Validate required config
