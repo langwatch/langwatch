@@ -186,10 +186,13 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 		return getEvaluatorDefaultSettings(evaluatorDef, project) ?? {};
 	}, [evaluatorDef, project]);
 
+	// Check if this is an LLM as Judge evaluator (should not prefill name)
+	const isLlmAsJudge = evaluatorType?.startsWith("langevals/llm_") ?? false;
+
 	// Form state using react-hook-form
 	const form = useForm<{ name: string; settings: Record<string, unknown> }>({
 		defaultValues: {
-			name: evaluatorDef?.name ?? "",
+			name: isLlmAsJudge ? "" : (evaluatorDef?.name ?? ""),
 			settings: defaultSettings,
 		},
 	});
@@ -203,11 +206,11 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 	useEffect(() => {
 		if (evaluatorDef && !evaluatorId) {
 			form.reset({
-				name: evaluatorDef.name,
+				name: isLlmAsJudge ? "" : evaluatorDef.name,
 				settings: defaultSettings,
 			});
 		}
-	}, [evaluatorDef, evaluatorId, defaultSettings, form]);
+	}, [evaluatorDef, evaluatorId, defaultSettings, form, isLlmAsJudge]);
 
 	// Initialize form with evaluator data
 	useEffect(() => {

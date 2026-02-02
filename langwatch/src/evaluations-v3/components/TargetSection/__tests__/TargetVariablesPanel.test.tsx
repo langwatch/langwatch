@@ -17,6 +17,11 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
   TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: () => "Web Search",
+}));
+
 const mockDatasets: DatasetReference[] = [
   {
     id: "dataset-1",
@@ -205,7 +210,8 @@ describe("TargetVariablesPanel", () => {
         await user.click(emptyInput);
 
         await waitFor(() => {
-          expect(screen.getByText("Web Search")).toBeInTheDocument();
+          // Name is resolved from target.id since names are now fetched via hooks
+          expect(screen.getByText("target-2")).toBeInTheDocument();
           expect(screen.getByText("search_results")).toBeInTheDocument();
         });
       }

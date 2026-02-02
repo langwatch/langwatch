@@ -19,6 +19,14 @@ import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { LocalPromptConfig } from "../types";
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "Test Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect/elementFromPoint properly
 vi.mock("rich-textarea", () => ({
   RichTextarea: forwardRef<

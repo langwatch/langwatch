@@ -81,6 +81,8 @@ describe("buildEvaluatorNode", () => {
       cell,
       0,
       settings,
+      undefined, // dbEvaluatorId
+      "Custom LLM Score", // name
     );
 
     // Settings should be in parameters array (format expected by langwatch_nlp)
@@ -120,6 +122,9 @@ describe("buildEvaluatorNode", () => {
       "target-1",
       cell,
       0,
+      {}, // settings
+      undefined, // dbEvaluatorId
+      "Exact Match", // name
     );
 
     // Should have empty parameters array when no settings
@@ -578,7 +583,7 @@ describe("buildEvaluatorTargetNode", () => {
     expect(() =>
       buildEvaluatorTargetNode("target-eval-1", targetConfig, cell),
     ).toThrow(
-      'Evaluator target "Sentiment Evaluator" (target-eval-1) has no evaluator ID',
+      'Evaluator target "target-eval-1" has no evaluator ID. targetEvaluatorId must be set.',
     );
   });
 
@@ -689,13 +694,39 @@ describe("buildEvaluatorTargetNode", () => {
     expect(node.data.cls).toBe("LangWatchEvaluator");
   });
 
-  it("preserves target name", () => {
+  it("preserves target name from loaded evaluator", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    // Must provide loadedEvaluators to get the evaluator name
+    const loadedEvaluators = new Map([
+      [
+        "eval-abc-123",
+        {
+          id: "eval-abc-123",
+          name: "Sentiment Evaluator",
+          config: {},
+        },
+      ],
+    ]);
+
+    const node = buildEvaluatorTargetNode(
+      "target-eval-1",
+      targetConfig,
+      cell,
+      loadedEvaluators,
+    );
+
+    expect(node.data.name).toBe("Sentiment Evaluator");
+  });
+
+  it("falls back to nodeId when evaluator not loaded", () => {
     const targetConfig = createEvaluatorTargetConfig();
     const cell = createCell();
 
     const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
 
-    expect(node.data.name).toBe("Sentiment Evaluator");
+    expect(node.data.name).toBe("target-eval-1");
   });
 
 });

@@ -9,6 +9,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "../../../types";
 import { EvaluatorChip } from "../EvaluatorChip";
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

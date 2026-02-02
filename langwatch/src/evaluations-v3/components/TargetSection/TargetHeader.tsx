@@ -218,19 +218,36 @@ export const TargetHeader = memo(function TargetHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Determine icon based on target type
+  // Note: Lucide icons don't forward data-testid, so we wrap in span for testing
   const getTargetIcon = () => {
     if (target.type === "prompt") {
-      return <LuFileText size={12} data-testid="icon-file" />;
+      return (
+        <span data-testid="icon-file">
+          <LuFileText size={12} />
+        </span>
+      );
     }
     if (target.type === "evaluator") {
-      return <LuCircleCheck size={12} data-testid="icon-evaluator" />;
+      return (
+        <span data-testid="icon-evaluator">
+          <LuCircleCheck size={12} />
+        </span>
+      );
     }
     // HTTP agents get a Globe icon
     if (target.type === "agent" && target.agentType === "http") {
-      return <LuGlobe size={12} data-testid="icon-globe" />;
+      return (
+        <span data-testid="icon-globe">
+          <LuGlobe size={12} />
+        </span>
+      );
     }
     // Other agents (code, workflow, signature) get Code icon
-    return <LuCode size={12} data-testid="icon-code" />;
+    return (
+      <span data-testid="icon-code">
+        <LuCode size={12} />
+      </span>
+    );
   };
 
   const getTargetColor = () => {

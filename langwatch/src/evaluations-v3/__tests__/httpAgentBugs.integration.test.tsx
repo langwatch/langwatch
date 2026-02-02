@@ -166,6 +166,22 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
+    prompts: {
+      getByIdOrHandle: {
+        useQuery: vi.fn(() => ({
+          data: { id: "prompt-123", name: "My Prompt" },
+          isLoading: false,
+        })),
+      },
+    },
+    evaluators: {
+      getById: {
+        useQuery: vi.fn(() => ({
+          data: undefined,
+          isLoading: false,
+        })),
+      },
+    },
     httpProxy: {
       execute: {
         useMutation: vi.fn(() => ({
@@ -245,11 +261,23 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
   });
 
   it("HTTP agent target displays with a Globe icon (different from code agent)", async () => {
-    // Create an HTTP agent target config
+    // Mock agents.getById to return agent names based on ID
+    vi.mocked(api.agents.getById.useQuery).mockImplementation((args) => {
+      if (args.id === "http-agent-1") {
+        return { data: { name: "My HTTP Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+      }
+      if (args.id === "code-agent-1") {
+        return { data: { name: "My Code Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+      }
+      return { data: undefined, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+    });
+
+    // Create an HTTP agent target config with dbAgentId to enable name lookup
     const httpAgentTarget: TargetConfig = {
       id: "http-target-1",
       type: "agent",
       agentType: "http",
+      dbAgentId: "http-agent-1",
       httpConfig: {
         url: "https://api.example.com/chat",
         method: "POST",
@@ -265,6 +293,7 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
       id: "code-target-1",
       type: "agent",
       agentType: "code",
+      dbAgentId: "code-agent-1",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},

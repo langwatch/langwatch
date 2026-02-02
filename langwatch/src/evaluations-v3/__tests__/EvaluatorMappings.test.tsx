@@ -60,6 +60,17 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "My Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: (evaluator: { evaluatorType: string }) =>
+    evaluator.evaluatorType === "langevals/llm_answer_match"
+      ? "LLM Answer Match"
+      : "Exact Match",
+}));
+
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {

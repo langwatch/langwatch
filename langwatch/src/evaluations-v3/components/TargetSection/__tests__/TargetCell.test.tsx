@@ -28,6 +28,14 @@ vi.mock("../../../hooks/useEvaluationsV3Store", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: () => "Test Target",
+}));
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

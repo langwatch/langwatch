@@ -27,6 +27,18 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: (target: { id: string }) => {
+    if (target.id === "test-target") return "Test Prompt";
+    if (target.id === "test-target-2") return "Test Prompt 2";
+    return "My Prompt";
+  },
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 

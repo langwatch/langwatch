@@ -19,6 +19,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "Test Target",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../types";

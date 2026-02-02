@@ -80,7 +80,6 @@ let saveExperimentMutateCall:
         targets: Array<{
           id: string;
           type: string;
-          name: string;
           promptId?: string;
           localPromptConfig?: {
             llm: { model: string };
@@ -326,7 +325,7 @@ describe("ExperimentFromPlaygroundButton", () => {
         const targets = saveExperimentMutateCall?.state.targets;
         expect(targets).toHaveLength(1);
         expect(targets?.[0]?.type).toBe("prompt");
-        expect(targets?.[0]?.name).toBe("My Saved Prompt");
+        // Name is now fetched via useTargetName hook, not stored on config
         // References the saved prompt
         expect(targets?.[0]?.promptId).toBe("prompt-123");
         // Has localPromptConfig because savedPrompt was not found (null in mock)

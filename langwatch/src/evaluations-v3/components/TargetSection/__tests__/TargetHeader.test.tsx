@@ -34,6 +34,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: (target: { id: string }) => target.id,
+}));
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Exact Match",
+}));
+
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 };
@@ -521,17 +529,17 @@ describe("TargetHeader", () => {
           status: "idle",
           targetOutputs: {
             // Results ARE persisted from previous execution
-            "target-1": ["Output 1", "Output 2", "Output 3"],
+            "test-prompt": ["Output 1", "Output 2", "Output 3"],
           },
           targetMetadata: {
-            "target-1": [
+            "test-prompt": [
               { duration: 1000, cost: 0.001 },
               { duration: 1200, cost: 0.002 },
               { duration: 800, cost: 0.001 },
             ],
           },
           evaluatorResults: {
-            "target-1": {
+            "test-prompt": {
               "evaluator-1": [
                 { status: "passed", passed: true },
                 { status: "passed", passed: true },
