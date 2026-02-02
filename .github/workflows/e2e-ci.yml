@@ -31,6 +31,7 @@ jobs:
       LANGEVALS_ENDPOINT: "http://localhost:5564"
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
+      NEXTAUTH_PROVIDER: "email"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
