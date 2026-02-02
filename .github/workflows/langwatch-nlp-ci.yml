@@ -1,0 +1,105 @@
+name: langwatch-nlp-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "langwatch_nlp/**"
+      - "python-sdk/**"
+      - ".github/workflows/langwatch-nlp-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "langwatch_nlp/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: langwatch_nlp
+        run: uv sync --all-extras
+
+      # FIXME: Re-enable linting and formatting checks
+      # - name: Run linting and formatting checks
+      #   working-directory: langwatch_nlp
+      #   run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "langwatch_nlp/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: langwatch_nlp
+        run: uv sync --all-extras
+
+      - name: Run unit tests
+        working-directory: langwatch_nlp
+        run: make test
+
+  test-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "langwatch_nlp/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: langwatch_nlp
+        run: uv sync --all-extras
+
+      - name: Run integration tests
+        working-directory: langwatch_nlp
+        env:
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
+        run: make test-integration
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.langwatch_nlp
+          push: false
+          tags: langwatch/langwatch_nlp:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

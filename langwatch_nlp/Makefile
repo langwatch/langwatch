@@ -1,10 +1,20 @@
-.PHONY: test test-integration install
+.PHONY: test test-integration install lint format
 
 test:
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -m "not integration" -vv $(filter-out $@,$(MAKECMDGOALS))
 
 test-integration:
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -m integration $(filter-out $@,$(MAKECMDGOALS))
+
+lint:
+	uv run ruff check .
+	uv run black --check .
+	uv run isort --check-only .
+
+format:
+	uv run ruff check --fix .
+	uv run black .
+	uv run isort .
 
 install: ensure-uv
 	uv sync --all-extras && uv pip uninstall litellm-enterprise litellm-proxy-extras
