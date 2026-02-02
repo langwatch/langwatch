@@ -2,15 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../library/domain/tenantId";
 import { EventStream } from "../../../../library/streams/eventStream";
 import {
-  EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
-  EXPERIMENT_RUN_STATE_PROJECTION_VERSION_LATEST,
-  EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
-  EVALUATOR_RESULT_EVENT_TYPE,
-  EVALUATOR_RESULT_EVENT_VERSION_LATEST,
-  TARGET_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_VERSION_LATEST,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
+  EXPERIMENT_RUN_PROJECTION_VERSIONS,
 } from "../../schemas/constants";
 import type {
   ExperimentRunCompletedEvent,
@@ -32,8 +26,8 @@ function createStartedEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 1000,
-    type: EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-    version: EXPERIMENT_RUN_STARTED_EVENT_VERSION_LATEST,
+    type: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+    version: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
     data: {
       runId: "run-123",
       experimentId: "exp-1",
@@ -54,8 +48,8 @@ function createTargetResultEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 2000,
-    type: TARGET_RESULT_EVENT_TYPE,
-    version: TARGET_RESULT_EVENT_VERSION_LATEST,
+    type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+    version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
     data: {
       runId: "run-123",
       experimentId: "exp-1",
@@ -79,8 +73,8 @@ function createEvaluatorResultEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 3000,
-    type: EVALUATOR_RESULT_EVENT_TYPE,
-    version: EVALUATOR_RESULT_EVENT_VERSION_LATEST,
+    type: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+    version: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
     data: {
       runId: "run-123",
       experimentId: "exp-1",
@@ -104,8 +98,8 @@ function createCompletedEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 4000,
-    type: EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-    version: EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
+    type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
+    version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
     data: {
       runId: "run-123",
       finishedAt: 4000,
@@ -130,7 +124,7 @@ describe("ExperimentRunStateProjectionHandler", () => {
     expect(projection.data.CompletedCount).toBe(0);
     expect(projection.data.FailedCount).toBe(0);
     expect(projection.version).toBe(
-      EXPERIMENT_RUN_STATE_PROJECTION_VERSION_LATEST,
+      EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
     );
   });
 
