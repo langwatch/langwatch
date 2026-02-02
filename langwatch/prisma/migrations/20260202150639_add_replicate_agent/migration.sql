@@ -10,3 +10,6 @@ ALTER TABLE "Agent" ADD COLUMN     "copiedFromAgentId" TEXT;
 
 -- CreateIndex
 CREATE INDEX "Agent_copiedFromAgentId_idx" ON "Agent"("copiedFromAgentId");
+
+-- AddForeignKey
+ALTER TABLE "Agent" ADD CONSTRAINT "Agent_copiedFromAgentId_fkey" FOREIGN KEY ("copiedFromAgentId") REFERENCES "Agent"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;

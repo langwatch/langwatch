@@ -11,3 +11,6 @@ ALTER TABLE "Evaluator" ADD COLUMN     "copiedFromEvaluatorId" TEXT;
 
 -- CreateIndex
 CREATE INDEX "Evaluator_copiedFromEvaluatorId_idx" ON "Evaluator"("copiedFromEvaluatorId");
+
+-- AddForeignKey
+ALTER TABLE "Evaluator" ADD CONSTRAINT "Evaluator_copiedFromEvaluatorId_fkey" FOREIGN KEY ("copiedFromEvaluatorId") REFERENCES "Evaluator"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
