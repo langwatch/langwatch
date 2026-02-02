@@ -7,9 +7,9 @@ import { defineCommandSchema } from "../../../library";
 import type { RecordEvaluatorResultCommandData } from "../schemas/commands";
 import { recordEvaluatorResultCommandDataSchema } from "../schemas/commands";
 import {
-  EVALUATOR_RESULT_EVENT_TYPE,
-  EVALUATOR_RESULT_EVENT_VERSION_LATEST,
-  RECORD_EVALUATOR_RESULT_COMMAND_TYPE,
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../schemas/constants";
 import type {
   ExperimentRunProcessingEvent,
@@ -26,8 +26,8 @@ const config: ExperimentRunCommandConfig<
   RecordEvaluatorResultCommandData,
   EvaluatorResultEventData
 > = {
-  eventType: EVALUATOR_RESULT_EVENT_TYPE,
-  eventVersion: EVALUATOR_RESULT_EVENT_VERSION_LATEST,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
   loggerName: "record-evaluator-result",
   handleLogMessage: "Handling record evaluator result command",
   emitLogMessage: "Emitting evaluator result event",
@@ -65,7 +65,7 @@ export class RecordEvaluatorResultCommand
     >
 {
   static readonly schema = defineCommandSchema(
-    RECORD_EVALUATOR_RESULT_COMMAND_TYPE,
+    EXPERIMENT_RUN_COMMAND_TYPES.RECORD_EVALUATOR_RESULT,
     recordEvaluatorResultCommandDataSchema,
     "Command to record an evaluator result",
   );

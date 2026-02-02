@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { targetSchema } from "./shared";
 
-/**
- * Command data for starting an experiment run.
- * Emitted when an experiment run begins.
- */
 export const startExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
@@ -18,10 +14,6 @@ export type StartExperimentRunCommandData = z.infer<
   typeof startExperimentRunCommandDataSchema
 >;
 
-/**
- * Command data for recording a target result.
- * Emitted when a target execution completes for a row.
- */
 export const recordTargetResultCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
@@ -40,10 +32,6 @@ export type RecordTargetResultCommandData = z.infer<
   typeof recordTargetResultCommandDataSchema
 >;
 
-/**
- * Command data for recording an evaluator result.
- * Emitted when an evaluator completes for a row.
- */
 export const recordEvaluatorResultCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
@@ -64,10 +52,6 @@ export type RecordEvaluatorResultCommandData = z.infer<
   typeof recordEvaluatorResultCommandDataSchema
 >;
 
-/**
- * Command data for completing an experiment run.
- * Emitted when an experiment run finishes (either normally or stopped).
- */
 export const completeExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),

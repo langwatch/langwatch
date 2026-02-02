@@ -1,9 +1,4 @@
-import {
-  EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  EVALUATOR_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_TYPE,
-} from "./constants";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
 import type {
   ExperimentRunCompletedEvent,
   ExperimentRunProcessingEvent,
@@ -12,38 +7,26 @@ import type {
   TargetResultEvent,
 } from "./events";
 
-/**
- * Type guard for ExperimentRunStartedEvent.
- */
 export function isExperimentRunStartedEvent(
   event: ExperimentRunProcessingEvent,
 ): event is ExperimentRunStartedEvent {
-  return event.type === EXPERIMENT_RUN_STARTED_EVENT_TYPE;
+  return event.type === EXPERIMENT_RUN_EVENT_TYPES.STARTED;
 }
 
-/**
- * Type guard for TargetResultEvent.
- */
 export function isTargetResultEvent(
   event: ExperimentRunProcessingEvent,
 ): event is TargetResultEvent {
-  return event.type === TARGET_RESULT_EVENT_TYPE;
+  return event.type === EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT;
 }
 
-/**
- * Type guard for EvaluatorResultEvent.
- */
 export function isEvaluatorResultEvent(
   event: ExperimentRunProcessingEvent,
 ): event is EvaluatorResultEvent {
-  return event.type === EVALUATOR_RESULT_EVENT_TYPE;
+  return event.type === EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT;
 }
 
-/**
- * Type guard for ExperimentRunCompletedEvent.
- */
 export function isExperimentRunCompletedEvent(
   event: ExperimentRunProcessingEvent,
 ): event is ExperimentRunCompletedEvent {
-  return event.type === EXPERIMENT_RUN_COMPLETED_EVENT_TYPE;
+  return event.type === EXPERIMENT_RUN_EVENT_TYPES.COMPLETED;
 }

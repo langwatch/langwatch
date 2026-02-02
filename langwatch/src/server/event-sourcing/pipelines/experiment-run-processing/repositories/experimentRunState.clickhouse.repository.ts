@@ -18,15 +18,12 @@ import type {
 } from "../projections/experimentRunState.projection.handler";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
-const TABLE_NAME = "batch_evaluation_runs" as const;
+const TABLE_NAME = "experiment_runs" as const;
 
 const logger = createLogger(
   "langwatch:experiment-run-processing:run-state-repository",
 );
 
-/**
- * ClickHouse record matching the batch_evaluation_runs table schema exactly.
- */
 interface ClickHouseExperimentRunRecord {
   Id: string;
   TenantId: string;
@@ -34,44 +31,32 @@ interface ClickHouseExperimentRunRecord {
   ExperimentId: string;
   WorkflowVersionId: string | null;
   Version: string;
-
   Total: number;
   Progress: number;
   CompletedCount: number;
   FailedCount: number;
   TotalCost: number | null;
-  TotalDurationMs: string | null; // UInt64 as string
+  TotalDurationMs: string | null;
   AvgScore: number | null;
   PassRate: number | null;
   Targets: string;
-
-  CreatedAt: string; // DateTime64(3) as string
+  CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;
   StoppedAt: string | null;
-
   LastProcessedEventId: string;
 }
 
-/**
- * Converts a Unix millisecond timestamp to ClickHouse DateTime64(3) format.
- */
 function timestampToDateTime64(timestampMs: number | null): string | null {
   if (timestampMs === null) return null;
   return timestampMs.toString();
 }
 
-/**
- * Converts a ClickHouse DateTime64(3) string to Unix millisecond timestamp.
- */
 function dateTime64ToTimestamp(dateTime64: string | null): number | null {
   if (dateTime64 === null) return null;
   return parseInt(dateTime64, 10);
 }
 
-/**
- * ClickHouse repository for experiment run states.
- */
 export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType>
@@ -117,7 +102,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       ExperimentId: data.ExperimentId,
       WorkflowVersionId: data.WorkflowVersionId,
       Version: projectionVersion,
-
       Total: data.Total,
       Progress: data.Progress,
       CompletedCount: data.CompletedCount,
@@ -127,12 +111,10 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScore: data.AvgScore,
       PassRate: data.PassRate,
       Targets: data.Targets,
-
       CreatedAt: timestampToDateTime64(data.CreatedAt) ?? "0",
       UpdatedAt: timestampToDateTime64(data.UpdatedAt) ?? "0",
       FinishedAt: timestampToDateTime64(data.FinishedAt),
       StoppedAt: timestampToDateTime64(data.StoppedAt),
-
       LastProcessedEventId: lastProcessedEventId,
     };
   }
@@ -152,67 +134,42 @@ export class ExperimentRunStateRepositoryClickHouse<
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id,
-            TenantId,
-            RunId,
-            ExperimentId,
-            WorkflowVersionId,
-            Version,
-            Total,
-            Progress,
-            CompletedCount,
-            FailedCount,
-            TotalCost,
+            Id, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
+            Total, Progress, CompletedCount, FailedCount, TotalCost,
             toString(TotalDurationMs) AS TotalDurationMs,
-            AvgScore,
-            PassRate,
-            Targets,
+            AvgScore, PassRate, Targets,
             toString(CreatedAt) AS CreatedAt,
             toString(UpdatedAt) AS UpdatedAt,
             toString(FinishedAt) AS FinishedAt,
             toString(StoppedAt) AS StoppedAt,
             LastProcessedEventId
           FROM ${TABLE_NAME} FINAL
-          WHERE TenantId = {tenantId:String}
-            AND RunId = {runId:String}
+          WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
           ORDER BY Version DESC
           LIMIT 1
         `,
-        query_params: {
-          tenantId: context.tenantId,
-          runId: runId,
-        },
+        query_params: { tenantId: context.tenantId, runId },
         format: "JSONEachRow",
       });
 
       const rows = await result.json<ClickHouseExperimentRunRecord>();
       const row = rows[0];
-      if (!row) {
-        return null;
-      }
-
-      const projectionData = this.mapClickHouseRecordToProjectionData(row);
+      if (!row) return null;
 
       const projection: ExperimentRunState = {
         id: row.Id,
         aggregateId: runId,
         tenantId: createTenantId(context.tenantId),
         version: row.Version,
-        data: projectionData,
+        data: this.mapClickHouseRecordToProjectionData(row),
       };
 
       return projection as ProjectionType;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
-        {
-          runId,
-          tenantId: context.tenantId,
-          error: errorMessage,
-        },
-        "Failed to get projection from ClickHouse",
-      );
+      logger.error({ runId, tenantId: context.tenantId, error: errorMessage },
+        "Failed to get projection from ClickHouse");
       throw new StoreError(
         "getProjection",
         "ExperimentRunStateRepositoryClickHouse",
@@ -257,7 +214,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
-        projection.id, // Use projection ID as lastProcessedEventId for now
+        projection.id,
       );
 
       await this.clickHouseClient.insert({
@@ -266,35 +223,23 @@ export class ExperimentRunStateRepositoryClickHouse<
         format: "JSONEachRow",
       });
 
-      logger.debug(
-        {
-          tenantId: context.tenantId,
-          runId,
-          projectionId: projection.id,
-        },
-        "Stored experiment run state projection to ClickHouse",
-      );
+      logger.debug({ tenantId: context.tenantId, runId, projectionId: projection.id },
+        "Stored experiment run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
-        {
-          tenantId: context.tenantId,
-          runId: String(projection.aggregateId),
-          projectionId: projection.id,
-          error: errorMessage,
-        },
-        "Failed to store projection in ClickHouse",
-      );
+      logger.error({
+        tenantId: context.tenantId,
+        runId: String(projection.aggregateId),
+        projectionId: projection.id,
+        error: errorMessage,
+      }, "Failed to store projection in ClickHouse");
       throw new StoreError(
         "storeProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
         ErrorCategory.CRITICAL,
-        {
-          projectionId: projection.id,
-          runId: String(projection.aggregateId),
-        },
+        { projectionId: projection.id, runId: String(projection.aggregateId) },
         error,
       );
     }

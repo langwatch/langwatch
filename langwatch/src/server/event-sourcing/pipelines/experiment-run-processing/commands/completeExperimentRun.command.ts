@@ -7,9 +7,9 @@ import { defineCommandSchema } from "../../../library";
 import type { CompleteExperimentRunCommandData } from "../schemas/commands";
 import { completeExperimentRunCommandDataSchema } from "../schemas/commands";
 import {
-  EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
-  COMPLETE_EXPERIMENT_RUN_COMMAND_TYPE,
+  EXPERIMENT_RUN_COMMAND_TYPES,
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../schemas/constants";
 import type {
   ExperimentRunCompletedEvent,
@@ -26,8 +26,8 @@ const config: ExperimentRunCommandConfig<
   CompleteExperimentRunCommandData,
   ExperimentRunCompletedEventData
 > = {
-  eventType: EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  eventVersion: EXPERIMENT_RUN_COMPLETED_EVENT_VERSION_LATEST,
+  eventType: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
   loggerName: "complete-experiment-run",
   handleLogMessage: "Handling complete experiment run command",
   emitLogMessage: "Emitting experiment run completed event",
@@ -54,7 +54,7 @@ export class CompleteExperimentRunCommand
     >
 {
   static readonly schema = defineCommandSchema(
-    COMPLETE_EXPERIMENT_RUN_COMMAND_TYPE,
+    EXPERIMENT_RUN_COMMAND_TYPES.COMPLETE,
     completeExperimentRunCommandDataSchema,
     "Command to complete an experiment run",
   );

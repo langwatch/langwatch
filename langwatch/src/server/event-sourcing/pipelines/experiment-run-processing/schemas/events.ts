@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { EventSchema } from "../../../library/domain/types";
-import {
-  EXPERIMENT_RUN_COMPLETED_EVENT_TYPE,
-  EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-  EVALUATOR_RESULT_EVENT_TYPE,
-  TARGET_RESULT_EVENT_TYPE,
-} from "./constants";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
 import { targetSchema } from "./shared";
 
 /**
@@ -29,7 +24,7 @@ export const experimentRunStartedEventDataSchema = z.object({
 });
 
 export const experimentRunStartedEventSchema = EventSchema.extend({
-  type: z.literal(EXPERIMENT_RUN_STARTED_EVENT_TYPE),
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.STARTED),
   data: experimentRunStartedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
@@ -58,7 +53,7 @@ export const targetResultEventDataSchema = z.object({
 });
 
 export const targetResultEventSchema = EventSchema.extend({
-  type: z.literal(TARGET_RESULT_EVENT_TYPE),
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT),
   data: targetResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
@@ -85,7 +80,7 @@ export const evaluatorResultEventDataSchema = z.object({
 });
 
 export const evaluatorResultEventSchema = EventSchema.extend({
-  type: z.literal(EVALUATOR_RESULT_EVENT_TYPE),
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT),
   data: evaluatorResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
@@ -105,7 +100,7 @@ export const experimentRunCompletedEventDataSchema = z.object({
 });
 
 export const experimentRunCompletedEventSchema = EventSchema.extend({
-  type: z.literal(EXPERIMENT_RUN_COMPLETED_EVENT_TYPE),
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.COMPLETED),
   data: experimentRunCompletedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
@@ -126,7 +121,6 @@ export type ExperimentRunProcessingEvent =
   | EvaluatorResultEvent
   | ExperimentRunCompletedEvent;
 
-// Re-export type guards for backwards compatibility
 export {
   isExperimentRunCompletedEvent,
   isExperimentRunStartedEvent,
