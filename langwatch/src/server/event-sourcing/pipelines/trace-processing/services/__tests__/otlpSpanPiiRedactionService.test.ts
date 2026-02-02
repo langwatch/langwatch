@@ -10,13 +10,29 @@ import {
   type OtlpSpanPiiRedactionServiceDependencies,
 } from "../otlpSpanPiiRedactionService";
 
-// Use a mutable reference to allow tests to change NODE_ENV behavior
-const mockEnv = { NODE_ENV: "test" as string };
+// Use vi.hoisted to ensure mockEnv is available when vi.mock is hoisted
+const mockEnv = vi.hoisted(() => ({
+  NODE_ENV: "test" as string,
+  LANGEVALS_ENDPOINT: "http://mock-langevals",
+}));
 
 vi.mock("~/env.mjs", () => ({
   get env() {
     return mockEnv;
   },
+}));
+
+// Mock server modules to prevent t3-env server-side validation
+vi.mock("~/server/db", () => ({
+  prisma: {
+    project: {
+      findUnique: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("~/server/background/workers/collector/piiCheck", () => ({
+  clearPII: vi.fn(),
 }));
 
 function createMockOtlpSpan(attributes: OtlpKeyValue[]): OtlpSpan {
