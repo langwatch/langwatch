@@ -51,7 +51,7 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
-import { enforceLicenseLimit } from "../../license-enforcement/enforcement.middleware";
+import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
