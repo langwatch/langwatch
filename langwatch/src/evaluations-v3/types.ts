@@ -370,6 +370,8 @@ export type UIState = {
   autosaveStatus: AutosaveStatus;
   // Concurrency limit for parallel execution (default 10)
   concurrency: number;
+  // Whether an evaluation has been run this session (enables History button)
+  hasRunThisSession: boolean;
 };
 
 // ============================================================================
@@ -680,6 +682,7 @@ export const createInitialUIState = (): UIState => ({
     dataset: "idle",
   },
   concurrency: DEFAULT_CONCURRENCY,
+  hasRunThisSession: false,
 });
 
 export const createInitialState = (): EvaluationsV3State => ({

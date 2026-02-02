@@ -100,6 +100,7 @@ const setupStore = () => {
         dataset: "idle",
       },
       concurrency: 10,
+      hasRunThisSession: false,
     },
   });
 };

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -8,7 +8,6 @@ import type {
   ExecutionRequest,
   ExecutionScope,
 } from "~/server/evaluations-v3/execution/types";
-import { api } from "~/utils/api";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import type { EvaluationResults } from "../types";
 import {
@@ -71,11 +70,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const [totalCost, setTotalCost] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isAborting, setIsAborting] = useState(false);
-
-  // Track if we've already invalidated the history query for this session
-  // We only need to invalidate once to enable the History button
-  const hasInvalidatedHistory = useRef(false);
-  const trpcUtils = api.useContext();
 
   // Get store state and actions
   const {
@@ -257,32 +251,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             progress: 0,
             total: event.total,
           });
-          // Invalidate history query once to enable the History button, but only if
-          // there was no history before. If history already exists, no need to invalidate.
-          if (!hasInvalidatedHistory.current && project?.id && experimentId) {
-            // Mark as invalidated so we never check again
-            hasInvalidatedHistory.current = true;
-            // Check if trpcUtils is available (may be null in tests)
-            try {
-              const cachedHistory =
-                trpcUtils.experiments.getExperimentBatchEvaluationRuns.getData({
-                  projectId: project.id,
-                  experimentId,
-                });
-              const hasExistingRuns = (cachedHistory?.runs.length ?? 0) > 0;
-              // Only invalidate if there were no runs before
-              if (!hasExistingRuns) {
-                void trpcUtils.experiments.getExperimentBatchEvaluationRuns.invalidate(
-                  {
-                    projectId: project.id,
-                    experimentId,
-                  },
-                );
-              }
-            } catch {
-              // trpcUtils may not be available in tests - ignore
-            }
-          }
           break;
 
         case "cell_started":
@@ -373,15 +341,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
       }
     },
-    [
-      setResults,
-      updateTargetOutput,
-      updateTargetError,
-      updateEvaluatorResult,
-      project?.id,
-      experimentId,
-      trpcUtils,
-    ],
+    [setResults, updateTargetOutput, updateTargetError, updateEvaluatorResult],
   );
 
   /**
@@ -402,6 +362,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       setStatus("running");
       setError(null);
       setTotalCost(0);
+
+      // Mark that we've run an evaluation this session (enables History button)
+      // Only for full executions, not for cell/evaluator reruns
+      if (scope.type === "full") {
+        useEvaluationsV3Store.setState((state) => ({
+          ui: { ...state.ui, hasRunThisSession: true },
+        }));
+      }
 
       // Compute which cells will be executed (single source of truth)
       const datasetRows = activeDataset.inline?.records

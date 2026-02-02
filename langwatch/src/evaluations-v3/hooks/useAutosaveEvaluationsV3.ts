@@ -88,6 +88,7 @@ export const useAutosaveEvaluationsV3 = () => {
       hiddenColumns,
       autosaveStatus: { evaluation: "idle", dataset: "idle" },
       concurrency,
+      hasRunThisSession: false,
     },
   });
 
