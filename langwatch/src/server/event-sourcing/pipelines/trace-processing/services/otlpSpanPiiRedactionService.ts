@@ -110,7 +110,8 @@ export class OtlpSpanPiiRedactionService {
    * Mirrors the PII redaction behavior from piiCheck.ts:
    * 1. Checks process.env.DISABLE_PII_REDACTION - if set, skips entirely
    * 2. Checks piiRedactionLevel !== "DISABLED" - if disabled, skips
-   * 3. Sets enforced: env.NODE_ENV === "production" - in prod, errors fail; otherwise warn and continue
+   * 3. Checks LANGEVALS_ENDPOINT is set for presidio method
+   * 4. Sets enforced: env.NODE_ENV === "production" - in prod, errors fail; otherwise warn and continue
    *
    * Only scans attributes with keys in piiBearingAttributeKeys to minimize cost.
    *
@@ -132,6 +133,17 @@ export class OtlpSpanPiiRedactionService {
 
     // In production, enforce PII redaction (errors fail); otherwise warn and continue
     const piiEnforced = env.NODE_ENV === "production";
+
+    // Mirror cleanupPIIs pre-check: presidio requires LANGEVALS_ENDPOINT
+    if (!env.LANGEVALS_ENDPOINT) {
+      if (piiEnforced) {
+        throw new Error(
+          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
+        );
+      }
+      // In non-production, skip PII check but allow processing to continue
+      return;
+    }
 
     const options: PIICheckOptions = {
       piiRedactionLevel,
@@ -183,9 +195,7 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== undefined &&
         attr.value.stringValue !== null
       ) {
-        promises.push(
-          this.deps.clearPII(attr.value, ["stringValue"], options),
-        );
+        promises.push(this.deps.clearPII(attr.value, ["stringValue"], options));
       }
     }
   }
