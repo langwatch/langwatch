@@ -19,7 +19,7 @@ export function createModelFromParams(
   litellmParams: LiteLLMParams,
   nlpServiceUrl: string,
 ) {
-  const providerKey = litellmParams.model.split("/")[0];
+  const providerKey = litellmParams.model.split("/")[0] || undefined;
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,

@@ -71,9 +71,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
     const contentType = response.headers.get("content-type");
     if (contentType?.includes("application/json")) {
-      return response.json();
+      return await response.json();
     }
-    return response.text();
+    return await response.text();
   }
 
   private extractResponseContent(data: unknown): string {

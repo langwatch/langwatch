@@ -13,14 +13,14 @@ START_APP_COMMAND="pnpm run start:app"
 
 COMMANDS=()
 NAMES=()
-COMMANDS+=("\"$RUNTIME_ENV $START_APP_COMMAND\"")
+COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
 NAMES+=("app")
 
 # Auto-start workers if Redis is available (convenience for local dev)
-if grep -Eq "^(REDIS_URL|REDIS_CLUSTER_ENDPOINTS)=\"?[[:alnum:]]" .env \
+if { [ -f .env ] && grep -Eq "^(REDIS_URL|REDIS_CLUSTER_ENDPOINTS)=\"?[[:alnum:]]" .env; } \
    || [ -n "$REDIS_URL" ] \
    || [ -n "$REDIS_CLUSTER_ENDPOINTS" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV pnpm run start:workers\"")
+  COMMANDS+=("$RUNTIME_ENV pnpm run start:workers")
   NAMES+=("workers")
 fi
 

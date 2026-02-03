@@ -341,7 +341,8 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
           if (!params.api_key || !params.model) return null;
 
           return params as LiteLLMParams;
-        } catch {
+        } catch (error) {
+          console.error("Failed to prepare LiteLLM params:", error);
           return null;
         }
       },
