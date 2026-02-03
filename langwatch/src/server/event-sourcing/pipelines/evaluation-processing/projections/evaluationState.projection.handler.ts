@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   EventStream,
   Projection,
@@ -60,9 +60,10 @@ export interface EvaluationState extends Projection<EvaluationStateData> {
  * - EvaluationStartedEvent -> status: "in_progress"
  * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
  */
-export class EvaluationStateProjectionHandler
-  implements ProjectionHandler<EvaluationProcessingEvent, EvaluationState>
-{
+export class EvaluationStateProjectionHandler implements ProjectionHandler<
+  EvaluationProcessingEvent,
+  EvaluationState
+> {
   static get store() {
     return getEvaluationStateRepository();
   }

@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import type {

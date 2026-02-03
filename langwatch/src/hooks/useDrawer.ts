@@ -5,7 +5,6 @@ import {
   type DrawerCallbacks,
   type DrawerProps,
   type DrawerType,
-  drawers,
 } from "../components/drawerRegistry";
 import { createLogger } from "../utils/logger";
 

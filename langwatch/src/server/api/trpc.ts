@@ -24,7 +24,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
 import type { PermissionMiddleware } from "./rbac";
@@ -215,9 +215,8 @@ const auditLogMutations = t.middleware(
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } = await import(
-      "../context/asyncContext"
-    );
+    const { createContextFromTRPC, runWithContext } =
+      await import("../context/asyncContext");
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);
@@ -243,7 +242,8 @@ export const loggerMiddleware = t.middleware(
         };
 
         if (error) {
-          logData.error = error instanceof Error ? error : JSON.stringify(error);
+          logData.error =
+            error instanceof Error ? error : JSON.stringify(error);
 
           captureException(error);
 

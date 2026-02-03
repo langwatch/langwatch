@@ -13,7 +13,7 @@ import { spawn, type ChildProcess } from "child_process";
 import path from "path";
 import type { Job, Worker } from "bullmq";
 import { Worker as BullMQWorker } from "bullmq";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
 import {

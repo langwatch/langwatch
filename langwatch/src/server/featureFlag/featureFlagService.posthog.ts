@@ -1,12 +1,9 @@
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "../posthog";
 import { FEATURE_FLAG_CACHE_TTL_MS } from "./constants";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
-import type {
-  FeatureFlagOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.

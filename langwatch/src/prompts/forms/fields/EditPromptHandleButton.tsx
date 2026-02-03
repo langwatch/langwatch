@@ -10,7 +10,7 @@ import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger/client";
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
   "langwatch:prompt-configs:edit-prompt-handle-button",

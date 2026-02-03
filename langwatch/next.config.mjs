@@ -87,6 +87,7 @@ const config = {
     "pino-pretty",
     "pino-opentelemetry-transport",
     "thread-stream",
+    "async_hooks",
   ],
 
   experimental: {
@@ -162,6 +163,8 @@ const config = {
         "node:stream": false,
         worker_threads: false,
         "node:worker_threads": false,
+        async_hooks: false,
+        "node:async_hooks": false,
       };
     }
 

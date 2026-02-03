@@ -5,13 +5,17 @@
  * dependencies. Each method is focused on a single responsibility.
  */
 
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type {
   ExecutionInput,
   OrchestratorDependencies,
   TracerHandle,
 } from "./orchestrator.types";
-import type { LiteLLMParams, ScenarioConfig, ScenarioExecutionResult } from "./types";
+import type {
+  LiteLLMParams,
+  ScenarioConfig,
+  ScenarioExecutionResult,
+} from "./types";
 
 const logger = createLogger("langwatch:scenarios:orchestrator");
 
@@ -23,7 +27,10 @@ export class ScenarioExecutionOrchestrator {
     let tracerHandle: TracerHandle | undefined;
 
     try {
-      const scenario = await this.fetchScenario(context.projectId, context.scenarioId);
+      const scenario = await this.fetchScenario(
+        context.projectId,
+        context.scenarioId,
+      );
       if (!scenario) {
         return this.notFound("Scenario", context.scenarioId);
       }
@@ -45,7 +52,11 @@ export class ScenarioExecutionOrchestrator {
         return this.failure(`Failed to prepare model params`);
       }
 
-      const adapterResult = await this.createAdapter(context.projectId, target, modelParams);
+      const adapterResult = await this.createAdapter(
+        context.projectId,
+        target,
+        modelParams,
+      );
       if (!adapterResult.success) {
         return this.failure(adapterResult.error);
       }
@@ -61,7 +72,9 @@ export class ScenarioExecutionOrchestrator {
       );
     } catch (error) {
       logger.error({ error, context }, "Scenario execution failed");
-      return this.failure(error instanceof Error ? error.message : String(error));
+      return this.failure(
+        error instanceof Error ? error.message : String(error),
+      );
     } finally {
       await this.shutdownTracer(tracerHandle);
     }
@@ -82,7 +95,9 @@ export class ScenarioExecutionOrchestrator {
   private async createAdapter(
     projectId: string,
     target: ExecutionInput["target"],
-    modelParams: NonNullable<Awaited<ReturnType<typeof this.prepareModelParams>>>,
+    modelParams: NonNullable<
+      Awaited<ReturnType<typeof this.prepareModelParams>>
+    >,
   ) {
     return this.deps.adapterFactory.create({
       projectId,
@@ -130,7 +145,10 @@ export class ScenarioExecutionOrchestrator {
       await tracerHandle.shutdown();
     } catch (error) {
       // Log but don't propagate - scenario result is more important
-      logger.warn({ error }, "Tracer shutdown failed, traces may be incomplete");
+      logger.warn(
+        { error },
+        "Tracer shutdown failed, traces may be incomplete",
+      );
     }
   }
 

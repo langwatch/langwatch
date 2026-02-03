@@ -24,7 +24,6 @@ export interface JobContextMetadata {
   userId?: string;
 }
 
-// AsyncLocalStorage instance for propagating context across async boundaries
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
 
 /**
@@ -32,7 +31,6 @@ const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
  * Falls back to extracting from OpenTelemetry if not in AsyncLocalStorage.
  */
 export function getCurrentContext(): RequestContext | undefined {
-  // First, try AsyncLocalStorage
   const alsContext = asyncLocalStorage.getStore();
   if (alsContext) {
     return alsContext;

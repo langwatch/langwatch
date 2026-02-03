@@ -1,6 +1,6 @@
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,

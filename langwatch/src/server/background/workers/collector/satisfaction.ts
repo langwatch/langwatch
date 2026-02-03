@@ -3,7 +3,7 @@ import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";
 import { lambdaFetch } from "../../../../utils/lambdaFetch";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import { skipPermissionCheck } from "../rbac";
@@ -7,9 +7,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
 
-const frontendFeatureFlagSchema = z.enum([
-  ...FRONTEND_FEATURE_FLAGS,
-] as [string, ...string[]]);
+const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
+  string,
+  ...string[],
+]);
 
 /**
  * tRPC router for feature flag checks.
@@ -36,17 +37,24 @@ export const featureFlagRouter = createTRPCRouter({
         organizationId: z.string().optional(),
       }),
     )
-    .use(skipPermissionCheck({
-      allow: {
-        projectId: "for PostHog targeting, not resource access",
-        organizationId: "for PostHog targeting, not resource access",
-      },
-    }))
+    .use(
+      skipPermissionCheck({
+        allow: {
+          projectId: "for PostHog targeting, not resource access",
+          organizationId: "for PostHog targeting, not resource access",
+        },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
       logger.debug(
-        { userId, flag: input.flag, projectId: input.projectId, organizationId: input.organizationId },
+        {
+          userId,
+          flag: input.flag,
+          projectId: input.projectId,
+          organizationId: input.organizationId,
+        },
         "Feature flag check requested",
       );
 

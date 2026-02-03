@@ -9,7 +9,7 @@
  */
 
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { EvaluationV3Event, ExecutionSummary } from "./types";
 
 const logger = createLogger("evaluations-v3:run-state-manager");

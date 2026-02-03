@@ -30,7 +30,7 @@ import { runStateManager } from "~/server/evaluations-v3/execution/runStateManag
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:run");

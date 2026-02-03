@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../library";
 import { createTenantId, EventUtils } from "../../../library";
 import type { EvaluationProcessingEvent } from "../schemas/events";

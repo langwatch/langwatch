@@ -1,13 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
 import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../library/utils/distributedLock";
 import { RedisDistributedLock } from "../library/utils/distributedLock";
-import type {
-  EventSourcingConfig,
-  EventSourcingConfigOptions,
-} from "./config";
+import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
 import { DefaultQueueProcessorFactory } from "./queue";
@@ -383,7 +380,9 @@ export function getEventSourcingRuntime(): EventSourcingRuntime {
         redisConnection: redisConnection ?? undefined,
       }),
     );
-    logger.info("Event sourcing auto-initialized via getEventSourcingRuntime()");
+    logger.info(
+      "Event sourcing auto-initialized via getEventSourcingRuntime()",
+    );
   }
   return globalForEventSourcing.eventSourcingRuntime;
 }

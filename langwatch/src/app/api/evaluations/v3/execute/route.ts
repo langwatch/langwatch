@@ -19,7 +19,7 @@ import {
   runOrchestrator,
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:execute");

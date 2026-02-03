@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventUtils } from "../../index";

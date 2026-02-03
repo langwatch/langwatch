@@ -1,7 +1,7 @@
 import type { ConnectionOptions } from "bullmq";
 import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
 import { runUsageStatsJob } from "../workers/usageStatsWorker";

@@ -12,7 +12,7 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { authOptions } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { abortManager } from "~/server/evaluations-v3/execution/abortManager";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("evaluations-v3:abort");
 

@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/client";
+import { createLogger } from "~/utils/logger/server";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";

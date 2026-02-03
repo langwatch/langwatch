@@ -4,7 +4,7 @@ import type {
   ElasticSearchEvent,
   ElasticSearchTrace,
 } from "../../../server/tracer/types";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,

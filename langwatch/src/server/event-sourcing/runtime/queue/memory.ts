@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -31,9 +31,9 @@ interface QueuedJob<Payload> {
  * - No persistence (jobs lost on restart)
  * - Simple concurrency (no advanced scheduling)
  */
-export class EventSourcedQueueProcessorMemory<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class EventSourcedQueueProcessorMemory<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly tracer: ReturnType<typeof getLangWatchTracer>;
   private readonly queueName: string;

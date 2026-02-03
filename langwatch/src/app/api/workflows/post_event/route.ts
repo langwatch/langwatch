@@ -16,7 +16,7 @@ import {
 import { hasProjectPermission } from "../../../../server/api/rbac";
 import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { loggerMiddleware } from "../../middleware/logger";
 import { studioBackendPostEvent } from "./post-event";
 

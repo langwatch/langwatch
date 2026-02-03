@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { availableFilters } from "./registry";
 import type { FilterField } from "./types";
 

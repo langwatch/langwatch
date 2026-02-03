@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { NormalizedSpan } from "../schemas/spans";
 import { IdUtils } from "../utils/id.utils";
 import type { SpanRepository } from "./spanRepository";

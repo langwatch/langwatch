@@ -10,7 +10,7 @@ import {
 } from "~/prompts/schemas/field-schemas";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,

@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../library";
 import { createTenantId } from "../../library";
 import { buildCheckpointKey } from "../../library/utils/checkpointKey";
@@ -34,9 +34,9 @@ const logger = createLogger(
  * Gracefully closes a pipeline and waits for cleanup to complete.
  * This ensures all BullMQ workers finish processing before the next test starts.
  */
-export async function closePipelineGracefully(
-  pipeline: { service: { close: () => Promise<void> } },
-): Promise<void> {
+export async function closePipelineGracefully(pipeline: {
+  service: { close: () => Promise<void> };
+}): Promise<void> {
   await pipeline.service.close();
   // Wait for BullMQ workers to fully shut down and release Redis connections
   // Using 2000ms to ensure all async operations complete before next test

@@ -16,7 +16,7 @@ import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");

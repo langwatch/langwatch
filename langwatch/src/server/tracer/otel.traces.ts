@@ -12,7 +12,7 @@ import { getLangWatchTracer } from "langwatch";
 import cloneDeep from "lodash-es/cloneDeep";
 import Long from "long";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";

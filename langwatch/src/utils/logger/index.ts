@@ -1,6 +1,11 @@
 /**
- * Server-side logger module.
+ * Universal logger - safe for both browser and server environments.
  *
- * For client-side logging, use: import { createLogger } from '~/utils/logger/client'
+ * For server-only code with context injection, import from '~/utils/logger/server'.
  */
-export { createLogger, type CreateLoggerOptions, type Logger } from "./server";
+import pino, { type Logger as PinoLogger } from "pino";
+
+export type Logger = PinoLogger;
+
+export const createLogger = (name: string): PinoLogger =>
+  pino({ name, level: "info", browser: { asObject: true } });

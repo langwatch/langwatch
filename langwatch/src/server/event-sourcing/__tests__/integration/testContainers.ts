@@ -1,7 +1,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import IORedis, { type Redis } from "ioredis";
 import { migrateUp } from "~/server/clickhouse/goose";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:event-sourcing:test-containers");
 

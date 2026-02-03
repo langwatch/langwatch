@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
 import { spanRepository } from "../repositories";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
@@ -19,9 +19,7 @@ import { TraceRequestUtils } from "../utils/traceRequest.utils";
  * This materializes the read model (stored_spans) from the event stream,
  * following the CQRS pattern where event handlers maintain read models.
  */
-export class SpanStorageEventHandler
-  implements EventHandler<SpanReceivedEvent>
-{
+export class SpanStorageEventHandler implements EventHandler<SpanReceivedEvent> {
   private readonly spanNormalizationPipelineService =
     new SpanNormalizationPipelineService();
   private readonly tracer = getLangWatchTracer(

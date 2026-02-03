@@ -20,7 +20,7 @@ import type {
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:event-sourcing:register");
 

@@ -9,7 +9,7 @@ import {
 } from "~/server/elasticsearch";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import { eSBatchEvaluationSchema } from "~/server/experiments/types.generated";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { safeTruncate } from "~/utils/truncate";
 import type {
   BatchEvaluation,

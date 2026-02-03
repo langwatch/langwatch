@@ -1,4 +1,4 @@
-import type { createLogger } from "../../../../utils/logger";
+import type { createLogger } from "../../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";

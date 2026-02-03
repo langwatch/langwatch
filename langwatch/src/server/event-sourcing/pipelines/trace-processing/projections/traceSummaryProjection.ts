@@ -1,6 +1,6 @@
 import { type Span, SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   EventStream,
   Projection,
@@ -112,9 +112,10 @@ export interface TraceSummary extends Projection<TraceSummaryData> {
  * .withProjection("traceSummary", TraceSummaryProjectionHandler)
  * ```
  */
-export class TraceSummaryProjectionHandler
-  implements ProjectionHandler<TraceProcessingEvent, TraceSummary>
-{
+export class TraceSummaryProjectionHandler implements ProjectionHandler<
+  TraceProcessingEvent,
+  TraceSummary
+> {
   static readonly store = traceSummaryRepository;
 
   private readonly spanNormalizationPipelineService =
@@ -255,7 +256,10 @@ export class TraceSummaryProjectionHandler
     context: { tenantId: string; aggregateId: string },
   ): extracted is ExtractedEventData & { firstSpanEvent: SpanReceivedEvent } {
     if (!extracted.firstSpanEvent || extracted.normalizedSpans.length === 0) {
-      this.logger.debug(context, "No spans found for trace, skipping projection");
+      this.logger.debug(
+        context,
+        "No spans found for trace, skipping projection",
+      );
       return false;
     }
     return true;

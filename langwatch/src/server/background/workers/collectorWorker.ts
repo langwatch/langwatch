@@ -10,7 +10,7 @@ import {
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   getCurrentScope,
@@ -900,7 +900,9 @@ export const startCollectorWorker = () => {
         void job.log(message);
       };
 
-      jobLog(`Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`);
+      jobLog(
+        `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
+      );
 
       try {
         await processCollectorJob(job.id, job.data);

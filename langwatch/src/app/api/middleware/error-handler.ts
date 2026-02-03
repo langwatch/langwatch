@@ -3,7 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
 

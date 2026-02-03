@@ -1,6 +1,6 @@
 import { Counter, Gauge, Histogram, register } from "prom-client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -21,7 +21,10 @@ export const observeClickHouseQueryDuration = (
   queryType: "SELECT" | "INSERT" | "OTHER",
   table: string,
   durationSeconds: number,
-) => clickhouseQueryDurationHistogram.labels(queryType, table).observe(durationSeconds);
+) =>
+  clickhouseQueryDurationHistogram
+    .labels(queryType, table)
+    .observe(durationSeconds);
 
 // Counter for query totals
 register.removeSingleMetric("clickhouse_query_total");

@@ -7,7 +7,7 @@ import {
   getStatusCodeFromError,
   logHttpRequest,
 } from "../../../server/middleware/requestLogging";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:api:hono");
 

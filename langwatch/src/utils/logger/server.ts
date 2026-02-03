@@ -1,31 +1,20 @@
 import pino, { type LoggerOptions, type Logger as PinoLogger } from "pino";
-import { getContext } from "../../server/context/contextProvider";
-
-// Initialize context provider registration (no-op if already done)
-// This ensures getLogContext is registered before any logger is created
-import "../../server/context/init";
+import { getLogContext } from "../../server/context/logging";
 
 export interface CreateLoggerOptions {
   /**
    * Disable automatic context injection (traceId, spanId, organizationId, projectId, userId).
-   * By default, context is automatically included in all log entries when available.
-   * Set to true to disable this behavior.
    */
   disableContext?: boolean;
 }
 
 /**
- * Creates a server-side logger instance with the given name.
- *
- * Uses pino transports for console output and optional OTel export.
+ * Creates a server-side logger with context injection and transports.
  *
  * Environment variables:
  * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
- * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export (local dev only)
+ * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export
  * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
- *
- * @param name - Logger name (e.g., "langwatch:api:hono")
- * @param options - Optional configuration
  */
 export const createLogger = (
   name: string,
@@ -48,10 +37,9 @@ export const createLogger = (
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
     },
-    mixin: options?.disableContext ? undefined : () => getContext(),
+    mixin: options?.disableContext ? undefined : () => getLogContext(),
   };
 
-  // Try to create transport, fallback to stdout on error
   try {
     const transport = buildTransport({
       isDevMode,

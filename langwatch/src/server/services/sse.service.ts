@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { connection } from "../redis";
 
 /**

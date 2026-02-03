@@ -13,7 +13,7 @@ import { BullMQOtel } from "bullmq-otel";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { connection } from "../../../redis";
 import {
   type JobContextMetadata,
@@ -90,9 +90,9 @@ type JobDataWithContext<Payload> = Payload & {
   __context?: JobContextMetadata;
 };
 
-export class EventSourcedQueueProcessorBullMq<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class EventSourcedQueueProcessorBullMq<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly queueName: string;
   private readonly jobName: string;
@@ -348,8 +348,9 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       );
 
       try {
-        // Pass the original payload without context metadata to the processor
-        await this.process(jobData);
+        // Strip context metadata before passing to processor
+        const { __context: _, ...payloadWithoutContext } = jobData;
+        await this.process(payloadWithoutContext as Payload);
         this.logger.debug(
           {
             queueName: this.queueName,

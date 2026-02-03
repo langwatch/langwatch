@@ -1,7 +1,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import type { PromptService } from "../../prompt-config/prompt.service";
 

@@ -13,7 +13,7 @@ import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
-import { createLogger } from "../../../../../utils/logger/client";
+import { createLogger } from "../../../../../utils/logger";
 import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,

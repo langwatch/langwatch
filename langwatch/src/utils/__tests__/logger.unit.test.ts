@@ -19,14 +19,14 @@ vi.mock("pino", () => {
   return { default: pinoFn };
 });
 
-describe("createLogger", () => {
+describe("server createLogger", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
   });
 
   it("creates a logger with the given name", async () => {
-    const { createLogger } = await import("../logger");
+    const { createLogger } = await import("../logger/server");
     const pino = (await import("pino")).default;
 
     createLogger("test-logger");
@@ -44,7 +44,7 @@ describe("createLogger", () => {
     process.env.PINO_LOG_LEVEL = "debug";
 
     vi.resetModules();
-    const { createLogger } = await import("../logger");
+    const { createLogger } = await import("../logger/server");
     const pino = (await import("pino")).default;
 
     createLogger("test-level");
@@ -60,7 +60,7 @@ describe("createLogger", () => {
   });
 
   it("configures mixin for context injection when not disabled", async () => {
-    const { createLogger } = await import("../logger");
+    const { createLogger } = await import("../logger/server");
     const pino = (await import("pino")).default;
 
     createLogger("mixin-test");
@@ -71,7 +71,7 @@ describe("createLogger", () => {
   });
 
   it("disables mixin when disableContext is true", async () => {
-    const { createLogger } = await import("../logger");
+    const { createLogger } = await import("../logger/server");
     const pino = (await import("pino")).default;
 
     createLogger("no-context", { disableContext: true });
@@ -81,7 +81,7 @@ describe("createLogger", () => {
   });
 
   it("returns a pino logger instance", async () => {
-    const { createLogger } = await import("../logger");
+    const { createLogger } = await import("../logger/server");
 
     const logger = createLogger("instance-test");
 
@@ -90,5 +90,35 @@ describe("createLogger", () => {
     expect(typeof logger.error).toBe("function");
     expect(typeof logger.warn).toBe("function");
     expect(typeof logger.debug).toBe("function");
+  });
+});
+
+describe("client createLogger (universal)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it("creates a logger with the given name", async () => {
+    const { createLogger } = await import("../logger");
+    const pino = (await import("pino")).default;
+
+    createLogger("test-client-logger");
+
+    expect(pino).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "test-client-logger",
+      })
+    );
+  });
+
+  it("returns a pino logger instance", async () => {
+    const { createLogger } = await import("../logger");
+
+    const logger = createLogger("client-instance-test");
+
+    expect(logger).toBeDefined();
+    expect(typeof logger.info).toBe("function");
+    expect(typeof logger.error).toBe("function");
   });
 });

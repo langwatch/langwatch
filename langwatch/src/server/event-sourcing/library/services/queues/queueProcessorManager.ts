@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
 import type { Command, CommandHandler } from "../../commands/command";
@@ -145,7 +145,10 @@ function resolveDeduplicationStrategy<Payload>(
 /**
  * Creates a command dispatcher that processes commands and stores resulting events.
  */
-function createCommandDispatcher<Payload extends HasTenantId, EventType extends Event>(
+function createCommandDispatcher<
+  Payload extends HasTenantId,
+  EventType extends Event,
+>(
   commandType: CommandType,
   commandSchema: CommandSchemaType<Payload, CommandType>,
   handler: CommandHandler<Command<Payload>, EventType>,

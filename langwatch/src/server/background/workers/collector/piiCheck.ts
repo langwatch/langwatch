@@ -2,7 +2,7 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import type { PIIRedactionLevel } from "@prisma/client";
 import { env } from "../../../../env.mjs";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
 import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
 import {

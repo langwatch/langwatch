@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   type AggregateType,
   createTenantId,
@@ -73,9 +73,10 @@ export interface TestProjection extends Projection<TestProjectionData> {
 // Command Handler
 // ============================================================================
 
-export class TestCommandHandler
-  implements CommandHandler<Command<TestCommandPayload>, any>
-{
+export class TestCommandHandler implements CommandHandler<
+  Command<TestCommandPayload>,
+  any
+> {
   static readonly schema = defineCommandSchema(
     TEST_COMMAND_TYPE as any,
     testCommandPayloadSchema,
@@ -203,9 +204,10 @@ class TestProjectionStore implements ProjectionStore<TestProjection> {
 /**
  * Test projection handler that aggregates events into a projection.
  */
-export class TestProjectionHandler
-  implements ProjectionHandler<any, TestProjection>
-{
+export class TestProjectionHandler implements ProjectionHandler<
+  any,
+  TestProjection
+> {
   static readonly store = new TestProjectionStore();
 
   handle(stream: EventStream<TenantId, any>): TestProjection {
