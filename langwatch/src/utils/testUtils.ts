@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks, type RequestMethod } from "node-mocks-http";
 import { prisma } from "../server/db";
+import { ENTERPRISE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
 
 export async function getTestUser() {
   // Ensure a user exists
@@ -26,20 +27,18 @@ export async function getTestUser() {
     });
   }
 
-  // Ensure an organization exists
-  let organization = await prisma.organization.findUnique({
-    where: {
+  // Ensure an organization exists with an enterprise license.
+  // The license allows integration tests to create many resources without hitting FREE tier limits.
+  // Uses upsert to always ensure the license is set correctly.
+  const organization = await prisma.organization.upsert({
+    where: { slug: "test-organization" },
+    update: { license: ENTERPRISE_LICENSE_KEY },
+    create: {
+      name: "Test Organization",
       slug: "test-organization",
+      license: ENTERPRISE_LICENSE_KEY,
     },
   });
-  if (!organization) {
-    organization = await prisma.organization.create({
-      data: {
-        name: "Test Organization",
-        slug: "test-organization",
-      },
-    });
-  }
 
   // Ensure a team exists
   let team = await prisma.team.findUnique({

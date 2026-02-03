@@ -18,6 +18,7 @@ export default defineConfig({
       // setupEnv.ts MUST run first - sets env vars before any application code loads
       "./src/server/event-sourcing/__tests__/integration/setupEnv.ts",
       // setup.ts sets REDIS_URL/CLICKHOUSE_URL at module load time
+      // before test-setup.ts imports any application code
       "./src/server/event-sourcing/__tests__/integration/setup.ts",
       "./test-setup.ts",
     ],
