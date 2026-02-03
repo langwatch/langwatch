@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioAIGeneration } from "../ScenarioAIGeneration";
+import { SCENARIO_AI_PROMPT_KEY } from "../services/scenarioPromptStorage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mocks
@@ -50,6 +51,11 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 // Clean up after each test to avoid interference
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
+});
+
+beforeEach(() => {
+  sessionStorage.clear();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,11 +63,48 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("<ScenarioAIGeneration/>", () => {
-  it("shows prompt view by default", () => {
-    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+  describe("when no stored prompt", () => {
+    it("shows prompt view by default", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    // Should show the "Need Help?" prompt card
-    expect(screen.getByText("Need Help?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+      // Should show the "Need Help?" prompt card
+      expect(screen.getByText("Need Help?")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+    });
+  });
+
+  describe("when sessionStorage has stored prompt", () => {
+    it("shows input view with AI Generation title", async () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "My initial prompt");
+
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      // Should show the "AI Generation" input view
+      await waitFor(() => {
+        expect(screen.getByText("AI Generation")).toBeInTheDocument();
+      });
+    });
+
+    it("displays the stored prompt in history", async () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "My initial prompt");
+
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      // Should show the prompt in history
+      await waitFor(() => {
+        expect(screen.getByText("My initial prompt")).toBeInTheDocument();
+      });
+    });
+
+    it("clears sessionStorage after consumption", async () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "My initial prompt");
+
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      // Should have cleared sessionStorage
+      await waitFor(() => {
+        expect(sessionStorage.getItem(SCENARIO_AI_PROMPT_KEY)).toBeNull();
+      });
+    });
   });
 });

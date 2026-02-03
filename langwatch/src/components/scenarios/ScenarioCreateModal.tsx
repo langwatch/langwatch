@@ -7,6 +7,7 @@ import { toaster } from "../ui/toaster";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
+import { storePromptForScenario } from "./services/scenarioPromptStorage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -110,6 +111,9 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
 
       // Create scenario with generated content
       const scenario = await createScenario(generatedData);
+
+      // Store the prompt in sessionStorage for the scenario editor to display in AI history
+      storePromptForScenario(description);
 
       // Navigate to editor
       openDrawer(

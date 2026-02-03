@@ -236,3 +236,78 @@ Feature: AI Create Modal for Scenarios
     When rendered with custom example templates
     Then it displays the custom example pills
     And clicking a pill fills the textarea with the template text
+
+  # ============================================================================
+  # Prompt History Persistence (Session Storage)
+  # ============================================================================
+
+  @e2e
+  Scenario: AI-generated scenario shows original prompt in AI history panel
+    When I click the "New Scenario" button
+    And I enter "A customer support agent that helps users reset their passwords" in the textarea
+    And I click "Generate with AI"
+    And generation completes successfully
+    Then I am navigated to the scenario editor
+    And the AI history panel shows "A customer support agent that helps users reset their passwords"
+
+  @integration
+  Scenario: Prompt is stored in sessionStorage when generation succeeds
+    When I click the "New Scenario" button
+    And I enter "Test scenario prompt" in the textarea
+    And I click "Generate with AI"
+    And generation completes successfully
+    Then sessionStorage contains key "scenario_ai_prompt"
+    And the stored value is "Test scenario prompt"
+
+  @integration
+  Scenario: Scenario editor reads initial prompt from sessionStorage
+    Given sessionStorage contains key "scenario_ai_prompt" with value "My initial prompt"
+    When I open the scenario editor for a newly created scenario
+    Then the AI history panel shows "My initial prompt"
+    And the AI generation view is in "input" mode
+
+  @integration
+  Scenario: SessionStorage entry is cleared after being consumed
+    Given sessionStorage contains key "scenario_ai_prompt" with value "My initial prompt"
+    When I open the scenario editor for a newly created scenario
+    Then sessionStorage no longer contains key "scenario_ai_prompt"
+
+  @integration
+  Scenario: AI history panel shows empty state when no stored prompt exists
+    Given sessionStorage does not contain key "scenario_ai_prompt"
+    When I open the scenario editor for an existing scenario
+    Then the AI history panel shows the initial "Need Help?" prompt view
+    And no prompt history is displayed
+
+  @unit
+  Scenario: usePromptHistory hook initializes from sessionStorage
+    Given sessionStorage contains key "scenario_ai_prompt" with value "Stored prompt"
+    When usePromptHistory hook mounts
+    Then history contains "Stored prompt"
+    And hasHistory returns true
+
+  @unit
+  Scenario: usePromptHistory hook handles missing sessionStorage gracefully
+    Given sessionStorage does not contain key "scenario_ai_prompt"
+    When usePromptHistory hook mounts
+    Then history is empty
+    And hasHistory returns false
+
+  @unit
+  Scenario: storePromptForScenario function stores prompt in sessionStorage
+    Given an empty sessionStorage
+    When storePromptForScenario is called with "My prompt"
+    Then sessionStorage contains key "scenario_ai_prompt" with value "My prompt"
+
+  @unit
+  Scenario: consumeStoredPrompt function reads and clears sessionStorage
+    Given sessionStorage contains key "scenario_ai_prompt" with value "My prompt"
+    When consumeStoredPrompt is called
+    Then it returns "My prompt"
+    And sessionStorage no longer contains key "scenario_ai_prompt"
+
+  @unit
+  Scenario: consumeStoredPrompt function returns null when no prompt exists
+    Given sessionStorage does not contain key "scenario_ai_prompt"
+    When consumeStoredPrompt is called
+    Then it returns null

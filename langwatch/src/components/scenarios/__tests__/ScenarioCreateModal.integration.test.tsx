@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
+import { SCENARIO_AI_PROMPT_KEY } from "../services/scenarioPromptStorage";
 
 // Mock useOrganizationTeamProject
 const mockProject = {
@@ -99,12 +100,17 @@ describe("<ScenarioCreateModal/>", () => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
     mockToasterCreate.mockClear();
+    sessionStorage.clear();
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ scenario: mockGeneratedScenario }),
     });
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
   });
 
   describe("when open", () => {
@@ -276,6 +282,26 @@ describe("<ScenarioCreateModal/>", () => {
           { resetStack: true }
         );
       });
+    });
+
+    it("stores prompt in sessionStorage on successful generation", async () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const textarea = within(dialog).getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "Test scenario prompt" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+
+      // Wait for the modal to complete generation
+      await waitFor(() => {
+        expect(mockOpenDrawer).toHaveBeenCalled();
+      });
+
+      // Verify prompt was stored in sessionStorage
+      expect(sessionStorage.getItem(SCENARIO_AI_PROMPT_KEY)).toBe("Test scenario prompt");
     });
   });
 
