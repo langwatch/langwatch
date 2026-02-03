@@ -22,6 +22,7 @@ import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { trackEvent } from "~/utils/tracking";
 import type { Workflow } from "~/optimization_studio/types/dsl";
@@ -64,8 +65,11 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  // License enforcement for agent creation
-  const { checkAndProceed } = useLicenseEnforcement("agents");
+  // License enforcement for agent AND workflow creation
+  // Creating a workflow agent requires creating both a workflow AND an agent,
+  // so we need to check both limits before proceeding
+  const agentEnforcement = useLicenseEnforcement("agents");
+  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -93,6 +97,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       onSave?.(agent);
     },
     onError: (error) => {
+      // Skip toast if error was already handled by global license modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -152,6 +158,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
+        // Skip toast if error was already handled by global license modal
+        if (isHandledByGlobalLicenseHandler(error)) return;
         console.error("Error creating workflow agent:", error);
         toaster.create({
           title: "Error",
@@ -260,9 +268,15 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               </Button>
               <Button
                 colorPalette="blue"
-                onClick={() =>
-                  checkAndProceed(() => void handleSubmit(onSubmit)())
-                }
+                onClick={() => {
+                  // Check workflows limit first (creating workflow agent creates a workflow first)
+                  workflowEnforcement.checkAndProceed(() => {
+                    // Then check agents limit
+                    agentEnforcement.checkAndProceed(() =>
+                      void handleSubmit(onSubmit)()
+                    );
+                  });
+                }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-agent-button"
