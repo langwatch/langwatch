@@ -92,6 +92,7 @@ function Page() {
   const deleteMutation = api.evaluators.delete.useMutation({
     onSuccess: () => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
     },
   });
 
@@ -99,6 +100,7 @@ function Page() {
     onSuccess: (result) => {
       setEvaluatorToDelete(null);
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
 
       const parts: string[] = [];
       if (result.archivedWorkflow) {
