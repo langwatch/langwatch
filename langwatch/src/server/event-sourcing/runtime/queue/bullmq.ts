@@ -84,9 +84,10 @@ const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 const QUEUE_METRICS_INTERVAL_MS = 15000;
 
 /**
- * Type for job data that includes context metadata for trace correlation.
+ * Container type for job data that wraps the payload and context metadata.
  */
-type JobDataWithContext<Payload> = Payload & {
+type JobContainer<Payload> = {
+  __payload: Payload;
   __context?: JobContextMetadata;
 };
 
@@ -291,9 +292,10 @@ export class EventSourcedQueueProcessorBullMq<
    * Processes a single job from the queue.
    */
   private async processJob(job: Job<Payload>): Promise<void> {
-    // Cast to JobDataWithContext to access the __context field we attached
-    const jobData = job.data as JobDataWithContext<Payload>;
-    const contextMetadata = jobData.__context;
+    // Extract payload and context from the container
+    const container = job.data as unknown as JobContainer<Payload>;
+    const payload = container.__payload;
+    const contextMetadata = container.__context;
 
     // Create request context from job metadata
     const requestContext = createContextFromJobData(contextMetadata);
@@ -307,7 +309,7 @@ export class EventSourcedQueueProcessorBullMq<
     // Run the job processing within the restored context
     return runWithContext(requestContext, async () => {
       const customAttributes = this.spanAttributes
-        ? this.spanAttributes(jobData)
+        ? this.spanAttributes(payload)
         : {};
 
       const span = trace.getActiveSpan();
@@ -348,9 +350,7 @@ export class EventSourcedQueueProcessorBullMq<
       );
 
       try {
-        // Strip context metadata before passing to processor
-        const { __context: _, ...payloadWithoutContext } = jobData;
-        await this.process(payloadWithoutContext as Payload);
+        await this.process(payload);
         this.logger.debug(
           {
             queueName: this.queueName,
@@ -525,11 +525,12 @@ export class EventSourcedQueueProcessorBullMq<
     span?.setAttributes({ ...customAttributes });
 
     // Get current context metadata and attach it to the job payload for trace correlation
+    // Always wrap in a container to avoid issues with primitive payloads being spread
     const contextMetadata = getJobContextMetadata();
     const payloadWithContext = {
-      ...payload,
+      __payload: payload,
       __context: contextMetadata,
-    } as Payload; // Cast back to Payload for the queue, but includes __context at runtime
+    } as unknown as Payload;
 
     await this.queue.add(
       // @ts-expect-error - jobName is a string, this is stupid typing from BullMQ

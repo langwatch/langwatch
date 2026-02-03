@@ -23,10 +23,11 @@ export const createLogger = (
   const isDevMode = process.env.NODE_ENV !== "production";
   const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
 
-  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const isTest = process.env.NODE_ENV === "test";
+  const defaultLevel = isTest ? "error" : "debug";
+  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? (isTest ? "error" : "info");
   const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
-  const baseLevel =
-    process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "debug";
+  const baseLevel = process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
 
   const pinoOptions: LoggerOptions = {
     name,

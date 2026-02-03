@@ -7,5 +7,10 @@ import pino, { type Logger as PinoLogger } from "pino";
 
 export type Logger = PinoLogger;
 
+const level =
+  process.env.NODE_ENV === "test"
+    ? "error"
+    : process.env.PINO_LOG_LEVEL ?? "info";
+
 export const createLogger = (name: string): PinoLogger =>
-  pino({ name, level: "info", browser: { asObject: true } });
+  pino({ name, level, browser: { asObject: true } });
