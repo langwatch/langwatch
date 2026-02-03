@@ -34,7 +34,7 @@ Built for teams that need regression testing, simulations, and production observ
 - [**Collaboration that doesn't slow shipping**](https://docs.langwatch.ai/features/annotations)
   Review runs, annotate failures, and ship fixes faster. Let domain experts label edge cases with [annotations & queues](https://docs.langwatch.ai/features/annotations), keep prompts in Git with the [GitHub integration](https://docs.langwatch.ai/prompt-management/features/essential/github-integration), and [link prompt versions to traces](https://docs.langwatch.ai/prompt-management/features/advanced/link-to-traces).
 
-LangWatch helps you observe, test, and debug LLM-powered systems by combining traces, simulations, evaluations, and production monitoring in one place
+LangWatch gives you full visibility into agent behavior and the tools to systematically improve reliability, performance, and cost, while keeping you in control of your AI system
 
 ## Getting Started
 
