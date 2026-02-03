@@ -41,6 +41,12 @@ export const createLogger = (
     mixin: options?.disableContext ? undefined : () => getLogContext(),
   };
 
+  // In test mode, skip transports to avoid spawning worker threads
+  // (which add exit listeners and cause MaxListenersExceededWarning)
+  if (isTest) {
+    return pino(pinoOptions, process.stdout);
+  }
+
   try {
     const transport = buildTransport({
       isDevMode,
