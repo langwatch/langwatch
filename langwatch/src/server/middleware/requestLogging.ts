@@ -35,13 +35,24 @@ export function getStatusCodeFromError(error: unknown): number {
 }
 
 /**
- * Logs an HTTP request with appropriate level based on error status.
- * Uses error level for errors, info level for success.
+ * Determines log level based on HTTP status code.
+ * - 4xx: 'warn' (client errors - expected, handled)
+ * - 5xx: 'error' (server errors - unexpected, needs attention)
+ * - Others: 'info' (success or redirects)
  */
-export function logHttpRequest(
-  logger: Logger,
-  data: RequestLogData,
-): void {
+export function getLogLevelFromStatusCode(
+  statusCode: number,
+): "info" | "warn" | "error" {
+  if (statusCode >= 500) return "error";
+  if (statusCode >= 400) return "warn";
+  return "info";
+}
+
+/**
+ * Logs an HTTP request with appropriate level based on status code.
+ * Uses error level for 5xx, warn for 4xx, info for success.
+ */
+export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const logData: Record<string, unknown> = {
     method: data.method,
     url: data.url,
@@ -53,10 +64,12 @@ export function logHttpRequest(
 
   if (data.error) {
     logData.error = data.error;
-    logger.error(logData, "error handling request");
-  } else {
-    logger.info(logData, "request handled");
   }
+
+  const level = getLogLevelFromStatusCode(data.statusCode);
+  const message = data.error ? "error handling request" : "request handled";
+
+  logger[level](logData, message);
 }
 
 /**

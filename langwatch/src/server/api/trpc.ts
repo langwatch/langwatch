@@ -24,6 +24,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
@@ -245,9 +246,14 @@ export const loggerMiddleware = t.middleware(
           logData.error =
             error instanceof Error ? error : JSON.stringify(error);
 
-          captureException(error);
+          // Only capture 5xx errors to Sentry (actual bugs)
+          const statusCode = logData.statusCode ?? 500;
+          if (statusCode >= 500) {
+            captureException(error);
+          }
 
-          logger.error(logData, "trpc error");
+          const logLevel = getLogLevelFromStatusCode(statusCode);
+          logger[logLevel](logData, "trpc call");
         } else {
           logger.info(logData, "trpc call");
         }

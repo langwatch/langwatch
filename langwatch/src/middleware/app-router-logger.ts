@@ -4,6 +4,7 @@ import {
   createContextFromNextRequest,
   runWithContext,
 } from "../server/context/asyncContext";
+import { logHttpRequest } from "../server/middleware/requestLogging";
 
 const logger = createLogger("langwatch:app-router:logger");
 
@@ -36,24 +37,17 @@ export function withAppRouterLogger(
         throw err;
       } finally {
         const duration = Date.now() - startTime;
-        const status = response?.status ?? 500;
+        const statusCode = response?.status ?? 500;
 
-        // Logger automatically includes context (traceId, spanId, etc.)
-        const logData: Record<string, unknown> = {
+        logHttpRequest(logger, {
           method,
           url,
-          statusCode: status,
+          statusCode,
           duration,
           userAgent,
-          ...additionalContext,
-        };
-
-        if (error) {
-          logData.error = error;
-          logger.error(logData, "error handling request");
-        } else {
-          logger.info(logData, "request handled");
-        }
+          error: error ?? undefined,
+          extra: additionalContext,
+        });
       }
 
       return response;

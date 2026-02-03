@@ -737,7 +737,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        logger.error({ jobId: job.id, error }, "failed to process job");
+        // Note: Logging is handled by the 'failed' event handler to avoid double logging
 
         if (
           typeof error === "object" &&

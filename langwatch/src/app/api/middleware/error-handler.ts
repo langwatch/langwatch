@@ -3,11 +3,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
-import { createLogger } from "~/utils/logger/server";
 import { HttpError, NotFoundError } from "../shared/errors";
 import { errorSchema } from "../shared/schemas";
-
-const logger = createLogger("langwatch:api:errors");
 
 /**
  * Error handling middleware that catches errors and formats responses.
@@ -27,23 +24,20 @@ export const handleError = async (
   },
   c: Context,
 ) => {
-  const projectId = c.get("project")?.id;
-  const path = c.req.path;
-  const method = c.req.method;
-  const routeParams = c.req.param();
+  // Determine status code and response
+  // Note: Logging is handled by the logger middleware, not here, to avoid double logging
+  const { statusCode, response } = determineErrorResponse(error);
 
-  // Log the error with context
-  logger.error(
-    {
-      projectId,
-      path,
-      method,
-      routeParams,
-      error,
-    },
-    `API Error: ${error.message || String(error)}`,
-  );
+  return c.json(response, statusCode);
+};
 
+function determineErrorResponse(
+  error: Error & {
+    status?: ContentfulStatusCode;
+    code?: string;
+    name?: string;
+  },
+): { statusCode: ContentfulStatusCode; response: { error: string; message?: string } } {
   // Check if it's a "not found" error
   const isNotFoundError =
     error.message?.includes("not found") ||
@@ -54,33 +48,39 @@ export const handleError = async (
 
   if (isNotFoundError) {
     const notFoundError = new NotFoundError(error.message);
-    return c.json(errorSchema.parse(notFoundError), notFoundError.status);
+    return {
+      statusCode: notFoundError.status,
+      response: errorSchema.parse(notFoundError),
+    };
   }
 
   // Handle HttpError instances (can be parsed directly)
   if (error instanceof HttpError) {
-    return c.json(errorSchema.parse(error), error.status);
+    return {
+      statusCode: error.status,
+      response: errorSchema.parse(error),
+    };
   }
 
   if (error.status) {
-    return c.json(
-      errorSchema.parse({
+    return {
+      statusCode: error.status,
+      response: errorSchema.parse({
         error: error.message || "An error occurred",
         message: error.message,
       }),
-      error.status,
-    );
+    };
   }
 
   // Otherwise treat as server error
-  return c.json(
-    errorSchema.parse({
+  return {
+    statusCode: 500,
+    response: errorSchema.parse({
       error: "Internal server error",
       message:
         process.env.NODE_ENV === "development"
           ? error.message
           : "Internal server error",
     }),
-    500,
-  );
-};
+  };
+}
