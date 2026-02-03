@@ -22,16 +22,40 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-// Mock the permission check to always allow
-vi.mock("../../rbac", () => ({
-  hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-  checkProjectPermission:
-    () =>
-    async ({ ctx, next }: any) => {
+// Mock the permission check to always allow; use importOriginal so other rbac exports (e.g. checkPermissionOrPubliclyShared) are available to transitive imports
+vi.mock("../../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../rbac")>();
+  return {
+    ...actual,
+    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+    checkProjectPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    checkOrganizationPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    checkTeamPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    skipPermissionCheck: ({ ctx, next }: any) => {
       ctx.permissionChecked = true;
       return next();
     },
-}));
+    skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    },
+  };
+});
 
 // Mock the audit log to avoid database writes
 vi.mock("../../../auditLog", () => ({

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
-import { skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");

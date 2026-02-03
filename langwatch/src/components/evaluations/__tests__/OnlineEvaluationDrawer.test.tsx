@@ -333,6 +333,23 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
+    traces: {
+      getSampleTracesDataset: {
+        useQuery: vi.fn(() => ({
+          data: [
+            {
+              trace_id: "trace-1",
+              spans: [
+                { name: "openai/gpt-4", type: "llm" },
+                { name: "my-custom-span", type: "span" },
+              ],
+            },
+          ],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
     licenseEnforcement: {
       checkLimit: {
         useQuery: vi.fn(() => ({
@@ -2149,13 +2166,24 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     // Click on "spans"
     await user.click(screen.getByTestId("field-option-spans"));
 
-    // Should show spans badge AND nested children
+    // Should show spans badge AND nested children (span names)
     await waitFor(() => {
       expect(screen.getByTestId("path-segment-tag-0")).toHaveTextContent(
         "spans",
       );
     });
 
+    // With the new two-level selection, spans first shows "* (any span)" and dynamic span names
+    // The name "*" is used for "Any span" option
+    await waitFor(() => {
+      // "* (any span)" option has name "*", so testid is "field-option-*"
+      expect(screen.getByTestId("field-option-*")).toBeInTheDocument();
+    });
+
+    // Click on "* (any span)" to see the span subfields
+    await user.click(screen.getByTestId("field-option-*"));
+
+    // Now should show span subfields: input, output, params, contexts
     await waitFor(() => {
       expect(screen.getByTestId("field-option-input")).toBeInTheDocument();
       expect(screen.getByTestId("field-option-output")).toBeInTheDocument();
@@ -2164,12 +2192,12 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     // Select output
     await user.click(screen.getByTestId("field-option-output"));
 
-    // Should show completed mapping
+    // Should show completed mapping (spans.*.output)
     await waitFor(() => {
       const sourceTags = screen.getAllByTestId("source-mapping-tag");
       expect(sourceTags.length).toBeGreaterThan(0);
       const hasSpansOutputMapping = sourceTags.some((tag) =>
-        tag.textContent?.includes("spans.output"),
+        tag.textContent?.includes("spans") && tag.textContent?.includes("output"),
       );
       expect(hasSpansOutputMapping).toBe(true);
     });

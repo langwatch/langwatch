@@ -105,19 +105,52 @@ See `specs/README.md` for detailed BDD guidance.
 
 ## Decision Tree
 
+Apply in order. Stop at first match.
+
 ```text
-Is this a happy path demonstrating SDK usage?
-  -> E2E (wrap an example)
+Is this testing UI elements exist? (form fields, buttons, layout)
+  -> @integration
 
-Does it test orchestration between internal modules or external API behavior?
-  -> Integration (mock external boundaries)
+Is this testing navigation/routing only?
+  -> @integration
 
-Is it pure logic or a single class in isolation?
-  -> Unit (mock collaborators)
+Is this testing error handling or edge cases?
+  -> @integration (mock boundaries)
 
-Is it a regression from production?
-  -> Add test at the LOWEST sufficient level (unit > integration > e2e)
+Is this a complete user workflow with observable outcome?
+  -> @e2e (user intent + multiple steps + result + business value)
+
+Is this pure logic in isolation?
+  -> @unit
+
+Is this a regression from production?
+  -> Add at LOWEST sufficient level (unit > integration > e2e)
 ```
+
+### Examples
+
+**Valid @e2e** - Complete workflow:
+```gherkin
+@e2e
+Scenario: User creates and publishes a scenario
+  Given I am logged in
+  When I create a new scenario
+  And I fill in the required fields
+  And I save the scenario
+  Then I see a success message
+  And the scenario appears in my list after refresh
+```
+
+**Invalid @e2e** - Should be @integration:
+```gherkin
+@e2e  # WRONG: just testing UI exists
+Scenario: Create form has required fields
+  Given I am on the create page
+  Then I see a name field
+  And I see a submit button
+```
+
+Use `/test-review` to validate pyramid placement.
 
 ## Scenario Design
 

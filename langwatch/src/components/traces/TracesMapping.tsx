@@ -389,13 +389,24 @@ export const TracesMapping = ({
               ? TRACE_MAPPINGS[source]
               : undefined;
 
+          // Get subkeys for the selected key
+          // For "Any span" (empty key), return default span subfields
+          const defaultSpanSubkeys = [
+            { key: "input", label: "input" },
+            { key: "output", label: "output" },
+            { key: "params", label: "params" },
+            { key: "contexts", label: "contexts" },
+          ];
+
           const subkeys =
             traceMappingDefinition &&
             "subkeys" in traceMappingDefinition &&
             source !== "threads"
-              ? traceMappingDefinition.subkeys(traces_, key!, {
-                  annotationScoreOptions: getAnnotationScoreOptions.data,
-                })
+              ? key === "" && source === "spans"
+                ? defaultSpanSubkeys
+                : traceMappingDefinition.subkeys(traces_, key!, {
+                    annotationScoreOptions: getAnnotationScoreOptions.data,
+                  })
               : undefined;
 
           const targetHandle = `inputs.${targetField}`;
@@ -554,7 +565,14 @@ export const TracesMapping = ({
                                 }}
                                 value={key}
                               >
-                                <option value=""></option>
+                                {/* "* (any span)" option - matches all spans */}
+                                <option value="">
+                                  {source === "spans"
+                                    ? "* (any span)"
+                                    : source === "metadata"
+                                      ? "* (all metadata)"
+                                      : "* (any)"}
+                                </option>
                                 {traceMappingDefinition
                                   .keys(traces_)
                                   .map(
@@ -604,7 +622,12 @@ export const TracesMapping = ({
                               }}
                               value={subkey}
                             >
-                              <option value=""></option>
+                              {/* "* (full object)" option - returns complete object for the selected key */}
+                              <option value="">
+                                {source === "spans"
+                                  ? "* (full span object)"
+                                  : "* (full object)"}
+                              </option>
                               {subkeys.map(
                                 ({
                                   key,

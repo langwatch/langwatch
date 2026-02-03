@@ -1,17 +1,13 @@
-import type { PIIRedactionLevel, PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { prisma as defaultPrisma } from "~/server/db";
 import {
   clearPII as defaultClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type PIIRedactionLevel,
+} from "../schemas/commands";
 import type { OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
-
-/**
- * Default PII redaction level when project settings are not available.
- * ESSENTIAL provides a safe default that protects user privacy.
- */
-export const DEFAULT_PII_REDACTION_LEVEL: PIIRedactionLevel = "ESSENTIAL";
 
 /**
  * Default attribute keys known to contain PII-bearing content.
@@ -47,8 +43,6 @@ export type ClearPIIFunction = (
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
-  /** Prisma client for fetching project PII settings */
-  prisma: Pick<PrismaClient, "project">;
   /** Function to clear PII from objects */
   clearPII: ClearPIIFunction;
   /** Set of attribute keys known to contain PII-bearing content */
@@ -62,7 +56,6 @@ let cachedDefaultDependencies: OtlpSpanPiiRedactionServiceDependencies | null =
 function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
   if (!cachedDefaultDependencies) {
     cachedDefaultDependencies = {
-      prisma: defaultPrisma,
       clearPII: defaultClearPII,
       piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
     };
@@ -81,26 +74,6 @@ export class OtlpSpanPiiRedactionService {
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
     this.deps = { ...getDefaultDependencies(), ...deps };
-  }
-
-  /**
-   * Redacts PII from a span for a given tenant.
-   * Fetches the project's PII redaction settings and applies redaction.
-   * Mutates the span in place for efficiency.
-   *
-   * @param span - The OTLP span to redact
-   * @param tenantId - The project/tenant ID to fetch settings for
-   */
-  async redactSpanForTenant(span: OtlpSpan, tenantId: string): Promise<void> {
-    const project = await this.deps.prisma.project.findUnique({
-      where: { id: tenantId },
-      select: { piiRedactionLevel: true },
-    });
-
-    const piiRedactionLevel =
-      project?.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
-
-    await this.redactSpan(span, piiRedactionLevel);
   }
 
   /**

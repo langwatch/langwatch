@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   extractProviderFromModel,
@@ -11,8 +11,13 @@ import {
   useScenarioGeneration,
 } from "../ScenarioAIGeneration";
 
+// Clean up after each test to avoid interference
+afterEach(() => {
+  cleanup();
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Tests
+// Hook Tests
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("usePromptHistory", () => {
@@ -195,6 +200,10 @@ describe("useScenarioGeneration", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure Function Tests
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("formHasContent", () => {
   it("returns false for empty form", () => {

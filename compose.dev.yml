@@ -110,9 +110,11 @@ services:
     volumes:
       - ./langwatch:/app
       - app_modules:/app/node_modules
+      - pnpm_store:/root/.local/share/pnpm/store
     command: >
       sh -c "
         corepack enable &&
+        pnpm config set store-dir /root/.local/share/pnpm/store &&
         if [ ! -f node_modules/.modules.yaml ]; then
           echo 'Installing dependencies for Linux...' &&
           pnpm install &&
@@ -312,3 +314,5 @@ volumes:
   redis-data:
   opensearch-data:
   app_modules:
+  pnpm_store:
+    name: langwatch-pnpm-store  # Shared across all worktrees

@@ -17,6 +17,95 @@ type TraceWithAnnotations = BaseTrace & {
   annotations?: (Annotation & { user?: User | null })[];
 };
 
+/**
+ * Span subfield type for UI components
+ */
+export type SpanSubfield = {
+  name: string;
+  label?: string;
+  type: "str" | "dict" | "list";
+};
+
+/**
+ * Standard span subfields available for mapping.
+ * Used by both Online Evaluation and Dataset mapping UIs.
+ * Note: "*" is used as a wildcard marker in the path for display purposes.
+ */
+export const SPAN_SUBFIELDS: SpanSubfield[] = [
+  { name: "*", label: "* (full span object)", type: "dict" },
+  { name: "input", type: "str" },
+  { name: "output", type: "str" },
+  { name: "params", type: "dict" },
+  { name: "contexts", type: "list" },
+];
+
+/**
+ * Build span field children for the mapping UI.
+ * Returns "* (any span)" (always available) plus dynamic span names from traces.
+ *
+ * @param spanNames - Dynamic span names extracted from project traces
+ * @returns Array of span field children with nested subfields
+ */
+export function buildSpanFieldChildren(
+  spanNames: Array<{ key: string; label: string }>
+): Array<{
+  name: string;
+  label: string;
+  type: "dict";
+  children: SpanSubfield[];
+}> {
+  return [
+    { name: "*", label: "* (any span)", type: "dict" as const, children: SPAN_SUBFIELDS },
+    ...spanNames.map((span) => ({
+      name: span.key,
+      label: span.label,
+      type: "dict" as const,
+      children: SPAN_SUBFIELDS,
+    })),
+  ];
+}
+
+/**
+ * Reserved metadata keys that are always available.
+ */
+export const RESERVED_METADATA_KEYS = [
+  "thread_id",
+  "user_id",
+  "customer_id",
+  "labels",
+  "topic_id",
+  "subtopic_id",
+];
+
+/**
+ * Build metadata field children for the mapping UI.
+ * Returns "* (any key)" (always available) plus dynamic metadata keys from traces.
+ *
+ * @param metadataKeys - Dynamic metadata keys extracted from project traces
+ * @returns Array of metadata field children
+ */
+export function buildMetadataFieldChildren(
+  metadataKeys: Array<{ key: string; label: string }>
+): Array<{
+  name: string;
+  label: string;
+  type: "str" | "dict" | "list";
+}> {
+  // Determine type based on key name (labels is a list, others are strings)
+  const getTypeForKey = (key: string): "str" | "list" => {
+    return key === "labels" ? "list" : "str";
+  };
+
+  return [
+    { name: "*", label: "* (any key)", type: "str" as const },
+    ...metadataKeys.map((meta) => ({
+      name: meta.key,
+      label: meta.label,
+      type: getTypeForKey(meta.key) as "str" | "list",
+    })),
+  ];
+}
+
 export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithAnnotations) => trace.trace_id,
@@ -100,10 +189,15 @@ export const TRACE_MAPPINGS = {
       if (!key) {
         return traceSpans;
       }
-      const filteredSpans = traceSpans.filter(
-        (span) => getSpanNameOrModel(span as Span) === key,
-      );
-      if (!subkey) {
+      // Handle * as wildcard - return all spans (same as empty key)
+      const filteredSpans =
+        key === "*"
+          ? traceSpans
+          : traceSpans.filter(
+              (span) => getSpanNameOrModel(span as Span) === key,
+            );
+      // Handle * as wildcard for subkey - return full span objects
+      if (!subkey || subkey === "*") {
         return filteredSpans;
       }
       return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
@@ -145,8 +239,13 @@ export const TRACE_MAPPINGS = {
         label: reservedKeys.includes(key) ? `${key}` : key,
       }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string) =>
-      key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata),
+    mapping: (trace: TraceWithAnnotations, key: string) => {
+      // Handle * as wildcard - return full metadata object
+      if (key === "*") {
+        return trace.metadata;
+      }
+      return key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata);
+    },
   },
   evaluations: {
     keys: (traces: TraceWithAnnotations[]) => {

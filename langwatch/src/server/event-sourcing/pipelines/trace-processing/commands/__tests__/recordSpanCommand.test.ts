@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId, type Command } from "../../../../library";
-import type { RecordSpanCommandData } from "../../schemas/commands";
+import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -15,6 +15,7 @@ function createMockCommand(
   traceId: string,
   spanId: string,
   attributes: Array<{ key: string; value: { stringValue?: string } }> = [],
+  piiRedactionLevel?: PIIRedactionLevel,
 ): Command<RecordSpanCommandData> {
   return {
     type: RECORD_SPAN_COMMAND_TYPE,
@@ -43,70 +44,90 @@ function createMockCommand(
       instrumentationScope: {
         name: "test-scope",
       },
+      piiRedactionLevel,
     },
   };
 }
 
 function createMockDependencies(): {
   deps: RecordSpanCommandDependencies;
-  mockRedactSpanForTenant: ReturnType<typeof vi.fn>;
+  mockRedactSpan: ReturnType<typeof vi.fn>;
 } {
-  const mockRedactSpanForTenant = vi.fn();
+  const mockRedactSpan = vi.fn();
 
   return {
     deps: {
       piiRedactionService: {
-        redactSpanForTenant: mockRedactSpanForTenant,
+        redactSpan: mockRedactSpan,
       },
     },
-    mockRedactSpanForTenant,
+    mockRedactSpan,
   };
 }
 
 describe("RecordSpanCommand", () => {
   let handler: RecordSpanCommand;
-  let mockRedactSpanForTenant: ReturnType<typeof vi.fn>;
+  let mockRedactSpan: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const { deps, mockRedactSpanForTenant: mock } = createMockDependencies();
-    mockRedactSpanForTenant = mock;
+    const { deps, mockRedactSpan: mock } = createMockDependencies();
+    mockRedactSpan = mock;
     handler = new RecordSpanCommand(deps);
   });
 
   describe("handle", () => {
     describe("PII redaction", () => {
-      it("calls PII redaction service with tenantId", async () => {
-        const tenantId = "project-123";
-        const command = createMockCommand(tenantId, "trace-1", "span-1", [
-          { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
-        ]);
+      it("calls PII redaction service with piiRedactionLevel from command", async () => {
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+          [{ key: "gen_ai.prompt", value: { stringValue: "sensitive data" } }],
+          "STRICT",
+        );
 
         await handler.handle(command);
 
-        expect(mockRedactSpanForTenant).toHaveBeenCalledWith(
+        expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
-          tenantId,
+          "STRICT",
         );
       });
 
-      it("delegates project settings lookup to the service", async () => {
+      it("defaults to ESSENTIAL when piiRedactionLevel is not provided", async () => {
         const command = createMockCommand("project-456", "trace-1", "span-1");
 
         await handler.handle(command);
 
-        // Service receives tenantId and handles project lookup internally
-        expect(mockRedactSpanForTenant).toHaveBeenCalledWith(
+        expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.any(Object),
-          "project-456",
+          "ESSENTIAL",
+        );
+      });
+
+      it("uses DISABLED level when specified", async () => {
+        const command = createMockCommand(
+          "project-789",
+          "trace-1",
+          "span-1",
+          [],
+          "DISABLED",
+        );
+
+        await handler.handle(command);
+
+        expect(mockRedactSpan).toHaveBeenCalledWith(
+          expect.any(Object),
+          "DISABLED",
         );
       });
     });
 
     describe("event creation", () => {
       it("creates SpanReceivedEvent with redacted span data", async () => {
-        // Mock redactSpanForTenant to mutate the span (simulating redaction)
-        mockRedactSpanForTenant.mockImplementation(
+        // Mock redactSpan to mutate the span (simulating redaction)
+        mockRedactSpan.mockImplementation(
           async (span: {
             attributes: Array<{ key: string; value: { stringValue?: string } }>;
           }) => {
@@ -119,9 +140,13 @@ describe("RecordSpanCommand", () => {
           },
         );
 
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          { key: "gen_ai.prompt", value: { stringValue: "sensitive" } },
-        ]);
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+          [{ key: "gen_ai.prompt", value: { stringValue: "sensitive" } }],
+          "STRICT",
+        );
 
         const events = await handler.handle(command);
 
@@ -154,7 +179,7 @@ describe("RecordSpanCommand", () => {
       });
 
       it("does not mutate the original command data", async () => {
-        mockRedactSpanForTenant.mockImplementation(
+        mockRedactSpan.mockImplementation(
           async (span: { name: string }) => {
             span.name = "[REDACTED]";
           },

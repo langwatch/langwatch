@@ -63,6 +63,11 @@ export type NestedField = {
    *   (e.g., "spans" can be selected as a whole OR drilled into)
    */
   isComplete?: boolean;
+  /**
+   * Custom label for the "Use all X" option when isComplete is true and field has children.
+   * Defaults to "Use all {fieldName}" if not provided.
+   */
+  isCompleteLabel?: string;
 };
 
 export type AvailableSource = {
@@ -239,6 +244,7 @@ export const VariableMappingInput = ({
           depth: 0,
           parentFieldName: null,
           isParentComplete: false,
+          parentIsCompleteLabel: null,
         };
 
       let currentFields = source.fields;
@@ -252,6 +258,7 @@ export const VariableMappingInput = ({
             depth: inProgressPath.path.length,
             parentFieldName: null,
             isParentComplete: false,
+            parentIsCompleteLabel: null,
           };
         parentField = field;
         currentFields = getFieldChildren(field);
@@ -263,6 +270,7 @@ export const VariableMappingInput = ({
         : false;
       const parentFieldName =
         inProgressPath.path[inProgressPath.path.length - 1] ?? null;
+      const parentIsCompleteLabel = parentField?.isCompleteLabel ?? null;
 
       return {
         fields: currentFields,
@@ -270,6 +278,7 @@ export const VariableMappingInput = ({
         depth: inProgressPath.path.length,
         parentFieldName,
         isParentComplete,
+        parentIsCompleteLabel,
       };
     }
 
@@ -280,6 +289,7 @@ export const VariableMappingInput = ({
       depth: 0,
       parentFieldName: null,
       isParentComplete: false,
+      parentIsCompleteLabel: null,
     };
   }, [availableSources, inProgressPath]);
 
@@ -626,6 +636,13 @@ export const VariableMappingInput = ({
     }
   }, [isOpen, filteredSources, inProgressPath, updateDropdownPosition]);
 
+  // Scroll dropdown to top when navigating into nested fields
+  useEffect(() => {
+    if (dropdownRef.current && inProgressPath) {
+      dropdownRef.current.scrollTop = 0;
+    }
+  }, [inProgressPath]);
+
   // Track current option index for highlighting
   let currentOptionIndex = -1;
 
@@ -839,7 +856,8 @@ export const VariableMappingInput = ({
                         fontWeight="medium"
                         color="green.600"
                       >
-                        Use all {currentDropdownContext.parentFieldName}
+                        {currentDropdownContext.parentIsCompleteLabel ??
+                          `Use all ${currentDropdownContext.parentFieldName}`}
                       </Text>
                     </HStack>
                   )}
@@ -906,7 +924,22 @@ export const VariableMappingInput = ({
                         >
                           <VariableTypeIcon type={field.type} size={12} />
                           <Text fontSize="13px" fontFamily="mono" flex={1}>
-                            {field.label ?? field.name}
+                            {(() => {
+                              const label = field.label ?? field.name;
+                              // Render "* (description)" with gray parenthesis part
+                              if (label.startsWith("* (") && label.endsWith(")")) {
+                                const parenContent = label.slice(2); // "(description)"
+                                return (
+                                  <>
+                                    *{" "}
+                                    <Text as="span" color="gray.400">
+                                      {parenContent}
+                                    </Text>
+                                  </>
+                                );
+                              }
+                              return label;
+                            })()}
                           </Text>
                           {fieldHasChildren ? (
                             <ChevronRight

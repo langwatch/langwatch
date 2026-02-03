@@ -51,7 +51,7 @@ specs/               # BDD feature specs
 
 ## Key References
 
-- `docs/CODING_STANDARDS.md` - clean code, SOLID principles
+- `docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
 - `docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
 - `docs/best_practices/` - language/framework conventions
 - `docs/adr/` - Architecture Decision Records
@@ -63,6 +63,8 @@ specs/               # BDD feature specs
 | Building from scratch without checking existing code | Search the codebase first - follow existing patterns, extend existing systems, reuse existing abstractions |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
+| Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
+| Naming tests as unit when they render components | Tests that render components and mock boundaries are integration tests (`.integration.test.ts`), not unit tests |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
 | Shared types in `types.ts` | Colocate unless truly shared |
@@ -97,7 +99,7 @@ Implementation tasks use `/orchestrate` to manage the plan → code → review �
 
 The orchestrator:
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
-2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer agent)
+2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
 3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)
 4. Tracks progress via task status updates
 5. Does NOT read or write code directly
