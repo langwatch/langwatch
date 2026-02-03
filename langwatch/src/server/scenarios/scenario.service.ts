@@ -1,5 +1,15 @@
-import type { PrismaClient } from "@prisma/client";
-import { ScenarioRepository } from "./scenario.repository";
+import { SpanKind } from "@opentelemetry/api";
+import type { PrismaClient, Scenario } from "@prisma/client";
+import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "~/utils/logger/server";
+import {
+  ScenarioRepository,
+  type CreateScenarioInput,
+  type UpdateScenarioInput,
+} from "./scenario.repository";
+
+const tracer = getLangWatchTracer("langwatch.scenarios.service");
+const logger = createLogger("langwatch:scenarios:service");
 
 export class ScenarioService {
   constructor(private readonly repository: ScenarioRepository) {}
@@ -8,19 +18,85 @@ export class ScenarioService {
     return new ScenarioService(new ScenarioRepository(prisma));
   }
 
-  get create() {
-    return this.repository.create.bind(this.repository);
+  async create(input: CreateScenarioInput): Promise<Scenario> {
+    return tracer.withActiveSpan(
+      "ScenarioService.create",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": input.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId: input.projectId }, "Creating scenario");
+        const result = await this.repository.create(input);
+        span.setAttribute("scenario.id", result.id);
+        return result;
+      },
+    );
   }
 
-  get getById() {
-    return this.repository.findById.bind(this.repository);
+  async getById(params: {
+    id: string;
+    projectId: string;
+  }): Promise<Scenario | null> {
+    return tracer.withActiveSpan(
+      "ScenarioService.getById",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "scenario.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, scenarioId: params.id },
+          "Fetching scenario by id",
+        );
+        const result = await this.repository.findById(params);
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
   }
 
-  get getAll() {
-    return this.repository.findAll.bind(this.repository);
+  async getAll(params: { projectId: string }): Promise<Scenario[]> {
+    return tracer.withActiveSpan(
+      "ScenarioService.getAll",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId: params.projectId }, "Fetching all scenarios");
+        const result = await this.repository.findAll(params);
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
   }
 
-  get update() {
-    return this.repository.update.bind(this.repository);
+  async update(
+    id: string,
+    projectId: string,
+    data: UpdateScenarioInput,
+  ): Promise<Scenario> {
+    return tracer.withActiveSpan(
+      "ScenarioService.update",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.id": id,
+        },
+      },
+      async () => {
+        logger.debug({ projectId, scenarioId: id }, "Updating scenario");
+        return await this.repository.update(id, projectId, data);
+      },
+    );
   }
 }

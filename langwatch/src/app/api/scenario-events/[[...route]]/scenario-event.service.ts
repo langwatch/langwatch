@@ -1,6 +1,12 @@
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "~/utils/logger/server";
 import { ScenarioRunStatus } from "./enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
+
+const tracer = getLangWatchTracer("langwatch.scenario-events.service");
+const logger = createLogger("langwatch:scenario-events:service");
 
 /**
  * Service responsible for managing scenario events and their associated data.
@@ -32,10 +38,28 @@ export class ScenarioEventService {
     scenarioRunId: string;
     [key: string]: any;
   }) {
-    await this.eventRepository.saveEvent({
-      projectId,
-      ...(event as ScenarioEvent),
-    });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.saveScenarioEvent",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.id": event.scenarioId,
+          "scenario.run.id": event.scenarioRunId,
+          "event.type": event.type,
+        },
+      },
+      async () => {
+        logger.debug(
+          { projectId, scenarioId: event.scenarioId, scenarioRunId: event.scenarioRunId, type: event.type },
+          "Saving scenario event",
+        );
+        await this.eventRepository.saveEvent({
+          projectId,
+          ...(event as ScenarioEvent),
+        });
+      },
+    );
   }
 
   /**
@@ -52,46 +76,64 @@ export class ScenarioEventService {
     scenarioRunId: string;
     projectId: string;
   }): Promise<ScenarioRunData | null> {
-    // Get run started event using dedicated repository method
-    const runStartedEvent =
-      await this.eventRepository.getRunStartedEventByScenarioRunId({
-        projectId,
-        scenarioRunId,
-      });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getScenarioRunData",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.run.id": scenarioRunId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioRunId }, "Fetching scenario run data");
 
-    if (!runStartedEvent) {
-      return null;
-    }
+        // Get run started event using dedicated repository method
+        const runStartedEvent =
+          await this.eventRepository.getRunStartedEventByScenarioRunId({
+            projectId,
+            scenarioRunId,
+          });
 
-    // Get latest message snapshot event using dedicated repository method (optional)
-    const latestMessageEvent =
-      await this.eventRepository.getLatestMessageSnapshotEventByScenarioRunId({
-        projectId,
-        scenarioRunId,
-      });
+        if (!runStartedEvent) {
+          span.setAttribute("result.found", false);
+          return null;
+        }
 
-    // Get latest run finished event using dedicated repository method
-    const latestRunFinishedEvent =
-      await this.eventRepository.getLatestRunFinishedEventByScenarioRunId({
-        projectId,
-        scenarioRunId,
-      });
+        // Get latest message snapshot event using dedicated repository method (optional)
+        const latestMessageEvent =
+          await this.eventRepository.getLatestMessageSnapshotEventByScenarioRunId({
+            projectId,
+            scenarioRunId,
+          });
 
-    return {
-      scenarioId: runStartedEvent.scenarioId,
-      batchRunId: runStartedEvent.batchRunId,
-      scenarioRunId: runStartedEvent.scenarioRunId,
-      status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
-      results: latestRunFinishedEvent?.results ?? null,
-      messages: latestMessageEvent?.messages ?? [],
-      timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
-      name: runStartedEvent?.metadata?.name ?? null,
-      description: runStartedEvent?.metadata?.description ?? null,
-      durationInMs:
-        runStartedEvent?.timestamp && latestRunFinishedEvent?.timestamp
-          ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
-          : 0,
-    };
+        // Get latest run finished event using dedicated repository method
+        const latestRunFinishedEvent =
+          await this.eventRepository.getLatestRunFinishedEventByScenarioRunId({
+            projectId,
+            scenarioRunId,
+          });
+
+        span.setAttribute("result.found", true);
+        span.setAttribute("scenario.id", runStartedEvent.scenarioId);
+
+        return {
+          scenarioId: runStartedEvent.scenarioId,
+          batchRunId: runStartedEvent.batchRunId,
+          scenarioRunId: runStartedEvent.scenarioRunId,
+          status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
+          results: latestRunFinishedEvent?.results ?? null,
+          messages: latestMessageEvent?.messages ?? [],
+          timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
+          name: runStartedEvent?.metadata?.name ?? null,
+          description: runStartedEvent?.metadata?.description ?? null,
+          durationInMs:
+            runStartedEvent?.timestamp && latestRunFinishedEvent?.timestamp
+              ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
+              : 0,
+        };
+      },
+    );
   }
 
   /**
@@ -101,9 +143,21 @@ export class ScenarioEventService {
    * @returns {Promise<void>}
    */
   async deleteAllEventsForProject({ projectId }: { projectId: string }) {
-    return await this.eventRepository.deleteAllEvents({
-      projectId,
-    });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.deleteAllEventsForProject",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+        },
+      },
+      async () => {
+        logger.debug({ projectId }, "Deleting all events for project");
+        return await this.eventRepository.deleteAllEvents({
+          projectId,
+        });
+      },
+    );
   }
 
   /**
@@ -122,23 +176,39 @@ export class ScenarioEventService {
     projectId: string;
     scenarioId: string;
   }) {
-    const scenarioRunIds =
-      await this.eventRepository.getScenarioRunIdsForScenario({
-        projectId,
-        scenarioId,
-      });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getScenarioRunDataByScenarioId",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.id": scenarioId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioId }, "Fetching scenario run data by scenario id");
 
-    if (scenarioRunIds.length === 0) {
-      return null;
-    }
+        const scenarioRunIds =
+          await this.eventRepository.getScenarioRunIdsForScenario({
+            projectId,
+            scenarioId,
+          });
 
-    // Use batch method instead of N+1 queries
-    const runs = await this.getScenarioRunDataBatch({
-      projectId,
-      scenarioRunIds,
-    });
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return null;
+        }
 
-    return runs;
+        // Use batch method instead of N+1 queries
+        const runs = await this.getScenarioRunDataBatch({
+          projectId,
+          scenarioRunIds,
+        });
+
+        span.setAttribute("result.count", runs.length);
+        return runs;
+      },
+    );
   }
 
   /**
@@ -148,9 +218,23 @@ export class ScenarioEventService {
    * @returns {Promise<any>} The scenario sets data
    */
   async getScenarioSetsDataForProject({ projectId }: { projectId: string }) {
-    return await this.eventRepository.getScenarioSetsDataForProject({
-      projectId,
-    });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getScenarioSetsDataForProject",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId }, "Fetching scenario sets data for project");
+        const result = await this.eventRepository.getScenarioSetsDataForProject({
+          projectId,
+        });
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
   }
 
   /**
@@ -175,35 +259,55 @@ export class ScenarioEventService {
     limit?: number;
     cursor?: string;
   }) {
-    // Validate limit to prevent abuse
-    const validatedLimit = Math.min(Math.max(1, limit), 100);
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getRunDataForScenarioSet",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+          "pagination.limit": limit,
+          "pagination.has_cursor": cursor !== undefined,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioSetId, limit, hasCursor: !!cursor }, "Fetching run data for scenario set");
 
-    // Use the new cursor-based repository method
-    const result = await this.eventRepository.getBatchRunIdsForScenarioSet({
-      projectId,
-      scenarioSetId,
-      limit: validatedLimit,
-      cursor,
-    });
+        // Validate limit to prevent abuse
+        const validatedLimit = Math.min(Math.max(1, limit), 100);
 
-    if (result.batchRunIds.length === 0) {
-      return {
-        runs: [],
-        nextCursor: undefined,
-        hasMore: false,
-      };
-    }
+        // Use the new cursor-based repository method
+        const result = await this.eventRepository.getBatchRunIdsForScenarioSet({
+          projectId,
+          scenarioSetId,
+          limit: validatedLimit,
+          cursor,
+        });
 
-    const runs = await this.getRunDataForBatchIds({
-      projectId,
-      batchRunIds: result.batchRunIds,
-    });
+        if (result.batchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return {
+            runs: [],
+            nextCursor: undefined,
+            hasMore: false,
+          };
+        }
 
-    return {
-      runs,
-      nextCursor: result.nextCursor,
-      hasMore: result.hasMore,
-    };
+        const runs = await this.getRunDataForBatchIds({
+          projectId,
+          batchRunIds: result.batchRunIds,
+        });
+
+        span.setAttribute("result.count", runs.length);
+        span.setAttribute("result.has_more", result.hasMore);
+
+        return {
+          runs,
+          nextCursor: result.nextCursor,
+          hasMore: result.hasMore,
+        };
+      },
+    );
   }
 
   /**
@@ -221,42 +325,65 @@ export class ScenarioEventService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    const batchRunIds = new Set<string>();
-    let cursor: string | undefined = undefined;
-    const pageLimit = 100; // repository/server cap
-    const maxPages = 200; // safety guard (20k ids)
-    let truncated = false;
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getAllRunDataForScenarioSet",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioSetId }, "Fetching all run data for scenario set");
 
-    for (let i = 0; i < maxPages; i++) {
-      const { batchRunIds: ids, nextCursor } =
-        await this.eventRepository.getBatchRunIdsForScenarioSet({
+        const batchRunIds = new Set<string>();
+        let cursor: string | undefined = undefined;
+        const pageLimit = 100; // repository/server cap
+        const maxPages = 200; // safety guard (20k ids)
+        let truncated = false;
+
+        for (let i = 0; i < maxPages; i++) {
+          const { batchRunIds: ids, nextCursor } =
+            await this.eventRepository.getBatchRunIdsForScenarioSet({
+              projectId,
+              scenarioSetId,
+              limit: pageLimit,
+              cursor,
+            });
+          if (ids.length === 0) break;
+          ids.forEach((id) => batchRunIds.add(id));
+
+          if (!nextCursor || nextCursor === cursor) break;
+          if (i === maxPages - 1 && nextCursor) {
+            truncated = true;
+            break;
+          }
+          cursor = nextCursor;
+        }
+        if (truncated) {
+          throw new Error(
+            `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
+              "Refine filters or use the paginated API.",
+          );
+        }
+
+        if (batchRunIds.size === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
+        }
+
+        const runs = await this.getRunDataForBatchIds({
           projectId,
-          scenarioSetId,
-          limit: pageLimit,
-          cursor,
+          batchRunIds: Array.from(batchRunIds),
         });
-      if (ids.length === 0) break;
-      ids.forEach((id) => batchRunIds.add(id));
 
-      if (!nextCursor || nextCursor === cursor) break;
-      if (i === maxPages - 1 && nextCursor) {
-        truncated = true;
-        break;
-      }
-      cursor = nextCursor;
-    }
-    if (truncated) {
-      throw new Error(
-        `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
-          "Refine filters or use the paginated API.",
-      );
-    }
+        span.setAttribute("result.count", runs.length);
+        span.setAttribute("batch_run_ids.count", batchRunIds.size);
 
-    if (batchRunIds.size === 0) return [];
-    return await this.getRunDataForBatchIds({
-      projectId,
-      batchRunIds: Array.from(batchRunIds),
-    });
+        return runs;
+      },
+    );
   }
 
   /**
@@ -276,23 +403,43 @@ export class ScenarioEventService {
     scenarioSetId: string;
     batchRunId: string;
   }) {
-    // Get scenario run IDs for this specific batch run
-    const scenarioRunIds =
-      await this.eventRepository.getScenarioRunIdsForBatchRun({
-        projectId,
-        scenarioSetId,
-        batchRunId,
-      });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getRunDataForBatchRun",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+          "batch.run.id": batchRunId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioSetId, batchRunId }, "Fetching run data for batch run");
 
-    if (scenarioRunIds.length === 0) return [];
+        // Get scenario run IDs for this specific batch run
+        const scenarioRunIds =
+          await this.eventRepository.getScenarioRunIdsForBatchRun({
+            projectId,
+            scenarioSetId,
+            batchRunId,
+          });
 
-    // Use batch method to get the actual run data
-    const runs = await this.getScenarioRunDataBatch({
-      projectId,
-      scenarioRunIds,
-    });
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
+        }
 
-    return runs;
+        // Use batch method to get the actual run data
+        const runs = await this.getScenarioRunDataBatch({
+          projectId,
+          scenarioRunIds,
+        });
+
+        span.setAttribute("result.count", runs.length);
+
+        return runs;
+      },
+    );
   }
 
   /**
@@ -309,22 +456,41 @@ export class ScenarioEventService {
     projectId: string;
     batchRunIds: string[];
   }) {
-    // 2. Get scenario run IDs
-    const scenarioRunIds =
-      await this.eventRepository.getScenarioRunIdsForBatchRuns({
-        projectId,
-        batchRunIds,
-      });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getRunDataForBatchIds",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "batch_run_ids.count": batchRunIds.length,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, batchRunIdsCount: batchRunIds.length }, "Fetching run data for batch ids");
 
-    if (scenarioRunIds.length === 0) return [];
+        // 2. Get scenario run IDs
+        const scenarioRunIds =
+          await this.eventRepository.getScenarioRunIdsForBatchRuns({
+            projectId,
+            batchRunIds,
+          });
 
-    // 3. Use batch method instead of N+1 queries
-    const runs = await this.getScenarioRunDataBatch({
-      projectId,
-      scenarioRunIds,
-    });
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
+        }
 
-    return runs;
+        // 3. Use batch method instead of N+1 queries
+        const runs = await this.getScenarioRunDataBatch({
+          projectId,
+          scenarioRunIds,
+        });
+
+        span.setAttribute("result.count", runs.length);
+
+        return runs;
+      },
+    );
   }
 
   /**
@@ -343,64 +509,81 @@ export class ScenarioEventService {
     projectId: string;
     scenarioRunIds: string[];
   }): Promise<ScenarioRunData[]> {
-    if (scenarioRunIds.length === 0) {
-      return [];
-    }
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getScenarioRunDataBatch",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario_run_ids.count": scenarioRunIds.length,
+        },
+      },
+      async (span) => {
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
+        }
 
-    // Dedupe to reduce payload and ensure stable, unique iteration order
-    const uniqueScenarioRunIds = Array.from(new Set(scenarioRunIds));
+        logger.debug({ projectId, scenarioRunIdsCount: scenarioRunIds.length }, "Batch fetching scenario run data");
 
-    // Fetch all data in 3 batch queries instead of 3N individual queries
-    const [runStartedEvents, messageEvents, runFinishedEvents] =
-      await Promise.all([
-        this.eventRepository.getRunStartedEventsByScenarioRunIds({
-          projectId,
-          scenarioRunIds: uniqueScenarioRunIds,
-        }),
-        this.eventRepository.getLatestMessageSnapshotEventsByScenarioRunIds({
-          projectId,
-          scenarioRunIds: uniqueScenarioRunIds,
-        }),
-        this.eventRepository.getLatestRunFinishedEventsByScenarioRunIds({
-          projectId,
-          scenarioRunIds: uniqueScenarioRunIds,
-        }),
-      ]);
+        // Dedupe to reduce payload and ensure stable, unique iteration order
+        const uniqueScenarioRunIds = Array.from(new Set(scenarioRunIds));
 
-    // Compose the data for each scenario run
-    const runs: ScenarioRunData[] = [];
+        // Fetch all data in 3 batch queries instead of 3N individual queries
+        const [runStartedEvents, messageEvents, runFinishedEvents] =
+          await Promise.all([
+            this.eventRepository.getRunStartedEventsByScenarioRunIds({
+              projectId,
+              scenarioRunIds: uniqueScenarioRunIds,
+            }),
+            this.eventRepository.getLatestMessageSnapshotEventsByScenarioRunIds({
+              projectId,
+              scenarioRunIds: uniqueScenarioRunIds,
+            }),
+            this.eventRepository.getLatestRunFinishedEventsByScenarioRunIds({
+              projectId,
+              scenarioRunIds: uniqueScenarioRunIds,
+            }),
+          ]);
 
-    for (const scenarioRunId of uniqueScenarioRunIds) {
-      const runStartedEvent = runStartedEvents.get(scenarioRunId);
-      const messageEvent = messageEvents.get(scenarioRunId);
-      const runFinishedEvent = runFinishedEvents.get(scenarioRunId);
+        // Compose the data for each scenario run
+        const runs: ScenarioRunData[] = [];
 
-      // Skip if we don't have the required events
-      if (!runStartedEvent) {
-        continue;
-      }
+        for (const scenarioRunId of uniqueScenarioRunIds) {
+          const runStartedEvent = runStartedEvents.get(scenarioRunId);
+          const messageEvent = messageEvents.get(scenarioRunId);
+          const runFinishedEvent = runFinishedEvents.get(scenarioRunId);
 
-      runs.push({
-        scenarioId: runStartedEvent.scenarioId,
-        batchRunId: runStartedEvent.batchRunId,
-        scenarioRunId: runStartedEvent.scenarioRunId,
-        status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
-        results: runFinishedEvent?.results ?? null,
-        messages: messageEvent?.messages ?? [],
-        timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,
-        name: runStartedEvent?.metadata?.name ?? null,
-        description: runStartedEvent?.metadata?.description ?? null,
-        durationInMs:
-          runStartedEvent?.timestamp && runFinishedEvent?.timestamp
-            ? Math.max(
-                0,
-                runFinishedEvent.timestamp - runStartedEvent.timestamp,
-              )
-            : 0,
-      });
-    }
+          // Skip if we don't have the required events
+          if (!runStartedEvent) {
+            continue;
+          }
 
-    return runs;
+          runs.push({
+            scenarioId: runStartedEvent.scenarioId,
+            batchRunId: runStartedEvent.batchRunId,
+            scenarioRunId: runStartedEvent.scenarioRunId,
+            status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
+            results: runFinishedEvent?.results ?? null,
+            messages: messageEvent?.messages ?? [],
+            timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,
+            name: runStartedEvent?.metadata?.name ?? null,
+            description: runStartedEvent?.metadata?.description ?? null,
+            durationInMs:
+              runStartedEvent?.timestamp && runFinishedEvent?.timestamp
+                ? Math.max(
+                    0,
+                    runFinishedEvent.timestamp - runStartedEvent.timestamp,
+                  )
+                : 0,
+          });
+        }
+
+        span.setAttribute("result.count", runs.length);
+
+        return runs;
+      },
+    );
   }
 
   /**
@@ -418,9 +601,24 @@ export class ScenarioEventService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    return await this.eventRepository.getBatchRunCountForScenarioSet({
-      projectId,
-      scenarioSetId,
-    });
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getBatchRunCountForScenarioSet",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, scenarioSetId }, "Getting batch run count for scenario set");
+        const count = await this.eventRepository.getBatchRunCountForScenarioSet({
+          projectId,
+          scenarioSetId,
+        });
+        span.setAttribute("result.count", count);
+        return count;
+      },
+    );
   }
 }

@@ -13,6 +13,9 @@
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -114,23 +117,34 @@ export async function prefetchScenarioData(
   target: TargetConfig,
   deps: DataPrefetcherDependencies,
 ): Promise<PrefetchResult> {
+  logger.debug(
+    { projectId: context.projectId, scenarioId: context.scenarioId, batchRunId: context.batchRunId, targetType: target.type },
+    "Prefetching scenario data",
+  );
+
   const scenario = await fetchScenario(
     context.projectId,
     context.scenarioId,
     deps.scenarioFetcher,
   );
   if (!scenario) {
+    logger.warn({ projectId: context.projectId, scenarioId: context.scenarioId }, "Scenario not found");
     return { success: false, error: `Scenario ${context.scenarioId} not found` };
   }
 
   const projectResult = await fetchProject(context.projectId, deps.projectFetcher);
   if (!projectResult.success) {
+    logger.warn({ projectId: context.projectId, error: projectResult.error }, "Project fetch failed");
     return { success: false, error: projectResult.error };
   }
   const project = projectResult.data;
 
   const adapterData = await fetchAgentData(context.projectId, target, deps);
   if (!adapterData) {
+    logger.warn(
+      { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
+      "Target adapter not found",
+    );
     return {
       success: false,
       error: `${target.type === "prompt" ? "Prompt" : "HTTP agent"} ${target.referenceId} not found`,
@@ -147,8 +161,14 @@ export async function prefetchScenarioData(
     modelForParams,
   );
   if (!modelParams) {
+    logger.warn({ projectId: context.projectId, model: modelForParams }, "Failed to prepare model params");
     return { success: false, error: "Failed to prepare model params" };
   }
+
+  logger.debug(
+    { projectId: context.projectId, scenarioId: context.scenarioId, targetType: target.type },
+    "Prefetch complete",
+  );
 
   return {
     success: true,

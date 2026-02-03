@@ -17,6 +17,11 @@ import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
 import {
+  type JobContextMetadata,
+  createContextFromJobData,
+  runWithContext,
+} from "../context/asyncContext";
+import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
@@ -160,47 +165,73 @@ export function buildChildProcessEnv(
 }
 
 /**
+ * Container type for job data that wraps the payload and context metadata.
+ * Used to extract context propagated from the queue.
+ */
+type JobContainer<DataType> = {
+  __payload: DataType;
+  __context?: JobContextMetadata;
+};
+
+/**
  * Process a scenario job by spawning an isolated child process.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
 ): Promise<ScenarioJobResult> {
-  const { projectId, scenarioId, target, setId, batchRunId } = job.data;
+  // Extract payload and context from the container (if wrapped)
+  const container = job.data as unknown as JobContainer<ScenarioJob>;
+  const jobData = container.__payload ?? job.data;
+  const contextMetadata = container.__context;
 
-  logger.info(
-    { jobId: job.id, scenarioId, projectId, batchRunId },
-    "Processing scenario job",
-  );
+  const { projectId, scenarioId, target, setId, batchRunId } = jobData;
 
-  // Pre-fetch all data needed for child process
-  const deps = createDataPrefetcherDependencies();
-  const prefetchResult = await prefetchScenarioData(
-    { projectId, scenarioId, setId, batchRunId },
-    target,
-    deps,
-  );
+  // Ensure projectId is set in context metadata (may come from job data)
+  const enrichedContextMetadata: JobContextMetadata = {
+    ...contextMetadata,
+    projectId: contextMetadata?.projectId ?? projectId,
+  };
 
-  if (!prefetchResult.success) {
-    logger.error(
-      { jobId: job.id, scenarioId, error: prefetchResult.error },
-      "Failed to prefetch scenario data",
+  // Create request context from job metadata
+  const requestContext = createContextFromJobData(enrichedContextMetadata);
+
+  // Run the job processing within the restored context
+  return runWithContext(requestContext, async () => {
+    logger.info(
+      { jobId: job.id, scenarioId, projectId, batchRunId, setId },
+      "Processing scenario job",
     );
-    return { success: false, error: prefetchResult.error };
-  }
 
-  // Spawn child process with isolated OTEL context
-  const result = await spawnScenarioChildProcess(
-    job,
-    prefetchResult.data,
-    prefetchResult.telemetry,
-  );
+    // Pre-fetch all data needed for child process
+    const deps = createDataPrefetcherDependencies();
+    const prefetchResult = await prefetchScenarioData(
+      { projectId, scenarioId, setId, batchRunId },
+      target,
+      deps,
+    );
 
-  logger.info(
-    { jobId: job.id, scenarioId, success: result.success },
-    "Scenario job completed",
-  );
+    if (!prefetchResult.success) {
+      logger.error(
+        { jobId: job.id, scenarioId, projectId, error: prefetchResult.error },
+        "Failed to prefetch scenario data",
+      );
+      return { success: false, error: prefetchResult.error };
+    }
 
-  return result;
+    // Spawn child process with isolated OTEL context
+    const result = await spawnScenarioChildProcess(
+      job,
+      prefetchResult.data,
+      prefetchResult.telemetry,
+    );
+
+    logger.info(
+      { jobId: job.id, scenarioId, projectId, success: result.success },
+      "Scenario job completed",
+    );
+
+    return result;
+  });
 }
 
 /**

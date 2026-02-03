@@ -10,8 +10,23 @@ import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../utils/logger/server";
 import { connection } from "../../redis";
+import {
+  type JobContextMetadata,
+  createContextFromJobData,
+  getJobContextMetadata,
+  runWithContext,
+} from "../../context/asyncContext";
 
 const logger = createLogger("langwatch:queueWithFallback");
+
+/**
+ * Container type for job data that wraps the payload and context metadata.
+ * Used to propagate request context through the queue.
+ */
+type JobContainer<DataType> = {
+  __payload: DataType;
+  __context?: JobContextMetadata;
+};
 
 // Queue that falls back to calling the worker directly if the queue is not available
 export class QueueWithFallback<
@@ -43,6 +58,9 @@ export class QueueWithFallback<
     data: DataType,
     opts?: JobsOptions,
   ): Promise<Job<DataType, ResultType, NameType>> {
+    // Capture current context to propagate to job processing
+    const contextMetadata = getJobContextMetadata();
+
     return await this.tracer.withActiveSpan(
       `FallbackQueue${this.name}.add`,
       {
@@ -50,12 +68,23 @@ export class QueueWithFallback<
         attributes: {
           "queue.name": name,
           "queue.id": opts?.jobId,
+          ...(contextMetadata.projectId && { "tenant.id": contextMetadata.projectId }),
         },
       },
       async () => {
+        // Wrap data with context for propagation
+        const wrappedData = {
+          __payload: data,
+          __context: contextMetadata,
+        } as unknown as DataType;
+
         if (!connection) {
           await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
-          await this.worker(new Job(this, name, data, opts));
+          // Restore context when executing fallback worker
+          const requestContext = createContextFromJobData(contextMetadata);
+          return await runWithContext(requestContext, async () => {
+            return await this.worker(new Job(this, name, data, opts));
+          });
         }
 
         try {
@@ -76,20 +105,33 @@ export class QueueWithFallback<
 
           const job = await Promise.race([
             timeoutPromise,
-            super.add(name, data, opts).then((job) => {
+            super.add(name, wrappedData, opts).then((job) => {
               timeoutState.state = "resolved";
               return job;
             }),
           ]);
 
+          logger.info(
+            {
+              jobId: opts?.jobId,
+              queueName: this.name,
+              projectId: contextMetadata.projectId,
+            },
+            "Job scheduled",
+          );
+
           return job as Job<DataType, ResultType, NameType>;
         } catch (error) {
           logger.error(
-            { error },
+            { error, projectId: contextMetadata.projectId },
             `failed sending to redis ${this.name} inserting trace directly, attempting to process job synchronously`,
           );
 
-          return await this.worker(new Job(this, name, data, opts));
+          // Restore context when executing fallback worker
+          const requestContext = createContextFromJobData(contextMetadata);
+          return await runWithContext(requestContext, async () => {
+            return await this.worker(new Job(this, name, data, opts));
+          });
         }
       },
     );
@@ -98,21 +140,49 @@ export class QueueWithFallback<
   async addBulk(
     jobs: { name: NameType; data: DataType; opts?: JobsOptions }[],
   ): Promise<Job<DataType, ResultType, NameType>[]> {
+    // Capture current context to propagate to job processing
+    const contextMetadata = getJobContextMetadata();
+
     return await this.tracer.withActiveSpan(
       `FallbackQueue${this.name}.addBulk`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "queue.name": jobs.map((job) => job.name).join(","),
+          "jobs.count": jobs.length,
+          ...(contextMetadata.projectId && { "tenant.id": contextMetadata.projectId }),
         },
       },
       async () => {
         if (!connection) {
-          await Promise.all(
-            jobs.map(async (job) => this.add(job.name, job.data, job.opts)),
-          );
+          // Restore context when executing fallback worker
+          const requestContext = createContextFromJobData(contextMetadata);
+          return await runWithContext(requestContext, async () => {
+            return await Promise.all(
+              jobs.map(async (job) => this.add(job.name, job.data, job.opts)),
+            );
+          });
         }
-        return await super.addBulk(jobs);
+
+        // Wrap each job's data with context
+        const wrappedJobs = jobs.map((job) => ({
+          ...job,
+          data: {
+            __payload: job.data,
+            __context: contextMetadata,
+          } as unknown as DataType,
+        }));
+
+        logger.info(
+          {
+            queueName: this.name,
+            jobCount: jobs.length,
+            projectId: contextMetadata.projectId,
+          },
+          "Bulk jobs scheduled",
+        );
+
+        return await super.addBulk(wrappedJobs);
       },
     );
   }

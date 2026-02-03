@@ -2,7 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
+
+const logger = createLogger("langwatch:api:scenarios:events");
 
 // Base schema for all project-related operations
 const projectSchema = z.object({
@@ -15,6 +18,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioSetsDataForProject({
         projectId: input.projectId,
@@ -33,6 +37,10 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
+        "Fetching scenario set run data",
+      );
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForScenarioSet({
         projectId: input.projectId,
@@ -48,6 +56,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching all scenario set run data");
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getAllRunDataForScenarioSet({
         projectId: input.projectId,
@@ -65,6 +74,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId, scenarioRunId: input.scenarioRunId }, "Fetching scenario run state");
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunData({
         projectId: input.projectId,
@@ -85,6 +95,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching batch run count");
       const scenarioRunnerService = new ScenarioEventService();
       const count = await scenarioRunnerService.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
@@ -102,6 +113,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId, scenarioId: input.scenarioId }, "Fetching run data by scenario id");
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
@@ -120,6 +132,10 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, batchRunId: input.batchRunId },
+        "Fetching batch run data",
+      );
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForBatchRun({
         projectId: input.projectId,
