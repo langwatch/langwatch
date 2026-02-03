@@ -104,52 +104,31 @@ Ship safer agents in minutes. [Create a free account](https://app.langwatch.ai),
 
 ## 🗺️ Integrations
 
+
 LangWatch builds and maintains several integrations listed below. Our tracing platform is built on top of [OpenTelemetry](https://opentelemetry.io/), so we support any OpenTelemetry-compatible library out of the box.
 
-We also support various community standards, such as [OpenInference](https://github.com/Arize-ai/openinference), [OpenLLMetry](https://github.com/traceloop/openllmetry), and more.
+**Frameworks:**  
+[LangChain](https://langwatch.ai/docs/integration/python/integrations/langchain) ·
+[LangGraph](https://langwatch.ai/docs/integration/python/integrations/langgraph) ·
+[Vercel AI SDK](https://langwatch.ai/docs/integration/typescript/integrations/vercel-ai) ·
+[Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra) ·
+[CrewAI](https://langwatch.ai/docs/integration/python/integrations/crewai) ·
+[Google ADK](https://langwatch.ai/docs/integration/python/integrations/google-ai)
 
-### Agent Simulation
-
-Test your agents before they hit production using [Scenarios](https://github.com/langwatch/scenario) — our lightweight simulation framework for stress testing agents against real-world situations. [Get started here](https://scenario.langwatch.ai/).
-
-### Python 🐍
-
-Our Python SDK supports the following auto-instrumentors:
-
-- [OpenAI](https://docs.langwatch.ai/integration/python/guide#open-ai)
-- [Azure](https://docs.langwatch.ai/integration/python/guide#azure)
-- [LiteLLM](https://docs.langwatch.ai/integration/python/guide#lite-llm)
-- [DSPy](https://docs.langwatch.ai/integration/python/guide#ds-py)
-- [LangChain](https://docs.langwatch.ai/integration/python/guide#lang-chain)
-
-<details>
-<summary>Additional frameworks via OpenTelemetry</summary>
-
-- AWS Bedrock
-- Haystack
-- CrewAI
-- Autogen
-- Groq
-- ...and many more
-
-You can find a [full guide](https://docs.langwatch.ai/integration/opentelemetry/guide) on our docs.
-
-</details>
-
-### JavaScript ☕️
-
-Our JavaScript SDK supports the following instrumentors:
-
-- [Vercel AI SDK](https://docs.langwatch.ai/integration/typescript/guide#vercel-ai-sdk)
-- [OpenAI](https://docs.langwatch.ai/integration/typescript/guide#open-ai)
-- [Azure](https://docs.langwatch.ai/integration/typescript/guide#azure)
-- [LangChain.js](https://docs.langwatch.ai/integration/typescript/guide#lang-chain-js)
+**Model Providers:**  
+[OpenAI](https://langwatch.ai/docs/integration/python/integrations/openai) ·
+[Anthropic](https://langwatch.ai/docs/integration/python/integrations/anthropic) ·
+[Azure](https://langwatch.ai/docs/integration/python/integrations/azure) ·
+[Google Cloud](https://langwatch.ai/docs/integration/python/integrations/google-cloud) ·
+[AWS](https://langwatch.ai/docs/integration/python/integrations/aws) ·
+[Groq](https://langwatch.ai/docs/integration/python/integrations/groq) ·
+[Ollama](https://langwatch.ai/docs/integration/python/integrations/ollama)
 
 ### Platforms
 
-- [LangFlow](https://docs.langwatch.ai/integration/langflow)
-- [Flowise](https://docs.langwatch.ai/integration/flowise)
-- [n8n](https://docs.langwatch.ai/integration/n8n)
+[LangFlow](https://docs.langwatch.ai/integration/langflow) · [Flowise](https://docs.langwatch.ai/integration/flowise) · [n8n](https://docs.langwatch.ai/integration/n8n)
+
+*and many more…*
 
 Are you using a platform that could benefit from a direct LangWatch integration? We'd love to hear from you, please [**fill out this very quick form.**](https://www.notion.so/1e35e165d48280468247fcbdc3349077?pvs=21)
 
