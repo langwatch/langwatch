@@ -29,7 +29,7 @@ export const loggerMiddleware = () => {
         const duration = Date.now() - start;
         const { method } = c.req;
         const url = c.req.url;
-        const statusCode = c.res.status || getStatusCodeFromError(error);
+        const statusCode = error ? getStatusCodeFromError(error) : c.res.status;
 
         // Log the request
         logHttpRequest(logger, {

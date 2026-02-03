@@ -5,6 +5,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getTraceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import { normalizeHeaderValue } from "~/utils/headers";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { generateOtelSpanId } from "~/utils/trace";
@@ -69,7 +70,7 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const authToken = req.headers["x-auth-token"];
+  const authToken = normalizeHeaderValue(req.headers["x-auth-token"]);
   if (!authToken) {
     return res
       .status(401)
@@ -77,7 +78,7 @@ export default async function handler(
   }
 
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+    where: { apiKey: authToken },
   });
   if (!project) {
     return res.status(401).json({ message: "Invalid auth token." });
@@ -215,7 +216,7 @@ export default async function handler(
       },
     },
     {
-      jobId: `track_event_${eventId}`,
+      jobId: `${project.id}_track_event_${eventId}`,
       // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
       delay: process.env.VITEST_MODE ? 0 : 5000,
     },

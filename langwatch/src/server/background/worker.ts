@@ -140,6 +140,7 @@ export const start = (
     registerCloseable("eventSourcing", eventSourcingWorker);
     registerCloseable("scenario", scenarioWorker);
     registerCloseable("metricsServer", { close: () => new Promise<void>((resolve) => metricsServer.close(() => resolve())) });
+    registerCloseable("storageStats", { close: () => stopStorageStatsCollection() });
 
     incrementWorkerRestartCount();
 

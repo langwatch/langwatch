@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
+import { normalizeHeaderValue } from "../../../utils/headers";
 
 import { createLogger } from "../../../utils/logger";
 
@@ -13,7 +14,7 @@ export default async function handler(
         return res.status(405).end(); // Only accept GET requests
     }
 
-    const authToken = req.headers["x-auth-token"];
+    const authToken = normalizeHeaderValue(req.headers["x-auth-token"]);
 
     if (!authToken) {
         return res
@@ -22,7 +23,7 @@ export default async function handler(
     }
 
     const project = await prisma.project.findUnique({
-        where: { apiKey: authToken as string },
+        where: { apiKey: authToken },
     });
 
     if (!project) {

@@ -20,7 +20,7 @@ export function OpenTelemetrySetup(): React.ReactElement {
 
   const envVarsCode = `# Set these environment variables in your application
 export OTEL_EXPORTER_OTLP_ENDPOINT="${effectiveEndpoint}/api/otel"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=bearer ${effectiveApiKey}"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${effectiveApiKey}"
 
 # Or for the trace-specific endpoint:
 # export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${effectiveEndpoint}/api/otel/v1/traces"`;
