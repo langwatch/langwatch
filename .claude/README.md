@@ -44,6 +44,7 @@ User Request
 │   ├── orchestrate/    # Manual: /orchestrate <requirements>
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
+│   ├── test-review/    # Delegates to test-reviewer agent
 │   ├── review/         # Delegates to uncle-bob-reviewer
 │   ├── sherpa/         # Delegates to repo-sherpa
 │   └── e2e/            # Coordinates E2E test generation workflow
@@ -125,14 +126,23 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 2. IMPLEMENT                                            │
+│ 2. TEST-REVIEW                                          │
+│    - /test-review validates pyramid placement           │
+│    - Checks @e2e, @integration, @unit appropriateness   │
+│    - Violations? → fix feature file, re-review          │
+│    - Approved? → Continue                               │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3. IMPLEMENT                                            │
 │    - /code with feature file and requirements           │
 │    - Coder implements with TDD, returns summary         │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 3. VERIFY                                               │
+│ 4. VERIFY                                               │
 │    - Check summary against acceptance criteria          │
 │    - Incomplete? → /code again with feedback            │
 │    - Max 3 iterations, then escalate                    │
@@ -140,7 +150,7 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 4. REVIEW                                               │
+│ 5. REVIEW                                               │
 │    - /review for quality gate                           │
 │    - Issues? → /code with reviewer feedback             │
 │    - Approved? → Continue                               │
@@ -148,7 +158,7 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 5. E2E VERIFICATION (if @e2e scenarios exist)           │
+│ 6. E2E VERIFICATION (if @e2e scenarios exist)           │
 │    - /e2e with feature file path                        │
 │    - Explores live app → generates tests → heals        │
 │    - All tests pass? → Complete                         │
@@ -159,11 +169,11 @@ Orchestration mode is explicit - use one of:
                           │    ┌────────────────────┘
                           │    │ (loop back to implement)
                           │    ▼
-                          │  Step 2 → 3 → 4 → 5
+                          │  Step 3 → 4 → 5 → 6
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 6. COMPLETE                                             │
+│ 7. COMPLETE                                             │
 │    - Report summary to user (code + tests)              │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -172,8 +182,10 @@ Orchestration mode is explicit - use one of:
 
 The orchestrator delegates, it doesn't implement:
 - `/plan` creates feature files
+- `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
 - `/review` checks quality
+- `/e2e` generates and verifies E2E tests
 
 The orchestrator reads only feature files and planning docs, not source code.
 
@@ -186,14 +198,21 @@ ORCHESTRATOR (main thread)
 │                  - Feature file creation
 │                  - Acceptance criteria
 │
+├── /test-review ► TEST-REVIEWER AGENT
+│                  - Pyramid placement validation
+│                  - Spec review decision tree
+│                  - Runs before implementation
+│
 ├── /code  ──────► CODER AGENT
 │                  - Implementation work
 │                  - TDD workflow
 │                  - Test execution
 │
-├── /review ─────► UNCLE-BOB-REVIEWER
-│                  - Quality gate
+├── /review ─────► UNCLE-BOB + CUPID + TEST-REVIEWER
+│                  - Quality gate (parallel review)
 │                  - SOLID violations
+│                  - CUPID properties
+│                  - Test pyramid placement
 │                  - Clean code inspection
 │
 ├── /e2e  ───────► E2E WORKFLOW (coordinates agents)
@@ -230,8 +249,9 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/orchestrate <req>` | (orchestrator mode) | Enter orchestration mode with requirements |
 | `/implement #123` | (orchestrator mode) | Fetch issue → invoke `/orchestrate` |
 | `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
+| `/test-review <path>` | test-reviewer | Review specs and tests for pyramid placement |
 | `/code <task>` | coder | Implement with TDD |
-| `/review <focus>` | uncle-bob-reviewer | Quality review |
+| `/review <focus>` | uncle-bob + cupid + test-reviewer | Quality review (parallel) |
 | `/e2e <feature>` | (coordinates e2e agents) | Generate and verify E2E tests |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
