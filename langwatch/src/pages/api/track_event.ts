@@ -191,6 +191,7 @@ export default async function handler(
         instrumentationScope: {
           name: "langwatch.track_event",
         },
+        piiRedactionLevel: project.piiRedactionLevel,
       });
     } catch (error) {
       logger.error(

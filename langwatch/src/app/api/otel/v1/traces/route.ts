@@ -189,6 +189,7 @@ async function handleTracesRequest(req: NextRequest) {
         clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
           project.id,
           traceRequest,
+          project.piiRedactionLevel,
         );
       }
 

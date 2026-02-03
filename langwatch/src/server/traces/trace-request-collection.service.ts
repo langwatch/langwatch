@@ -2,6 +2,7 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../utils/logger";
+import type { PIIRedactionLevel } from "../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,
   type OtlpSpan,
@@ -53,6 +54,7 @@ export class TraceRequestCollectionService {
    *
    * @param tenantId - The tenant ID (project ID).
    * @param traceRequest - The OTLP trace request.
+   * @param piiRedactionLevel - The PII redaction level for the project.
    * @returns A promise that resolves when all spans have been ingested.
    *
    * @example
@@ -60,12 +62,14 @@ export class TraceRequestCollectionService {
    * await traceRequestCollectionService.handleOtlpTraceRequest(
    *   projectId,
    *   traceRequest,
+   *   "ESSENTIAL",
    * );
    * ```
    */
   async handleOtlpTraceRequest(
     tenantId: string,
     traceRequest: IExportTraceServiceRequest,
+    piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
       "TraceRequestCollectionService.handleOtlpTraceRequest",
@@ -141,6 +145,7 @@ export class TraceRequestCollectionService {
                   span: normalizedSpan,
                   resource: resourceParseResult.data ?? null,
                   instrumentationScope: scopeParseResult.data ?? null,
+                  piiRedactionLevel,
                 });
 
                 collectedSpanCount++;
