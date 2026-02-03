@@ -12,10 +12,13 @@ import {
   TRPCClientError,
 } from "@trpc/client";
 import { createTRPCNext } from "@trpc/next";
+import { MutationCache } from "@tanstack/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import { sseLink } from "./sseLink";
+import { extractLimitExceededInfo } from "./trpcError";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -79,6 +82,22 @@ export const api = createTRPCNext<AppRouter>({
       ],
 
       queryClientConfig: {
+        mutationCache: new MutationCache({
+          onError: (error, _variables, _context, mutation) => {
+            // Automatically handle license limit errors globally
+            const limitInfo = extractLimitExceededInfo(error);
+            if (limitInfo) {
+              // Mark the error as handled so component-level handlers can skip it
+              // This prevents showing both the upgrade modal AND an error toast
+              (error as { _handledByGlobalLicenseHandler?: boolean })._handledByGlobalLicenseHandler = true;
+
+              useUpgradeModalStore
+                .getState()
+                .open(limitInfo.limitType, limitInfo.current, limitInfo.max);
+            }
+            // Non-license errors bubble up to component-level handlers
+          },
+        }),
         defaultOptions: {
           mutations: {
             networkMode: "always",

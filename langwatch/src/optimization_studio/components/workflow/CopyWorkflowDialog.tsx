@@ -18,6 +18,7 @@ import {
   teamRoleHasPermission,
 } from "../../../server/api/rbac";
 import { api } from "../../../utils/api";
+import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
 
 export const CopyWorkflowDialog = ({
   open,
@@ -110,6 +111,8 @@ export const CopyWorkflowDialog = ({
 
       onClose();
     } catch (error) {
+      // Skip toast if the global license handler already showed the upgrade modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error replicating workflow",
         description: error instanceof Error ? error.message : "Unknown error",
