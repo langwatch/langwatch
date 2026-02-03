@@ -242,9 +242,12 @@ async function spawnScenarioChildProcess(
     });
 
     // tsx is available since the worker runs via tsx
+    // Use __dirname to resolve cwd reliably - go up from src/server/scenarios to package root
+    const packageRoot = path.resolve(__dirname, "../../..");
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
       env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
+      cwd: packageRoot,
     });
 
     let stderr = "";
