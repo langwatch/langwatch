@@ -12,7 +12,9 @@ export default function NewEvaluationRedirect() {
   useEffect(() => {
     if (!projectSlug || !router.isReady) return;
 
-    void router.replace(`/${projectSlug}/evaluations?drawer.open=evaluatorCategorySelector`);
+    void router.replace(
+      `/${projectSlug}/evaluations?drawer.open=evaluatorCategorySelector`,
+    );
   }, [projectSlug, router, router.isReady]);
 
   return null;

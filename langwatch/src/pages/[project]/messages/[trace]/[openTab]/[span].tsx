@@ -15,10 +15,12 @@ export default function TraceDetailsWithSpanRedirect() {
   useEffect(() => {
     if (!projectSlug || !traceId || !router.isReady) return;
 
-    const tabParam = openTab ? `&drawer.openTab=${encodeURIComponent(openTab)}` : "";
+    const tabParam = openTab
+      ? `&drawer.openTab=${encodeURIComponent(openTab)}`
+      : "";
     const spanParam = span ? `&span=${encodeURIComponent(span)}` : "";
     void router.replace(
-      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}${tabParam}${spanParam}`
+      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}${tabParam}${spanParam}`,
     );
   }, [projectSlug, traceId, openTab, span, router, router.isReady]);
 

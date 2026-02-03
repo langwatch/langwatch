@@ -111,11 +111,13 @@ function MembersList({
   const { hasPermission } = useOrganizationTeamProject();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
-  
+
   // License enforcement for both member types
-  const { checkAndProceed: checkMembersLimit } = useLicenseEnforcement("members");
-  const { checkAndProceed: checkMembersLiteLimit } = useLicenseEnforcement("membersLite");
-  
+  const { checkAndProceed: checkMembersLimit } =
+    useLicenseEnforcement("members");
+  const { checkAndProceed: checkMembersLiteLimit } =
+    useLicenseEnforcement("membersLite");
+
   const teamOptions = teams.map((team) => ({
     label: team.name,
     value: team.id,
@@ -226,10 +228,10 @@ function MembersList({
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     // Count new invites by member type
     const hasNewFullMembers = data.invites.some(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL
+      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
     );
     const hasNewLiteMembers = data.invites.some(
-      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL
+      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
     );
 
     // Chain the limit checks based on what types of members are being added

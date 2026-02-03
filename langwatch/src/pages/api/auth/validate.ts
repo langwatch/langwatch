@@ -5,28 +5,28 @@ import { createLogger } from "../../../utils/logger";
 const _logger = createLogger("langwatch:auth:validate");
 
 export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse,
+  req: NextApiRequest,
+  res: NextApiResponse,
 ) {
-    if (req.method !== "POST") {
-        return res.status(405).end(); // Only accept POST requests
-    }
+  if (req.method !== "POST") {
+    return res.status(405).end(); // Only accept POST requests
+  }
 
-    const authToken = req.headers["x-auth-token"];
+  const authToken = req.headers["x-auth-token"];
 
-    if (!authToken) {
-        return res
-            .status(401)
-            .json({ message: "X-Auth-Token header is required." });
-    }
+  if (!authToken) {
+    return res
+      .status(401)
+      .json({ message: "X-Auth-Token header is required." });
+  }
 
-    const project = await prisma.project.findUnique({
-        where: { apiKey: authToken as string },
-    });
+  const project = await prisma.project.findUnique({
+    where: { apiKey: authToken as string },
+  });
 
-    if (!project) {
-        return res.status(401).json({ message: "Invalid auth token." });
-    }
+  if (!project) {
+    return res.status(401).json({ message: "Invalid auth token." });
+  }
 
-    return res.status(200).json({ projectSlug: project.slug });
+  return res.status(200).json({ projectSlug: project.slug });
 }

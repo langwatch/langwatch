@@ -5,20 +5,20 @@ import { fromZodError } from "zod-validation-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
-    BATCH_EVALUATION_INDEX,
-    batchEvaluationId,
-    esClient,
+  BATCH_EVALUATION_INDEX,
+  batchEvaluationId,
+  esClient,
 } from "../../../../server/elasticsearch";
 import type {
-    ESBatchEvaluation,
-    ESBatchEvaluationRESTParams,
-    ESBatchEvaluationTarget,
-    ESBatchEvaluationTargetType,
+  ESBatchEvaluation,
+  ESBatchEvaluationRESTParams,
+  ESBatchEvaluationTarget,
+  ESBatchEvaluationTargetType,
 } from "../../../../server/experiments/types";
 import {
-    eSBatchEvaluationRESTParamsSchema,
-    eSBatchEvaluationSchema,
-    eSBatchEvaluationTargetTypeSchema,
+  eSBatchEvaluationRESTParamsSchema,
+  eSBatchEvaluationSchema,
+  eSBatchEvaluationTargetTypeSchema,
 } from "../../../../server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
 import { createLogger } from "../../../../utils/logger";
@@ -27,132 +27,131 @@ import { findOrCreateExperiment } from "../../experiment/init";
 
 /** Valid target types for validation */
 const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = [
-    "prompt",
-    "agent",
-    "custom",
+  "prompt",
+  "agent",
+  "custom",
 ];
 
 const logger = createLogger("langwatch:evaluations:batch:log_results");
 
 export const config = {
-    api: {
-        bodyParser: {
-            sizeLimit: "20mb",
-        },
+  api: {
+    bodyParser: {
+      sizeLimit: "20mb",
     },
+  },
 };
 
 export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse,
+  req: NextApiRequest,
+  res: NextApiResponse,
 ) {
-    if (req.method !== "POST") {
-        return res.status(405).end(); // Only accept POST requests
-    }
+  if (req.method !== "POST") {
+    return res.status(405).end(); // Only accept POST requests
+  }
 
-    const xAuthToken = req.headers["x-auth-token"];
-    const authHeader = req.headers.authorization;
+  const xAuthToken = req.headers["x-auth-token"];
+  const authHeader = req.headers.authorization;
 
-    const authToken =
-        xAuthToken ??
-        (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+  const authToken =
+    xAuthToken ??
+    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
 
-    if (!authToken) {
-        return res.status(401).json({
-            message:
-                "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-        });
-    }
-
-    if (
-        req.headers["content-type"] !== "application/json" ||
-        typeof req.body !== "object"
-    ) {
-        return res
-            .status(400)
-            .json({ message: "Invalid body, expecting json" });
-    }
-
-    const project = await prisma.project.findUnique({
-        where: { apiKey: authToken as string },
+  if (!authToken) {
+    return res.status(401).json({
+      message:
+        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
     });
+  }
 
-    if (!project) {
-        return res.status(401).json({ message: "Invalid auth token." });
-    }
+  if (
+    req.headers["content-type"] !== "application/json" ||
+    typeof req.body !== "object"
+  ) {
+    return res.status(400).json({ message: "Invalid body, expecting json" });
+  }
 
-    getPayloadSizeHistogram("log_results").observe(
-        JSON.stringify(req.body).length,
+  const project = await prisma.project.findUnique({
+    where: { apiKey: authToken as string },
+  });
+
+  if (!project) {
+    return res.status(401).json({ message: "Invalid auth token." });
+  }
+
+  getPayloadSizeHistogram("log_results").observe(
+    JSON.stringify(req.body).length,
+  );
+
+  // TODO: check for plan limits here?
+
+  let params: ESBatchEvaluationRESTParams;
+  try {
+    params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
+  } catch (error) {
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid log_results data received",
     );
+    // TODO: should it be a warning instead of exception? here and all over our APIs
+    captureException(error, { extra: { projectId: project.id } });
 
-    // TODO: check for plan limits here?
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
+  }
 
-    let params: ESBatchEvaluationRESTParams;
-    try {
-        params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
-    } catch (error) {
-        logger.error(
-            { error, body: req.body, projectId: project.id },
-            "invalid log_results data received",
-        );
-        // TODO: should it be a warning instead of exception? here and all over our APIs
-        captureException(error, { extra: { projectId: project.id } });
+  if (!params.experiment_id && !params.experiment_slug) {
+    return res.status(400).json({
+      error: "Either experiment_id or experiment_slug is required",
+    });
+  }
 
-        const validationError = fromZodError(error as ZodError);
-        return res.status(400).json({ error: validationError.message });
+  if (
+    params.timestamps?.created_at &&
+    params.timestamps.created_at.toString().length === 10
+  ) {
+    logger.error(
+      {
+        runId: params.run_id,
+        experimentSlug: params.experiment_slug,
+        experimentId: params.experiment_id,
+      },
+      "timestamps not in milliseconds for batch evaluation run",
+    );
+    return res.status(400).json({
+      error:
+        "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+    });
+  }
+
+  try {
+    await processBatchEvaluation(project, params);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.error(
+        { error, body: params, projectId: project.id },
+        "failed to validate data for batch evaluation",
+      );
+      captureException(error, {
+        extra: { projectId: project.id, param: params },
+      });
+
+      const validationError = fromZodError(error);
+      return res.status(400).json({ error: validationError.message });
+    } else {
+      logger.error(
+        { error, body: params, projectId: project.id },
+        "internal server error processing batch evaluation",
+      );
+      captureException(error, {
+        extra: { projectId: project.id, param: params },
+      });
+
+      return res.status(500).json({ error: "Internal server error" });
     }
+  }
 
-    if (!params.experiment_id && !params.experiment_slug) {
-        return res.status(400).json({
-            error: "Either experiment_id or experiment_slug is required",
-        });
-    }
-
-    if (
-        params.timestamps?.created_at &&
-        params.timestamps.created_at.toString().length === 10
-    ) {
-        logger.error(
-            {
-                runId: params.run_id,
-                experimentSlug: params.experiment_slug,
-                experimentId: params.experiment_id,
-            },
-            "timestamps not in milliseconds for batch evaluation run",
-        );
-        return res.status(400).json({
-            error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-        });
-    }
-
-    try {
-        await processBatchEvaluation(project, params);
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            logger.error(
-                { error, body: params, projectId: project.id },
-                "failed to validate data for batch evaluation",
-            );
-            captureException(error, {
-                extra: { projectId: project.id, param: params },
-            });
-
-            const validationError = fromZodError(error);
-            return res.status(400).json({ error: validationError.message });
-        } else {
-            logger.error(
-                { error, body: params, projectId: project.id },
-                "internal server error processing batch evaluation",
-            );
-            captureException(error, {
-                extra: { projectId: project.id, param: params },
-            });
-
-            return res.status(500).json({ error: "Internal server error" });
-        }
-    }
-
-    return res.status(200).json({ message: "ok" });
+  return res.status(200).json({ message: "ok" });
 }
 
 /**
@@ -161,116 +160,109 @@ export default async function handler(
  * and remove it from metadata.
  */
 const processTargets = (
-    targets: ESBatchEvaluationRESTParams["targets"],
+  targets: ESBatchEvaluationRESTParams["targets"],
 ): ESBatchEvaluationTarget[] | null => {
-    if (!targets || targets.length === 0) {
-        return null;
+  if (!targets || targets.length === 0) {
+    return null;
+  }
+
+  return targets.map((target) => {
+    let targetType: ESBatchEvaluationTargetType = target.type ?? "custom";
+    let metadata = target.metadata;
+
+    // If metadata contains a "type" field, validate and use it
+    if (metadata && "type" in metadata) {
+      const typeFromMetadata = metadata.type;
+      if (typeof typeFromMetadata === "string") {
+        const parseResult =
+          eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
+        if (parseResult.success) {
+          targetType = parseResult.data;
+          // Remove "type" from metadata since it's now the target type
+          const { type: _, ...restMetadata } = metadata;
+          metadata = Object.keys(restMetadata).length > 0 ? restMetadata : null;
+        } else {
+          throw new Error(
+            `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
+          );
+        }
+      }
     }
 
-    return targets.map((target) => {
-        let targetType: ESBatchEvaluationTargetType = target.type ?? "custom";
-        let metadata = target.metadata;
-
-        // If metadata contains a "type" field, validate and use it
-        if (metadata && "type" in metadata) {
-            const typeFromMetadata = metadata.type;
-            if (typeof typeFromMetadata === "string") {
-                const parseResult =
-                    eSBatchEvaluationTargetTypeSchema.safeParse(
-                        typeFromMetadata,
-                    );
-                if (parseResult.success) {
-                    targetType = parseResult.data;
-                    // Remove "type" from metadata since it's now the target type
-                    const { type: _, ...restMetadata } = metadata;
-                    metadata =
-                        Object.keys(restMetadata).length > 0
-                            ? restMetadata
-                            : null;
-                } else {
-                    throw new Error(
-                        `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
-                    );
-                }
-            }
-        }
-
-        return {
-            id: target.id,
-            name: target.name,
-            type: targetType,
-            prompt_id: target.prompt_id,
-            prompt_version: target.prompt_version,
-            agent_id: target.agent_id,
-            model: target.model,
-            metadata: metadata ?? null,
-        };
-    });
+    return {
+      id: target.id,
+      name: target.name,
+      type: targetType,
+      prompt_id: target.prompt_id,
+      prompt_version: target.prompt_version,
+      agent_id: target.agent_id,
+      model: target.model,
+      metadata: metadata ?? null,
+    };
+  });
 };
 
 const processBatchEvaluation = async (
-    project: Project,
-    param: ESBatchEvaluationRESTParams,
+  project: Project,
+  param: ESBatchEvaluationRESTParams,
 ) => {
-    const { run_id, experiment_id, experiment_slug } = param;
+  const { run_id, experiment_id, experiment_slug } = param;
 
-    const experiment = await findOrCreateExperiment({
-        project,
-        experiment_id,
-        experiment_slug,
-        experiment_type: ExperimentType.BATCH_EVALUATION_V2,
-        experiment_name: param.name ?? undefined,
-        workflowId: param.workflow_id ?? undefined,
-    });
+  const experiment = await findOrCreateExperiment({
+    project,
+    experiment_id,
+    experiment_slug,
+    experiment_type: ExperimentType.BATCH_EVALUATION_V2,
+    experiment_name: param.name ?? undefined,
+    workflowId: param.workflow_id ?? undefined,
+  });
 
-    const id = batchEvaluationId({
-        projectId: project.id,
-        experimentId: experiment.id,
-        runId: run_id,
-    });
+  const id = batchEvaluationId({
+    projectId: project.id,
+    experimentId: experiment.id,
+    runId: run_id,
+  });
 
-    // Process targets with type extraction from metadata
-    const processedTargets = processTargets(param.targets);
+  // Process targets with type extraction from metadata
+  const processedTargets = processTargets(param.targets);
 
-    const batchEvaluation: ESBatchEvaluation = {
-        ...param,
-        experiment_id: experiment.id,
-        project_id: project.id,
-        targets: processedTargets,
-        dataset:
-            param.dataset?.map((entry) => ({
-                ...entry,
-                ...(entry.entry
-                    ? { entry: safeTruncate(entry.entry, 32 * 1024) }
-                    : {}),
-                ...(entry.predicted
-                    ? { predicted: safeTruncate(entry.predicted, 32 * 1024) }
-                    : {}),
-            })) ?? [],
-        evaluations:
-            param.evaluations?.map((evaluation) => ({
-                ...evaluation,
-                ...(evaluation.inputs
-                    ? { inputs: safeTruncate(evaluation.inputs, 32 * 1024) }
-                    : {}),
-                ...(evaluation.details
-                    ? { details: safeTruncate(evaluation.details, 32 * 1024) }
-                    : {}),
-            })) ?? [],
-        timestamps: {
-            ...param.timestamps,
-            created_at: param.timestamps?.created_at ?? new Date().getTime(),
-            inserted_at: new Date().getTime(),
-            updated_at: new Date().getTime(),
-        },
-    };
+  const batchEvaluation: ESBatchEvaluation = {
+    ...param,
+    experiment_id: experiment.id,
+    project_id: project.id,
+    targets: processedTargets,
+    dataset:
+      param.dataset?.map((entry) => ({
+        ...entry,
+        ...(entry.entry ? { entry: safeTruncate(entry.entry, 32 * 1024) } : {}),
+        ...(entry.predicted
+          ? { predicted: safeTruncate(entry.predicted, 32 * 1024) }
+          : {}),
+      })) ?? [],
+    evaluations:
+      param.evaluations?.map((evaluation) => ({
+        ...evaluation,
+        ...(evaluation.inputs
+          ? { inputs: safeTruncate(evaluation.inputs, 32 * 1024) }
+          : {}),
+        ...(evaluation.details
+          ? { details: safeTruncate(evaluation.details, 32 * 1024) }
+          : {}),
+      })) ?? [],
+    timestamps: {
+      ...param.timestamps,
+      created_at: param.timestamps?.created_at ?? new Date().getTime(),
+      inserted_at: new Date().getTime(),
+      updated_at: new Date().getTime(),
+    },
+  };
 
-    // To guarantee no extra keys
-    const validatedBatchEvaluation =
-        eSBatchEvaluationSchema.parse(batchEvaluation);
+  // To guarantee no extra keys
+  const validatedBatchEvaluation =
+    eSBatchEvaluationSchema.parse(batchEvaluation);
 
-    const script = {
-        source: `
+  const script = {
+    source: `
       if (ctx._source.evaluations == null) {
         ctx._source.evaluations = [];
       }
@@ -348,26 +340,26 @@ const processBatchEvaluation = async (
         ctx._source.total = params.total;
       }
     `,
-        params: {
-            evaluations: batchEvaluation.evaluations,
-            dataset: batchEvaluation.dataset,
-            targets: batchEvaluation.targets ?? [],
-            updated_at: new Date().getTime(),
-            finished_at: batchEvaluation.timestamps.finished_at,
-            stopped_at: batchEvaluation.timestamps.stopped_at,
-            progress: batchEvaluation.progress,
-            total: batchEvaluation.total,
-        },
-    };
+    params: {
+      evaluations: batchEvaluation.evaluations,
+      dataset: batchEvaluation.dataset,
+      targets: batchEvaluation.targets ?? [],
+      updated_at: new Date().getTime(),
+      finished_at: batchEvaluation.timestamps.finished_at,
+      stopped_at: batchEvaluation.timestamps.stopped_at,
+      progress: batchEvaluation.progress,
+      total: batchEvaluation.total,
+    },
+  };
 
-    const client = await esClient({ projectId: project.id });
-    await client.update({
-        index: BATCH_EVALUATION_INDEX.alias,
-        id,
-        body: {
-            script,
-            upsert: validatedBatchEvaluation,
-        },
-        retry_on_conflict: 5,
-    });
+  const client = await esClient({ projectId: project.id });
+  await client.update({
+    index: BATCH_EVALUATION_INDEX.alias,
+    id,
+    body: {
+      script,
+      upsert: validatedBatchEvaluation,
+    },
+    retry_on_conflict: 5,
+  });
 };
