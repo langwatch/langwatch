@@ -455,10 +455,9 @@ export const evaluatorsRouter = createTRPCRouter({
         projectId: input.projectId,
         name: source.name,
         type: source.type,
-        config:
-          source.config === null
-            ? Prisma.JsonNull
-            : (source.config as Prisma.InputJsonValue),
+        config: (source.config === null
+          ? Prisma.JsonNull
+          : source.config) as Prisma.InputJsonValue,
         workflowId: newWorkflowId ?? undefined,
         copiedFromEvaluatorId: source.id,
       });
