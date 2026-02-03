@@ -15,7 +15,7 @@ import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 

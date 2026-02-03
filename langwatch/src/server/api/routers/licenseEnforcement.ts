@@ -5,10 +5,7 @@ import {
   limitTypes,
   limitTypeSchema,
 } from "../../license-enforcement";
-import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-} from "../permission";
+import { checkOrganizationPermission } from "../rbac";
 
 export const licenseEnforcementRouter = createTRPCRouter({
   /**
@@ -22,11 +19,7 @@ export const licenseEnforcementRouter = createTRPCRouter({
         limitType: limitTypeSchema,
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const service = createLicenseEnforcementService(ctx.prisma);
       return service.checkLimit(
@@ -42,11 +35,7 @@ export const licenseEnforcementRouter = createTRPCRouter({
    */
   checkAllLimits: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const service = createLicenseEnforcementService(ctx.prisma);
       const results = await Promise.all(

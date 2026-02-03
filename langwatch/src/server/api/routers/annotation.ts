@@ -17,7 +17,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger";
 import type { Protections } from "../../elasticsearch/protections";
-import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";

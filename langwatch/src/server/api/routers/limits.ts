@@ -2,20 +2,13 @@ import { z } from "zod";
 import { prisma } from "../../db";
 import { UsageStatsService } from "../../license-enforcement/usage-stats.service";
 import { UsageLimitService } from "../../notifications/usage-limit.service";
-import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-} from "../permission";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
       const service = UsageStatsService.create(prisma);
@@ -29,11 +22,7 @@ export const limitsRouter = createTRPCRouter({
         maxMonthlyUsageLimit: z.number(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ input }) => {
       const service = UsageLimitService.create(prisma);
       const notification = await service.checkAndSendWarning({
