@@ -127,6 +127,8 @@ function buildTestChildProcessEnv(
     TERM: process.env.TERM,
     // Node.js vars
     NODE_ENV: process.env.NODE_ENV,
+    // CI/pnpm vars (required for pnpm exec tsx in CI)
+    PNPM_HOME: process.env.PNPM_HOME,
     // Test-specific vars
     ...testEnv,
   };
