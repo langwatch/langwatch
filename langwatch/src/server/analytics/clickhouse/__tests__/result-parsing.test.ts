@@ -17,7 +17,7 @@ import type { FlattenAnalyticsMetricsEnum, SeriesInputType } from "../../registr
 describe("result-parsing", () => {
   describe("alias consistency", () => {
     // Test with a single series (index 0)
-    it("should generate consistent aliases for single metric", () => {
+    it("generates consistent aliases for single metric", () => {
       const series = { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const };
 
       // This is the alias used when parsing results (always index 0 for first series)
@@ -45,7 +45,7 @@ describe("result-parsing", () => {
     });
 
     // Test with multiple series to verify indices are correct
-    it("should use correct indices for multiple metrics", () => {
+    it("uses correct indices for multiple metrics", () => {
       const series = [
         { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
         { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const },
@@ -78,7 +78,7 @@ describe("result-parsing", () => {
   });
 
   describe("UserThreads-like query", () => {
-    it("should generate correct aliases for all 4 UserThreads metrics", () => {
+    it("generates correct aliases for all 4 UserThreads metrics", () => {
       const userThreadsSeries: SeriesInputType[] = [
         { metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" },
         {
@@ -130,7 +130,7 @@ describe("result-parsing", () => {
   });
 
   describe("LLMSummary-like query", () => {
-    it("should generate correct aliases for all LLMSummary metrics", () => {
+    it("generates correct aliases for all LLMSummary metrics", () => {
       const llmSummarySeries: SeriesInputType[] = [
         { metric: "performance.total_tokens" as FlattenAnalyticsMetricsEnum, aggregation: "avg" },
         { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "avg" },
@@ -172,7 +172,7 @@ describe("result-parsing", () => {
   });
 
   describe("simulated result parsing", () => {
-    it("should correctly match simulated ClickHouse JSONEachRow response to aliases", () => {
+    it("correctly matches simulated ClickHouse JSONEachRow response to aliases", () => {
       // This simulates what ClickHouse would return for a UserThreads query
       // Note: ClickHouse JSONEachRow does NOT include backticks in column names
       const simulatedChResponse = [
@@ -258,7 +258,7 @@ describe("result-parsing", () => {
      * (e.g., due to empty subquery results), the normalization ensures
      * all metrics have default values of 0 in both periods.
      */
-    it("should normalize missing metrics to 0 so frontend can calculate % change", () => {
+    it("normalizes missing metrics to 0 so frontend can calculate % change", () => {
       // Simulate ClickHouse response where pipeline metrics return NULL for previous period
       // (this happens when subquery returns no data for that period)
       const simulatedChResponseWithNulls = [

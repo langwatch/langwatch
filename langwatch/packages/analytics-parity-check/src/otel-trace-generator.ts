@@ -85,6 +85,8 @@ async function generateLLMTraces(
 
     await tracer.withActiveSpan(`${model} completion`, async (span) => {
       span.setType("llm");
+      // Set run prefix for trace isolation
+      span.setAttribute("run.prefix", runPrefix);
       span.setInput("chat_messages", [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: `Test message ${i}` },
@@ -129,6 +131,8 @@ async function generateRAGTraces(
 
     await tracer.withActiveSpan("main_chain", async (rootSpan) => {
       rootSpan.setType("chain");
+      // Set run prefix for trace isolation
+      rootSpan.setAttribute("run.prefix", runPrefix);
       rootSpan.setInput("text", `Input for chain ${i}`);
 
       // Set metadata on root span
@@ -206,6 +210,8 @@ async function generateChainToolTraces(
 
     await tracer.withActiveSpan("main_chain", async (rootSpan) => {
       rootSpan.setType("chain");
+      // Set run prefix for trace isolation
+      rootSpan.setAttribute("run.prefix", runPrefix);
       rootSpan.setInput("text", `Input for chain ${i}`);
 
       // Set metadata
@@ -273,6 +279,8 @@ async function generateMetadataVariationTraces(
 
     await tracer.withActiveSpan(`${model} completion`, async (span) => {
       span.setType("llm");
+      // Set run prefix for trace isolation
+      span.setAttribute("run.prefix", runPrefix);
       span.setInput("chat_messages", [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: `Test message ${i}` },
@@ -318,6 +326,8 @@ async function generateErrorTraces(
   for (let i = 0; i < count; i++) {
     await tracer.withActiveSpan("failed_completion", async (span) => {
       span.setType("llm");
+      // Set run prefix for trace isolation
+      span.setAttribute("run.prefix", runPrefix);
       span.setInput("text", "This will fail");
 
       // Set metadata
@@ -355,6 +365,8 @@ async function generateEvaluationTraces(
 
     await tracer.withActiveSpan(`${model} completion`, async (span) => {
       span.setType("llm");
+      // Set run prefix for trace isolation
+      span.setAttribute("run.prefix", runPrefix);
       span.setInput("chat_messages", [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: `Test message ${i}` },

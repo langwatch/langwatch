@@ -122,11 +122,27 @@ export class AnalyticsComparator {
 
       if (!esBucket || !chBucket) continue;
 
-      for (const key of Object.keys(esBucket)) {
+      // Use union of keys from both buckets to catch keys present only in one
+      const allKeys = new Set([
+        ...Object.keys(esBucket),
+        ...Object.keys(chBucket),
+      ]);
+
+      for (const key of allKeys) {
         if (key === "date") continue;
 
         const esValue = esBucket[key];
         const chValue = chBucket[key];
+
+        // Report missing keys
+        if (esValue === undefined && chValue !== undefined) {
+          discrepancies.push(`Bucket ${i} key ${key}: missing in ES, CH=${chValue}`);
+          continue;
+        }
+        if (chValue === undefined && esValue !== undefined) {
+          discrepancies.push(`Bucket ${i} key ${key}: ES=${esValue}, missing in CH`);
+          continue;
+        }
 
         if (typeof esValue === "number" && typeof chValue === "number") {
           if (!this.valuesMatch(esValue, chValue)) {
@@ -156,11 +172,27 @@ export class AnalyticsComparator {
 
       if (!esBucket || !chBucket) continue;
 
-      for (const key of Object.keys(esBucket)) {
+      // Use union of keys from both buckets to catch keys present only in one
+      const allKeys = new Set([
+        ...Object.keys(esBucket),
+        ...Object.keys(chBucket),
+      ]);
+
+      for (const key of allKeys) {
         if (key === "date") continue;
 
         const esValue = esBucket[key];
         const chValue = chBucket[key];
+
+        // Report missing keys
+        if (esValue === undefined && chValue !== undefined) {
+          discrepancies.push(`Previous bucket ${i} key ${key}: missing in ES, CH=${chValue}`);
+          continue;
+        }
+        if (chValue === undefined && esValue !== undefined) {
+          discrepancies.push(`Previous bucket ${i} key ${key}: ES=${esValue}, missing in CH`);
+          continue;
+        }
 
         if (typeof esValue === "number" && typeof chValue === "number") {
           if (!this.valuesMatch(esValue, chValue)) {
@@ -187,16 +219,33 @@ export class AnalyticsComparator {
       );
     }
 
-    // Compare counts for matching fields
+    // Compare counts for matching fields (both directions)
     const esOptionMap = new Map(
       esResult.options.map((o) => [o.field, o.count]),
     );
+    const chOptionMap = new Map(
+      chResult.options.map((o) => [o.field, o.count]),
+    );
 
+    // Check CH options against ES
     for (const chOption of chResult.options) {
       const esCount = esOptionMap.get(chOption.field);
-      if (esCount !== undefined && !this.valuesMatch(esCount, chOption.count)) {
+      if (esCount === undefined) {
+        discrepancies.push(
+          `Option ${chOption.field}: missing in ES, CH=${chOption.count}`,
+        );
+      } else if (!this.valuesMatch(esCount, chOption.count)) {
         discrepancies.push(
           `Option ${chOption.field}: ES=${esCount}, CH=${chOption.count}`,
+        );
+      }
+    }
+
+    // Check ES options missing in CH
+    for (const esOption of esResult.options) {
+      if (!chOptionMap.has(esOption.field)) {
+        discrepancies.push(
+          `Option ${esOption.field}: ES=${esOption.count}, missing in CH`,
         );
       }
     }
@@ -286,16 +335,33 @@ export class AnalyticsComparator {
       );
     }
 
-    // Compare counts for matching document IDs
+    // Compare counts for matching document IDs (both directions)
     const esDocMap = new Map(
       esResult.topDocuments.map((d) => [d.documentId, d.count]),
     );
+    const chDocMap = new Map(
+      chResult.topDocuments.map((d) => [d.documentId, d.count]),
+    );
 
+    // Check CH documents against ES
     for (const chDoc of chResult.topDocuments) {
       const esCount = esDocMap.get(chDoc.documentId);
-      if (esCount !== undefined && !this.valuesMatch(esCount, chDoc.count)) {
+      if (esCount === undefined) {
+        discrepancies.push(
+          `Document ${chDoc.documentId}: missing in ES, CH=${chDoc.count}`,
+        );
+      } else if (!this.valuesMatch(esCount, chDoc.count)) {
         discrepancies.push(
           `Document ${chDoc.documentId}: ES=${esCount}, CH=${chDoc.count}`,
+        );
+      }
+    }
+
+    // Check ES documents missing in CH
+    for (const esDoc of esResult.topDocuments) {
+      if (!chDocMap.has(esDoc.documentId)) {
+        discrepancies.push(
+          `Document ${esDoc.documentId}: ES=${esDoc.count}, missing in CH`,
         );
       }
     }

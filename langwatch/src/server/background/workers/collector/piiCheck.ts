@@ -24,9 +24,30 @@ let cachedCredentials: { project_id: string } | undefined | null = null;
 
 function getCredentials(): { project_id: string } | undefined {
   if (cachedCredentials === null) {
-    cachedCredentials = env.GOOGLE_APPLICATION_CREDENTIALS
-      ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
-      : undefined;
+    if (!env.GOOGLE_APPLICATION_CREDENTIALS) {
+      cachedCredentials = undefined;
+    } else {
+      try {
+        const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
+        if (
+          typeof parsed?.project_id !== "string" ||
+          !parsed.project_id.trim()
+        ) {
+          logger.error(
+            "GOOGLE_APPLICATION_CREDENTIALS missing valid project_id",
+          );
+          cachedCredentials = undefined;
+        } else {
+          cachedCredentials = parsed;
+        }
+      } catch (e) {
+        logger.error(
+          { error: e },
+          "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
+        );
+        cachedCredentials = undefined;
+      }
+    }
   }
   return cachedCredentials ?? undefined;
 }

@@ -5,7 +5,11 @@
  * to equivalent ClickHouse SQL expressions.
  */
 
-import type { AggregationTypes, PercentileAggregationTypes } from "../types";
+import type {
+  AggregationTypes,
+  PercentileAggregationTypes,
+  PipelineAggregationTypes,
+} from "../types";
 import {
   type CHTable,
   getFieldMapping,
@@ -613,11 +617,12 @@ function translateEventMetric(
     }
 
     case "events.event_details":
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-      };
+      // ES implementation requires key (event_type) and subkey (event_details.key)
+      // and only supports cardinality aggregation. CH implementation not yet complete.
+      throw new Error(
+        `Metric events.event_details is not yet supported in ClickHouse ` +
+          `(aggregation=${aggregation}, metricKey=${metricKey ?? "undefined"})`,
+      );
 
     default:
       return {
@@ -717,7 +722,7 @@ export function translatePipelineAggregation(
   metric: string,
   aggregation: AggregationTypes,
   pipelineField: string,
-  pipelineAggregation: string,
+  pipelineAggregation: PipelineAggregationTypes,
   index: number,
   key?: string,
   subkey?: string,
@@ -762,14 +767,9 @@ export function translatePipelineAggregation(
   // 3. Compute avg across users
   if (metric === "threads.average_duration_per_thread" && innerMetric.requiresSubquery) {
     const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
-    const outerAgg =
-      pipelineAggregation === "sum"
-        ? "sum"
-        : pipelineAggregation === "avg"
-          ? "avg"
-          : pipelineAggregation === "min"
-            ? "min"
-            : "max";
+    // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
+    // which matches CH function names directly
+    const outerAgg = pipelineAggregation;
 
     // Build a nested subquery for 3-level aggregation
     // Use trace_summaries.OccurredAt which is set to the trace's execution start time
@@ -811,15 +811,9 @@ export function translatePipelineAggregation(
     };
   }
 
-  // Map pipeline aggregation to CH function
-  const outerAgg =
-    pipelineAggregation === "sum"
-      ? "sum"
-      : pipelineAggregation === "avg"
-        ? "avg"
-        : pipelineAggregation === "min"
-          ? "min"
-          : "max";
+  // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
+  // which matches CH function names directly
+  const outerAgg = pipelineAggregation;
 
   // Remove alias from selectExpression using regex anchored to end of string
   // Escape special regex characters in alias to prevent injection issues

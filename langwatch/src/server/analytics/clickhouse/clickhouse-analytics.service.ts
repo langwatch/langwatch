@@ -477,17 +477,24 @@ export class ClickHouseAnalyticsService {
 
         try {
           // The query has two parts separated by semicolon
-          const [topDocsSql, totalSql] = sql.split(";");
+          const parts = sql.split(";");
+          if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+            throw new Error(
+              `Expected topDocuments query to have exactly 2 non-empty statements ` +
+                `separated by semicolon, got ${parts.length} parts`,
+            );
+          }
+          const [topDocsSql, totalSql] = parts;
 
           // Execute both queries
           const [topDocsResult, totalResult] = await Promise.all([
             this.clickHouseClient.query({
-              query: topDocsSql!,
+              query: topDocsSql,
               query_params: params,
               format: "JSONEachRow",
             }),
             this.clickHouseClient.query({
-              query: totalSql!,
+              query: totalSql,
               query_params: params,
               format: "JSONEachRow",
             }),
