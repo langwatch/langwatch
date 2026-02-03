@@ -87,11 +87,12 @@ export async function setup(): Promise<void> {
 
   console.log("[globalSetup] Starting testcontainers...");
 
-  // Start ClickHouse container
+  // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
   clickHouseContainer = await new ClickHouseContainer()
     .withLabels(CONTAINER_LABELS)
+    .withReuse()
     .withCopyFilesToContainer([
       {
         source: storagePolicyConfigPath,
@@ -101,9 +102,10 @@ export async function setup(): Promise<void> {
     .withStartupTimeout(120000) // 2 minutes for container startup
     .start();
 
-  // Start Redis container
+  // Start Redis container (reusable to speed up subsequent test runs)
   redisContainer = await new RedisContainer()
     .withLabels(CONTAINER_LABELS)
+    .withReuse()
     .start();
 
   const clickHouseBaseUrl = clickHouseContainer.getConnectionUrl();
@@ -138,11 +140,21 @@ export async function setup(): Promise<void> {
 
 /**
  * Global teardown for integration tests.
- * Stops testcontainers after all test files complete.
+ * With reusable containers, we don't stop them - they persist for faster subsequent runs.
+ * To manually stop: docker rm -f $(docker ps -q --filter "label=langwatch.test=true")
  */
 export async function teardown(): Promise<void> {
   // Skip if using CI service containers
   if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
+    return;
+  }
+
+  // With reusable containers, we keep them running for faster subsequent test runs.
+  // The container info file is also kept so the next run can find the containers.
+  // To force cleanup, set STOP_TEST_CONTAINERS=true or run:
+  //   docker rm -f $(docker ps -q --filter "label=langwatch.test=true")
+  if (process.env.STOP_TEST_CONTAINERS !== "true") {
+    console.log("[globalSetup] Keeping reusable containers running for faster subsequent runs");
     return;
   }
 
