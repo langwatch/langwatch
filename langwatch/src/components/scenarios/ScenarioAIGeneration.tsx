@@ -19,6 +19,10 @@ import { createLogger } from "../../utils/logger";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
+import {
+  generateScenarioWithAI,
+  type GeneratedScenario,
+} from "./services/scenarioGeneration";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -33,12 +37,8 @@ type ScenarioAIGenerationProps = {
 export type GenerationStatus = "idle" | "generating" | "done" | "error";
 type ViewMode = "prompt" | "input";
 
-export type GeneratedScenario = {
-  name: string;
-  situation: string;
-  criteria: string[];
-  labels: string[];
-};
+// Re-export for backwards compatibility
+export type { GeneratedScenario } from "./services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Hooks
@@ -64,26 +64,20 @@ export function useScenarioGeneration(projectId: string | undefined) {
       prompt: string,
       currentScenario: GeneratedScenario | null,
     ): Promise<GeneratedScenario> => {
+      if (!projectId) {
+        throw new Error("Project ID is required");
+      }
+
       setStatus("generating");
 
       try {
-        const response = await fetch("/api/scenario/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, currentScenario, projectId }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to generate scenario");
-        }
-
-        const data = await response.json();
-        if (!data.scenario) {
-          throw new Error("Invalid response: missing scenario data");
-        }
+        const scenario = await generateScenarioWithAI(
+          prompt,
+          projectId,
+          currentScenario
+        );
         setStatus("done");
-        return data.scenario;
+        return scenario;
       } catch (error) {
         setStatus("error");
         throw error;
@@ -126,6 +120,7 @@ const TOAST_DURATION_MS = 5000;
 
 export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { project } = useOrganizationTeamProject();
+
   const [viewMode, setViewMode] = useState<ViewMode>("prompt");
   const [input, setInput] = useState("");
 
