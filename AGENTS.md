@@ -75,6 +75,8 @@ specs/               # BDD feature specs
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
 | Inconsistent branch naming | Issue branches: `issue123/slug`, features: `feat/slug`. Use `/worktree #123` for automatic naming |
+| Ignoring review findings marked "NEEDS USER DECISION" or "Should fix (Important)" | Address ALL review findings before proceeding. If flagged "NEEDS USER DECISION", ask the user. Never skip "Should fix (Important)" items by rationalizing "it works anyway" |
+| Feature file scenarios with implementation details like `settings.X equals Y` | Feature files describe behavior from user perspective, not config values or internals. Write "job fails without retry" not "settings.attempts equals 1" |
 
 ## TypeScript
 

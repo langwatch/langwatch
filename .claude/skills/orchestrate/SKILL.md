@@ -87,8 +87,34 @@ Be aware of context size. When context grows large, ask the user if they'd like 
   - If all pass → mark task as `completed`
 - If no `@e2e` scenarios → skip to Complete
 
-### 7. Complete
+### 7. Self-Check (Required)
+
+Before completing, verify you didn't make mistakes:
+
+**Review Compliance:**
+- Did you address ALL items marked "Should fix (Important)"?
+- Did you ask the user about items marked "NEEDS USER DECISION"?
+- Did you skip any reviewer recommendations without justification?
+
+**Test Coverage:**
+- Check the feature file for `@unit`, `@integration`, `@e2e` tags
+- Verify tests exist for EACH tagged scenario
+- If a scenario is tagged `@integration` but only unit tests exist, that's incomplete
+
+**Acceptance Criteria:**
+- Re-read the feature file acceptance criteria
+- Verify each criterion is implemented AND tested
+
+If ANY check fails:
+1. Do NOT proceed to Complete
+2. Go back to the appropriate step (Implement, Review, or E2E)
+3. Fix the gap before continuing
+
+This self-check exists because it's easy to rationalize skipping work. Don't.
+
+### 8. Complete
 - Verify all tasks are completed
+- Verify self-check passed
 - Report summary to user (include E2E test status if applicable)
 
 ## Boundaries
