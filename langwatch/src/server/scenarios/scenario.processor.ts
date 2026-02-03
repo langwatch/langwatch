@@ -366,6 +366,13 @@ export function startScenarioProcessor(
     logger.info("Scenario processor ready, waiting for jobs");
   });
 
+  worker.on("stalled", (jobId) => {
+    logger.warn(
+      { jobId },
+      "Scenario job stalled - worker may have died mid-execution",
+    );
+  });
+
   worker.on("failed", (job, error) => {
     logger.error(
       { jobId: job?.id, error, data: job?.data },

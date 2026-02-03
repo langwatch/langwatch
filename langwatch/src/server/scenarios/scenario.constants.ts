@@ -16,8 +16,8 @@ export const SCENARIO_QUEUE = {
   FAILED_JOB_RETENTION_SECONDS: 60 * 60 * 24 * 3, // 3 days
   /** Initial delay for exponential backoff (ms) */
   BACKOFF_DELAY_MS: 1000,
-  /** Number of retry attempts */
-  MAX_ATTEMPTS: 3,
+  /** Number of retry attempts (1 = no retries, immediate fail after stall detection) */
+  MAX_ATTEMPTS: 1,
 } as const;
 
 /** Worker configuration */
