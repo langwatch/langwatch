@@ -18,8 +18,8 @@
 
 ## Why LangWatch?
 
-LangWatch is an AI engineering platform for building, testing, and operating LLM-powered systems, from prompt workflows to full-stack, tool-using agents.
-
+The platform for LLM evaluations and AI agent testing.
+We help teams test, simulate, evaluate, and monitor LLM-powered agents end-to-end — before release and in production.
 Built for teams that need regression testing, simulations, and production observability without building custom tooling.
 
 - [**End-to-end agent simulations**](https://langwatch.ai/scenario/)
