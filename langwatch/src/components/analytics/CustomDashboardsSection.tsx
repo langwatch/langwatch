@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { MenuLink } from "~/components/MenuLink";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -26,6 +27,7 @@ export function CustomDashboardsSection({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const currentDashboardId = router.query.dashboard as string | undefined;
+  const { checkAndProceed } = useLicenseEnforcement("dashboards");
 
   const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
     null,
@@ -54,31 +56,33 @@ export function CustomDashboardsSection({
   }, [editingDashboardId]);
 
   const handleCreateDashboard = () => {
-    const name = prompt(
-      "Enter dashboard name:",
-      `Dashboard ${dashboards.length + 1}`,
-    );
-    if (!name) return;
+    checkAndProceed(() => {
+      const name = prompt(
+        "Enter dashboard name:",
+        `Dashboard ${dashboards.length + 1}`,
+      );
+      if (!name) return;
 
-    createDashboard.mutate(
-      { projectId, name },
-      {
-        onSuccess: (newDashboard) => {
-          void dashboardsQuery.refetch();
-          void router.push(
-            `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
-          );
+      createDashboard.mutate(
+        { projectId, name },
+        {
+          onSuccess: (newDashboard) => {
+            void dashboardsQuery.refetch();
+            void router.push(
+              `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
+            );
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error creating dashboard",
+              type: "error",
+              duration: 3000,
+              meta: { closable: true },
+            });
+          },
         },
-        onError: () => {
-          toaster.create({
-            title: "Error creating dashboard",
-            type: "error",
-            duration: 3000,
-            meta: { closable: true },
-          });
-        },
-      },
-    );
+      );
+    });
   };
 
   const handleStartRename = (dashboardId: string, currentName: string) => {

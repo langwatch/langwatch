@@ -94,6 +94,10 @@ export interface ILicenseEnforcementRepository {
   getAgentCount(organizationId: string): Promise<number>;
   getExperimentCount(organizationId: string): Promise<number>;
   getOnlineEvaluationCount(organizationId: string): Promise<number>;
+  getDatasetCount(organizationId: string): Promise<number>;
+  getDashboardCount(organizationId: string): Promise<number>;
+  getCustomGraphCount(organizationId: string): Promise<number>;
+  getTriggerCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -413,6 +417,56 @@ export class LicenseEnforcementRepository
     return this.prisma.monitor.count({
       where: {
         projectId: { in: projectIds },
+      },
+    });
+  }
+
+  /**
+   * Counts active (non-archived) datasets for license enforcement.
+   * Only active datasets count against the license limit.
+   */
+  async getDatasetCount(organizationId: string): Promise<number> {
+    return this.prisma.dataset.count({
+      where: {
+        project: { team: { organizationId } },
+        archivedAt: null,
+      },
+    });
+  }
+
+  /**
+   * Counts all dashboards for license enforcement.
+   * Dashboards do not support archival - all dashboards count against limits.
+   */
+  async getDashboardCount(organizationId: string): Promise<number> {
+    return this.prisma.dashboard.count({
+      where: {
+        project: { team: { organizationId } },
+      },
+    });
+  }
+
+  /**
+   * Counts all custom graphs for license enforcement.
+   * Custom graphs do not support archival - all graphs count against limits.
+   */
+  async getCustomGraphCount(organizationId: string): Promise<number> {
+    return this.prisma.customGraph.count({
+      where: {
+        project: { team: { organizationId } },
+      },
+    });
+  }
+
+  /**
+   * Counts active (non-deleted) triggers for license enforcement.
+   * Only active triggers count against the license limit.
+   */
+  async getTriggerCount(organizationId: string): Promise<number> {
+    return this.prisma.trigger.count({
+      where: {
+        project: { team: { organizationId } },
+        deleted: false,
       },
     });
   }

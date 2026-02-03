@@ -73,6 +73,14 @@ const FREE_TIER_LIMITS = {
   EXPERIMENTS: 3,
   /** Minimal experimentation allowance */
   ONLINE_EVALUATIONS: 3,
+  /** Minimal experimentation allowance */
+  DATASETS: 3,
+  /** Minimal experimentation allowance */
+  DASHBOARDS: 3,
+  /** Minimal experimentation allowance */
+  CUSTOM_GRAPHS: 3,
+  /** Minimal experimentation allowance */
+  TRIGGERS: 3,
   /** ~33 messages per day */
   MESSAGES_PER_MONTH: 1_000,
   /** Just enough to try the feature */
@@ -106,6 +114,10 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxAgents: Number.MAX_SAFE_INTEGER,
   maxExperiments: Number.MAX_SAFE_INTEGER,
   maxOnlineEvaluations: Number.MAX_SAFE_INTEGER,
+  maxDatasets: Number.MAX_SAFE_INTEGER,
+  maxDashboards: Number.MAX_SAFE_INTEGER,
+  maxCustomGraphs: Number.MAX_SAFE_INTEGER,
+  maxTriggers: Number.MAX_SAFE_INTEGER,
   canPublish: true,
   prices: {
     USD: 0,
@@ -138,6 +150,10 @@ export const FREE_PLAN: PlanInfo = {
   maxAgents: FREE_TIER_LIMITS.AGENTS,
   maxExperiments: FREE_TIER_LIMITS.EXPERIMENTS,
   maxOnlineEvaluations: FREE_TIER_LIMITS.ONLINE_EVALUATIONS,
+  maxDatasets: FREE_TIER_LIMITS.DATASETS,
+  maxDashboards: FREE_TIER_LIMITS.DASHBOARDS,
+  maxCustomGraphs: FREE_TIER_LIMITS.CUSTOM_GRAPHS,
+  maxTriggers: FREE_TIER_LIMITS.TRIGGERS,
   canPublish: false,
   prices: {
     USD: 0,

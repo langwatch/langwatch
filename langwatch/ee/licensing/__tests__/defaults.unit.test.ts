@@ -134,6 +134,10 @@ describe("resolvePlanDefaults", () => {
       maxAgents: resolved.maxAgents,
       maxExperiments: resolved.maxExperiments,
       maxOnlineEvaluations: resolved.maxOnlineEvaluations,
+      maxDatasets: resolved.maxDatasets,
+      maxDashboards: resolved.maxDashboards,
+      maxCustomGraphs: resolved.maxCustomGraphs,
+      maxTriggers: resolved.maxTriggers,
       canPublish: resolved.canPublish,
     };
 

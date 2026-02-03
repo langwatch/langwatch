@@ -19,6 +19,7 @@ import { AddParticipants } from "~/components/traces/AddParticipants";
 import { useDrawer } from "~/hooks/useDrawer";
 
 import { useFilterParams } from "~/hooks/useFilterParams";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
@@ -42,6 +43,7 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 export function AutomationDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, open } = useDisclosure();
+  const { checkAndProceed } = useLicenseEnforcement("triggers");
 
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
@@ -161,48 +163,50 @@ export function AutomationDrawer() {
   };
 
   const onSubmit = (data: Trigger) => {
-    let actionParams: ActionParams = {
-      members: [],
-      slackWebhook: "",
-      datasetId: datasetId,
-      datasetMapping: datasetTriggerMapping,
-      annotators: annotators,
-    };
-    if (data.action === TriggerAction.SEND_EMAIL) {
-      actionParams = {
-        members: data.members ?? [],
-      };
-    } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
-      actionParams = {
-        slackWebhook: data.slackWebhook ?? "",
-      };
-    } else if (data.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
-      actionParams = {
-        annotators: annotators,
-      };
-    } else if (data.action === TriggerAction.ADD_TO_DATASET) {
-      actionParams = {
+    checkAndProceed(() => {
+      let actionParams: ActionParams = {
+        members: [],
+        slackWebhook: "",
         datasetId: datasetId,
         datasetMapping: datasetTriggerMapping,
+        annotators: annotators,
       };
-    }
+      if (data.action === TriggerAction.SEND_EMAIL) {
+        actionParams = {
+          members: data.members ?? [],
+        };
+      } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
+        actionParams = {
+          slackWebhook: data.slackWebhook ?? "",
+        };
+      } else if (data.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+        actionParams = {
+          annotators: annotators,
+        };
+      } else if (data.action === TriggerAction.ADD_TO_DATASET) {
+        actionParams = {
+          datasetId: datasetId,
+          datasetMapping: datasetTriggerMapping,
+        };
+      }
 
-    createTrigger.mutate(
-      {
-        projectId: project?.id ?? "",
-        name: data.name,
-        action: data.action,
-        filters: filterParams.filters,
-        actionParams: {
-          ...actionParams,
-          datasetMapping: actionParams.datasetMapping
-            ? {
-                mapping: actionParams.datasetMapping.mapping,
-                expansions: Array.from(
-                  actionParams.datasetMapping.expansions ?? [],
-                ),
-              }
-            : undefined,
+      createTrigger.mutate(
+        {
+          projectId: project?.id ?? "",
+          name: data.name,
+          action: data.action,
+          filters: filterParams.filters,
+          actionParams: {
+            ...actionParams,
+            datasetMapping: actionParams.datasetMapping
+              ? {
+                  mapping: actionParams.datasetMapping.mapping,
+                  expansions: Array.from(
+                    actionParams.datasetMapping.expansions ?? [],
+                  ),
+                }
+              : undefined,
+          },
         },
       },
       {

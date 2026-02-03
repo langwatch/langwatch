@@ -2,6 +2,7 @@ import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
@@ -38,6 +39,8 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
+      await enforceLicenseLimit(ctx, input.projectId, "triggers");
+
       const project = await ctx.prisma.project.findUnique({
         where: {
           id: input.projectId,

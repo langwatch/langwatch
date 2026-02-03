@@ -70,6 +70,22 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
     getCount: (repo, orgId) => repo.getOnlineEvaluationCount(orgId),
     getMax: (plan) => plan.maxOnlineEvaluations,
   },
+  datasets: {
+    getCount: (repo, orgId) => repo.getDatasetCount(orgId),
+    getMax: (plan) => plan.maxDatasets,
+  },
+  dashboards: {
+    getCount: (repo, orgId) => repo.getDashboardCount(orgId),
+    getMax: (plan) => plan.maxDashboards,
+  },
+  customGraphs: {
+    getCount: (repo, orgId) => repo.getCustomGraphCount(orgId),
+    getMax: (plan) => plan.maxCustomGraphs,
+  },
+  triggers: {
+    getCount: (repo, orgId) => repo.getTriggerCount(orgId),
+    getMax: (plan) => plan.maxTriggers,
+  },
 };
 
 // Compile-time check: ensure all LimitTypes are covered in config
