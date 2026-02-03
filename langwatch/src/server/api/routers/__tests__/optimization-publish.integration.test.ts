@@ -11,6 +11,28 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
+/**
+ * Retry a query until it returns a result or max attempts reached.
+ * Helps with occasional DB sync delays in integration tests.
+ */
+async function waitForEvaluator(
+  workflowId: string,
+  projectId: string,
+  maxAttempts = 3,
+  delayMs = 50
+) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const evaluator = await prisma.evaluator.findFirst({
+      where: { workflowId, projectId, archivedAt: null },
+    });
+    if (evaluator) return evaluator;
+    if (i < maxAttempts - 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return null;
+}
+
 describe("Optimization Publish - Evaluator Integration", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
@@ -130,10 +152,8 @@ describe("Optimization Publish - Evaluator Integration", () => {
         isComponent: false,
       });
 
-      // Get the evaluator
-      const evaluator = await prisma.evaluator.findFirst({
-        where: { workflowId: workflow.id, projectId, archivedAt: null },
-      });
+      // Get the evaluator (with retry for DB sync)
+      const evaluator = await waitForEvaluator(workflow.id, projectId);
       expect(evaluator?.name).toBe("Original Name");
       createdEvaluatorIds.push(evaluator!.id);
 
