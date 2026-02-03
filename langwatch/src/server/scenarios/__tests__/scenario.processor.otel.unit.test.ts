@@ -744,25 +744,3 @@ describe.skipIf(process.env.CI)("Scenario Processor - OTEL Isolation", () => {
     );
   });
 });
-
-describe("buildOtelResourceAttributes", () => {
-  /**
-   * Unit tests for the label formatting function are in scenario.processor.unit.test.ts
-   * These integration tests verify the function integrates correctly with child process env.
-   */
-  it(
-    "formats labels as OTEL_RESOURCE_ATTRIBUTES with escaped special characters",
-    async () => {
-      const { buildOtelResourceAttributes } = await import(
-        "../scenario.processor"
-      );
-
-      const labels = ["support", "billing", "priority=high"];
-      const attrs = buildOtelResourceAttributes(labels);
-
-      // Should escape special characters per OTEL spec
-      expect(attrs).toBe("scenario.labels=support,billing,priority\\=high");
-    },
-    30000
-  );
-});
