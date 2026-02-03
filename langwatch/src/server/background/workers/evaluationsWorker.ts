@@ -48,7 +48,7 @@ import {
 } from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
-  EVALUATIONS_QUEUE_NAME,
+  EVALUATIONS_QUEUE,
   updateEvaluationStatusInES,
 } from "../queues/evaluationsQueue";
 
@@ -641,7 +641,7 @@ export const startEvaluationsWorker = (
   }
 
   const traceChecksWorker = new Worker<EvaluationJob, any, EvaluatorTypes>(
-    EVALUATIONS_QUEUE_NAME,
+    EVALUATIONS_QUEUE.NAME,
     async (job) => {
       if (
         env.NODE_ENV !== "test" &&

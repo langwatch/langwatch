@@ -17,10 +17,13 @@
 #   BULLBOARD_PORT=3000
 #   AI_SERVER_PORT=3456
 #
+# Debug logging (set in shell or .env.dev):
+#   PINO_LOG_LEVEL=debug    # For verbose worker/app logs
+#
 # Resource limits:
-#   minimal (dev):     ~4.3GB (postgres 256 + redis 64 + app 4096)
-#   scenarios:         ~5.6GB (+ workers 512 + scenario 512 + nlp 256 + bullboard 128 + ai-server 128)
-#   full:              ~6.6GB (+ opensearch 512 + langevals 256)
+#   minimal (dev):     ~6.3GB (postgres 256 + redis 64 + app 6144)
+#   scenarios:         ~7.6GB (+ workers 512 + scenario 512 + nlp 256 + bullboard 128 + ai-server 128)
+#   full:              ~8.6GB (+ opensearch 512 + langevals 256)
 #
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
@@ -143,7 +146,7 @@ services:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       NODE_ENV: development
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env (shared dev elastic or local opensearch)
+      # ELASTICSEARCH_NODE_URL comes from .env
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
@@ -161,7 +164,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
+          memory: 6g
           cpus: "2.0"
 
   # =============================================================================
@@ -175,7 +178,7 @@ services:
     volumes:
       - ./langwatch:/app
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm tsx --watch --tsconfig tsconfig.workers.json src/workers.ts"
+    command: sh -c "corepack enable && while true; do pnpm tsx --watch --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       NODE_ENV: development
@@ -184,33 +187,11 @@ services:
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
-    env_file:
-      - langwatch/.env
-    depends_on:
-      init:
-        condition: service_completed_successfully
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-          cpus: "0.5"
-
-  scenario-worker:
-    image: node:20
-    working_dir: /app
-    profiles: [scenarios, full]
-    volumes:
-      - ./langwatch:/app
-      - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm tsx --watch --tsconfig tsconfig.workers.json src/scenario-worker.ts"
-    environment:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      NODE_ENV: development
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env
-      REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-      LANGEVALS_ENDPOINT: http://langevals:5562
+      # Override BASE_HOST for Docker networking - scenario child processes post events here
+      BASE_HOST: http://app:5560
+      PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
+      # Uncomment to enable verbose scenario SDK logging
+      # SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
     depends_on:
@@ -261,26 +242,22 @@ services:
     working_dir: /app
     profiles: [debug, scenarios, full]
     volumes:
-      - ./langwatch:/app
-      - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm bullboard"
+      - ./bullboard:/app
+      - bullboard_modules:/app/node_modules
+    command: sh -c "corepack enable && pnpm install && pnpm start"
     ports:
       - "${BULLBOARD_PORT:-6380}:6380"
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       REDIS_URL: redis://redis:6379
-    env_file:
-      - langwatch/.env
     depends_on:
-      init:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          memory: 128m
-          cpus: "0.25"
+          memory: 512m
+          cpus: "0.5"
 
   # =============================================================================
   # TEST TOOLS (profile: test)
@@ -316,3 +293,4 @@ volumes:
   app_modules:
   pnpm_store:
     name: langwatch-pnpm-store  # Shared across all worktrees
+  bullboard_modules:
