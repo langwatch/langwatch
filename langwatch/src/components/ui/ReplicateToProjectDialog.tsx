@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type { CopyTargetProject } from "~/hooks/useProjectsForCopy";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { Dialog } from "./dialog";
 import { Select } from "./select";
 import { toaster } from "./toaster";
@@ -79,6 +80,9 @@ export function ReplicateToProjectDialog({
       onSuccess?.();
       onClose();
     } catch (error) {
+      // Skip toast if the global license handler already showed the upgrade modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
+
       logError?.(
         { error, ...(sourceId && { sourceId }), projectId },
         `Error replicating ${entityLabel.toLowerCase()}`,

@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { extractLimitExceededInfo } from "~/utils/trpcError";
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
   type SaveDialogFormValues,
@@ -88,10 +89,13 @@ export function PromptConfigProvider({
               },
             });
             onSuccess?.(prompt);
+            setSaveVersionDialogProps(null);
           } catch (error) {
             onError?.(error as Error);
-          } finally {
-            setSaveVersionDialogProps(null);
+            // Don't close the dialog if it's a license error - the UpgradeModal will be shown
+            if (!extractLimitExceededInfo(error)) {
+              setSaveVersionDialogProps(null);
+            }
           }
         };
 
@@ -120,10 +124,13 @@ export function PromptConfigProvider({
               },
             });
             onSuccess?.(prompt);
+            setCreatePromptDialogProps(null);
           } catch (error) {
             onError?.(error as Error);
-          } finally {
-            setCreatePromptDialogProps(null);
+            // Don't close the dialog if it's a license error - the UpgradeModal will be shown
+            if (!extractLimitExceededInfo(error)) {
+              setCreatePromptDialogProps(null);
+            }
           }
         };
 
@@ -155,10 +162,13 @@ export function PromptConfigProvider({
                   data: formValues,
                 });
                 onSuccess?.(updatedPrompt);
+                setChangeHandleDialogProps(null);
               } catch (error) {
                 onError?.(error as Error);
-              } finally {
-                setChangeHandleDialogProps(null);
+                // Don't close the dialog if it's a license error - the UpgradeModal will be shown
+                if (!extractLimitExceededInfo(error)) {
+                  setChangeHandleDialogProps(null);
+                }
               }
             };
 

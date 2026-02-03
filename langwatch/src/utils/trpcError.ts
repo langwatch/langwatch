@@ -12,6 +12,26 @@ export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
   return false;
 };
 
+/**
+ * Check if an error was already handled by the global license limit handler.
+ * Use this in component-level onError callbacks to avoid showing duplicate
+ * error messages (toast + modal) for license limit errors.
+ *
+ * @example
+ * ```tsx
+ * const mutation = api.prompts.create.useMutation({
+ *   onError: (error) => {
+ *     if (isHandledByGlobalLicenseHandler(error)) return;
+ *     toaster.create({ title: "Error", description: error.message });
+ *   },
+ * });
+ * ```
+ */
+export function isHandledByGlobalLicenseHandler(error: unknown): boolean {
+  return !!(error as { _handledByGlobalLicenseHandler?: boolean })
+    ?._handledByGlobalLicenseHandler;
+}
+
 export interface LimitExceededInfo {
   limitType: LimitType;
   current: number;
