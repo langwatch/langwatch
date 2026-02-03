@@ -11,6 +11,7 @@ import {
 } from "../../evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
+import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -151,6 +152,9 @@ export const monitorsRouter = createTRPCRouter({
         threadIdleTimeout,
       } = input;
       const prisma = ctx.prisma;
+
+      // Enforce license limit before creating monitor
+      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
 
       // Validate evaluator exists and belongs to project if provided
       if (evaluatorId) {

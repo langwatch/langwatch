@@ -13,15 +13,17 @@
  * any application code (like redis.ts) is loaded.
  */
 
+import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
+
+// Set TEST_PUBLIC_KEY for license verification in integration tests.
+// This allows test licenses (signed with TEST_PRIVATE_KEY) to validate correctly.
+process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
+
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;
   // Must delete BUILD_TIME to allow redis.ts to create connections
   delete process.env.BUILD_TIME;
 }
-
-// Disable license enforcement for integration tests
-// This allows tests to create resources without hitting license limits
-process.env.LICENSE_ENFORCEMENT_DISABLED = "true";
 
 if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
   process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;

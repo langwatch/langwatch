@@ -1,18 +1,19 @@
 import os
 import unittest
 import pytest
-from dotenv import load_dotenv
 
 from langwatch_nlp.topic_clustering.topic_naming import (
     generate_topic_names,
     improve_similar_names,
 )
 
-load_dotenv()
-
 
 class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not os.getenv("AZURE_OPENAI_ENDPOINT"),
+        reason="AZURE_OPENAI_ENDPOINT environment variable not set"
+    )
     async def test_it_generates_topic_names(self):
         topic_names, _cost = generate_topic_names(
             {
@@ -31,7 +32,6 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
         assert type(topic_names[1]) == str
 
         topic_names, _cost = improve_similar_names(
-            model="azure/gpt-4-1106-preview",
             litellm_params={
                 "model": "azure/gpt-4-1106-preview",
                 "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
@@ -51,6 +51,10 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
         assert type(topic_names[1]) == str
 
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not os.getenv("AZURE_OPENAI_ENDPOINT"),
+        reason="AZURE_OPENAI_ENDPOINT environment variable not set"
+    )
     async def test_it_avoid_already_existing_topic_names(self):
         topic_names = generate_topic_names(
             {

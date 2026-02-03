@@ -57,10 +57,18 @@ describe("LicenseHandler Integration", () => {
   });
 
   afterAll(async () => {
-    // Cleanup
-    await prisma.organization.deleteMany({
+    // Cleanup - delete in correct order for foreign key constraints
+    const org = await prisma.organization.findUnique({
       where: { slug: "license-handler-test-org" },
     });
+    if (org) {
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: org.id },
+      });
+      await prisma.organization.delete({
+        where: { id: org.id },
+      });
+    }
   });
 
   afterEach(async () => {

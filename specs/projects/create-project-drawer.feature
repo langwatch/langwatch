@@ -117,18 +117,22 @@ Feature: Create Project Drawer
     Then validation prevents submission
     And the new team name field shows an error state
 
-  Scenario: Show limit warning when at max projects
-    Given my organization has reached the maximum project limit
-    When the CreateProjectDrawer opens
-    Then I see a warning about the project limit
-    And I see a link to upgrade my plan
-
-  Scenario: Disable creation when at max projects
+  Scenario: Show upgrade modal when submitting at max projects
     Given my organization has reached the maximum project limit
     And the plan does not override adding limitations
-    When I try to submit the form
-    Then creation is blocked
-    And I see a message to upgrade
+    When I click "Add new project"
+    Then the CreateProjectDrawer opens normally
+    And I can fill out the form
+    When I click the submit button
+    Then the upgrade modal appears
+    And the project is not created
+
+  Scenario: Drawer opens without warnings when at limit
+    Given my organization has reached the maximum project limit
+    When I click "Add new project"
+    Then the CreateProjectDrawer opens
+    And I do not see any inline limit warnings
+    And the submit button is enabled
 
   @unit
   Scenario: Allow creation when plan has override enabled

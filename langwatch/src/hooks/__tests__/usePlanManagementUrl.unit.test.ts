@@ -21,11 +21,11 @@ describe("getPlanManagementUrl", () => {
 });
 
 describe("getPlanManagementButtonLabel", () => {
-  it("returns 'Change plan' in SaaS mode", () => {
-    expect(getPlanManagementButtonLabel(true)).toBe("Change plan");
+  it("returns 'Upgrade plan' in SaaS mode", () => {
+    expect(getPlanManagementButtonLabel(true)).toBe("Upgrade plan");
   });
 
-  it("returns 'Manage license' in self-hosted mode", () => {
-    expect(getPlanManagementButtonLabel(false)).toBe("Manage license");
+  it("returns 'Upgrade license' in self-hosted mode", () => {
+    expect(getPlanManagementButtonLabel(false)).toBe("Upgrade license");
   });
 });

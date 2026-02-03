@@ -21,6 +21,7 @@ export function useLicenseActions({
         type: "success",
       });
       onUploadSuccess();
+      window.location.reload();
     },
     onError: (error) => {
       toaster.create({
@@ -39,6 +40,7 @@ export function useLicenseActions({
         type: "info",
       });
       onRemoveSuccess();
+      window.location.reload();
     },
     onError: (error) => {
       toaster.create({

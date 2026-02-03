@@ -42,7 +42,7 @@ function hasPermissionWithHierarchy(
 
 describe("RBAC Permission System", () => {
   describe("Permission Hierarchy Logic", () => {
-    it("should allow direct permission match", () => {
+    it("allows direct permission match", () => {
       const permissions = ["workflows:view", "datasets:manage"];
 
       expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
@@ -53,7 +53,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should allow manage permissions to include view permissions", () => {
+    it("allows manage permissions to include view permissions", () => {
       const permissions = ["workflows:manage"];
 
       expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
@@ -64,7 +64,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should not allow view permissions to include manage permissions", () => {
+    it("does not allow view permissions to include manage permissions", () => {
       const permissions = ["workflows:view"];
 
       expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
@@ -75,7 +75,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should not allow unrelated permissions", () => {
+    it("does not allow unrelated permissions", () => {
       const permissions = ["datasets:view"];
 
       expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
@@ -86,7 +86,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should work with different resource types", () => {
+    it("works with different resource types", () => {
       const permissions = [
         "analytics:manage",
         "evaluations:manage",
@@ -104,7 +104,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should handle empty permissions array", () => {
+    it("handles empty permissions array", () => {
       const permissions: string[] = [];
 
       expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
@@ -117,7 +117,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Team Role Permissions", () => {
-    it("should allow ADMIN to access all experiment permissions", () => {
+    it("allows ADMIN to access all experiment permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.ADMIN, "workflows:view")).toBe(
         true,
       );
@@ -126,7 +126,7 @@ describe("RBAC Permission System", () => {
       ).toBe(true);
     });
 
-    it("should allow MEMBER to access all experiment permissions", () => {
+    it("allows MEMBER to access all experiment permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, "workflows:view")).toBe(
         true,
       );
@@ -135,7 +135,7 @@ describe("RBAC Permission System", () => {
       ).toBe(true);
     });
 
-    it("should allow VIEWER to access only experiment view permissions", () => {
+    it("allows VIEWER to access only experiment view permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.VIEWER, "workflows:view")).toBe(
         true,
       );
@@ -144,7 +144,7 @@ describe("RBAC Permission System", () => {
       ).toBe(false);
     });
 
-    it("should allow ADMIN to access all project permissions", () => {
+    it("allows ADMIN to access all project permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.ADMIN, "project:view")).toBe(
         true,
       );
@@ -162,7 +162,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should allow MEMBER to access limited project permissions", () => {
+    it("allows MEMBER to access limited project permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.MEMBER, "project:view")).toBe(
         true,
       );
@@ -180,7 +180,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should allow VIEWER to access only project view permissions", () => {
+    it("allows VIEWER to access only project view permissions", () => {
       expect(teamRoleHasPermission(TeamUserRole.VIEWER, "project:view")).toBe(
         true,
       );
@@ -200,7 +200,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Organization Role Permissions", () => {
-    it("should allow ORGANIZATION_ADMIN to access organization permissions", () => {
+    it("allows ORGANIZATION_ADMIN to access organization permissions", () => {
       expect(
         organizationRoleHasPermission(
           OrganizationUserRole.ADMIN,
@@ -215,7 +215,7 @@ describe("RBAC Permission System", () => {
       ).toBe(true);
     });
 
-    it("should allow ORGANIZATION_MEMBER to access organization view permissions", () => {
+    it("allows ORGANIZATION_MEMBER to access organization view permissions", () => {
       expect(
         organizationRoleHasPermission(
           OrganizationUserRole.MEMBER,
@@ -230,7 +230,7 @@ describe("RBAC Permission System", () => {
       ).toBe(false);
     });
 
-    it("should allow ORGANIZATION_EXTERNAL to access organization view permissions", () => {
+    it("allows ORGANIZATION_EXTERNAL to access organization view permissions", () => {
       expect(
         organizationRoleHasPermission(
           OrganizationUserRole.EXTERNAL,
@@ -247,7 +247,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Custom Role Scenarios", () => {
-    it("should simulate custom role with only manage permission", () => {
+    it("simulates custom role with only manage permission", () => {
       // Simulate a custom role that only has workflows:manage
       const customPermissions = ["workflows:manage"];
 
@@ -260,7 +260,7 @@ describe("RBAC Permission System", () => {
       ).toBe(true);
     });
 
-    it("should simulate custom role with only view permission", () => {
+    it("simulates custom role with only view permission", () => {
       // Simulate a custom role that only has workflows:view
       const customPermissions = ["workflows:view"];
 
@@ -273,7 +273,7 @@ describe("RBAC Permission System", () => {
       ).toBe(false);
     });
 
-    it("should simulate custom role with mixed permissions", () => {
+    it("simulates custom role with mixed permissions", () => {
       // Simulate a custom role with mixed permissions
       const customPermissions = [
         "workflows:manage",
@@ -304,7 +304,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle permissions with different action types", () => {
+    it("handles permissions with different action types", () => {
       const permissions = ["traces:share", "triggers:manage"];
 
       // Share permissions don't follow the view/manage hierarchy
@@ -324,7 +324,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should handle malformed permission strings", () => {
+    it("handles malformed permission strings", () => {
       const permissions = ["workflows:manage"];
 
       // Should not match malformed strings
@@ -335,7 +335,7 @@ describe("RBAC Permission System", () => {
       );
     });
 
-    it("should handle case sensitivity", () => {
+    it("handles case sensitivity", () => {
       const permissions = ["workflows:manage"];
 
       // Should be case sensitive
@@ -350,34 +350,34 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Helper Functions", () => {
     describe("canView", () => {
-      it("should return true for ADMIN role on all resources", () => {
+      it("returns true for ADMIN role on all resources", () => {
         expect(canView(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.TRACES)).toBe(true);
       });
 
-      it("should return true for MEMBER role on all resources", () => {
+      it("returns true for MEMBER role on all resources", () => {
         expect(canView(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.TRACES)).toBe(true);
       });
 
-      it("should return true for VIEWER role on most resources", () => {
+      it("returns true for VIEWER role on most resources", () => {
         expect(canView(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.TRACES)).toBe(true);
       });
 
-      it("should return false for VIEWER role on cost resource", () => {
+      it("returns false for VIEWER role on cost resource", () => {
         expect(canView(TeamUserRole.VIEWER, Resources.COST)).toBe(false);
       });
     });
 
     describe("canManage", () => {
-      it("should return true for ADMIN role on all resources", () => {
+      it("returns true for ADMIN role on all resources", () => {
         expect(canManage(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
@@ -385,7 +385,7 @@ describe("RBAC Permission System", () => {
         expect(canManage(TeamUserRole.ADMIN, Resources.TRACES)).toBe(false);
       });
 
-      it("should return true for MEMBER role on most resources", () => {
+      it("returns true for MEMBER role on most resources", () => {
         expect(canManage(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(
           true,
         );
@@ -395,11 +395,11 @@ describe("RBAC Permission System", () => {
         expect(canManage(TeamUserRole.MEMBER, Resources.TRACES)).toBe(false);
       });
 
-      it("should return false for MEMBER role on project resource", () => {
+      it("returns false for MEMBER role on project resource", () => {
         expect(canManage(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
       });
 
-      it("should return false for VIEWER role on all resources", () => {
+      it("returns false for VIEWER role on all resources", () => {
         expect(canManage(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(
           false,
         );
@@ -410,43 +410,43 @@ describe("RBAC Permission System", () => {
     });
 
     describe("canCreate", () => {
-      it("should return true for ADMIN role on project resource", () => {
+      it("returns true for ADMIN role on project resource", () => {
         expect(canCreate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
       });
 
-      it("should return false for MEMBER role on project resource", () => {
+      it("returns false for MEMBER role on project resource", () => {
         expect(canCreate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
       });
 
-      it("should return false for VIEWER role on project resource", () => {
+      it("returns false for VIEWER role on project resource", () => {
         expect(canCreate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
       });
     });
 
     describe("canUpdate", () => {
-      it("should return true for ADMIN role on project resource", () => {
+      it("returns true for ADMIN role on project resource", () => {
         expect(canUpdate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
       });
 
-      it("should return true for MEMBER role on project resource", () => {
+      it("returns true for MEMBER role on project resource", () => {
         expect(canUpdate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(true);
       });
 
-      it("should return false for VIEWER role on project resource", () => {
+      it("returns false for VIEWER role on project resource", () => {
         expect(canUpdate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
       });
     });
 
     describe("canDelete", () => {
-      it("should return true for ADMIN role on project resource", () => {
+      it("returns true for ADMIN role on project resource", () => {
         expect(canDelete(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
       });
 
-      it("should return false for MEMBER role on project resource", () => {
+      it("returns false for MEMBER role on project resource", () => {
         expect(canDelete(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
       });
 
-      it("should return false for VIEWER role on project resource", () => {
+      it("returns false for VIEWER role on project resource", () => {
         expect(canDelete(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
       });
     });
@@ -454,7 +454,7 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Retrieval Functions", () => {
     describe("getTeamRolePermissions", () => {
-      it("should return all permissions for ADMIN role", () => {
+      it("returns all permissions for ADMIN role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.ADMIN);
         expect(permissions).toContain("project:view");
         expect(permissions).toContain("project:create");
@@ -466,7 +466,7 @@ describe("RBAC Permission System", () => {
         expect(permissions).toContain("team:manage");
       });
 
-      it("should return limited permissions for MEMBER role", () => {
+      it("returns limited permissions for MEMBER role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.MEMBER);
         expect(permissions).toContain("project:view");
         expect(permissions).toContain("project:update");
@@ -478,7 +478,7 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("team:manage");
       });
 
-      it("should return view-only permissions for VIEWER role", () => {
+      it("returns view-only permissions for VIEWER role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.VIEWER);
         expect(permissions).toContain("project:view");
         expect(permissions).not.toContain("project:create");
@@ -492,7 +492,7 @@ describe("RBAC Permission System", () => {
     });
 
     describe("getOrganizationRolePermissions", () => {
-      it("should return all permissions for ORGANIZATION_ADMIN", () => {
+      it("returns all permissions for ORGANIZATION_ADMIN", () => {
         const permissions = getOrganizationRolePermissions(
           OrganizationUserRole.ADMIN,
         );
@@ -501,7 +501,7 @@ describe("RBAC Permission System", () => {
         expect(permissions).toContain("organization:delete");
       });
 
-      it("should return limited permissions for ORGANIZATION_MEMBER", () => {
+      it("returns limited permissions for ORGANIZATION_MEMBER", () => {
         const permissions = getOrganizationRolePermissions(
           OrganizationUserRole.MEMBER,
         );
@@ -510,7 +510,7 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("organization:delete");
       });
 
-      it("should return limited permissions for Member Lite (EXTERNAL)", () => {
+      it("returns limited permissions for Lite Member (EXTERNAL)", () => {
         const permissions = getOrganizationRolePermissions(
           OrganizationUserRole.EXTERNAL,
         );
@@ -525,37 +525,37 @@ describe("RBAC Permission System", () => {
     // Note: Demo project tests are skipped due to environment mocking complexity
     // The isDemoProject function uses env.DEMO_PROJECT_ID from ~/env.mjs
     // which requires more complex mocking setup
-    it.skip("should allow view permissions for demo project", () => {
+    it.skip("allows view permissions for demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should not allow manage permissions for demo project", () => {
+    it.skip("does not allow manage permissions for demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should not allow create permissions for demo project", () => {
+    it.skip("does not allow create permissions for demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should not allow update permissions for demo project", () => {
+    it.skip("does not allow update permissions for demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should not allow delete permissions for demo project", () => {
+    it.skip("does not allow delete permissions for demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should return false for non-demo project", () => {
+    it.skip("returns false for non-demo project", () => {
       // This test would require mocking the env module
     });
 
-    it.skip("should allow playground view for demo project", () => {
+    it.skip("allows playground view for demo project", () => {
       // This test would require mocking the env module
     });
   });
 
   describe("Permission Constants", () => {
-    it("should have all expected resources defined", () => {
+    it("has all expected resources defined", () => {
       expect(Resources.ORGANIZATION).toBe("organization");
       expect(Resources.PROJECT).toBe("project");
       expect(Resources.TEAM).toBe("team");
@@ -572,7 +572,7 @@ describe("RBAC Permission System", () => {
       expect(Resources.PLAYGROUND).toBe("playground");
     });
 
-    it("should have all expected actions defined", () => {
+    it("has all expected actions defined", () => {
       expect(Actions.VIEW).toBe("view");
       expect(Actions.CREATE).toBe("create");
       expect(Actions.UPDATE).toBe("update");
@@ -583,7 +583,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Permission Type Safety", () => {
-    it("should create valid permission strings", () => {
+    it("creates valid permission strings", () => {
       const permission: Permission = `${Resources.WORKFLOWS}:${Actions.VIEW}`;
       expect(permission).toBe("workflows:view");
 
@@ -591,7 +591,7 @@ describe("RBAC Permission System", () => {
       expect(managePermission).toBe("datasets:manage");
     });
 
-    it("should validate permission format", () => {
+    it("validates permission format", () => {
       const validPermissions: Permission[] = [
         "workflows:view",
         "datasets:manage",
@@ -607,7 +607,7 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Complex Permission Scenarios", () => {
-    it("should handle all CRUD operations for ADMIN role", () => {
+    it("handles all CRUD operations for ADMIN role", () => {
       const adminPermissions = getTeamRolePermissions(TeamUserRole.ADMIN);
 
       // Should have all CRUD operations for project (only resource with individual CRUD)
@@ -624,7 +624,7 @@ describe("RBAC Permission System", () => {
       expect(adminPermissions).toContain("datasets:manage");
     });
 
-    it("should handle mixed permissions for MEMBER role", () => {
+    it("handles mixed permissions for MEMBER role", () => {
       const memberPermissions = getTeamRolePermissions(TeamUserRole.MEMBER);
 
       // Should have manage permissions for most resources
@@ -640,7 +640,7 @@ describe("RBAC Permission System", () => {
       expect(memberPermissions).not.toContain("project:manage");
     });
 
-    it("should handle view-only permissions for VIEWER role", () => {
+    it("handles view-only permissions for VIEWER role", () => {
       const viewerPermissions = getTeamRolePermissions(TeamUserRole.VIEWER);
 
       // Should only have view permissions

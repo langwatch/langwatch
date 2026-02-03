@@ -129,19 +129,19 @@ Feature: Member Limit Enforcement with License
     Then the invite is created successfully
 
   # ============================================================================
-  # Member Lite vs Full Member Classification
+  # Lite Member vs Full Member Classification
   # ============================================================================
-  # Member Lite: EXTERNAL role (with view-only or no custom permissions)
+  # Lite Member: EXTERNAL role (with view-only or no custom permissions)
   # Full Member: ADMIN/MEMBER role OR any role with non-view permissions
 
-  Scenario: Member Lite users are counted separately from full members
+  Scenario: Lite Member users are counted separately from full members
     Given the organization has 2 Full Members
-    And the organization has 1 Member Lite with role EXTERNAL
+    And the organization has 1 Lite Member with role EXTERNAL
     And the organization has a license with maxMembers 3 and maxMembersLite 2
     When I invite user "new@example.com" as EXTERNAL to the organization
     Then the invite is created successfully
 
-  Scenario: Member Lite pending invites count toward Member Lite limit
+  Scenario: Lite Member pending invites count toward Lite Member limit
     Given the organization has 2 Full Members
     And the organization has 1 pending invite with role EXTERNAL
     And the organization has a license with maxMembers 3 and maxMembersLite 1
@@ -165,13 +165,13 @@ Feature: Member Limit Enforcement with License
   # Custom Role Classification
   # ============================================================================
 
-  Scenario: Custom role with only view permissions counts as Member Lite
+  Scenario: Custom role with only view permissions counts as Lite Member
     Given a custom role "Viewer" exists with permissions:
       | project:view    |
       | analytics:view  |
       | traces:view     |
     And the organization has 2 Full Members
-    And the organization has 1 Member Lite with custom role "Viewer"
+    And the organization has 1 Lite Member with custom role "Viewer"
     And the organization has a license with maxMembers 3 and maxMembersLite 2
     When I invite user "new@example.com" with custom role "Viewer" to the organization
     Then the invite is created successfully
@@ -221,7 +221,7 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Sharer" to the organization
     Then the request fails with FORBIDDEN
 
-  Scenario: Pending invite with view-only custom role counts as Member Lite
+  Scenario: Pending invite with view-only custom role counts as Lite Member
     Given a custom role "Viewer" exists with permissions:
       | project:view    |
       | analytics:view  |
@@ -344,39 +344,39 @@ Feature: Member Limit Enforcement with License
   # Role Update Limit Checks
   # ============================================================================
 
-  Scenario: Blocks upgrade from Member Lite to full member when at member limit
+  Scenario: Blocks upgrade from Lite Member to full member when at member limit
     Given the organization has 3 Full Members
-    And the organization has 1 Member Lite user "lite@example.com"
+    And the organization has 1 Lite Member user "lite@example.com"
     And the organization has a license with maxMembers 3
     When I update "lite@example.com" org role to MEMBER
     Then the request fails with FORBIDDEN
     And the error message contains "member limit reached"
 
-  Scenario: Allows upgrade from Member Lite to full member when under limit
+  Scenario: Allows upgrade from Lite Member to full member when under limit
     Given the organization has 2 Full Members
-    And the organization has 1 Member Lite user "lite@example.com"
+    And the organization has 1 Lite Member user "lite@example.com"
     And the organization has a license with maxMembers 3
     When I update "lite@example.com" org role to MEMBER
     Then the update succeeds
 
-  Scenario: Blocks downgrade from full member to Member Lite when at lite limit
+  Scenario: Blocks downgrade from full member to Lite Member when at lite limit
     Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 1 Member Lite
+    And the organization has 1 Lite Member
     And the organization has a license with maxMembersLite 1
     When I update "member@example.com" org role to EXTERNAL
     Then the request fails with FORBIDDEN
-    And the error message contains "Member Lite limit reached"
+    And the error message contains "Lite Member limit reached"
 
-  Scenario: Allows downgrade from full member to Member Lite when under limit
+  Scenario: Allows downgrade from full member to Lite Member when under limit
     Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 0 Member Lite users
+    And the organization has 0 Lite Member users
     And the organization has a license with maxMembersLite 1
     When I update "member@example.com" org role to EXTERNAL
     Then the update succeeds
 
   Scenario: Blocks custom role change that would exceed full member limit
     Given the organization has 3 Full Members
-    And the organization has 1 Member Lite with view-only custom role "viewer-role"
+    And the organization has 1 Lite Member with view-only custom role "viewer-role"
     And the organization has a license with maxMembers 3
     When I change "viewer-role" to include manage permissions
     Then the request fails with FORBIDDEN
@@ -399,7 +399,7 @@ Feature: Member Limit Enforcement with License
     Then the result is "no-change"
 
   @unit
-  Scenario: getRoleChangeType returns no-change when both roles are Member Lite
+  Scenario: getRoleChangeType returns no-change when both roles are Lite Member
     Given a user with role EXTERNAL and view-only permissions ["project:view"]
     When I check the role change type to EXTERNAL with view-only permissions ["analytics:view"]
     Then the result is "no-change"

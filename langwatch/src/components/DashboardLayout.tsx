@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, Lock, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -21,25 +21,25 @@ import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+import { UpgradeModal } from "./UpgradeModal";
+import type { LimitType } from "../server/license-enforcement";
+import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
-import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { RandomColorAvatar } from "./RandomColorAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
-import { Tooltip } from "./ui/tooltip";
 import { CommandBarTrigger } from "../features/command-bar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -243,19 +243,9 @@ export const AddProjectButton = ({
   team: Team;
   organization: Organization;
 }) => {
-  const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const { url: planManagementUrl } = usePlanManagementUrl();
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization.id },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
 
-  return canAddProjects(usage.data) ? (
+  return (
     <Menu.Item
       value={`new-project-${team.slug}`}
       fontSize="14px"
@@ -270,33 +260,6 @@ export const AddProjectButton = ({
       <Plus />
       New Project
     </Menu.Item>
-  ) : (
-    <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
-      <Link
-        href={planManagementUrl}
-        _hover={{
-          textDecoration: "none",
-        }}
-        onClick={() => {
-          trackEvent("subscription_hook_click", {
-            project_id: project?.id,
-            hook: "new_project",
-          });
-        }}
-      >
-        <Menu.Item
-          value={`new-project-${team.slug}`}
-          fontSize="14px"
-          color="fg.subtle"
-          _hover={{
-            backgroundColor: "transparent",
-          }}
-        >
-          <Lock />
-          New Project
-        </Menu.Item>
-      </Link>
-    </Tooltip>
   );
 };
 
@@ -645,6 +608,23 @@ export const DashboardLayout = ({
           </VStack>
         </Box>
       </HStack>
+      <GlobalUpgradeModal />
     </Box>
   );
 };
+
+function GlobalUpgradeModal() {
+  const { isOpen, limitType, current, max, close } = useUpgradeModalStore();
+
+  if (!limitType) return null;
+
+  return (
+    <UpgradeModal
+      open={isOpen}
+      onClose={close}
+      limitType={limitType as LimitType}
+      current={current ?? undefined}
+      max={max ?? undefined}
+    />
+  );
+}

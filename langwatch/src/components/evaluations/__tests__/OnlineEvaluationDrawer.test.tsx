@@ -222,6 +222,12 @@ const mockEvaluatorUpdateMutate = vi.fn();
 // Mock tRPC API
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
     evaluators: {
       getAll: {
         useQuery: vi.fn(() => ({
@@ -371,6 +377,40 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Mock useUpgradeModalStore
+const mockOpenUpgradeModal = vi.fn();
+vi.mock("~/stores/upgradeModalStore", () => ({
+  useUpgradeModalStore: (
+    selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown
+  ) => {
+    if (typeof selector === "function") {
+      return selector({ open: mockOpenUpgradeModal });
+    }
+    return { open: mockOpenUpgradeModal };
+  },
+}));
+
+// License enforcement mock state
+let mockLicenseIsAllowed = true;
+const mockCheckAndProceed = vi.fn((callback: () => void) => {
+  if (mockLicenseIsAllowed) {
+    callback();
+  } else {
+    mockOpenUpgradeModal("onlineEvaluations", 3, 3);
+  }
+});
+
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: mockCheckAndProceed,
+    isAllowed: mockLicenseIsAllowed,
+    isLoading: false,
+    limitInfo: mockLicenseIsAllowed
+      ? { allowed: true, current: 2, max: 10 }
+      : { allowed: false, current: 3, max: 3 },
+  }),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -383,6 +423,7 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery = {};
+    mockLicenseIsAllowed = true; // Reset license state
     clearDrawerStack();
     clearFlowCallbacks();
     clearOnlineEvaluationDrawerState();
@@ -4400,6 +4441,147 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
           screen.queryByText(/Conversation Idle Time/i),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe("License Enforcement", () => {
+
+    /**
+     * Helper to select evaluation level
+     */
+    const selectLevelInLicenseTests = async (
+      user: ReturnType<typeof userEvent.setup>,
+      level: "trace" | "thread" = "trace",
+    ) => {
+      const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+      await waitFor(() => {
+        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      });
+      await user.click(screen.getByLabelText(levelLabel));
+      await vi.advanceTimersByTimeAsync(50);
+    };
+
+    it("allows creating online evaluation when under limit", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockCreateMutate.mockClear();
+      mockOpenUpgradeModal.mockClear();
+      mockCheckAndProceed.mockClear();
+
+      // Set limit check to allow creation
+      mockLicenseIsAllowed = true;
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevelInLicenseTests(user, "trace");
+
+      // Select evaluator with auto-inferred mapping
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Wait for Create button to be enabled
+      await waitFor(() => {
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
+      });
+
+      await user.click(screen.getByText("Create Online Evaluation"));
+
+      // Verify checkAndProceed was called
+      expect(mockCheckAndProceed).toHaveBeenCalled();
+      // Verify mutation was called (allowed)
+      expect(mockCreateMutate).toHaveBeenCalled();
+      // Verify upgrade modal was NOT shown
+      expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
+    });
+
+    it("shows upgrade modal when creating online evaluation at limit", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockCreateMutate.mockClear();
+      mockOpenUpgradeModal.mockClear();
+      mockCheckAndProceed.mockClear();
+
+      // Set limit check to block creation
+      mockLicenseIsAllowed = false;
+
+      render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
+
+      await selectLevelInLicenseTests(user, "trace");
+
+      // Select evaluator
+      await waitFor(() => {
+        expect(screen.getByText("Select Evaluator")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Select Evaluator"));
+      await waitFor(() =>
+        expect(getFlowCallbacks("evaluatorList")).toBeDefined(),
+      );
+      getFlowCallbacks("evaluatorList")?.onSelect?.(mockEvaluators[0]!);
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      // Wait for Create button to be enabled
+      await waitFor(() => {
+        expect(screen.getByText("Create Online Evaluation")).not.toBeDisabled();
+      });
+
+      await user.click(screen.getByText("Create Online Evaluation"));
+
+      // Verify checkAndProceed was called
+      expect(mockCheckAndProceed).toHaveBeenCalled();
+      // Verify mutation was NOT called (blocked)
+      expect(mockCreateMutate).not.toHaveBeenCalled();
+      // Verify upgrade modal was shown
+      expect(mockOpenUpgradeModal).toHaveBeenCalledWith(
+        "onlineEvaluations",
+        3,
+        3,
+      );
+    });
+
+    it("allows updating online evaluation regardless of limit status", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockUpdateMutate.mockClear();
+      mockOpenUpgradeModal.mockClear();
+      mockCheckAndProceed.mockClear();
+
+      // Set limit check to block creation (but update should still work)
+      mockLicenseIsAllowed = false;
+
+      // Open drawer in edit mode with existing monitor
+      render(<OnlineEvaluationDrawer open={true} monitorId="monitor-1" />, {
+        wrapper: Wrapper,
+      });
+
+      // Wait for monitor data to load and populate the form
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("My PII Monitor")).toBeInTheDocument();
+      });
+
+      // The Save Changes button should be visible (edit mode)
+      await waitFor(() => {
+        expect(screen.getByText("Save Changes")).toBeInTheDocument();
+      });
+
+      // Modify the name to enable save
+      const nameInput = screen.getByDisplayValue("My PII Monitor");
+      await user.clear(nameInput);
+      await user.type(nameInput, "Updated PII Monitor");
+
+      await user.click(screen.getByText("Save Changes"));
+
+      // Verify checkAndProceed was NOT called (update bypasses limit check)
+      expect(mockCheckAndProceed).not.toHaveBeenCalled();
+      // Verify update mutation was called (allowed even when at limit)
+      expect(mockUpdateMutate).toHaveBeenCalled();
+      // Verify upgrade modal was NOT shown (update bypasses limit check)
+      expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
     });
   });
 });

@@ -17,7 +17,7 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
  * classifyMemberType, isFullMember, isMemberLite) are in member-classification.unit.test.ts
  *
- * Terminology: The EXTERNAL enum value corresponds to "Member Lite" in user-facing text.
+ * Terminology: The EXTERNAL enum value corresponds to "Lite Member" in user-facing text.
  */
 
 // Create mock Prisma client
@@ -213,7 +213,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(2);
     });
 
-    it("counts EXTERNAL role users with non-view custom role as full members (elevated from Member Lite)", async () => {
+    it("counts EXTERNAL role users with non-view custom role as full members (elevated from Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -231,7 +231,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("does not count EXTERNAL role users with view-only custom role as full members (they are Member Lite)", async () => {
+    it("does not count EXTERNAL role users with view-only custom role as full members (they are Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -330,7 +330,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("does not count EXTERNAL role users without team assignment as full members (they are Member Lite)", async () => {
+    it("does not count EXTERNAL role users without team assignment as full members (they are Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -384,7 +384,7 @@ describe("LicenseEnforcementRepository", () => {
       vi.useRealTimers();
     });
 
-    it("counts EXTERNAL users without custom role as Member Lite", async () => {
+    it("counts EXTERNAL users without custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -400,7 +400,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("counts EXTERNAL users with view-only custom role as Member Lite", async () => {
+    it("counts EXTERNAL users with view-only custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -418,7 +418,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("does not count EXTERNAL users with non-view custom role as Member Lite", async () => {
+    it("does not count EXTERNAL users with non-view custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
@@ -436,7 +436,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("does not count ADMIN or MEMBER users as Member Lite", async () => {
+    it("does not count ADMIN or MEMBER users as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.ADMIN },
         { userId: "u2", role: OrganizationUserRole.MEMBER },
@@ -449,7 +449,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("counts pending invites with EXTERNAL role and no custom role as Member Lite", async () => {
+    it("counts pending invites with EXTERNAL role and no custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
@@ -466,7 +466,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("counts pending invites with EXTERNAL role and view-only custom role as Member Lite", async () => {
+    it("counts pending invites with EXTERNAL role and view-only custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.customRole.findMany.mockResolvedValue([
@@ -485,7 +485,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("does not count pending invites with non-view custom role as Member Lite", async () => {
+    it("does not count pending invites with non-view custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.customRole.findMany.mockResolvedValue([
@@ -504,7 +504,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("does not count pending invites with ADMIN or MEMBER role as Member Lite", async () => {
+    it("does not count pending invites with ADMIN or MEMBER role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
@@ -525,7 +525,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("returns zero when no Member Lite users exist", async () => {
+    it("returns zero when no Lite Member users exist", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
@@ -535,7 +535,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("counts EXTERNAL users without team assignment as Member Lite", async () => {
+    it("counts EXTERNAL users without team assignment as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);

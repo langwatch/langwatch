@@ -1,7 +1,5 @@
 import {
   Box,
-  Button,
-  Card,
   Heading,
   HStack,
   Table,
@@ -16,7 +14,6 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -25,9 +22,6 @@ import type {
   TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { canAddProjects } from "../../utils/limits";
-import { trackEvent } from "../../utils/tracking";
-import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -42,18 +36,8 @@ function ProjectsList({
 }: {
   organization: FullyLoadedOrganization;
 }) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const { url: planManagementUrl } = usePlanManagementUrl();
-
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization.id },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
 
   return (
     <SettingsLayout>
@@ -67,44 +51,14 @@ function ProjectsList({
       >
         <HStack width="full" justifyContent="space-between">
           <Heading size="lg">Projects</Heading>
-          {hasPermission("project:create") &&
-            (canAddProjects(usage.data) ? (
-              <PageLayout.HeaderButton
-                onClick={() => openDrawer("createProject")}
-              >
-                <Plus size={20} />
-                <Text>Add new project</Text>
-              </PageLayout.HeaderButton>
-            ) : (
-              <Tooltip
-                content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
-                positioning={{ placement: "top" }}
-              >
-                <Link
-                  href={planManagementUrl}
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "new_project_limit_reached_2",
-                    });
-                  }}
-                >
-                  <Button
-                    background="gray.50"
-                    _hover={{ background: "gray.50" }}
-                    color="fg.subtle"
-                  >
-                    <HStack gap={2}>
-                      <Plus size={20} />
-                      <Text>Add new project</Text>
-                    </HStack>
-                  </Button>
-                </Link>
-              </Tooltip>
-            ))}
+          {hasPermission("project:create") && (
+            <PageLayout.HeaderButton
+              onClick={() => openDrawer("createProject")}
+            >
+              <Plus size={20} />
+              <Text>Add new project</Text>
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         <Table.Root variant="line" width="full" size="md">
           {organization.teams.map((team) => (

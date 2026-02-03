@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Field,
@@ -20,15 +19,10 @@ import {
   type ProjectFormData,
   TechStackSelector,
 } from "~/components/TechStack";
-import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
 import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
-import { isAtMaxProjects } from "../../../utils/limits";
-import { trackEvent } from "../../../utils/tracking";
-import { usePlanManagementUrl } from "../../../hooks/usePlanManagementUrl";
 
 type RadioCardProps = {
   value: string;
@@ -79,10 +73,9 @@ export default function ProjectOnboarding() {
   const teamId = watch("teamId");
 
   const router = useRouter();
-  const { organization, project } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToProjectOnboarding: false,
   });
-  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const { team: teamSlug } = router.query;
   const team = api.team.getBySlug.useQuery(
@@ -95,14 +88,6 @@ export default function ProjectOnboarding() {
   const teams = api.team.getTeamsWithMembers.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
-  );
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
   );
   const safeReturnToPath = getSafeReturnToPath(router.query.return_to);
 
@@ -151,33 +136,6 @@ export default function ProjectOnboarding() {
           <Heading as="h1" fontSize="x-large">
             Create New Project
           </Heading>
-          {isAtMaxProjects(usage.data) && (
-            <Alert.Root>
-              <Alert.Indicator />
-              <Alert.Content>
-                <Text>
-                  You have reached the maximum number of projects allowed by
-                  your plan. Please{" "}
-                  <Link
-                    href={planManagementUrl}
-                    textDecoration="underline"
-                    _hover={{
-                      textDecoration: "none",
-                    }}
-                    onClick={() => {
-                      trackEvent("subscription_hook_click", {
-                        project_id: project?.id,
-                        hook: "new_project_limit_reached",
-                      });
-                    }}
-                  >
-                    upgrade your plan
-                  </Link>{" "}
-                  to create more projects.
-                </Text>
-              </Alert.Content>
-            </Alert.Root>
-          )}
           <Text paddingBottom={4} fontSize="14px">
             You can set up separate projects for each service or LLM feature of
             your application (for example, one for your ChatBot, another for
@@ -219,26 +177,17 @@ export default function ProjectOnboarding() {
           <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">
-            <Tooltip
-              content={
-                isAtMaxProjects(usage.data)
-                  ? "You reached the limit of max new projects, upgrade your plan to add more projects"
-                  : ""
-              }
-              positioning={{ placement: "top" }}
+            <Button
+              colorPalette="orange"
+              type="submit"
+              disabled={createProject.isLoading || createProject.isSuccess}
             >
-              <Button
-                colorPalette="orange"
-                type="submit"
-                disabled={
-                  createProject.isLoading || isAtMaxProjects(usage.data)
-                }
-              >
-                {createProject.isLoading || createProject.isSuccess
+              {createProject.isSuccess
+                ? "Created"
+                : createProject.isLoading
                   ? "Loading..."
                   : "Next"}
-              </Button>
-            </Tooltip>
+            </Button>
           </HStack>
         </VStack>
       </form>

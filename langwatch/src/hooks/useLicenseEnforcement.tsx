@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { UpgradeModal } from "../components/UpgradeModal";
-import type { LimitType, LimitCheckResult } from "../server/license-enforcement";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+import type { LimitType } from "../server/license-enforcement";
 
 /**
  * Hook for enforcing license limits in the UI.
@@ -13,7 +13,7 @@ import type { LimitType, LimitCheckResult } from "../server/license-enforcement"
  * @example
  * ```tsx
  * function CreateWorkflowButton() {
- *   const { checkAndProceed, upgradeModal } = useLicenseEnforcement("workflows");
+ *   const { checkAndProceed } = useLicenseEnforcement("workflows");
  *
  *   const handleClick = () => {
  *     checkAndProceed(() => {
@@ -22,19 +22,13 @@ import type { LimitType, LimitCheckResult } from "../server/license-enforcement"
  *     });
  *   };
  *
- *   return (
- *     <>
- *       <Button onClick={handleClick}>Create Workflow</Button>
- *       {upgradeModal}
- *     </>
- *   );
+ *   return <Button onClick={handleClick}>Create Workflow</Button>;
  * }
  * ```
  */
 export function useLicenseEnforcement(limitType: LimitType) {
   const { organization } = useOrganizationTeamProject();
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitCheckResult | null>(null);
+  const openUpgradeModal = useUpgradeModalStore((state) => state.open);
 
   const checkResult = api.licenseEnforcement.checkLimit.useQuery(
     { organizationId: organization?.id ?? "", limitType },
@@ -56,21 +50,10 @@ export function useLicenseEnforcement(limitType: LimitType) {
       if (checkResult.data.allowed) {
         onAllowed();
       } else {
-        setLimitInfo(checkResult.data);
-        setShowUpgradeModal(true);
+        openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
       }
     },
-    [checkResult.data],
-  );
-
-  const upgradeModal = (
-    <UpgradeModal
-      open={showUpgradeModal}
-      onClose={() => setShowUpgradeModal(false)}
-      limitType={limitType}
-      current={limitInfo?.current ?? 0}
-      max={limitInfo?.max ?? 0}
-    />
+    [checkResult.data, openUpgradeModal, limitType],
   );
 
   return {
@@ -82,7 +65,5 @@ export function useLicenseEnforcement(limitType: LimitType) {
     isAllowed: checkResult.data?.allowed ?? true,
     /** Full limit information (current, max, allowed) */
     limitInfo: checkResult.data,
-    /** Render this in your component to show the upgrade modal when needed */
-    upgradeModal,
   };
 }

@@ -64,6 +64,11 @@ from asyncio import Queue
 from langevals_core.base_evaluator import Money
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Stress test with 130K+ examples takes too long for CI (2+ hours)"
+)
 @pytest.mark.asyncio
 async def test_file_descriptor_limits():
     soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)

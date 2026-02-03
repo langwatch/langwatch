@@ -124,6 +124,20 @@ const mockCodeAgent: TypedAgent = {
 // Default mock implementation
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
+    licenseEnforcement: {
+      checkLimit: {
+        useQuery: () => ({
+          data: { allowed: true, current: 1, max: 10 },
+          isLoading: false,
+        }),
+      },
+    },
     agents: {
       getAll: {
         useQuery: vi.fn(() => ({

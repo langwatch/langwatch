@@ -54,7 +54,7 @@ describe("Members page - license enforcement (documentation)", () => {
     // Pattern requirements verified by code inspection:
     // 1. useLicenseEnforcement("members") is called at component level
     // 2. checkAndProceed() wraps the onClick handler
-    // 3. upgradeModal is rendered in the JSX
+    // 3. Global UpgradeModal is shown via useUpgradeModalStore when limit exceeded
     // 4. Button is NOT disabled based on license limits (only permissions)
     expect(true).toBe(true);
   });

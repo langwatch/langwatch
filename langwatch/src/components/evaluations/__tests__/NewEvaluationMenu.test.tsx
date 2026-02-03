@@ -90,6 +90,30 @@ vi.mock("~/utils/humanReadableId", () => ({
   generateHumanReadableId: vi.fn(() => "swift-bright-fox"),
 }));
 
+// License enforcement mock state
+let mockLicenseIsAllowed = true;
+let mockLicenseCallbackExecuted = false;
+let mockLicenseShowUpgradeModal = false;
+const mockCheckAndProceed = vi.fn((callback: () => void) => {
+  if (mockLicenseIsAllowed) {
+    callback();
+    mockLicenseCallbackExecuted = true;
+  } else {
+    mockLicenseShowUpgradeModal = true;
+  }
+});
+
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: mockCheckAndProceed,
+    isAllowed: mockLicenseIsAllowed,
+    isLoading: false,
+    limitInfo: mockLicenseIsAllowed
+      ? { allowed: true, current: 1, max: 10, limitType: "experiments" }
+      : { allowed: false, current: 3, max: 3, limitType: "experiments" },
+  }),
+}));
+
 // Wrapper with ChakraProvider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -104,6 +128,10 @@ describe("NewEvaluationMenu", () => {
     mockMutateCallback = null;
     mockOnSuccess = null;
     mockIsPending = false;
+    mockLicenseIsAllowed = true;
+    mockLicenseCallbackExecuted = false;
+    mockLicenseShowUpgradeModal = false;
+    mockCheckAndProceed.mockClear();
     clearDrawerStack();
     clearFlowCallbacks();
   });
@@ -332,6 +360,116 @@ describe("NewEvaluationMenu", () => {
         expect(mockPush).toHaveBeenCalled();
         const pushCall = mockPush.mock.calls[0]?.[0] as string;
         expect(pushCall).toContain("drawer.open=guardrails");
+      });
+    });
+  });
+
+  describe("License enforcement", () => {
+    it("calls checkAndProceed when creating experiment", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockMutateCallback = vi.fn();
+
+      render(<NewEvaluationMenu />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Evaluation"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Create Experiment"));
+
+      await waitFor(() => {
+        expect(mockCheckAndProceed).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("proceeds with experiment creation when license allows", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockLicenseIsAllowed = true;
+      let mutateData: unknown = null;
+      mockMutateCallback = (data) => {
+        mutateData = data;
+      };
+
+      render(<NewEvaluationMenu />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Evaluation"));
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Create Experiment"));
+
+      await waitFor(() => {
+        expect(mockLicenseCallbackExecuted).toBe(true);
+        expect(mutateData).not.toBeNull();
+      });
+    });
+
+    it("blocks experiment creation when limit reached", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockLicenseIsAllowed = false;
+      let mutateData: unknown = null;
+      mockMutateCallback = (data) => {
+        mutateData = data;
+      };
+
+      render(<NewEvaluationMenu />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Evaluation"));
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Create Experiment"));
+
+      await waitFor(() => {
+        expect(mockLicenseShowUpgradeModal).toBe(true);
+        expect(mutateData).toBeNull();
+      });
+    });
+
+    it("triggers upgrade modal when experiment limit reached", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockLicenseIsAllowed = false;
+
+      render(<NewEvaluationMenu />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Evaluation"));
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Create Experiment"));
+
+      // Verify the license enforcement hook was triggered to show upgrade modal
+      await waitFor(() => {
+        expect(mockCheckAndProceed).toHaveBeenCalled();
+        expect(mockLicenseShowUpgradeModal).toBe(true);
+      });
+    });
+
+    it("passes callback to checkAndProceed that creates experiment", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockLicenseIsAllowed = true;
+      let mutateWasCalled = false;
+      mockMutateCallback = () => {
+        mutateWasCalled = true;
+      };
+
+      render(<NewEvaluationMenu />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Evaluation"));
+      await waitFor(() =>
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText("Create Experiment"));
+
+      // Verify the callback passed to checkAndProceed actually triggers mutation
+      await waitFor(() => {
+        expect(mockCheckAndProceed).toHaveBeenCalled();
+        // The callback should have been executed since license is allowed
+        expect(mockLicenseCallbackExecuted).toBe(true);
+        // And the mutation should have been called
+        expect(mutateWasCalled).toBe(true);
       });
     });
   });

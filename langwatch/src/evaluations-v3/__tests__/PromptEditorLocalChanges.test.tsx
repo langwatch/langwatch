@@ -27,6 +27,16 @@ vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
 }));
 
+// Mock useLicenseEnforcement hook
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: (cb: () => void) => cb(),
+    isLoading: false,
+    isAllowed: true,
+    limitInfo: { allowed: true, current: 2, max: 5 },
+  }),
+}));
+
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect/elementFromPoint properly
 vi.mock("rich-textarea", () => ({
   RichTextarea: forwardRef<
@@ -110,6 +120,12 @@ vi.mock("~/utils/api", () => ({
         getAllVersionsForPrompt: { invalidate: vi.fn() },
       },
     }),
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
     prompts: {
       getByIdOrHandle: {
         useQuery: ({ idOrHandle }: { idOrHandle: string }) => ({
