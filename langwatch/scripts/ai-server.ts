@@ -196,16 +196,16 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`
-AI Test Server running on http://localhost:${PORT}/generate
-
-  Method:  POST
-  Headers: X-API-Key: <openai-api-key>
-           X-Client-ID: <client-identifier>
-           Content-Type: application/json
-  Body:    { "model": "gpt-4o-mini", "messages": [...] }
-
-  Docker:  http://host.docker.internal:${PORT}/generate
-  Tunnel:  docker run --rm cloudflare/cloudflared tunnel \\
-           --url http://host.docker.internal:${PORT}
+╔════════════════════════════════════════════════════════════╗
+║                    AI Test Server                          ║
+╠════════════════════════════════════════════════════════════╣
+║  URL:     http://localhost:${PORT}/generate                   ║
+║  Method:  POST                                             ║
+║  Headers: X-API-Key: <openai-api-key>                      ║
+║           X-Client-ID: <client-identifier>                 ║
+║           Content-Type: application/json                   ║
+╠════════════════════════════════════════════════════════════╣
+║  Body:    { "model": "gpt-4o-mini", "messages": [...] }    ║
+╚════════════════════════════════════════════════════════════╝
 `);
 });

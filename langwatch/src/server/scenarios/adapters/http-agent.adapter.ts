@@ -2,18 +2,49 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { JSONPath } from "jsonpath-plus";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type {
+  HttpAuth,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import { createLogger } from "~/utils/logger";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AgentRepository,
   type AgentRepository as AgentRepositoryType,
 } from "../../agents/agent.repository";
-import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
+
+type AuthStrategy = (auth: HttpAuth) => Record<string, string>;
+
+const AUTH_STRATEGIES: Record<string, AuthStrategy> = {
+  none: () => {
+    return {};
+  },
+  bearer: (auth) => {
+    if (auth.type !== "bearer") return {};
+    const headers: Record<string, string> = {};
+    headers.Authorization = `Bearer ${auth.token}`;
+    return headers;
+  },
+  api_key: (auth) => {
+    if (auth.type !== "api_key") return {};
+    const headers: Record<string, string> = {};
+    headers[auth.header] = auth.value;
+    return headers;
+  },
+  basic: (auth) => {
+    if (auth.type !== "basic") return {};
+    const credentials = Buffer.from(
+      `${auth.username}:${auth.password}`,
+    ).toString("base64");
+    const headers: Record<string, string> = {};
+    headers.Authorization = `Basic ${credentials}`;
+    return headers;
+  },
+};
 
 interface HttpAgentAdapterParams {
   agentId: string;
@@ -125,7 +156,7 @@ export class HttpAgentAdapter extends AgentAdapter {
       "Content-Type": "application/json",
     };
     this.applyCustomHeaders(headers, config.headers);
-    this.applyAuthenticationHeaders(headers, config.auth);
+    this.applyAuthentication(headers, config.auth);
     return headers;
   }
 
@@ -143,11 +174,16 @@ export class HttpAgentAdapter extends AgentAdapter {
     }
   }
 
-  private applyAuthenticationHeaders(
+  private applyAuthentication(
     headers: Record<string, string>,
     auth: HttpComponentConfig["auth"],
   ): void {
-    Object.assign(headers, applyAuthentication(auth));
+    if (!auth) return;
+
+    const strategy = AUTH_STRATEGIES[auth.type];
+    if (strategy) {
+      Object.assign(headers, strategy(auth));
+    }
   }
 
   private async executeHttpRequest(

@@ -18,7 +18,7 @@ Before delegating any work, create a task list using **TaskCreate** to map out t
 3. Use tasks to track progress through the plan → code → review loop
 
 Example:
-```text
+```
 TaskCreate: "Create feature file for user auth"
 TaskCreate: "Implement login endpoint"
 TaskCreate: "Implement logout endpoint"

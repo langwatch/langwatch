@@ -25,7 +25,6 @@ import http from "http";
 import path from "path";
 import { register } from "prom-client";
 import { workerRestartsCounter } from "../metrics";
-import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
 import type { EventSourcingJob } from "./types";
 
@@ -34,52 +33,8 @@ import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { getClickHouseClient } from "../clickhouse/client";
 import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
-import { startScenarioProcessor } from "../scenarios/scenario.processor";
-import type { ScenarioJob, ScenarioJobResult } from "../scenarios/scenario.queue";
 
 const logger = createLogger("langwatch:workers");
-
-type Closeable = { name: string; close: () => Promise<void> | void };
-// Use Map to dedupe closeables by name - prevents accumulation across restarts
-const closeables = new Map<string, Closeable>();
-let isShuttingDown = false;
-
-function registerCloseable(name: string, closeable: { close: () => Promise<void> | void } | undefined) {
-  if (closeable) {
-    closeables.set(name, { name, close: () => closeable.close() });
-  }
-}
-
-export async function gracefulShutdown() {
-  if (isShuttingDown) return; // Prevent multiple shutdown attempts
-  isShuttingDown = true;
-
-  logger.info({ count: closeables.size }, "Shutting down workers...");
-
-  const results = await Promise.allSettled(
-    [...closeables.values()].map(async (c) => {
-      try {
-        await c.close();
-        logger.debug({ name: c.name }, "Closed");
-      } catch (error) {
-        logger.error({ name: c.name, error }, "Failed to close");
-        throw error;
-      }
-    })
-  );
-
-  const failed = results.filter((r) => r.status === "rejected").length;
-  if (failed > 0) {
-    logger.warn({ failed, total: closeables.size }, "Shutdown completed with errors");
-  } else {
-    logger.info("Shutdown complete");
-  }
-
-  process.exit(failed > 0 ? 1 : 0);
-}
-
-process.on("SIGINT", () => void gracefulShutdown());
-process.on("SIGTERM", () => void gracefulShutdown());
 
 type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
@@ -88,7 +43,6 @@ type Workers = {
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
   eventSourcingWorker: Worker<EventSourcingJob, void, string> | undefined;
-  scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
 
 export const start = (
@@ -99,10 +53,6 @@ export const start = (
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
-  // Reset state for restart scenarios - prevents duplicate closeables
-  closeables.clear();
-  isShuttingDown = false;
-
   // Initialize event sourcing with ClickHouse and Redis clients
   initializeEventSourcing({
     clickHouseClient: getClickHouseClient(),
@@ -118,23 +68,11 @@ export const start = (
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
     const eventSourcingWorker = startEventSourcingWorker();
-    const scenarioWorker = startScenarioProcessor();
-    const metricsServer = startMetricsServer();
 
-    // Register all closeables for graceful shutdown
-    registerCloseable("collector", collectorWorker);
-    registerCloseable("evaluations", evaluationsWorker);
-    registerCloseable("topicClustering", topicClusteringWorker);
-    registerCloseable("trackEvents", trackEventsWorker);
-    registerCloseable("usageStats", usageStatsWorker);
-    registerCloseable("eventSourcing", eventSourcingWorker);
-    registerCloseable("scenario", scenarioWorker);
-    registerCloseable("metricsServer", { close: () => new Promise<void>((resolve) => metricsServer.close(() => resolve())) });
-
+    startMetricsServer();
     incrementWorkerRestartCount();
 
     const closingListener = () => {
-      if (isShuttingDown) return; // Don't restart during intentional shutdown
       logger.info("closed before expected, restarting");
       reject(new WorkersRestart("Worker closing before expected, restarting"));
     };
@@ -145,7 +83,6 @@ export const start = (
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     eventSourcingWorker?.on("closing", closingListener);
-    scenarioWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -158,7 +95,6 @@ export const start = (
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           eventSourcingWorker?.off("closing", closingListener);
-          scenarioWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
@@ -166,8 +102,6 @@ export const start = (
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
             eventSourcingWorker?.close(),
-            scenarioWorker?.close(),
-            new Promise<void>((resolve) => metricsServer.close(() => resolve())),
           ]);
 
           setTimeout(() => {
@@ -185,7 +119,6 @@ export const start = (
         trackEventsWorker,
         usageStatsWorker,
         eventSourcingWorker,
-        scenarioWorker,
       });
     }
   });
@@ -212,9 +145,7 @@ const incrementWorkerRestartCount = () => {
   }
 };
 
-const startMetricsServer = (): http.Server => {
-  const port = getWorkerMetricsPort();
-
+const startMetricsServer = () => {
   const server = http.createServer((req, res) => {
     if (req.url === "/metrics") {
       res.setHeader("Content-Type", register.contentType);
@@ -237,9 +168,7 @@ const startMetricsServer = (): http.Server => {
     }
   });
 
-  server.listen(port, () => {
-    logger.info(`metrics server listening on port ${port}`);
+  server.listen(2999, () => {
+    logger.info("metrics server listening on port 2999");
   });
-
-  return server;
 };
