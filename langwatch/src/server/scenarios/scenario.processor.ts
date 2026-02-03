@@ -225,10 +225,8 @@ async function spawnScenarioChildProcess(
     };
 
     // Use tsx to run the TypeScript file directly, avoiding Next.js bundling issues
-    const childPath = path.resolve(
-      process.cwd(),
-      "src/server/scenarios/execution/scenario-child-process.ts",
-    );
+    // Use __dirname instead of process.cwd() for reliable path resolution in Docker
+    const childPath = path.join(__dirname, "execution/scenario-child-process.ts");
 
     // Build OTEL resource attributes including scenario labels
     const otelResourceAttrs = buildOtelResourceAttributes(jobData.scenario.labels);
