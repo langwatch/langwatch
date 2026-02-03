@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
@@ -23,6 +23,7 @@ import {
   generateScenarioWithAI,
   type GeneratedScenario,
 } from "./services/scenarioGeneration";
+import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -46,6 +47,14 @@ export type { GeneratedScenario } from "./services/scenarioGeneration";
 
 export function usePromptHistory() {
   const [history, setHistory] = useState<string[]>([]);
+
+  // On mount, check sessionStorage for a stored prompt from the AI Create Modal
+  useEffect(() => {
+    const storedPrompt = consumeStoredPrompt();
+    if (storedPrompt) {
+      setHistory([storedPrompt]);
+    }
+  }, []);
 
   const addPrompt = useCallback((prompt: string) => {
     setHistory((prev) => [...prev, prompt]);
@@ -126,6 +135,13 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   const { history, addPrompt, hasHistory } = usePromptHistory();
   const { generate, status } = useScenarioGeneration(project?.id);
+
+  // Switch to input mode when there's history from a stored prompt
+  useEffect(() => {
+    if (hasHistory) {
+      setViewMode("input");
+    }
+  }, [hasHistory]);
 
   // Check if the default model is enabled
   const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;

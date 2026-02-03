@@ -10,6 +10,7 @@ import {
   usePromptHistory,
   useScenarioGeneration,
 } from "../ScenarioAIGeneration";
+import { SCENARIO_AI_PROMPT_KEY } from "../services/scenarioPromptStorage";
 
 // Clean up after each test to avoid interference
 afterEach(() => {
@@ -20,8 +21,16 @@ afterEach(() => {
 // Hook Tests
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("usePromptHistory", () => {
-  it("starts with empty history", () => {
+describe("usePromptHistory()", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("starts with empty history when no stored prompt", () => {
     const { result } = renderHook(() => usePromptHistory());
 
     expect(result.current.history).toEqual([]);
@@ -53,6 +62,46 @@ describe("usePromptHistory", () => {
     });
 
     expect(result.current.history).toEqual(["first", "second", "third"]);
+  });
+
+  describe("when sessionStorage has stored prompt", () => {
+    it("initializes history with stored prompt", () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "Stored prompt");
+
+      const { result } = renderHook(() => usePromptHistory());
+
+      expect(result.current.history).toEqual(["Stored prompt"]);
+      expect(result.current.hasHistory).toBe(true);
+    });
+
+    it("clears sessionStorage after consumption", () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "Stored prompt");
+
+      renderHook(() => usePromptHistory());
+
+      expect(sessionStorage.getItem(SCENARIO_AI_PROMPT_KEY)).toBeNull();
+    });
+
+    it("adds new prompts after initial stored prompt", () => {
+      sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, "Initial prompt");
+
+      const { result } = renderHook(() => usePromptHistory());
+
+      act(() => {
+        result.current.addPrompt("Second prompt");
+      });
+
+      expect(result.current.history).toEqual(["Initial prompt", "Second prompt"]);
+    });
+  });
+
+  describe("when sessionStorage is empty", () => {
+    it("returns empty history", () => {
+      const { result } = renderHook(() => usePromptHistory());
+
+      expect(result.current.history).toEqual([]);
+      expect(result.current.hasHistory).toBe(false);
+    });
   });
 });
 
