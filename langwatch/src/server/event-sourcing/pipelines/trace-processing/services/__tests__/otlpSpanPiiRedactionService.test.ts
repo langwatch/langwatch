@@ -15,9 +15,7 @@ const mockEnv = vi.hoisted(() => ({
 }));
 
 vi.mock("~/env.mjs", () => ({
-  get env() {
-    return mockEnv;
-  },
+  env: mockEnv,
 }));
 
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({

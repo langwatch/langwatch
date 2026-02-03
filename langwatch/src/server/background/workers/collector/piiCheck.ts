@@ -19,7 +19,8 @@ import type {
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
 // Lazy initialization - env vars accessed only when getCredentials() is called
-let cachedCredentials: { project_id: string } | undefined | null = null; // null = not yet initialized
+// null = not yet initialized, undefined = initialized but no credentials
+let cachedCredentials: { project_id: string } | undefined | null = null;
 
 function getCredentials(): { project_id: string } | undefined {
   if (cachedCredentials === null) {
@@ -27,7 +28,7 @@ function getCredentials(): { project_id: string } | undefined {
       ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
       : undefined;
   }
-  return cachedCredentials;
+  return cachedCredentials ?? undefined;
 }
 
 // Lazy DLP client - created only when getDlpClient() is called
