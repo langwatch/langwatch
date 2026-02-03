@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
+import { vi } from "vitest";
 
 dotenv.config({ path: ".env" });
 
