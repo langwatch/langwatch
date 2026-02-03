@@ -64,7 +64,7 @@ const sampleDSPyStep: DSPyStepRESTParams = {
           },
         ],
         created: 1716492338,
-        model: "gpt-3.5-turbo-0125",
+        model: "gpt-4o",
         object: "chat.completion",
         system_fingerprint: null,
         usage: { completion_tokens: 7, prompt_tokens: 282, total_tokens: 289 },
@@ -116,7 +116,7 @@ const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
           },
         ],
         created: 1716492338,
-        model: "gpt-3.5-turbo-0125",
+        model: "gpt-4o",
         object: "chat.completion",
         system_fingerprint: null,
         usage: { completion_tokens: 7, prompt_tokens: 282, total_tokens: 289 },
@@ -201,7 +201,7 @@ describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
     expect(indexedStep._source?.examples).toHaveLength(2);
 
     expect(indexedStep._source?.llm_calls[0]?.model).toEqual(
-      "gpt-3.5-turbo-0125",
+      "gpt-4o",
     );
     expect(indexedStep._source?.llm_calls[0]?.cost).toBeGreaterThan(0);
   });

@@ -330,7 +330,14 @@ async function waitForEvaluationCheckpoint(
 // Integration Tests
 // ============================================================================
 
-describe("Evaluation Processing Pipeline - Integration Tests", () => {
+// Skip when running without testcontainers (Prisma-only integration tests)
+const hasTestcontainers = !!(
+  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
+);
+
+describe.skipIf(!hasTestcontainers)(
+  "Evaluation Processing Pipeline - Integration Tests",
+  () => {
   let pipeline: ReturnType<typeof createEvaluationTestPipeline>;
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;

@@ -25,8 +25,10 @@ import type { EvaluationV3Event, ExecutionScope } from "../types";
  * - Redis available (for abort flags)
  * - Database available for test project
  */
-// Skip for now as those tests depend on the NLP service, which is not available in the CI environment.
-describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
+// Skip when NLP service isn't available (CI or prisma-integration tests)
+const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE;
+
+describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
   let project: Project;
 
   beforeAll(async () => {

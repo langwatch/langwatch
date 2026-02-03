@@ -302,6 +302,10 @@ class Experiment:
         iter_ctx = IterationContext(index=index, item=item)
         iter_token = _iteration_context.set(iter_ctx)
 
+        # Reset target context at the start of each iteration to prevent pollution
+        # from previous iterations (especially important for implicit Output targets)
+        _target_context.set(None)
+
         # Determine if we should create an iteration trace:
         # - Don't create if evaluation uses targets (each target creates its own trace)
         # - Don't create if we're collecting submit() calls (not in_thread yet)
@@ -340,6 +344,8 @@ class Experiment:
         finally:
             # Reset iteration context
             _iteration_context.reset(iter_token)
+            # Reset target context to prevent pollution to next iteration
+            _target_context.set(None)
 
         # Handle iteration trace cleanup
         # Note: If target() was used, it may have already closed the trace
@@ -715,9 +721,10 @@ class Experiment:
         """
         Log the model's response/output for the current target.
 
-        Must be called inside a `target()` context. The response will be stored
-        in the dataset entry's `predicted` field, which is displayed in the
-        results table.
+        Can be called inside a `target()` context, or outside of one. When called
+        outside a target context, an implicit "Output" target is created automatically.
+        The response will be stored in the dataset entry's `predicted` field, which
+        is displayed in the results table.
 
         Args:
             response: The model's output. Can be a string (will be wrapped as
@@ -725,30 +732,131 @@ class Experiment:
 
         Example:
             ```python
+            # With explicit target
             with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
                 response = call_gpt4(row["question"])
                 evaluation.log_response(response)  # Store the output
                 evaluation.log("quality", index=index, score=0.95)  # Log metrics
-            ```
 
-        Raises:
-            RuntimeError: If called outside of a target() context.
+            # Without explicit target (creates implicit "Output" target)
+            for index, row in evaluation.loop(df.iterrows()):
+                response = my_model(row["question"])
+                evaluation.log_response(response)  # Creates "Output" target
+                evaluation.log("quality", index=index, score=0.95)
+            ```
         """
         ctx = _target_context.get()
-        if ctx is None:
-            raise RuntimeError(
-                "log_response() must be called inside a target() context. "
-                "Example: with evaluation.target('my-target'): evaluation.log_response(response)"
-            )
 
         # Normalize response to dict format
         if isinstance(response, str):
-            ctx.predicted = {"output": response}
+            predicted = {"output": response}
         elif isinstance(response, dict):
-            ctx.predicted = response
+            predicted = response
         else:
             # Try to convert to string for other types
-            ctx.predicted = {"output": str(response)}
+            predicted = {"output": str(response)}
+
+        if ctx is None:
+            # Create implicit "Output" target and dataset entry immediately
+            self._create_implicit_output_target(predicted)
+        else:
+            # Inside explicit target context - just set predicted
+            ctx.predicted = predicted
+
+    def _create_implicit_output_target(self, predicted: Dict[str, Any]) -> None:
+        """
+        Create an implicit "Output" target when log_response() is called outside
+        a target() context. This enables a simpler API for single-target evaluations.
+
+        Creates the dataset entry immediately with the predicted response.
+        """
+        target_name = "Output"
+
+        # Mark that targets are being used
+        if not self._evaluation_uses_targets:
+            self._evaluation_uses_targets = True
+            # Close the active iteration trace if any
+            if self._active_iteration_trace is not None:
+                self._active_iteration_trace.__exit__(None, None, None)
+                self._active_iteration_trace = None
+
+        self._current_iteration_used_with_target = True
+
+        # Register the target
+        self._register_target(target_name, None)
+
+        # Get index and item from iteration context
+        iter_ctx = _iteration_context.get()
+        if iter_ctx is not None:
+            index = iter_ctx.index
+            current_item = iter_ctx.item
+        else:
+            index = self._current_index
+            current_item = self._current_item
+
+        # Create a trace for this implicit target
+        tracer = trace.get_tracer("langwatch-evaluation")
+        root_context = otel_context.Context()
+
+        # Start span and get trace_id
+        with tracer.start_span(
+            f"evaluation.target.{target_name}",
+            context=root_context,
+            attributes={
+                "evaluation.run_id": self.run_id,
+                "evaluation.index": index,
+                "evaluation.target": target_name,
+            },
+        ) as span:
+            span_context = span.get_span_context()
+            trace_id = format(span_context.trace_id, "032x")
+
+        # Create and set target context (for subsequent log() calls)
+        ctx = TargetContext(
+            target_id=target_name,
+            index=index,
+            trace_id=trace_id,
+            predicted=predicted,
+        )
+        _target_context.set(ctx)
+
+        # Create dataset entry immediately
+        entry_data: Any = (
+            current_item.to_dict()
+            if hasattr(current_item, "to_dict")
+            else (
+                current_item.__dict__
+                if hasattr(current_item, "__dict__")
+                else (
+                    current_item[1].to_dict()
+                    if type(current_item) == tuple
+                    and hasattr(current_item[1], "to_dict")
+                    else (
+                        current_item[1].__dict__
+                        if type(current_item) == tuple
+                        and hasattr(current_item[1], "__dict__")
+                        else {
+                            "entry": json.dumps(
+                                current_item, cls=SerializableWithStringFallback
+                            )
+                        }
+                    )
+                )
+            )
+        )
+
+        batch_entry = BatchEntry(
+            index=index,
+            entry=entry_data,
+            duration=0,  # Duration not tracked for implicit targets
+            error=None,
+            trace_id=trace_id,
+            target_id=target_name,
+            predicted=predicted,
+        )
+
+        with self.lock:
+            self.batch["dataset"].append(batch_entry)
 
     def log(
         self,
