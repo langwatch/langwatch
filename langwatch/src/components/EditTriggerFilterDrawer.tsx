@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, Heading, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "~/hooks/useFilterParams";
@@ -120,14 +120,8 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              Edit Trigger Filter
-            </Text>
-          </HStack>
+          <Drawer.CloseTrigger />
+          <Heading>Edit Trigger Filter</Heading>
         </Drawer.Header>
         <Drawer.Body>
           <HorizontalFormControl
