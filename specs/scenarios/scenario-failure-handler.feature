@@ -168,6 +168,13 @@ Feature: Scenario Failure Handler
   # detects the stalled job after ~30s. These scenarios ensure stalled jobs
   # fail cleanly instead of retrying indefinitely.
 
+  @unit
+  Scenario: Stalled jobs fail without retry
+    Given a scenario job has stalled
+    When BullMQ processes the stalled job
+    Then the job fails immediately
+    And no retry is attempted
+
   @integration
   Scenario: Worker logs stalled jobs with warning level
     Given a scenario worker is processing jobs
