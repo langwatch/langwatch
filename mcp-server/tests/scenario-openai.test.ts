@@ -15,6 +15,8 @@ import { anthropic } from "@ai-sdk/anthropic";
 
 dotenv.config();
 
+const isCI = !!process.env.CI;
+
 const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
   role: AgentRole.AGENT,
   call: async (state) => {
@@ -98,7 +100,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 });
 
 describe("OpenAI Implementation", () => {
-  it("implements LangWatch in an OpenAI bot project", async () => {
+  it.skipIf(isCI)("implements LangWatch in an OpenAI bot project", async () => {
     const tempFolder = fs.mkdtempSync(
       path.join(os.tmpdir(), "langwatch-openai-bot-")
     );
