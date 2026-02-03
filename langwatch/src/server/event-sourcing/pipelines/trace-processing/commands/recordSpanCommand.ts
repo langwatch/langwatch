@@ -8,7 +8,7 @@ import {
   EventUtils,
 } from "../../../library";
 import type { OtlpSpan } from "../schemas/otlp";
-import type { RecordSpanCommandData } from "../schemas/commands";
+import type { PIIRedactionLevel, RecordSpanCommandData } from "../schemas/commands";
 import { recordSpanCommandDataSchema } from "../schemas/commands";
 import {
   RECORD_SPAN_COMMAND_TYPE,
@@ -16,16 +16,19 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  OtlpSpanPiiRedactionService,
+} from "../services/otlpSpanPiiRedactionService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
  * Dependencies for RecordSpanCommand that can be injected for testing.
  */
 export interface RecordSpanCommandDependencies {
-  /** Service for redacting PII from spans. Handles project settings lookup internally. */
+  /** Service for redacting PII from spans. */
   piiRedactionService: {
-    redactSpanForTenant: (span: OtlpSpan, tenantId: string) => Promise<void>;
+    redactSpan: (span: OtlpSpan, piiRedactionLevel: PIIRedactionLevel) => Promise<void>;
   };
 }
 
@@ -95,11 +98,12 @@ export class RecordSpanCommand
         );
 
         // Clone span before redaction to preserve command immutability
-        // The service handles project settings lookup, env var checks, and redaction
         const spanToRedact = structuredClone(commandData.span);
-        await this.deps.piiRedactionService.redactSpanForTenant(
+        const piiRedactionLevel =
+          commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
+        await this.deps.piiRedactionService.redactSpan(
           spanToRedact,
-          tenantIdStr,
+          piiRedactionLevel,
         );
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
@@ -112,6 +116,7 @@ export class RecordSpanCommand
             span: spanToRedact,
             resource: commandData.resource,
             instrumentationScope: commandData.instrumentationScope,
+            piiRedactionLevel,
           },
           { traceId, spanId },
         );
