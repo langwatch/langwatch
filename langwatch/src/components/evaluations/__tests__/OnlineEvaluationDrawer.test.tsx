@@ -190,9 +190,9 @@ vi.mock("next/router", () => {
       const asPath =
         Object.keys(mockQuery).length > 0
           ? "/test?" +
-            Object.entries(mockQuery)
-              .map(([k, v]) => `${k}=${v}`)
-              .join("&")
+          Object.entries(mockQuery)
+            .map(([k, v]) => `${k}=${v}`)
+            .join("&")
           : "/test";
       // console.log("useRouter called, asPath:", asPath);
       return {

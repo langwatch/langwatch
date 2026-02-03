@@ -17,7 +17,10 @@ import { AgentService } from "../../agents/agent.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { copyWorkflowWithDatasets } from "./workflows";
+import {
+  copyWorkflowWithDatasets,
+  saveOrCommitWorkflowVersion,
+} from "./workflows";
 
 /**
  * Get config schema based on agent type for validation
@@ -177,17 +180,16 @@ export const agentsRouter = createTRPCRouter({
       });
 
       // Find the linked workflow (if any)
-      const workflow =
-        agent?.workflowId
-          ? await ctx.prisma.workflow.findFirst({
-              where: {
-                id: agent.workflowId,
-                projectId: input.projectId,
-                archivedAt: null,
-              },
-              select: { id: true, name: true },
-            })
-          : null;
+      const workflow = agent?.workflowId
+        ? await ctx.prisma.workflow.findFirst({
+            where: {
+              id: agent.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            select: { id: true, name: true },
+          })
+        : null;
 
       return { workflow };
     }),
@@ -337,8 +339,8 @@ export const agentsRouter = createTRPCRouter({
             newAgentId: `agent_${nanoid()}`,
           },
           {
-            copyWorkflow: (opts) =>
-              copyWorkflowWithDatasets({
+            copyWorkflow: async (opts) => {
+              const { workflowId, dsl } = await copyWorkflowWithDatasets({
                 ctx,
                 workflow: {
                   ...opts.workflow,
@@ -351,7 +353,19 @@ export const agentsRouter = createTRPCRouter({
                 targetProjectId: opts.targetProjectId,
                 sourceProjectId: opts.sourceProjectId,
                 copiedFromWorkflowId: opts.copiedFromWorkflowId,
-              }),
+              });
+              await saveOrCommitWorkflowVersion({
+                ctx,
+                input: {
+                  projectId: opts.targetProjectId,
+                  workflowId,
+                  dsl,
+                },
+                autoSaved: false,
+                commitMessage: "Copied from " + opts.workflow.name,
+              });
+              return { workflowId };
+            },
           },
         );
       } catch (error) {
@@ -470,12 +484,15 @@ export const agentsRouter = createTRPCRouter({
         });
       }
       try {
-        return await agentService.syncFromSource(input.agentId, input.projectId);
+        return await agentService.syncFromSource(
+          input.agentId,
+          input.projectId,
+        );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         if (
-          message === "This agent is not a copy and has no source to sync from" ||
+          message ===
+            "This agent is not a copy and has no source to sync from" ||
           message === "Source agent has been deleted"
         ) {
           throw new TRPCError({

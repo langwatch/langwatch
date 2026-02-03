@@ -113,41 +113,74 @@ export class AgentService {
     }
 
     let newWorkflowId: string | null = null;
-    if (
-      source.type === "workflow" &&
-      source.workflowId &&
-      source.workflow?.latestVersion?.dsl
-    ) {
-      const { workflowId } = await deps.copyWorkflow({
-        workflow: {
-          id: source.workflow.id,
-          name: source.workflow.name,
-          icon: source.workflow.icon,
-          description: source.workflow.description,
-          latestVersion: source.workflow.latestVersion,
-        },
-        targetProjectId: input.targetProjectId,
-        sourceProjectId: input.sourceProjectId,
-        copiedFromWorkflowId: source.workflowId,
+    try {
+      if (
+        source.type === "workflow" &&
+        source.workflowId &&
+        source.workflow?.latestVersion?.dsl
+      ) {
+        const { workflowId } = await deps.copyWorkflow({
+          workflow: {
+            id: source.workflow.id,
+            name: source.workflow.name,
+            icon: source.workflow.icon,
+            description: source.workflow.description,
+            latestVersion: source.workflow.latestVersion,
+          },
+          targetProjectId: input.targetProjectId,
+          sourceProjectId: input.sourceProjectId,
+          copiedFromWorkflowId: source.workflowId,
+        });
+        newWorkflowId = workflowId;
+      }
+
+      const copied = await this.repository.create({
+        id: input.newAgentId,
+        projectId: input.targetProjectId,
+        name: source.name,
+        type: source.type as AgentType,
+        config: source.config as AgentComponentConfig,
+        workflowId: newWorkflowId ?? undefined,
+        copiedFromAgentId: source.id,
       });
-      newWorkflowId = workflowId;
+
+      return {
+        id: copied.id,
+        name: copied.name,
+        copiedFromAgentId: source.id,
+      };
+    } catch (createError) {
+      if (newWorkflowId != null) {
+        await this.deleteCopiedWorkflow(
+          newWorkflowId,
+          input.targetProjectId,
+        ).catch(() => {});
+      }
+      throw createError;
     }
+  }
 
-    const copied = await this.repository.create({
-      id: input.newAgentId,
-      projectId: input.targetProjectId,
-      name: source.name,
-      type: source.type as AgentType,
-      config: source.config as AgentComponentConfig,
-      workflowId: newWorkflowId ?? undefined,
-      copiedFromAgentId: source.id,
+  /**
+   * Deletes a workflow and its versions (e.g. to clean up after a failed agent create).
+   */
+  private async deleteCopiedWorkflow(
+    workflowId: string,
+    projectId: string,
+  ): Promise<void> {
+    await this.prisma.workflow.update({
+      where: { id: workflowId, projectId },
+      data: { currentVersionId: null, latestVersionId: null },
     });
-
-    return {
-      id: copied.id,
-      name: copied.name,
-      copiedFromAgentId: source.id,
-    };
+    await this.prisma.workflowVersion.updateMany({
+      where: { workflowId, projectId },
+      data: { parentId: null },
+    });
+    await this.prisma.workflowVersion.deleteMany({
+      where: { workflowId, projectId },
+    });
+    await this.prisma.workflow.delete({
+      where: { id: workflowId, projectId },
+    });
   }
 
   /**
@@ -166,7 +199,8 @@ export class AgentService {
     if (!source) {
       throw new Error("Agent not found");
     }
-    const copies = await this.repository.findCopiesBySourceAgentId(sourceAgentId);
+    const copies =
+      await this.repository.findCopiesBySourceAgentId(sourceAgentId);
     if (copies.length === 0) {
       throw new Error("This agent has no copies to push to");
     }

@@ -164,17 +164,16 @@ export const evaluatorsRouter = createTRPCRouter({
       });
 
       // Find the linked workflow (if any)
-      const workflow =
-        evaluator?.workflowId
-          ? await ctx.prisma.workflow.findFirst({
-              where: {
-                id: evaluator.workflowId,
-                projectId: input.projectId,
-                archivedAt: null,
-              },
-              select: { id: true, name: true },
-            })
-          : null;
+      const workflow = evaluator?.workflowId
+        ? await ctx.prisma.workflow.findFirst({
+            where: {
+              id: evaluator.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            select: { id: true, name: true },
+          })
+        : null;
 
       // Find monitors using this evaluator
       const monitors = await ctx.prisma.monitor.findMany({
@@ -358,7 +357,12 @@ export const evaluatorsRouter = createTRPCRouter({
           project: {
             select: {
               name: true,
-              team: { select: { name: true, organization: { select: { name: true } } } },
+              team: {
+                select: {
+                  name: true,
+                  organization: { select: { name: true } },
+                },
+              },
             },
           },
         },
@@ -432,7 +436,11 @@ export const evaluatorsRouter = createTRPCRouter({
       }
 
       let newWorkflowId: string | null = null;
-      if (source.type === "workflow" && source.workflowId && source.workflow?.latestVersion?.dsl) {
+      if (
+        source.type === "workflow" &&
+        source.workflowId &&
+        source.workflow?.latestVersion?.dsl
+      ) {
         const { workflowId } = await copyWorkflowWithDatasets({
           ctx,
           workflow: {
@@ -574,7 +582,8 @@ export const evaluatorsRouter = createTRPCRouter({
       if (!copy?.copiedFromEvaluatorId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "This evaluator is not a copy and has no source to sync from",
+          message:
+            "This evaluator is not a copy and has no source to sync from",
         });
       }
 
