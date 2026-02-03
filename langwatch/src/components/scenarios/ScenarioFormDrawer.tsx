@@ -140,7 +140,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
-          await runScenario({ scenarioId: savedScenario.id, target });
+          await runScenario(savedScenario.id, target);
         })();
       } catch (error) {
         toaster.create({

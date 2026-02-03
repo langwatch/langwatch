@@ -19,7 +19,7 @@ From repo root (requires Docker):
 
 ```bash
 make dev              # Minimal: postgres + redis + app
-make dev-scenarios    # + workers (includes scenarios) + bullboard + ai-server + nlp
+make dev-scenarios    # + workers + scenario-worker + bullboard + ai-server + nlp
 make dev-full         # Everything including opensearch
 make quickstart       # Interactive profile chooser
 make down             # Stop all services
@@ -64,7 +64,6 @@ specs/               # BDD feature specs
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
-| Flat test structure with GWT comments | Use nested `describe("given X")` and `describe("when Y")` blocks for BDD structure, not comments |
 | Naming tests as unit when they render components | Tests that render components and mock boundaries are integration tests (`.integration.test.ts`), not unit tests |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
@@ -83,7 +82,6 @@ specs/               # BDD feature specs
 | Using npm tsc to compile | Use `pnpm typecheck` instead, it uses the new tsgo which is much faster |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
-| Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
 
 ## Database
 
@@ -106,9 +104,38 @@ The orchestrator:
 4. Tracks progress via task status updates
 5. Does NOT read or write code directly
 
-Agents:
-- **coder** (`.claude/agents/coder.md`): Implements features with TDD. Reads requirements, writes failing tests first, implements minimal code to pass, refactors, and self-verifies before returning.
-- **uncle-bob-reviewer** (`.claude/agents/uncle-bob-reviewer.md`): Reviews code for SOLID principles, clean code violations, and TDD practices. Provides uncompromising feedback on software craftsmanship.
-- **repo-sherpa** (`.claude/agents/repo-sherpa.md`): Answers questions about repository structure, documentation, and developer experience. Owns the meta-layer (agents, skills, docs).
-
 See `.claude/README.md` for full orchestration documentation.
+
+## E2E Testing Workflow
+
+After code is implemented and reviewed, features with `@e2e` scenarios go through E2E verification:
+
+```
+/e2e specs/scenarios/my-feature.feature
+    │
+    ├── playwright-test-planner (Opus)
+    │   - Explores live app at localhost:5570
+    │   - Creates test plan in agentic-e2e-tests/plans/
+    │
+    ├── playwright-test-generator (Sonnet)
+    │   - Generates Playwright tests from plan
+    │   - Saves to agentic-e2e-tests/tests/
+    │
+    ├── playwright-test-healer (Sonnet)
+    │   - Runs tests, fixes failures
+    │   - Iterates until passing
+    │
+    └── test-reviewer (Opus)
+        - Reviews test quality
+        - Checks pyramid placement
+```
+
+**Run E2E tests manually:**
+```bash
+cd agentic-e2e-tests
+docker compose up -d        # Start infrastructure
+cd ../langwatch && PORT=5570 pnpm dev  # Start app
+cd ../agentic-e2e-tests && pnpm test   # Run tests
+```
+
+See `agentic-e2e-tests/README.md` for detailed setup and conventions.

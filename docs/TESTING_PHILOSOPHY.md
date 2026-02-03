@@ -52,46 +52,6 @@ See [bettertests.js.org](https://bettertests.js.org/) for more patterns.
 
 Isolating assertions makes failures immediately clear. When multiple behaviors need testing, create separate tests.
 
-### BDD-Style Test Structure
-
-Use nested `describe` blocks to express Given/When/Then structure:
-
-```typescript
-describe("ClassName", () => {
-  describe("methodName", () => {
-    describe("given some precondition", () => {
-      beforeEach(() => { /* setup context */ });
-
-      describe("when some action occurs", () => {
-        it("produces expected result", () => { /* assertion */ });
-        it("also does this other thing", () => { /* assertion */ });
-      });
-    });
-
-    describe("given different precondition", () => {
-      describe("when same action occurs", () => {
-        it("produces different result", () => { /* assertion */ });
-      });
-    });
-  });
-});
-```
-
-Benefits:
-- **Grouping**: Related tests share setup in `beforeEach`
-- **Readability**: Test output reads like a spec: "ClassName > methodName > given X > when Y > does Z"
-- **Organization**: Clear separation of context (given) from action (when) from expectation (it)
-
-Avoid flat structures with Given/When/Then only in comments:
-```typescript
-// Avoid: comments don't provide grouping or shared setup
-it("does X when Y given Z", () => {
-  // Given: Z
-  // When: Y
-  // Then: X
-});
-```
-
 ## Test Hierarchy
 
 Avoid overlap. Each level has a distinct purpose.

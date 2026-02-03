@@ -61,29 +61,3 @@ Feature: Scenario Execution
     When I view the run history
     Then I see a list of past runs with timestamps
     And I can click any run to view its details
-
-  # ============================================================================
-  # Run Again
-  # ============================================================================
-
-  @e2e
-  Scenario: Run Again preserves scenario set
-    Given I am viewing a run in scenario set "production-tests"
-    When I click "Run Again"
-    Then the new run appears in the same scenario set "production-tests"
-    And the new run does NOT appear in the default set
-
-  @e2e
-  Scenario: Run Again with remembered target
-    Given I have previously run scenario "Refund Flow" with target "Support Agent"
-    And the target preference is remembered
-    When I click "Run Again"
-    Then the scenario runs immediately with "Support Agent"
-    And I am not prompted to select a target
-
-  @e2e
-  Scenario: Run Again without remembered target
-    Given I have not run scenario "Refund Flow" before
-    When I click "Run Again"
-    Then I am prompted to select a target
-    And I can optionally remember my choice

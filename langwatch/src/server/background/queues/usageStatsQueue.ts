@@ -5,18 +5,17 @@ import { createLogger } from "../../../utils/logger";
 import { prisma } from "../../db";
 import { connection } from "../../redis";
 import { runUsageStatsJob } from "../workers/usageStatsWorker";
-import { USAGE_STATS_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
 
-export { USAGE_STATS_QUEUE } from "./constants";
-
 const logger = createLogger("langwatch:usageStatsQueue");
+
+export const USAGE_STATS_QUEUE_NAME = "{usage_stats}";
 
 export const usageStatsQueue = new QueueWithFallback<
   UsageStatsJob,
   void,
   string
->(USAGE_STATS_QUEUE.NAME, runUsageStatsJob, {
+>(USAGE_STATS_QUEUE_NAME, runUsageStatsJob, {
   connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
@@ -60,7 +59,7 @@ export const scheduleUsageStats = async () => {
       logger.info({ instanceId }, "Scheduling usage stats for organization");
 
       return await usageStatsQueue.add(
-        USAGE_STATS_QUEUE.JOB,
+        "usage_stats",
         {
           instance_id: instanceId,
           timestamp: Date.now(),
@@ -97,7 +96,7 @@ export const scheduleUsageStatsForOrganization = async (organization: {
   const yyyymmdd = new Date().toISOString().split("T")[0];
 
   return await usageStatsQueue.add(
-    USAGE_STATS_QUEUE.JOB,
+    "usage_stats",
     {
       instance_id: instanceId,
       timestamp: Date.now(),

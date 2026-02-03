@@ -27,14 +27,11 @@ require("./server/background/worker")
 process.on("uncaughtException", (err) => {
   logger.fatal({ error: err }, "uncaught exception detected");
 
-  // Attempt graceful shutdown, abort if it takes too long
-  const { gracefulShutdown } = require("./server/background/worker");
-  Promise.race([
-    gracefulShutdown(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Shutdown timeout")), 3000)),
-  ])
-    .catch(() => process.abort())
-    .finally(() => process.exit(1));
+  // If a graceful shutdown is not achieved after 3 seconds,
+  // shut down the process completely
+  setTimeout(() => {
+    process.abort(); // exit immediately and generate a core dump file
+  }, 3000).unref();
 });
 
 process.on("unhandledRejection", (reason, promise) => {

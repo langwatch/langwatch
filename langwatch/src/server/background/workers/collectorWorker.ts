@@ -129,7 +129,7 @@ export const scheduleTraceCollectionWithGrouping = async (
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
       try {
         await existingJob.remove();
-        await collectorQueue.add(COLLECTOR_QUEUE.JOB, mergedJob, {
+        await collectorQueue.add("collector", mergedJob, {
           jobId,
           delay: 10_000,
         });
@@ -150,7 +150,7 @@ export const scheduleTraceCollectionWithGrouping = async (
         { collectionJobTraceId: collectorJob.traceId },
         "collecting job trace",
       );
-      await collectorQueue.add(COLLECTOR_QUEUE.JOB, collectorJob, {
+      await collectorQueue.add("collector", collectorJob, {
         jobId,
         delay: index > 1 ? 10_000 : 0,
       });
@@ -894,23 +894,8 @@ export const startCollectorWorker = () => {
   void prewarmTiktokenModels();
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
-    COLLECTOR_QUEUE.NAME,
-    async (job) => {
-      const jobLog = (message: string) => {
-        void job.log(message);
-      };
-
-      jobLog(`Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`);
-
-      try {
-        await processCollectorJob(job.id, job.data);
-        jobLog(`Completed successfully`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        jobLog(`Failed: ${message}`);
-        throw error;
-      }
-    },
+    COLLECTOR_QUEUE,
+    (job) => processCollectorJob(job.id, job.data),
     {
       connection,
       concurrency: 20,

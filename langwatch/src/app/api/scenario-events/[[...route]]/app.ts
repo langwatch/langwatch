@@ -58,17 +58,6 @@ app.post(
     const { project } = c.var;
     const event = c.req.valid("json");
 
-    logger.info(
-      {
-        projectId: project.id,
-        eventType: event.type,
-        scenarioId: event.scenarioId,
-        scenarioRunId: event.scenarioRunId,
-        scenarioSetId: event.scenarioSetId,
-      },
-      "Received scenario event",
-    );
-
     const scenarioRunnerService = new ScenarioEventService();
     await scenarioRunnerService.saveScenarioEvent({
       projectId: project.id,

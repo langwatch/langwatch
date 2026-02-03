@@ -1,4 +1,3 @@
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { createLogger } from "./logger";
 
 const logger = createLogger("pollForScenarioRun");
@@ -28,15 +27,9 @@ export type PollResult =
   | { success: false; error: "timeout" | "run_error"; scenarioRunId?: string };
 
 /**
- * Polls for a scenario run to be available.
- *
- * Returns when:
- * - RUN_STARTED exists (scenarioRunId available) -> success (frontend can show progress)
- * - ERROR/FAILED/CANCELLED status -> error with scenarioRunId
- * - Timeout reached -> error without scenarioRunId
- *
- * The frontend run page handles showing progress and messages as they arrive,
- * so we don't need to wait for messages here.
+ * Polls for a scenario run to have content or reach terminal state.
+ * Returns when: has messages (something to show), or ERROR/FAILED/SUCCESS.
+ * Returns success with scenarioRunId, or error with reason.
  */
 export async function pollForScenarioRun(
   fetchBatchRunData: FetchBatchRunData,
@@ -79,9 +72,9 @@ export async function pollForScenarioRun(
 
         // Check for error/cancelled states first
         if (
-          run.status === ScenarioRunStatus.ERROR ||
-          run.status === ScenarioRunStatus.FAILED ||
-          run.status === ScenarioRunStatus.CANCELLED
+          run.status === "ERROR" ||
+          run.status === "FAILED" ||
+          run.status === "CANCELLED"
         ) {
           logger.info(
             { status: run.status, scenarioRunId: run.scenarioRunId },
@@ -94,17 +87,21 @@ export async function pollForScenarioRun(
           };
         }
 
-        // RUN_STARTED exists - return success so frontend can show progress
-        // The run page will display messages as they arrive
-        logger.info(
-          {
-            status: run.status,
-            hasMessages: run.messages && run.messages.length > 0,
-            scenarioRunId: run.scenarioRunId,
-          },
-          "Run ready",
-        );
-        return { success: true, scenarioRunId: run.scenarioRunId };
+        // Return success if we have messages to show or run is complete
+        const hasMessages = run.messages && run.messages.length > 0;
+        if (hasMessages || run.status === "SUCCESS") {
+          logger.info(
+            {
+              status: run.status,
+              hasMessages,
+              scenarioRunId: run.scenarioRunId,
+            },
+            "Run ready",
+          );
+          return { success: true, scenarioRunId: run.scenarioRunId };
+        }
+
+        // Run exists but no messages yet and not terminal - keep polling
       }
     } catch (error) {
       logger.error({ error }, "Fetch error");

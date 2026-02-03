@@ -8,7 +8,7 @@
 
 Local development required running multiple services (postgres, redis, opensearch, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
 - Frontend work: just app + postgres + redis
-- Scenario development: + workers + bullboard + ai-server (scenario processing is part of workers)
+- Scenario development: + workers + scenario-worker + bullboard + ai-server
 - Full stack: everything
 
 Additionally, macOS developers face platform mismatch issues: native Node modules (esbuild, Prisma) compiled for macOS don't work in Linux containers.
@@ -24,7 +24,7 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 | (none) | postgres, redis, app | Minimal frontend dev |
 | search | + opensearch | Trace/search features |
 | nlp | + langwatch_nlp, langevals | Evaluations |
-| scenarios | + workers (includes scenarios), bullboard, ai-server, nlp | Scenario development |
+| scenarios | + workers, scenario-worker, bullboard, ai-server, nlp | Scenario development |
 | full | Everything | Full integration |
 
 ### Init Container Pattern

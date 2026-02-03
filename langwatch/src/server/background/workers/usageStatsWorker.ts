@@ -12,7 +12,7 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
-import { USAGE_STATS_QUEUE } from "../queues/usageStatsQueue";
+import { USAGE_STATS_QUEUE_NAME } from "../queues/usageStatsQueue";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 
@@ -72,7 +72,7 @@ export const startUsageStatsWorker = () => {
   }
 
   const usageStatsWorker = new Worker<UsageStatsJob, void, string>(
-    USAGE_STATS_QUEUE.NAME,
+    USAGE_STATS_QUEUE_NAME,
     runUsageStatsJob,
     {
       connection,
