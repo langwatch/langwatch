@@ -285,7 +285,7 @@ class EvaluationReporting:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-            data=json.dumps(body, cls=SerializableWithStringFallback),  # type: ignore
+            data=json.dumps(body, cls=SerializableWithStringFallback, ensure_ascii=False),  # type: ignore
             timeout=60,
         )
         response.raise_for_status()

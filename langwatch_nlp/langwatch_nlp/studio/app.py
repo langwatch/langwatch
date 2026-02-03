@@ -208,7 +208,7 @@ async def execute_event_on_a_subprocess(
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
     async for event in event_generator:
-        yield f"data: {json.dumps(event.model_dump(exclude_none=True), cls=SerializableWithPydanticAndPredictEncoder)}\n\n"
+        yield f"data: {json.dumps(event.model_dump(exclude_none=True), cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False)}\n\n"
 
 
 @app.post("/execute")

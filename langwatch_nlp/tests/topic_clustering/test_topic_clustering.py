@@ -224,7 +224,8 @@ def create_openai_chat_completion_mock(n):
                                             (f"topic_{index}", "sample topic name")
                                             for index in range(n)
                                         ]
-                                    )
+                                    ),
+                                    ensure_ascii=False,
                                 ),
                             }
                         }
