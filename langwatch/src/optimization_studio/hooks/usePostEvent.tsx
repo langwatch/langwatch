@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/client";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";

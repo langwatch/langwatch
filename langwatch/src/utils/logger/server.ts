@@ -1,9 +1,9 @@
 import pino, { type LoggerOptions, type Logger as PinoLogger } from "pino";
-import { getContext } from "../server/context/contextProvider";
+import { getContext } from "../../server/context/contextProvider";
 
 // Initialize context provider registration (no-op if already done)
 // This ensures getLogContext is registered before any logger is created
-import "../server/context/init";
+import "../../server/context/init";
 
 export interface CreateLoggerOptions {
   /**

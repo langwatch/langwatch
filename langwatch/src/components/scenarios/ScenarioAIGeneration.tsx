@@ -15,7 +15,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/client";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";

@@ -21,7 +21,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/client";
 
 const logger = createLogger("VersionHistoryListPopover");
 
