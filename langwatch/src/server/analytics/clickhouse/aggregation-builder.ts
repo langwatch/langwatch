@@ -442,7 +442,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       joinClauses,
       baseWhere,
       filterWhere,
-      groupByAdditionalWhere,
       allTranslationParams,
       timeZone,
     );
@@ -573,7 +572,6 @@ function buildArrayJoinTimeseriesQuery(
   joinClauses: string,
   baseWhere: string,
   filterWhere: string,
-  groupByAdditionalWhere: string | undefined,
   filterParams: Record<string, unknown>,
   timeZone: string,
 ): BuiltQuery {
@@ -654,7 +652,6 @@ function buildArrayJoinTimeseriesQuery(
       ${joinClauses}
       WHERE ${baseWhere}
         ${filterWhere}
-        ${groupByAdditionalWhere ? `AND ${groupByAdditionalWhere}` : ""}
     )
     SELECT
       ${outerSelectExprs.join(",\n      ")}
