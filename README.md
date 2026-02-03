@@ -22,9 +22,6 @@ LangWatch is an AI engineering platform for building, testing, and operating LLM
 
 Built for teams that need regression testing, simulations, and production observability without building custom tooling.
 
-- [**Agent-first, not prompt-first**](https://docs.langwatch.ai/better-agents/overview)
-  Built for **multi-step, tool-using agents** (memory, routing, retries), not just single-shot prompt evals.
-
 - [**End-to-end agent simulations**](https://langwatch.ai/scenario/)
   Run realistic scenarios against your **full stack** (tools, state, user simulator, judge) and pinpoint where your agents break, and why? down to each decision.
 
