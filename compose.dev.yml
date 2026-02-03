@@ -294,5 +294,3 @@ volumes:
   pnpm_store:
     name: langwatch-pnpm-store  # Shared across all worktrees
   bullboard_modules:
-  pnpm_store:
-    name: langwatch-pnpm-store  # Shared across all worktrees
