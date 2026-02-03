@@ -150,7 +150,7 @@ def end_workflow_event(workflow: Workflow, trace_id: str, result):
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 result=json.loads(
                     json.dumps(
-                        result.toDict(), cls=SerializableWithPydanticAndPredictEncoder
+                        result.toDict(), cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False
                     )
                 ),
             )

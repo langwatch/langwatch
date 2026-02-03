@@ -76,10 +76,10 @@ def interpolate_template(template: str, inputs: Dict[str, Any]) -> str:
         if isinstance(v, str):
             # JSON-encode then strip outer quotes for safe embedding in JSON strings
             # This escapes quotes, newlines, etc.
-            str_inputs[k] = json.dumps(v)[1:-1]
+            str_inputs[k] = json.dumps(v, ensure_ascii=False)[1:-1]
         else:
             # For arrays/dicts, JSON stringify for direct embedding
-            str_inputs[k] = json.dumps(v, cls=SerializableWithStringFallback)
+            str_inputs[k] = json.dumps(v, cls=SerializableWithStringFallback, ensure_ascii=False)
 
     result = liquid.render(template, **str_inputs)
 
