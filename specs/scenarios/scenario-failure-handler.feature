@@ -172,7 +172,7 @@ Feature: Scenario Failure Handler
   Scenario: Stalled job configuration prevents retries
     Given a scenario worker is configured with job options
     When the worker options are inspected
-    Then settings.maxStalledCount equals 1
+    Then settings.attempts equals 1
     And the job will fail after first stall detection
 
   @integration
