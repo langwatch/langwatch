@@ -8,14 +8,11 @@ import {
   type ClearPIIFunction,
 } from "../otlpSpanPiiRedactionService";
 
-// Use vi.hoisted to ensure mockEnv is available when vi.mock is hoisted
-const mockEnv = vi.hoisted(() => ({
-  NODE_ENV: "test" as string,
-  LANGEVALS_ENDPOINT: "http://mock-langevals",
-}));
-
 vi.mock("~/env.mjs", () => ({
-  env: mockEnv,
+  env: {
+    NODE_ENV: "test",
+    LANGEVALS_ENDPOINT: "http://mock-langevals",
+  },
 }));
 
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({
@@ -78,8 +75,6 @@ describe("OtlpSpanPiiRedactionService", () => {
     vi.clearAllMocks();
     // Reset env vars to avoid pollution between tests
     delete process.env.DISABLE_PII_REDACTION;
-    mockEnv.NODE_ENV = "test";
-    mockEnv.LANGEVALS_ENDPOINT = "http://mock-langevals";
     const { mockClearPII, clearPIISpy: spy } = createMockClearPII();
     clearPIISpy = spy;
     service = new OtlpSpanPiiRedactionService({ clearPII: mockClearPII });
