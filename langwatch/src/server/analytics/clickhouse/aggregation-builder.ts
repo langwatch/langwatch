@@ -869,74 +869,88 @@ function buildSubqueryTimeseriesQuery(
   };
 }
 
+/** Maps source field names to their corresponding CTE column names */
+const DEDUP_FIELD_MAPPINGS: Record<string, string> = {
+  TotalCost: "trace_total_cost",
+  TotalDurationMs: "trace_duration_ms",
+  TotalPromptTokenCount: "trace_prompt_tokens",
+  TotalCompletionTokenCount: "trace_completion_tokens",
+};
+
+/** Aggregation patterns and their transformation logic */
+const AGGREGATION_HANDLERS: Array<{
+  pattern: RegExp;
+  transform: (col: string, expr: string) => string | null;
+}> = [
+  {
+    pattern: /\bsum\s*\(/,
+    transform: (col) => `sum(${col})`,
+  },
+  {
+    pattern: /\bavg\s*\(/,
+    transform: (col) => `avg(${col})`,
+  },
+  {
+    pattern: /\bmin\s*\(/,
+    transform: (col) => `min(${col})`,
+  },
+  {
+    pattern: /\bmax\s*\(/,
+    transform: (col) => `max(${col})`,
+  },
+  {
+    pattern: /\bquantileTDigest\s*\(/,
+    transform: (col, expr) => {
+      const match = expr.match(/quantileTDigest\s*\(\s*([\d.]+)\s*\)/);
+      return match ? `quantileTDigest(${match[1]})(${col})` : null;
+    },
+  },
+  {
+    pattern: /\bquantileExact\s*\(/,
+    transform: (col, expr) => {
+      const match = expr.match(/quantileExact\s*\(\s*([\d.]+)\s*\)/);
+      return match ? `quantileExact(${match[1]})(${col})` : null;
+    },
+  },
+];
+
 /**
  * Transform a metric expression to work with deduplicated trace data.
  * count() becomes uniqExact(trace_id) to count distinct traces.
  * Sum/avg of trace-level values use the CTE columns.
  */
-function transformMetricForDedup(selectExpression: string, alias: string): string {
-  // Match patterns like "count() AS alias" or "count(*) AS alias"
+function transformMetricForDedup(
+  selectExpression: string,
+  alias: string
+): string {
+  // Handle count() -> uniqExact(trace_id)
   if (/\bcount\s*\(\s*\*?\s*\)/.test(selectExpression)) {
     return `uniqExact(trace_id) AS ${alias}`;
   }
 
-  // Match "uniq(...)" or "cardinality" - these should become uniqExact(trace_id)
-  if (/\buniq\s*\(/.test(selectExpression) || /\buniqExact\s*\(/.test(selectExpression)) {
-    // For cardinality of trace_id, use uniqExact(trace_id)
-    if (selectExpression.includes("TraceId")) {
-      return `uniqExact(trace_id) AS ${alias}`;
-    }
+  // Handle uniq/uniqExact of TraceId -> uniqExact(trace_id)
+  if (
+    (/\buniq\s*\(/.test(selectExpression) ||
+      /\buniqExact\s*\(/.test(selectExpression)) &&
+    selectExpression.includes("TraceId")
+  ) {
+    return `uniqExact(trace_id) AS ${alias}`;
   }
 
-  // For sum of TotalCost - use the CTE column
-  // Handle both with and without coalesce wrapper
-  if (selectExpression.includes("TotalCost")) {
-    if (/\bsum\s*\(/.test(selectExpression)) {
+  // Find matching field and apply aggregation transformation
+  for (const [fieldName, cteColumn] of Object.entries(DEDUP_FIELD_MAPPINGS)) {
+    if (!selectExpression.includes(fieldName)) continue;
+
+    for (const handler of AGGREGATION_HANDLERS) {
+      if (!handler.pattern.test(selectExpression)) continue;
+
+      const transformed = handler.transform(cteColumn, selectExpression);
+      if (!transformed) continue;
+
       // Preserve coalesce wrapper if present
-      if (/\bcoalesce\s*\(/.test(selectExpression)) {
-        return `coalesce(sum(trace_total_cost), 0) AS ${alias}`;
-      }
-      return `sum(trace_total_cost) AS ${alias}`;
-    }
-    if (/\bavg\s*\(/.test(selectExpression)) {
-      return `avg(trace_total_cost) AS ${alias}`;
-    }
-  }
-
-  // For duration metrics
-  if (selectExpression.includes("TotalDurationMs")) {
-    if (/\bavg\s*\(/.test(selectExpression)) {
-      return `avg(trace_duration_ms) AS ${alias}`;
-    }
-    if (/\bsum\s*\(/.test(selectExpression)) {
-      if (/\bcoalesce\s*\(/.test(selectExpression)) {
-        return `coalesce(sum(trace_duration_ms), 0) AS ${alias}`;
-      }
-      return `sum(trace_duration_ms) AS ${alias}`;
-    }
-    if (/\bmax\s*\(/.test(selectExpression)) {
-      return `max(trace_duration_ms) AS ${alias}`;
-    }
-    if (/\bmin\s*\(/.test(selectExpression)) {
-      return `min(trace_duration_ms) AS ${alias}`;
-    }
-    // Handle percentile aggregations
-    if (/\bquantileTDigest\s*\(/.test(selectExpression)) {
-      const percentileMatch = selectExpression.match(/quantileTDigest\s*\(\s*([\d.]+)\s*\)/);
-      if (percentileMatch) {
-        return `quantileTDigest(${percentileMatch[1]})(trace_duration_ms) AS ${alias}`;
-      }
-    }
-  }
-
-  // For token metrics
-  if (selectExpression.includes("TotalPromptTokenCount") || selectExpression.includes("TotalCompletionTokenCount")) {
-    if (/\bsum\s*\(/.test(selectExpression)) {
-      const col = selectExpression.includes("TotalPromptTokenCount") ? "trace_prompt_tokens" : "trace_completion_tokens";
-      if (/\bcoalesce\s*\(/.test(selectExpression)) {
-        return `coalesce(sum(${col}), 0) AS ${alias}`;
-      }
-      return `sum(${col}) AS ${alias}`;
+      const hasCoalesce = /\bcoalesce\s*\(/.test(selectExpression);
+      const result = hasCoalesce ? `coalesce(${transformed}, 0)` : transformed;
+      return `${result} AS ${alias}`;
     }
   }
 
