@@ -275,11 +275,14 @@ function getDateTruncFunction(
   // Convert minutes to appropriate interval
   if (timeScaleMinutes <= 1) {
     return `toStartOfMinute(ts.OccurredAt, '${validatedTimeZone}')`;
-  } else if (timeScaleMinutes <= MINUTES_PER_HOUR) {
+  } else if (timeScaleMinutes < MINUTES_PER_DAY) {
+    // Use HOUR interval only when timeScaleMinutes is an exact multiple of 60
+    // Otherwise use MINUTE interval to preserve precision (e.g., 90 minutes)
+    if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
+      const hours = timeScaleMinutes / MINUTES_PER_HOUR;
+      return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
+    }
     return `toStartOfInterval(ts.OccurredAt, INTERVAL ${timeScaleMinutes} MINUTE, '${validatedTimeZone}')`;
-  } else if (timeScaleMinutes <= MINUTES_PER_DAY) {
-    const hours = Math.floor(timeScaleMinutes / MINUTES_PER_HOUR);
-    return `toStartOfInterval(ts.OccurredAt, INTERVAL ${hours} HOUR, '${validatedTimeZone}')`;
   } else {
     // Days
     const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
