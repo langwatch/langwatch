@@ -31,8 +31,6 @@ export interface LicenseEnforcementInput {
  * 3. Calling enforceLimit
  * 4. Mapping LimitExceededError to TRPCError
  *
- * Set DISABLE_LICENSE_ENFORCEMENT=true to skip enforcement (for tests).
- *
  * @param ctx - tRPC context containing prisma and session
  * @param projectId - The project ID to check limits for
  * @param limitType - The type of resource being created
@@ -43,11 +41,6 @@ export async function enforceLicenseLimit(
   projectId: string,
   limitType: LimitType,
 ): Promise<void> {
-  // Skip enforcement when disabled (for integration tests)
-  if (process.env.DISABLE_LICENSE_ENFORCEMENT === "true") {
-    return;
-  }
-
   let organizationId: string;
 
   try {
