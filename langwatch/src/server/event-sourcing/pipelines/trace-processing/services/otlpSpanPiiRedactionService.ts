@@ -3,14 +3,11 @@ import {
   clearPII as defaultClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
-import type { PIIRedactionLevel } from "../schemas/commands";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type PIIRedactionLevel,
+} from "../schemas/commands";
 import type { OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
-
-/**
- * Default PII redaction level when project settings are not available.
- * ESSENTIAL provides a safe default that protects user privacy.
- */
-export const DEFAULT_PII_REDACTION_LEVEL: PIIRedactionLevel = "ESSENTIAL";
 
 /**
  * Default attribute keys known to contain PII-bearing content.

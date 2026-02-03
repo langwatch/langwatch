@@ -8,18 +8,19 @@ import {
   EventUtils,
 } from "../../../library";
 import type { OtlpSpan } from "../schemas/otlp";
-import type { PIIRedactionLevel, RecordSpanCommandData } from "../schemas/commands";
-import { recordSpanCommandDataSchema } from "../schemas/commands";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  recordSpanCommandDataSchema,
+  type PIIRedactionLevel,
+  type RecordSpanCommandData,
+} from "../schemas/commands";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  OtlpSpanPiiRedactionService,
-} from "../services/otlpSpanPiiRedactionService";
+import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
