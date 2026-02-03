@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
+export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
+
 export const recordSpanCommandDataSchema = z.object({
   tenantId: z.string(),
   span: spanSchema,
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
 });
 
 export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;
