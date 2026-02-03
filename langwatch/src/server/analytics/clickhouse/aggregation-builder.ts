@@ -373,6 +373,16 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     allJoins.add(join);
   }
 
+  // Collect all params from metric translations and filter translations
+  const metricParams = metricTranslations.reduce(
+    (acc, m) => ({ ...acc, ...m.params }),
+    {} as Record<string, unknown>,
+  );
+  const allTranslationParams = {
+    ...filterTranslation.params,
+    ...metricParams,
+  };
+
   // Handle groupBy
   let groupByColumn: string | null = null;
   let usesArrayJoin = false;
@@ -430,7 +440,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       baseWhere,
       filterWhere,
       groupByAdditionalWhere,
-      filterTranslation.params,
+      allTranslationParams,
       timeZone,
     );
   }
@@ -462,7 +472,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       joinClauses,
       baseWhere,
       filterWhere,
-      filterTranslation.params,
+      allTranslationParams,
     );
   }
 
@@ -541,7 +551,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
-      ...filterTranslation.params,
+      ...allTranslationParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };

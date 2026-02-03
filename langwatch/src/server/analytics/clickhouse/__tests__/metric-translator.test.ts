@@ -140,16 +140,23 @@ describe("metric-translator", () => {
         expect(result.requiredJoins).toContain("evaluation_states");
       });
 
-      it("translates evaluations.evaluation_score with evaluator key", () => {
+      it("translates evaluations.evaluation_score with evaluator key using parameterized query", () => {
         const result = translateMetric(
           "evaluations.evaluation_score",
           "avg",
           0,
           "eval-123"
         );
-        expect(result.selectExpression).toContain(
-          "es.EvaluatorId = 'eval-123'"
+        // Should use parameterized query for evaluator ID (SQL injection prevention)
+        expect(result.selectExpression).toMatch(
+          /es\.EvaluatorId = \{m_evaluatorId_[a-f0-9]+:String\}/
         );
+        // Params should contain the evaluator ID value
+        const paramKey = Object.keys(result.params).find((k) =>
+          k.startsWith("m_evaluatorId_")
+        );
+        expect(paramKey).toBeDefined();
+        expect(result.params[paramKey!]).toBe("eval-123");
       });
 
       it("translates evaluations.evaluation_pass_rate", () => {
@@ -179,7 +186,7 @@ describe("metric-translator", () => {
         expect(result.requiredJoins).toContain("stored_spans");
       });
 
-      it("translates events.event_type with event type key", () => {
+      it("translates events.event_type with event type key using parameterized query", () => {
         const result = translateMetric(
           "events.event_type",
           "cardinality",
@@ -187,7 +194,16 @@ describe("metric-translator", () => {
           "thumbs_up_down"
         );
         expect(result.selectExpression).toContain("countIf");
-        expect(result.selectExpression).toContain("thumbs_up_down");
+        // Should use parameterized query for event type (SQL injection prevention)
+        expect(result.selectExpression).toMatch(
+          /\{m_eventType_[a-f0-9]+:String\}/
+        );
+        // Params should contain the event type value
+        const paramKey = Object.keys(result.params).find((k) =>
+          k.startsWith("m_eventType_")
+        );
+        expect(paramKey).toBeDefined();
+        expect(result.params[paramKey!]).toBe("thumbs_up_down");
       });
     });
 

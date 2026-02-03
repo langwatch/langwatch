@@ -27,6 +27,16 @@ import {
 const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hours
 
 /**
+ * Generate a unique parameter name for metrics using random suffix.
+ * Uses 'm_' prefix to avoid collisions with filter params.
+ */
+function genMetricParamName(prefix: string): string {
+  // Use first 8 chars of random UUID for uniqueness without excessive length
+  const suffix = crypto.randomUUID().slice(0, 8);
+  return `m_${prefix}_${suffix}`;
+}
+
+/**
  * Result of translating an ES metric to CH SQL
  */
 export interface MetricTranslation {
@@ -36,6 +46,8 @@ export interface MetricTranslation {
   alias: string;
   /** Tables that need to be JOINed */
   requiredJoins: CHTable[];
+  /** Parameter values for parameterized queries */
+  params: Record<string, unknown>;
   /** Additional GROUP BY expressions if needed */
   groupByExpression?: string;
   /** Whether this metric requires a subquery (e.g., pipeline aggregations) */
@@ -245,6 +257,7 @@ export function translateMetric(
       selectExpression: translateSimpleAggregation(column, aggregation, alias),
       alias,
       requiredJoins,
+      params: {},
     };
   }
 
@@ -253,6 +266,7 @@ export function translateMetric(
     selectExpression: `count() AS ${alias}`,
     alias,
     requiredJoins,
+    params: {},
   };
 }
 
@@ -278,6 +292,7 @@ function translateMetadataMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "metadata.user_id":
@@ -287,6 +302,7 @@ function translateMetadataMetric(
           selectExpression: `uniqIf(${ts}.Attributes['langwatch.user_id'], ${ts}.Attributes['langwatch.user_id'] != '') AS ${alias}`,
           alias,
           requiredJoins,
+          params: {},
         };
       }
       return {
@@ -297,6 +313,7 @@ function translateMetadataMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "metadata.thread_id":
@@ -306,6 +323,7 @@ function translateMetadataMetric(
           selectExpression: `uniqIf(${ts}.Attributes['gen_ai.conversation.id'], ${ts}.Attributes['gen_ai.conversation.id'] != '') AS ${alias}`,
           alias,
           requiredJoins,
+          params: {},
         };
       }
       return {
@@ -316,6 +334,7 @@ function translateMetadataMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "metadata.span_type":
@@ -330,6 +349,7 @@ function translateMetadataMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     default:
@@ -337,6 +357,7 @@ function translateMetadataMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
   }
 }
@@ -363,6 +384,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.first_token":
@@ -374,6 +396,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.total_cost":
@@ -385,6 +408,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.prompt_tokens":
@@ -396,6 +420,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.completion_tokens":
@@ -407,6 +432,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.total_tokens":
@@ -419,6 +445,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "performance.tokens_per_second": {
@@ -440,12 +467,14 @@ function translatePerformanceMetric(
           selectExpression: `quantileExactIf(${percentile})(${spanTps}, ${hasTokens}) AS ${alias}`,
           alias,
           requiredJoins,
+          params: {},
         };
       }
       return {
         selectExpression: `${getConditionalAggregation(aggregation)}(${spanTps}, ${hasTokens}) AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
     }
 
@@ -461,6 +490,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "spans.metrics.completion_tokens":
@@ -475,6 +505,7 @@ function translatePerformanceMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     default:
@@ -482,6 +513,7 @@ function translatePerformanceMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
   }
 }
@@ -499,10 +531,14 @@ function translateEvaluationMetric(
   requiredJoins.push("evaluation_states");
   const es = tableAliases.evaluation_states;
 
-  // Build evaluator filter condition if key is provided
-  const evaluatorCondition = evaluatorId
-    ? `${es}.EvaluatorId = '${evaluatorId.replace(/'/g, "''")}'`
-    : "1=1";
+  // Build evaluator filter condition with parameterized query to prevent SQL injection
+  const params: Record<string, unknown> = {};
+  let evaluatorCondition = "1=1";
+  if (evaluatorId) {
+    const evalIdParam = genMetricParamName("evaluatorId");
+    evaluatorCondition = `${es}.EvaluatorId = {${evalIdParam}:String}`;
+    params[evalIdParam] = evaluatorId;
+  }
 
   switch (metric) {
     case "evaluations.evaluation_score":
@@ -512,12 +548,14 @@ function translateEvaluationMetric(
           selectExpression: `quantileExactIf(${percentile})(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
+          params,
         };
       }
       return {
         selectExpression: `${getConditionalAggregation(aggregation)}(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
         alias,
         requiredJoins,
+        params,
       };
 
     case "evaluations.evaluation_pass_rate":
@@ -528,12 +566,14 @@ function translateEvaluationMetric(
           selectExpression: `quantileExactIf(${percentile})(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
+          params,
         };
       }
       return {
         selectExpression: `${getConditionalAggregation(aggregation)}(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
         alias,
         requiredJoins,
+        params,
       };
 
     case "evaluations.evaluation_runs":
@@ -541,6 +581,7 @@ function translateEvaluationMetric(
         selectExpression: `uniqIf(${es}.EvaluationId, ${evaluatorCondition}) AS ${alias}`,
         alias,
         requiredJoins,
+        params,
       };
 
     default:
@@ -548,6 +589,7 @@ function translateEvaluationMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params,
       };
   }
 }
@@ -568,15 +610,23 @@ function translateEventMetric(
 
   switch (metric) {
     case "events.event_type": {
-      // Count events of a specific type
-      const typeCondition = eventType
-        ? `has(${ss}."Events.Name", '${eventType.replace(/'/g, "''")}')`
-        : `length(${ss}."Events.Name") > 0`;
+      // Count events of a specific type using parameterized query
+      const params: Record<string, unknown> = {};
+      let typeCondition: string;
+
+      if (eventType) {
+        const eventTypeParam = genMetricParamName("eventType");
+        typeCondition = `has(${ss}."Events.Name", {${eventTypeParam}:String})`;
+        params[eventTypeParam] = eventType;
+      } else {
+        typeCondition = `length(${ss}."Events.Name") > 0`;
+      }
 
       return {
         selectExpression: `countIf(${typeCondition}) AS ${alias}`,
         alias,
         requiredJoins,
+        params,
       };
     }
 
@@ -585,16 +635,21 @@ function translateEventMetric(
       // Events.Attributes is Array(Map(String, String))
       // Score is stored in 'event.metrics.score' key
       // Use paired arrayFilter to correlate event type with its attributes
-      const scoreKey = metricKey ?? "event.metrics.score";
+      // Using parameterized queries to prevent SQL injection
+      const params: Record<string, unknown> = {};
+      const scoreKeyParam = genMetricParamName("scoreKey");
+      params[scoreKeyParam] = metricKey ?? "event.metrics.score";
+
       let scoreExtraction: string;
 
       if (eventType) {
         // Filter to specific event type and extract scores at matching indices
-        const escapedEventType = eventType.replace(/'/g, "''");
+        const eventTypeParam = genMetricParamName("eventType");
+        params[eventTypeParam] = eventType;
         scoreExtraction = `arrayFilter(
           x -> x IS NOT NULL,
           arrayMap(
-            (n, a) -> if(n = '${escapedEventType}', toFloat64OrNull(a['${scoreKey}']), NULL),
+            (n, a) -> if(n = {${eventTypeParam}:String}, toFloat64OrNull(a[{${scoreKeyParam}:String}]), NULL),
             ${ss}."Events.Name",
             ${ss}."Events.Attributes"
           )
@@ -603,7 +658,7 @@ function translateEventMetric(
         // Extract all scores
         scoreExtraction = `arrayFilter(
           x -> x IS NOT NULL,
-          arrayMap(a -> toFloat64OrNull(a['${scoreKey}']), ${ss}."Events.Attributes")
+          arrayMap(a -> toFloat64OrNull(a[{${scoreKeyParam}:String}]), ${ss}."Events.Attributes")
         )`;
       }
 
@@ -613,6 +668,7 @@ function translateEventMetric(
         selectExpression: aggExpr,
         alias,
         requiredJoins,
+        params,
       };
     }
 
@@ -629,6 +685,7 @@ function translateEventMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
   }
 }
@@ -656,6 +713,7 @@ function translateSentimentMetric(
         ),
         alias,
         requiredJoins,
+        params: {},
       };
 
     case "sentiment.thumbs_up_down":
@@ -665,6 +723,7 @@ function translateSentimentMetric(
         selectExpression: `countIf(has(${ss}."Events.Name", 'thumbs_up_down')) AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
 
     default:
@@ -672,6 +731,7 @@ function translateSentimentMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
   }
 }
@@ -698,6 +758,7 @@ function translateThreadsMetric(
         selectExpression: `avg(thread_duration) AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
         requiresSubquery: true,
         subquery: {
           innerSelect: `${ts}.Attributes['gen_ai.conversation.id'] AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
@@ -711,6 +772,7 @@ function translateThreadsMetric(
         selectExpression: `count() AS ${alias}`,
         alias,
         requiredJoins,
+        params: {},
       };
   }
 }
@@ -778,6 +840,7 @@ export function translatePipelineAggregation(
       selectExpression: `${outerAgg}(user_avg_duration) AS ${alias}`,
       alias,
       requiredJoins: innerMetric.requiredJoins,
+      params: innerMetric.params,
       requiresSubquery: true,
       subquery: {
         // Inner: compute avg thread duration per user
@@ -807,6 +870,7 @@ export function translatePipelineAggregation(
       selectExpression: `NULL AS ${alias}`,
       alias,
       requiredJoins: innerMetric.requiredJoins,
+      params: innerMetric.params,
       requiresSubquery: false, // Don't add to subquery metrics list
     };
   }
@@ -827,6 +891,7 @@ export function translatePipelineAggregation(
     selectExpression: `${outerAgg}(inner_value) AS ${alias}`,
     alias,
     requiredJoins: innerMetric.requiredJoins,
+    params: innerMetric.params,
     requiresSubquery: true,
     subquery: {
       // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
