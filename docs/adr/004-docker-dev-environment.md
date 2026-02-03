@@ -31,7 +31,7 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 
 ```yaml
 init:
-  image: node:20
+  image: node:24
   command: sh -c "pnpm install && pnpm prisma generate"
   volumes:
     - ./langwatch:/app
@@ -71,7 +71,7 @@ Profiles keep everything in one file, easier to maintain. `--profile scenarios` 
 **Why init container over host install?**
 macOS binaries don't work in Linux containers. We tried `.npmrc` supportedArchitectures but it was unreliable. Init container guarantees correct platform binaries.
 
-**Why node:20 over node:20-slim?**
+**Why node:25 over node:25-slim?**
 Slim lacks build tools (python, gcc) for native modules and OpenSSL for Prisma. The ~200MB size difference is negligible for dev.
 
 **Why custom server over next dev?**
