@@ -8,7 +8,7 @@ import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { copyWorkflowWithDatasets } from "./workflows";
+import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
 
 /**
  * Evaluator type enum for validation
@@ -441,7 +441,7 @@ export const evaluatorsRouter = createTRPCRouter({
         source.workflowId &&
         source.workflow?.latestVersion?.dsl
       ) {
-        const { workflowId } = await copyWorkflowWithDatasets({
+        const { workflowId, dsl } = await copyWorkflowWithDatasets({
           ctx,
           workflow: {
             id: source.workflow.id,
@@ -453,6 +453,16 @@ export const evaluatorsRouter = createTRPCRouter({
           targetProjectId: input.projectId,
           sourceProjectId: input.sourceProjectId,
           copiedFromWorkflowId: source.workflowId,
+        });
+        await saveOrCommitWorkflowVersion({
+          ctx,
+          input: {
+            projectId: input.projectId,
+            workflowId,
+            dsl,
+          },
+          autoSaved: false,
+          commitMessage: "Copied from " + source.workflow.name,
         });
         newWorkflowId = workflowId;
       }
