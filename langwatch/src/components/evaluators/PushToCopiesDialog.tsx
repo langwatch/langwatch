@@ -69,13 +69,16 @@ export const PushToCopiesDialog = ({
       error={error ? { message: error.message } : null}
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
-      onPush={async () =>
-        pushToCopies.mutateAsync({
+      onPush={async () => {
+        if (!project) {
+          throw new Error("No project available for push");
+        }
+        return pushToCopies.mutateAsync({
           evaluatorId,
-          projectId: project!.id,
+          projectId: project.id,
           copyIds: Array.from(selectedCopyIds),
-        })
-      }
+        });
+      }}
       pushLoading={pushToCopies.isLoading}
       onSuccess={() => setSelectedCopyIds(new Set())}
     />

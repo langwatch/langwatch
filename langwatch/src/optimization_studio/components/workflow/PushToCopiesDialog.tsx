@@ -70,9 +70,12 @@ export const PushToCopiesDialog = ({
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
       onPush={async () => {
+        if (!project) {
+          throw new Error("No project available for push");
+        }
         const result = await pushToCopies.mutateAsync({
           workflowId,
-          projectId: project!.id,
+          projectId: project.id,
           copyIds: Array.from(selectedCopyIds),
         });
         await utils.workflow.getAll.invalidate();
