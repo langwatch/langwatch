@@ -94,6 +94,9 @@ make down             # Stop all
 - `Makefile` - Convenience targets
 
 **Trade-offs accepted:**
-- First startup slower (init container installs deps)
+- First startup slower (init container installs deps), but mitigated by shared pnpm store volume
 - Requires Docker Desktop with sufficient memory allocation
 - Host node_modules still needed for IDE tooling (separate from container's)
+
+**Performance optimization:**
+The `pnpm_store` named volume persists downloaded packages across container restarts and is shared across all worktrees (`name: langwatch-pnpm-store`). After first install, subsequent `pnpm install` runs are significantly faster.
