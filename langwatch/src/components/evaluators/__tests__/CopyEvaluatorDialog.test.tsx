@@ -155,7 +155,12 @@ describe("CopyEvaluatorDialog", () => {
       hidden: true,
     });
     await user.click(options[0]!);
-    await user.click(screen.getByRole("button", { name: /replicate/i }));
+
+    const replicateBtn = screen.getByRole("button", { name: /replicate/i });
+    await waitFor(() => {
+      expect(replicateBtn).not.toBeDisabled();
+    });
+    await user.click(replicateBtn);
 
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalled();

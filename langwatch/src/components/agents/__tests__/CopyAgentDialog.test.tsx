@@ -108,11 +108,16 @@ describe("CopyAgentDialog", () => {
     expect(replicateBtn).toBeDisabled();
   });
 
-  it("calls copy mutation and onClose when project selected and Replicate clicked", async () => {
+  it("calls copy mutation, onSuccess, and onClose when project selected and Replicate clicked", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
+    const onSuccess = vi.fn();
     render(
-      <CopyAgentDialog {...defaultProps} onClose={onClose} />,
+      <CopyAgentDialog
+        {...defaultProps}
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
       { wrapper: Wrapper },
     );
 
@@ -134,28 +139,8 @@ describe("CopyAgentDialog", () => {
       expect(copyMutateArgs?.agentId).toBe("agent-1");
       expect(copyMutateArgs?.projectId).toBe(TARGET_PROJECT_ID);
       expect(copyMutateArgs?.sourceProjectId).toBe(SOURCE_PROJECT_ID);
-      expect(onClose).toHaveBeenCalled();
-    });
-  });
-
-  it("calls onSuccess after successful replicate", async () => {
-    const user = userEvent.setup();
-    const onSuccess = vi.fn();
-    render(
-      <CopyAgentDialog {...defaultProps} onSuccess={onSuccess} />,
-      { wrapper: Wrapper },
-    );
-
-    await user.click(screen.getByRole("combobox"));
-    const options = await screen.findAllByRole("option", {
-      name: /Org \/ Team \/ Target Project/,
-      hidden: true,
-    });
-    await user.click(options[0]!);
-    await user.click(screen.getByRole("button", { name: /replicate/i }));
-
-    await waitFor(() => {
       expect(onSuccess).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
     });
   });
 

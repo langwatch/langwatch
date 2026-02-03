@@ -450,19 +450,27 @@ export const evaluatorsRouter = createTRPCRouter({
       }
 
       const evaluatorService = EvaluatorService.create(ctx.prisma);
-      const copied = await evaluatorService.create({
-        id: `evaluator_${nanoid()}`,
-        projectId: input.projectId,
-        name: source.name,
-        type: source.type,
-        config: (source.config === null
-          ? Prisma.JsonNull
-          : source.config) as Prisma.InputJsonValue,
-        workflowId: newWorkflowId ?? undefined,
-        copiedFromEvaluatorId: source.id,
-      });
-
-      return copied;
+      try {
+        const copied = await evaluatorService.create({
+          id: `evaluator_${nanoid()}`,
+          projectId: input.projectId,
+          name: source.name,
+          type: source.type,
+          config: (source.config === null
+            ? Prisma.JsonNull
+            : source.config) as Prisma.InputJsonValue,
+          workflowId: newWorkflowId ?? undefined,
+          copiedFromEvaluatorId: source.id,
+        });
+        return copied;
+      } catch (createError) {
+        if (newWorkflowId) {
+          await ctx.prisma.workflow
+            .delete({ where: { id: newWorkflowId } })
+            .catch(() => {});
+        }
+        throw createError;
+      }
     }),
 
   /**

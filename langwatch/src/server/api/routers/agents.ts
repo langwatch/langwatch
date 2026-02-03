@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -265,12 +265,10 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
-      const source = await ctx.prisma.agent.findFirst({
-        where: {
-          id: input.agentId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
+      const agentService = AgentService.create(ctx.prisma);
+      const source = await agentService.getById({
+        id: input.agentId,
+        projectId: input.projectId,
       });
       if (!source) {
         throw new TRPCError({
@@ -278,28 +276,7 @@ export const agentsRouter = createTRPCRouter({
           message: "Agent not found",
         });
       }
-      const copies = await ctx.prisma.agent.findMany({
-        where: {
-          copiedFromAgentId: input.agentId,
-          archivedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          projectId: true,
-          project: {
-            select: {
-              name: true,
-              team: {
-                select: {
-                  name: true,
-                  organization: { select: { name: true } },
-                },
-              },
-            },
-          },
-        },
-      });
+      const copies = await agentService.getCopies(input.agentId);
 
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
@@ -350,62 +327,42 @@ export const agentsRouter = createTRPCRouter({
         });
       }
 
-      const source = await ctx.prisma.agent.findFirst({
-        where: {
-          id: input.agentId,
-          projectId: input.sourceProjectId,
-          archivedAt: null,
-        },
-        include: {
-          workflow: { include: { latestVersion: true } },
-        },
-      });
-
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Agent not found",
-        });
-      }
-
-      let newWorkflowId: string | null = null;
-      if (
-        source.type === "workflow" &&
-        source.workflowId &&
-        source.workflow?.latestVersion?.dsl
-      ) {
-        const { workflowId } = await copyWorkflowWithDatasets({
-          ctx,
-          workflow: {
-            id: source.workflow.id,
-            name: source.workflow.name,
-            icon: source.workflow.icon,
-            description: source.workflow.description,
-            latestVersion: source.workflow.latestVersion,
-          },
-          targetProjectId: input.projectId,
-          sourceProjectId: input.sourceProjectId,
-          copiedFromWorkflowId: source.workflowId,
-        });
-        newWorkflowId = workflowId;
-      }
-
       const agentService = AgentService.create(ctx.prisma);
-      const copied = await agentService.create({
-        id: `agent_${nanoid()}`,
-        projectId: input.projectId,
-        name: source.name,
-        type: source.type as AgentType,
-        config: source.config as AgentComponentConfig,
-        workflowId: newWorkflowId ?? undefined,
-      });
-
-      await ctx.prisma.agent.update({
-        where: { id: copied.id },
-        data: { copiedFromAgentId: source.id },
-      });
-
-      return { ...copied, copiedFromAgentId: source.id };
+      try {
+        return await agentService.copyAgent(
+          {
+            sourceAgentId: input.agentId,
+            sourceProjectId: input.sourceProjectId,
+            targetProjectId: input.projectId,
+            newAgentId: `agent_${nanoid()}`,
+          },
+          {
+            copyWorkflow: (opts) =>
+              copyWorkflowWithDatasets({
+                ctx,
+                workflow: {
+                  ...opts.workflow,
+                  latestVersion: opts.workflow.latestVersion
+                    ? {
+                        dsl: opts.workflow.latestVersion.dsl as JsonValue,
+                      }
+                    : null,
+                },
+                targetProjectId: opts.targetProjectId,
+                sourceProjectId: opts.sourceProjectId,
+                copiedFromWorkflowId: opts.copiedFromWorkflowId,
+              }),
+          },
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === "Agent not found") {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -421,68 +378,53 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      const source = await ctx.prisma.agent.findFirst({
-        where: {
-          id: input.agentId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        include: {
-          _count: { select: { copiedAgents: true } },
-          copiedAgents: {
-            where: { archivedAt: null },
-            select: { id: true, projectId: true },
-          },
-        },
-      });
+      const agentService = AgentService.create(ctx.prisma);
+      const copies = await agentService.getCopies(input.agentId);
+      const permittedCopyIds = (
+        await Promise.all(
+          copies.map(async (c) => ({
+            id: c.id,
+            hasPermission: await hasProjectPermission(
+              ctx,
+              c.projectId,
+              "evaluations:manage",
+            ),
+          })),
+        )
+      )
+        .filter((r) => r.hasPermission)
+        .map((r) => r.id);
+      const copyIdsToPush =
+        input.copyIds != null
+          ? input.copyIds.filter((id) => permittedCopyIds.includes(id))
+          : permittedCopyIds;
 
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Agent not found",
-        });
-      }
-      if (source.copiedAgents.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This agent has no copies to push to",
-        });
-      }
-
-      const copiesToPush = input.copyIds
-        ? source.copiedAgents.filter((c) => input.copyIds!.includes(c.id))
-        : source.copiedAgents;
-
-      if (copiesToPush.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "No valid copies selected to push to",
-        });
-      }
-
-      let pushedTo = 0;
-      for (const copy of copiesToPush) {
-        const hasPermission = await hasProjectPermission(
-          ctx,
-          copy.projectId,
-          "evaluations:manage",
+      try {
+        return await agentService.pushToCopies(
+          input.agentId,
+          input.projectId,
+          copyIdsToPush,
         );
-        if (!hasPermission) continue;
-
-        await ctx.prisma.agent.update({
-          where: { id: copy.id },
-          data: {
-            name: source.name,
-            config:
-              source.config === null
-                ? Prisma.JsonNull
-                : (source.config as Prisma.InputJsonValue),
-          },
-        });
-        pushedTo++;
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === "Agent not found") {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Agent not found",
+            });
+          }
+          if (
+            error.message === "This agent has no copies to push to" ||
+            error.message === "No valid copies selected to push to"
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: error.message,
+            });
+          }
+        }
+        throw error;
       }
-
-      return { pushedTo, selectedCopies: copiesToPush.length };
     }),
 
   /**
@@ -497,34 +439,24 @@ export const agentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      const copy = await ctx.prisma.agent.findFirst({
-        where: {
-          id: input.agentId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        select: { id: true, name: true, copiedFromAgentId: true },
+      const agentService = AgentService.create(ctx.prisma);
+      const copy = await agentService.getById({
+        id: input.agentId,
+        projectId: input.projectId,
       });
-
       if (!copy?.copiedFromAgentId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "This agent is not a copy and has no source to sync from",
         });
       }
-
-      const source = await ctx.prisma.agent.findFirst({
-        where: { id: copy.copiedFromAgentId, archivedAt: null },
-        select: { projectId: true, name: true, config: true },
-      });
-
+      const source = await agentService.getByIdOnly(copy.copiedFromAgentId);
       if (!source) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Source agent has been deleted",
         });
       }
-
       const hasSourcePermission = await hasProjectPermission(
         ctx,
         source.projectId,
@@ -537,18 +469,24 @@ export const agentsRouter = createTRPCRouter({
             "You do not have permission to manage evaluations in the source project",
         });
       }
-
-      await ctx.prisma.agent.update({
-        where: { id: copy.id },
-        data: {
-          name: source.name,
-          config:
-            source.config === null
-              ? Prisma.JsonNull
-              : (source.config as Prisma.InputJsonValue),
-        },
-      });
-
-      return { ok: true };
+      try {
+        return await agentService.syncFromSource(input.agentId, input.projectId);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (
+          message === "This agent is not a copy and has no source to sync from" ||
+          message === "Source agent has been deleted"
+        ) {
+          throw new TRPCError({
+            code:
+              message === "Source agent has been deleted"
+                ? "NOT_FOUND"
+                : "BAD_REQUEST",
+            message,
+          });
+        }
+        throw error;
+      }
     }),
 });

@@ -99,6 +99,7 @@ export type CreateAgentInput = {
   type: AgentType;
   config: AgentComponentConfig;
   workflowId?: string;
+  copiedFromAgentId?: string;
 };
 
 /**
@@ -188,6 +189,9 @@ export class AgentRepository {
         type,
         config: validatedConfig as unknown as Prisma.InputJsonValue,
         workflowId: input.workflowId,
+        ...(input.copiedFromAgentId && {
+          copiedFromAgentId: input.copiedFromAgentId,
+        }),
       },
     });
 
@@ -263,4 +267,122 @@ export class AgentRepository {
 
     return parseAgent(agent);
   }
+
+  /**
+   * Finds an agent by id and projectId with workflow and latestVersion for copy.
+   * Returns raw agent + workflow (for copyWorkflowWithDatasets); config/type not parsed.
+   */
+  async findByIdWithWorkflow(
+    id: string,
+    projectId: string,
+  ): Promise<AgentWithWorkflow | null> {
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id,
+        projectId,
+        archivedAt: null,
+      },
+      include: {
+        workflow: { include: { latestVersion: true } },
+      },
+    });
+    return agent as AgentWithWorkflow | null;
+  }
+
+  /**
+   * Finds an agent by id only (any project). For syncFromSource source lookup.
+   */
+  async findByIdOnly(id: string): Promise<TypedAgent | null> {
+    const agent = await this.prisma.agent.findFirst({
+      where: { id, archivedAt: null },
+    });
+    if (!agent) return null;
+    return parseAgent(agent);
+  }
+
+  /**
+   * Updates only name and config of an agent (for pushToCopies / syncFromSource).
+   * config null is stored as Prisma.JsonNull.
+   */
+  async updateNameAndConfig(
+    agentId: string,
+    projectId: string,
+    data: { name: string; config: AgentComponentConfig | null },
+  ): Promise<void> {
+    const existing = await this.prisma.agent.findFirst({
+      where: { id: agentId, projectId },
+    });
+    if (!existing) {
+      throw new Error(`Agent ${agentId} not found in project ${projectId}`);
+    }
+    const type = agentTypeSchema.parse(existing.type);
+    const configToStore =
+      data.config === null
+        ? Prisma.JsonNull
+        : (validateConfig(type, data.config) as unknown as Prisma.InputJsonValue);
+    await this.prisma.agent.update({
+      where: { id: agentId, projectId },
+      data: { name: data.name, config: configToStore },
+    });
+  }
+
+  /**
+   * Finds all non-archived agents that are copies of the given source agent,
+   * with project/team/org for building fullPath. Used by getCopies (push-to-replicas UI).
+   */
+  async findCopiesBySourceAgentId(sourceAgentId: string): Promise<AgentCopyRow[]> {
+    const copies = await this.prisma.agent.findMany({
+      where: {
+        copiedFromAgentId: sourceAgentId,
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        projectId: true,
+        project: {
+          select: {
+            name: true,
+            team: {
+              select: {
+                name: true,
+                organization: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return copies as AgentCopyRow[];
+  }
 }
+
+/**
+ * Row shape for agent copies (with project/team/org for fullPath).
+ * Returned by findCopiesBySourceAgentId.
+ */
+export type AgentCopyRow = {
+  id: string;
+  name: string;
+  projectId: string;
+  project: {
+    name: string;
+    team: {
+      name: string;
+      organization: { name: string };
+    };
+  };
+};
+
+/**
+ * Agent with workflow and latestVersion for copy. Returned by findByIdWithWorkflow.
+ */
+export type AgentWithWorkflow = Agent & {
+  workflow: {
+    id: string;
+    name: string;
+    icon: string | null;
+    description: string | null;
+    latestVersion: { dsl: unknown } | null;
+  } | null;
+};

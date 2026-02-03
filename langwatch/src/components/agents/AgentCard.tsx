@@ -31,6 +31,51 @@ const agentTypeLabels: Record<string, string> = {
   workflow: "Workflow",
 };
 
+/**
+ * Menu item that is either clickable (when permitted) or disabled with an
+ * explanatory tooltip. Use for actions that require evaluations:manage.
+ */
+function PermissionGuardedMenuItem({
+  value,
+  icon: Icon,
+  label,
+  permissionMessage,
+  hasPermission,
+  onAction,
+}: {
+  value: string;
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+  permissionMessage: string;
+  hasPermission: boolean;
+  onAction: () => void;
+}) {
+  if (hasPermission) {
+    return (
+      <Menu.Item
+        value={value}
+        onClick={(e) => {
+          e.stopPropagation();
+          onAction();
+        }}
+      >
+        <Icon size={16} /> {label}
+      </Menu.Item>
+    );
+  }
+  return (
+    <Tooltip
+      content={permissionMessage}
+      positioning={{ placement: "right" }}
+      showArrow
+    >
+      <Menu.Item value={value} disabled>
+        <Icon size={16} /> {label}
+      </Menu.Item>
+    </Tooltip>
+  );
+}
+
 export type AgentCardProps = {
   agent: TypedAgent;
   onClick?: () => void;
@@ -57,8 +102,7 @@ export function AgentCard({
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
 
-  const isCopiedAgent = !!(agent as { copiedFromAgentId?: string | null })
-    .copiedFromAgentId;
+  const isCopiedAgent = !!agent.copiedFromAgentId;
   const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -120,85 +164,34 @@ export function AgentCard({
                     </Menu.Item>
                   )}
                   {isCopiedAgent && onSyncFromSource && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to sync from source"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
-                      <Menu.Item
-                        value="sync"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onSyncFromSource();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
-                      >
-                        <RefreshCw size={16} /> Update from source
-                      </Menu.Item>
-                    </Tooltip>
+                    <PermissionGuardedMenuItem
+                      value="sync"
+                      icon={RefreshCw}
+                      label="Update from source"
+                      permissionMessage="You need evaluations:manage permission to sync from source"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onSyncFromSource}
+                    />
                   )}
                   {hasCopies && onPushToCopies && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to push to replicas"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
-                      <Menu.Item
-                        value="push"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onPushToCopies();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
-                      >
-                        <ArrowUp size={16} /> Push to replicas
-                      </Menu.Item>
-                    </Tooltip>
+                    <PermissionGuardedMenuItem
+                      value="push"
+                      icon={ArrowUp}
+                      label="Push to replicas"
+                      permissionMessage="You need evaluations:manage permission to push to replicas"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onPushToCopies}
+                    />
                   )}
                   {onReplicate && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to replicate agents"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
-                      <Menu.Item
-                        value="replicate"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onReplicate();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
-                      >
-                        <Copy size={16} /> Replicate to another project
-                      </Menu.Item>
-                    </Tooltip>
+                    <PermissionGuardedMenuItem
+                      value="replicate"
+                      icon={Copy}
+                      label="Replicate to another project"
+                      permissionMessage="You need evaluations:manage permission to replicate agents"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onReplicate}
+                    />
                   )}
                   {onDelete && (
                     <Menu.Item
