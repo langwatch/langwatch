@@ -8,13 +8,6 @@ import {
   type ClearPIIFunction,
 } from "../otlpSpanPiiRedactionService";
 
-vi.mock("~/env.mjs", () => ({
-  env: {
-    NODE_ENV: "test",
-    LANGEVALS_ENDPOINT: "http://mock-langevals",
-  },
-}));
-
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({
   clearPII: vi.fn(),
 }));
@@ -77,7 +70,11 @@ describe("OtlpSpanPiiRedactionService", () => {
     delete process.env.DISABLE_PII_REDACTION;
     const { mockClearPII, clearPIISpy: spy } = createMockClearPII();
     clearPIISpy = spy;
-    service = new OtlpSpanPiiRedactionService({ clearPII: mockClearPII });
+    service = new OtlpSpanPiiRedactionService({
+      clearPII: mockClearPII,
+      isLangevalsConfigured: true,
+      isProduction: false,
+    });
   });
 
   afterEach(() => {
@@ -417,6 +414,8 @@ describe("OtlpSpanPiiRedactionService", () => {
         const errorService = new OtlpSpanPiiRedactionService({
           clearPII: errorClearPII,
           piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+          isLangevalsConfigured: true,
+          isProduction: false,
         });
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "test" } },
@@ -437,6 +436,8 @@ describe("OtlpSpanPiiRedactionService", () => {
       const customService = new OtlpSpanPiiRedactionService({
         clearPII: mockClearPII,
         piiBearingAttributeKeys: customKeys,
+        isLangevalsConfigured: true,
+        isProduction: false,
       });
 
       const span = createMockOtlpSpan([
