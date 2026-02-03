@@ -454,17 +454,24 @@ export const evaluatorsRouter = createTRPCRouter({
           sourceProjectId: input.sourceProjectId,
           copiedFromWorkflowId: source.workflowId,
         });
-        await saveOrCommitWorkflowVersion({
-          ctx,
-          input: {
-            projectId: input.projectId,
-            workflowId,
-            dsl,
-          },
-          autoSaved: false,
-          commitMessage: "Copied from " + source.workflow.name,
-        });
         newWorkflowId = workflowId;
+        try {
+          await saveOrCommitWorkflowVersion({
+            ctx,
+            input: {
+              projectId: input.projectId,
+              workflowId,
+              dsl,
+            },
+            autoSaved: false,
+            commitMessage: "Copied from " + source.workflow.name,
+          });
+        } catch (saveError) {
+          await ctx.prisma.workflow
+            .delete({ where: { id: newWorkflowId } })
+            .catch(() => {});
+          throw saveError;
+        }
       }
 
       const evaluatorService = EvaluatorService.create(ctx.prisma);
