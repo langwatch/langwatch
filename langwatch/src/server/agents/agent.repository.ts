@@ -1,4 +1,5 @@
-import type { Agent, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Agent, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
   type CodeComponentConfig,

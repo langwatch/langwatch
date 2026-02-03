@@ -103,7 +103,7 @@ export class AgentService {
         copiedFromWorkflowId: string;
       }) => Promise<{ workflowId: string }>;
     },
-  ): Promise<{ id: string; name: string; copiedFromAgentId: string }> {
+  ): Promise<{ id: string; projectId: string; name: string; copiedFromAgentId: string }> {
     const source = await this.repository.findByIdWithWorkflow(
       input.sourceAgentId,
       input.sourceProjectId,
@@ -146,6 +146,7 @@ export class AgentService {
 
       return {
         id: copied.id,
+        projectId: input.targetProjectId,
         name: copied.name,
         copiedFromAgentId: source.id,
       };
