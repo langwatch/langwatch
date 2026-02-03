@@ -5,15 +5,16 @@ import type {
 } from "~/server/background/types";
 import { connection } from "../../redis";
 import { processCollectorJob } from "../workers/collectorWorker";
+import { COLLECTOR_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
 
-export const COLLECTOR_QUEUE = "{collector}";
+export { COLLECTOR_QUEUE } from "./constants";
 
 export const collectorQueue = new QueueWithFallback<
   CollectorJob | CollectorCheckAndAdjustJob,
   void,
   string
->(COLLECTOR_QUEUE, (job) => processCollectorJob(job.id, job.data), {
+>(COLLECTOR_QUEUE.NAME, (job) => processCollectorJob(job.id, job.data), {
   connection: connection as ConnectionOptions,
   defaultJobOptions: {
     delay: 0,
