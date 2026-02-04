@@ -72,31 +72,34 @@ export const FilterDisplay = ({
 
     for (const [key, value] of Object.entries(obj)) {
       if (Array.isArray(value)) {
-        if (!key.startsWith("eval")) {
-          result.push(
-            <FilterContainer key={key} hasBorder={hasBorder}>
-              <FilterLabel>{key}</FilterLabel>
-              <FilterValue>{value.join(", ")}</FilterValue>
-            </FilterContainer>,
-          );
-        }
+        result.push(
+          <FilterContainer key={key} hasBorder={hasBorder}>
+            <FilterLabel>{key}</FilterLabel>
+            <FilterValue>{value.join(", ")}</FilterValue>
+          </FilterContainer>,
+        );
       } else if (typeof value === "object" && value !== null) {
-        const nestedResult = [];
+        const nestedResult: string[] = [];
         for (const [nestedKey, nestedValue] of Object.entries(value)) {
           if (Array.isArray(nestedValue)) {
-            nestedResult.push(`${nestedKey}:${nestedValue.join("-")}`);
+            nestedResult.push(`${nestedKey}: ${nestedValue.join(", ")}`);
+          } else if (typeof nestedValue === "object" && nestedValue !== null) {
+            // Handle double-nested objects (e.g., evaluations.passed)
+            for (const [subKey, subValue] of Object.entries(nestedValue)) {
+              if (Array.isArray(subValue)) {
+                nestedResult.push(`${nestedKey} → ${subKey}: ${subValue.join(", ")}`);
+              }
+            }
           } else {
-            nestedResult.push(`${nestedKey}:${nestedValue}`);
+            nestedResult.push(`${nestedKey}: ${String(nestedValue)}`);
           }
         }
-        if (!key.startsWith("eval")) {
-          result.push(
-            <FilterContainer key={key} hasBorder={hasBorder}>
-              <FilterLabel>{key}</FilterLabel>
-              <FilterValue>{nestedResult}</FilterValue>
-            </FilterContainer>,
-          );
-        }
+        result.push(
+          <FilterContainer key={key} hasBorder={hasBorder}>
+            <FilterLabel>{key}</FilterLabel>
+            <FilterValue>{nestedResult.join("; ")}</FilterValue>
+          </FilterContainer>,
+        );
       } else {
         result.push(
           <FilterContainer key={key} fontSize="xs" hasBorder={hasBorder}>

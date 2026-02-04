@@ -27,7 +27,7 @@ import { z } from "zod";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { SmallLabel } from "~/components/SmallLabel";
-import { FilterDisplay } from "~/components/triggers/FilterDisplay";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { useDrawer } from "~/hooks/useDrawer";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -42,12 +42,12 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
-function Triggers() {
+function Automations() {
   const { project, organizations } = useOrganizationTeamProject();
   const { open, onOpen, onClose } = useDisclosure();
   const { openDrawer } = useDrawer();
 
-  const triggers = api.trigger.getTriggers.useQuery(
+  const triggers = api.automation.getTriggers.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -69,8 +69,8 @@ function Triggers() {
     },
   });
 
-  const toggleTrigger = api.trigger.toggleTrigger.useMutation();
-  const deleteTriggerMutation = api.trigger.deleteById.useMutation();
+  const toggleTrigger = api.automation.toggleTrigger.useMutation();
+  const deleteTriggerMutation = api.automation.deleteById.useMutation();
 
   const handleToggleTrigger = (triggerId: string, active: boolean) => {
     toggleTrigger.mutate(
@@ -81,9 +81,9 @@ function Triggers() {
         },
         onError: () => {
           toaster.create({
-            title: "Update trigger",
+            title: "Update automation",
             type: "error",
-            description: "Failed to update trigger",
+            description: "Failed to update automation",
             meta: {
               closable: true,
             },
@@ -114,9 +114,9 @@ function Triggers() {
       {
         onSuccess: () => {
           toaster.create({
-            title: "Delete trigger",
+            title: "Delete automation",
             type: "success",
-            description: "Trigger deleted",
+            description: "Automation deleted",
             meta: {
               closable: true,
             },
@@ -125,9 +125,9 @@ function Triggers() {
         },
         onError: () => {
           toaster.create({
-            title: "Delete trigger",
+            title: "Delete automation",
             type: "error",
-            description: "Failed to delete trigger",
+            description: "Failed to delete automation",
             meta: {
               closable: true,
             },
@@ -252,7 +252,7 @@ function Triggers() {
     <SettingsLayout>
       <Container maxWidth="1280px" padding={4}>
         <HStack width="full" align="top" gap={6} paddingBottom={6}>
-          <Heading>Triggers</Heading>
+          <Heading>Automations</Heading>
           <Spacer />
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
@@ -260,14 +260,14 @@ function Triggers() {
         </HStack>
         {triggers.data && triggers.data.length == 0 ? (
           <NoDataInfoBlock
-            title="No triggers yet"
-            description="Set up triggers on your messages to get notified when certain conditions are met."
+            title="No automations yet"
+            description="Set up automations on your messages to get notified when certain conditions are met."
             docsInfo={
               <Text>
-                To learn more about triggers, please visit our{" "}
+                To learn more about automations, please visit our{" "}
                 <Link
                   color="orange.400"
-                  href="https://docs.langwatch.ai/features/triggers"
+                  href="https://docs.langwatch.ai/features/automations"
                   isExternal
                 >
                   documentation
@@ -278,21 +278,28 @@ function Triggers() {
             icon={<Bell />}
           />
         ) : (
-          <Table.Root variant="line" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Action</Table.ColumnHeader>
-                <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                <Table.ColumnHeader>Filters</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">
-                  Last Triggered At
-                </Table.ColumnHeader>
-                <Table.ColumnHeader>Active</Table.ColumnHeader>
-                <Table.ColumnHeader>Actions</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
+          <VStack align="stretch" gap={4}>
+            <Box
+              border="1px solid"
+              borderColor="gray.200"
+              borderRadius="lg"
+              overflow="hidden"
+            >
+              <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Action</Table.ColumnHeader>
+                  <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                  <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                  <Table.ColumnHeader whiteSpace="nowrap">
+                    Last Triggered At
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader>Active</Table.ColumnHeader>
+                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
               {triggers.isLoading ? (
                 <Table.Row>
                   <Table.Cell colSpan={5}>Loading...</Table.Cell>
@@ -380,8 +387,8 @@ function Triggers() {
                               value="edit"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                openDrawer("editTriggerFilter", {
-                                  triggerId: trigger.id,
+                                openDrawer("editAutomationFilter", {
+                                  automationId: trigger.id,
                                 });
                               }}
                             >
@@ -414,8 +421,21 @@ function Triggers() {
                   );
                 })
               )}
-            </Table.Body>
-          </Table.Root>
+              </Table.Body>
+            </Table.Root>
+            </Box>
+            <Text fontSize="sm" color="fg.muted">
+              Learn more about creating automations on our{" "}
+              <Link
+                color="orange.400"
+                href="https://langwatch.ai/docs/features/automations#create-automations-based-on-langwatch-filters"
+                isExternal
+              >
+                docs
+              </Link>
+              .
+            </Text>
+          </VStack>
         )}
       </Container>
       <Drawer.Root
@@ -425,7 +445,7 @@ function Triggers() {
       >
         <Drawer.Content>
           <Drawer.Header>
-            <Drawer.Title>Trigger Message</Drawer.Title>
+            <Drawer.Title>Alert Message</Drawer.Title>
           </Drawer.Header>
           <Drawer.CloseTrigger />
           <Drawer.Body>
@@ -447,7 +467,7 @@ function Triggers() {
 
 export default withPermissionGuard("triggers:view", {
   layoutComponent: SettingsLayout,
-})(Triggers);
+})(Automations);
 
 const triggerFormSchema = z.object({
   alertType: z.enum(["CRITICAL", "WARNING", "INFO", ""]),
@@ -467,7 +487,7 @@ const TriggerForm = ({
   handleSubmit: UseFormHandleSubmit<TriggerFormData>;
   onClose: () => void;
 }) => {
-  const addCustomMessageMutation = api.trigger.addCustomMessage.useMutation();
+  const addCustomMessageMutation = api.automation.addCustomMessage.useMutation();
   const { project } = useOrganizationTeamProject();
 
   const onSubmit: SubmitHandler<TriggerFormData> = (data) => {
@@ -510,7 +530,7 @@ const TriggerForm = ({
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} align="start" width="full">
         <Text>
-          Customize the notification message that will be sent when this trigger
+          Customize the notification message that will be sent when this automation
           activates. This will replace the default message.
         </Text>
         <VStack width="full" align="start">
@@ -551,7 +571,7 @@ const TriggerForm = ({
         <HStack width="full">
           <Spacer />
           <Button type="submit" colorPalette="orange">
-            Save Trigger
+            Save Automation
           </Button>
         </HStack>
       </VStack>

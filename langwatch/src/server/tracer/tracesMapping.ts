@@ -847,3 +847,151 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   }
   return value as unknown as StringTypeToType[T];
 };
+
+// ============================================================================
+// Available Sources for Mapping UI
+// ============================================================================
+
+/**
+ * Type for available sources in the mapping UI.
+ * Matches the AvailableSource type from VariableMappingInput.
+ */
+export type TraceAvailableSource = {
+  id: string;
+  name: string;
+  type: "dataset";
+  fields: Array<{
+    name: string;
+    label?: string;
+    type: "str" | "dict" | "list";
+    children?: Array<{
+      name: string;
+      label?: string;
+      type: "str" | "dict" | "list";
+      children?: SpanSubfield[];
+    }>;
+    isComplete?: boolean;
+    isCompleteLabel?: string;
+  }>;
+};
+
+/**
+ * Static children for thread traces field.
+ * These are the common trace fields that can be extracted from each trace in a thread.
+ */
+const THREAD_TRACES_CHILDREN = [
+  { name: "input", type: "str" as const },
+  { name: "output", type: "str" as const },
+  { name: "contexts", type: "list" as const },
+  { name: "timestamp", type: "str" as const },
+  { name: "trace_id", type: "str" as const },
+];
+
+/**
+ * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
+ * Provides dynamic children for metadata and spans based on project traces.
+ *
+ * @param spanNames - Dynamic span names extracted from project traces
+ * @param metadataKeys - Dynamic metadata keys extracted from project traces
+ */
+export function getTraceAvailableSources(
+  spanNames: Array<{ key: string; label: string }>,
+  metadataKeys: Array<{ key: string; label: string }>
+): TraceAvailableSource[] {
+  // Filter out "threads" from trace-level sources - it's confusing at trace level
+  // (threads is for getting all traces in a thread, which is a thread-level concept)
+  const traceFields = Object.entries(TRACE_MAPPINGS)
+    .filter(([key]) => key !== "threads")
+    .map(([key, config]) => {
+      const hasKeys = "keys" in config && typeof config.keys === "function";
+
+      // Provide dynamic children for metadata
+      if (key === "metadata") {
+        return {
+          name: key,
+          type: "dict" as const,
+          // Use dynamic metadata keys with "* (any key)" always available
+          children: buildMetadataFieldChildren(metadataKeys),
+          // Allow selecting metadata itself (returns full metadata object)
+          isComplete: true,
+          isCompleteLabel: "All metadata",
+        };
+      }
+
+      if (key === "spans") {
+        return {
+          name: key,
+          type: "list" as const,
+          // Use dynamic span names with "* (any span)" always available
+          children: buildSpanFieldChildren(spanNames),
+          // Allow selecting spans itself (returns all spans array)
+          isComplete: true,
+          isCompleteLabel: "Full spans array",
+        };
+      }
+
+      // Other fields with keys() function - mark as complete (no nested selection needed)
+      if (hasKeys) {
+        return {
+          name: key,
+          type: "dict" as const,
+          isComplete: true,
+        };
+      }
+
+      return {
+        name: key,
+        type: "str" as const,
+      };
+    });
+
+  return [
+    {
+      id: "trace",
+      name: "Trace",
+      type: "dataset",
+      fields: traceFields,
+    },
+  ];
+}
+
+/**
+ * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
+ */
+export function getThreadAvailableSources(): TraceAvailableSource[] {
+  return [
+    {
+      id: "thread",
+      name: "Thread",
+      type: "dataset",
+      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
+        // Special handling for "traces" - provide nested children for field selection
+        if (key === "traces") {
+          return {
+            name: key,
+            type: "list" as const,
+            children: THREAD_TRACES_CHILDREN,
+            // Allow selecting traces itself (returns all trace data)
+            isComplete: true,
+          };
+        }
+
+        const hasKeys = "keys" in config && typeof config.keys === "function";
+
+        // For thread mappings, most fields are complete selections
+        if (hasKeys) {
+          return {
+            name: key,
+            type: "dict" as const,
+            isComplete: true,
+          };
+        }
+
+        return {
+          name: key,
+          type: "str" as const,
+        };
+      }),
+    },
+  ];
+}
