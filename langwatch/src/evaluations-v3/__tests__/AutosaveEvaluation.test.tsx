@@ -6,7 +6,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -104,6 +104,7 @@ const TestAutosaveComponent = () => {
 describe("Autosave evaluation state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     queryClient.clear();
     // Reset the mock to default success implementation
     mockMutateAsync.mockResolvedValue({
@@ -122,6 +123,7 @@ describe("Autosave evaluation state", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("triggers save when cell value changes", async () => {
@@ -132,9 +134,9 @@ describe("Autosave evaluation state", () => {
     // Wait for initial render - should not have called save yet
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
-    // Wait for initial effect to complete and debounce to clear
+    // Wait for initial effect to complete
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      vi.advanceTimersByTime(50);
     });
 
     // Make a change to the store
@@ -147,13 +149,10 @@ describe("Autosave evaluation state", () => {
     // Force re-render to pick up store changes
     rerender(<TestAutosaveComponent />);
 
-    // Wait for autosave to be triggered (debounce + buffer)
-    await waitFor(
-      () => {
-        expect(mockMutateAsync).toHaveBeenCalled();
-      },
-      { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-    );
+    // Advance past debounce delay
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
 
     // Verify the mutation was called with the right project
     expect(mockMutateAsync).toHaveBeenCalledWith(
@@ -163,70 +162,42 @@ describe("Autosave evaluation state", () => {
     );
   });
 
-  it(
-    "updates autosave status to saving then saved then idle",
-    { timeout: 15000 },
-    async () => {
-      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+  it("updates autosave status to saving then saved then idle", async () => {
+    render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait for initial render, any pending saves, and status to settle to idle
-      await waitFor(
-        () => {
-          expect(
-            useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-          ).toBe("idle");
-        },
-        { timeout: AUTOSAVE_DEBOUNCE_MS + 3000 },
-      );
+    // Make a change
+    act(() => {
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "trigger save");
+    });
 
-      // Wait for debounce to clear
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      });
+    // Advance past debounce - should trigger save and go to "saving" then "saved"
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
 
-      // Make a change
-      act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue("test-data", 0, "input", "trigger save " + Date.now());
-      });
+    // After mutation completes, should be at "saved"
+    expect(
+      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+    ).toBe("saved");
 
-      // Status should transition through saving -> saved (may be too fast to catch "saving")
-      // So we check it reaches "saved" which proves the flow worked
-      await waitFor(
-        () => {
-          const status =
-            useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation;
-          expect(["saving", "saved"]).toContain(status);
-        },
-        { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-      );
+    // Advance past the 2s delay in markSaved to go back to idle
+    await act(async () => {
+      vi.advanceTimersByTime(2100);
+    });
 
-      // After mutation completes, should go to saved
-      await waitFor(() => {
-        expect(
-          useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-        ).toBe("saved");
-      });
-
-      // After delay, should go back to idle (2s delay in markSaved + buffer)
-      await waitFor(
-        () => {
-          expect(
-            useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-          ).toBe("idle");
-        },
-        { timeout: 5000 },
-      );
-    },
-  );
+    expect(
+      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+    ).toBe("idle");
+  });
 
   it("sets autosave status to error when save fails", async () => {
     render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-    // Wait for initial render and debounce to clear
+    // Wait for initial render
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      vi.advanceTimersByTime(50);
     });
 
     // NOW mock mutation to fail (after any initial effects have completed)
@@ -236,26 +207,26 @@ describe("Autosave evaluation state", () => {
     act(() => {
       useEvaluationsV3Store
         .getState()
-        .setCellValue("test-data", 0, "input", "will fail " + Date.now());
+        .setCellValue("test-data", 0, "input", "will fail");
     });
 
-    // Should eventually show error status (after debounce)
-    await waitFor(
-      () => {
-        const status =
-          useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation;
-        expect(status).toBe("error");
-      },
-      { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-    );
+    // Advance past debounce to trigger save
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
+
+    // Should show error status
+    expect(
+      useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+    ).toBe("error");
   });
 
   it("saves when a new dataset is added", async () => {
     render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-    // Wait for initial render and debounce to clear
+    // Wait for initial render
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      vi.advanceTimersByTime(50);
     });
 
     // Add a new dataset
@@ -272,21 +243,20 @@ describe("Autosave evaluation state", () => {
       });
     });
 
-    // Wait for autosave (after debounce)
-    await waitFor(
-      () => {
-        expect(mockMutateAsync).toHaveBeenCalled();
-      },
-      { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-    );
+    // Advance past debounce to trigger save
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalled();
   });
 
   it("saves when active dataset changes", async () => {
     render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-    // Wait for initial render and debounce to clear
+    // Wait for initial render
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      vi.advanceTimersByTime(50);
     });
 
     // First, add another dataset
@@ -303,31 +273,23 @@ describe("Autosave evaluation state", () => {
       });
     });
 
-    // Wait for first save (after debounce)
-    await waitFor(
-      () => {
-        expect(mockMutateAsync).toHaveBeenCalled();
-      },
-      { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-    );
-    mockMutateAsync.mockClear();
-
-    // Wait for debounce to clear again
+    // Advance past debounce for first save
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
     });
+    expect(mockMutateAsync).toHaveBeenCalled();
+    mockMutateAsync.mockClear();
 
     // Change active dataset
     act(() => {
       useEvaluationsV3Store.getState().setActiveDataset("second-dataset");
     });
 
-    // Wait for autosave (after debounce)
-    await waitFor(
-      () => {
-        expect(mockMutateAsync).toHaveBeenCalled();
-      },
-      { timeout: AUTOSAVE_DEBOUNCE_MS + 1000 },
-    );
+    // Advance past debounce for second save
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalled();
   });
 });
