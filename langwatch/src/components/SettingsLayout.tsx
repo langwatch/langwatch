@@ -2,6 +2,7 @@ import { Container, HStack, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PageLayout } from "./ui/layouts/PageLayout";
@@ -13,6 +14,7 @@ export default function SettingsLayout({
   const { project } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
+  const { isEnterprise } = useActivePlan();
 
   return (
     <DashboardLayout compactMenu>
@@ -40,8 +42,12 @@ export default function SettingsLayout({
           <MenuLink href="/settings/members" includePath="members">
             Members
           </MenuLink>
-          <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
-          <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+          {isEnterprise && (
+            <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+          )}
+          {isEnterprise && (
+            <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+          )}
 
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
