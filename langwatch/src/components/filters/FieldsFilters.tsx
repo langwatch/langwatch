@@ -57,14 +57,14 @@ export function QueryStringFieldsFilters({
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
 				hasPermission("triggers:manage") && !hideTriggerButton ? (
-					<Tooltip content="Create a filter to add a trigger.">
+					<Tooltip content="Create a filter to add an automation.">
 						<Button
 							colorPalette="gray"
-							onClick={() => openDrawer("trigger", undefined)}
+							onClick={() => openDrawer("automation", undefined)}
 							disabled={!hasAnyFilters}
 						>
 							<LuZap />
-							Add Trigger
+							Add Automation
 						</Button>
 					</Tooltip>
 				) : undefined

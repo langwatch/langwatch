@@ -72,7 +72,7 @@ const checks: IntegrationCheck[] = [
   {
     key: "triggers",
     label: "Set up an alert",
-    href: () => `https://docs.langwatch.ai/features/triggers`,
+    href: () => `https://docs.langwatch.ai/features/automations`,
     event: "integration_checks_first_alert",
     isExternal: true,
     icon: LuBell,

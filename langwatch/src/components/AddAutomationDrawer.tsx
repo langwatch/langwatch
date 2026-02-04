@@ -39,14 +39,14 @@ import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
-export function TriggerDrawer() {
+export function AutomationDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, open } = useDisclosure();
 
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  const createTrigger = api.trigger.create.useMutation();
+  const createTrigger = api.automation.create.useMutation();
   const teamSlug = team?.slug;
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -208,8 +208,8 @@ export function TriggerDrawer() {
       {
         onSuccess: () => {
           toaster.create({
-            title: "Trigger Created",
-            description: "You have successfully created a trigger",
+            title: "Automation Created",
+            description: "You have successfully created an automation",
             type: "success",
             meta: {
               closable: true,
@@ -221,7 +221,7 @@ export function TriggerDrawer() {
         onError: () => {
           toaster.create({
             title: "Error",
-            description: "Error creating trigger",
+            description: "Error creating automation",
             type: "error",
             meta: {
               closable: true,
@@ -317,18 +317,18 @@ export function TriggerDrawer() {
       <Drawer.Content maxWidth="1200px">
         <Drawer.Header>
           <Drawer.CloseTrigger />
-          <Heading>Add Trigger</Heading>
+          <Heading>Add Automation</Heading>
         </Drawer.Header>
         <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"
-              helper="Give it a name that identifies what trigger it might be"
+              helper="Give it a name that identifies what automation it might be"
               invalid={!!errors.name}
             >
               <Input
-                placeholder="Evaluation trigger"
+                placeholder="Evaluation automation"
                 required
                 {...register("name")}
               />
@@ -337,7 +337,7 @@ export function TriggerDrawer() {
 
             <HorizontalFormControl
               label="Action"
-              helper="Select action you would like to take once a your trigger has taken place."
+              helper="Select action you would like to take once your automation has taken place."
               minWidth="calc(50% - 16px)"
             >
               <RadioGroup {...register("action")}>
@@ -355,7 +355,7 @@ export function TriggerDrawer() {
                         <Text fontWeight="500">Send Slack Message</Text>
                         <Text fontSize="13px" fontWeight="normal">
                           Add your slack webhook url to send a message to when
-                          the trigger is activated.
+                          the automation is activated.
                         </Text>
                       </VStack>
                     </Radio>
@@ -386,7 +386,7 @@ export function TriggerDrawer() {
                         <Text fontWeight="500">Email</Text>
                         <Text fontSize="13px" fontWeight="normal">
                           Receive an email with the details and the items that
-                          triggered the alert.
+                          activated the automation.
                         </Text>
                       </Radio>
 
@@ -409,7 +409,7 @@ export function TriggerDrawer() {
                         <Text fontWeight="500">Add to Annotation Queue</Text>
                         <Text fontSize="13px" fontWeight="normal">
                           Add entries to the annotation queue, this allows you
-                          to keep track of the results of your triggers.
+                          to keep track of the results of your automations.
                         </Text>
                       </VStack>
                     </Radio>
@@ -437,7 +437,7 @@ export function TriggerDrawer() {
                         <Text fontWeight="500">Add to Dataset</Text>
                         <Text fontSize="13px" fontWeight="normal">
                           Add entries to the dataset, this allows you to keep
-                          track of the results of your triggers.
+                          track of the results of your automations.
                         </Text>
                       </VStack>
                     </Radio>
@@ -478,7 +478,7 @@ export function TriggerDrawer() {
                 minWidth="fit-content"
                 loading={createTrigger.isLoading}
               >
-                Add Trigger
+                Add Automation
               </Button>
             </HStack>
           </form>
