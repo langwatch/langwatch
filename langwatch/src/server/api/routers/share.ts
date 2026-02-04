@@ -11,9 +11,9 @@ import { prisma } from "~/server/db";
 
 import {
   checkPermissionOrPubliclyShared,
+  checkProjectPermission,
   skipPermissionCheck,
-} from "../permission";
-import { checkProjectPermission } from "../rbac";
+} from "../rbac";
 
 export const shareRouter = createTRPCRouter({
   getShared: publicProcedure

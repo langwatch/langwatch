@@ -43,6 +43,10 @@ describe("PRO_TEMPLATE", () => {
     expect(PRO_TEMPLATE.maxScenarios).toBe(50);
   });
 
+  it("has maxOnlineEvaluations of 50", () => {
+    expect(PRO_TEMPLATE.maxOnlineEvaluations).toBe(50);
+  });
+
   it("has canPublish true", () => {
     expect(PRO_TEMPLATE.canPublish).toBe(true);
   });
@@ -87,6 +91,10 @@ describe("ENTERPRISE_TEMPLATE", () => {
 
   it("has maxScenarios of 1000", () => {
     expect(ENTERPRISE_TEMPLATE.maxScenarios).toBe(1000);
+  });
+
+  it("has maxOnlineEvaluations of 1000", () => {
+    expect(ENTERPRISE_TEMPLATE.maxOnlineEvaluations).toBe(1000);
   });
 
   it("has canPublish true", () => {

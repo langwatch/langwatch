@@ -16,6 +16,7 @@ import {
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
+import type { EvaluatorConfig } from "../../types";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
   formatCost,
@@ -26,6 +27,7 @@ import {
 
 type TargetSummaryProps = {
   aggregates: TargetAggregate;
+  evaluators: EvaluatorConfig[];
   isRunning?: boolean;
 };
 
@@ -38,8 +40,20 @@ type TargetSummaryProps = {
  * Chakra's built-in interactive behavior conflicts with nested tooltips,
  * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
+// Helper to get evaluator name from the evaluators array
+const getEvaluatorName = (
+  evaluatorId: string,
+  evaluators: EvaluatorConfig[]
+): string => {
+  // For now, just use the evaluator ID as the display name
+  // The proper solution would be to fetch names via tRPC, but that requires
+  // hooks which can't be used in a map iteration
+  return evaluators.find((e) => e.id === evaluatorId)?.id ?? evaluatorId;
+};
+
 export const TargetSummary = memo(function TargetSummary({
   aggregates,
+  evaluators,
   isRunning = false,
 }: TargetSummaryProps) {
   const { isOpen, handleMouseEnter, handleMouseLeave } =
@@ -180,7 +194,7 @@ export const TargetSummary = memo(function TargetSummary({
             {aggregates.evaluators.map((evaluator) => (
               <HStack key={evaluator.evaluatorId} justify="space-between">
                 <Text color="white/75" truncate maxWidth="150px">
-                  {evaluator.evaluatorName}
+                  {getEvaluatorName(evaluator.evaluatorId, evaluators)}
                 </Text>
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (

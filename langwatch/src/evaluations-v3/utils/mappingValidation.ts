@@ -165,6 +165,45 @@ export const getTargetMissingMappings = (
     "agentType" in target &&
     target.agentType === "http";
 
+  // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
+  const isEvaluatorTarget = target.type === "evaluator";
+
+  if (isEvaluatorTarget) {
+    // For evaluator targets, use the optional property on each input field
+    // Fields without optional: true are considered required
+    // Note: evaluator targets use target.inputs directly (no localPromptConfig)
+    const evaluatorInputs = target.inputs ?? [];
+    let hasAnyMapping = false;
+    let missingRequiredCount = 0;
+
+    for (const input of evaluatorInputs) {
+      const hasMapping = datasetMappings[input.identifier] !== undefined;
+
+      if (hasMapping) {
+        hasAnyMapping = true;
+      } else if (!input.optional) {
+        // Required field (not marked as optional) is missing
+        missingRequiredCount++;
+        missingMappings.push({
+          fieldId: input.identifier,
+          fieldName: input.identifier,
+          isRequired: true,
+        });
+      }
+      // Optional fields don't block validation - don't add to missingMappings
+    }
+
+    // Valid if no required fields are missing AND at least one field has a mapping (or no fields)
+    const isValid =
+      missingRequiredCount === 0 &&
+      (evaluatorInputs.length === 0 || hasAnyMapping);
+
+    return {
+      isValid,
+      missingMappings,
+    };
+  }
+
   if (isHttpAgent) {
     // HTTP agents: all fields are optional, but at least one must be mapped
     let hasAtLeastOneMapping = false;

@@ -149,7 +149,7 @@ export const customEvaluatorTemplate: Workflow = {
       type: "signature",
       position: { x: 230, y: 0 },
       data: {
-        name: "LLM Cognitive Bias Detection",
+        name: "Sample LLM Bias Detection",
         parameters: [
           {
             identifier: "llm",

@@ -7,9 +7,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { CheckSquare, Plus } from "lucide-react";
+import { useState } from "react";
+import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,14 +29,58 @@ function Page() {
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
 
+  // State for tracking which evaluator is being deleted
+  const [evaluatorToDelete, setEvaluatorToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
 
+  // Query related entities when delete dialog is open
+  const relatedEntitiesQuery = api.evaluators.getRelatedEntities.useQuery(
+    { id: evaluatorToDelete?.id ?? "", projectId: project?.id ?? "" },
+    { enabled: !!evaluatorToDelete && !!project?.id },
+  );
+
   const deleteMutation = api.evaluators.delete.useMutation({
     onSuccess: () => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+    },
+  });
+
+  const cascadeArchiveMutation = api.evaluators.cascadeArchive.useMutation({
+    onSuccess: (result) => {
+      setEvaluatorToDelete(null);
+      void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+
+      const parts: string[] = [];
+      if (result.archivedWorkflow) {
+        parts.push("1 workflow");
+      }
+      if (result.deletedMonitorsCount > 0) {
+        parts.push(
+          `${result.deletedMonitorsCount} online evaluation${result.deletedMonitorsCount > 1 ? "s" : ""}`,
+        );
+      }
+
+      toaster.create({
+        title: `Evaluator deleted`,
+        description:
+          parts.length > 0 ? `Also deleted: ${parts.join(", ")}` : undefined,
+        type: "success",
+        meta: { closable: true },
+      });
+    },
+    onError: () => {
+      toaster.create({
+        title: "Error deleting evaluator",
+        description: "Please try again later.",
+        type: "error",
+      });
     },
   });
 
@@ -58,13 +105,45 @@ function Page() {
   };
 
   const handleDeleteEvaluator = (evaluator: { id: string; name: string }) => {
-    if (
-      window.confirm(`Are you sure you want to delete "${evaluator.name}"?`)
-    ) {
-      deleteMutation.mutate({
-        id: evaluator.id,
-        projectId: project?.id ?? "",
+    setEvaluatorToDelete(evaluator);
+  };
+
+  const confirmDeleteEvaluator = () => {
+    if (!evaluatorToDelete || !project) return;
+
+    const hasRelated =
+      !!relatedEntitiesQuery.data?.workflow ||
+      (relatedEntitiesQuery.data?.monitors.length ?? 0) > 0;
+
+    if (hasRelated) {
+      cascadeArchiveMutation.mutate({
+        id: evaluatorToDelete.id,
+        projectId: project.id,
       });
+    } else {
+      deleteMutation.mutate(
+        {
+          id: evaluatorToDelete.id,
+          projectId: project.id,
+        },
+        {
+          onSuccess: () => {
+            setEvaluatorToDelete(null);
+            toaster.create({
+              title: "Evaluator deleted",
+              type: "success",
+              meta: { closable: true },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error deleting evaluator",
+              description: "Please try again later.",
+              type: "error",
+            });
+          },
+        },
+      );
     }
   };
 
@@ -121,6 +200,22 @@ function Page() {
           </Grid>
         </VStack>
       )}
+
+      <CascadeArchiveDialog
+        open={!!evaluatorToDelete}
+        onClose={() => setEvaluatorToDelete(null)}
+        onConfirm={confirmDeleteEvaluator}
+        isLoading={cascadeArchiveMutation.isPending || deleteMutation.isPending}
+        isLoadingRelated={relatedEntitiesQuery.isLoading}
+        entityType="evaluator"
+        entityName={evaluatorToDelete?.name ?? ""}
+        relatedEntities={{
+          workflows: relatedEntitiesQuery.data?.workflow
+            ? [relatedEntitiesQuery.data.workflow]
+            : [],
+          monitors: relatedEntitiesQuery.data?.monitors,
+        }}
+      />
     </DashboardLayout>
   );
 }

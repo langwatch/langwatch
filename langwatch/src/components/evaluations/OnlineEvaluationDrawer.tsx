@@ -11,17 +11,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode, type Evaluator } from "@prisma/client";
+import { EvaluationExecutionMode } from "@prisma/client";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import type {
-  AvailableSource,
-  FieldMapping as UIFieldMapping,
-} from "~/components/variables";
-import { validateEvaluatorMappings } from "~/evaluations-v3/utils/mappingValidation";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
   navigateToDrawer,
@@ -29,15 +27,12 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
 import {
   type MappingState,
-  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
@@ -65,152 +60,15 @@ const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
   contexts: "contexts",
   "contexts.string_list": "contexts.string_list",
 };
-
 /**
- * Static children for metadata field.
- * These are the reserved metadata keys that are always available.
+ * Get all field identifiers from an evaluator.
+ * Fields are pre-computed by the API for both built-in and workflow evaluators.
  */
-const METADATA_CHILDREN = [
-  { name: "thread_id", type: "str" as const },
-  { name: "user_id", type: "str" as const },
-  { name: "customer_id", type: "str" as const },
-  { name: "labels", type: "list" as const },
-  { name: "topic_id", type: "str" as const },
-  { name: "subtopic_id", type: "str" as const },
-];
-
-/**
- * Static children for spans field.
- * These are the common span subfields.
- */
-const SPANS_CHILDREN = [
-  { name: "input", type: "str" as const },
-  { name: "output", type: "str" as const },
-  { name: "params", type: "dict" as const },
-  { name: "contexts", type: "list" as const },
-];
-
-/**
- * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
- * Provides static children for known nested fields like metadata and spans.
- */
-function getTraceAvailableSources(): AvailableSource[] {
-  // Filter out "threads" from trace-level sources - it's confusing at trace level
-  // (threads is for getting all traces in a thread, which is a thread-level concept)
-  const traceFields = Object.entries(TRACE_MAPPINGS)
-    .filter(([key]) => key !== "threads")
-    .map(([key, config]) => {
-      const hasKeys = "keys" in config && typeof config.keys === "function";
-
-      // Provide static children for known nested fields
-      if (key === "metadata") {
-        return {
-          name: key,
-          type: "dict" as const,
-          children: METADATA_CHILDREN,
-          // Allow selecting metadata itself (returns full metadata object)
-          isComplete: true,
-        };
-      }
-
-      if (key === "spans") {
-        return {
-          name: key,
-          type: "list" as const,
-          children: SPANS_CHILDREN,
-          // Allow selecting spans itself (returns all spans)
-          isComplete: true,
-        };
-      }
-
-      // Other fields with keys() function - mark as complete (no nested selection needed)
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    });
-
-  return [
-    {
-      id: "trace",
-      name: "Trace",
-      type: "dataset",
-      fields: traceFields,
-    },
-  ];
-}
-
-/**
- * Static children for thread traces field.
- * These are the common trace fields that can be extracted from each trace in a thread.
- */
-const THREAD_TRACES_CHILDREN = [
-  { name: "input", type: "str" as const },
-  { name: "output", type: "str" as const },
-  { name: "contexts", type: "list" as const },
-  { name: "timestamp", type: "str" as const },
-  { name: "trace_id", type: "str" as const },
-];
-
-/**
- * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
- */
-function getThreadAvailableSources(): AvailableSource[] {
-  return [
-    {
-      id: "thread",
-      name: "Thread",
-      type: "dataset",
-      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-        // Special handling for "traces" - provide nested children for field selection
-        if (key === "traces") {
-          return {
-            name: key,
-            type: "list" as const,
-            children: THREAD_TRACES_CHILDREN,
-            // Allow selecting traces itself (returns all trace data)
-            isComplete: true,
-          };
-        }
-
-        const hasKeys = "keys" in config && typeof config.keys === "function";
-
-        // For thread mappings, most fields are complete selections
-        if (hasKeys) {
-          return {
-            name: key,
-            type: "dict" as const,
-            isComplete: true,
-          };
-        }
-
-        return {
-          name: key,
-          type: "str" as const,
-        };
-      }),
-    },
-  ];
-}
-
-/**
- * Get all fields (required + optional) from an evaluator definition.
- */
-function getAllFields(evaluatorType: EvaluatorTypes | undefined): string[] {
-  if (!evaluatorType) return [];
-  const def = AVAILABLE_EVALUATORS[evaluatorType];
-  if (!def) return [];
-  const required = def.requiredFields ?? ["input", "output"];
-  const optional = def.optionalFields ?? [];
-  return [...required, ...optional];
+function getEvaluatorFieldIds(
+  evaluator: EvaluatorWithFields | null | undefined,
+): string[] {
+  if (!evaluator?.fields) return [];
+  return evaluator.fields.map((f) => f.identifier);
 }
 
 /**
@@ -263,7 +121,7 @@ const fieldOptions: Record<string, string> = {
 let onlineEvaluationDrawerState: {
   level: EvaluationLevel; // Can be null (no selection), "trace", or "thread"
   name: string;
-  selectedEvaluator: Evaluator | null;
+  selectedEvaluator: EvaluatorWithFields | null;
   sample: number;
   mappings: Record<string, UIFieldMapping>;
   preconditions: CheckPrecondition[];
@@ -286,6 +144,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
+
+  // License enforcement for online evaluation creation
+  const { checkAndProceed } = useLicenseEnforcement("onlineEvaluations");
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -329,9 +190,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const threadIdleTimeout = form.watch("threadIdleTimeout");
 
   // These are managed separately due to complex interactions with drawer system
-  const [selectedEvaluator, setSelectedEvaluator] = useState<Evaluator | null>(
-    () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
-  );
+  const [selectedEvaluator, setSelectedEvaluator] =
+    useState<EvaluatorWithFields | null>(
+      () => onlineEvaluationDrawerState?.selectedEvaluator ?? null,
+    );
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     () => onlineEvaluationDrawerState?.mappings ?? {},
   );
@@ -384,6 +246,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
   );
 
+  // Check if selected evaluator is a workflow evaluator (for checkType determination)
+  const isWorkflowEvaluator = selectedEvaluator?.type === "workflow";
+
   // Create mutation
   const createMutation = api.monitors.create.useMutation({
     onSuccess: () => {
@@ -416,31 +281,37 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         ?.evaluatorType as EvaluatorTypes | undefined)
     : undefined;
 
-  // Compute all fields
-  const allFields = useMemo(() => getAllFields(evaluatorType), [evaluatorType]);
+  // Compute all fields from the evaluator (pre-computed by API for both built-in and workflow)
+  const allFields = useMemo(
+    () => getEvaluatorFieldIds(selectedEvaluator),
+    [selectedEvaluator],
+  );
 
   // Use shared validation logic (same as evaluations v3)
-  // This ensures consistent validation across the platform
+  // Fields include required/optional flag from the API
   const mappingValidation = useMemo(() => {
-    if (!evaluatorType) {
+    if (!selectedEvaluator?.fields) {
       return { isValid: true, hasAnyMapping: false, missingRequiredFields: [] };
     }
-    return validateEvaluatorMappings(evaluatorType, mappings);
-  }, [evaluatorType, mappings]);
+    // Extract required and optional fields from the evaluator
+    const requiredFields = selectedEvaluator.fields
+      .filter((f) => !f.optional)
+      .map((f) => f.identifier);
+    const optionalFields = selectedEvaluator.fields
+      .filter((f) => f.optional)
+      .map((f) => f.identifier);
+    return validateEvaluatorMappingsWithFields(
+      requiredFields,
+      optionalFields,
+      mappings,
+    );
+  }, [selectedEvaluator, mappings]);
 
   // For backward compatibility with existing code
   const pendingFields = mappingValidation.missingRequiredFields;
   // Invalid if: required fields missing OR no fields mapped (when there are fields)
   const hasPendingMappings =
     selectedEvaluator !== null && !mappingValidation.isValid;
-
-  // Get available sources based on level (empty if no level selected)
-  const availableSources = useMemo(() => {
-    if (!level) return [];
-    return level === "trace"
-      ? getTraceAvailableSources()
-      : getThreadAvailableSources();
-  }, [level]);
 
   // Track if we've already loaded the monitor data (to prevent re-loading on remount)
   const monitorDataLoadedRef = useRef(false);
@@ -584,6 +455,33 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     }
   }, [evaluatorQuery.data]);
 
+  // Auto-infer mappings when evaluator with fields is selected but mappings are empty
+  // This handles all evaluator types (built-in and workflow) since fields are pre-computed
+  const lastAutoInferredEvaluatorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      selectedEvaluator?.fields &&
+      level &&
+      // Only auto-infer if we haven't already done so for this evaluator
+      lastAutoInferredEvaluatorRef.current !== selectedEvaluator.id &&
+      // Only auto-infer if mappings are empty
+      Object.keys(mappings).length === 0
+    ) {
+      lastAutoInferredEvaluatorRef.current = selectedEvaluator.id;
+      const fields = getEvaluatorFieldIds(selectedEvaluator);
+      const autoMappings = autoInferMappings(fields, level);
+      setMappings(autoMappings);
+
+      // Persist to module-level state
+      if (onlineEvaluationDrawerState) {
+        onlineEvaluationDrawerState = {
+          ...onlineEvaluationDrawerState,
+          mappings: autoMappings,
+        };
+      }
+    }
+  }, [selectedEvaluator, level, mappings]);
+
   // Load pending evaluator (newly created from the flow)
   useEffect(() => {
     if (pendingEvaluatorQuery.data && pendingEvaluatorId) {
@@ -596,10 +494,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         form.setValue("name", evaluator.name);
       }
 
-      // Get evaluator type and auto-infer mappings
-      const evalType = (evaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined;
-      const fields = getAllFields(evalType);
+      // Auto-infer mappings using pre-computed fields from the API
+      const fields = getEvaluatorFieldIds(evaluator);
       const autoMappings = autoInferMappings(fields, level);
       setMappings(autoMappings);
 
@@ -663,7 +559,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (!selectedEvaluator) return;
 
     const mappingsConfig: EvaluatorMappingsConfig = {
-      availableSources,
+      level: level ?? undefined,
       initialMappings: mappings,
       onMappingChange: handleMappingChange,
     };
@@ -674,7 +570,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
   }, [
     selectedEvaluator,
-    availableSources,
+    level,
     mappings,
     handleMappingChange,
     openDrawer,
@@ -688,7 +584,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     // Set up the flow callback for if user wants to change evaluator from the list
     // (accessible via "back" button in evaluator editor)
     setFlowCallbacks("evaluatorList", {
-      onSelect: (evaluator: Evaluator) => {
+      onSelect: (evaluator: EvaluatorWithFields) => {
         const newName = name || evaluator.name;
         setSelectedEvaluator(evaluator);
         setHasUnsavedChanges(true); // User selected a different evaluator
@@ -696,10 +592,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           form.setValue("name", newName);
         }
 
-        // Get evaluator type and all fields (required + optional)
-        const evalType = (evaluator.config as { evaluatorType?: string } | null)
-          ?.evaluatorType as EvaluatorTypes | undefined;
-        const fields = getAllFields(evalType);
+        // Auto-infer mappings using pre-computed fields from the API
+        const fields = getEvaluatorFieldIds(evaluator);
         const autoMappings = autoInferMappings(fields, level);
         setMappings(autoMappings);
 
@@ -716,10 +610,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
         // Build mappings config and navigate to evaluator editor
         const newMappingsConfig: EvaluatorMappingsConfig = {
-          availableSources:
-            level === "trace"
-              ? getTraceAvailableSources()
-              : getThreadAvailableSources(),
+          level: level ?? undefined,
           initialMappings: autoMappings,
           onMappingChange: handleMappingChange,
         };
@@ -738,7 +629,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
 
     const mappingsConfig: EvaluatorMappingsConfig = {
-      availableSources,
+      level: level ?? undefined,
       initialMappings: mappings,
       onMappingChange: handleMappingChange,
     };
@@ -755,7 +646,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     level,
     sample,
     preconditions,
-    availableSources,
     mappings,
     handleMappingChange,
     openDrawer,
@@ -763,7 +653,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   const handleSelectEvaluator = useCallback(() => {
     // Helper function to handle evaluator selection (used by both existing and new evaluators)
-    const selectEvaluatorAndOpenEditor = (evaluator: Evaluator) => {
+    const selectEvaluatorAndOpenEditor = (evaluator: EvaluatorWithFields) => {
       const newName = name || evaluator.name;
       setSelectedEvaluator(evaluator);
       setHasUnsavedChanges(true); // User selected an evaluator
@@ -773,12 +663,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         form.setValue("name", newName);
       }
 
-      // Get evaluator type and all fields (required + optional)
-      const evalType = (evaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined;
-      const fields = getAllFields(evalType);
-
-      // Auto-infer mappings for all fields (required + optional)
+      // Auto-infer mappings using pre-computed fields from the API
+      const fields = getEvaluatorFieldIds(evaluator);
       const autoMappings = autoInferMappings(fields, level);
 
       setMappings(autoMappings);
@@ -796,10 +682,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
-        availableSources:
-          level === "trace"
-            ? getTraceAvailableSources()
-            : getThreadAvailableSources(),
+        level: level ?? undefined,
         initialMappings: autoMappings,
         onMappingChange: handleMappingChange,
       };
@@ -951,12 +834,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
     if (hasPendingMappings) return;
 
+    // Detect workflow evaluators by checking the evaluator type field
+    const isWorkflowEvaluator = selectedEvaluator.type === "workflow";
+
     const evaluatorConfig = selectedEvaluator.config as {
       evaluatorType?: string;
       settings?: Record<string, unknown>;
     } | null;
 
-    const checkType = evaluatorConfig?.evaluatorType ?? "langevals/basic";
+    // For workflow evaluators, use "workflow" as checkType
+    // For built-in evaluators, use the evaluatorType from config
+    const checkType = isWorkflowEvaluator
+      ? "workflow"
+      : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format
@@ -992,19 +882,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
       });
     } else {
-      // Create new monitor
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        checkType,
-        preconditions,
-        settings,
-        mappings: mappingState,
-        sample,
-        executionMode: EvaluationExecutionMode.ON_MESSAGE,
-        evaluatorId: selectedEvaluator.id,
-        level: level ?? "trace",
-        threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
+      // Create new monitor - check limit first
+      checkAndProceed(() => {
+        createMutation.mutate({
+          projectId: project.id,
+          name: name.trim(),
+          checkType,
+          preconditions,
+          settings,
+          mappings: mappingState,
+          sample,
+          executionMode: EvaluationExecutionMode.ON_MESSAGE,
+          evaluatorId: selectedEvaluator.id,
+          level: level ?? "trace",
+          threadIdleTimeout: level === "thread" ? threadIdleTimeout : null,
+        });
       });
     }
   }, [
@@ -1020,6 +912,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     createMutation,
     level,
     threadIdleTimeout,
+    checkAndProceed,
   ]);
 
   const isLoading = createMutation.isPending || updateMutation.isPending;

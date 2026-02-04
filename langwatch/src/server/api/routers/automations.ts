@@ -1,0 +1,252 @@
+import { AlertType, TriggerAction } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { extractCheckKeys } from "../utils";
+
+export const automationRouter = createTRPCRouter({
+  create: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        name: z.string(),
+        action: z.nativeEnum(TriggerAction),
+        filters: z.any(),
+        actionParams: z.object({
+          createdByUserId: z.string().optional(),
+          members: z.string().array().optional(),
+          slackWebhook: z.string().optional(),
+          datasetId: z.string().optional(),
+          datasetMapping: z
+            .object({
+              mapping: z.any(),
+              expansions: z.array(z.string()).optional(),
+            })
+            .optional(),
+          annotators: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+              }),
+            )
+            .optional(),
+        }),
+      }),
+    )
+    .use(checkProjectPermission("triggers:create"))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.prisma.project.findUnique({
+        where: {
+          id: input.projectId,
+        },
+        select: {
+          teamId: true,
+        },
+      });
+
+      if (!project) {
+        throw new Error(`Project with id ${input.projectId} not found`);
+      }
+
+      const teamMembers = await ctx.prisma.teamUser.findMany({
+        where: {
+          teamId: project.teamId,
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+        input.actionParams.createdByUserId = ctx.session?.user.id;
+
+        if (!input.actionParams.annotators) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Annotators are required",
+          });
+        }
+      }
+
+      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
+        if (!input.actionParams.slackWebhook) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Slack webhook is required",
+          });
+        }
+      } else if (input.action === TriggerAction.SEND_EMAIL) {
+        const teamEmails = teamMembers.map((user) => user.user.email);
+
+        if (input.actionParams.members) {
+          input.actionParams.members.map((email: string) => {
+            if (!teamEmails.includes(email)) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Error with selected emails",
+              });
+            }
+          });
+        }
+      }
+
+      return ctx.prisma.trigger.create({
+        data: {
+          id: nanoid(),
+          name: input.name,
+          action: input.action,
+          actionParams: input.actionParams,
+          filters: JSON.stringify(input.filters),
+          projectId: input.projectId,
+          lastRunAt: new Date().getTime(),
+        },
+      });
+    }),
+  deleteById: protectedProcedure
+    .input(z.object({ projectId: z.string(), triggerId: z.string() }))
+    .use(checkProjectPermission("triggers:delete"))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.trigger.update({
+        where: {
+          id: input.triggerId,
+          projectId: input.projectId,
+        },
+        data: {
+          deleted: true,
+          active: false,
+        },
+      });
+
+      return { success: true };
+    }),
+  addCustomMessage: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        message: z.string(),
+        projectId: z.string(),
+        alertType: z
+          .union([z.nativeEnum(AlertType), z.literal("")])
+          .optional()
+          .nullable(),
+        name: z.string().optional(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: { id: input.triggerId, projectId: input.projectId },
+        data: {
+          message: input.message,
+          alertType: input.alertType ? input.alertType : null,
+          name: input.name,
+        },
+      });
+    }),
+  getTriggers: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const triggers = await ctx.prisma.trigger.findMany({
+        where: {
+          projectId: input.projectId,
+          deleted: false,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      const allCheckIds = triggers.flatMap((trigger) => {
+        if (typeof trigger.filters === "string") {
+          const triggerFilters = JSON.parse(trigger.filters);
+          return extractCheckKeys(triggerFilters);
+        } else {
+          return [];
+        }
+      });
+
+      const allChecks = await ctx.prisma.monitor.findMany({
+        where: {
+          id: {
+            in: allCheckIds,
+          },
+          projectId: input.projectId,
+        },
+      });
+
+      const checksMap = allChecks.reduce<
+        Record<string, (typeof allChecks)[number]>
+      >((map, check) => {
+        map[check.id] = check;
+        return map;
+      }, {});
+
+      const enhancedTriggers = triggers.map((trigger) => {
+        let triggerFilters: Record<string, any> = {};
+
+        if (typeof trigger.filters === "string") {
+          triggerFilters = JSON.parse(trigger.filters);
+        }
+
+        const checkIds = extractCheckKeys(triggerFilters);
+
+        const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
+
+        return {
+          ...trigger,
+          checks,
+        };
+      });
+
+      return enhancedTriggers;
+    }),
+  toggleTrigger: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        active: z.boolean(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: {
+          id: input.triggerId,
+          projectId: input.projectId,
+        },
+        data: {
+          active: input.active,
+        },
+      });
+    }),
+  getTriggerById: protectedProcedure
+    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.findUnique({
+        where: { id: input.triggerId, projectId: input.projectId },
+      });
+    }),
+  updateTriggerFilters: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        projectId: z.string(),
+        filters: z.any(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:update"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: { id: input.triggerId, projectId: input.projectId },
+        data: {
+          filters: JSON.stringify(input.filters),
+        },
+      });
+    }),
+});

@@ -33,6 +33,20 @@ export const filterFieldsEnum = z.enum([
 
 export type FilterField = z.infer<typeof filterFieldsEnum>;
 
+// Schema for trigger filter values - can be nested up to 2 levels deep
+const filterValueSchema: z.ZodType<
+  string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+> = z.lazy(() =>
+  z.union([
+    z.array(z.string()),
+    z.record(z.string(), z.array(z.string())),
+    z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+  ]),
+);
+
+// Schema for validating trigger filter JSON structure
+export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+
 export type FilterDefinition = {
   name: string;
   urlKey: string;

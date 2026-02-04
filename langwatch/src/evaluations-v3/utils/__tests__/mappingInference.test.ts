@@ -53,7 +53,6 @@ const createTestTarget = (
 ): TargetConfig => ({
   id,
   type: "prompt",
-  name: `Target ${id}`,
   inputs,
   outputs,
   mappings,
@@ -66,7 +65,6 @@ const _createTestEvaluator = (
 ): EvaluatorConfig => ({
   id,
   evaluatorType: "langevals/exact_match",
-  name: `Evaluator ${id}`,
   inputs,
   mappings,
 });

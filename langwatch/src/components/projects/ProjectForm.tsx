@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Field,
   HStack,
@@ -14,15 +13,11 @@ import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { isAtMaxProjects } from "../../utils/limits";
-import { trackEvent } from "../../utils/tracking";
-import { Link } from "../ui/link";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
   validateProjectName,
 } from "./projectFormValidation";
-import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 
 export interface ProjectFormData {
   name: string;
@@ -50,9 +45,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     defaultTeamId,
     organizationId: organizationIdProp,
   } = props;
-  const { organization: currentOrganization, project } =
-    useOrganizationTeamProject();
-  const { url: planManagementUrl } = usePlanManagementUrl();
+  const { organization: currentOrganization } = useOrganizationTeamProject();
 
   // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
   const effectiveOrganizationId =
@@ -78,15 +71,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     { enabled: !!effectiveOrganizationId },
   );
 
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: effectiveOrganizationId ?? "" },
-    {
-      enabled: !!effectiveOrganizationId,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
-
   // Set default team when teams are loaded
   useEffect(() => {
     if (teams.data && teams.data.length > 0 && !teamId) {
@@ -108,8 +92,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     onSubmitProp({ ...data, language: "other", framework: "other" });
   };
 
-  const atMaxProjects = isAtMaxProjects(usage.data);
-
   const showTeamSelector =
     teams.data?.some(
       (team: { projects: unknown[] }) => team.projects.length > 0,
@@ -119,32 +101,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack align="stretch" gap={6}>
-        {atMaxProjects && (
-          <Alert.Root>
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You have reached the maximum number of projects allowed by your
-                plan. Please{" "}
-                <Link
-                  href={planManagementUrl}
-                  textDecoration="underline"
-                  _hover={{ textDecoration: "none" }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "new_project_limit_reached",
-                    });
-                  }}
-                >
-                  upgrade your plan
-                </Link>{" "}
-                to create more projects.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-
         <Text fontSize="sm" color="fg.muted">
           You can set up separate projects for each service or LLM feature of
           your application (for example, one for your ChatBot, another for that
@@ -211,7 +167,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             colorPalette="orange"
             type="submit"
             loading={isLoading}
-            disabled={atMaxProjects || isLoading}
+            disabled={isLoading}
           >
             Create
           </Button>

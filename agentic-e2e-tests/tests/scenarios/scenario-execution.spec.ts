@@ -3,13 +3,16 @@ import {
   givenIAmLoggedIntoProject,
   givenIAmOnTheScenariosListPage,
   givenIAmOnTheSimulationsPage,
+  givenIAmViewingAScenarioRun,
   thenISeeSimulationsPageContent,
   whenIClickNewScenario,
   whenIFillInNameWith,
   whenIFillInSituationWith,
   whenIAddCriterion,
   whenIClickSave,
+  whenIClickRunAgain,
   thenScenarioAppearsInList,
+  getScenarioSetIdFromUrl,
 } from "./steps";
 
 /**
@@ -79,6 +82,45 @@ test.describe("Scenario Execution", () => {
       .getByText(/running|in progress|completed|pass|fail/i)
       .first();
     await expect(runningOrResults).toBeVisible({ timeout: 60000 });
+  });
+
+  // ===========================================================================
+  // Run Again
+  // ===========================================================================
+
+  /**
+   * Scenario: Run Again preserves scenario set
+   * Source: scenario-execution.feature lines 67-71
+   *
+   * When clicking "Run Again" from an individual run page,
+   * the new run should appear in the same scenario set, not "default".
+   */
+  test("Run Again preserves scenario set ID", async ({ page }) => {
+    // Navigate to an existing scenario run
+    await givenIAmViewingAScenarioRun(page);
+
+    // Capture the current scenario set ID from URL
+    const originalSetId = getScenarioSetIdFromUrl(page);
+
+    // Skip test if we couldn't find a scenario run to test with
+    if (!originalSetId || originalSetId === "scenarios") {
+      test.skip();
+      return;
+    }
+
+    // Click Run Again
+    await whenIClickRunAgain(page);
+
+    // Either modal appears (if no remembered target) or run starts immediately
+    // Wait for navigation to complete - URL should contain the same setId
+    await expect(page).toHaveURL(
+      new RegExp(`simulations/${originalSetId}/`),
+      { timeout: 60000 }
+    );
+
+    // Verify we're NOT in the legacy "default" fallback set
+    // Note: "local-scenarios" (PLATFORM_SET_ID) is valid - that's the platform default
+    expect(page.url()).not.toContain("/default/");
   });
 
   /**

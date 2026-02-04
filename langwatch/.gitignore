@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.pnpm-store
 
 # testing
 /coverage
@@ -70,3 +71,4 @@ node_modules/
 /reports/
 
 licenses.json
+.pnpm-store/

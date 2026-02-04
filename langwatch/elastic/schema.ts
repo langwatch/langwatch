@@ -357,6 +357,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
         prompt_id: { type: "keyword" },
         prompt_version: { type: "integer" },
         agent_id: { type: "keyword" },
+        evaluator_id: { type: "keyword" },
         model: { type: "keyword" },
         metadata: { type: FLATENNED_TYPE } as any,
       },

@@ -1,10 +1,7 @@
 import type { Project } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  checkUserPermissionForOrganization,
-  OrganizationRoleGroup,
-} from "../permission";
+import { checkOrganizationPermission } from "../rbac";
 
 export const costsRouter = createTRPCRouter({
   getAggregatedCostsForOrganization: protectedProcedure
@@ -15,11 +12,7 @@ export const costsRouter = createTRPCRouter({
         endDate: z.number(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const { startDate, endDate } = input;
       const prisma = ctx.prisma;

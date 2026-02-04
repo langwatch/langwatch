@@ -8,7 +8,7 @@
 
 Local development required running multiple services (postgres, redis, opensearch, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
 - Frontend work: just app + postgres + redis
-- Scenario development: + workers + scenario-worker + bullboard + ai-server
+- Scenario development: + workers + bullboard + ai-server (scenario processing is part of workers)
 - Full stack: everything
 
 Additionally, macOS developers face platform mismatch issues: native Node modules (esbuild, Prisma) compiled for macOS don't work in Linux containers.
@@ -24,7 +24,7 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 | (none) | postgres, redis, app | Minimal frontend dev |
 | search | + opensearch | Trace/search features |
 | nlp | + langwatch_nlp, langevals | Evaluations |
-| scenarios | + workers, scenario-worker, bullboard, ai-server, nlp | Scenario development |
+| scenarios | + workers (includes scenarios), bullboard, ai-server, nlp | Scenario development |
 | full | Everything | Full integration |
 
 ### Init Container Pattern
@@ -94,6 +94,9 @@ make down             # Stop all
 - `Makefile` - Convenience targets
 
 **Trade-offs accepted:**
-- First startup slower (init container installs deps)
+- First startup slower (init container installs deps), but mitigated by shared pnpm store volume
 - Requires Docker Desktop with sufficient memory allocation
 - Host node_modules still needed for IDE tooling (separate from container's)
+
+**Performance optimization:**
+The `pnpm_store` named volume persists downloaded packages across container restarts and is shared across all worktrees (`name: langwatch-pnpm-store`). After first install, subsequent `pnpm install` runs are significantly faster.

@@ -27,7 +27,7 @@ import { prisma } from "~/server/db";
 import { createLogger } from "../../utils/logger";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import type { PermissionMiddleware } from "./permission";
+import type { PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -100,12 +100,25 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
+    // Extract limit info if present in cause
+    const cause = error.cause as
+      | { limitType?: string; current?: number; max?: number }
+      | undefined;
+    const limitInfo = cause?.limitType
+      ? {
+          limitType: cause.limitType,
+          current: cause.current,
+          max: cause.max,
+        }
+      : null;
+
     return {
       ...shape,
       data: {
         ...shape.data,
         zodError:
           error.cause instanceof ZodError ? error.cause.flatten() : null,
+        cause: limitInfo,
       },
     };
   },

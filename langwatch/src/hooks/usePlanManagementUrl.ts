@@ -6,8 +6,8 @@ import { usePublicEnv } from "./usePublicEnv";
  * - Self-hosted mode (IS_SAAS=false): "/settings/license"
  *
  * Also provides the appropriate button label:
- * - SaaS mode: "Change plan"
- * - Self-hosted mode: "Manage license"
+ * - SaaS mode: "Upgrade plan"
+ * - Self-hosted mode: "Upgrade license"
  */
 export function usePlanManagementUrl() {
   const publicEnv = usePublicEnv();
@@ -15,7 +15,7 @@ export function usePlanManagementUrl() {
 
   return {
     url: isSaaS ? "/settings/subscription" : "/settings/license",
-    buttonLabel: isSaaS ? "Change plan" : "Manage license",
+    buttonLabel: isSaaS ? "Upgrade plan" : "Upgrade license",
     isSaaS,
     isLoading: publicEnv.isLoading,
   };
@@ -34,5 +34,5 @@ export function getPlanManagementUrl(isSaaS: boolean): string {
  * Use this for cases where you need the label outside of a React component.
  */
 export function getPlanManagementButtonLabel(isSaaS: boolean): string {
-  return isSaaS ? "Change plan" : "Manage license";
+  return isSaaS ? "Upgrade plan" : "Upgrade license";
 }

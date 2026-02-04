@@ -2,7 +2,7 @@
 Feature: Member Role Team Restrictions
   As a LangWatch organization admin
   I want team role options to be restricted based on organization role
-  So that Member Lite users can only have Viewer team access and Members cannot be Viewers
+  So that Lite Member users can only have Viewer team access and Members cannot be Viewers
 
   Background:
     Given I am on the Add Members form
@@ -12,25 +12,25 @@ Feature: Member Role Team Restrictions
   # Label Display
   # ============================================================================
 
-  Scenario: Organization role dropdown shows "Member Lite" instead of "External / Viewer"
+  Scenario: Organization role dropdown shows "Lite Member" instead of "External / Viewer"
     When I view the Org Role dropdown options
-    Then I should see "Admin", "Member", and "Member Lite" as options
+    Then I should see "Admin", "Member", and "Lite Member" as options
     And I should not see "External / Viewer" as an option
 
   # ============================================================================
-  # Member Lite (EXTERNAL) Role Restrictions
+  # Lite Member (EXTERNAL) Role Restrictions
   # ============================================================================
 
-  Scenario: Member Lite org role restricts team role to Viewer only
-    When I select "Member Lite" as the Org Role
+  Scenario: Lite Member org role restricts team role to Viewer only
+    When I select "Lite Member" as the Org Role
     And I view the Team Role dropdown options
     Then I should only see "Viewer" as a team role option
     And I should not see "Admin" or "Member" as team role options
     And I should not see any custom roles
 
-  Scenario: Member Lite does not show custom roles in team role dropdown
+  Scenario: Lite Member does not show custom roles in team role dropdown
     Given the organization has custom roles defined
-    When I select "Member Lite" as the Org Role
+    When I select "Lite Member" as the Org Role
     And I view the Team Role dropdown options
     Then I should only see "Viewer" as a team role option
 
@@ -70,22 +70,22 @@ Feature: Member Role Team Restrictions
   # Dynamic Role Updates When Switching Org Role
   # ============================================================================
 
-  Scenario: Switching from Member to Member Lite auto-corrects team role to Viewer
+  Scenario: Switching from Member to Lite Member auto-corrects team role to Viewer
     Given I have selected "Member" as the Org Role
     And I have selected "Admin" as the Team Role
-    When I change the Org Role to "Member Lite"
+    When I change the Org Role to "Lite Member"
     Then the Team Role should automatically change to "Viewer"
 
-  Scenario: Switching from Member Lite to Member auto-corrects team role to Member
-    Given I have selected "Member Lite" as the Org Role
+  Scenario: Switching from Lite Member to Member auto-corrects team role to Member
+    Given I have selected "Lite Member" as the Org Role
     And the Team Role is "Viewer"
     When I change the Org Role to "Member"
     Then the Team Role should automatically change to "Member"
 
-  Scenario: Switching from Admin to Member Lite auto-corrects team role to Viewer
+  Scenario: Switching from Admin to Lite Member auto-corrects team role to Viewer
     Given I have selected "Admin" as the Org Role
     And I have selected "Member" as the Team Role
-    When I change the Org Role to "Member Lite"
+    When I change the Org Role to "Lite Member"
     Then the Team Role should automatically change to "Viewer"
 
   Scenario: Switching from Admin to Member with Viewer team role auto-corrects to Member
@@ -104,8 +104,8 @@ Feature: Member Role Team Restrictions
   # Default Team Role Based on Org Role
   # ============================================================================
 
-  Scenario: Adding a new team assignment defaults to Viewer for Member Lite
-    Given I have selected "Member Lite" as the Org Role
+  Scenario: Adding a new team assignment defaults to Viewer for Lite Member
+    Given I have selected "Lite Member" as the Org Role
     When I click "Add team" to add a team assignment
     Then the new team assignment should have "Viewer" as the default team role
 
@@ -123,8 +123,8 @@ Feature: Member Role Team Restrictions
   # Multiple Team Assignments
   # ============================================================================
 
-  Scenario: All team assignments respect Member Lite restrictions
-    Given I have selected "Member Lite" as the Org Role
+  Scenario: All team assignments respect Lite Member restrictions
+    Given I have selected "Lite Member" as the Org Role
     And I have added multiple team assignments
     When I view any Team Role dropdown
     Then each dropdown should only show "Viewer" as an option
@@ -132,5 +132,5 @@ Feature: Member Role Team Restrictions
   Scenario: Switching org role updates all team assignments
     Given I have selected "Member" as the Org Role
     And I have multiple team assignments with "Admin" team role
-    When I change the Org Role to "Member Lite"
+    When I change the Org Role to "Lite Member"
     Then all team assignments should have "Viewer" as the team role

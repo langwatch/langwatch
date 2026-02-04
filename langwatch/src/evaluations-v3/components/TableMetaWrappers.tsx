@@ -90,6 +90,7 @@ export const TargetHeaderFromMeta = ({
       target={target}
       onEdit={meta?.openTargetEditor}
       onDuplicate={meta?.handleDuplicateTarget}
+      onSwitch={meta?.handleSwitchTarget}
       onRemove={meta?.handleRemoveTarget}
       onRun={
         meta?.handleRunTarget

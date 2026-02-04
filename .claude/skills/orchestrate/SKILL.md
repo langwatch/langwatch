@@ -18,7 +18,7 @@ Before delegating any work, create a task list using **TaskCreate** to map out t
 3. Use tasks to track progress through the plan → code → review loop
 
 Example:
-```
+```text
 TaskCreate: "Create feature file for user auth"
 TaskCreate: "Implement login endpoint"
 TaskCreate: "Implement logout endpoint"
@@ -47,24 +47,33 @@ Be aware of context size. When context grows large, ask the user if they'd like 
 - Read the feature file to understand acceptance criteria
 - Create tasks for each acceptance criterion
 
-### 2. Implement
+### 2. Test Review (Required)
+- Invoke `/test-review` on the feature file
+- Validates pyramid placement before any implementation begins
+- Checks that `@e2e`, `@integration`, `@unit` tags are appropriate
+- If violations found:
+  - Update the feature file to fix tag placement
+  - Re-run `/test-review` to confirm fixes
+- If approved → proceed to Implement
+
+### 3. Implement
 - Mark task as `in_progress`
 - Invoke `/code` with the feature file path and requirements
 - Coder agent implements with TDD and returns a summary
 - Mark task as `completed` when done
 
-### 3. Verify
+### 4. Verify
 - Check the coder's summary against acceptance criteria
 - If incomplete → invoke `/code` again with specific feedback
 - Max 3 iterations, then escalate to user
 
-### 4. Review (Required)
+### 5. Review (Required)
 - Mark review task as `in_progress`
 - Invoke `/review` to run quality gate
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. E2E Verification (Conditional)
+### 6. E2E Verification (Conditional)
 - Check if feature file has `@e2e` tagged scenarios
 - If yes:
   - Mark e2e task as `in_progress`
@@ -78,14 +87,41 @@ Be aware of context size. When context grows large, ask the user if they'd like 
   - If all pass → mark task as `completed`
 - If no `@e2e` scenarios → skip to Complete
 
-### 6. Complete
+### 7. Self-Check (Required)
+
+Before completing, verify you didn't make mistakes:
+
+**Review Compliance:**
+- Did you address ALL items marked "Should fix (Important)"?
+- Did you ask the user about items marked "NEEDS USER DECISION"?
+- Did you skip any reviewer recommendations without justification?
+
+**Test Coverage:**
+- Check the feature file for `@unit`, `@integration`, `@e2e` tags
+- Verify tests exist for EACH tagged scenario
+- If a scenario is tagged `@integration` but only unit tests exist, that's incomplete
+
+**Acceptance Criteria:**
+- Re-read the feature file acceptance criteria
+- Verify each criterion is implemented AND tested
+
+If ANY check fails:
+1. Do NOT proceed to Complete
+2. Go back to the appropriate step (Implement, Review, or E2E)
+3. Fix the gap before continuing
+
+This self-check exists because it's easy to rationalize skipping work. Don't.
+
+### 8. Complete
 - Verify all tasks are completed
+- Verify self-check passed
 - Report summary to user (include E2E test status if applicable)
 
 ## Boundaries
 
 You delegate, you don't implement:
 - `/plan` creates feature files
+- `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
 - `/review` checks quality
 - `/e2e` generates and verifies E2E tests

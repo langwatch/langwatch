@@ -317,3 +317,70 @@ export async function thenISeePassFailStatus(page: Page) {
 
   await expect(passStatus.or(failStatus).first()).toBeVisible({ timeout: 30000 });
 }
+
+// =============================================================================
+// Run Again Steps
+// =============================================================================
+
+/**
+ * Given I am viewing a scenario run
+ * Navigates to the first available scenario run
+ */
+export async function givenIAmViewingAScenarioRun(page: Page) {
+  await givenIAmOnTheSimulationsPage(page);
+
+  // Click on first simulation set
+  const firstSetCard = page.locator("[data-testid='simulation-set-card']").first();
+  if (await firstSetCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await firstSetCard.click();
+    await expect(page).toHaveURL(/simulations\/[^/]+$/, { timeout: 10000 });
+
+    // Click on first batch run
+    const firstBatchCard = page.locator("[data-testid='batch-run-card']").first();
+    if (await firstBatchCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await firstBatchCard.click();
+
+      // Click on first scenario run
+      const firstRunCard = page.locator("[data-testid='scenario-run-card']").first();
+      if (await firstRunCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await firstRunCard.click();
+        await expect(page).toHaveURL(/simulations\/[^/]+\/[^/]+\/[^/]+/, { timeout: 10000 });
+      }
+    }
+  }
+}
+
+/**
+ * When I click "Run Again"
+ */
+export async function whenIClickRunAgain(page: Page) {
+  const runAgainButton = page.getByRole("button", { name: /run again/i });
+  await expect(runAgainButton).toBeVisible({ timeout: 10000 });
+  await runAgainButton.click();
+}
+
+/**
+ * Then I see the target selection modal
+ */
+export async function thenISeeTargetSelectionModal(page: Page) {
+  const modal = page.getByRole("dialog").filter({ hasText: /select.*target|run.*scenario/i });
+  await expect(modal).toBeVisible({ timeout: 10000 });
+}
+
+/**
+ * Then the new run is in the same scenario set
+ * Verifies the URL contains the original setId after running again
+ */
+export async function thenTheNewRunIsInSameScenarioSet(page: Page, expectedSetId: string) {
+  // After run completes, URL should contain the same setId
+  await expect(page).toHaveURL(new RegExp(`simulations/${expectedSetId}/`), { timeout: 60000 });
+}
+
+/**
+ * Extract the scenario set ID from the current URL
+ */
+export function getScenarioSetIdFromUrl(page: Page): string {
+  const url = page.url();
+  const match = url.match(/simulations\/([^/]+)/);
+  return match?.[1] ?? "";
+}

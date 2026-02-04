@@ -31,15 +31,14 @@ class LangWatchWorkflowModule(ReportingModule):
         raise NotImplementedError("This method should be implemented by the subclass")
 
     def wrapped(self, module: type[T], node_id: str, run: bool = True) -> type[T]:
-        # If already patched, unpatch everything
-        if hasattr(module, "__forward_before_autoparsing__"):
-            module.forward = module.__forward_before_autoparsing__  # type: ignore
-            delattr(module, "__forward_before_autoparsing__")
-            delattr(module, "__forward_before_reporting__")
-            delattr(module, "__forward_before_metadata__")
+        # Create a subclass to avoid polluting the original class with patches
+        # This prevents the `run` value from leaking across different workflow executions
+        class WrappedModule(module):  # type: ignore
+            pass
 
-        module = self.with_reporting(with_autoparsing(module), node_id)
-        module.__forward_before_metadata__ = module.forward  # type: ignore
+        # Apply autoparsing and reporting to the subclass, not the original
+        wrapped_module = self.with_reporting(with_autoparsing(WrappedModule), node_id)
+        wrapped_module.__forward_before_metadata__ = wrapped_module.forward  # type: ignore
 
         def forward_with_metadata(instance_self, *args, **kwargs):
             if not run:
@@ -52,7 +51,7 @@ class LangWatchWorkflowModule(ReportingModule):
 
             start_time = time.time()
             try:
-                result = module.__forward_before_metadata__(instance_self, *args, **kwargs)  # type: ignore
+                result = wrapped_module.__forward_before_metadata__(instance_self, *args, **kwargs)  # type: ignore
                 # Skip cost and duration calculation for evaluation results as those are counted separately
                 if not isinstance(result, PredictionWithEvaluationAndMetadata):
                     cost = getattr(result, "cost", None)
@@ -65,8 +64,8 @@ class LangWatchWorkflowModule(ReportingModule):
                 raise e
             return result
 
-        module.forward = forward_with_metadata  # type: ignore
-        return module
+        wrapped_module.forward = forward_with_metadata  # type: ignore
+        return wrapped_module
 
     def run_in_parallel(self, *module_kwargs: Tuple[T, Dict[str, Any]]):
         """

@@ -52,6 +52,46 @@ See [bettertests.js.org](https://bettertests.js.org/) for more patterns.
 
 Isolating assertions makes failures immediately clear. When multiple behaviors need testing, create separate tests.
 
+### BDD-Style Test Structure
+
+Use nested `describe` blocks to express Given/When/Then structure:
+
+```typescript
+describe("ClassName", () => {
+  describe("methodName", () => {
+    describe("given some precondition", () => {
+      beforeEach(() => { /* setup context */ });
+
+      describe("when some action occurs", () => {
+        it("produces expected result", () => { /* assertion */ });
+        it("also does this other thing", () => { /* assertion */ });
+      });
+    });
+
+    describe("given different precondition", () => {
+      describe("when same action occurs", () => {
+        it("produces different result", () => { /* assertion */ });
+      });
+    });
+  });
+});
+```
+
+Benefits:
+- **Grouping**: Related tests share setup in `beforeEach`
+- **Readability**: Test output reads like a spec: "ClassName > methodName > given X > when Y > does Z"
+- **Organization**: Clear separation of context (given) from action (when) from expectation (it)
+
+Avoid flat structures with Given/When/Then only in comments:
+```typescript
+// Avoid: comments don't provide grouping or shared setup
+it("does X when Y given Z", () => {
+  // Given: Z
+  // When: Y
+  // Then: X
+});
+```
+
 ## Test Hierarchy
 
 Avoid overlap. Each level has a distinct purpose.
@@ -105,19 +145,52 @@ See `specs/README.md` for detailed BDD guidance.
 
 ## Decision Tree
 
+Apply in order. Stop at first match.
+
 ```text
-Is this a happy path demonstrating SDK usage?
-  -> E2E (wrap an example)
+Is this testing UI elements exist? (form fields, buttons, layout)
+  -> @integration
 
-Does it test orchestration between internal modules or external API behavior?
-  -> Integration (mock external boundaries)
+Is this testing navigation/routing only?
+  -> @integration
 
-Is it pure logic or a single class in isolation?
-  -> Unit (mock collaborators)
+Is this testing error handling or edge cases?
+  -> @integration (mock boundaries)
 
-Is it a regression from production?
-  -> Add test at the LOWEST sufficient level (unit > integration > e2e)
+Is this a complete user workflow with observable outcome?
+  -> @e2e (user intent + multiple steps + result + business value)
+
+Is this pure logic in isolation?
+  -> @unit
+
+Is this a regression from production?
+  -> Add at LOWEST sufficient level (unit > integration > e2e)
 ```
+
+### Examples
+
+**Valid @e2e** - Complete workflow:
+```gherkin
+@e2e
+Scenario: User creates and publishes a scenario
+  Given I am logged in
+  When I create a new scenario
+  And I fill in the required fields
+  And I save the scenario
+  Then I see a success message
+  And the scenario appears in my list after refresh
+```
+
+**Invalid @e2e** - Should be @integration:
+```gherkin
+@e2e  # WRONG: just testing UI exists
+Scenario: Create form has required fields
+  Given I am on the create page
+  Then I see a name field
+  And I see a submit button
+```
+
+Use `/test-review` to validate pyramid placement.
 
 ## Scenario Design
 

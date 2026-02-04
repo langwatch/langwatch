@@ -22,17 +22,22 @@ const getImportedModelCosts = () => {
       model.pricing?.inputCostPerToken != null ||
       model.pricing?.outputCostPerToken != null
     ) {
+      // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
+      const hasVendorPrefix = modelId.includes("/");
+      const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
+      const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
+
+      const escapedModelName = escapeStringRegexp(modelName)
+        .replaceAll("\\x2d", "-")
+        // Fix for langchain using vertexai while litellm uses vertex_ai
+        .replace("vertex_ai", "(vertex_ai|vertexai)");
+
+      const regex = hasVendorPrefix
+        ? `^(${escapeStringRegexp(vendorPrefix!)}\\/)?${escapedModelName}$`
+        : `^${escapedModelName}$`;
+
       tokenModels[modelId] = {
-        regex:
-          "^" +
-          // Fix for anthropic/ models not coming with vendor name from litellm
-          (modelId.startsWith("claude-") ? "(anthropic\\/)?" : "") +
-          escapeStringRegexp(modelId)
-            .replaceAll("\\x2d", "-")
-            .replaceAll("/", "\\/")
-            // Fix for langchain using vertexai while litellm uses vertex_ai
-            .replace("vertex_ai", "(vertex_ai|vertexai)") +
-          "$",
+        regex,
         inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
       };

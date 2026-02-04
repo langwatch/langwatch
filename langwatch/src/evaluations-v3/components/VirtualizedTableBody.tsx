@@ -128,10 +128,8 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
                 isLoading={isLoading}
               />
             ))}
-            {/* Filler column - absorbs remaining space */}
-            <td style={{ width: "auto" }} />
-            {/* Spacer column to match drawer width */}
-            <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+            {/* Filler column - absorbs remaining space + spacer column to match drawer width */}
+            <td colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }} />
           </tr>
         );
       })}

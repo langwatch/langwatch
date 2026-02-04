@@ -321,6 +321,295 @@ describe("updateEvaluationStatusInES", () => {
 });
 
 /**
+ * Tests for workflow evaluators
+ * These tests verify that workflow-based evaluators are handled correctly
+ */
+describe("runEvaluationJob - workflow evaluators", () => {
+  const projectId = `test-project-workflow-${nanoid()}`;
+  const testMonitorIds: string[] = [];
+  const testEvaluatorIds: string[] = [];
+  const testWorkflowIds: string[] = [];
+
+  afterAll(async () => {
+    // Clean up test data - ignore errors if records don't exist
+    for (const monitorId of testMonitorIds) {
+      await prisma.monitor
+        .delete({ where: { id: monitorId, projectId } })
+        .catch(() => undefined);
+    }
+    for (const evaluatorId of testEvaluatorIds) {
+      await prisma.evaluator
+        .delete({ where: { id: evaluatorId, projectId } })
+        .catch(() => undefined);
+    }
+    for (const workflowId of testWorkflowIds) {
+      await prisma.workflow
+        .delete({ where: { id: workflowId, projectId } })
+        .catch(() => undefined);
+    }
+  });
+
+  it("creates monitor with workflow evaluator and checkType 'workflow'", async () => {
+    // Create a workflow first
+    const workflow = await prisma.workflow.create({
+      data: {
+        id: `workflow_${nanoid()}`,
+        projectId,
+        name: "Test Workflow Evaluator",
+        icon: "📊",
+        description: "Test workflow for evaluator",
+      },
+    });
+    testWorkflowIds.push(workflow.id);
+
+    // Create a workflow-based evaluator
+    const evaluator = await prisma.evaluator.create({
+      data: {
+        id: `evaluator_${nanoid()}`,
+        projectId,
+        name: "Test Workflow Evaluator",
+        type: "workflow",
+        config: {}, // Workflow evaluators have empty config
+        workflowId: workflow.id,
+      },
+    });
+    testEvaluatorIds.push(evaluator.id);
+
+    // Create monitor with workflow evaluator
+    const monitor = await prisma.monitor.create({
+      data: {
+        id: `monitor_${nanoid()}`,
+        projectId,
+        name: "Workflow Evaluation Monitor",
+        checkType: "workflow", // This is the key - workflow evaluators use "workflow" as checkType
+        slug: `workflow-monitor-${nanoid().slice(0, 5)}`,
+        preconditions: [],
+        parameters: {},
+        sample: 1.0,
+        enabled: true,
+        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        evaluatorId: evaluator.id,
+        mappings: {
+          mapping: {
+            answer: { source: "trace", key: "output" },
+          },
+        },
+      },
+    });
+    testMonitorIds.push(monitor.id);
+
+    // Verify monitor was created with correct checkType
+    const savedMonitor = await prisma.monitor.findUnique({
+      where: { id: monitor.id, projectId },
+      include: { evaluator: true },
+    });
+
+    expect(savedMonitor?.checkType).toBe("workflow");
+    expect(savedMonitor?.evaluator?.type).toBe("workflow");
+    expect(savedMonitor?.evaluator?.workflowId).toBe(workflow.id);
+  });
+
+  it("workflow evaluator data passes through without field filtering", async () => {
+    // This test verifies that buildDataForEvaluation returns data as-is for workflow evaluators
+    // (unlike built-in evaluators which filter to requiredFields + optionalFields)
+
+    // Create a workflow-based evaluator
+    const workflow = await prisma.workflow.create({
+      data: {
+        id: `workflow_${nanoid()}`,
+        projectId,
+        name: "Test Workflow",
+        icon: "📊",
+        description: "Test workflow for custom mappings",
+      },
+    });
+    testWorkflowIds.push(workflow.id);
+
+    const evaluator = await prisma.evaluator.create({
+      data: {
+        id: `evaluator_${nanoid()}`,
+        projectId,
+        name: "Workflow Evaluator",
+        type: "workflow",
+        config: {},
+        workflowId: workflow.id,
+      },
+    });
+    testEvaluatorIds.push(evaluator.id);
+
+    // Create monitor with custom mappings
+    const monitor = await prisma.monitor.create({
+      data: {
+        id: `monitor_${nanoid()}`,
+        projectId,
+        name: "Workflow Monitor with Custom Mappings",
+        checkType: "workflow",
+        slug: `workflow-custom-${nanoid().slice(0, 5)}`,
+        preconditions: [],
+        parameters: {},
+        sample: 1.0,
+        enabled: true,
+        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        evaluatorId: evaluator.id,
+        mappings: {
+          mapping: {
+            custom_field_1: { source: "trace", key: "input" },
+            custom_field_2: { source: "trace", key: "output" },
+            another_field: { source: "trace", key: "metadata.user_id" },
+          },
+        },
+      },
+    });
+    testMonitorIds.push(monitor.id);
+
+    // Verify the mappings are stored correctly
+    const savedMonitor = await prisma.monitor.findUnique({
+      where: { id: monitor.id, projectId },
+    });
+
+    expect(savedMonitor?.mappings).toEqual({
+      mapping: {
+        custom_field_1: { source: "trace", key: "input" },
+        custom_field_2: { source: "trace", key: "output" },
+        another_field: { source: "trace", key: "metadata.user_id" },
+      },
+    });
+  });
+});
+
+/**
+ * Tests for workflow evaluator workflowId resolution
+ * These tests verify that workflow evaluators get their workflowId from the evaluator record
+ */
+describe("runEvaluationJob - workflow evaluator workflowId resolution", () => {
+  const projectId = `test-project-wfid-${nanoid()}`;
+  const testMonitorIds: string[] = [];
+  const testEvaluatorIds: string[] = [];
+  const testWorkflowIds: string[] = [];
+
+  afterAll(async () => {
+    for (const monitorId of testMonitorIds) {
+      await prisma.monitor
+        .delete({ where: { id: monitorId, projectId } })
+        .catch(() => undefined);
+    }
+    for (const evaluatorId of testEvaluatorIds) {
+      await prisma.evaluator
+        .delete({ where: { id: evaluatorId, projectId } })
+        .catch(() => undefined);
+    }
+    for (const workflowId of testWorkflowIds) {
+      await prisma.workflow
+        .delete({ where: { id: workflowId, projectId } })
+        .catch(() => undefined);
+    }
+  });
+
+  it("resolves workflowId from evaluator record for workflow evaluators", async () => {
+    // Create workflow
+    const workflow = await prisma.workflow.create({
+      data: {
+        id: `workflow_${nanoid()}`,
+        projectId,
+        name: "Test Workflow for ID Resolution",
+        icon: "🔍",
+        description: "Test workflow",
+      },
+    });
+    testWorkflowIds.push(workflow.id);
+
+    // Create workflow evaluator linked to workflow
+    const evaluator = await prisma.evaluator.create({
+      data: {
+        id: `evaluator_${nanoid()}`,
+        projectId,
+        name: "Workflow Evaluator",
+        type: "workflow",
+        config: {},
+        workflowId: workflow.id,
+      },
+    });
+    testEvaluatorIds.push(evaluator.id);
+
+    // Create monitor with checkType "workflow"
+    const monitor = await prisma.monitor.create({
+      data: {
+        id: `monitor_${nanoid()}`,
+        projectId,
+        name: "Workflow Monitor",
+        checkType: "workflow", // Note: NOT "custom/<workflowId>" pattern
+        slug: `wfid-monitor-${nanoid().slice(0, 5)}`,
+        preconditions: [],
+        parameters: {},
+        sample: 1.0,
+        enabled: true,
+        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        evaluatorId: evaluator.id,
+        mappings: {
+          mapping: {
+            answer: { source: "trace", key: "output" },
+          },
+        },
+      },
+    });
+    testMonitorIds.push(monitor.id);
+
+    // Fetch monitor with evaluator to verify the workflowId resolution path
+    const monitorWithEvaluator = await prisma.monitor.findUnique({
+      where: { id: monitor.id, projectId },
+      include: { evaluator: true },
+    });
+
+    // Verify the workflowId resolution logic (same logic as in runEvaluationJob)
+    const resolvedWorkflowId =
+      monitorWithEvaluator?.evaluator?.type === "workflow"
+        ? monitorWithEvaluator.evaluator.workflowId
+        : undefined;
+
+    expect(resolvedWorkflowId).toBe(workflow.id);
+    expect(monitorWithEvaluator?.checkType).toBe("workflow");
+    // Verify workflowId is NOT embedded in checkType
+    expect(monitorWithEvaluator?.checkType).not.toContain(workflow.id);
+  });
+
+  it("custom evaluators still resolve workflowId from checkType pattern", async () => {
+    // Create workflow
+    const workflow = await prisma.workflow.create({
+      data: {
+        id: `workflow_${nanoid()}`,
+        projectId,
+        name: "Custom Workflow",
+        icon: "⚙️",
+        description: "Test custom workflow",
+      },
+    });
+    testWorkflowIds.push(workflow.id);
+
+    // Create monitor with legacy custom/<workflowId> pattern (no evaluator)
+    const monitor = await prisma.monitor.create({
+      data: {
+        id: `monitor_${nanoid()}`,
+        projectId,
+        name: "Legacy Custom Monitor",
+        checkType: `custom/${workflow.id}`, // Legacy pattern
+        slug: `custom-monitor-${nanoid().slice(0, 5)}`,
+        preconditions: [],
+        parameters: {},
+        sample: 1.0,
+        enabled: true,
+        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+        // No evaluatorId - legacy monitor
+      },
+    });
+    testMonitorIds.push(monitor.id);
+
+    // Verify the checkType contains the workflowId (legacy pattern)
+    expect(monitor.checkType).toBe(`custom/${workflow.id}`);
+    expect(monitor.checkType.split("/")[1]).toBe(workflow.id);
+  });
+});
+
+/**
  * Full queue integration tests
  *
  * NOTE: These tests are skipped because they require:

@@ -13,7 +13,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
+import { CascadeArchiveDialog } from "../../../components/CascadeArchiveDialog";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
@@ -50,6 +50,44 @@ export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   );
 }
 
+/**
+ * Simple workflow card display component for reuse.
+ * Shows workflow icon, name, and timestamp with a customizable action slot.
+ */
+export function WorkflowCardDisplay({
+  name,
+  icon,
+  updatedAt,
+  action,
+  ...props
+}: {
+  name: string;
+  icon: React.ReactNode;
+  updatedAt?: Date | number;
+  action?: React.ReactNode;
+} & Omit<React.ComponentProps<typeof WorkflowCardBase>, "children">) {
+  return (
+    <WorkflowCardBase paddingX={0} {...props}>
+      <HStack gap={4} paddingX={4} paddingBottom={2} width="full">
+        <WorkflowIcon icon={icon} size="lg" />
+        <Spacer />
+        {action}
+      </HStack>
+      <Spacer />
+      <Text paddingX={4} color="fg.muted" fontSize="sm" fontWeight={500}>
+        {name}
+      </Text>
+      {updatedAt && (
+        <Text paddingX={4} color="fg.subtle" fontSize="12px">
+          {formatTimeAgo(
+            typeof updatedAt === "number" ? updatedAt : updatedAt.getTime(),
+          )}
+        </Text>
+      )}
+    </WorkflowCardBase>
+  );
+}
+
 export function WorkflowCard({
   workflowId,
   query,
@@ -71,6 +109,7 @@ export function WorkflowCard({
 } & React.ComponentProps<typeof WorkflowCardBase>) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
+  const cascadeArchiveWorkflow = api.workflow.cascadeArchive.useMutation();
   const syncFromSource = api.workflow.syncFromSource.useMutation();
   const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
   const hasWorkflowsCreatePermission = hasPermission("workflows:create");
@@ -79,6 +118,12 @@ export function WorkflowCard({
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
     useState(false);
+
+  // Query related entities when delete dialog is open
+  const relatedEntitiesQuery = api.workflow.getRelatedEntities.useQuery(
+    { workflowId: workflowId ?? "", projectId: project?.id ?? "" },
+    { enabled: isDeleteDialogOpen && !!workflowId && !!project?.id },
+  );
 
   // Get the workflow data to check if it's a copy or has copies
   const workflow = workflowId
@@ -130,68 +175,87 @@ export function WorkflowCard({
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
 
-    archiveWorkflow.mutate(
-      { workflowId, projectId: project.id },
-      {
-        onSuccess: () => {
-          void query?.refetch();
-          toaster.create({
-            title: `Workflow ${name} deleted`,
-            description: (
-              <HStack>
-                <Button
-                  unstyled
-                  color="white"
-                  cursor="pointer"
-                  textDecoration="underline"
-                  onClick={() => {
-                    toaster.remove(`delete-workflow-${workflowId}`);
-                    setTimeout(() => {
-                      void query?.refetch();
-                    }, 1000);
-                    archiveWorkflow.mutate(
-                      {
-                        projectId: project?.id ?? "",
-                        workflowId,
-                        unarchive: true,
-                      },
-                      {
-                        onSuccess: () => {
-                          void query?.refetch();
-                          toaster.create({
-                            title: "Workflow restored",
-                            description: "The workflow has been restored.",
-                            type: "success",
-                            meta: {
-                              closable: true,
-                            },
-                          });
-                        },
-                      },
-                    );
-                  }}
-                >
-                  Undo
-                </Button>
-              </HStack>
-            ),
-            id: `delete-workflow-${workflowId}`,
-            type: "success",
-            meta: {
-              closable: true,
-            },
-          });
+    const hasRelated =
+      (relatedEntitiesQuery.data?.evaluators.length ?? 0) > 0 ||
+      (relatedEntitiesQuery.data?.agents.length ?? 0) > 0;
+
+    // Use cascade archive if there are related entities, otherwise use simple archive
+    if (hasRelated) {
+      cascadeArchiveWorkflow.mutate(
+        { workflowId, projectId: project.id },
+        {
+          onSuccess: (result) => {
+            setIsDeleteDialogOpen(false);
+            void query?.refetch();
+
+            const parts: string[] = [];
+            if (result.archivedEvaluatorsCount > 0) {
+              parts.push(
+                `${result.archivedEvaluatorsCount} evaluator${result.archivedEvaluatorsCount > 1 ? "s" : ""}`,
+              );
+            }
+            if (result.archivedAgentsCount > 0) {
+              parts.push(
+                `${result.archivedAgentsCount} agent${result.archivedAgentsCount > 1 ? "s" : ""}`,
+              );
+            }
+            if (result.deletedMonitorsCount > 0) {
+              parts.push(
+                `${result.deletedMonitorsCount} online evaluation${result.deletedMonitorsCount > 1 ? "s" : ""}`,
+              );
+            }
+
+            toaster.create({
+              title: `Workflow "${name}" deleted`,
+              description:
+                parts.length > 0
+                  ? `Also deleted: ${parts.join(", ")}`
+                  : undefined,
+              type: "success",
+              meta: { closable: true },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error deleting workflow",
+              description: "Please try again later.",
+              type: "error",
+            });
+          },
         },
-        onError: () => {
-          toaster.create({
-            title: "Error deleting workflow",
-            description: "Please try again later.",
-            type: "error",
-          });
+      );
+    } else {
+      archiveWorkflow.mutate(
+        { workflowId, projectId: project.id },
+        {
+          onSuccess: () => {
+            setIsDeleteDialogOpen(false);
+            void query?.refetch();
+            toaster.create({
+              title: `Workflow "${name}" deleted`,
+              type: "success",
+              meta: { closable: true },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error deleting workflow",
+              description: "Please try again later.",
+              type: "error",
+            });
+          },
         },
-      },
-    );
-  }, [archiveWorkflow, name, project, query, workflowId]);
+      );
+    }
+  }, [
+    archiveWorkflow,
+    cascadeArchiveWorkflow,
+    name,
+    project,
+    query,
+    relatedEntitiesQuery.data,
+    workflowId,
+  ]);
 
   return (
     <>
@@ -326,12 +390,21 @@ export function WorkflowCard({
         </Text>
       </WorkflowCardBase>
 
-      <DeleteConfirmationDialog
-        title="Are you really sure?"
-        description={`Deleting "${name}" cannot be undone. If you're sure you want to delete this workflow, type 'delete' below:`}
+      <CascadeArchiveDialog
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={onArchiveWorkflow}
+        isLoading={
+          cascadeArchiveWorkflow.isPending || archiveWorkflow.isPending
+        }
+        isLoadingRelated={relatedEntitiesQuery.isLoading}
+        entityType="workflow"
+        entityName={name}
+        relatedEntities={{
+          evaluators: relatedEntitiesQuery.data?.evaluators,
+          agents: relatedEntitiesQuery.data?.agents,
+          monitors: relatedEntitiesQuery.data?.monitors,
+        }}
       />
 
       {workflowId && (

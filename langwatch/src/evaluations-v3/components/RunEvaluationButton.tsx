@@ -109,7 +109,7 @@ export const RunEvaluationButton = ({
         if (target) {
           availableSources.push({
             id: target.id,
-            name: target.name,
+            name: target.id, // Display name will be resolved by the drawer
             type: "signature" as const,
             fields: target.outputs.map((o) => ({
               name: o.identifier,
@@ -184,7 +184,7 @@ export const RunEvaluationButton = ({
     const validation = validateWorkbench(targets, evaluators, activeDatasetId);
     if (!validation.isValid) {
       if (validation.firstInvalidTarget) {
-        return `Configure missing mappings for "${validation.firstInvalidTarget.target.name}"`;
+        return `Configure missing mappings for target`;
       }
       if (validation.firstInvalidEvaluator) {
         return `Configure missing mappings for evaluator`;

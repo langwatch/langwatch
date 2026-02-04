@@ -83,10 +83,10 @@ export function formatLicenseDate(isoDate: string): string {
 
 /**
  * Formats a limit value for display.
- * Returns "Unlimited" for very large numbers (1M+) or special values like MAX_SAFE_INTEGER.
+ * Returns "Unlimited" for non-finite values (Infinity, NaN) or large numbers (1M+).
  */
 export function formatLimitOrUnlimited(value: number): string {
-  if (!Number.isFinite(value)) {
+  if (!Number.isFinite(value) || value >= 1_000_000) {
     return "Unlimited";
   }
   return value.toLocaleString();

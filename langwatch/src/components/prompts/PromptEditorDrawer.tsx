@@ -14,11 +14,7 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { UpgradeModal } from "~/components/UpgradeModal";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -167,6 +163,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const flowCallbacks = getFlowCallbacks("promptEditor");
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
+
+  // License enforcement for prompt creation
+  const { checkAndProceed } = useLicenseEnforcement("prompts");
 
   // Check if we're in evaluations context (targetId in URL params)
   const targetId = drawerParams.targetId as string | undefined;
@@ -530,12 +529,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "prompts") {
-        setLimitInfo(limitExceeded);
-        setShowUpgradeModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -626,9 +619,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
   // State for change handle dialog (for renaming existing prompts)
   const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
-  // State for upgrade modal when limit is exceeded
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
   const pendingSaveDataRef = useRef<ReturnType<
     typeof formValuesToTriggerSaveVersionParams
   > | null>(null);
@@ -665,7 +655,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       const saveData = pendingSaveDataRef.current;
 
       if (promptId && promptQuery.data?.id) {
-        // Update existing prompt
+        // Update existing prompt - no limit check needed
         updateMutation.mutate({
           projectId: project.id,
           id: promptQuery.data.id,
@@ -675,15 +665,17 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         });
       } else if (newPromptData) {
-        // Create new prompt
-        createMutation.mutate({
-          projectId: project.id,
-          data: {
-            ...saveData,
-            handle: newPromptData.handle,
-            scope: newPromptData.scope,
-            commitMessage,
-          },
+        // Create new prompt - check limit first
+        checkAndProceed(() => {
+          createMutation.mutate({
+            projectId: project.id,
+            data: {
+              ...saveData,
+              handle: newPromptData.handle,
+              scope: newPromptData.scope,
+              commitMessage,
+            },
+          });
         });
       }
     },
@@ -693,6 +685,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       promptQuery.data?.id,
       createMutation,
       updateMutation,
+      checkAndProceed,
     ],
   );
 
@@ -1122,13 +1115,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           </Drawer.Footer>
         )}
       </Drawer.Content>
-      <UpgradeModal
-        open={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="prompts"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
     </Drawer.Root>
   );
 }

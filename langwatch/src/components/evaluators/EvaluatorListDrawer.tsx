@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
 import { useState } from "react";
@@ -32,7 +32,7 @@ import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 export type EvaluatorListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (evaluator: Evaluator) => void;
+  onSelect?: (evaluator: EvaluatorWithFields) => void;
   onCreateNew?: () => void;
 };
 
@@ -75,7 +75,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     },
   });
 
-  const handleSelectEvaluator = (evaluator: Evaluator) => {
+  const handleSelectEvaluator = (evaluator: EvaluatorWithFields) => {
     // IMPORTANT: Only call the callback - do NOT navigate here!
     // Navigation (goBack/closeDrawer) is the CALLER'S responsibility.
     // Different callers have different navigation needs:
@@ -86,7 +86,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     onSelect?.(evaluator);
   };
 
-  const handleEditEvaluator = (evaluator: Evaluator) => {
+  const handleEditEvaluator = (evaluator: EvaluatorWithFields) => {
     const config = evaluator.config as { evaluatorType?: string } | null;
     openDrawer("evaluatorEditor", {
       evaluatorId: evaluator.id,
@@ -94,7 +94,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     });
   };
 
-  const handleDeleteEvaluator = (evaluator: Evaluator) => {
+  const handleDeleteEvaluator = (evaluator: EvaluatorWithFields) => {
     if (
       window.confirm(`Are you sure you want to delete "${evaluator.name}"?`)
     ) {
@@ -106,11 +106,10 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   };
 
   // State for API usage dialog
-  const [apiDialogEvaluator, setApiDialogEvaluator] = useState<Evaluator | null>(
-    null,
-  );
+  const [apiDialogEvaluator, setApiDialogEvaluator] =
+    useState<EvaluatorWithFields | null>(null);
 
-  const handleUseFromApi = (evaluator: Evaluator) => {
+  const handleUseFromApi = (evaluator: EvaluatorWithFields) => {
     setApiDialogEvaluator(evaluator);
   };
 
@@ -225,7 +224,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 // ============================================================================
 
 type EvaluatorCardProps = {
-  evaluator: Evaluator;
+  evaluator: EvaluatorWithFields;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;

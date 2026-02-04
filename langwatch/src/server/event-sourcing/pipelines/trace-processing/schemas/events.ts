@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../library/domain/types";
+import { piiRedactionLevelSchema } from "./commands";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -26,6 +27,7 @@ export const spanReceivedEventDataSchema = z.object({
   span: spanSchema,
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema,
 });
 
 export const spanReceivedEventSchema = EventSchema.extend({

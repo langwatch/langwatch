@@ -69,7 +69,7 @@ class S3Syncer:
         # Update files.json if new files were added
         if new_files_added:
             try:
-                files_json = json.dumps(list(self.known_files))
+                files_json = json.dumps(list(self.known_files), ensure_ascii=False)
                 files_json_path = os.path.join(self.local_dir, "files.json")
                 with open(files_json_path, "w") as f:
                     f.write(files_json)

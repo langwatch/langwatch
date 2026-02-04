@@ -141,6 +141,14 @@ async function handleTracesRequest(req: NextRequest) {
       span.setAttribute("langwatch.project.id", project.id);
 
       const body = await req.arrayBuffer();
+
+      // Handle empty body gracefully - protobuf decode throws on empty input.
+      // OTEL SDKs may send empty requests during shutdown/flush cycles.
+      if (body.byteLength === 0) {
+        logger.debug("Received empty trace request, ignoring");
+        return NextResponse.json({ message: "No traces to process" });
+      }
+
       let traceRequest: IExportTraceServiceRequest;
       try {
         if (contentType === "application/json") {
@@ -189,6 +197,7 @@ async function handleTracesRequest(req: NextRequest) {
         clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
           project.id,
           traceRequest,
+          project.piiRedactionLevel,
         );
       }
 

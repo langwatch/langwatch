@@ -1,10 +1,12 @@
 "use client";
 // Internal pages don't need to be server rendering
 
+import { useState } from "react";
 import { HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
+import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
@@ -19,7 +21,8 @@ import { api } from "~/utils/api";
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("scenarios");
+  const { checkAndProceed } = useLicenseEnforcement("scenarios");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const {
     data: scenarios,
@@ -44,7 +47,7 @@ function ScenarioLibraryPage() {
 
   const handleNewScenario = () => {
     checkAndProceed(() => {
-      openDrawer("scenarioEditor");
+      setIsCreateModalOpen(true);
     });
   };
 
@@ -96,7 +99,10 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
-      {upgradeModal}
+      <ScenarioCreateModal
+        open={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </DashboardLayout>
   );
 }

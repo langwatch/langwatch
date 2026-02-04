@@ -11,6 +11,7 @@ import {
 } from "../../evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
+import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -151,6 +152,9 @@ export const monitorsRouter = createTRPCRouter({
         threadIdleTimeout,
       } = input;
       const prisma = ctx.prisma;
+
+      // Enforce license limit before creating monitor
+      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
 
       // Validate evaluator exists and belongs to project if provided
       if (evaluatorId) {
@@ -326,9 +330,13 @@ export const monitorsRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
+  // Allow workflow evaluators (they use "workflow" as checkType)
+  const isWorkflowEvaluator = checkType === "workflow";
+
   if (
     AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
-    !checkType.startsWith("custom/")
+    !checkType.startsWith("custom/") &&
+    !isWorkflowEvaluator
   ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -336,7 +344,9 @@ const validateCheckSettings = (checkType: string, parameters: any) => {
     });
   }
 
-  if (!checkType.startsWith("custom/")) {
+  // Skip settings validation for workflow evaluators and custom evaluators
+  // (they don't have schema-based settings)
+  if (!checkType.startsWith("custom/") && !isWorkflowEvaluator) {
     const checkType_ = checkType as EvaluatorTypes;
     try {
       evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);

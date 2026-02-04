@@ -9,9 +9,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
+import { Link } from "~/components/ui/link";
+import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import { z } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Drawer } from "~/components/ui/drawer";
@@ -29,17 +32,17 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
-import { UpgradeModal } from "~/components/UpgradeModal";
 import { toaster } from "~/components/ui/toaster";
-import {
-  extractLimitExceededInfo,
-  type LimitExceededInfo,
-} from "~/utils/trpcError";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import {
+  getTraceAvailableSources,
+  getThreadAvailableSources,
+} from "~/server/tracer/tracesMapping";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
@@ -49,10 +52,22 @@ import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
  * Mapping configuration for showing evaluator input mappings.
  * This is provided by the caller (e.g., Evaluations V3, Optimization Studio)
  * to enable context-specific mapping UI without this component knowing the details.
+ *
+ * Two modes are supported:
+ * 1. Online evaluation: provide `level` and the component fetches trace/thread sources
+ * 2. Dataset evaluation: provide `availableSources` directly (e.g., dataset columns)
  */
 export type EvaluatorMappingsConfig = {
-  /** Available sources for variable mapping */
-  availableSources: AvailableSource[];
+  /**
+   * For online evaluation: specify level and sources will be fetched automatically.
+   * This avoids race conditions when the drawer opens before data loads.
+   */
+  level?: "trace" | "thread";
+  /**
+   * For dataset evaluation: provide sources directly (dataset columns, signature fields).
+   * If both level and availableSources are provided, availableSources takes precedence.
+   */
+  availableSources?: AvailableSource[];
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
@@ -69,7 +84,8 @@ export type EvaluatorEditorDrawerProps = {
   onSave?: (evaluator: {
     id: string;
     name: string;
-  }) => boolean | void | Promise<void>;
+    evaluatorType?: string;
+  }) => boolean | void | Promise<void> | Promise<boolean>;
   /** Evaluator type (e.g., "langevals/exact_match") */
   evaluatorType?: string;
   /** If provided, loads an existing evaluator for editing */
@@ -99,7 +115,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
-  const { checkAndProceed, upgradeModal } = useLicenseEnforcement("evaluators");
+  const { checkAndProceed } = useLicenseEnforcement("evaluators");
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -131,6 +147,9 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
 
+  // Check if this is a workflow evaluator
+  const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
+
   // Get evaluatorType from props, URL params, complexProps, or loaded evaluator data
   const loadedEvaluatorType = (
     evaluatorQuery.data?.config as { evaluatorType?: string } | null
@@ -146,6 +165,25 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
     : undefined;
 
+  // For workflow evaluators, construct a synthetic evaluator definition from the pre-computed fields
+  // This allows the mappings section to work with workflow fields using the existing structure
+  // For built-in evaluators, we also use the pre-computed fields from the backend
+  const effectiveEvaluatorDef = useMemo(() => {
+    const fields = evaluatorQuery.data?.fields;
+    if (fields && fields.length > 0) {
+      // Use pre-computed fields from the backend (works for both workflow and built-in evaluators)
+      const requiredFields = fields
+        .filter((f) => !f.optional)
+        .map((f) => f.identifier);
+      const optionalFields = fields
+        .filter((f) => f.optional)
+        .map((f) => f.identifier);
+      return { requiredFields, optionalFields };
+    }
+    // Fallback to AVAILABLE_EVALUATORS for new evaluators not yet saved
+    return evaluatorDef;
+  }, [evaluatorQuery.data?.fields, evaluatorDef]);
+
   // Get the schema for this evaluator type
   const settingsSchema = useMemo(() => {
     if (!evaluatorType) return undefined;
@@ -160,28 +198,38 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     return getEvaluatorDefaultSettings(evaluatorDef, project) ?? {};
   }, [evaluatorDef, project]);
 
+  // Check if this is an LLM as Judge evaluator (should not prefill name)
+  const forceUserToDecideAName =
+    evaluatorType?.startsWith("langevals/llm_") &&
+    evaluatorType !== "langevals/llm_answer_match"
+      ? true
+      : false;
+
   // Form state using react-hook-form
   const form = useForm<{ name: string; settings: Record<string, unknown> }>({
     defaultValues: {
-      name: evaluatorDef?.name ?? "",
+      name: forceUserToDecideAName ? "" : (evaluatorDef?.name ?? ""),
       settings: defaultSettings,
     },
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  // State for upgrade modal when limit is exceeded (handles race conditions)
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<LimitExceededInfo | null>(null);
 
   // Update form defaults when evaluator type changes
   useEffect(() => {
     if (evaluatorDef && !evaluatorId) {
       form.reset({
-        name: evaluatorDef.name,
+        name: forceUserToDecideAName ? "" : evaluatorDef.name,
         settings: defaultSettings,
       });
     }
-  }, [evaluatorDef, evaluatorId, defaultSettings, form]);
+  }, [
+    evaluatorDef,
+    evaluatorId,
+    defaultSettings,
+    form,
+    forceUserToDecideAName,
+  ]);
 
   // Initialize form with evaluator data
   useEffect(() => {
@@ -220,6 +268,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       const handledNavigation = freshOnSave?.({
         id: evaluator.id,
         name: evaluator.name,
+        evaluatorType, // Pass the evaluator type to the callback
       });
       if (handledNavigation) return;
       // Default: go back if there's a stack, otherwise close
@@ -230,12 +279,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       }
     },
     onError: (error) => {
-      const limitExceeded = extractLimitExceededInfo(error);
-      if (limitExceeded?.limitType === "evaluators") {
-        setLimitInfo(limitExceeded);
-        setShowLimitModal(true);
-        return;
-      }
       toaster.create({
         title: "Error creating evaluator",
         description: error.message,
@@ -273,7 +316,28 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const isValid = name?.trim().length > 0;
 
   const handleSave = useCallback(() => {
-    if (!project?.id || !isValid || !evaluatorType) return;
+    if (!project?.id || !isValid) return;
+
+    // For existing workflow evaluators, we're just "selecting" them, not saving
+    // Call onSave directly without requiring evaluatorType
+    if (evaluatorId && isWorkflowEvaluator) {
+      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+      const handledNavigation = freshOnSave?.({
+        id: evaluatorId,
+        name: evaluatorQuery.data?.name ?? "",
+      });
+      if (handledNavigation) return;
+      // Default: go back if there's a stack, otherwise close
+      if (getDrawerStack().length > 1) {
+        goBack();
+      } else {
+        onClose();
+      }
+      return;
+    }
+
+    // For built-in evaluators, we need evaluatorType
+    if (!evaluatorType) return;
 
     const formValues = form.getValues();
     const config = {
@@ -304,11 +368,16 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     project?.id,
     evaluatorId,
     evaluatorType,
+    isWorkflowEvaluator,
     isValid,
     form,
     createMutation,
     updateMutation,
     checkAndProceed,
+    onSave,
+    onClose,
+    goBack,
+    evaluatorQuery.data?.name,
   ]);
 
   const handleClose = () => {
@@ -409,25 +478,54 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   />
                 )}
 
-                {!hasSettings && !mappingsConfig && (
+                {/* Workflow card - always shown for workflow evaluators */}
+                {isWorkflowEvaluator && evaluatorQuery.data?.workflowId && (
+                  <VStack gap={4} paddingTop={4} align="stretch">
+                    <Text fontSize="sm" color="fg.muted">
+                      This evaluator is powered by a workflow. Click below to
+                      open the workflow editor:
+                    </Text>
+                    <Link
+                      href={`/${project?.slug}/studio/${evaluatorQuery.data.workflowId}`}
+                      data-testid="open-workflow-link"
+                      target="_blank"
+                    >
+                      <WorkflowCardDisplay
+                        name={evaluatorQuery.data.workflowName ?? "Workflow"}
+                        icon={evaluatorQuery.data.workflowIcon}
+                        updatedAt={evaluatorQuery.data.updatedAt}
+                        action={
+                          <ExternalLink
+                            size={16}
+                            color="var(--chakra-colors-fg-muted)"
+                          />
+                        }
+                        width="300px"
+                      />
+                    </Link>
+                  </VStack>
+                )}
+
+                {/* No settings message - only for non-workflow evaluators with no settings and no mappings */}
+                {!hasSettings && !mappingsConfig && !isWorkflowEvaluator && (
                   <Text fontSize="sm" color="fg.muted">
                     This evaluator does not have any settings to configure.
                   </Text>
                 )}
 
                 {/* Mappings section - shown when caller provides mappingsConfig */}
-                {mappingsConfig &&
-                  mappingsConfig.availableSources.length > 0 && (
-                    <Box paddingTop={4}>
-                      <EvaluatorMappingsSection
-                        evaluatorDef={evaluatorDef}
-                        availableSources={mappingsConfig.availableSources}
-                        initialMappings={mappingsConfig.initialMappings}
-                        onMappingChange={mappingsConfig.onMappingChange}
-                        scrollToMissingOnMount={true}
-                      />
-                    </Box>
-                  )}
+                {mappingsConfig && (
+                  <Box paddingTop={4}>
+                    <EvaluatorMappingsSection
+                      evaluatorDef={effectiveEvaluatorDef}
+                      level={mappingsConfig.level}
+                      providedSources={mappingsConfig.availableSources}
+                      initialMappings={mappingsConfig.initialMappings}
+                      onMappingChange={mappingsConfig.onMappingChange}
+                      scrollToMissingOnMount={true}
+                    />
+                  </Box>
+                )}
               </VStack>
             </FormProvider>
           )}
@@ -450,14 +548,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
-      {upgradeModal}
-      <UpgradeModal
-        open={showLimitModal}
-        onClose={() => setShowLimitModal(false)}
-        limitType="evaluators"
-        current={limitInfo?.current}
-        max={limitInfo?.max}
-      />
     </Drawer.Root>
   );
 }
@@ -473,7 +563,15 @@ type EvaluatorMappingsSectionProps = {
         optionalFields?: string[];
       }
     | undefined;
-  availableSources: AvailableSource[];
+  /**
+   * For online evaluation: specify level and sources will be fetched automatically.
+   */
+  level?: "trace" | "thread";
+  /**
+   * For dataset evaluation: provide sources directly.
+   * If provided, takes precedence over level-based fetching.
+   */
+  providedSources?: AvailableSource[];
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
@@ -489,14 +587,40 @@ type EvaluatorMappingsSectionProps = {
  * Sub-component for evaluator input mappings.
  * Manages local state for immediate UI feedback, persists via onMappingChange.
  * Computes missingMappingIds reactively from local state.
+ *
+ * Supports two modes:
+ * 1. Level-based: fetches span names/metadata keys internally (avoids race conditions)
+ * 2. Provided sources: uses the sources passed directly (for dataset evaluations)
  */
 function EvaluatorMappingsSection({
   evaluatorDef,
-  availableSources,
+  level,
+  providedSources,
   initialMappings,
   onMappingChange,
   scrollToMissingOnMount = false,
 }: EvaluatorMappingsSectionProps) {
+  const { project } = useOrganizationTeamProject();
+
+  // Fetch span names and metadata keys for level-based mode
+  // Only used when providedSources is not given
+  const { spanNames, metadataKeys } = useProjectSpanNames(
+    providedSources ? undefined : project?.id
+  );
+
+  // Build availableSources - use providedSources if given, otherwise fetch based on level
+  const availableSources = useMemo(() => {
+    // If sources are provided directly, use them (dataset evaluation mode)
+    if (providedSources) {
+      return providedSources;
+    }
+    // Otherwise, fetch based on level (online evaluation mode)
+    if (level === "thread") {
+      return getThreadAvailableSources() as AvailableSource[];
+    }
+    return getTraceAvailableSources(spanNames, metadataKeys) as AvailableSource[];
+  }, [providedSources, level, spanNames, metadataKeys]);
+
   // Local state for mappings - source of truth for UI
   const [localMappings, setLocalMappings] =
     useState<Record<string, UIFieldMapping>>(initialMappings);

@@ -9,6 +9,7 @@ import type { ExecutionCell } from "../types";
 import {
   buildCodeNodeFromAgent,
   buildEvaluatorNode,
+  buildEvaluatorTargetNode,
   buildHttpNodeFromAgent,
   buildSignatureNodeFromAgent,
 } from "../workflowBuilder";
@@ -17,7 +18,6 @@ describe("buildEvaluatorNode", () => {
   const createBasicEvaluatorConfig = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match",
-    name: "Exact Match",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },
@@ -48,7 +48,6 @@ describe("buildEvaluatorNode", () => {
     targetConfig: {
       id: "target-1",
       type: "prompt",
-      name: "Test Target",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -65,7 +64,6 @@ describe("buildEvaluatorNode", () => {
     const evaluator: EvaluatorConfig = {
       ...createBasicEvaluatorConfig(),
       evaluatorType: "langevals/llm_score",
-      name: "Custom LLM Score",
     };
     const cell = createBasicCell();
 
@@ -83,6 +81,8 @@ describe("buildEvaluatorNode", () => {
       cell,
       0,
       settings,
+      undefined, // dbEvaluatorId
+      "Custom LLM Score", // name
     );
 
     // Settings should be in parameters array (format expected by langwatch_nlp)
@@ -122,6 +122,9 @@ describe("buildEvaluatorNode", () => {
       "target-1",
       cell,
       0,
+      {}, // settings
+      undefined, // dbEvaluatorId
+      "Exact Match", // name
     );
 
     // Should have empty parameters array when no settings
@@ -235,7 +238,6 @@ describe("buildSignatureNodeFromAgent", () => {
   const createTargetConfig = (): TargetConfig => ({
     id: "target-1",
     type: "agent",
-    name: "Signature Agent Target",
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -396,7 +398,6 @@ describe("buildHttpNodeFromAgent", () => {
   const createTargetConfig = (): TargetConfig => ({
     id: "target-1",
     type: "agent",
-    name: "HTTP Agent Target",
     inputs: [
       { identifier: "input", type: "str" },
       { identifier: "threadId", type: "str" },
@@ -502,4 +503,230 @@ describe("buildHttpNodeFromAgent", () => {
     expect(node.data.outputs?.[0]?.identifier).toBe("output");
     expect(node.data.outputs?.[0]?.type).toBe("str");
   });
+});
+
+describe("buildEvaluatorTargetNode", () => {
+  const createEvaluatorTargetConfig = (): TargetConfig => ({
+    id: "target-eval-1",
+    type: "evaluator",
+    targetEvaluatorId: "eval-abc-123",
+    inputs: [
+      { identifier: "output", type: "str" },
+    ],
+    outputs: [
+      { identifier: "passed", type: "bool" },
+      { identifier: "score", type: "float" },
+      { identifier: "label", type: "str" },
+    ],
+    mappings: {
+      "dataset-1": {
+        output: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "response",
+        },
+      },
+    },
+  });
+
+  const createCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-eval-1",
+    targetConfig: createEvaluatorTargetConfig(),
+    evaluatorConfigs: [],
+    datasetEntry: {
+      _datasetId: "dataset-1",
+      response: "This is a positive sentiment response!",
+    },
+  });
+
+  it("creates evaluator node with target ID (not composite)", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    // Node ID should be the target ID, not a composite ID
+    expect(node.id).toBe("target-eval-1");
+    expect(node.id).not.toContain(".");
+  });
+
+  it("creates evaluator node with correct type", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    expect(node.type).toBe("evaluator");
+  });
+
+  it("uses evaluators/{id} path when dbEvaluatorId is set", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    expect(node.data.evaluator).toBe("evaluators/eval-abc-123");
+  });
+
+  it("throws error when targetEvaluatorId is not set", () => {
+    const targetConfig: TargetConfig = {
+      ...createEvaluatorTargetConfig(),
+      targetEvaluatorId: undefined,
+    };
+    const cell: ExecutionCell = {
+      ...createCell(),
+      targetConfig,
+    };
+
+    expect(() =>
+      buildEvaluatorTargetNode("target-eval-1", targetConfig, cell),
+    ).toThrow(
+      'Evaluator target "target-eval-1" has no evaluator ID. targetEvaluatorId must be set.',
+    );
+  });
+
+  it("has standard evaluator outputs (passed, score, label)", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
+      "passed",
+      "score",
+      "label",
+    ]);
+    expect(node.data.outputs?.map((o) => o.type)).toEqual([
+      "bool",
+      "float",
+      "str",
+    ]);
+  });
+
+  it("applies input mappings from dataset", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    // The 'output' input should NOT have a value (it comes from edge/dataset)
+    const outputInput = node.data.inputs?.find(
+      (i) => i.identifier === "output",
+    );
+    expect(outputInput).toBeDefined();
+    // Source mappings are handled via edges, not value
+    expect(outputInput?.value).toBeUndefined();
+  });
+
+  it("applies value mappings directly to inputs", () => {
+    const targetConfig: TargetConfig = {
+      ...createEvaluatorTargetConfig(),
+      mappings: {
+        "dataset-1": {
+          output: {
+            type: "value",
+            value: "literal value for output",
+          },
+        },
+      },
+    };
+    const cell: ExecutionCell = {
+      ...createCell(),
+      targetConfig,
+    };
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    const outputInput = node.data.inputs?.find(
+      (i) => i.identifier === "output",
+    );
+    expect(outputInput?.value).toBe("literal value for output");
+  });
+
+  it("loads settings from loadedEvaluators when available", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    // Mock loaded evaluators map with settings
+    const loadedEvaluators = new Map([
+      [
+        "eval-abc-123",
+        {
+          id: "eval-abc-123",
+          name: "Sentiment Evaluator",
+          config: {
+            evaluatorType: "langevals/sentiment",
+            settings: {
+              threshold: 0.8,
+              model: "openai/gpt-4o-mini",
+            },
+          },
+        },
+      ],
+    ]);
+
+    const node = buildEvaluatorTargetNode(
+      "target-eval-1",
+      targetConfig,
+      cell,
+      loadedEvaluators,
+    );
+
+    // Settings should be converted to parameters
+    const params = node.data.parameters ?? [];
+    expect(params).toHaveLength(2);
+
+    const thresholdParam = params.find((p) => p.identifier === "threshold");
+    expect(thresholdParam?.value).toBe(0.8);
+
+    const modelParam = params.find((p) => p.identifier === "model");
+    expect(modelParam?.value).toBe("openai/gpt-4o-mini");
+  });
+
+  it("has cls set to LangWatchEvaluator", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    expect(node.data.cls).toBe("LangWatchEvaluator");
+  });
+
+  it("preserves target name from loaded evaluator", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    // Must provide loadedEvaluators to get the evaluator name
+    const loadedEvaluators = new Map([
+      [
+        "eval-abc-123",
+        {
+          id: "eval-abc-123",
+          name: "Sentiment Evaluator",
+          config: {},
+        },
+      ],
+    ]);
+
+    const node = buildEvaluatorTargetNode(
+      "target-eval-1",
+      targetConfig,
+      cell,
+      loadedEvaluators,
+    );
+
+    expect(node.data.name).toBe("Sentiment Evaluator");
+  });
+
+  it("falls back to nodeId when evaluator not loaded", () => {
+    const targetConfig = createEvaluatorTargetConfig();
+    const cell = createCell();
+
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
+
+    expect(node.data.name).toBe("target-eval-1");
+  });
+
 });

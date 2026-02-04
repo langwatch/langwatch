@@ -363,6 +363,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       setError(null);
       setTotalCost(0);
 
+      // Mark that we've run an evaluation this session (enables History button)
+      // Only for full executions, not for cell/evaluator reruns
+      if (scope.type === "full") {
+        useEvaluationsV3Store.setState((state) => ({
+          ui: { ...state.ui, hasRunThisSession: true },
+        }));
+      }
+
       // Compute which cells will be executed (single source of truth)
       const datasetRows = activeDataset.inline?.records
         ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
@@ -499,11 +507,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         targets: targets.map((t) => ({
           id: t.id,
           type: t.type,
-          name: t.name,
           promptId: t.promptId,
           promptVersionId: t.promptVersionId,
           promptVersionNumber: t.promptVersionNumber,
           dbAgentId: t.dbAgentId,
+          agentType: t.agentType,
+          httpConfig: t.httpConfig,
+          targetEvaluatorId: t.targetEvaluatorId,
           inputs: t.inputs,
           outputs: t.outputs,
           mappings: t.mappings,
@@ -512,7 +522,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         evaluators: evaluators.map((e) => ({
           id: e.id,
           evaluatorType: e.evaluatorType,
-          name: e.name,
           inputs: e.inputs,
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,

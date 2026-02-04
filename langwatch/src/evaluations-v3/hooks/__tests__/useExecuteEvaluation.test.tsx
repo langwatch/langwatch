@@ -76,7 +76,6 @@ const setupStore = () => {
     targets: [
       {
         id: "target-1",
-        name: "Test Target",
         type: "prompt",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -111,6 +110,7 @@ const setupStore = () => {
         dataset: "idle",
       },
       concurrency: 10,
+      hasRunThisSession: false,
     },
   });
 };
@@ -474,7 +474,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -550,7 +549,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -605,7 +603,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -691,7 +688,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -761,7 +757,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -844,7 +839,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -908,7 +902,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             settings: {},
             inputs: [],
@@ -986,7 +979,6 @@ describe("useExecuteEvaluation", () => {
         evaluators: [
           {
             id: "eval-1",
-            name: "Test Evaluator",
             evaluatorType: "langevals/exact_match",
             inputs: [],
             mappings: {},
@@ -996,7 +988,6 @@ describe("useExecuteEvaluation", () => {
           ...state.targets,
           {
             id: "target-2",
-            name: "Target 2",
             type: "prompt",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

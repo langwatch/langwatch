@@ -176,10 +176,11 @@ export type LoadedExecutionData = {
  */
 type TargetForLoading = {
   type: string;
-  name: string;
   promptId?: string;
   promptVersionNumber?: number;
   dbAgentId?: string;
+  /** For evaluator targets: the database evaluator ID */
+  targetEvaluatorId?: string;
 };
 
 /**
@@ -225,7 +226,7 @@ export const loadExecutionData = async (
             ? ` version ${target.promptVersionNumber}`
             : "";
           return {
-            error: `Prompt "${target.name}"${versionInfo} not found`,
+            error: `Prompt "${target.promptId}"${versionInfo} not found`,
             status: 404,
           };
         }
@@ -242,7 +243,7 @@ export const loadExecutionData = async (
           "Failed to load prompt for target",
         );
         return {
-          error: `Failed to load prompt "${target.name}"${versionInfo}: ${(promptError as Error).message}`,
+          error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
           status: 404,
         };
       }
@@ -265,19 +266,35 @@ export const loadExecutionData = async (
     }
   }
 
-  // Load evaluators from DB
+  // Load evaluators from DB (for both evaluator configs AND evaluator targets)
   const loadedEvaluators = new Map<string, Evaluator>();
   const evaluatorService = EvaluatorService.create(prisma);
 
+  // Collect all evaluator IDs to load
+  const evaluatorIdsToLoad = new Set<string>();
+
+  // Add evaluator IDs from evaluator configs
   for (const evaluator of evaluators) {
     if (evaluator.dbEvaluatorId) {
-      const dbEvaluator = await evaluatorService.getById({
-        id: evaluator.dbEvaluatorId,
-        projectId,
-      });
-      if (dbEvaluator) {
-        loadedEvaluators.set(evaluator.dbEvaluatorId, dbEvaluator);
-      }
+      evaluatorIdsToLoad.add(evaluator.dbEvaluatorId);
+    }
+  }
+
+  // Add evaluator IDs from evaluator targets
+  for (const target of targets) {
+    if (target.type === "evaluator" && target.targetEvaluatorId) {
+      evaluatorIdsToLoad.add(target.targetEvaluatorId);
+    }
+  }
+
+  // Load all evaluators
+  for (const evaluatorId of evaluatorIdsToLoad) {
+    const dbEvaluator = await evaluatorService.getById({
+      id: evaluatorId,
+      projectId,
+    });
+    if (dbEvaluator) {
+      loadedEvaluators.set(evaluatorId, dbEvaluator);
     }
   }
 

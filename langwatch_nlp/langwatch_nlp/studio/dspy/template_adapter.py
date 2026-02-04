@@ -172,7 +172,7 @@ class TemplateAdapter(dspy.JSONAdapter):
             str_inputs[k] = (
                 v
                 if type(v) == str
-                else json.dumps(v, cls=SerializableWithStringFallback)
+                else json.dumps(v, cls=SerializableWithStringFallback, ensure_ascii=False)
             )
 
         return liquid.render(template, **str_inputs)
@@ -285,7 +285,7 @@ class TemplateAdapter(dspy.JSONAdapter):
                 return (
                     output
                     if type(output) == str
-                    else json.dumps(output, cls=SerializableWithStringFallback)
+                    else json.dumps(output, cls=SerializableWithStringFallback, ensure_ascii=False)
                 )
 
         return super().format_assistant_message_content(

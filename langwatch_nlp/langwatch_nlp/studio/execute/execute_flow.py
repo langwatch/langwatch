@@ -80,7 +80,7 @@ async def execute_flow(
             until_node_id=until_node_id,
             do_not_trace=do_not_trace,
         ) as (Module, module_inputs):
-            module = Module(run_evaluations=True)
+            module = Module(run_evaluations=event.run_evaluations)
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
             entry_node = cast(
@@ -150,7 +150,7 @@ def end_workflow_event(workflow: Workflow, trace_id: str, result):
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 result=json.loads(
                     json.dumps(
-                        result.toDict(), cls=SerializableWithPydanticAndPredictEncoder
+                        result.toDict(), cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False
                     )
                 ),
             )

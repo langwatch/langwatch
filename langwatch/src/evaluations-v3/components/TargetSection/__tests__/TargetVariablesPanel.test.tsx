@@ -17,6 +17,11 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
   TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../../../hooks/useTargetName", () => ({
+  useTargetName: () => "Web Search",
+}));
+
 const mockDatasets: DatasetReference[] = [
   {
     id: "dataset-1",
@@ -34,7 +39,6 @@ const ACTIVE_DATASET_ID = "dataset-1";
 const mockTarget: TargetConfig = {
   id: "target-1",
   type: "prompt",
-  name: "GPT-4o Prompt",
   inputs: [
     { identifier: "question", type: "str" },
     { identifier: "context", type: "str" },
@@ -71,7 +75,6 @@ const mockTarget: TargetConfig = {
 const mockOtherTarget: TargetConfig = {
   id: "target-2",
   type: "prompt",
-  name: "Web Search",
   inputs: [{ identifier: "query", type: "str" }],
   outputs: [{ identifier: "search_results", type: "str" }],
   mappings: {},
@@ -207,7 +210,8 @@ describe("TargetVariablesPanel", () => {
         await user.click(emptyInput);
 
         await waitFor(() => {
-          expect(screen.getByText("Web Search")).toBeInTheDocument();
+          // Name is resolved from target.id since names are now fetched via hooks
+          expect(screen.getByText("target-2")).toBeInTheDocument();
           expect(screen.getByText("search_results")).toBeInTheDocument();
         });
       }

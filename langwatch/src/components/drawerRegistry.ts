@@ -13,7 +13,7 @@ import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { TriggerDrawer } from "./AddTriggerDrawer";
+import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
 import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
@@ -24,7 +24,7 @@ import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
-import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
 import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 // Online Evaluations (Monitors) drawers
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
@@ -50,7 +50,7 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
-  trigger: TriggerDrawer,
+  automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
@@ -58,7 +58,7 @@ export const drawers = {
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVModal,
   addOrEditDataset: AddOrEditDatasetDrawer,
-  editTriggerFilter: EditTriggerFilterDrawer,
+  editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   customGraphAlert: AlertDrawer,

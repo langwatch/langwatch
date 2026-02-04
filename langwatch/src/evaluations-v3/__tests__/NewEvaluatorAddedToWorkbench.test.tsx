@@ -37,6 +37,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
+// Mock name hooks to avoid tRPC queries
+vi.mock("../hooks/useTargetName", () => ({
+  useTargetName: () => "My Prompt",
+}));
+vi.mock("../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "My Custom Evaluator",
+}));
+
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
@@ -132,6 +140,10 @@ vi.mock("~/utils/api", () => ({
             },
             createdAt: new Date(),
             updatedAt: new Date(),
+            fields: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
           }),
         },
       },
@@ -240,7 +252,6 @@ describe("New Evaluator Added to Workbench", () => {
         {
           id: "target-1",
           type: "prompt",
-          name: "GPT-4o",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},
@@ -351,7 +362,6 @@ describe("New Evaluator Added to Workbench", () => {
     // Verify the evaluator was added to the workbench store
     const state = useEvaluationsV3Store.getState();
     expect(state.evaluators.length).toBe(1);
-    expect(state.evaluators[0]?.name).toBe("My Custom Evaluator");
     expect(state.evaluators[0]?.dbEvaluatorId).toBe("new-evaluator-123");
   });
 
@@ -362,7 +372,6 @@ describe("New Evaluator Added to Workbench", () => {
         {
           id: "evaluator_123",
           evaluatorType: "langevals/exact_match",
-          name: "My Custom Evaluator",
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },

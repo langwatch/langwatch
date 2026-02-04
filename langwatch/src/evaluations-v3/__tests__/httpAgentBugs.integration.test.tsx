@@ -122,6 +122,20 @@ const mockCodeAgent: TypedAgent = {
 // Default mock implementation
 vi.mock("~/utils/api", () => ({
   api: {
+    publicEnv: {
+      useQuery: () => ({
+        data: { IS_SAAS: false },
+        isLoading: false,
+      }),
+    },
+    licenseEnforcement: {
+      checkLimit: {
+        useQuery: () => ({
+          data: { allowed: true, current: 1, max: 10 },
+          isLoading: false,
+        }),
+      },
+    },
     agents: {
       getAll: {
         useQuery: vi.fn(() => ({
@@ -132,6 +146,12 @@ vi.mock("~/utils/api", () => ({
       getById: {
         useQuery: vi.fn(() => ({
           data: undefined,
+          isLoading: false,
+        })),
+      },
+      getRelatedEntities: {
+        useQuery: vi.fn(() => ({
+          data: { workflow: null },
           isLoading: false,
         })),
       },
@@ -151,6 +171,28 @@ vi.mock("~/utils/api", () => ({
         useMutation: vi.fn(() => ({
           mutate: vi.fn(),
           isPending: false,
+        })),
+      },
+      cascadeArchive: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
+    },
+    prompts: {
+      getByIdOrHandle: {
+        useQuery: vi.fn(() => ({
+          data: { id: "prompt-123", name: "My Prompt" },
+          isLoading: false,
+        })),
+      },
+    },
+    evaluators: {
+      getById: {
+        useQuery: vi.fn(() => ({
+          data: undefined,
+          isLoading: false,
         })),
       },
     },
@@ -233,12 +275,23 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
   });
 
   it("HTTP agent target displays with a Globe icon (different from code agent)", async () => {
-    // Create an HTTP agent target config
+    // Mock agents.getById to return agent names based on ID
+    vi.mocked(api.agents.getById.useQuery).mockImplementation((args) => {
+      if (args.id === "http-agent-1") {
+        return { data: { name: "My HTTP Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+      }
+      if (args.id === "code-agent-1") {
+        return { data: { name: "My Code Agent" }, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+      }
+      return { data: undefined, isLoading: false } as ReturnType<typeof api.agents.getById.useQuery>;
+    });
+
+    // Create an HTTP agent target config with dbAgentId to enable name lookup
     const httpAgentTarget: TargetConfig = {
       id: "http-target-1",
       type: "agent",
-      name: "My HTTP Agent",
       agentType: "http",
+      dbAgentId: "http-agent-1",
       httpConfig: {
         url: "https://api.example.com/chat",
         method: "POST",
@@ -253,8 +306,8 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     const codeAgentTarget: TargetConfig = {
       id: "code-target-1",
       type: "agent",
-      name: "My Code Agent",
       agentType: "code",
+      dbAgentId: "code-agent-1",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -303,7 +356,6 @@ describe("Bug 2: HTTP agent icon in TargetHeader", () => {
     const promptTarget: TargetConfig = {
       id: "prompt-target-1",
       type: "prompt",
-      name: "My Prompt",
       promptId: "prompt-123",
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],

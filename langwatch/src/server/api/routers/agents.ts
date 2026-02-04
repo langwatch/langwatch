@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -153,6 +154,86 @@ export const agentsRouter = createTRPCRouter({
             workflowId: input.workflowId,
           }),
         },
+      });
+    }),
+
+  /**
+   * Gets entities related to an agent for cascade archive warning.
+   * Returns linked workflow that would be affected.
+   */
+  getRelatedEntities: protectedProcedure
+    .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const agent = await ctx.prisma.agent.findFirst({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        select: { id: true, workflowId: true },
+      });
+
+      // Find the linked workflow (if any)
+      const workflow =
+        agent?.workflowId
+          ? await ctx.prisma.workflow.findFirst({
+              where: {
+                id: agent.workflowId,
+                projectId: input.projectId,
+                archivedAt: null,
+              },
+              select: { id: true, name: true },
+            })
+          : null;
+
+      return { workflow };
+    }),
+
+  /**
+   * Archives an agent and its linked workflow in a transaction.
+   */
+  cascadeArchive: protectedProcedure
+    .input(z.object({ id: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:manage"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.$transaction(async (tx) => {
+        // 1. Get the agent to find linked workflow
+        const agent = await tx.agent.findFirst({
+          where: {
+            id: input.id,
+            projectId: input.projectId,
+            archivedAt: null,
+          },
+          select: { id: true, workflowId: true },
+        });
+
+        if (!agent) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
+
+        // 2. Archive the agent
+        const archivedAgent = await tx.agent.update({
+          where: { id: input.id, projectId: input.projectId },
+          data: { archivedAt: new Date() },
+        });
+
+        // 3. Archive the linked workflow (if any)
+        let archivedWorkflow = null;
+        if (agent.workflowId) {
+          archivedWorkflow = await tx.workflow.update({
+            where: { id: agent.workflowId, projectId: input.projectId },
+            data: { archivedAt: new Date() },
+          });
+        }
+
+        return {
+          agent: archivedAgent,
+          archivedWorkflow,
+        };
       });
     }),
 

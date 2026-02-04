@@ -127,7 +127,6 @@ describe("buildHttpAgentTarget", () => {
   it("builds a complete HTTP agent target", () => {
     const target = buildHttpAgentTarget({
       id: "http-1",
-      name: "My HTTP Agent",
       dbAgentId: "db-agent-123",
       httpConfig: {
         url: "https://api.example.com/chat",
@@ -138,7 +137,6 @@ describe("buildHttpAgentTarget", () => {
     });
 
     expect(target.id).toBe("http-1");
-    expect(target.name).toBe("My HTTP Agent");
     expect(target.type).toBe("agent");
     expect(target.agentType).toBe("http");
     expect(target.dbAgentId).toBe("db-agent-123");
@@ -153,7 +151,6 @@ describe("buildHttpAgentTarget", () => {
   it("extracts inputs from bodyTemplate correctly", () => {
     const target = buildHttpAgentTarget({
       id: "http-2",
-      name: "Agent",
       httpConfig: {
         url: "https://api.example.com/chat",
         method: "POST",
@@ -169,7 +166,6 @@ describe("buildHttpAgentTarget", () => {
   it("handles empty bodyTemplate gracefully", () => {
     const target = buildHttpAgentTarget({
       id: "http-3",
-      name: "Agent",
       httpConfig: {
         url: "https://api.example.com/chat",
         method: "POST",

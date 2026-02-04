@@ -7,9 +7,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
+import { useRouter } from "next/router";
+import { useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
+import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -27,15 +31,48 @@ function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
+  const router = useRouter();
+
+  // State for tracking which agent is being deleted
+  const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
 
+  // Query related entities when delete dialog is open
+  const relatedEntitiesQuery = api.agents.getRelatedEntities.useQuery(
+    { id: agentToDelete?.id ?? "", projectId: project?.id ?? "" },
+    { enabled: !!agentToDelete && !!project?.id },
+  );
+
   const deleteMutation = api.agents.delete.useMutation({
     onSuccess: () => {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+    },
+  });
+
+  const cascadeArchiveMutation = api.agents.cascadeArchive.useMutation({
+    onSuccess: (result) => {
+      setAgentToDelete(null);
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+
+      toaster.create({
+        title: `Agent deleted`,
+        description: result.archivedWorkflow
+          ? "Also deleted: 1 workflow"
+          : undefined,
+        type: "success",
+        meta: { closable: true },
+      });
+    },
+    onError: () => {
+      toaster.create({
+        title: "Error deleting agent",
+        description: "Please try again later.",
+        type: "error",
+      });
     },
   });
 
@@ -59,11 +96,49 @@ function Page() {
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {
-    if (window.confirm(`Are you sure you want to delete "${agent.name}"?`)) {
-      deleteMutation.mutate({
-        id: agent.id,
-        projectId: project?.id ?? "",
+    setAgentToDelete(agent);
+  };
+
+  const confirmDeleteAgent = () => {
+    if (!agentToDelete || !project) return;
+
+    const hasRelated = !!relatedEntitiesQuery.data?.workflow;
+
+    if (hasRelated) {
+      cascadeArchiveMutation.mutate({
+        id: agentToDelete.id,
+        projectId: project.id,
       });
+    } else {
+      deleteMutation.mutate(
+        {
+          id: agentToDelete.id,
+          projectId: project.id,
+        },
+        {
+          onSuccess: () => {
+            setAgentToDelete(null);
+            toaster.create({
+              title: "Agent deleted",
+              type: "success",
+              meta: { closable: true },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error deleting agent",
+              description: "Please try again later.",
+              type: "error",
+            });
+          },
+        },
+      );
+    }
+  };
+
+  const handleOpenWorkflow = (agent: TypedAgent) => {
+    if (agent.workflowId && project?.slug) {
+      void router.push(`/${project.slug}/studio/${agent.workflowId}`);
     }
   };
 
@@ -119,6 +194,11 @@ function Page() {
                 onClick={() => handleEditAgent(agent)}
                 onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
+                onOpenWorkflow={
+                  agent.type === "workflow"
+                    ? () => handleOpenWorkflow(agent)
+                    : undefined
+                }
               />
             ))}
           </Grid>
@@ -126,6 +206,21 @@ function Page() {
       )}
 
       {/* Drawers are rendered by CurrentDrawer in DashboardLayout */}
+
+      <CascadeArchiveDialog
+        open={!!agentToDelete}
+        onClose={() => setAgentToDelete(null)}
+        onConfirm={confirmDeleteAgent}
+        isLoading={cascadeArchiveMutation.isPending || deleteMutation.isPending}
+        isLoadingRelated={relatedEntitiesQuery.isLoading}
+        entityType="agent"
+        entityName={agentToDelete?.name ?? ""}
+        relatedEntities={{
+          workflows: relatedEntitiesQuery.data?.workflow
+            ? [relatedEntitiesQuery.data.workflow]
+            : [],
+        }}
+      />
     </DashboardLayout>
   );
 }

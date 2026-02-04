@@ -25,6 +25,12 @@ const agentTypes: Array<{
   description: string;
 }> = [
   {
+    type: "http",
+    icon: Globe,
+    title: "HTTP Agent",
+    description: "Connect to an external API endpoint to process requests",
+  },
+  {
     type: "code",
     icon: Code,
     title: "Code Agent",
@@ -35,13 +41,7 @@ const agentTypes: Array<{
     type: "workflow",
     icon: Workflow,
     title: "Workflow Agent",
-    description: "Use an existing workflow as the agent implementation",
-  },
-  {
-    type: "http",
-    icon: Globe,
-    title: "HTTP Agent",
-    description: "Connect to an external API endpoint to process requests",
+    description: "Create a new workflow for custom agent logic",
   },
 ];
 
@@ -161,7 +161,7 @@ function AgentTypeCard({
     <Box
       as="button"
       onClick={onClick}
-      padding={5}
+      padding={4}
       borderRadius="lg"
       border="1px solid"
       borderColor="border"
@@ -173,15 +173,15 @@ function AgentTypeCard({
       data-testid={`agent-type-${type}`}
       cursor="pointer"
     >
-      <HStack gap={4} align="start">
-        <Box padding={3} borderRadius="md" bg="blue.subtle" color="blue.fg">
-          <Icon size={24} />
+      <HStack gap={3} align="start">
+        <Box padding={1} borderRadius="md" bg="blue.subtle" color="blue.fg">
+          <Icon size={18} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="semibold" fontSize="md">
+          <Text fontWeight="500" fontSize="sm">
             {title}
           </Text>
-          <Text fontSize="sm" color="fg.muted">
+          <Text fontSize="xs" color="fg.muted">
             {description}
           </Text>
         </VStack>

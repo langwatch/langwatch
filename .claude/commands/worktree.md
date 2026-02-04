@@ -1,6 +1,8 @@
 # Worktree
 
-Create a git worktree for a branch. Worktrees go in a dedicated `../worktrees/` directory, not inside langwatch-saas.
+Create a git worktree for a branch. Worktrees go in `../../worktrees/` (sibling to `langwatch-saas`).
+
+**CRITICAL:** The working directory is the `langwatch` repo (inside `langwatch-saas`). Run all git commands from this directory. Do NOT cd to `langwatch-saas` - that's a different repo.
 
 ## Naming Standards
 
@@ -23,32 +25,33 @@ Create a git worktree for a branch. Worktrees go in a dedicated `../worktrees/` 
 2. Fetch issue: `gh issue view <number> --json title,number`
 3. Derive slug from title (lowercase, hyphens, max 40 chars)
 4. Set branch name: `issue<number>/<slug>` (e.g., `issue123/user-login-feature`)
-5. Set directory: `../worktrees/worktree-issue<number>-<slug>`
+5. Set directory: `../../worktrees/worktree-issue<number>-<slug>`
 6. Check if branch exists: `git branch -r | grep -qw "origin/$BRANCH"`
-7. Create worktree:
+7. Create worktree (from langwatch dir):
    - Existing: `git worktree add "$DIR" "$BRANCH"`
    - New: `git worktree add -b "$BRANCH" "$DIR" origin/main`
-8. Copy .env: `cp langwatch/.env "$DIR/langwatch/.env"`
-9. Report: branch name, directory path, and linked issue
+8. Copy .env if it exists: `cp .env "$DIR/.env"` (we're already in langwatch dir)
+9. Report: branch name, absolute directory path, and linked issue
 
 ### For Existing Branches (`/worktree feat/existing-branch`)
 
 1. `git fetch origin`
 2. Verify branch exists: `git branch -r | grep -qw "origin/$ARGUMENTS"`
 3. Derive directory from branch (replace `/` with `-`): `worktree-feat-existing-branch`
-4. Create worktree: `git worktree add "$DIR" "$ARGUMENTS"`
-5. Copy .env: `cp langwatch/.env "$DIR/langwatch/.env"`
-6. Report path to user
+4. Set directory: `../../worktrees/$DIRNAME`
+5. Create worktree: `git worktree add "$DIR" "$ARGUMENTS"`
+6. Copy .env if it exists: `cp .env "$DIR/.env"`
+7. Report absolute path to user
 
 ### For New Feature Names (`/worktree my-new-feature`)
 
 1. `git fetch origin`
 2. Confirm branch doesn't exist
 3. Set branch name: `feat/$ARGUMENTS`
-4. Set directory: `../worktrees/worktree-feat-$ARGUMENTS`
+4. Set directory: `../../worktrees/worktree-feat-$ARGUMENTS`
 5. Create worktree: `git worktree add -b "$BRANCH" "$DIR" origin/main`
-6. Copy .env: `cp langwatch/.env "$DIR/langwatch/.env"`
-7. Report path to user
+6. Copy .env if it exists: `cp .env "$DIR/.env"`
+7. Report absolute path to user
 
 ## Examples
 

@@ -250,10 +250,47 @@ class TestLogResponse:
 
         assert evaluation.batch["dataset"][0].predicted == {"answer": "42", "confidence": 0.95}
 
-    def test_log_response_outside_target_raises(self, evaluation):
-        """log_response() outside target() raises RuntimeError."""
-        with pytest.raises(RuntimeError, match="must be called inside a target"):
-            evaluation.log_response("test")
+    def test_log_response_outside_target_creates_implicit_output_target(self, evaluation):
+        """log_response() outside target() creates an implicit 'Output' target."""
+        # Set up iteration context (normally done by loop())
+        from langwatch.experiment.experiment import _iteration_context, _target_context, IterationContext
+        iter_ctx = IterationContext(index=0, item={"question": "test"})
+        iter_token = _iteration_context.set(iter_ctx)
+
+        try:
+            evaluation.log_response("Hello, world!")
+
+            # Should create a dataset entry with target_id "Output"
+            assert len(evaluation.batch["dataset"]) == 1
+            entry = evaluation.batch["dataset"][0]
+            assert entry.target_id == "Output"
+            assert entry.predicted == {"output": "Hello, world!"}
+            assert entry.index == 0
+
+            # Should register the "Output" target
+            assert "Output" in evaluation._targets
+        finally:
+            _iteration_context.reset(iter_token)
+            # Reset target context to avoid polluting other tests
+            _target_context.set(None)
+
+    def test_log_response_outside_target_associates_log_with_output_target(self, evaluation):
+        """log() after log_response() outside target uses the implicit 'Output' target."""
+        from langwatch.experiment.experiment import _iteration_context, _target_context, IterationContext
+        iter_ctx = IterationContext(index=0, item={"question": "test"})
+        iter_token = _iteration_context.set(iter_ctx)
+
+        try:
+            evaluation.log_response("Hello, world!")
+            evaluation.log("quality", index=0, score=0.95)
+
+            # log() should use the implicit "Output" target
+            assert len(evaluation.batch["evaluations"]) == 1
+            assert evaluation.batch["evaluations"][0].target_id == "Output"
+        finally:
+            _iteration_context.reset(iter_token)
+            # Reset target context to avoid polluting other tests
+            _target_context.set(None)
 
     def test_log_response_with_multiple_metrics(self, evaluation):
         """log_response() works alongside multiple log() calls."""
@@ -269,3 +306,98 @@ class TestLogResponse:
 
         # Three evaluations
         assert len(evaluation.batch["evaluations"]) == 3
+
+
+class TestImplicitTargetContextReset:
+    """Tests to ensure implicit target context is properly reset between iterations."""
+
+    def test_implicit_target_context_reset_between_iterations(self):
+        """Context from log_response() in one iteration doesn't pollute the next."""
+        from langwatch.experiment.experiment import (
+            Experiment,
+            _iteration_context,
+            _target_context,
+            IterationContext,
+        )
+
+        ev = Experiment("test-context-reset")
+        ev.initialized = True
+        ev.last_sent = 9999999999  # Prevent sending
+
+        # First iteration with log_response (creates implicit Output target)
+        iter_ctx1 = IterationContext(index=0, item={"question": "q1"})
+        with ev._execute_item_iteration(0, {"question": "q1"}, in_thread=False):
+            ev.log_response("response 1")
+            ev.log("metric", index=0, score=0.5)
+
+        # Context should be reset after iteration
+        assert _target_context.get() is None, "Target context should be reset after iteration"
+
+        # Second iteration WITHOUT log_response - should not inherit Output target
+        with ev._execute_item_iteration(1, {"question": "q2"}, in_thread=False):
+            # log() without log_response should NOT have a target
+            ev.log("metric", index=1, score=0.6)
+
+        # Check the evaluations
+        evals = ev.batch["evaluations"]
+        assert len(evals) == 2
+        assert evals[0].target_id == "Output"  # First iteration used implicit target
+        assert evals[1].target_id is None  # Second iteration should have no target
+
+    def test_multiple_iterations_with_log_response_each_get_own_entry(self):
+        """Each iteration with log_response creates its own dataset entry."""
+        from langwatch.experiment.experiment import Experiment, _target_context
+
+        ev = Experiment("test-multi-iterations")
+        ev.initialized = True
+        ev.last_sent = 9999999999
+
+        # Run 3 iterations, each with log_response
+        for i in range(3):
+            with ev._execute_item_iteration(i, {"question": f"q{i}"}, in_thread=False):
+                ev.log_response(f"response {i}")
+                ev.log("metric", index=i, score=0.5 + i * 0.1)
+
+        # Should have 3 dataset entries
+        assert len(ev.batch["dataset"]) == 3
+        for i, entry in enumerate(ev.batch["dataset"]):
+            assert entry.target_id == "Output"
+            assert entry.predicted == {"output": f"response {i}"}
+            assert entry.index == i
+
+        # Should have 3 evaluations, all with Output target
+        assert len(ev.batch["evaluations"]) == 3
+        for i, eval_result in enumerate(ev.batch["evaluations"]):
+            assert eval_result.target_id == "Output"
+            assert eval_result.index == i
+
+    def test_run_without_log_response_after_run_with_log_response(self):
+        """A run without log_response after a run with log_response should work correctly."""
+        from langwatch.experiment.experiment import Experiment, _target_context
+
+        # Simulate first run with log_response
+        ev1 = Experiment("test-first-run")
+        ev1.initialized = True
+        ev1.last_sent = 9999999999
+
+        for i in range(2):
+            with ev1._execute_item_iteration(i, {"q": f"q{i}"}, in_thread=False):
+                ev1.log_response(f"response {i}")
+                ev1.log("metric", index=i, score=0.5)
+
+        # Context should be clean after first experiment
+        assert _target_context.get() is None
+
+        # Simulate second run WITHOUT log_response (like the user's second scenario)
+        ev2 = Experiment("test-second-run")
+        ev2.initialized = True
+        ev2.last_sent = 9999999999
+
+        for i in range(2):
+            with ev2._execute_item_iteration(i, {"q": f"q{i}"}, in_thread=False):
+                # Just log, no log_response
+                ev2.log("metric", index=i, score=0.6)
+
+        # Second run evaluations should NOT have Output target
+        for eval_result in ev2.batch["evaluations"]:
+            assert eval_result.target_id is None, "Second run should not inherit Output target"

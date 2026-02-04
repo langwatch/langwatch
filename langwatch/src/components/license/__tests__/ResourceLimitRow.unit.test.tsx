@@ -20,13 +20,13 @@ describe("ResourceLimitRow", () => {
     expect(screen.getByText("5 / 10")).toBeInTheDocument();
   });
 
-  it("displays formatted large max values", () => {
+  it("displays 'Unlimited' for large max values (>= 1M)", () => {
     render(<ResourceLimitRow label="Projects" current={3} max={1_000_000} />, {
       wrapper: Wrapper,
     });
 
     expect(screen.getByText("Projects:")).toBeInTheDocument();
-    expect(screen.getByText("3 / 1,000,000")).toBeInTheDocument();
+    expect(screen.getByText("3 / Unlimited")).toBeInTheDocument();
   });
 
   it("formats numbers with locale separators", () => {

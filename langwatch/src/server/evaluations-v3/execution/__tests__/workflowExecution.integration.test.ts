@@ -21,9 +21,10 @@ import { buildCellWorkflow } from "../workflowBuilder";
  * - OPENAI_API_KEY in environment
  * - Database available for test project
  */
-// Skip for now as those tests depend on the NLP service, which is not available in the CI environment.
+// Skip when NLP service isn't available (CI or prisma-integration tests)
+const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE;
 
-describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
+describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
   let project: Project;
 
   beforeAll(async () => {
@@ -65,7 +66,6 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
   ): TargetConfig => ({
     id: "target-1",
     type: "prompt",
-    name: "Test Prompt",
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
@@ -85,7 +85,6 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
   const createExactMatchEvaluator = (): EvaluatorConfig => ({
     id: "eval-1",
     evaluatorType: "langevals/exact_match", // Use full evaluator type
-    name: "Exact Match",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },
