@@ -13,7 +13,7 @@
 	"scripts": {
 		"tool:deja-view": "NODE_ENV=development pnpm --filter @langwatch/deja-view dev",
 		"tool:stressed-n-blessed": "NODE_ENV=development pnpm --filter @langwatch/stressed-n-blessed dev",
-		"build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint",
+		"build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint --turbo",
 		"lint": "pnpm exec biome check src/",
 		"lint:fix": "pnpm exec biome check src/ --write",
 		"format": "pnpm exec biome format src/ --write",
@@ -242,6 +242,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.8",
+		"turbo": "^2.4.4",
 		"@playwright/test": "^1.57.0",
 		"@testcontainers/clickhouse": "^10.10.0",
 		"@testcontainers/redis": "^10.10.0",

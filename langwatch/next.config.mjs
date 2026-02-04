@@ -49,6 +49,7 @@ const config = {
     // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
     ignoreBuildErrors: true,
   },
+
   turbopack: {
     rules: {
       "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
