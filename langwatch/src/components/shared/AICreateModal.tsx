@@ -362,6 +362,7 @@ function NoModelProvidersWarning() {
           Scenarios require a model provider to run. Please configure one to get started.{" "}
           <Link
             href="/settings/model-providers"
+            target="_blank"
             color="blue.500"
             fontWeight="medium"
           >

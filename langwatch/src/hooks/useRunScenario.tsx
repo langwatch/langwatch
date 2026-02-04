@@ -50,6 +50,7 @@ export function useRunScenario({
               <Button
                 as="a"
                 href="/settings/model-providers"
+                target="_blank"
                 size="xs"
                 bg="white"
                 color="red.600"

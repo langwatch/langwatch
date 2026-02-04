@@ -235,6 +235,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 Scenarios require a model provider to run.{" "}
                 <Link
                   href="/settings/model-providers"
+                  target="_blank"
                   color="blue.500"
                   fontWeight="medium"
                 >
