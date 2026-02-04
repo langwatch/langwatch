@@ -424,11 +424,17 @@ export class LicenseEnforcementRepository
   /**
    * Counts active (non-archived) datasets for license enforcement.
    * Only active datasets count against the license limit.
+   *
+   * Note: Dataset model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
    */
   async getDatasetCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
     return this.prisma.dataset.count({
       where: {
-        project: { team: { organizationId } },
+        projectId: { in: projectIds },
         archivedAt: null,
       },
     });
@@ -437,11 +443,17 @@ export class LicenseEnforcementRepository
   /**
    * Counts all dashboards for license enforcement.
    * Dashboards do not support archival - all dashboards count against limits.
+   *
+   * Note: Dashboard model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
    */
   async getDashboardCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
     return this.prisma.dashboard.count({
       where: {
-        project: { team: { organizationId } },
+        projectId: { in: projectIds },
       },
     });
   }
@@ -449,11 +461,17 @@ export class LicenseEnforcementRepository
   /**
    * Counts all custom graphs for license enforcement.
    * Custom graphs do not support archival - all graphs count against limits.
+   *
+   * Note: CustomGraph model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
    */
   async getCustomGraphCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
     return this.prisma.customGraph.count({
       where: {
-        project: { team: { organizationId } },
+        projectId: { in: projectIds },
       },
     });
   }
@@ -461,11 +479,17 @@ export class LicenseEnforcementRepository
   /**
    * Counts active (non-deleted) triggers for license enforcement.
    * Only active triggers count against the license limit.
+   *
+   * Note: Trigger model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
    */
   async getTriggerCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
     return this.prisma.trigger.count({
       where: {
-        project: { team: { organizationId } },
+        projectId: { in: projectIds },
         deleted: false,
       },
     });
