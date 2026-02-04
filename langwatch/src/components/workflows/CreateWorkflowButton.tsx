@@ -1,6 +1,5 @@
 import { Button, type ButtonProps, useDisclosure } from "@chakra-ui/react";
 import { Lock, Plus } from "lucide-react";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import { Tooltip } from "../ui/tooltip";
@@ -11,13 +10,6 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
   const hasWorkflowsCreatePermission = hasPermission("workflows:create");
 
   const { open, onClose, onOpen } = useDisclosure();
-  const { checkAndProceed } = useLicenseEnforcement("workflows");
-
-  const handleClick = () => {
-    checkAndProceed(() => {
-      onOpen();
-    });
-  };
 
   if (!hasWorkflowsCreatePermission) {
     return (
@@ -40,7 +32,7 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
     <>
       <Button
         data-testid="active-create-new-workflow-button"
-        onClick={handleClick}
+        onClick={onOpen}
         size="sm"
         variant="outline"
         {...props}

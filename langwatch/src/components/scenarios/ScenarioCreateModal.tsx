@@ -3,7 +3,9 @@ import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { api } from "~/utils/api";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
@@ -60,6 +62,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
+  const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
   const { hasEnabledProviders } = useModelProvidersSettings({
@@ -98,6 +101,13 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     [project?.id, createMutation]
   );
 
+  // License check - called by AICreateModal before any action
+  const handleBeforeAction = useCallback(() => {
+    let allowed = false;
+    checkAndProceed(() => { allowed = true; });
+    return allowed;
+  }, [checkAndProceed]);
+
   const handleGenerate = useCallback(
     async (description: string) => {
       if (!project?.id) {
@@ -111,24 +121,30 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         );
       }
 
-      // Generate scenario with AI
-      const generatedData = await generateScenarioWithAI(description, project.id);
+      try {
+        // Generate scenario with AI
+        const generatedData = await generateScenarioWithAI(description, project.id);
 
-      // Create scenario with generated content
-      const scenario = await createScenario(generatedData);
+        // Create scenario with generated content
+        const scenario = await createScenario(generatedData);
 
-      // Navigate to editor
-      openDrawer(
-        "scenarioEditor",
-        {
-          urlParams: {
-            scenarioId: scenario.id,
+        // Navigate to editor
+        openDrawer(
+          "scenarioEditor",
+          {
+            urlParams: {
+              scenarioId: scenario.id,
+            },
           },
-        },
-        { resetStack: true }
-      );
+          { resetStack: true }
+        );
 
-      onClose();
+        onClose();
+      } catch (error) {
+        // Prevent toast if global handler already showed upgrade modal
+        if (isHandledByGlobalLicenseHandler(error)) return;
+        throw error;
+      }
     },
     [project?.id, isModelDisabled, createScenario, openDrawer, onClose]
   );
@@ -155,6 +171,9 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
 
       onClose();
     } catch (error) {
+      // Prevent toast if global handler already showed upgrade modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
+
       toaster.create({
         title: "Failed to create scenario",
         description:
@@ -175,7 +194,8 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={handleGenerate}
       onSkip={handleSkip}
       generatingText={GENERATING_TEXT}
-      hasModelProviders={hasEnabledProviders}
+hasModelProviders={hasEnabledProviders}
+      onBeforeAction={handleBeforeAction}
     />
   );
 }

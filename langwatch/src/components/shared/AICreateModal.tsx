@@ -41,8 +41,10 @@ export interface AICreateModalProps {
   maxLength?: number;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
-  /** Whether model providers are configured (default: true) */
+/** Whether model providers are configured (default: true) */
   hasModelProviders?: boolean;
+  /** Called before any action - return false to block */
+  onBeforeAction?: () => boolean;
 }
 
 type ModalState = "idle" | "generating" | "error";
@@ -71,7 +73,8 @@ export function AICreateModal({
   onSkip,
   maxLength = DEFAULT_MAX_LENGTH,
   generatingText = DEFAULT_GENERATING_TEXT,
-  hasModelProviders = true,
+hasModelProviders = true,
+  onBeforeAction,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
   const [modalState, setModalState] = useState<ModalState>("idle");
@@ -111,6 +114,7 @@ export function AICreateModal({
 
   const handleGenerate = useCallback(async () => {
     if (!description.trim()) return;
+    if (onBeforeAction && !onBeforeAction()) return;
 
     setModalState("generating");
     setErrorMessage("");
@@ -135,11 +139,16 @@ export function AICreateModal({
         timeoutRef.current = null;
       }
     }
-  }, [description, onGenerate]);
+  }, [description, onGenerate, onBeforeAction]);
 
   const handleTryAgain = useCallback(() => {
     void handleGenerate();
   }, [handleGenerate]);
+
+  const handleSkip = useCallback(() => {
+    if (onBeforeAction && !onBeforeAction()) return;
+    onSkip();
+  }, [onSkip, onBeforeAction]);
 
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => {
@@ -191,14 +200,14 @@ export function AICreateModal({
 
           {hasModelProviders && modalState === "idle" && (
             <IdleFooter
-              onSkip={onSkip}
+              onSkip={handleSkip}
               onGenerate={handleGenerate}
               isGenerateDisabled={!description.trim()}
             />
           )}
 
-          {hasModelProviders && modalState === "error" && (
-            <ErrorFooter onSkip={onSkip} onTryAgain={handleTryAgain} />
+{hasModelProviders && modalState === "error" && (
+            <ErrorFooter onSkip={handleSkip} onTryAgain={handleTryAgain} />
           )}
         </Dialog.Footer>
       </Dialog.Content>
