@@ -936,6 +936,17 @@ function CustomGraphForm({
           Add Graph Filter
         </Button>
         <Spacer />
+        <Button
+          variant="outline"
+          onClick={() => {
+            const dashboardUrl = dashboardId
+              ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+              : `/${project?.slug}/analytics/reports`;
+            void router.push(dashboardUrl);
+          }}
+        >
+          Cancel
+        </Button>
         {customId ? (
           <Tooltip
             content={
