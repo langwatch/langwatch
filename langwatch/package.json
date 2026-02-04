@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"engines": {
-		"node": "20.x",
+		"node": "25.x",
 		"npm": ">=10.0.0"
 	},
 	"volta": {

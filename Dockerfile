@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:25-alpine
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@10.24.0
 
