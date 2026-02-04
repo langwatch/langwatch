@@ -7,7 +7,7 @@ config();
 export default defineConfig({
   test: {
     watch: false,
-    pool: "threads", // ~6% faster than default 'forks'. vmThreads breaks localStorage mocking in some tests
+    pool: "vmThreads", // ~25% faster than threads for evaluations-v3 tests
     maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
     testTimeout: 30000, // 30s default to handle slower CI runners
     setupFiles: ["./test-setup.ts"],
