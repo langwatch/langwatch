@@ -31,7 +31,7 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 
 ```yaml
 init:
-  image: node:24
+  image: node:25
   command: sh -c "pnpm install && pnpm prisma generate"
   volumes:
     - ./langwatch:/app
