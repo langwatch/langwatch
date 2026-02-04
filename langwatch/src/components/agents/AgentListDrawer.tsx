@@ -165,73 +165,75 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   };
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-    >
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2} justify="space-between" width="full">
-            <Heading>Choose Agent</Heading>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onCreateNew}
-              data-testid="new-agent-button"
-            >
-              <Plus size={16} />
-              New Agent
-            </Button>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select an existing agent or create a new one.
-            </Text>
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && onClose()}
+        size="md"
+      >
+        <Drawer.Content>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <HStack gap={2} justify="space-between" width="full">
+              <Heading>Choose Agent</Heading>
+              <Button
+                size="sm"
+                colorPalette="blue"
+                onClick={onCreateNew}
+                data-testid="new-agent-button"
+              >
+                <Plus size={16} />
+                New Agent
+              </Button>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            padding={0}
+          >
+            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
+                Select an existing agent or create a new one.
+              </Text>
 
-            {/* Agent list - scrollable */}
-            <VStack
-              gap={2}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingBottom={4}
-            >
-              {agentsQuery.isLoading ? (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              ) : agentsQuery.data?.length === 0 ? (
-                <EmptyState onCreateNew={onCreateNew} />
-              ) : (
-                agentsQuery.data?.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    onClick={() => handleSelectAgent(agent)}
-                    onEdit={() => handleEditAgent(agent)}
-                    onDelete={() => handleDeleteAgent(agent)}
-                  />
-                ))
-              )}
+              {/* Agent list - scrollable */}
+              <VStack
+                gap={2}
+                align="stretch"
+                flex={1}
+                overflowY="auto"
+                paddingX={6}
+                paddingBottom={4}
+              >
+                {agentsQuery.isLoading ? (
+                  <HStack justify="center" paddingY={8}>
+                    <Spinner size="md" />
+                  </HStack>
+                ) : agentsQuery.data?.length === 0 ? (
+                  <EmptyState onCreateNew={onCreateNew} />
+                ) : (
+                  agentsQuery.data?.map((agent) => (
+                    <AgentCard
+                      key={agent.id}
+                      agent={agent}
+                      onClick={() => handleSelectAgent(agent)}
+                      onEdit={() => handleEditAgent(agent)}
+                      onDelete={() => handleDeleteAgent(agent)}
+                    />
+                  ))
+                )}
+              </VStack>
             </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="border">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
 
       <CascadeArchiveDialog
         open={!!agentToDelete}
@@ -247,7 +249,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             : [],
         }}
       />
-    </Drawer.Root>
+    </>
   );
 }
 
