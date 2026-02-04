@@ -22,7 +22,7 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import type {
   BatchEvaluationRepository,
@@ -458,9 +458,7 @@ const buildEvaluatorInputs = (
  * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
  * so we can use mapping.sourceField directly without ID-to-name translation.
  */
-const buildTargetInputs = (
-  cell: ExecutionCell,
-): Record<string, unknown> => {
+const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
   if (!datasetId) return inputs;
@@ -626,7 +624,8 @@ export async function* runOrchestrator(
         index: event.rowIndex,
         target_id: event.targetId,
         entry: datasetEntry,
-        predicted: event.output !== undefined ? { output: event.output } : undefined,
+        predicted:
+          event.output !== undefined ? { output: event.output } : undefined,
         cost: event.cost ?? null,
         duration: event.duration ?? null,
         error: event.error ?? null,

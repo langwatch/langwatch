@@ -19,9 +19,7 @@ export default function License() {
           <Heading>License</Heading>
           <Spacer />
           {publicEnv.data?.IS_SAAS && (
-            <PageLayout.HeaderButton
-              onClick={() => setIsGeneratorOpen(true)}
-            >
+            <PageLayout.HeaderButton onClick={() => setIsGeneratorOpen(true)}>
               <Plus size={20} />
               New License
             </PageLayout.HeaderButton>

@@ -21,7 +21,7 @@ import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { extractStreamableOutput, type OutputConfig } from "./output-formatter";

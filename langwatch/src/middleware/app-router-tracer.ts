@@ -6,6 +6,7 @@ import {
   trace,
 } from "@opentelemetry/api";
 import type { NextRequest, NextResponse } from "next/server";
+import { getCurrentContext } from "../server/context/asyncContext";
 
 const headersGetter = {
   keys: (carrier: Headers): string[] => Array.from(carrier.keys()),
@@ -35,6 +36,18 @@ export function withAppRouterTracer(name?: string) {
             let response: NextResponse | null = null;
             try {
               response = await handler(req);
+
+              // Add context attributes to span if available from AsyncLocalStorage
+              const ctx = getCurrentContext();
+              if (ctx?.organizationId) {
+                span.setAttribute("organization.id", ctx.organizationId);
+              }
+              if (ctx?.projectId) {
+                span.setAttribute("tenant.id", ctx.projectId);
+              }
+              if (ctx?.userId) {
+                span.setAttribute("user.id", ctx.userId);
+              }
             } catch (err) {
               span.recordException(err as Error);
               span.setStatus({ code: SpanStatusCode.ERROR });

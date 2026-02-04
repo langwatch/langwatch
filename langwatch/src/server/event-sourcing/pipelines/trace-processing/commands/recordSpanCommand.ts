@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../library";
 import {
   createTenantId,
@@ -29,7 +29,10 @@ import { TraceRequestUtils } from "../utils/traceRequest.utils";
 export interface RecordSpanCommandDependencies {
   /** Service for redacting PII from spans. */
   piiRedactionService: {
-    redactSpan: (span: OtlpSpan, piiRedactionLevel: PIIRedactionLevel) => Promise<void>;
+    redactSpan: (
+      span: OtlpSpan,
+      piiRedactionLevel: PIIRedactionLevel,
+    ) => Promise<void>;
   };
 }
 
@@ -48,9 +51,10 @@ function getDefaultDependencies(): RecordSpanCommandDependencies {
 /**
  * Command handler for recording spans in the trace processing pipeline.
  */
-export class RecordSpanCommand
-  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
-{
+export class RecordSpanCommand implements CommandHandler<
+  Command<RecordSpanCommandData>,
+  SpanReceivedEvent
+> {
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
     recordSpanCommandDataSchema,

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,

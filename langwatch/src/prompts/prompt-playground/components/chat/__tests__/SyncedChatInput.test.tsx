@@ -30,7 +30,7 @@ const localStorageMock = (() => {
   };
 })();
 
-global.localStorage = localStorageMock as Storage;
+vi.stubGlobal("localStorage", localStorageMock);
 
 // Mock useOrganizationTeamProject
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

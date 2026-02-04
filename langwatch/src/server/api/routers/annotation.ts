@@ -15,7 +15,7 @@ import {
 } from "~/server/elasticsearch";
 import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
 import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";

@@ -36,8 +36,12 @@ export const CHILD_PROCESS = {
   TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes
 } as const;
 
-/** Scenario defaults */
+/**
+ * @deprecated Use getOnPlatformSetId() from internal-set-id.ts instead.
+ * This constant is kept for backward compatibility only.
+ * @see internal-set-id.ts
+ */
 export const SCENARIO_DEFAULTS = {
-  /** Set ID for scenarios run on the LangWatch platform */
+  /** @deprecated Use getOnPlatformSetId(projectId) instead */
   PLATFORM_SET_ID: "local-scenarios",
 } as const;

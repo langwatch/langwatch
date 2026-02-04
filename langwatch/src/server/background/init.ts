@@ -1,5 +1,5 @@
 import { env } from "~/env.mjs";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { scheduleUsageStats } from "./queues/usageStatsQueue";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 

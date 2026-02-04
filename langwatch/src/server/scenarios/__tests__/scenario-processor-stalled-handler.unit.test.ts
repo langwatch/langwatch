@@ -5,12 +5,27 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock bullmq before importing processor
-const mockWorkerOn = vi.fn();
+// Use vi.hoisted() to ensure mock values are available when vi.mock() factories run
+// (vi.mock is hoisted to the top of the file, so regular variables aren't available yet)
+const { mockWorkerOn, MockWorker, mockLoggerWarn, mockLoggerInfo, mockLoggerError, createMockLogger } = vi.hoisted(() => {
+  const mockWorkerOn = vi.fn();
+  const mockLoggerWarn = vi.fn();
+  const mockLoggerInfo = vi.fn();
+  const mockLoggerError = vi.fn();
 
-class MockWorker {
-  on = mockWorkerOn;
-}
+  const createMockLogger = (): Record<string, unknown> => ({
+    info: mockLoggerInfo,
+    warn: mockLoggerWarn,
+    error: mockLoggerError,
+    child: vi.fn(() => createMockLogger()),
+  });
+
+  class MockWorker {
+    on = mockWorkerOn;
+  }
+
+  return { mockWorkerOn, MockWorker, mockLoggerWarn, mockLoggerInfo, mockLoggerError, createMockLogger };
+});
 
 vi.mock("bullmq", () => ({
   Worker: MockWorker,
@@ -21,17 +36,8 @@ vi.mock("../../redis", () => ({
   connection: { host: "localhost", port: 6379 },
 }));
 
-// Mock logger
-const mockLoggerWarn = vi.fn();
-const mockLoggerInfo = vi.fn();
-const mockLoggerError = vi.fn();
-
-vi.mock("~/utils/logger", () => ({
-  createLogger: vi.fn(() => ({
-    info: mockLoggerInfo,
-    warn: mockLoggerWarn,
-    error: mockLoggerError,
-  })),
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => createMockLogger()),
 }));
 
 // Mock processor dependencies
@@ -57,6 +63,7 @@ vi.mock("../../db", () => ({
 
 describe("startScenarioProcessor", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
   });
 

@@ -14,7 +14,7 @@ export default function TraceDetailsRedirect() {
     if (!projectSlug || !traceId || !router.isReady) return;
 
     void router.replace(
-      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}`
+      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}`,
     );
   }, [projectSlug, traceId, router, router.isReady]);
 

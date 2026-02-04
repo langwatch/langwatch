@@ -257,6 +257,7 @@ export function PublishedPromptActions({
       <CopyPromptDialog
         open={isCopyDialogOpen}
         onClose={() => setIsCopyDialogOpen(false)}
+        onSuccess={() => void utils.prompts.getAllPromptsForProject.invalidate()}
         promptId={promptId}
         promptName={getDisplayHandle(promptHandle)}
       />

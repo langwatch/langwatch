@@ -1,11 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Archive, MoreVertical, Plus } from "lucide-react";
 import React from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";

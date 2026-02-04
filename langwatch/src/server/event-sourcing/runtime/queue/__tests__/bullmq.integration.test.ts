@@ -10,7 +10,7 @@ const mockLogger = {
   debug: vi.fn(),
 };
 
-vi.mock("../../../../utils/logger", () => ({
+vi.mock("../../../../utils/logger/server", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 
@@ -185,7 +185,10 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       // But we give more time for worker overhead
       const startTime = Date.now();
       const maxWaitMs = 10000;
-      while (processedPayloads.length < 5 && Date.now() - startTime < maxWaitMs) {
+      while (
+        processedPayloads.length < 5 &&
+        Date.now() - startTime < maxWaitMs
+      ) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 

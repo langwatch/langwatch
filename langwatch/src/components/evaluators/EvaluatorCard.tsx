@@ -1,10 +1,11 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
-import { CheckSquare, Code, MoreVertical, Workflow } from "lucide-react";
+import { ArrowUp, CheckSquare, Code, Copy, MoreVertical, RefreshCw, Workflow } from "lucide-react";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
+import { Tooltip } from "../ui/tooltip";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 const evaluatorTypeIcons: Record<string, typeof CheckSquare> = {
@@ -17,12 +18,20 @@ const evaluatorTypeLabels: Record<string, string> = {
   workflow: "Workflow",
 };
 
+export type EvaluatorWithCopyCount = Evaluator & {
+  _count?: { copiedEvaluators: number };
+};
+
 export type EvaluatorCardProps = {
-  evaluator: Evaluator;
+  evaluator: EvaluatorWithCopyCount;
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onUseFromApi?: () => void;
+  onReplicate?: () => void;
+  onPushToCopies?: () => void;
+  onSyncFromSource?: () => void;
+  hasEvaluationsManagePermission?: boolean;
 };
 
 export function EvaluatorCard({
@@ -31,6 +40,10 @@ export function EvaluatorCard({
   onEdit,
   onDelete,
   onUseFromApi,
+  onReplicate,
+  onPushToCopies,
+  onSyncFromSource,
+  hasEvaluationsManagePermission = false,
 }: EvaluatorCardProps) {
   const Icon = evaluatorTypeIcons[evaluator.type] ?? CheckSquare;
   const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
@@ -41,6 +54,9 @@ export function EvaluatorCard({
   // Extract evaluator type from config if available
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType;
+
+  const isCopiedEvaluator = !!(evaluator as { copiedFromEvaluatorId?: string | null }).copiedFromEvaluatorId;
+  const hasCopies = (evaluator._count?.copiedEvaluators ?? 0) > 0;
 
   const handleUseFromApi = () => {
     if (onUseFromApi) {
@@ -99,6 +115,87 @@ export function EvaluatorCard({
                     <Code size={14} />
                     Use via API
                   </Menu.Item>
+                  {isCopiedEvaluator && onSyncFromSource && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to sync from source"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="sync"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onSyncFromSource();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <RefreshCw size={16} /> Update from source
+                      </Menu.Item>
+                    </Tooltip>
+                  )}
+                  {hasCopies && onPushToCopies && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to push to replicas"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="push"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onPushToCopies();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <ArrowUp size={16} /> Push to replicas
+                      </Menu.Item>
+                    </Tooltip>
+                  )}
+                  {onReplicate && (
+                    <Tooltip
+                      content={
+                        !hasEvaluationsManagePermission
+                          ? "You need evaluations:manage permission to replicate evaluators"
+                          : undefined
+                      }
+                      disabled={hasEvaluationsManagePermission}
+                      positioning={{ placement: "right" }}
+                      showArrow
+                    >
+                      <Menu.Item
+                        value="replicate"
+                        onClick={
+                          hasEvaluationsManagePermission
+                            ? (e) => {
+                                e.stopPropagation();
+                                onReplicate();
+                              }
+                            : undefined
+                        }
+                        disabled={!hasEvaluationsManagePermission}
+                      >
+                        <Copy size={16} /> Replicate to another project
+                      </Menu.Item>
+                    </Tooltip>
+                  )}
                   {onDelete && (
                     <Menu.Item
                       value="delete"

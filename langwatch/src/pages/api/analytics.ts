@@ -9,6 +9,7 @@ import {
 import { timeseries } from "../../server/analytics/timeseries";
 import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
+import { normalizeHeaderValue } from "../../utils/headers";
 
 import { createLogger } from "../../utils/logger";
 
@@ -22,7 +23,7 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const authToken = req.headers["x-auth-token"];
+  const authToken = normalizeHeaderValue(req.headers["x-auth-token"]);
 
   if (!authToken) {
     return res
@@ -31,7 +32,7 @@ export default async function handler(
   }
 
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+    where: { apiKey: authToken },
   });
 
   if (!project) {

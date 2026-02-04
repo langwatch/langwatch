@@ -11,7 +11,7 @@ import type { ConnectionOptions, Job } from "bullmq";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { QueueWithFallback } from "../background/queues/queueWithFallback";
 import { connection } from "../redis";
 import { SCENARIO_QUEUE } from "./scenario.constants";

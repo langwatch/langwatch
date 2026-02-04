@@ -16,7 +16,7 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "~/server/prompt-config/prompt.service";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:evaluations-v3:dataLoader");
 
@@ -129,7 +129,9 @@ export const loadDataset = async (
 
     // Parse JSON columns
     const jsonColumns = new Set(
-      columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
+      columns
+        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
+        .map((c) => c.name),
     );
     rows = parseJsonColumns(rows, jsonColumns);
   } else if (dataset.type === "saved" && dataset.datasetId) {
@@ -150,7 +152,9 @@ export const loadDataset = async (
 
     // Parse JSON columns (saved datasets already use names as keys)
     const jsonColumns = new Set(
-      columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
+      columns
+        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
+        .map((c) => c.name),
     );
     rows = parseJsonColumns(rows, jsonColumns);
   } else {

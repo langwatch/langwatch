@@ -66,7 +66,8 @@ function Usage() {
 
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
-  const { url: planManagementUrl, buttonLabel: planButtonLabel } = usePlanManagementUrl();
+  const { url: planManagementUrl, buttonLabel: planButtonLabel } =
+    usePlanManagementUrl();
 
   const licenseStatus = api.license.getStatus.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -164,7 +165,8 @@ function Usage() {
           )}
           {hasLimitsError && (
             <Text color="fg.muted">
-              Unable to load resource limits. Please refresh the page or contact support if the issue persists.
+              Unable to load resource limits. Please refresh the page or contact
+              support if the issue persists.
             </Text>
           )}
           {hasCorruptedLicense && (
@@ -173,7 +175,8 @@ function Usage() {
                 Resource Limits
               </Heading>
               <Text color="orange.500">
-                Your license appears to be corrupted. Please re-upload your license on the{" "}
+                Your license appears to be corrupted. Please re-upload your
+                license on the{" "}
                 <Link href="/settings/license" textDecoration="underline">
                   License page
                 </Link>
@@ -181,22 +184,24 @@ function Usage() {
               </Text>
             </>
           )}
-          {hasValidLicense && licenseStatus.data && "currentMembers" in licenseStatus.data && (
-            <>
-              <Heading size="md" as="h2">
-                Resource Limits
-              </Heading>
-              <Text color="fg.muted" fontSize="sm" marginBottom={2}>
-                Current usage versus your license limits
-              </Text>
-              <ResourceLimitsDisplay
-                limits={mapLicenseStatusToLimits(licenseStatus.data)}
-              />
-              <Button asChild marginTop={2}>
-                <Link href={planManagementUrl}>{planButtonLabel}</Link>
-              </Button>
-            </>
-          )}
+          {hasValidLicense &&
+            licenseStatus.data &&
+            "currentMembers" in licenseStatus.data && (
+              <>
+                <Heading size="md" as="h2">
+                  Resource Limits
+                </Heading>
+                <Text color="fg.muted" fontSize="sm" marginBottom={2}>
+                  Current usage versus your license limits
+                </Text>
+                <ResourceLimitsDisplay
+                  limits={mapLicenseStatusToLimits(licenseStatus.data)}
+                />
+                <Button asChild marginTop={2}>
+                  <Link href={planManagementUrl}>{planButtonLabel}</Link>
+                </Button>
+              </>
+            )}
           {isFreeTier && (
             <>
               <HStack gap={3}>

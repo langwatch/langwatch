@@ -10,7 +10,7 @@ import {
 } from "~/server/api/trpc";
 import { sseService } from "~/server/services/sse.service";
 import { TraceService } from "~/server/traces/trace.service";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";

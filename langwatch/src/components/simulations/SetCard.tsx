@@ -1,5 +1,10 @@
-import { Card, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
+import { Settings } from "lucide-react";
 import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
+import {
+  isOnPlatformSet,
+  ON_PLATFORM_DISPLAY_NAME,
+} from "~/server/scenarios/internal-set-id";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 export interface SetCardProps extends ScenarioSetData {
@@ -12,6 +17,9 @@ export function SetCard({
   lastRunAt,
   onClick,
 }: SetCardProps) {
+  const isInternalSet = isOnPlatformSet(scenarioSetId);
+  const displayName = isInternalSet ? ON_PLATFORM_DISPLAY_NAME : scenarioSetId;
+
   const _formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
 
@@ -41,11 +49,17 @@ export function SetCard({
       position="relative"
     >
       <VStack align="stretch" gap="2">
-        <Text fontSize="2xl" paddingBottom="2">
-          {"🎭"}
-        </Text>
+        {isInternalSet ? (
+          <Box fontSize="2xl" paddingBottom="2" color="fg.subtle">
+            <Settings size={28} aria-label="System set icon" />
+          </Box>
+        ) : (
+          <Text fontSize="2xl" paddingBottom="2">
+            {"\uD83C\uDFAD"}
+          </Text>
+        )}
         <Text fontWeight="500" color="fg">
-          {scenarioSetId}
+          {displayName}
         </Text>
 
         {/* Scenarios count and last run in a row */}

@@ -74,7 +74,7 @@ export function useScenarioGeneration(projectId: string | undefined) {
         const scenario = await generateScenarioWithAI(
           prompt,
           projectId,
-          currentScenario
+          currentScenario,
         );
         setStatus("done");
         return scenario;

@@ -1,4 +1,4 @@
-import { trace } from "@opentelemetry/api";
+import { context as otContext, SpanKind, trace } from "@opentelemetry/api";
 import {
   DelayedError,
   type Job,
@@ -13,8 +13,19 @@ import { BullMQOtel } from "bullmq-otel";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { connection } from "../../../redis";
+import {
+  type JobContextMetadata,
+  createContextFromJobData,
+  getJobContextMetadata,
+  runWithContext,
+} from "../../../context/asyncContext";
+import {
+  type BullMQQueueState,
+  getBullMQJobWaitDurationHistogram,
+  setBullMQJobCount,
+} from "../../../metrics";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -69,9 +80,20 @@ const SHUTDOWN_CONFIG = {
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
-export class EventSourcedQueueProcessorBullMq<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+/** Interval for collecting queue metrics in milliseconds */
+const QUEUE_METRICS_INTERVAL_MS = 15000;
+
+/**
+ * Container type for job data that wraps the payload and context metadata.
+ */
+type JobContainer<Payload> = {
+  __payload: Payload;
+  __context?: JobContextMetadata;
+};
+
+export class EventSourcedQueueProcessorBullMq<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly queueName: string;
   private readonly jobName: string;
@@ -84,6 +106,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly redisConnection: IORedis | Cluster;
   private shutdownRequested = false;
+  private metricsInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -204,125 +227,225 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         );
       },
     );
+
+    // Start periodic queue metrics collection
+    this.startMetricsCollection();
+  }
+
+  /**
+   * Starts periodic collection of queue metrics.
+   */
+  private startMetricsCollection(): void {
+    // Collect immediately
+    void this.collectQueueMetrics();
+
+    // Then collect periodically
+    this.metricsInterval = setInterval(() => {
+      void this.collectQueueMetrics();
+    }, QUEUE_METRICS_INTERVAL_MS);
+  }
+
+  /**
+   * Collects and reports queue metrics to Prometheus.
+   */
+  private async collectQueueMetrics(): Promise<void> {
+    try {
+      const counts = await this.queue.getJobCounts();
+
+      // Report each state as a gauge metric
+      const states: Array<{ state: BullMQQueueState; count: number }> = [
+        { state: "waiting", count: counts.waiting ?? 0 },
+        { state: "active", count: counts.active ?? 0 },
+        { state: "completed", count: counts.completed ?? 0 },
+        { state: "failed", count: counts.failed ?? 0 },
+        { state: "delayed", count: counts.delayed ?? 0 },
+        { state: "paused", count: counts.paused ?? 0 },
+        { state: "prioritized", count: counts.prioritized ?? 0 },
+        { state: "waiting-children", count: counts["waiting-children"] ?? 0 },
+      ];
+
+      for (const { state, count } of states) {
+        setBullMQJobCount(this.queueName, state, count);
+      }
+    } catch (error) {
+      this.logger.debug(
+        {
+          queueName: this.queueName,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to collect queue metrics",
+      );
+    }
+  }
+
+  /**
+   * Stops the periodic metrics collection.
+   */
+  private stopMetricsCollection(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = null;
+    }
   }
 
   /**
    * Processes a single job from the queue.
    */
   private async processJob(job: Job<Payload>): Promise<void> {
-    const customAttributes = this.spanAttributes
-      ? this.spanAttributes(job.data)
-      : {};
+    // Extract payload and context from the container
+    const container = job.data as unknown as JobContainer<Payload>;
+    const payload = container.__payload;
+    const contextMetadata = container.__context;
 
-    const span = trace.getActiveSpan();
-    span?.setAttributes({
-      ...customAttributes,
-    });
+    // Create request context from job metadata
+    const requestContext = createContextFromJobData(contextMetadata);
 
-    this.logger.debug(
-      {
-        queueName: this.queueName,
-        jobId: job.id,
-      },
-      "Processing queue job",
-    );
+    // Record job wait time (time from enqueue to processing start)
+    if (job.timestamp) {
+      const waitTimeMs = Date.now() - job.timestamp;
+      getBullMQJobWaitDurationHistogram(this.queueName).observe(waitTimeMs);
+    }
 
-    try {
-      await this.process(job.data);
+    // Run the job processing within the restored context
+    return runWithContext(requestContext, async () => {
+      const customAttributes = this.spanAttributes
+        ? this.spanAttributes(payload)
+        : {};
+
+      const span = trace.getActiveSpan();
+      span?.setAttributes({
+        ...customAttributes,
+        // Add context attributes to the span
+        ...(contextMetadata?.organizationId && {
+          "organization.id": contextMetadata.organizationId,
+        }),
+        ...(contextMetadata?.projectId && {
+          "tenant.id": contextMetadata.projectId,
+        }),
+        ...(contextMetadata?.userId && {
+          "user.id": contextMetadata.userId,
+        }),
+      });
+
+      // If we have a parent trace context, create a link to it
+      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+        span?.addLink({
+          context: {
+            traceId: contextMetadata.traceId,
+            spanId: contextMetadata.parentSpanId,
+            traceFlags: 1, // sampled
+          },
+        });
+      }
+
       this.logger.debug(
         {
           queueName: this.queueName,
           jobId: job.id,
+          traceId: requestContext.traceId,
+          organizationId: requestContext.organizationId,
+          projectId: requestContext.projectId,
         },
-        "Queue job processed successfully",
-      );
-    } catch (error) {
-      // Detect expected errors - ordering and lock contention are normal when events arrive close together
-      const isOrderingError = isSequentialOrderingError(error);
-      const isLockContention = isLockError(error);
-
-      // For ordering errors, re-queue with progressive delay
-      if (isOrderingError) {
-        const previousSequence = extractPreviousSequenceNumber(error);
-        const progressiveDelayMs = calculateProgressiveDelay(
-          previousSequence,
-          job.attemptsStarted,
-        );
-
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            delayMs: progressiveDelayMs,
-            attemptsStarted: job.attemptsStarted,
-            previousSequenceNumber: previousSequence,
-          },
-          "Re-queuing job with delay due to ordering (previous event not yet processed)",
-        );
-
-        const targetTimestamp = Date.now() + progressiveDelayMs;
-        await job.moveToDelayed(targetTimestamp, job.token);
-        // Throw DelayedError to tell BullMQ not to try to complete the job
-        // (the job has been moved to delayed state, so there's nothing to complete)
-        throw new DelayedError();
-      }
-
-      // For lock contention, delay significantly since the lock holder will process all events
-      // Use DelayedError so it doesn't count against retry attempts
-      if (isLockContention) {
-        const lockContentionDelayMs = calculateLockContentionDelay(
-          job.attemptsStarted,
-        );
-
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            delayMs: lockContentionDelayMs,
-            attemptsStarted: job.attemptsStarted,
-          },
-          "Lock contention detected, delaying job (lock holder will process all events)",
-        );
-
-        const targetTimestamp = Date.now() + lockContentionDelayMs;
-        await job.moveToDelayed(targetTimestamp, job.token);
-        throw new DelayedError();
-      }
-
-      // For "no events found" errors (ClickHouse replication lag), use exponential backoff
-      if (isNoEventsFoundError(error)) {
-        const exponentialDelayMs = calculateExponentialBackoff(
-          job.attemptsStarted,
-        );
-
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            delayMs: exponentialDelayMs,
-            attemptsStarted: job.attemptsStarted,
-          },
-          "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
-        );
-
-        const targetTimestamp = Date.now() + exponentialDelayMs;
-        await job.moveToDelayed(targetTimestamp, job.token);
-        throw new DelayedError();
-      }
-
-      // Non-expected errors are actual failures
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          jobId: job.id,
-          error: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : void 0,
-        },
-        "Queue job processing failed",
+        "Processing queue job",
       );
 
-      throw error;
-    }
+      try {
+        await this.process(payload);
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job.id,
+          },
+          "Queue job processed successfully",
+        );
+      } catch (error) {
+        // Detect expected errors - ordering and lock contention are normal when events arrive close together
+        const isOrderingError = isSequentialOrderingError(error);
+        const isLockContention = isLockError(error);
+
+        // For ordering errors, re-queue with progressive delay
+        if (isOrderingError) {
+          const previousSequence = extractPreviousSequenceNumber(error);
+          const progressiveDelayMs = calculateProgressiveDelay(
+            previousSequence,
+            job.attemptsStarted,
+          );
+
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              jobId: job.id,
+              delayMs: progressiveDelayMs,
+              attemptsStarted: job.attemptsStarted,
+              previousSequenceNumber: previousSequence,
+            },
+            "Re-queuing job with delay due to ordering (previous event not yet processed)",
+          );
+
+          const targetTimestamp = Date.now() + progressiveDelayMs;
+          await job.moveToDelayed(targetTimestamp, job.token);
+          // Throw DelayedError to tell BullMQ not to try to complete the job
+          // (the job has been moved to delayed state, so there's nothing to complete)
+          throw new DelayedError();
+        }
+
+        // For lock contention, delay significantly since the lock holder will process all events
+        // Use DelayedError so it doesn't count against retry attempts
+        if (isLockContention) {
+          const lockContentionDelayMs = calculateLockContentionDelay(
+            job.attemptsStarted,
+          );
+
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              jobId: job.id,
+              delayMs: lockContentionDelayMs,
+              attemptsStarted: job.attemptsStarted,
+            },
+            "Lock contention detected, delaying job (lock holder will process all events)",
+          );
+
+          const targetTimestamp = Date.now() + lockContentionDelayMs;
+          await job.moveToDelayed(targetTimestamp, job.token);
+          throw new DelayedError();
+        }
+
+        // For "no events found" errors (ClickHouse replication lag), use exponential backoff
+        if (isNoEventsFoundError(error)) {
+          const exponentialDelayMs = calculateExponentialBackoff(
+            job.attemptsStarted,
+          );
+
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              jobId: job.id,
+              delayMs: exponentialDelayMs,
+              attemptsStarted: job.attemptsStarted,
+            },
+            "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
+          );
+
+          const targetTimestamp = Date.now() + exponentialDelayMs;
+          await job.moveToDelayed(targetTimestamp, job.token);
+          throw new DelayedError();
+        }
+
+        // Non-expected errors are actual failures
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            jobId: job.id,
+            error: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : void 0,
+          },
+          "Queue job processing failed",
+        );
+
+        throw error;
+      }
+    });
   }
 
   /**
@@ -401,10 +524,18 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     const span = trace.getActiveSpan();
     span?.setAttributes({ ...customAttributes });
 
+    // Get current context metadata and attach it to the job payload for trace correlation
+    // Always wrap in a container to avoid issues with primitive payloads being spread
+    const contextMetadata = getJobContextMetadata();
+    const payloadWithContext = {
+      __payload: payload,
+      __context: contextMetadata,
+    } as unknown as Payload;
+
     await this.queue.add(
       // @ts-expect-error - jobName is a string, this is stupid typing from BullMQ
       this.jobName,
-      payload,
+      payloadWithContext,
       opts,
     );
   }
@@ -430,6 +561,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
    */
   async close(): Promise<void> {
     this.shutdownRequested = true;
+    this.stopMetricsCollection();
     this.logger.info({ queueName: this.queueName }, "Closing queue processor");
 
     const closeWithTimeout = async (): Promise<void> => {

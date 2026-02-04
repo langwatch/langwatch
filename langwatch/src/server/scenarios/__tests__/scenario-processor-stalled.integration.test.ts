@@ -64,12 +64,15 @@ const mockLoggerInfo = vi.fn();
 const mockLoggerWarn = vi.fn();
 const mockLoggerError = vi.fn();
 
-vi.mock("~/utils/logger", () => ({
-  createLogger: vi.fn(() => ({
-    info: mockLoggerInfo,
-    warn: mockLoggerWarn,
-    error: mockLoggerError,
-  })),
+const createMockLogger = () => ({
+  info: mockLoggerInfo,
+  warn: mockLoggerWarn,
+  error: mockLoggerError,
+  child: vi.fn(() => createMockLogger()),
+});
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => createMockLogger()),
 }));
 
 // Mock database
@@ -337,10 +340,10 @@ describe("startScenarioProcessor", () => {
       failedHandler!(mockJob, stalledError);
 
       // Then: the failure is logged at error level
+      // Note: jobId/scenarioId are bound via logger.child(), error is passed as string
       expect(mockLoggerError).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: mockJob.id,
-          error: stalledError,
+          error: stalledError.message,
         }),
         expect.stringContaining("failed")
       );
@@ -395,10 +398,10 @@ describe("startScenarioProcessor", () => {
       await waitForAsyncHandlers();
 
       // Then: the error from the failure handler is logged but doesn't crash
+      // Note: jobId/scenarioId are bound via logger.child(), emitError is passed in call
       expect(mockLoggerError).toHaveBeenCalledWith(
         expect.objectContaining({
-          jobId: mockJob.id,
-          scenarioId: mockJob.data.scenarioId,
+          emitError: expect.any(Error),
         }),
         expect.stringContaining("Failed to emit failure events")
       );

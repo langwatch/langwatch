@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { EventUtils } from "../../library";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { TenantId } from "../../library/domain/tenantId";
@@ -32,9 +32,7 @@ import { CheckpointRepositoryMemory } from "./repositories/checkpointRepositoryM
  * This implementation will throw an error if used in production environments
  * to prevent accidental deployment of non-thread-safe code in multi-instance setups.
  */
-export class ProcessorCheckpointStoreMemory
-  implements ProcessorCheckpointStore
-{
+export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore {
   private readonly repository: CheckpointRepository;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:processor-checkpoint-store:memory",

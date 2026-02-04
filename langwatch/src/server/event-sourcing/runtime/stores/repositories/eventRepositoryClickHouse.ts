@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;

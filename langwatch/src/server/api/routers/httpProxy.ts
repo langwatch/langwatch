@@ -1,6 +1,6 @@
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

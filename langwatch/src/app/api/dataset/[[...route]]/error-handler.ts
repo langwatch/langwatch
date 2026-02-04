@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { HttpError, InternalServerError } from "../../shared/errors";
 import { errorSchema } from "../../shared/schemas";
 

@@ -1,8 +1,8 @@
-import { Button, Field, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { Checkbox } from "../../../components/ui/checkbox";
-import { Dialog } from "../../../components/ui/dialog";
-import { toaster } from "../../../components/ui/toaster";
+import {
+  PushToCopiesDialog as GenericPushToCopiesDialog,
+  type PushToCopiesCopyItem,
+} from "../../../components/ui/PushToCopiesDialog";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 
@@ -31,7 +31,7 @@ export const PushToCopiesDialog = ({
   } = api.workflow.getCopies.useQuery(
     {
       projectId: project?.id ?? "",
-      workflowId: workflowId,
+      workflowId,
     },
     {
       enabled: open && !!project?.id && !!workflowId,
@@ -39,19 +39,12 @@ export const PushToCopiesDialog = ({
   );
 
   const [availableCopies, setAvailableCopies] = useState<
-    Array<{
-      id: string;
-      name: string;
-      projectId: string;
-      fullPath: string;
-    }>
+    PushToCopiesCopyItem[]
   >([]);
 
   useEffect(() => {
     if (!copies) return;
-
     setAvailableCopies(copies);
-    // Select all by default
     setSelectedCopyIds(new Set(copies.map((c) => c.id)));
   }, [copies]);
 
@@ -65,98 +58,39 @@ export const PushToCopiesDialog = ({
     setSelectedCopyIds(newSelected);
   };
 
-  const handlePush = async () => {
-    if (!project || selectedCopyIds.size === 0) return;
-
-    try {
-      const result = await pushToCopies.mutateAsync({
-        workflowId: workflowId,
-        projectId: project.id,
-        copyIds: Array.from(selectedCopyIds),
-      });
-
-      await utils.workflow.getAll.invalidate();
-
-      toaster.create({
-        title: "Workflow pushed",
-        description: `Latest version of "${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated workflow(s).`,
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-
-      onClose();
-      setSelectedCopyIds(new Set());
-    } catch (error) {
-      toaster.create({
-        title: "Error pushing workflow",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
-      });
-    }
-  };
-
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content onClick={(e) => e.stopPropagation()}>
-        <Dialog.Header>
-          <Dialog.Title>Push to Replicas</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align={"start"}>
-            <Text fontSize="sm" color="fg.muted">
-              Select which replicas to push the latest version to:
-            </Text>
-            {isLoading ? (
-              <Text>Loading replicas...</Text>
-            ) : error ? (
-              <Text color="red.500">
-                Error loading replicas: {error.message}
-              </Text>
-            ) : availableCopies.length === 0 ? (
-              <Text color="fg.muted">
-                No replicas found. This may be because you don't have
-                workflows:update permission on the replica projects, or the
-                replicas have been archived.
-              </Text>
-            ) : (
-              <VStack gap={2} align={"start"} width="full">
-                {availableCopies.map((copy) => (
-                  <Checkbox
-                    key={copy.id}
-                    checked={selectedCopyIds.has(copy.id)}
-                    onChange={() => handleToggleCopy(copy.id)}
-                  >
-                    <VStack align={"start"} gap={0}>
-                      <Text fontWeight="medium">{copy.name}</Text>
-                      <Text fontSize="sm" color="fg.muted">
-                        {copy.fullPath}
-                      </Text>
-                    </VStack>
-                  </Checkbox>
-                ))}
-              </VStack>
-            )}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="blue"
-            onClick={() => {
-              void handlePush();
-            }}
-            loading={pushToCopies.isLoading}
-            disabled={selectedCopyIds.size === 0 || isLoading}
-          >
-            Push to {selectedCopyIds.size} replica
-            {selectedCopyIds.size !== 1 ? "s" : ""}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <GenericPushToCopiesDialog
+      open={open}
+      onClose={onClose}
+      entityLabel="Workflow"
+      sourceName={workflowName}
+      copies={availableCopies}
+      isLoading={isLoading}
+      error={error ? { message: error.message } : null}
+      selectedCopyIds={selectedCopyIds}
+      onToggleCopy={handleToggleCopy}
+      onPush={async () => {
+        if (!project) {
+          throw new Error("No project available for push");
+        }
+        const result = await pushToCopies.mutateAsync({
+          workflowId,
+          projectId: project.id,
+          copyIds: Array.from(selectedCopyIds),
+        });
+        await utils.workflow.getAll.invalidate();
+        return result;
+      }}
+      pushLoading={pushToCopies.isLoading}
+      bodyIntro="Select which replicas to push the latest version to:"
+      emptyMessage={
+        <>
+          No replicas found. This may be because you don't have
+          workflows:update permission on the replica projects, or the
+          replicas have been archived.
+        </>
+      }
+      onSuccess={() => setSelectedCopyIds(new Set())}
+    />
   );
 };

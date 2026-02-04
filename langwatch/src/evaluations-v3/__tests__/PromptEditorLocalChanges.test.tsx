@@ -256,7 +256,7 @@ describe("Prompt Editor Local Changes", () => {
 
   describe("when onLocalConfigChange callback is provided (evaluations context)", () => {
     it("does NOT show save confirmation when closing with changes", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const mockOnLocalConfigChange = vi.fn();
 
       mockRouterQuery = {
@@ -297,7 +297,7 @@ describe("Prompt Editor Local Changes", () => {
     }, 30000);
 
     it("calls onLocalConfigChange when changes are made", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       const mockOnLocalConfigChange = vi.fn();
 
       mockRouterQuery = {
@@ -347,7 +347,7 @@ describe("Prompt Editor Local Changes", () => {
 
   describe("when onLocalConfigChange is NOT provided (standalone prompt editing)", () => {
     it("shows save confirmation when closing with unsaved changes", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       mockRouterQuery = {
         "drawer.open": "promptEditor",
@@ -396,7 +396,7 @@ describe("Prompt Editor Local Changes", () => {
       // 5. BUG: Alert icon disappears because target.inputs still only has [input]!
       //    The saved prompt has [input, wtf] but target.inputs wasn't updated
 
-      const _user = userEvent.setup();
+      const _user = userEvent.setup({ delay: null });
 
       // Set up target with only "input" field - all mapped, NO alert initially
       useEvaluationsV3Store.setState({
@@ -525,7 +525,7 @@ describe("Prompt Editor Local Changes", () => {
       // BUG: After clicking save, the form resets to initialLocalConfig
       // instead of keeping the user's changes or showing the saved data.
 
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       // initialLocalConfig has DIFFERENT content than mockPromptData (server data)
       // This simulates: user had unsaved local changes, then we open the drawer
@@ -840,7 +840,7 @@ describe("Prompt Editor Local Changes", () => {
 
   describe("flow callbacks integration", () => {
     it("updateTarget is called when onLocalConfigChange fires with config", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       // Create a mock that simulates what EvaluationsV3Table does
       const updateTarget = useEvaluationsV3Store.getState().updateTarget;

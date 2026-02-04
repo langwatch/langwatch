@@ -122,14 +122,8 @@ describe("Optimization Publish - Evaluator Integration", () => {
       expect(updatedWorkflow?.isEvaluator).toBe(true);
       expect(updatedWorkflow?.isComponent).toBe(false);
 
-      // Verify evaluator was created
-      const evaluator = await prisma.evaluator.findFirst({
-        where: {
-          workflowId: workflow.id,
-          projectId,
-          archivedAt: null,
-        },
-      });
+      // Verify evaluator was created (with retry for DB sync)
+      const evaluator = await waitForEvaluator(workflow.id, projectId);
 
       expect(evaluator).not.toBeNull();
       expect(evaluator?.name).toBe("Bias Detection Evaluator");

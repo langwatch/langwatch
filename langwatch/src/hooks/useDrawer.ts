@@ -5,7 +5,6 @@ import {
   type DrawerCallbacks,
   type DrawerProps,
   type DrawerType,
-  drawers,
 } from "../components/drawerRegistry";
 import { createLogger } from "../utils/logger";
 
@@ -401,14 +400,7 @@ export const useDrawer = () => {
       setFlowCallbacks,
       getFlowCallbacks,
     }),
-    [
-      openDrawer,
-      closeDrawer,
-      drawerOpen,
-      goBack,
-      canGoBack,
-      currentDrawer,
-    ],
+    [openDrawer, closeDrawer, drawerOpen, goBack, canGoBack, currentDrawer],
   );
 };
 

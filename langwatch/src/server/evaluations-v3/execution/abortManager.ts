@@ -1,5 +1,5 @@
 import { connection } from "~/server/redis";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("evaluations-v3:abort-manager");
 

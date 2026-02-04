@@ -16,7 +16,7 @@
  * - gen_ai.output.messages (from gen_ai.choice events)
  */
 
-import { createLogger } from "../../../../../../utils/logger";
+import { createLogger } from "../../../../../../utils/logger/server";
 import type { NormalizedEvent } from "../../schemas/spans";
 import { ATTR_KEYS } from "./_constants";
 import {

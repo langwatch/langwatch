@@ -16,7 +16,7 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,
@@ -451,7 +451,13 @@ export const runEvaluation = async ({
   }
 
   if (data.type === "custom") {
-    return customEvaluation(projectId, evaluatorType, data.data, trace, workflowId);
+    return customEvaluation(
+      projectId,
+      evaluatorType,
+      data.data,
+      trace,
+      workflowId,
+    );
   }
 
   // At this point, evaluatorType is a built-in evaluator (not "workflow" or "custom/*")
@@ -731,7 +737,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        logger.error({ jobId: job.id, error }, "failed to process job");
+        // Note: Logging is handled by the 'failed' event handler to avoid double logging
 
         if (
           typeof error === "object" &&

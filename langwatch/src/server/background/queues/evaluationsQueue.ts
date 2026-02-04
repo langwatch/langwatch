@@ -6,7 +6,7 @@ import {
 } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError, extractErrorMessage } from "../../../utils/captureError";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
 import { prisma } from "../../db";
@@ -357,31 +357,35 @@ export const updateEvaluationStatusInES = async ({
         const evaluationId = getEvaluationId(check);
         if (status === "in_progress") {
           // Emit started event
-          await getEvaluationProcessingPipeline().commands.startEvaluation.send({
-            tenantId: trace.project_id,
-            evaluationId,
-            evaluatorId: getEvaluatorId(check),
-            evaluatorType: check.type,
-            evaluatorName: check.name,
-            traceId: trace.trace_id,
-            isGuardrail: is_guardrail,
-          });
+          await getEvaluationProcessingPipeline().commands.startEvaluation.send(
+            {
+              tenantId: trace.project_id,
+              evaluationId,
+              evaluatorId: getEvaluatorId(check),
+              evaluatorType: check.type,
+              evaluatorName: check.name,
+              traceId: trace.trace_id,
+              isGuardrail: is_guardrail,
+            },
+          );
         } else if (
           status === "processed" ||
           status === "error" ||
           status === "skipped"
         ) {
           // Emit completed event
-          await getEvaluationProcessingPipeline().commands.completeEvaluation.send({
-            tenantId: trace.project_id,
-            evaluationId,
-            status,
-            score,
-            passed,
-            label,
-            details,
-            error: extractErrorMessage(error),
-          });
+          await getEvaluationProcessingPipeline().commands.completeEvaluation.send(
+            {
+              tenantId: trace.project_id,
+              evaluationId,
+              status,
+              score,
+              passed,
+              label,
+              details,
+              error: extractErrorMessage(error),
+            },
+          );
         }
       }
     } catch (eventError) {

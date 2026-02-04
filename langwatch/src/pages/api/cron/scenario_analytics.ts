@@ -189,7 +189,9 @@ async function filterExistingAnalytics(
 
   const existingEntries = await prisma.analytics.findMany({
     where: {
-      projectId: { in: analyticsToCreate.map((entry) => entry.projectId) },
+      projectId: {
+        in: analyticsToCreate.map((entry) => entry.projectId),
+      },
       key: {
         in: [
           ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
@@ -325,8 +327,9 @@ export default async function handler(
     });
   } catch (error) {
     logger.error({ error }, "[Scenario Analytics] Error");
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to process scenario analytics" });
+    return res.status(500).json({
+      success: false,
+      error: "Failed to process scenario analytics",
+    });
   }
 }

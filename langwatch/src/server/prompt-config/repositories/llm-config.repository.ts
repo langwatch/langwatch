@@ -6,7 +6,7 @@ import type {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
 import {

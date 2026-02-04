@@ -3,7 +3,7 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AgentRepository,

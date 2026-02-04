@@ -10,7 +10,7 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { startCollectorWorker } from "./workers/collectorWorker";
 import {
   runEvaluationJob,
@@ -32,10 +32,17 @@ import type { EventSourcingJob } from "./types";
 import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { getClickHouseClient } from "../clickhouse/client";
+import {
+  startStorageStatsCollection,
+  stopStorageStatsCollection,
+} from "../clickhouse/metrics";
 import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
 import { startScenarioProcessor } from "../scenarios/scenario.processor";
-import type { ScenarioJob, ScenarioJobResult } from "../scenarios/scenario.queue";
+import type {
+  ScenarioJob,
+  ScenarioJobResult,
+} from "../scenarios/scenario.queue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -44,7 +51,10 @@ type Closeable = { name: string; close: () => Promise<void> | void };
 const closeables = new Map<string, Closeable>();
 let isShuttingDown = false;
 
-function registerCloseable(name: string, closeable: { close: () => Promise<void> | void } | undefined) {
+function registerCloseable(
+  name: string,
+  closeable: { close: () => Promise<void> | void } | undefined,
+) {
   if (closeable) {
     closeables.set(name, { name, close: () => closeable.close() });
   }
@@ -65,12 +75,15 @@ export async function gracefulShutdown() {
         logger.error({ name: c.name, error }, "Failed to close");
         throw error;
       }
-    })
+    }),
   );
 
   const failed = results.filter((r) => r.status === "rejected").length;
   if (failed > 0) {
-    logger.warn({ failed, total: closeables.size }, "Shutdown completed with errors");
+    logger.warn(
+      { failed, total: closeables.size },
+      "Shutdown completed with errors",
+    );
   } else {
     logger.info("Shutdown complete");
   }
@@ -104,10 +117,16 @@ export const start = (
   isShuttingDown = false;
 
   // Initialize event sourcing with ClickHouse and Redis clients
+  const clickHouseClient = getClickHouseClient();
   initializeEventSourcing({
-    clickHouseClient: getClickHouseClient(),
+    clickHouseClient,
     redisConnection: redis,
   });
+
+  // Start ClickHouse storage metrics collection if ClickHouse is enabled
+  if (clickHouseClient) {
+    startStorageStatsCollection(clickHouseClient);
+  }
 
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
@@ -129,7 +148,13 @@ export const start = (
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("eventSourcing", eventSourcingWorker);
     registerCloseable("scenario", scenarioWorker);
-    registerCloseable("metricsServer", { close: () => new Promise<void>((resolve) => metricsServer.close(() => resolve())) });
+    registerCloseable("metricsServer", {
+      close: () =>
+        new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+    });
+    registerCloseable("storageStats", {
+      close: () => stopStorageStatsCollection(),
+    });
 
     incrementWorkerRestartCount();
 
@@ -167,7 +192,9 @@ export const start = (
             usageStatsWorker?.close(),
             eventSourcingWorker?.close(),
             scenarioWorker?.close(),
-            new Promise<void>((resolve) => metricsServer.close(() => resolve())),
+            new Promise<void>((resolve) =>
+              metricsServer.close(() => resolve()),
+            ),
           ]);
 
           setTimeout(() => {

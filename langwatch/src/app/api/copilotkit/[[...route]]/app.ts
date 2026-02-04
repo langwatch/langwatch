@@ -14,7 +14,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 
 import type { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   authMiddleware,
   handleError,

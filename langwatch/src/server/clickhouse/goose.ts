@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:clickhouse:migrations");
 

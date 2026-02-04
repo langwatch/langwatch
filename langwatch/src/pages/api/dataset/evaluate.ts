@@ -220,7 +220,10 @@ export default async function handler(
   });
 
   if (!experiment) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Experiment not found" });
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment not found",
+    });
   }
 
   if ("cost" in result && result.cost) {

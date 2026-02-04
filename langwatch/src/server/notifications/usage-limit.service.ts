@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { getCurrentMonthStart } from "../utils/dateUtils";

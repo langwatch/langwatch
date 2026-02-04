@@ -23,7 +23,7 @@ vi.mock("~/server/scenarios/scenario.queue", () => ({
   scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job_test_123" }),
 }));
 
-vi.mock("~/utils/logger", () => ({
+vi.mock("~/utils/logger/server", () => ({
   createLogger: vi.fn().mockReturnValue({
     info: vi.fn(),
     warn: vi.fn(),
@@ -50,6 +50,7 @@ vi.mock("~/server/auditLog", () => ({
 
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { scheduleScenarioRun } from "~/server/scenarios/scenario.queue";
 import { simulationRunnerRouter } from "../simulation-runner.router";
 import { createInnerTRPCContext } from "../../../trpc";
@@ -64,7 +65,10 @@ function createTestCaller() {
       expires: "2099-01-01",
     } as any,
   });
-  return simulationRunnerRouter.createCaller({ ...ctx, permissionChecked: true });
+  return simulationRunnerRouter.createCaller({
+    ...ctx,
+    permissionChecked: true,
+  });
 }
 
 describe("simulationRunnerRouter.run", () => {
@@ -105,7 +109,9 @@ describe("simulationRunnerRouter.run", () => {
         try {
           await caller.run(defaultInput);
         } catch (error) {
-          expect((error as TRPCError).message).toBe("Project default model is not configured");
+          expect((error as TRPCError).message).toBe(
+            "Project default model is not configured",
+          );
         }
       });
 
@@ -130,10 +136,12 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when run is called", () => {
       it("throws TRPCError with BAD_REQUEST code", async () => {
-        await expect(caller.run({
-          ...defaultInput,
-          scenarioId: "nonexistent",
-        })).rejects.toThrow(TRPCError);
+        await expect(
+          caller.run({
+            ...defaultInput,
+            scenarioId: "nonexistent",
+          }),
+        ).rejects.toThrow(TRPCError);
       });
 
       it("returns error message containing not found", async () => {
@@ -231,26 +239,61 @@ describe("simulationRunnerRouter.run", () => {
       });
     });
 
-    describe("when run is called", () => {
-      it("schedules the scenario run with correct parameters", async () => {
+    describe("when run is called without explicit setId", () => {
+      it("schedules the scenario run with internal on-platform set ID", async () => {
         await caller.run(defaultInput);
+
+        const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
+        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
+          projectId: "proj_123",
+          scenarioId: "scen_123",
+          target: { type: "prompt", referenceId: "prompt_123" },
+          setId: expectedSetId,
+          batchRunId: "batch_test_123",
+        });
+      });
+
+      it("returns scheduled job info with internal set ID", async () => {
+        const result = await caller.run(defaultInput);
+
+        const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
+        expect(result).toEqual({
+          scheduled: true,
+          jobId: "job_test_123",
+          setId: expectedSetId,
+          batchRunId: "batch_test_123",
+        });
+      });
+    });
+
+    describe("when run is called with explicit setId", () => {
+      it("preserves the user-provided set ID", async () => {
+        const inputWithSetId = {
+          ...defaultInput,
+          setId: "production-tests",
+        };
+        await caller.run(inputWithSetId);
 
         expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
           projectId: "proj_123",
           scenarioId: "scen_123",
           target: { type: "prompt", referenceId: "prompt_123" },
-          setId: "local-scenarios",
+          setId: "production-tests",
           batchRunId: "batch_test_123",
         });
       });
 
-      it("returns scheduled job info", async () => {
-        const result = await caller.run(defaultInput);
+      it("returns scheduled job info with user-provided set ID", async () => {
+        const inputWithSetId = {
+          ...defaultInput,
+          setId: "production-tests",
+        };
+        const result = await caller.run(inputWithSetId);
 
         expect(result).toEqual({
           scheduled: true,
           jobId: "job_test_123",
-          setId: "local-scenarios",
+          setId: "production-tests",
           batchRunId: "batch_test_123",
         });
       });

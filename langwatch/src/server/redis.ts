@@ -1,7 +1,7 @@
 import IORedis, { Cluster } from "ioredis";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import { env } from "../env.mjs";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:redis");
 

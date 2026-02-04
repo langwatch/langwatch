@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { EventUtils } from "../../library";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { TenantId } from "../../library/domain/tenantId";
@@ -40,9 +40,7 @@ import type {
  *
  * Schema in /server/clickhouse/migrations/00003_create_processor_checkpoints.sql
  */
-export class ProcessorCheckpointStoreClickHouse
-  implements ProcessorCheckpointStore
-{
+export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointStore {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.checkpoint-store.clickhouse",
   );

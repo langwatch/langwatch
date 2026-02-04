@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType, Event, ParentLink, Projection } from "../library";
 import type {
   EventSourcedQueueDefinition,
@@ -16,9 +16,9 @@ const logger = createLogger("langwatch:event-sourcing:disabled");
 /**
  * A no-op queue processor that logs warnings when commands are sent.
  */
-class DisabledQueueProcessor<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+class DisabledQueueProcessor<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   constructor(
     private readonly pipelineName: string,
     private readonly commandName: string,
@@ -79,8 +79,7 @@ export class DisabledPipeline<
     string,
     Projection
   >,
-> implements RegisteredPipeline<EventType, ProjectionTypes>
-{
+> implements RegisteredPipeline<EventType, ProjectionTypes> {
   readonly name: string;
   readonly aggregateType: AggregateType;
   readonly service: EventSourcingService<EventType, ProjectionTypes>;

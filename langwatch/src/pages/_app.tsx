@@ -1009,7 +1009,7 @@ export const system = createSystem(defaultConfig, {
                 padding: 0,
               },
               item: {
-                marginX: 1
+                marginX: 1,
               },
             },
             sm: {
@@ -1017,7 +1017,7 @@ export const system = createSystem(defaultConfig, {
                 padding: 0,
               },
               item: {
-                marginX: 1
+                marginX: 1,
               },
             },
             md: {
@@ -1025,7 +1025,7 @@ export const system = createSystem(defaultConfig, {
                 padding: 0,
               },
               item: {
-                marginX: 2
+                marginX: 2,
               },
             },
             lg: {
@@ -1033,7 +1033,7 @@ export const system = createSystem(defaultConfig, {
                 padding: 0,
               },
               item: {
-                marginX: 2
+                marginX: 2,
               },
             },
           },

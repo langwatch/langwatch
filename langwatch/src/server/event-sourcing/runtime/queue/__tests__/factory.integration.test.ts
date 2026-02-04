@@ -16,7 +16,7 @@ const mockTracer = {
   withActiveSpan: vi.fn((_name, _options, fn) => fn()),
 };
 
-vi.mock("../../../../utils/logger", () => ({
+vi.mock("../../../../utils/logger/server", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 

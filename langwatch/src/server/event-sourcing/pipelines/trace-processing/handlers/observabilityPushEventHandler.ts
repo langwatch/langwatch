@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { sseService } from "../../../../../server/services/sse.service";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
@@ -13,9 +13,7 @@ import type { SpanReceivedEvent } from "../schemas/events";
  * This handler simply notifies that new trace data is available,
  * without parsing or processing the span data itself.
  */
-export class ObservabilityPushEventHandler
-  implements EventHandler<SpanReceivedEvent>
-{
+export class ObservabilityPushEventHandler implements EventHandler<SpanReceivedEvent> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.span-sse-handler",
   );

@@ -14,9 +14,11 @@ export default function TraceDetailsWithTabRedirect() {
   useEffect(() => {
     if (!projectSlug || !traceId || !router.isReady) return;
 
-    const tabParam = openTab ? `&drawer.openTab=${encodeURIComponent(openTab)}` : "";
+    const tabParam = openTab
+      ? `&drawer.openTab=${encodeURIComponent(openTab)}`
+      : "";
     void router.replace(
-      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}${tabParam}`
+      `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}${tabParam}`,
     );
   }, [projectSlug, traceId, openTab, router, router.isReady]);
 

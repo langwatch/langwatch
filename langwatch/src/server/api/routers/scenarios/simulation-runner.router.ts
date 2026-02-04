@@ -9,12 +9,12 @@ import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
-import { SCENARIO_DEFAULTS } from "~/server/scenarios/scenario.constants";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import {
   generateBatchRunId,
   scheduleScenarioRun,
 } from "~/server/scenarios/scenario.queue";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
@@ -34,7 +34,7 @@ export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
   target: simulationTargetSchema,
-  /** Optional set ID - defaults to local-scenarios for ad-hoc runs */
+  /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
   setId: z.string().optional(),
 });
 
@@ -53,20 +53,29 @@ export const simulationRunnerRouter = createTRPCRouter({
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
-      const setId = input.setId ?? SCENARIO_DEFAULTS.PLATFORM_SET_ID;
+      const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
       const prefetchResult = await prefetchScenarioData(
-        { projectId: input.projectId, scenarioId: input.scenarioId, setId, batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          setId,
+          batchRunId,
+        },
         input.target,
         deps,
       );
 
       if (!prefetchResult.success) {
         logger.warn(
-          { projectId: input.projectId, scenarioId: input.scenarioId, error: prefetchResult.error },
+          {
+            projectId: input.projectId,
+            scenarioId: input.scenarioId,
+            error: prefetchResult.error,
+          },
           "Scenario validation failed",
         );
         throw new TRPCError({
@@ -76,7 +85,11 @@ export const simulationRunnerRouter = createTRPCRouter({
       }
 
       logger.info(
-        { projectId: input.projectId, scenarioId: input.scenarioId, batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          batchRunId,
+        },
         "Scheduling scenario execution",
       );
 
@@ -88,10 +101,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         batchRunId,
       });
 
-      logger.info(
-        { jobId: job.id, batchRunId },
-        "Scenario scheduled",
-      );
+      logger.info({ jobId: job.id, batchRunId }, "Scenario scheduled");
 
       // Return honest response: job was scheduled, not executed
       return {
