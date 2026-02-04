@@ -33,18 +33,16 @@ export interface AICreateModalProps {
   placeholder?: string;
   /** Example pill templates */
   exampleTemplates: ExampleTemplate[];
-  /** Called when Generate is clicked, should handle the async generation */
-  onGenerate: (description: string) => Promise<void>;
+  /** Called when Generate is clicked. Return undefined to block (no generating state shown). */
+  onGenerate: (description: string) => Promise<void> | undefined;
   /** Called when Skip is clicked */
   onSkip: () => void;
   /** Max character length (default: 500) */
   maxLength?: number;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
-/** Whether model providers are configured (default: true) */
+  /** Whether model providers are configured (default: true) */
   hasModelProviders?: boolean;
-  /** Called before any action - return false to block */
-  onBeforeAction?: () => boolean;
 }
 
 type ModalState = "idle" | "generating" | "error";
@@ -73,8 +71,7 @@ export function AICreateModal({
   onSkip,
   maxLength = DEFAULT_MAX_LENGTH,
   generatingText = DEFAULT_GENERATING_TEXT,
-hasModelProviders = true,
-  onBeforeAction,
+  hasModelProviders = true,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
   const [modalState, setModalState] = useState<ModalState>("idle");
@@ -114,8 +111,12 @@ hasModelProviders = true,
 
   const handleGenerate = useCallback(async () => {
     if (!description.trim()) return;
-    if (onBeforeAction && !onBeforeAction()) return;
 
+    // Call onGenerate first - if it returns undefined, the action was blocked
+    const generationPromise = onGenerate(description);
+    if (!generationPromise) return;
+
+    // Action is proceeding - show generating state
     setModalState("generating");
     setErrorMessage("");
 
@@ -127,7 +128,7 @@ hasModelProviders = true,
     });
 
     try {
-      await Promise.race([onGenerate(description), timeoutPromise]);
+      await Promise.race([generationPromise, timeoutPromise]);
     } catch (error) {
       setModalState("error");
       setErrorMessage(
@@ -139,16 +140,15 @@ hasModelProviders = true,
         timeoutRef.current = null;
       }
     }
-  }, [description, onGenerate, onBeforeAction]);
+  }, [description, onGenerate]);
 
   const handleTryAgain = useCallback(() => {
     void handleGenerate();
   }, [handleGenerate]);
 
   const handleSkip = useCallback(() => {
-    if (onBeforeAction && !onBeforeAction()) return;
     onSkip();
-  }, [onSkip, onBeforeAction]);
+  }, [onSkip]);
 
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => {

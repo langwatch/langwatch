@@ -101,13 +101,6 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     [project?.id, createMutation]
   );
 
-  // License check - called by AICreateModal before any action
-  const handleBeforeAction = useCallback(() => {
-    let allowed = false;
-    checkAndProceed(() => { allowed = true; });
-    return allowed;
-  }, [checkAndProceed]);
-
   const handleGenerate = useCallback(
     async (description: string) => {
       if (!project?.id) {
@@ -191,11 +184,10 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       title={MODAL_TITLE}
       placeholder={MODAL_PLACEHOLDER}
       exampleTemplates={EXAMPLE_TEMPLATES}
-      onGenerate={handleGenerate}
-      onSkip={handleSkip}
+      onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
+      onSkip={() => checkAndProceed(handleSkip)}
       generatingText={GENERATING_TEXT}
-hasModelProviders={hasEnabledProviders}
-      onBeforeAction={handleBeforeAction}
+      hasModelProviders={hasEnabledProviders}
     />
   );
 }
