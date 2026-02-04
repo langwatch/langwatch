@@ -387,9 +387,7 @@ describe("<ScenarioCreateModal/>", () => {
       expect(openDialogs.length).toBeGreaterThan(0);
     });
   });
-});
 
-describe("<ScenarioCreateModal/>", () => {
   describe("when no model providers are configured", () => {
     beforeEach(() => {
       vi.clearAllMocks();
@@ -405,10 +403,7 @@ describe("<ScenarioCreateModal/>", () => {
         { wrapper: Wrapper }
       );
 
-      const dialogs = screen.queryAllByRole("dialog");
-      const dialog = dialogs[dialogs.length - 1]!;
-
-      // Should show warning message when no providers configured
+      const dialog = getDialogContent();
       expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
     });
 
@@ -418,9 +413,7 @@ describe("<ScenarioCreateModal/>", () => {
         { wrapper: Wrapper }
       );
 
-      const dialogs = screen.queryAllByRole("dialog");
-      const dialog = dialogs[dialogs.length - 1]!;
-
+      const dialog = getDialogContent();
       expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
     });
 
@@ -430,9 +423,7 @@ describe("<ScenarioCreateModal/>", () => {
         { wrapper: Wrapper }
       );
 
-      const dialogs = screen.queryAllByRole("dialog");
-      const dialog = dialogs[dialogs.length - 1]!;
-
+      const dialog = getDialogContent();
       expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
     });
   });
