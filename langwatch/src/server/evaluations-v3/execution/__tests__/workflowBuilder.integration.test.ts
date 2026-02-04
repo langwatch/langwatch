@@ -494,6 +494,7 @@ describe("WorkflowBuilder", () => {
         ],
       },
       workflowId: null,
+      copiedFromAgentId: null,
       archivedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),

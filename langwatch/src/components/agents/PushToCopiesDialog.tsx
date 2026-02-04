@@ -2,24 +2,24 @@ import { useEffect, useState } from "react";
 import {
   PushToCopiesDialog as GenericPushToCopiesDialog,
   type PushToCopiesCopyItem,
-} from "../../../components/ui/PushToCopiesDialog";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../utils/api";
+} from "../ui/PushToCopiesDialog";
+import { usePushAgentToCopies } from "~/hooks/usePushAgentToCopies";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 export const PushToCopiesDialog = ({
   open,
   onClose,
-  workflowId,
-  workflowName,
+  agentId,
+  agentName,
 }: {
   open: boolean;
   onClose: () => void;
-  workflowId: string;
-  workflowName: string;
+  agentId: string;
+  agentName: string;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const pushToCopies = api.workflow.pushToCopies.useMutation();
-  const utils = api.useContext();
+  const pushToCopies = usePushAgentToCopies();
   const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
     new Set(),
   );
@@ -28,13 +28,13 @@ export const PushToCopiesDialog = ({
     data: copies,
     isLoading,
     error,
-  } = api.workflow.getCopies.useQuery(
+  } = api.agents.getCopies.useQuery(
     {
       projectId: project?.id ?? "",
-      workflowId,
+      agentId,
     },
     {
-      enabled: open && !!project?.id && !!workflowId,
+      enabled: open && !!project?.id && !!agentId,
     },
   );
 
@@ -62,34 +62,21 @@ export const PushToCopiesDialog = ({
     <GenericPushToCopiesDialog
       open={open}
       onClose={onClose}
-      entityLabel="Workflow"
-      sourceName={workflowName}
+      entityLabel="Agent"
+      sourceName={agentName}
       copies={availableCopies}
       isLoading={isLoading}
       error={error ? { message: error.message } : null}
       selectedCopyIds={selectedCopyIds}
       onToggleCopy={handleToggleCopy}
-      onPush={async () => {
-        if (!project) {
-          throw new Error("No project available for push");
-        }
-        const result = await pushToCopies.mutateAsync({
-          workflowId,
-          projectId: project.id,
+      onPush={async () =>
+        pushToCopies.mutateAsync({
+          agentId,
+          projectId: project!.id,
           copyIds: Array.from(selectedCopyIds),
-        });
-        await utils.workflow.getAll.invalidate();
-        return result;
-      }}
-      pushLoading={pushToCopies.isLoading}
-      bodyIntro="Select which replicas to push the latest version to:"
-      emptyMessage={
-        <>
-          No replicas found. This may be because you don't have
-          workflows:update permission on the replica projects, or the
-          replicas have been archived.
-        </>
+        })
       }
+      pushLoading={pushToCopies.isLoading}
       onSuccess={() => setSelectedCopyIds(new Set())}
     />
   );

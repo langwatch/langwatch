@@ -1,17 +1,21 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
+  ArrowUp,
   Bot,
   Code,
+  Copy,
   ExternalLink,
   Globe,
   MessageSquare,
   MoreVertical,
+  RefreshCw,
   Workflow,
 } from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
+import { Tooltip } from "../ui/tooltip";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -27,12 +31,61 @@ const agentTypeLabels: Record<string, string> = {
   workflow: "Workflow",
 };
 
+/**
+ * Menu item that is either clickable (when permitted) or disabled with an
+ * explanatory tooltip. Use for actions that require evaluations:manage.
+ */
+function PermissionGuardedMenuItem({
+  value,
+  icon: Icon,
+  label,
+  permissionMessage,
+  hasPermission,
+  onAction,
+}: {
+  value: string;
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+  permissionMessage: string;
+  hasPermission: boolean;
+  onAction: () => void;
+}) {
+  if (hasPermission) {
+    return (
+      <Menu.Item
+        value={value}
+        onClick={(e) => {
+          e.stopPropagation();
+          onAction();
+        }}
+      >
+        <Icon size={16} /> {label}
+      </Menu.Item>
+    );
+  }
+  return (
+    <Tooltip
+      content={permissionMessage}
+      positioning={{ placement: "right" }}
+      showArrow
+    >
+      <Menu.Item value={value} disabled>
+        <Icon size={16} /> {label}
+      </Menu.Item>
+    </Tooltip>
+  );
+}
+
 export type AgentCardProps = {
   agent: TypedAgent;
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onOpenWorkflow?: () => void;
+  onReplicate?: () => void;
+  onPushToCopies?: () => void;
+  onSyncFromSource?: () => void;
+  hasEvaluationsManagePermission?: boolean;
 };
 
 export function AgentCard({
@@ -41,9 +94,16 @@ export function AgentCard({
   onEdit,
   onDelete,
   onOpenWorkflow,
+  onReplicate,
+  onPushToCopies,
+  onSyncFromSource,
+  hasEvaluationsManagePermission = false,
 }: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
+
+  const isCopiedAgent = !!agent.copiedFromAgentId;
+  const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking within menu
@@ -102,6 +162,36 @@ export function AgentCard({
                       <ExternalLink size={14} />
                       Open Workflow
                     </Menu.Item>
+                  )}
+                  {isCopiedAgent && onSyncFromSource && (
+                    <PermissionGuardedMenuItem
+                      value="sync"
+                      icon={RefreshCw}
+                      label="Update from source"
+                      permissionMessage="You need evaluations:manage permission to sync from source"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onSyncFromSource}
+                    />
+                  )}
+                  {hasCopies && onPushToCopies && (
+                    <PermissionGuardedMenuItem
+                      value="push"
+                      icon={ArrowUp}
+                      label="Push to replicas"
+                      permissionMessage="You need evaluations:manage permission to push to replicas"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onPushToCopies}
+                    />
+                  )}
+                  {onReplicate && (
+                    <PermissionGuardedMenuItem
+                      value="replicate"
+                      icon={Copy}
+                      label="Replicate to another project"
+                      permissionMessage="You need evaluations:manage permission to replicate agents"
+                      hasPermission={hasEvaluationsManagePermission}
+                      onAction={onReplicate}
+                    />
                   )}
                   {onDelete && (
                     <Menu.Item
