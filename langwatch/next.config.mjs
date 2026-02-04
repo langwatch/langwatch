@@ -50,12 +50,6 @@ const config = {
     ignoreBuildErrors: true,
   },
 
-  // Disable output file tracing in CI to speed up builds
-  // This saves ~2 minutes by skipping the "Collecting build traces" phase
-  ...(process.env.CI && {
-    output: "standalone",
-    outputFileTracingRoot: undefined,
-  }),
   turbopack: {
     rules: {
       "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
