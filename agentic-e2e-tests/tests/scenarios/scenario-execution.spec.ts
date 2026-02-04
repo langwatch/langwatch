@@ -119,7 +119,7 @@ test.describe("Scenario Execution", () => {
     );
 
     // Verify we're NOT in the legacy "default" fallback set
-    // Note: "local-scenarios" (PLATFORM_SET_ID) is valid - that's the platform default
+    // Internal on-platform sets use getOnPlatformSetId() from internal-set-id.ts
     expect(page.url()).not.toContain("/default/");
   });
 

@@ -11,9 +11,6 @@ import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
 import { ScenarioService } from "./scenario.service";
 
-/** Default scenario set for local/quick runs */
-const _DEFAULT_SIMULATION_SET_ID = "local-scenarios";
-
 /** Generates a unique batch run ID for grouping scenario executions */
 export function generateBatchRunId(): string {
   return `scenariobatch_${nanoid()}`;

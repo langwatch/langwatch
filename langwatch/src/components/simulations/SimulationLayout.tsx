@@ -8,6 +8,10 @@ import {
 } from "@chakra-ui/react";
 import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
 import { useSimulationRouter } from "~/hooks/simulations";
+import {
+  isOnPlatformSet,
+  ON_PLATFORM_DISPLAY_NAME,
+} from "~/server/scenarios/internal-set-id";
 import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 
@@ -60,6 +64,10 @@ const Header = ({
   onHistorySidebarOpenChange: (open: boolean) => void;
 }) => {
   const { scenarioSetId } = useSimulationRouter();
+  const displayName =
+    scenarioSetId && isOnPlatformSet(scenarioSetId)
+      ? ON_PLATFORM_DISPLAY_NAME
+      : scenarioSetId ?? "unknown";
   return (
     <Box w="full" p={4} borderBottom="1px" bg="bg.surface" borderColor="border">
       <HStack>
@@ -80,7 +88,7 @@ const Header = ({
             <Text fontSize={"xs"} color={"fg.muted"} as="span">
               Scenario Set ID:
             </Text>{" "}
-            <code>{scenarioSetId ?? "unknown"}</code>
+            <code>{displayName}</code>
           </Text>
         </Flex>
       </HStack>
