@@ -9,7 +9,7 @@ import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
-import { SCENARIO_DEFAULTS } from "~/server/scenarios/scenario.constants";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import {
   generateBatchRunId,
   scheduleScenarioRun,
@@ -34,7 +34,7 @@ export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
   target: simulationTargetSchema,
-  /** Optional set ID - defaults to local-scenarios for ad-hoc runs */
+  /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
   setId: z.string().optional(),
 });
 
@@ -53,7 +53,7 @@ export const simulationRunnerRouter = createTRPCRouter({
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
-      const setId = input.setId ?? SCENARIO_DEFAULTS.PLATFORM_SET_ID;
+      const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
