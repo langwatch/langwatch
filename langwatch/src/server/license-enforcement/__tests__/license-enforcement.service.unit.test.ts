@@ -40,7 +40,7 @@ describe("LicenseEnforcementService", () => {
     maxDatasets: 5,
     maxDashboards: 5,
     maxCustomGraphs: 10,
-    maxTriggers: 5,
+    maxAutomations: 5,
     evaluationsCredit: 100,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
@@ -58,7 +58,7 @@ describe("LicenseEnforcementService", () => {
       getDatasetCount: vi.fn().mockResolvedValue(0),
       getDashboardCount: vi.fn().mockResolvedValue(0),
       getCustomGraphCount: vi.fn().mockResolvedValue(0),
-      getTriggerCount: vi.fn().mockResolvedValue(0),
+      getAutomationCount: vi.fn().mockResolvedValue(0),
       getProjectCount: vi.fn().mockResolvedValue(0),
       getTeamCount: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(0),
@@ -158,7 +158,7 @@ describe("LicenseEnforcementService", () => {
         { type: "datasets", repoMethod: "getDatasetCount", planField: "maxDatasets" },
         { type: "dashboards", repoMethod: "getDashboardCount", planField: "maxDashboards" },
         { type: "customGraphs", repoMethod: "getCustomGraphCount", planField: "maxCustomGraphs" },
-        { type: "triggers", repoMethod: "getTriggerCount", planField: "maxTriggers" },
+        { type: "automations", repoMethod: "getAutomationCount", planField: "maxAutomations" },
       ];
 
       it.each(limitTypeTests)(

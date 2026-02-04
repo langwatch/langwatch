@@ -39,7 +39,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "triggers");
+      await enforceLicenseLimit(ctx, input.projectId, "automations");
 
       const project = await ctx.prisma.project.findUnique({
         where: {

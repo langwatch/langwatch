@@ -97,7 +97,7 @@ export interface ILicenseEnforcementRepository {
   getDatasetCount(organizationId: string): Promise<number>;
   getDashboardCount(organizationId: string): Promise<number>;
   getCustomGraphCount(organizationId: string): Promise<number>;
-  getTriggerCount(organizationId: string): Promise<number>;
+  getAutomationCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -477,13 +477,13 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts active (non-deleted) triggers for license enforcement.
-   * Only active triggers count against the license limit.
+   * Counts active (non-deleted) automations for license enforcement.
+   * Only active automations count against the license limit.
    *
    * Note: Trigger model has RLS policy requiring direct projectId filter,
    * so we first get project IDs then filter by them.
    */
-  async getTriggerCount(organizationId: string): Promise<number> {
+  async getAutomationCount(organizationId: string): Promise<number> {
     const projectIds = await this.getProjectIds(organizationId);
     if (projectIds.length === 0) return 0;
 

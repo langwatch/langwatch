@@ -43,7 +43,7 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 export function AutomationDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
   const { onOpen, onClose, open } = useDisclosure();
-  const { checkAndProceed } = useLicenseEnforcement("triggers");
+  const { checkAndProceed } = useLicenseEnforcement("automations");
 
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
@@ -163,33 +163,34 @@ export function AutomationDrawer() {
   };
 
   const onSubmit = (data: Trigger) => {
-    checkAndProceed(() => {
-      let actionParams: ActionParams = {
-        members: [],
-        slackWebhook: "",
-        datasetId: datasetId,
-        datasetMapping: datasetTriggerMapping,
+    let actionParams: ActionParams = {
+      members: [],
+      slackWebhook: "",
+      datasetId: datasetId,
+      datasetMapping: datasetTriggerMapping,
+      annotators: annotators,
+    };
+    if (data.action === TriggerAction.SEND_EMAIL) {
+      actionParams = {
+        members: data.members ?? [],
+      };
+    } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
+      actionParams = {
+        slackWebhook: data.slackWebhook ?? "",
+      };
+    } else if (data.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+      actionParams = {
         annotators: annotators,
       };
-      if (data.action === TriggerAction.SEND_EMAIL) {
-        actionParams = {
-          members: data.members ?? [],
-        };
-      } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        actionParams = {
-          slackWebhook: data.slackWebhook ?? "",
-        };
-      } else if (data.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
-        actionParams = {
-          annotators: annotators,
-        };
-      } else if (data.action === TriggerAction.ADD_TO_DATASET) {
-        actionParams = {
-          datasetId: datasetId,
-          datasetMapping: datasetTriggerMapping,
-        };
-      }
+    } else if (data.action === TriggerAction.ADD_TO_DATASET) {
+      actionParams = {
+        datasetId: datasetId,
+        datasetMapping: datasetTriggerMapping,
+      };
+    }
 
+    // Check license limit before creating automation
+    checkAndProceed(() => {
       createTrigger.mutate(
         {
           projectId: project?.id ?? "",
@@ -208,32 +209,32 @@ export function AutomationDrawer() {
               : undefined,
           },
         },
-      },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Automation Created",
-            description: "You have successfully created an automation",
-            type: "success",
-            meta: {
-              closable: true,
-            },
-          });
-          reset();
-          closeDrawer();
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Automation Created",
+              description: "You have successfully created an automation",
+              type: "success",
+              meta: {
+                closable: true,
+              },
+            });
+            reset();
+            closeDrawer();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error",
+              description: "Error creating automation",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+            });
+          },
         },
-        onError: () => {
-          toaster.create({
-            title: "Error",
-            description: "Error creating automation",
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-        },
-      },
-    );
+      );
+    });
   };
 
   const MultiSelect = () => {

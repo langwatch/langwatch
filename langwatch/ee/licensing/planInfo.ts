@@ -28,7 +28,7 @@ export type PlanInfo = {
   maxDatasets: number;
   maxDashboards: number;
   maxCustomGraphs: number;
-  maxTriggers: number;
+  maxAutomations: number;
   canPublish: boolean;
   userPrice?: {
     USD: number;

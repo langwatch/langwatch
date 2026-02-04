@@ -44,6 +44,6 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     maxDatasets: plan.maxDatasets ?? DEFAULT_LIMIT,
     maxDashboards: plan.maxDashboards ?? DEFAULT_LIMIT,
     maxCustomGraphs: plan.maxCustomGraphs ?? DEFAULT_LIMIT,
-    maxTriggers: plan.maxTriggers ?? DEFAULT_LIMIT,
+    maxAutomations: plan.maxAutomations ?? DEFAULT_LIMIT,
   };
 }

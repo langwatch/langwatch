@@ -215,7 +215,7 @@ export class LicenseHandler {
       currentDatasets,
       currentDashboards,
       currentCustomGraphs,
-      currentTriggers,
+      currentAutomations,
       currentMessagesPerMonth,
       currentEvaluationsCredit,
     ] = await Promise.all([
@@ -233,7 +233,7 @@ export class LicenseHandler {
       this.repository.getDatasetCount(organizationId),
       this.repository.getDashboardCount(organizationId),
       this.repository.getCustomGraphCount(organizationId),
-      this.repository.getTriggerCount(organizationId),
+      this.repository.getAutomationCount(organizationId),
       messagesCountPromise,
       this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
@@ -267,8 +267,8 @@ export class LicenseHandler {
       maxDashboards: resolved.maxDashboards,
       currentCustomGraphs,
       maxCustomGraphs: resolved.maxCustomGraphs,
-      currentTriggers,
-      maxTriggers: resolved.maxTriggers,
+      currentAutomations,
+      maxAutomations: resolved.maxAutomations,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
       currentEvaluationsCredit,

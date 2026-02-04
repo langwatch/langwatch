@@ -82,9 +82,9 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
     getCount: (repo, orgId) => repo.getCustomGraphCount(orgId),
     getMax: (plan) => plan.maxCustomGraphs,
   },
-  triggers: {
-    getCount: (repo, orgId) => repo.getTriggerCount(orgId),
-    getMax: (plan) => plan.maxTriggers,
+  automations: {
+    getCount: (repo, orgId) => repo.getAutomationCount(orgId),
+    getMax: (plan) => plan.maxAutomations,
   },
 };
 

@@ -23,7 +23,7 @@ export const PRO_TEMPLATE: LicensePlanLimits = {
   maxDatasets: 50,
   maxDashboards: 50,
   maxCustomGraphs: 50,
-  maxTriggers: 50,
+  maxAutomations: 50,
   canPublish: true,
 };
 
@@ -50,7 +50,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxDatasets: 1000,
   maxDashboards: 1000,
   maxCustomGraphs: 1000,
-  maxTriggers: 1000,
+  maxAutomations: 1000,
   canPublish: true,
 };
 

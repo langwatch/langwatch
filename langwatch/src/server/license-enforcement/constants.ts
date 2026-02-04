@@ -27,7 +27,7 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   datasets: "datasets",
   dashboards: "dashboards",
   customGraphs: "custom graphs",
-  triggers: "triggers",
+  automations: "automations",
 } as const;
 
 /**
@@ -55,5 +55,5 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   datasets: "Datasets",
   dashboards: "Dashboards",
   customGraphs: "Custom Graphs",
-  triggers: "Triggers",
+  automations: "Automations",
 } as const;

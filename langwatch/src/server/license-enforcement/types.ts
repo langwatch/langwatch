@@ -20,7 +20,7 @@ export const limitTypes = [
   "datasets",
   "dashboards",
   "customGraphs",
-  "triggers",
+  "automations",
 ] as const;
 
 export type LimitType = (typeof limitTypes)[number];

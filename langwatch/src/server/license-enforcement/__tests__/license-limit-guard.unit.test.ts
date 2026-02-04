@@ -29,7 +29,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       getDatasetCount: vi.fn(),
       getDashboardCount: vi.fn(),
       getCustomGraphCount: vi.fn(),
-      getTriggerCount: vi.fn(),
+      getAutomationCount: vi.fn(),
       getEvaluationsCreditUsed: vi.fn(),
       getCurrentMonthCost: vi.fn(),
       getCurrentMonthCostForProjects: vi.fn(),
