@@ -88,8 +88,20 @@ jobs:
         run: pnpm start:prepare:files
 
       - name: Run unit tests with coverage
+        id: unit-tests
         working-directory: langwatch
-        run: pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: |
+          pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
+          # Extract failures for notification comparison
+          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+
+      - name: Notify Slack on new failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: langwatch
+        run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -262,8 +274,20 @@ jobs:
         run: pnpm clickhouse:migrate
 
       - name: Run integration tests with coverage
+        id: integration-tests
         working-directory: langwatch
-        run: pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: |
+          pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
+          # Extract failures for notification comparison
+          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+
+      - name: Notify Slack on new failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: langwatch
+        run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
         uses: codecov/codecov-action@v5
