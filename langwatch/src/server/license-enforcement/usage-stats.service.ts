@@ -1,11 +1,71 @@
 import type { PrismaClient } from "@prisma/client";
 import { dependencies } from "../../injection/dependencies.server";
+import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "./license-enforcement.repository";
 import type { MinimalUser } from "./license-enforcement.service";
+
+/** Threshold at which to show a warning (80% of limit) */
+export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
+
+/** Alert levels for message usage */
+export type MessageLimitStatus = "ok" | "warning" | "exceeded";
+
+/** Pre-formatted message limit info for frontend display */
+export interface MessageLimitInfo {
+  status: MessageLimitStatus;
+  current: number;
+  max: number;
+  currentFormatted: string;
+  maxFormatted: string;
+  percentageFormatted: string;
+  message: string;
+}
+
+/**
+ * Calculates the message limit status based on current usage and max allowed.
+ */
+export function getMessageLimitStatus(
+  current: number,
+  max: number,
+): MessageLimitStatus {
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER) return "ok";
+  if (current >= max) return "exceeded";
+  if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
+  return "ok";
+}
+
+/**
+ * Builds the complete message limit info with pre-formatted values.
+ */
+export function buildMessageLimitInfo(
+  current: number,
+  max: number,
+): MessageLimitInfo {
+  const percentage = max > 0 ? current / max : 0;
+  const status = getMessageLimitStatus(current, max);
+  const currentFormatted = formatNumber(current);
+  const maxFormatted = formatNumber(max);
+  const percentageFormatted = formatPercent(percentage);
+
+  const message =
+    status === "exceeded"
+      ? `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`
+      : `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
+
+  return {
+    status,
+    current,
+    max,
+    currentFormatted,
+    maxFormatted,
+    percentageFormatted,
+    message,
+  };
+}
 
 /**
  * Interface for trace usage counting.
@@ -36,6 +96,7 @@ export interface UsageStats {
   agentsCount: number;
   experimentsCount: number;
   evaluationsCreditUsed: number;
+  messageLimitInfo: MessageLimitInfo;
 }
 
 /**
@@ -112,6 +173,11 @@ export class UsageStatsService {
       this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
 
+    const messageLimitInfo = buildMessageLimitInfo(
+      currentMonthMessagesCount,
+      activePlan.maxMessagesPerMonth,
+    );
+
     return {
       projectsCount,
       currentMonthMessagesCount,
@@ -128,6 +194,7 @@ export class UsageStatsService {
       agentsCount,
       experimentsCount,
       evaluationsCreditUsed,
+      messageLimitInfo,
     };
   }
 
