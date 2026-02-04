@@ -160,3 +160,34 @@ Feature: Scenario Failure Handler
     When I view the run history
     Then I see the failed run with ERROR status
     And I can click to view the error details
+
+  # ============================================================================
+  # Worker Death Handling - Stalled Job Behavior
+  # ============================================================================
+  # When a worker dies mid-scenario (crash, OOM, network partition), BullMQ
+  # detects the stalled job after ~30s. These scenarios ensure stalled jobs
+  # fail cleanly instead of retrying indefinitely.
+
+  @unit
+  Scenario: Stalled jobs fail without retry
+    Given a scenario job has stalled
+    When BullMQ processes the stalled job
+    Then the job fails immediately
+    And no retry is attempted
+
+  @integration
+  Scenario: Worker logs stalled jobs with warning level
+    Given a scenario worker is processing jobs
+    When a job becomes stalled
+    Then the worker emits a "stalled" event
+    And the event is logged at warning level
+    And the log includes the job ID
+
+  @integration
+  Scenario: Stalled job triggers failure handler after detection
+    Given a scenario job is being processed
+    And the worker dies mid-execution
+    When BullMQ detects the stalled job after ~30 seconds
+    Then the job transitions to failed state
+    And ScenarioFailureHandler.ensureFailureEventsEmitted is called
+    And the error message indicates the job was stalled
