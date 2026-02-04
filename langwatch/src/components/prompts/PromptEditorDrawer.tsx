@@ -318,6 +318,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const savedFormValuesRef = useRef(savedFormValues);
   const promptIdRef = useRef(promptId);
   promptIdRef.current = promptId;
+  // Track the targetId that was used when form was initialized.
+  // This prevents race conditions when switching targets: the callback ref is updated
+  // during render (before effects), but the form still has the old target's values.
+  // We only call the callback if the current targetId matches what we initialized with.
+  const initializedTargetIdRef = useRef<string | undefined>(undefined);
+  const targetIdRef = useRef(targetId);
+  targetIdRef.current = targetId;
 
   // Initialize form when drawer opens and data is available
   useEffect(() => {
@@ -358,6 +365,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // which keeps hasUnsavedChanges=true and doesn't clear the local config.
       savedFormValuesRef.current = serverValues;
       methods.reset(formValues);
+      initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
     } else if (!promptId && modelMetadata) {
       // New prompt - use defaults with model's max tokens
@@ -378,6 +386,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
       setConfigValues(defaults);
       methods.reset(defaults);
+      initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
 
       // Auto-map default inputs to matching dataset columns
@@ -475,8 +484,17 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return isUnsaved;
       });
 
-      // Update local config for evaluations context
-      if (onLocalConfigChangeRef.current && promptIdRef.current) {
+      // Update local config for evaluations context.
+      // IMPORTANT: Only call the callback if the current targetId matches what we
+      // initialized with. This prevents race conditions when switching targets:
+      // the callback ref is updated during render (before effects), so without this
+      // guard, switching from target-A to target-B would call onLocalConfigChangeB
+      // with target-A's stale form values before the form reinitializes.
+      if (
+        onLocalConfigChangeRef.current &&
+        promptIdRef.current &&
+        targetIdRef.current === initializedTargetIdRef.current
+      ) {
         if (isUnsaved) {
           debouncedUpdateLocalConfig(
             extractLocalConfig(formValues as PromptConfigFormValues),
