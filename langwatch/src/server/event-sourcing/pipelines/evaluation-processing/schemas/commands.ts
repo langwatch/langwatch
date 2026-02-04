@@ -43,7 +43,7 @@ export const completeEvaluationCommandDataSchema = z.object({
   status: z.enum(["processed", "error", "skipped"]),
   score: z.number().optional(),
   passed: z.boolean().optional(),
-  label: z.string().optional(),
+  label: z.string().nullable().optional(),
   details: z.string().optional(),
   error: z.string().optional(),
 });

@@ -23,7 +23,7 @@ const thumbsUpDownSchema = z.object({
   }),
   event_details: z
     .object({
-      feedback: z.string().optional(),
+      feedback: z.string().nullish(),
     })
     .optional(),
 });
