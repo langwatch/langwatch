@@ -1,67 +1,46 @@
-import { context as otContext, trace } from "@opentelemetry/api";
 import type { Context, Next } from "hono";
-
-import { createLogger } from "../../../utils/logger";
+import {
+  createContextFromHono,
+  runWithContext,
+} from "../../../server/context/asyncContext";
+import {
+  getStatusCodeFromError,
+  logHttpRequest,
+} from "../../../server/middleware/requestLogging";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:api:hono");
 
 export const loggerMiddleware = () => {
   return async (c: Context, next: Next): Promise<any> => {
-    const start = Date.now();
-    let error: any = c.error;
+    // Create context from Hono context and run within it
+    const ctx = createContextFromHono(c);
 
-    try {
-      await next();
-    } catch (err) {
-      error = err;
-      throw err; // Re-throw so Hono can handle the error downstream
-    } finally {
-      const duration = Date.now() - start;
-      const { method } = c.req;
-      const url = c.req.url;
-      const statusCode = c.res.status || getStatusCode(error);
+    return runWithContext(ctx, async () => {
+      const start = Date.now();
+      let error: unknown = c.error;
 
-      const logData: Record<string, unknown> = {
-        method,
-        url,
-        statusCode,
-        duration,
-        userAgent: c.req.header("user-agent") ?? null,
-        userId: c.get("user")?.id ?? null,
-        projectId: c.get("project")?.id ?? null,
-        organizationId: c.get("organization")?.id ?? null,
-        traceId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return c.get("traceId") ?? span?.spanContext().traceId ?? null;
-        })(),
-        spanId: (() => {
-          const span = trace.getSpan(otContext.active());
-          return c.get("spanId") ?? span?.spanContext().spanId ?? null;
-        })(),
-      };
+      try {
+        await next();
+      } catch (err) {
+        error = err;
+        throw err; // Re-throw so Hono can handle the error downstream
+      } finally {
+        const duration = Date.now() - start;
+        const { method } = c.req;
+        const url = c.req.url;
+        const statusCode = error ? getStatusCodeFromError(error) : c.res.status;
 
-      if (error || c.error) {
-        logData.error = error;
-        logger.error(logData, "error handling request");
-      } else {
-        logger.info(logData, "request handled");
+        // Log the request
+        logHttpRequest(logger, {
+          method,
+          url,
+          statusCode,
+          duration,
+          userAgent: c.req.header("user-agent") ?? null,
+          error: error || c.error,
+        });
       }
-    }
+    });
   };
 };
-
-function getStatusCode(error: unknown): number {
-  if (
-    error instanceof Error &&
-    "status" in error &&
-    typeof error.status === "number"
-  ) {
-    return error.status;
-  }
-
-  if (error) {
-    return 500;
-  }
-
-  return 200;
-}

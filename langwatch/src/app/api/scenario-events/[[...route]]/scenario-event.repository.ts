@@ -1,6 +1,9 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./enums";
 import { scenarioEventSchema } from "./schemas";
@@ -17,6 +20,9 @@ import {
   transformFromElasticsearch,
   transformToElasticsearch,
 } from "./utils/elastic-search-transformers";
+
+const tracer = getLangWatchTracer("langwatch.scenario-events.repository");
+const logger = createLogger("langwatch:scenario-events:repository");
 
 const projectIdSchema = z.string();
 const scenarioIdSchema = z.string();
@@ -47,27 +53,46 @@ export class ScenarioEventRepository {
     projectId,
     ...event
   }: ScenarioEvent & { projectId: string }) {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedEvent = scenarioEventSchema.parse(event);
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.saveEvent",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "INDEX",
+          "tenant.id": projectId,
+          "event.type": event.type,
+        },
+      },
+      async () => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedEvent = scenarioEventSchema.parse(event);
 
-    const client = await this.getClient();
+        logger.debug(
+          { projectId, scenarioId: event.scenarioId, scenarioRunId: event.scenarioRunId, type: event.type },
+          "Indexing scenario event",
+        );
 
-    // Transform to Elasticsearch format before saving
-    const elasticsearchEvent = transformToElasticsearch({
-      ...validatedEvent,
-      projectId: validatedProjectId,
-      timestamp: validatedEvent.timestamp || Date.now(),
-    });
+        const client = await this.getClient();
 
-    await client.index({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: elasticsearchEvent,
-      // Wait for the next ES refresh cycle (up to 1s) before returning.
-      // This ensures the event is searchable immediately after the API returns,
-      // which is required for polling to find newly created scenario runs.
-      // Using "wait_for" instead of "true" avoids blocking other indexing operations.
-      refresh: "wait_for",
-    });
+        // Transform to Elasticsearch format before saving
+        const elasticsearchEvent = transformToElasticsearch({
+          ...validatedEvent,
+          projectId: validatedProjectId,
+          timestamp: validatedEvent.timestamp || Date.now(),
+        });
+
+        await client.index({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: elasticsearchEvent,
+          // Wait for the next ES refresh cycle (up to 1s) before returning.
+          // This ensures the event is searchable immediately after the API returns,
+          // which is required for polling to find newly created scenario runs.
+          // Using "wait_for" instead of "true" avoids blocking other indexing operations.
+          refresh: "wait_for",
+        });
+      },
+    );
   }
 
   /**
@@ -86,47 +111,65 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioMessageSnapshotEvent | undefined> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
-              { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getLatestMessageSnapshotEventByScenarioRunId",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.run.id": scenarioRunId,
         },
-        sort: [
-          { timestamp: "desc" },
-          {
-            _script: {
-              type: "number",
-              script: {
-                source:
-                  "params._source.messages != null ? params._source.messages.length : 0",
-              },
-              order: "desc",
-            },
-          },
-        ],
-        size: 1,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
 
-    const rawResult = response.hits.hits[0]?._source as
-      | Record<string, unknown>
-      | undefined;
+        logger.debug({ projectId, scenarioRunId }, "Querying latest message snapshot event");
 
-    return rawResult
-      ? (transformFromElasticsearch(rawResult) as ScenarioMessageSnapshotEvent)
-      : undefined;
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
+                  { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
+                ],
+              },
+            },
+            sort: [
+              { timestamp: "desc" },
+              {
+                _script: {
+                  type: "number",
+                  script: {
+                    source:
+                      "params._source.messages != null ? params._source.messages.length : 0",
+                  },
+                  order: "desc",
+                },
+              },
+            ],
+            size: 1,
+          },
+        });
+
+        const rawResult = response.hits.hits[0]?._source as
+          | Record<string, unknown>
+          | undefined;
+
+        span.setAttribute("result.found", rawResult !== undefined);
+
+        return rawResult
+          ? (transformFromElasticsearch(rawResult) as ScenarioMessageSnapshotEvent)
+          : undefined;
+      },
+    );
   }
 
   /**
@@ -145,35 +188,53 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunFinishedEvent | undefined> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
-              { term: { type: ScenarioEventType.RUN_FINISHED } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getLatestRunFinishedEventByScenarioRunId",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.run.id": scenarioRunId,
         },
-        sort: [{ timestamp: "desc" }],
-        size: 1,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
 
-    const rawResult = response.hits.hits[0]?._source as
-      | Record<string, unknown>
-      | undefined;
+        logger.debug({ projectId, scenarioRunId }, "Querying latest run finished event");
 
-    return rawResult
-      ? (transformFromElasticsearch(rawResult) as ScenarioRunFinishedEvent)
-      : undefined;
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
+                  { term: { type: ScenarioEventType.RUN_FINISHED } },
+                ],
+              },
+            },
+            sort: [{ timestamp: "desc" }],
+            size: 1,
+          },
+        });
+
+        const rawResult = response.hits.hits[0]?._source as
+          | Record<string, unknown>
+          | undefined;
+
+        span.setAttribute("result.found", rawResult !== undefined);
+
+        return rawResult
+          ? (transformFromElasticsearch(rawResult) as ScenarioRunFinishedEvent)
+          : undefined;
+      },
+    );
   }
 
   /**
@@ -184,17 +245,33 @@ export class ScenarioEventRepository {
    * @throws {z.ZodError} If validation fails for projectId
    */
   async deleteAllEvents({ projectId }: { projectId: string }): Promise<void> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const client = await this.getClient();
-
-    await client.deleteByQuery({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          term: { [ES_FIELDS.projectId]: validatedProjectId },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.deleteAllEvents",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "DELETE_BY_QUERY",
+          "tenant.id": projectId,
         },
       },
-    });
+      async () => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+
+        logger.debug({ projectId }, "Deleting all events for project");
+
+        const client = await this.getClient();
+
+        await client.deleteByQuery({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              term: { [ES_FIELDS.projectId]: validatedProjectId },
+            },
+          },
+        });
+      },
+    );
   }
 
   /**
@@ -213,40 +290,59 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioId: string;
   }): Promise<string[]> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioId = scenarioIdSchema.parse(scenarioId);
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioId]: validatedScenarioId } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getScenarioRunIdsForScenario",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH_AGGREGATION",
+          "tenant.id": projectId,
+          "scenario.id": scenarioId,
         },
-        aggs: {
-          unique_runs: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 10000,
-            },
-          },
-        },
-        size: 0,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioId = scenarioIdSchema.parse(scenarioId);
 
-    return (
-      (
-        response.aggregations?.unique_runs as {
-          buckets: Array<{ key: string }>;
-        }
-      )?.buckets?.map((bucket) => bucket.key) ?? []
+        logger.debug({ projectId, scenarioId }, "Querying scenario run ids for scenario");
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioId]: validatedScenarioId } },
+                ],
+              },
+            },
+            aggs: {
+              unique_runs: {
+                terms: {
+                  field: ES_FIELDS.scenarioRunId,
+                  size: 10000,
+                },
+              },
+            },
+            size: 0,
+          },
+        });
+
+        const result =
+          (
+            response.aggregations?.unique_runs as {
+              buckets: Array<{ key: string }>;
+            }
+          )?.buckets?.map((bucket) => bucket.key) ?? [];
+
+        span.setAttribute("result.count", result.length);
+
+        return result;
+      },
     );
   }
 
@@ -281,87 +377,105 @@ export class ScenarioEventRepository {
   }: {
     projectId: string;
   }): Promise<ScenarioSetData[]> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { exists: { field: ES_FIELDS.scenarioSetId } }, // Only events that are part of a scenario set
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getScenarioSetsDataForProject",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH_AGGREGATION",
+          "tenant.id": projectId,
         },
-        aggs: {
-          // Group by scenario set ID to get each unique set
-          scenario_sets: {
-            terms: {
-              field: ES_FIELDS.scenarioSetId,
-              size: 1000, // Reasonable limit for scenario sets per project
+      },
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+
+        logger.debug({ projectId }, "Querying scenario sets data for project");
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { exists: { field: ES_FIELDS.scenarioSetId } }, // Only events that are part of a scenario set
+                ],
+              },
             },
             aggs: {
-              // Count unique scenarios within each set
-              unique_scenario_count: {
-                cardinality: {
-                  field: ES_FIELDS.scenarioId,
-                },
-              },
-              // Get the latest timestamp across all events in this set
-              latest_run_timestamp: {
-                max: {
-                  field: "timestamp",
-                },
-              },
-              // Calculate success rate from finished runs only
-              finished_runs: {
-                filter: {
-                  term: { type: "scenario_run_finished" },
+              // Group by scenario set ID to get each unique set
+              scenario_sets: {
+                terms: {
+                  field: ES_FIELDS.scenarioSetId,
+                  size: 1000, // Reasonable limit for scenario sets per project
                 },
                 aggs: {
-                  total_runs: {
-                    value_count: {
-                      field: ES_FIELDS.scenarioRunId,
+                  // Count unique scenarios within each set
+                  unique_scenario_count: {
+                    cardinality: {
+                      field: ES_FIELDS.scenarioId,
                     },
                   },
-                  successful_runs: {
+                  // Get the latest timestamp across all events in this set
+                  latest_run_timestamp: {
+                    max: {
+                      field: "timestamp",
+                    },
+                  },
+                  // Calculate success rate from finished runs only
+                  finished_runs: {
                     filter: {
-                      term: { "results.verdict": Verdict.SUCCESS },
+                      term: { type: "scenario_run_finished" },
+                    },
+                    aggs: {
+                      total_runs: {
+                        value_count: {
+                          field: ES_FIELDS.scenarioRunId,
+                        },
+                      },
+                      successful_runs: {
+                        filter: {
+                          term: { "results.verdict": Verdict.SUCCESS },
+                        },
+                      },
                     },
                   },
                 },
               },
             },
+            size: 0, // We only need aggregation results, not individual documents
           },
-        },
-        size: 0, // We only need aggregation results, not individual documents
+        });
+
+        const setBuckets =
+          (
+            response.aggregations?.scenario_sets as {
+              buckets: Array<{
+                key: string;
+                unique_scenario_count: { value: number };
+                latest_run_timestamp: { value: number };
+                finished_runs: {
+                  total_runs: { value: number };
+                  successful_runs: { doc_count: number };
+                };
+              }>;
+            }
+          )?.buckets ?? [];
+
+        span.setAttribute("result.count", setBuckets.length);
+
+        return setBuckets.map((bucket) => {
+          return {
+            scenarioSetId: bucket.key,
+            scenarioCount: bucket.unique_scenario_count.value,
+            lastRunAt: bucket.latest_run_timestamp.value,
+          };
+        });
       },
-    });
-
-    const setBuckets =
-      (
-        response.aggregations?.scenario_sets as {
-          buckets: Array<{
-            key: string;
-            unique_scenario_count: { value: number };
-            latest_run_timestamp: { value: number };
-            finished_runs: {
-              total_runs: { value: number };
-              successful_runs: { doc_count: number };
-            };
-          }>;
-        }
-      )?.buckets ?? [];
-
-    return setBuckets.map((bucket) => {
-      return {
-        scenarioSetId: bucket.key,
-        scenarioCount: bucket.unique_scenario_count.value,
-        lastRunAt: bucket.latest_run_timestamp.value,
-      };
-    });
+    );
   }
 
   /**
@@ -714,35 +828,53 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunStartedEvent | undefined> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
-              { term: { type: ScenarioEventType.RUN_STARTED } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getRunStartedEventByScenarioRunId",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.run.id": scenarioRunId,
         },
-        sort: [{ timestamp: "desc" }],
-        size: 1,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
 
-    const rawResult = response.hits.hits[0]?._source as
-      | Record<string, unknown>
-      | undefined;
+        logger.debug({ projectId, scenarioRunId }, "Querying run started event");
 
-    return rawResult
-      ? (transformFromElasticsearch(rawResult) as ScenarioRunStartedEvent)
-      : undefined;
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
+                  { term: { type: ScenarioEventType.RUN_STARTED } },
+                ],
+              },
+            },
+            sort: [{ timestamp: "desc" }],
+            size: 1,
+          },
+        });
+
+        const rawResult = response.hits.hits[0]?._source as
+          | Record<string, unknown>
+          | undefined;
+
+        span.setAttribute("result.found", rawResult !== undefined);
+
+        return rawResult
+          ? (transformFromElasticsearch(rawResult) as ScenarioRunStartedEvent)
+          : undefined;
+      },
+    );
   }
 
   /**
@@ -761,68 +893,88 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunIds: string[];
   }): Promise<Map<string, ScenarioRunStartedEvent>> {
-    if (scenarioRunIds.length === 0) {
-      return new Map();
-    }
-
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
-    );
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        track_total_hits: false,
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
-              { term: { type: ScenarioEventType.RUN_STARTED } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getRunStartedEventsByScenarioRunIds",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH_AGGREGATION",
+          "tenant.id": projectId,
+          "scenario_run_ids.count": scenarioRunIds.length,
         },
-        aggs: {
-          by_scenario_run: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 1000, // Limit to prevent timeouts
+      },
+      async (span) => {
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return new Map();
+        }
+
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunIds = Array.from(
+          new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+        );
+
+        logger.debug({ projectId, scenarioRunIdsCount: validatedScenarioRunIds.length }, "Batch querying run started events");
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+                  { term: { type: ScenarioEventType.RUN_STARTED } },
+                ],
+              },
             },
             aggs: {
-              latest_event: {
-                top_hits: {
-                  size: 1,
-                  sort: [{ timestamp: "desc" }],
+              by_scenario_run: {
+                terms: {
+                  field: ES_FIELDS.scenarioRunId,
+                  size: 1000, // Limit to prevent timeouts
+                },
+                aggs: {
+                  latest_event: {
+                    top_hits: {
+                      size: 1,
+                      sort: [{ timestamp: "desc" }],
+                    },
+                  },
                 },
               },
             },
+            size: 0, // We only need aggregation results
           },
-        },
-        size: 0, // We only need aggregation results
-      },
-    });
+        });
 
-    const results = new Map<string, ScenarioRunStartedEvent>();
+        const results = new Map<string, ScenarioRunStartedEvent>();
 
-    const buckets =
-      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
-    for (const bucket of buckets) {
-      const hit = bucket.latest_event.hits.hits[0];
-      if (hit) {
-        const rawResult = hit._source as Record<string, unknown>;
-        if (rawResult) {
-          const event = transformFromElasticsearch(
-            rawResult,
-          ) as ScenarioRunStartedEvent;
-          const scenarioRunId = event.scenarioRunId;
-          results.set(scenarioRunId, event);
+        const buckets =
+          (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+        for (const bucket of buckets) {
+          const hit = bucket.latest_event.hits.hits[0];
+          if (hit) {
+            const rawResult = hit._source as Record<string, unknown>;
+            if (rawResult) {
+              const event = transformFromElasticsearch(
+                rawResult,
+              ) as ScenarioRunStartedEvent;
+              const scenarioRunId = event.scenarioRunId;
+              results.set(scenarioRunId, event);
+            }
+          }
         }
-      }
-    }
-    return results;
+
+        span.setAttribute("result.count", results.size);
+
+        return results;
+      },
+    );
   }
 
   /**
@@ -841,80 +993,100 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunIds: string[];
   }): Promise<Map<string, ScenarioMessageSnapshotEvent>> {
-    if (scenarioRunIds.length === 0) {
-      return new Map();
-    }
-
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
-    );
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        track_total_hits: false,
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
-              { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getLatestMessageSnapshotEventsByScenarioRunIds",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH_AGGREGATION",
+          "tenant.id": projectId,
+          "scenario_run_ids.count": scenarioRunIds.length,
         },
-        aggs: {
-          by_scenario_run: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 1000, // Limit to prevent timeouts
+      },
+      async (span) => {
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return new Map();
+        }
+
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunIds = Array.from(
+          new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+        );
+
+        logger.debug({ projectId, scenarioRunIdsCount: validatedScenarioRunIds.length }, "Batch querying message snapshot events");
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+                  { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
+                ],
+              },
             },
             aggs: {
-              latest_event: {
-                top_hits: {
-                  size: 1,
-                  sort: [
-                    { timestamp: "desc" },
-                    {
-                      _script: {
-                        type: "number",
-                        script: {
-                          source:
-                            "params._source.messages != null ? params._source.messages.length : 0",
+              by_scenario_run: {
+                terms: {
+                  field: ES_FIELDS.scenarioRunId,
+                  size: 1000, // Limit to prevent timeouts
+                },
+                aggs: {
+                  latest_event: {
+                    top_hits: {
+                      size: 1,
+                      sort: [
+                        { timestamp: "desc" },
+                        {
+                          _script: {
+                            type: "number",
+                            script: {
+                              source:
+                                "params._source.messages != null ? params._source.messages.length : 0",
+                            },
+                            order: "desc",
+                          },
                         },
-                        order: "desc",
-                      },
+                      ],
                     },
-                  ],
+                  },
                 },
               },
             },
+            size: 0, // We only need aggregation results
           },
-        },
-        size: 0, // We only need aggregation results
-      },
-    });
+        });
 
-    const results = new Map<string, ScenarioMessageSnapshotEvent>();
+        const results = new Map<string, ScenarioMessageSnapshotEvent>();
 
-    const buckets =
-      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
-    for (const bucket of buckets) {
-      const hit = bucket.latest_event.hits.hits[0];
-      if (hit) {
-        const rawResult = hit._source as Record<string, unknown>;
-        if (rawResult) {
-          const event = transformFromElasticsearch(
-            rawResult,
-          ) as ScenarioMessageSnapshotEvent;
-          const scenarioRunId = event.scenarioRunId;
-          results.set(scenarioRunId, event);
+        const buckets =
+          (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+        for (const bucket of buckets) {
+          const hit = bucket.latest_event.hits.hits[0];
+          if (hit) {
+            const rawResult = hit._source as Record<string, unknown>;
+            if (rawResult) {
+              const event = transformFromElasticsearch(
+                rawResult,
+              ) as ScenarioMessageSnapshotEvent;
+              const scenarioRunId = event.scenarioRunId;
+              results.set(scenarioRunId, event);
+            }
+          }
         }
-      }
-    }
-    return results;
+
+        span.setAttribute("result.count", results.size);
+
+        return results;
+      },
+    );
   }
 
   /**
@@ -933,68 +1105,88 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioRunIds: string[];
   }): Promise<Map<string, ScenarioRunFinishedEvent>> {
-    if (scenarioRunIds.length === 0) {
-      return new Map();
-    }
-
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
-    );
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        track_total_hits: false,
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
-              { term: { type: ScenarioEventType.RUN_FINISHED } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getLatestRunFinishedEventsByScenarioRunIds",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH_AGGREGATION",
+          "tenant.id": projectId,
+          "scenario_run_ids.count": scenarioRunIds.length,
         },
-        aggs: {
-          by_scenario_run: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 1000, // Limit to prevent timeouts
+      },
+      async (span) => {
+        if (scenarioRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return new Map();
+        }
+
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioRunIds = Array.from(
+          new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+        );
+
+        logger.debug({ projectId, scenarioRunIdsCount: validatedScenarioRunIds.length }, "Batch querying run finished events");
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            track_total_hits: false,
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+                  { term: { type: ScenarioEventType.RUN_FINISHED } },
+                ],
+              },
             },
             aggs: {
-              latest_event: {
-                top_hits: {
-                  size: 1,
-                  sort: [{ timestamp: "desc" }],
+              by_scenario_run: {
+                terms: {
+                  field: ES_FIELDS.scenarioRunId,
+                  size: 1000, // Limit to prevent timeouts
+                },
+                aggs: {
+                  latest_event: {
+                    top_hits: {
+                      size: 1,
+                      sort: [{ timestamp: "desc" }],
+                    },
+                  },
                 },
               },
             },
+            size: 0, // We only need aggregation results
           },
-        },
-        size: 0, // We only need aggregation results
-      },
-    });
+        });
 
-    const results = new Map<string, ScenarioRunFinishedEvent>();
+        const results = new Map<string, ScenarioRunFinishedEvent>();
 
-    const buckets =
-      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
-    for (const bucket of buckets) {
-      const hit = bucket.latest_event.hits.hits[0];
-      if (hit) {
-        const rawResult = hit._source as Record<string, unknown>;
-        if (rawResult) {
-          const event = transformFromElasticsearch(
-            rawResult,
-          ) as ScenarioRunFinishedEvent;
-          const scenarioRunId = event.scenarioRunId;
-          results.set(scenarioRunId, event);
+        const buckets =
+          (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+        for (const bucket of buckets) {
+          const hit = bucket.latest_event.hits.hits[0];
+          if (hit) {
+            const rawResult = hit._source as Record<string, unknown>;
+            if (rawResult) {
+              const event = transformFromElasticsearch(
+                rawResult,
+              ) as ScenarioRunFinishedEvent;
+              const scenarioRunId = event.scenarioRunId;
+              results.set(scenarioRunId, event);
+            }
+          }
         }
-      }
-    }
-    return results;
+
+        span.setAttribute("result.count", results.size);
+
+        return results;
+      },
+    );
   }
 
   /**

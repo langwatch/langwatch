@@ -2,7 +2,7 @@ import { type Job, Worker } from "bullmq";
 import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
 import { collectUsageStats } from "~/server/collectUsageStats";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,

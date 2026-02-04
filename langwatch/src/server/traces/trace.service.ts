@@ -3,7 +3,7 @@ import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Evaluation, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import type {

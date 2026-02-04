@@ -1,12 +1,9 @@
 import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
-import type {
-  FeatureFlagOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
 /**
  * Main feature flag service with automatic backend selection and env overrides.
@@ -72,11 +69,28 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   ): Promise<boolean> {
     const envOverride = checkFlagEnvOverride(flagKey);
     if (envOverride !== undefined) {
-      this.logger.debug({ flagKey, distinctId, envOverride }, "Flag resolved via env override");
+      this.logger.debug(
+        { flagKey, distinctId, envOverride },
+        "Flag resolved via env override",
+      );
       return envOverride;
     }
-    const result = await this.service.isEnabled(flagKey, distinctId, defaultValue, options);
-    this.logger.debug({ flagKey, distinctId, enabled: result, projectId: options?.projectId, organizationId: options?.organizationId }, "Flag checked");
+    const result = await this.service.isEnabled(
+      flagKey,
+      distinctId,
+      defaultValue,
+      options,
+    );
+    this.logger.debug(
+      {
+        flagKey,
+        distinctId,
+        enabled: result,
+        projectId: options?.projectId,
+        organizationId: options?.organizationId,
+      },
+      "Flag checked",
+    );
     return result;
   }
 
@@ -90,7 +104,9 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
       return FeatureFlagServicePostHog.create();
     }
 
-    this.logger.warn("POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. RELEASE_UI_SIMULATIONS_MENU_ENABLED=1).");
+    this.logger.warn(
+      "POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. RELEASE_UI_SIMULATIONS_MENU_ENABLED=1).",
+    );
     return FeatureFlagServiceMemory.create();
   }
 

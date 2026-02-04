@@ -3,24 +3,9 @@ import { createNextApiHandler } from "@trpc/server/adapters/next";
 import { appRouter } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 
-import { createLogger } from "~/utils/logger";
-
-const logger = createLogger("langwatch:trpc");
-
-// export API handler
+// Logging is handled by the tRPC middleware in src/server/api/trpc.ts
+// to avoid double logging and to include duration/status info
 export default createNextApiHandler({
   router: appRouter,
   createContext: createTRPCContext,
-  onError: ({ ctx, error, input, path, type }) => {
-    const logData: Record<string, any> = {
-      error,
-      path,
-      type,
-      userId: ctx?.session?.user?.id || null,
-      projectId: (input as any)?.projectId,
-      organizationId: (input as any)?.organizationId,
-    };
-
-    return logger.error(logData, "trpc error");
-  },
 });

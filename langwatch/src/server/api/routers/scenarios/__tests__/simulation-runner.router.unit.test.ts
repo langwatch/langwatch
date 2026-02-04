@@ -23,7 +23,7 @@ vi.mock("~/server/scenarios/scenario.queue", () => ({
   scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job_test_123" }),
 }));
 
-vi.mock("~/utils/logger", () => ({
+vi.mock("~/utils/logger/server", () => ({
   createLogger: vi.fn().mockReturnValue({
     info: vi.fn(),
     warn: vi.fn(),
@@ -65,7 +65,10 @@ function createTestCaller() {
       expires: "2099-01-01",
     } as any,
   });
-  return simulationRunnerRouter.createCaller({ ...ctx, permissionChecked: true });
+  return simulationRunnerRouter.createCaller({
+    ...ctx,
+    permissionChecked: true,
+  });
 }
 
 describe("simulationRunnerRouter.run", () => {
@@ -106,7 +109,9 @@ describe("simulationRunnerRouter.run", () => {
         try {
           await caller.run(defaultInput);
         } catch (error) {
-          expect((error as TRPCError).message).toBe("Project default model is not configured");
+          expect((error as TRPCError).message).toBe(
+            "Project default model is not configured",
+          );
         }
       });
 
@@ -131,10 +136,12 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when run is called", () => {
       it("throws TRPCError with BAD_REQUEST code", async () => {
-        await expect(caller.run({
-          ...defaultInput,
-          scenarioId: "nonexistent",
-        })).rejects.toThrow(TRPCError);
+        await expect(
+          caller.run({
+            ...defaultInput,
+            scenarioId: "nonexistent",
+          }),
+        ).rejects.toThrow(TRPCError);
       });
 
       it("returns error message containing not found", async () => {

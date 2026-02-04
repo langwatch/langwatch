@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType, Event, ParentLink, Projection } from "../library";
 import { EventSourcingService } from "../library";
 import type {
@@ -15,8 +15,7 @@ export class EventSourcingPipeline<
     string,
     Projection
   >,
-> implements RegisteredPipeline<EventType, ProjectionTypes>
-{
+> implements RegisteredPipeline<EventType, ProjectionTypes> {
   public readonly name!: string;
   public readonly aggregateType!: AggregateType;
   public readonly service!: EventSourcingService<EventType, ProjectionTypes>;

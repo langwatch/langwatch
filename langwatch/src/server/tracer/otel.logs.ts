@@ -1,7 +1,7 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
 import {

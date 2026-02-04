@@ -13,9 +13,14 @@ import { spawn, type ChildProcess } from "child_process";
 import path from "path";
 import type { Job, Worker } from "bullmq";
 import { Worker as BullMQWorker } from "bullmq";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
+import {
+  type JobContextMetadata,
+  createContextFromJobData,
+  runWithContext,
+} from "../context/asyncContext";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
@@ -118,6 +123,20 @@ export async function handleFailedJobResult(
 const logger = createLogger("langwatch:scenarios:processor");
 
 /**
+ * Creates a child logger with scenario job context bound.
+ * This ensures all logs from a job have consistent identifiers.
+ */
+function createJobLogger(job: Job<ScenarioJob, ScenarioJobResult, string>, jobData: ScenarioJob) {
+  return logger.child({
+    jobId: job.id,
+    scenarioId: jobData.scenarioId,
+    projectId: jobData.projectId,
+    batchRunId: jobData.batchRunId,
+    setId: jobData.setId,
+  });
+}
+
+/**
  * Build OTEL resource attributes string for scenario labels.
  * Returns undefined if no labels are present.
  * @internal Exported for testing
@@ -160,47 +179,91 @@ export function buildChildProcessEnv(
 }
 
 /**
+ * Container type for job data that wraps the payload and context metadata.
+ * Used to extract context propagated from the queue.
+ */
+type JobContainer<DataType> = {
+  __payload: DataType;
+  __context?: JobContextMetadata;
+};
+
+/**
  * Process a scenario job by spawning an isolated child process.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
 ): Promise<ScenarioJobResult> {
-  const { projectId, scenarioId, target, setId, batchRunId } = job.data;
+  // Extract payload and context from the container (if wrapped)
+  const container = job.data as unknown as JobContainer<ScenarioJob>;
+  const jobData = container.__payload ?? job.data;
+  const contextMetadata = container.__context;
 
-  logger.info(
-    { jobId: job.id, scenarioId, projectId, batchRunId },
-    "Processing scenario job",
-  );
+  const { projectId, scenarioId, target, setId, batchRunId } = jobData;
 
-  // Pre-fetch all data needed for child process
-  const deps = createDataPrefetcherDependencies();
-  const prefetchResult = await prefetchScenarioData(
-    { projectId, scenarioId, setId, batchRunId },
-    target,
-    deps,
-  );
+  // Ensure projectId is set in context metadata (may come from job data)
+  const enrichedContextMetadata: JobContextMetadata = {
+    ...contextMetadata,
+    projectId: contextMetadata?.projectId ?? projectId,
+  };
 
-  if (!prefetchResult.success) {
-    logger.error(
-      { jobId: job.id, scenarioId, error: prefetchResult.error },
-      "Failed to prefetch scenario data",
+  // Create request context from job metadata
+  const requestContext = createContextFromJobData(enrichedContextMetadata);
+
+  // Create child logger with job context bound
+  const jobLogger = createJobLogger(job, jobData);
+
+  // Run the job processing within the restored context
+  return runWithContext(requestContext, async () => {
+    const startTime = Date.now();
+    jobLogger.info("Processing scenario job");
+
+    // Pre-fetch all data needed for child process
+    const deps = createDataPrefetcherDependencies();
+    const prefetchResult = await prefetchScenarioData(
+      { projectId, scenarioId, setId, batchRunId },
+      target,
+      deps,
     );
-    return { success: false, error: prefetchResult.error };
-  }
 
-  // Spawn child process with isolated OTEL context
-  const result = await spawnScenarioChildProcess(
-    job,
-    prefetchResult.data,
-    prefetchResult.telemetry,
-  );
+    if (!prefetchResult.success) {
+      jobLogger.error(
+        { error: prefetchResult.error, phase: "prefetch" },
+        "Failed to prefetch scenario data",
+      );
+      return { success: false, error: prefetchResult.error };
+    }
 
-  logger.info(
-    { jobId: job.id, scenarioId, success: result.success },
-    "Scenario job completed",
-  );
+    jobLogger.debug(
+      { durationMs: Date.now() - startTime, phase: "prefetch" },
+      "Scenario data prefetched",
+    );
 
-  return result;
+    // Spawn child process with isolated OTEL context
+    const childStartTime = Date.now();
+    const result = await spawnScenarioChildProcess(
+      job,
+      jobData,
+      prefetchResult.data,
+      prefetchResult.telemetry,
+    );
+
+    const totalDurationMs = Date.now() - startTime;
+    const childDurationMs = Date.now() - childStartTime;
+
+    if (result.success) {
+      jobLogger.info(
+        { success: true, totalDurationMs, childDurationMs },
+        "Scenario job completed",
+      );
+    } else {
+      jobLogger.warn(
+        { success: false, error: result.error, totalDurationMs, childDurationMs },
+        "Scenario job completed with failure",
+      );
+    }
+
+    return result;
+  });
 }
 
 /**
@@ -211,16 +274,29 @@ export async function processScenarioJob(
  */
 async function spawnScenarioChildProcess(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
-  jobData: ChildProcessJobData,
+  jobData: ScenarioJob,
+  childProcessData: ChildProcessJobData,
   telemetry: { endpoint: string; apiKey: string },
 ): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
-    const scenarioId = jobData.scenario.id;
-    const childLogger = createLogger(`langwatch:scenarios:child:${scenarioId}`);
+    const { scenarioId, projectId, batchRunId, setId } = jobData;
+    // Create child logger with scenario context bound for structured logging
+    const childLogger = logger.child({
+      jobId: job.id,
+      scenarioId,
+      projectId,
+      batchRunId,
+      setId,
+      component: "child-process",
+    });
 
     // Helper to log to both pino (stdout) and BullMQ job (visible in Bull Board)
-    const log = (level: "info" | "warn" | "error", message: string) => {
-      childLogger[level](message);
+    const log = (
+      level: "info" | "warn" | "error",
+      message: string,
+      extra?: Record<string, unknown>,
+    ) => {
+      childLogger[level](extra ?? {}, message);
       void job.log(`[${level.toUpperCase()}] ${message}`);
     };
 
@@ -229,7 +305,7 @@ async function spawnScenarioChildProcess(
     const childPath = path.join(__dirname, "execution/scenario-child-process.ts");
 
     // Build OTEL resource attributes including scenario labels
-    const otelResourceAttrs = buildOtelResourceAttributes(jobData.scenario.labels);
+    const otelResourceAttrs = buildOtelResourceAttributes(childProcessData.scenario.labels);
 
     // Build minimal env for child process - whitelist only what's needed
     // Following the goose.ts pattern to prevent leaking sensitive vars
@@ -261,7 +337,7 @@ async function spawnScenarioChildProcess(
     };
 
     const timeout = setTimeout(() => {
-      log("error", "Child process timed out");
+      log("error", "Child process timed out", { timeoutMs: CHILD_PROCESS.TIMEOUT_MS });
       cleanup();
       resolve({
         success: false,
@@ -291,7 +367,7 @@ async function spawnScenarioChildProcess(
       resolved = true;
 
       if (code !== 0) {
-        log("error", `Child process exited with code ${code}: ${stderr}`);
+        log("error", `Child process exited with code ${code}`, { exitCode: code, stderr });
         resolve({
           success: false,
           error: `Child process exited with code ${code}: ${stderr}`,
@@ -299,7 +375,7 @@ async function spawnScenarioChildProcess(
         return;
       }
 
-      log("info", "Scenario completed successfully");
+      log("info", "Scenario completed successfully", { exitCode: code });
       // Child reports results via LangWatch SDK, we just confirm it succeeded
       resolve({ success: true });
     });
@@ -319,13 +395,13 @@ async function spawnScenarioChildProcess(
     // Send job data to child via stdin with error handling to prevent EPIPE crashes
     if (child.stdin) {
       child.stdin.on("error", (err) => {
-        log("warn", `Child stdin error: ${err.message}`);
+        log("warn", "Child stdin error", { error: err.message });
       });
       try {
-        child.stdin.write(JSON.stringify(jobData));
+        child.stdin.write(JSON.stringify(childProcessData));
         child.stdin.end();
       } catch (err) {
-        log("warn", `Child stdin write failed: ${(err as Error).message}`);
+        log("warn", "Child stdin write failed", { error: (err as Error).message });
       }
     }
   });
@@ -363,7 +439,10 @@ export function startScenarioProcessor(
   );
 
   worker.on("ready", () => {
-    logger.info("Scenario processor ready, waiting for jobs");
+    logger.info(
+      { concurrency: SCENARIO_WORKER.CONCURRENCY, queue: SCENARIO_QUEUE.NAME },
+      "Scenario processor ready, waiting for jobs",
+    );
   });
 
   worker.on("stalled", (jobId) => {
@@ -374,15 +453,28 @@ export function startScenarioProcessor(
   });
 
   worker.on("failed", (job, error) => {
-    logger.error(
-      { jobId: job?.id, error, data: job?.data },
-      "Scenario job failed",
+    const jobData = job?.data;
+    const eventLogger = job
+      ? logger.child({
+          jobId: job.id,
+          scenarioId: jobData?.scenarioId,
+          projectId: jobData?.projectId,
+          batchRunId: jobData?.batchRunId,
+          setId: jobData?.setId,
+          event: "job_failed",
+        })
+      : logger;
+
+    eventLogger.error(
+      { error: error?.message, errorStack: error?.stack },
+      "Scenario job failed unexpectedly",
     );
+
     // Emit failure events for unexpected errors (e.g., exceptions in processScenarioJob)
-    if (job) {
-      void handleFailedJobResult(job.data, error?.message, deps).catch((emitError) =>
-        logger.error(
-          { jobId: job.id, scenarioId: job.data.scenarioId, error: emitError },
+    if (job && jobData) {
+      void handleFailedJobResult(jobData, error?.message, deps).catch((emitError) =>
+        eventLogger.error(
+          { emitError },
           "Failed to emit failure events from failed handler",
         ),
       );
@@ -390,36 +482,41 @@ export function startScenarioProcessor(
   });
 
   worker.on("completed", async (job, result) => {
-    logger.info(
-      { jobId: job.id, scenarioId: job.data.scenarioId, success: result?.success },
-      "Scenario job completed",
+    const jobData = job.data;
+    const eventLogger = logger.child({
+      jobId: job.id,
+      scenarioId: jobData.scenarioId,
+      projectId: jobData.projectId,
+      batchRunId: jobData.batchRunId,
+      setId: jobData.setId,
+      event: "job_completed",
+    });
+
+    // If job succeeded, log at info level
+    if (result?.success) {
+      eventLogger.info({ success: true }, "Scenario job completed successfully");
+      return;
+    }
+
+    // Job completed but with a failure result - ensure failure events are emitted
+    // to Elasticsearch so the frontend can show the error instead of timing out
+    eventLogger.warn(
+      { success: false, error: result?.error ?? "No error provided" },
+      "Scenario job completed with failure",
     );
 
-    // If job failed, ensure failure events are emitted to Elasticsearch
-    // so the frontend can show the error instead of timing out
-    if (result && !result.success) {
-      // Log the failure explicitly - even when result.error is undefined
-      logger.error(
-        { jobId: job.id, scenarioId: job.data.scenarioId, error: result.error ?? "No error provided" },
-        "Scenario job failed",
-      );
-
-      try {
-        await handleFailedJobResult(job.data, result.error, deps);
-        logger.info(
-          { jobId: job.id, scenarioId: job.data.scenarioId },
-          "Failure events emitted",
-        );
-      } catch (error) {
-        // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
-        logger.error(
-          { jobId: job.id, scenarioId: job.data.scenarioId, error },
-          "Failed to emit failure events",
-        );
-      }
+    try {
+      await handleFailedJobResult(jobData, result?.error, deps);
+      eventLogger.debug("Failure events emitted to Elasticsearch");
+    } catch (emitError) {
+      // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
+      eventLogger.error({ emitError }, "Failed to emit failure events");
     }
   });
 
-  logger.info("Scenario processor started");
+  logger.info(
+    { concurrency: SCENARIO_WORKER.CONCURRENCY, queue: SCENARIO_QUEUE.NAME },
+    "Scenario processor started",
+  );
   return worker;
 }

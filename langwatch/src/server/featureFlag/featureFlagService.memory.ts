@@ -1,9 +1,6 @@
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger";
-import type {
-  FeatureFlagOptions,
-  FeatureFlagServiceInterface,
-} from "./types";
+import { createLogger } from "~/utils/logger/server";
+import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
 /**
  * In-memory feature flag service with default values.

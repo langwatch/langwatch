@@ -1,5 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:clickhouse:client");
 

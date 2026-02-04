@@ -1,7 +1,7 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import sgMail from "@sendgrid/mail";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:mailer:emailSender");
 

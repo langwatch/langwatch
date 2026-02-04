@@ -5,7 +5,7 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/library/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -75,8 +75,7 @@ function dateTime64ToTimestamp(dateTime64: string | null): number | null {
  */
 export class EvaluationStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
-> implements EvaluationStateRepository<ProjectionType>
-{
+> implements EvaluationStateRepository<ProjectionType> {
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
 
   private mapClickHouseRecordToProjectionData(

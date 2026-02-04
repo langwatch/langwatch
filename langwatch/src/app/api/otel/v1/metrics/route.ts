@@ -13,7 +13,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { prisma } from "../../../../../server/db";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
 const logger = createLogger("langwatch:otel:v1:metrics");

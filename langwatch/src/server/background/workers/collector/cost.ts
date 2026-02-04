@@ -6,7 +6,7 @@ import type { Tiktoken } from "tiktoken/lite";
 import models from "tiktoken/model_to_encoding.json";
 // @ts-ignore
 import registry from "tiktoken/registry.json";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
 import {
   getLLMModelCosts,

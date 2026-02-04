@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import z from "zod";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   authMiddleware,
   blockTraceUsageExceededMiddleware,

@@ -9,7 +9,7 @@
  * **Security:** All components must not contain `:` to prevent key injection vulnerabilities.
  */
 
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { createTenantId, type TenantId } from "../domain/tenantId";
 import { CheckpointError } from "../services/errorHandling";
 

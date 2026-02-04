@@ -6,7 +6,7 @@ import {
   type PreconditionTrace,
 } from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { slugify } from "../../../../utils/slugify";
 import { prisma } from "../../../db";
 import type { ElasticSearchEvaluation, Span } from "../../../tracer/types";

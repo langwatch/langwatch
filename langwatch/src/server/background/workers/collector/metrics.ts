@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { getLLMModelCosts } from "../../../modelProviders/llmModelCost";
 import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseFilterService } from "./clickhouse-filter.service";
 import {
   ElasticsearchFilterService,

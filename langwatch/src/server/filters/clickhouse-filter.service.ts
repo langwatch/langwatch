@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type ClickHouseFilterQueryParams,
@@ -183,7 +183,9 @@ export class ClickHouseFilterService {
               field,
               hasQuery: !!options.query,
               queryLength: options.query?.length ?? 0,
-              hasScopeFilters: !!options.scopeFilters && Object.keys(options.scopeFilters).length > 0,
+              hasScopeFilters:
+                !!options.scopeFilters &&
+                Object.keys(options.scopeFilters).length > 0,
             },
             "Executing ClickHouse filter query",
           );

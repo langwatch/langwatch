@@ -82,6 +82,14 @@ const config = {
     },
   },
 
+  serverExternalPackages: [
+    "pino",
+    "pino-pretty",
+    "pino-opentelemetry-transport",
+    "thread-stream",
+    "async_hooks",
+  ],
+
   experimental: {
     scrollRestoration: true,
     optimizePackageImports: [
@@ -145,7 +153,7 @@ const config = {
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
-    // Add fallback for pino logger requirements
+    // Add fallback for pino logger requirements (browser-side)
     if (!config.isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -155,6 +163,8 @@ const config = {
         "node:stream": false,
         worker_threads: false,
         "node:worker_threads": false,
+        async_hooks: false,
+        "node:async_hooks": false,
       };
     }
 

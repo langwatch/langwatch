@@ -12,7 +12,7 @@ import { hasProjectPermission } from "../../../../server/api/rbac";
 import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { tools } from "./tools";
 
 const logger = createLogger("langwatch:api:dataset:generate");

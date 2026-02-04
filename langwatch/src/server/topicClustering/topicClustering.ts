@@ -10,7 +10,7 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import {
@@ -603,10 +603,10 @@ export const storeResults = async (
               tenantId: projectId,
               traceId: trace_id,
               topicId: topic_id,
-              topicName: topic_id ? topicNameMap.get(topic_id) ?? null : null,
+              topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
               subtopicId: subtopic_id,
               subtopicName: subtopic_id
-                ? subtopicNameMap.get(subtopic_id) ?? null
+                ? (subtopicNameMap.get(subtopic_id) ?? null)
                 : null,
               isIncremental,
             }),
@@ -619,10 +619,7 @@ export const storeResults = async (
         );
       }
     } catch (error) {
-      logger.error(
-        { projectId, error },
-        "Failed to send AssignTopic commands",
-      );
+      logger.error({ projectId, error }, "Failed to send AssignTopic commands");
       // Don't fail the job - ES update already succeeded
     }
   }

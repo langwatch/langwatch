@@ -2,7 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { EventUtils } from "~/server/event-sourcing/library";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   NormalizedEvent,
   NormalizedLink,

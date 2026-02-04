@@ -3,7 +3,7 @@ import type { MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";
 
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:auth");
 

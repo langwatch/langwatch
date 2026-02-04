@@ -72,9 +72,12 @@ export default function ExperimentPage() {
     <DashboardLayout>
       {project && experiment.data?.type === ExperimentType.DSPY ? (
         <DSPyExperiment project={project} experiment={experiment.data} />
-      ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
+      ) : project &&
+        experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
         <BatchEvaluation project={project} experiment={experiment.data} />
-      ) : !project || experiment.data === undefined || experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
+      ) : !project ||
+        experiment.data === undefined ||
+        experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
         experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
         <BatchEvaluationResults
           project={project}

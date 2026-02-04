@@ -1,7 +1,7 @@
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import type { PIIRedactionLevel } from "../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,

@@ -1,6 +1,6 @@
 import { type Job, Worker } from "bullmq";
 import { env } from "~/env.mjs";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   withScope,

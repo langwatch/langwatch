@@ -27,7 +27,7 @@ import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { getTestProject } from "~/utils/testUtils";
 
 // Mock the logger to avoid console noise in tests
-vi.mock("~/utils/logger", () => ({
+vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

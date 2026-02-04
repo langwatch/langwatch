@@ -33,9 +33,10 @@ export default async function handler(
       });
 
       if (!annotationsByTrace || annotationsByTrace.length === 0) {
-        return res
-          .status(404)
-          .json({ status: "error", message: "No annotations found." });
+        return res.status(404).json({
+          status: "error",
+          message: "No annotations found.",
+        });
       }
 
       return res.status(200).json({ data: annotationsByTrace });

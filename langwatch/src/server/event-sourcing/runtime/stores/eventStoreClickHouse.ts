@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import type {
   AggregateType,
   EventStore as BaseEventStore,
@@ -19,9 +19,9 @@ import type {
   EventRepository,
 } from "./repositories/eventRepository.types";
 
-export class EventStoreClickHouse<EventType extends Event = Event>
-  implements BaseEventStore<EventType>
-{
+export class EventStoreClickHouse<
+  EventType extends Event = Event,
+> implements BaseEventStore<EventType> {
   tracer = getLangWatchTracer(
     "langwatch.trace-processing.event-store.clickhouse",
   );

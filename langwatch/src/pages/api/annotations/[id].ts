@@ -94,9 +94,10 @@ export default async function handler(
         where: { id: annotationId, projectId: project.id },
       });
       if (!annotation) {
-        return res
-          .status(404)
-          .json({ status: "error", message: "Annotation not found." });
+        return res.status(404).json({
+          status: "error",
+          message: "Annotation not found.",
+        });
       }
       return res.status(200).json({ data: annotation });
     } catch (e) {

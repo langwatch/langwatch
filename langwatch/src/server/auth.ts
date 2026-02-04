@@ -24,7 +24,7 @@ import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");

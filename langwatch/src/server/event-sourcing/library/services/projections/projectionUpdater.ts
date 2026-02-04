@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { TenantId } from "../../domain/tenantId";
 import type {
@@ -666,9 +666,10 @@ export class ProjectionUpdater<
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<
-    { projection: ProjectionTypes[ProjectionName]; events: readonly EventType[] } | null
-  > {
+  ): Promise<{
+    projection: ProjectionTypes[ProjectionName];
+    events: readonly EventType[];
+  } | null> {
     // Always validate the event-store read context
     EventUtils.validateTenantId(context, "updateProjectionByName");
 

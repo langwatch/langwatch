@@ -1,4 +1,3 @@
-// src/server/schemas/llm-config-schema.ts
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -11,13 +10,8 @@ import {
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
-import { createLogger } from "../../../utils/logger";
 import { SchemaVersion } from "../enums";
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
-
-const logger = createLogger(
-  "langwatch:prompt-config:llm-config-version-schema",
-);
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 
@@ -123,10 +117,6 @@ export function parseLlmConfigVersion(
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
 
   if (!validator) {
-    logger.error(
-      { schemaVersion, llmConfigVersion },
-      "Unknown schema llmConfigVersion",
-    );
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `Unknown schema llmConfigVersion: ${schemaVersion}`,

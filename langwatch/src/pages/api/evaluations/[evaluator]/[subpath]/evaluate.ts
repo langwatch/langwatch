@@ -77,7 +77,9 @@ export async function handleEvaluatorCall(
   let evaluatorSettings: Record<string, unknown> | undefined;
   let evaluatorName: string | undefined;
   let savedEvaluatorId: string | undefined; // ID from Evaluator table when using evaluators/ path
-  let workflowEvaluatorDef: { name: string; requiredFields: string[] } | undefined; // For workflow evaluators from Evaluator table
+  let workflowEvaluatorDef:
+    | { name: string; requiredFields: string[] }
+    | undefined; // For workflow evaluators from Evaluator table
 
   // Check if using the new evaluators/slug or evaluators/id format
   if (evaluatorSlug.startsWith("evaluators/")) {
@@ -114,7 +116,9 @@ export async function handleEvaluatorCall(
         }
 
         // Build evaluator definition from workflow DSL
-        const dsl = workflow.currentVersion?.dsl as unknown as Workflow | undefined;
+        const dsl = workflow.currentVersion?.dsl as unknown as
+          | Workflow
+          | undefined;
         const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
         workflowEvaluatorDef = {
           name: savedEvaluator.name,
@@ -169,7 +173,10 @@ export async function handleEvaluatorCall(
   // Use pre-computed workflow evaluator definition, or look up from AVAILABLE_EVALUATORS/custom evaluators
   const evaluatorDefinition =
     workflowEvaluatorDef ??
-    (await getEvaluatorIncludingCustom(project.id, checkType as EvaluatorTypes));
+    (await getEvaluatorIncludingCustom(
+      project.id,
+      checkType as EvaluatorTypes,
+    ));
   if (!evaluatorDefinition) {
     return res.status(404).json({
       error: `Evaluator not found: ${checkType}`,
@@ -230,8 +237,7 @@ export async function handleEvaluatorCall(
         ? getEvaluatorDefaultSettings(evaluatorDefinition as any)
         : {}),
       // Use evaluatorSettings from saved Evaluator, or fall back to monitor parameters
-      ...(evaluatorSettings ??
-        (monitor ? (monitor.parameters as object) : {})),
+      ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
@@ -314,7 +320,8 @@ export async function handleEvaluatorCall(
         evaluationId,
         evaluatorId,
         evaluatorType: checkType,
-        evaluatorName: evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+        evaluatorName:
+          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
       });

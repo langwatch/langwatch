@@ -1,6 +1,6 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 
 /**
  * Cached checkpoint data stored in Redis.

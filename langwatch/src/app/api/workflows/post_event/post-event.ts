@@ -5,7 +5,7 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 
 const logger = createLogger("langwatch:post_event");
 

@@ -12,7 +12,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Evaluation, Span, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
   mapNormalizedSpansToSpans,
@@ -443,14 +443,17 @@ export class ClickHouseTraceService {
           }
 
           // Generate filter conditions from input.filters
-          const { conditions: filterConditions, params: filterParams, hasUnsupportedFilters } =
-            generateClickHouseFilterConditions(input.filters ?? {});
+          const {
+            conditions: filterConditions,
+            params: filterParams,
+            hasUnsupportedFilters,
+          } = generateClickHouseFilterConditions(input.filters ?? {});
 
           // If there are unsupported filters, fall back to Elasticsearch
           if (hasUnsupportedFilters) {
             this.logger.debug(
               { projectId: input.projectId },
-              "Filters contain unsupported fields for ClickHouse, falling back to Elasticsearch"
+              "Filters contain unsupported fields for ClickHouse, falling back to Elasticsearch",
             );
             return null;
           }
@@ -466,7 +469,7 @@ export class ClickHouseTraceService {
               input.startDate,
               input.endDate,
               filterConditions,
-              filterParams
+              filterParams,
             );
 
           // Generate new scrollId from last trace
@@ -988,7 +991,7 @@ export class ClickHouseTraceService {
     startDate?: number,
     endDate?: number,
     filterConditions?: string[],
-    filterParams?: Record<string, unknown>
+    filterParams?: Record<string, unknown>,
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",

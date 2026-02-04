@@ -1,4 +1,4 @@
-import type { createLogger } from "~/utils/logger";
+import type { createLogger } from "~/utils/logger/server";
 
 /**
  * Error categories for standardized error handling.

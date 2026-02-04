@@ -200,9 +200,7 @@ describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
     expect(indexedStep._source?.score).toEqual(0.6);
     expect(indexedStep._source?.examples).toHaveLength(2);
 
-    expect(indexedStep._source?.llm_calls[0]?.model).toEqual(
-      "gpt-4o",
-    );
+    expect(indexedStep._source?.llm_calls[0]?.model).toEqual("gpt-4o");
     expect(indexedStep._source?.llm_calls[0]?.cost).toBeGreaterThan(0);
   });
 });

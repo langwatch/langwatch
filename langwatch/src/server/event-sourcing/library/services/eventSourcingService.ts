@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { EventHandlerDefinition } from "../eventHandler.types";
@@ -578,9 +578,10 @@ export class EventSourcingService<
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<
-    { projection: ProjectionTypes[ProjectionName]; events: readonly EventType[] } | null
-  > {
+  ): Promise<{
+    projection: ProjectionTypes[ProjectionName];
+    events: readonly EventType[];
+  } | null> {
     return await this.projectionUpdater.updateProjectionByName(
       projectionName,
       aggregateId,

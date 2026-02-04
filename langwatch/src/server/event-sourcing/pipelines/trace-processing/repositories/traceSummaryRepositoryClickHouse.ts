@@ -7,7 +7,7 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/library/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -92,8 +92,7 @@ function dateTime64ToTimestamp(dateTime64: string): number {
  */
 export class TraceSummaryRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
-> implements TraceSummaryRepository<ProjectionType>
-{
+> implements TraceSummaryRepository<ProjectionType> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.trace-summary-repository",
   );
