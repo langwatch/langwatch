@@ -35,13 +35,3 @@ export const CHILD_PROCESS = {
   /** Timeout for scenario child process execution (ms) */
   TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes
 } as const;
-
-/**
- * @deprecated Use getOnPlatformSetId() from internal-set-id.ts instead.
- * This constant is kept for backward compatibility only.
- * @see internal-set-id.ts
- */
-export const SCENARIO_DEFAULTS = {
-  /** @deprecated Use getOnPlatformSetId(projectId) instead */
-  PLATFORM_SET_ID: "local-scenarios",
-} as const;

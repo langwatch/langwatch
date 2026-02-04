@@ -13,6 +13,10 @@ import {
 } from "@chakra-ui/react";
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight } from "react-feather";
+import {
+  isOnPlatformSet,
+  ON_PLATFORM_DISPLAY_NAME,
+} from "~/server/scenarios/internal-set-id";
 import { useColorModeValue } from "../../ui/color-mode";
 import { RunAccordionItem } from "./RunAccordionItem";
 import type { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarController";
@@ -23,6 +27,10 @@ export const SetRunHistorySidebarComponent = (
 ) => {
   const [openIndex, setOpenIndex] = useState<string[]>(["0"]);
   const { runs, onRunClick, isLoading, scenarioSetId, pagination } = props;
+  const displayName =
+    scenarioSetId && isOnPlatformSet(scenarioSetId)
+      ? ON_PLATFORM_DISPLAY_NAME
+      : scenarioSetId ?? "unknown";
 
   return (
     <Box
@@ -77,7 +85,7 @@ export const SetRunHistorySidebarComponent = (
               <EmptyState.Title>This set is all alone</EmptyState.Title>
               <EmptyState.Description>
                 You haven&apos;t run any simulations yet for the set
-                <code>{scenarioSetId ?? "unknown"}</code>
+                <code>{displayName}</code>
               </EmptyState.Description>
             </VStack>
           </EmptyState.Content>
