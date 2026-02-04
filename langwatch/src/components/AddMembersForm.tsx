@@ -1,10 +1,10 @@
 import {
   Box,
   Button,
+  createListCollection,
   Field,
   HStack,
   Input,
-  NativeSelect,
   Spinner,
   Table,
   Text,
@@ -14,7 +14,10 @@ import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import {
   Controller,
+  type Control,
+  type FieldErrors,
   type SubmitHandler,
+  type UseFormRegister,
   type UseFormSetValue,
   useFieldArray,
   useForm,
@@ -22,6 +25,12 @@ import {
 } from "react-hook-form";
 import { useEffect, useMemo, useRef } from "react";
 import { api } from "~/utils/api";
+import {
+  teamRolesOptions,
+  TeamRoleSelectItemContent,
+  type RoleOption,
+} from "./settings/TeamUserRoleField";
+import { Select } from "./ui/select";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -181,9 +190,9 @@ function MemberRow({
   onRemove,
 }: {
   index: number;
-  control: any;
-  register: any;
-  errors: any;
+  control: Control<MembersForm>;
+  register: UseFormRegister<MembersForm>;
+  errors: FieldErrors<MembersForm>;
   teamOptions: Option[];
   orgRoleOptions: Option[];
   organizationId: string;
@@ -222,12 +231,9 @@ function MemberRow({
           if (!team) return;
 
           const currentRole = team.role;
-          const isBuiltInRole = Object.values(TeamUserRole).includes(
-            currentRole as TeamUserRole,
-          );
 
           if (orgRole === OrganizationUserRole.EXTERNAL) {
-            // Lite Member: force all team roles to Viewer
+            // Viewer: force all team roles to Viewer
             if (currentRole !== TeamUserRole.VIEWER) {
               setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.VIEWER);
               setValue(`invites.${index}.teams.${teamIndex}.customRoleId`, undefined);
@@ -279,15 +285,24 @@ function MemberRow({
     }
   };
 
+  const orgRoleCollection = useMemo(
+    () => createListCollection({ items: orgRoleOptions }),
+    [orgRoleOptions],
+  );
+
   return (
     <VStack align="stretch" gap={4} width="full">
       <HStack gap={4} align="start">
-        <Field.Root flex="1">
+        <Field.Root flex="1" invalid={!!errors.invites?.[index]?.email}>
           <Field.Label>Email</Field.Label>
           <Input
             placeholder="Enter email address"
             {...register(`invites.${index}.email`, {
               required: "Email is required",
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Invalid email address",
+              },
             })}
           />
           <Field.ErrorText>
@@ -300,16 +315,32 @@ function MemberRow({
             control={control}
             name={`invites.${index}.orgRole`}
             render={({ field }) => (
-              <NativeSelect.Root>
-                <NativeSelect.Field {...field}>
+              <Select.Root
+                collection={orgRoleCollection}
+                value={[field.value]}
+                onValueChange={(details) => {
+                  const selectedValue = details.value[0];
+                  if (selectedValue) {
+                    field.onChange(selectedValue);
+                  }
+                }}
+              >
+                <Select.Trigger>
+                  <Select.ValueText placeholder="Select role" />
+                </Select.Trigger>
+                <Select.Content paddingY={2} zIndex="popover" width="320px">
                   {orgRoleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
+                    <Select.Item key={option.value} item={option}>
+                      <VStack align="start" gap={0} flex={1}>
+                        <Text>{option.label}</Text>
+                        <Text color="fg.muted" fontSize="13px">
+                          {option.description}
+                        </Text>
+                      </VStack>
+                    </Select.Item>
                   ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+                </Select.Content>
+              </Select.Root>
             )}
           />
         </Field.Root>
@@ -327,13 +358,11 @@ function MemberRow({
       </HStack>
       {teamFields.length > 0 && (
         <VStack
-          marginLeft={4}
-          paddingRight={3}
           align="start"
           gap={2}
           width="100%"
         >
-          <HStack paddingLeft={4} justify="space-between" width="100%">
+          <HStack justify="space-between" width="100%">
             <Text fontSize="sm" fontWeight="medium" color="fg">
               Team Assignments
             </Text>
@@ -349,9 +378,9 @@ function MemberRow({
             </Button>
           </HStack>
           <Box
-            paddingLeft={4}
+            paddingX={4}
             paddingY={3}
-            backgroundColor="gray.300"
+            backgroundColor="bg.muted"
             borderRadius="xl"
             width="100%"
           >
@@ -368,7 +397,7 @@ function MemberRow({
                     paddingLeft={0}
                     paddingRight={0}
                     paddingTop={0}
-                    width="60px"
+                    width="50px"
                   ></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -376,36 +405,11 @@ function MemberRow({
                 {teamFields.map((teamField, teamIndex) => (
                   <Table.Row key={teamField.id} backgroundColor="transparent">
                     <Table.Cell paddingLeft={0}>
-                      <Controller
+                      <TeamSelect
+                        index={index}
+                        teamIndex={teamIndex}
                         control={control}
-                        name={`invites.${index}.teams.${teamIndex}.teamId`}
-                        rules={{ required: "Team is required" }}
-                        render={({ field }) => {
-                          const availableOptions =
-                            getAvailableTeamOptions(teamIndex);
-                          return (
-                            <NativeSelect.Root>
-                              <NativeSelect.Field
-                                {...field}
-                                backgroundColor="white"
-                              >
-                                {availableOptions.length === 0 ? (
-                                  <option value="">No teams available</option>
-                                ) : (
-                                  availableOptions.map((option) => (
-                                    <option
-                                      key={option.value}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </option>
-                                  ))
-                                )}
-                              </NativeSelect.Field>
-                              <NativeSelect.Indicator />
-                            </NativeSelect.Root>
-                          );
-                        }}
+                        getAvailableTeamOptions={getAvailableTeamOptions}
                       />
                     </Table.Cell>
                     <Table.Cell paddingLeft={0}>
@@ -437,7 +441,7 @@ function MemberRow({
         </VStack>
       )}
       {teamFields.length === 0 && (
-        <HStack gap={2} paddingLeft={4} marginLeft={4}>
+        <HStack gap={2}>
           <Button
             type="button"
             size="sm"
@@ -454,30 +458,81 @@ function MemberRow({
 }
 
 /**
+ * TeamSelect component - renders a dropdown for selecting a team
+ */
+function TeamSelect({
+  index,
+  teamIndex,
+  control,
+  getAvailableTeamOptions,
+}: {
+  index: number;
+  teamIndex: number;
+  control: Control<MembersForm>;
+  getAvailableTeamOptions: (currentTeamIndex?: number) => Option[];
+}) {
+  const availableOptions = getAvailableTeamOptions(teamIndex);
+
+  const teamCollection = useMemo(
+    () => createListCollection({ items: availableOptions }),
+    [availableOptions],
+  );
+
+  return (
+    <Controller
+      control={control}
+      name={`invites.${index}.teams.${teamIndex}.teamId`}
+      rules={{ required: "Team is required" }}
+      render={({ field }) => (
+        <Select.Root
+          collection={teamCollection}
+          value={[field.value]}
+          onValueChange={(details) => {
+            const selectedValue = details.value[0];
+            if (selectedValue) {
+              field.onChange(selectedValue);
+            }
+          }}
+        >
+          <Select.Trigger background="bg" width="full">
+            <Select.ValueText placeholder="Select team" />
+          </Select.Trigger>
+          <Select.Content paddingY={2} zIndex="popover">
+            {availableOptions.map((option) => (
+              <Select.Item key={option.value} item={option}>
+                {option.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
+      )}
+    />
+  );
+}
+
+/**
  * Get the appropriate team role options based on org role
- * - EXTERNAL (Lite Member): only Viewer
+ * - EXTERNAL (Viewer): only Viewer
  * - MEMBER: all except Viewer (+ custom roles)
  * - ADMIN: all roles (+ custom roles)
  */
 function getFilteredTeamRoles(
   orgRole: OrganizationUserRole,
-  customRoles: Array<{ id: string; name: string }>,
-): Array<{ label: string; value: string; customRoleId?: string }> {
-  const baseRoles = [
-    { label: "Admin", value: TeamUserRole.ADMIN },
-    { label: "Member", value: TeamUserRole.MEMBER },
-    { label: "Viewer", value: TeamUserRole.VIEWER },
-  ];
+  customRoles: Array<{ id: string; name: string; description?: string | null }>,
+): RoleOption[] {
+  const baseRoles = Object.values(teamRolesOptions);
 
-  const customRoleOptions = customRoles.map((role) => ({
-    label: `${role.name} (Custom)`,
+  const customRoleOptions: RoleOption[] = customRoles.map((role) => ({
+    label: role.name,
     value: `custom:${role.id}`,
+    description: role.description ?? `Custom role`,
+    isCustom: true,
     customRoleId: role.id,
   }));
 
   if (orgRole === OrganizationUserRole.EXTERNAL) {
-    // Lite Member: only Viewer, no custom roles
-    return [{ label: "Viewer", value: TeamUserRole.VIEWER }];
+    // Viewer: only Viewer, no custom roles
+    return [teamRolesOptions.VIEWER];
   }
 
   if (orgRole === OrganizationUserRole.MEMBER) {
@@ -494,7 +549,7 @@ function getFilteredTeamRoles(
 
 /**
  * Get the default team role based on org role
- * - EXTERNAL (Lite Member): Viewer
+ * - EXTERNAL (Viewer): Viewer
  * - MEMBER: Member
  * - ADMIN: Member
  */
@@ -519,7 +574,7 @@ function TeamRoleSelect({
 }: {
   index: number;
   teamIndex: number;
-  control: any;
+  control: Control<MembersForm>;
   organizationId: string;
   orgRole: OrganizationUserRole;
   setValue: UseFormSetValue<MembersForm>;
@@ -532,14 +587,20 @@ function TeamRoleSelect({
     [orgRole, customRoles.data],
   );
 
+  const roleCollection = useMemo(
+    () => createListCollection({ items: roleOptions }),
+    [roleOptions],
+  );
+
   return (
     <Controller
       control={control}
       name={`invites.${index}.teams.${teamIndex}.role`}
       render={({ field }) => {
-        // When a custom role is selected, also update customRoleId
-        const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-          const selectedValue = e.target.value;
+        const handleValueChange = (details: { value: string[] }) => {
+          const selectedValue = details.value[0];
+          if (!selectedValue) return;
+
           field.onChange(selectedValue);
 
           // If it's a custom role, extract the roleId and set customRoleId
@@ -559,16 +620,23 @@ function TeamRoleSelect({
         };
 
         return (
-          <NativeSelect.Root>
-            <NativeSelect.Field {...field} onChange={handleChange}>
+          <Select.Root
+            collection={roleCollection}
+            value={[field.value]}
+            onValueChange={handleValueChange}
+            disabled={customRoles.isLoading}
+          >
+            <Select.Trigger background="bg" width="full">
+              <Select.ValueText placeholder="Select role" />
+            </Select.Trigger>
+            <Select.Content paddingY={2} zIndex="popover" width="320px">
               {roleOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <Select.Item key={option.value} item={option}>
+                  <TeamRoleSelectItemContent option={option} />
+                </Select.Item>
               ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+            </Select.Content>
+          </Select.Root>
         );
       }}
     />

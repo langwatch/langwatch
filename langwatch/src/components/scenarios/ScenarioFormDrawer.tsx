@@ -3,6 +3,7 @@ import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
@@ -41,7 +42,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const scenarioId = params.scenarioId;
 
   // License enforcement for scenario creation
-  const { checkAndProceed } = useLicenseEnforcement("scenarios");
+  const scenarioEnforcement = useLicenseEnforcement("scenarios");
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -121,21 +122,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       } else {
         // Check license limit before creating a new scenario
         return new Promise((resolve) => {
-          checkAndProceed(() => {
-            createMutation
-              .mutateAsync({
+          checkCompoundLimits([scenarioEnforcement], async () => {
+            try {
+              const result = await createMutation.mutateAsync({
                 projectId: project.id,
                 ...data,
-              })
-              .then(resolve)
-              .catch(() => resolve(null));
+              });
+              resolve(result);
+            } catch {
+              // Error already handled by global mutation cache if license error
+              resolve(null);
+            }
           });
-          // If checkAndProceed shows modal instead of proceeding, resolve with null
-          // The modal handles the upgrade flow
+
+          // If limit exceeded, modal is shown and callback won't run - resolve null
+          if (!scenarioEnforcement.isAllowed) {
+            resolve(null);
+          }
         });
       }
     },
-    [project?.id, scenario, createMutation, updateMutation, checkAndProceed],
+    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {

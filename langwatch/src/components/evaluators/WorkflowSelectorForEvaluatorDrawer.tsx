@@ -18,6 +18,7 @@ import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -273,13 +274,11 @@ export function WorkflowSelectorForEvaluatorDrawer(
               <Button
                 colorPalette="green"
                 onClick={() => {
-                  // Check workflows limit first (creating workflow evaluator creates a workflow first)
-                  workflowEnforcement.checkAndProceed(() => {
-                    // Then check evaluators limit
-                    evaluatorEnforcement.checkAndProceed(() =>
-                      void handleSubmit(onSubmit)()
-                    );
-                  });
+                  // Check both workflows and evaluators limits before proceeding
+                  checkCompoundLimits(
+                    [workflowEnforcement, evaluatorEnforcement],
+                    () => void handleSubmit(onSubmit)()
+                  );
                 }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}

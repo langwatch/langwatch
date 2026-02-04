@@ -82,13 +82,25 @@ export const api = createTRPCNext<AppRouter>({
       ],
 
       queryClientConfig: {
+        /**
+         * Global mutation error handler for license limit enforcement.
+         *
+         * This handler intercepts all tRPC mutation errors and:
+         * 1. Checks if the error is a LIMIT_EXCEEDED FORBIDDEN error
+         * 2. If so, opens the upgrade modal with limit details
+         * 3. Marks the error with `_handledByGlobalLicenseHandler = true`
+         *
+         * Components using `onError` callbacks should check `isHandledByGlobalLicenseHandler(error)`
+         * to avoid showing duplicate error UI (toast + modal) for license errors.
+         *
+         * @see isHandledByGlobalLicenseHandler in trpcError.ts
+         * @see extractLimitExceededInfo in trpcError.ts
+         */
         mutationCache: new MutationCache({
-          onError: (error, _variables, _context, mutation) => {
-            // Automatically handle license limit errors globally
+          onError: (error, _variables, _context, _mutation) => {
             const limitInfo = extractLimitExceededInfo(error);
             if (limitInfo) {
-              // Mark the error as handled so component-level handlers can skip it
-              // This prevents showing both the upgrade modal AND an error toast
+              // Mark as handled so component-level handlers can skip it
               (error as { _handledByGlobalLicenseHandler?: boolean })._handledByGlobalLicenseHandler = true;
 
               useUpgradeModalStore
