@@ -1,18 +1,19 @@
 import {
   Box,
+  Button,
+  Card,
   Heading,
   HStack,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, MoreVertical, Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import React from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
-import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -60,20 +61,24 @@ function ProjectsList({
             </PageLayout.HeaderButton>
           )}
         </HStack>
-        <Table.Root variant="line" width="full" size="md">
-          {organization.teams.map((team) => (
-            <React.Fragment key={team.id}>
-              <Table.Header key={team.id}>
-                <Table.Row>
-                  <Table.ColumnHeader colSpan={2}>
-                    {team.name}
-                  </Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <TeamProjectsList team={team} />
-            </React.Fragment>
-          ))}
-        </Table.Root>
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full" size="md">
+              {organization.teams.map((team) => (
+                <React.Fragment key={team.id}>
+                  <Table.Header key={team.id}>
+                    <Table.Row>
+                      <Table.ColumnHeader colSpan={2}>
+                        {team.name}
+                      </Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <TeamProjectsList team={team} />
+                </React.Fragment>
+              ))}
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );
@@ -129,21 +134,14 @@ export function TeamProjectsList({
           <Table.Cell textAlign="right">
             {teamProject.id !== project?.id &&
               hasPermission("project:delete") && (
-                <Menu.Root>
-                  <Menu.Trigger className="js-inner-menu">
-                    <MoreVertical size={18} />
-                  </Menu.Trigger>
-                  <Menu.Content className="js-inner-menu">
-                    <Menu.Item
-                      value="delete"
-                      color="red.500"
-                      onClick={() => onArchiveProject(teamProject.id)}
-                    >
-                      <Archive size={14} />
-                      Archive
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Root>
+                <Button
+                  variant="ghost"
+                  color="red.fg"
+                  size="sm"
+                  onClick={() => onArchiveProject(teamProject.id)}
+                >
+                  <Trash2 size={16} />
+                </Button>
               )}
           </Table.Cell>
         </Table.Row>

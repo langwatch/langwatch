@@ -11,6 +11,7 @@ import {
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   type TabData,
@@ -100,6 +101,8 @@ export function useHandleSavePrompt() {
      */
     const onError = (error: Error) => {
       console.error(error);
+      // Skip toast if the global license handler already showed the upgrade modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error saving",
         description: error.message,

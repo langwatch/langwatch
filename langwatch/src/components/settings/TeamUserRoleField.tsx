@@ -1,10 +1,18 @@
-import { Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  createListCollection,
+  Field,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { toaster } from "../../components/ui/toaster";
 import type { TeamMemberWithUser } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { Select } from "../ui/select";
 
 export type RoleOption = {
   label: string;
@@ -39,6 +47,29 @@ export const teamRolesOptions: Record<
 export type TeamUserRoleForm = {
   role: RoleOption;
 };
+
+/**
+ * Reusable component for rendering team role select item content
+ */
+export const TeamRoleSelectItemContent = ({
+  option,
+}: {
+  option: RoleOption;
+}) => (
+  <VStack align="start" gap={0} flex={1}>
+    <HStack>
+      <Text>{option.label}</Text>
+      {option.isCustom && (
+        <Text fontSize="xs" color="orange.solid">
+          Custom
+        </Text>
+      )}
+    </HStack>
+    <Text color="fg.muted" fontSize="13px">
+      {option.description}
+    </Text>
+  </VStack>
+);
 
 export const TeamUserRoleField = ({
   member,
@@ -116,12 +147,10 @@ export const TeamUserRoleField = ({
           <HStack gap={6}>
             <TeamRoleSelect
               organizationId={organizationId}
-              field={{
-                ...field,
-                onChange: (value: any) => {
-                  field.onChange(value);
-                  void handleSubmit(onSubmit)();
-                },
+              value={field.value}
+              onChange={(value: RoleOption) => {
+                field.onChange(value);
+                void handleSubmit(onSubmit)();
               }}
             />
             {updateTeamMemberRoleMutation.isLoading && <Spinner size="sm" />}
@@ -139,72 +168,62 @@ export const TeamUserRoleField = ({
  * Single Responsibility: Renders a dropdown selector for team roles (built-in and custom)
  */
 export const TeamRoleSelect = ({
-  field,
+  value,
+  onChange,
   organizationId,
 }: {
-  field: any;
+  value: RoleOption;
+  onChange: (value: RoleOption) => void;
   organizationId: string;
 }) => {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const allRoleOptions: RoleOption[] = [
-    ...Object.values(teamRolesOptions),
-    ...(customRoles.data ?? []).map((role) => ({
-      label: role.name,
-      value: `custom:${role.id}`,
-      description: role.description ?? `${role.permissions.length} permissions`,
-      isCustom: true,
-      customRoleId: role.id,
-    })),
-  ];
+  const allRoleOptions: RoleOption[] = useMemo(
+    () => [
+      ...Object.values(teamRolesOptions),
+      ...(customRoles.data ?? []).map((role) => ({
+        label: role.name,
+        value: `custom:${role.id}`,
+        description: role.description ?? `${role.permissions.length} permissions`,
+        isCustom: true,
+        customRoleId: role.id,
+      })),
+    ],
+    [customRoles.data],
+  );
+
+  const roleCollection = useMemo(
+    () => createListCollection({ items: allRoleOptions }),
+    [allRoleOptions],
+  );
 
   return (
-    <MultiSelect
-      {...field}
-      options={allRoleOptions}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          minWidth: "200px",
-        }),
+    <Select.Root
+      collection={roleCollection}
+      value={[value.value]}
+      onValueChange={(details) => {
+        const selectedValue = details.value[0];
+        if (selectedValue) {
+          const selectedOption = allRoleOptions.find(
+            (o) => o.value === selectedValue,
+          );
+          if (selectedOption) {
+            onChange(selectedOption);
+          }
+        }
       }}
-      useBasicStyles
-      isLoading={customRoles.isLoading}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "300px" },
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <HStack>
-                <Text>{children}</Text>
-                {(props.data as RoleOption).isCustom && (
-                  <Text fontSize="xs" color="orange.500">
-                    Custom
-                  </Text>
-                )}
-              </HStack>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {(props.data as RoleOption).description}
-              </Text>
-            </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
+      disabled={customRoles.isLoading}
+    >
+      <Select.Trigger width="200px" background="bg">
+        <Select.ValueText placeholder="Select role" />
+      </Select.Trigger>
+      <Select.Content width="300px" paddingY={2}>
+        {allRoleOptions.map((option) => (
+          <Select.Item key={option.value} item={option}>
+            <TeamRoleSelectItemContent option={option} />
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 };

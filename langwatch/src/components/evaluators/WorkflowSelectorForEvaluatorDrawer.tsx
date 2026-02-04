@@ -18,11 +18,13 @@ import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { trackEvent } from "~/utils/tracking";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
@@ -69,8 +71,11 @@ export function WorkflowSelectorForEvaluatorDrawer(
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  // License enforcement for evaluator creation
-  const { checkAndProceed } = useLicenseEnforcement("evaluators");
+  // License enforcement for evaluator AND workflow creation
+  // Creating a workflow evaluator requires creating both a workflow AND an evaluator,
+  // so we need to check both limits before proceeding
+  const evaluatorEnforcement = useLicenseEnforcement("evaluators");
+  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -102,6 +107,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
       });
     },
     onError: (error) => {
+      // Skip toast if error was already handled by global license modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error creating evaluator",
         description: error.message,
@@ -155,6 +162,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
           `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
         );
       } catch (error) {
+        // Skip toast if error was already handled by global license modal
+        if (isHandledByGlobalLicenseHandler(error)) return;
         console.error("Error creating workflow evaluator:", error);
         toaster.create({
           title: "Error",
@@ -264,9 +273,13 @@ export function WorkflowSelectorForEvaluatorDrawer(
               </Button>
               <Button
                 colorPalette="green"
-                onClick={() =>
-                  checkAndProceed(() => void handleSubmit(onSubmit)())
-                }
+                onClick={() => {
+                  // Check both workflows and evaluators limits before proceeding
+                  checkCompoundLimits(
+                    [workflowEnforcement, evaluatorEnforcement],
+                    () => void handleSubmit(onSubmit)()
+                  );
+                }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}
                 data-testid="save-evaluator-button"

@@ -11,7 +11,8 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
-import { ChevronRight, MoreVertical, Trash } from "react-feather";
+import { ChevronRight, MoreVertical } from "lucide-react";
+import { LuTrash } from "react-icons/lu";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
@@ -177,20 +178,20 @@ export default function UserDetailsPage() {
         </Card.Root>
 
         <Heading size="md">Teams</Heading>
-        <Card.Root width="full">
+        <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
             <Table.Root variant="line" width="full">
               <Table.Header>
                 <Table.Row>
-                  <Table.ColumnHeader>Team</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"35%"}>Role</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"10%"}>Actions</Table.ColumnHeader>
+                  <Table.ColumnHeader width="50%" paddingLeft={6}>Team</Table.ColumnHeader>
+                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader width="60px" paddingRight={6}></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {filteredTeamMemberships.map((tm) => (
                   <Table.Row key={tm.team.id}>
-                    <Table.Cell>
+                    <Table.Cell paddingLeft={6}>
                       <Link href={`/settings/teams/${tm.team.slug}`}>
                         {tm.team.name}
                       </Link>
@@ -233,23 +234,23 @@ export default function UserDetailsPage() {
                         </Text>
                       )}
                     </Table.Cell>
-                    <Table.Cell>
+                    <Table.Cell paddingRight={6}>
                       {hasPermission("team:manage") && (
                         <Menu.Root>
                           <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical size={16} />
                             </Button>
                           </Menu.Trigger>
                           <Menu.Content>
                             <Menu.Item
                               value="remove"
-                              color="red.600"
+                              color="red.500"
                               onClick={() => {
                                 void handleRemoveFromTeam(tm);
                               }}
                             >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
+                              <LuTrash size={16} />
                               Remove from team
                             </Menu.Item>
                           </Menu.Content>

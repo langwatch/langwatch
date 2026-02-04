@@ -1,5 +1,5 @@
 import {
-  Button,
+  Box,
   Card,
   Heading,
   HStack,
@@ -8,7 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, MoreVertical, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/router";
+import { MoreVertical } from "react-feather";
+import { LuPencil, LuTrash } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -41,6 +44,7 @@ export default withPermissionGuard("team:view", {
 
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   const { hasPermission, project } = useOrganizationTeamProject();
+  const router = useRouter();
   const hasTeamManagePermission = hasPermission("team:manage");
   const queryClient = api.useContext();
   const archiveTeam = api.team.archiveById.useMutation({
@@ -101,58 +105,77 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             )}
           </Tooltip>
         </HStack>
-        <Table.Root variant="line" width="full" size="md">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Members</Table.ColumnHeader>
-              <Table.ColumnHeader>Projects</Table.ColumnHeader>
-              <Table.ColumnHeader w={"10PX"}>Actions</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {teams.map((team) => (
-              <Table.Row key={team.id}>
-                <Table.Cell>
-                  <Link
-                    href={`/settings/teams/${team.slug}`}
-                    _hover={{ textDecoration: "underline" }}
-                  >
-                    {team.name}
-                  </Link>
-                </Table.Cell>
-                <Table.Cell>
-                  {team.members.length}{" "}
-                  {team.members.length == 1 ? "member" : "members"}
-                </Table.Cell>
-                <Table.Cell>
-                  {team.projects.length}{" "}
-                  {team.projects.length == 1 ? "project" : "projects"}
-                </Table.Cell>
-                <Table.Cell align="right">
-                  <Menu.Root>
-                    <Menu.Trigger className="js-inner-menu">
-                      <MoreVertical size={18} />
-                    </Menu.Trigger>
-                    <Menu.Content className="js-inner-menu">
-                      <Menu.Item
-                        value="archive"
-                        color="red.500"
-                        onClick={() => onArchiveTeam(team.id)}
-                        disabled={
-                          !hasPermission("team:manage") || archiveTeam.isPending
-                        }
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full" size="md">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Members</Table.ColumnHeader>
+                  <Table.ColumnHeader>Projects</Table.ColumnHeader>
+                  <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {teams.map((team) => (
+                  <Table.Row key={team.id}>
+                    <Table.Cell>
+                      <Link
+                        href={`/settings/teams/${team.slug}`}
+                        _hover={{ textDecoration: "underline" }}
                       >
-                        <Archive size={14} />
-                        Archive
-                      </Menu.Item>
-                    </Menu.Content>
-                  </Menu.Root>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
+                        {team.name}
+                      </Link>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {team.members.length}{" "}
+                      {team.members.length == 1 ? "member" : "members"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {team.projects.length}{" "}
+                      {team.projects.length == 1 ? "project" : "projects"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Box
+                        width="full"
+                        height="full"
+                        display="flex"
+                        justifyContent="end"
+                      >
+                        <Menu.Root>
+                          <Menu.Trigger>
+                            <MoreVertical size={16} />
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onClick={() => {
+                                void router.push(`/settings/teams/${team.slug}`);
+                              }}
+                            >
+                              <LuPencil size={16} />
+                              Edit
+                            </Menu.Item>
+                            {hasPermission("team:manage") && (
+                              <Menu.Item
+                                value="archive"
+                                color="red.500"
+                                onClick={() => onArchiveTeam(team.id)}
+                              >
+                                <LuTrash size={16} />
+                                Archive
+                              </Menu.Item>
+                            )}
+                          </Menu.Content>
+                        </Menu.Root>
+                      </Box>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );
