@@ -1,0 +1,57 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "public/**",
+        "next.config.mjs",
+        "tsconfig.json",
+        "package.json",
+        "prisma/schema.prisma"
+      ],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "cache": true,
+      "env": [
+        "NODE_ENV",
+        "ANALYZE",
+        "BUILD_TIME",
+        "SKIP_ENV_VALIDATION",
+        "NEXTJS_DIST_DIR",
+        "CI"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "tsconfig.json", "tsconfig.tsgo.json"],
+      "outputs": [],
+      "cache": true
+    },
+    "test:unit": {
+      "dependsOn": [],
+      "inputs": [
+        "src/**",
+        "vitest.config.ts",
+        "tsconfig.json"
+      ],
+      "outputs": ["coverage/**"],
+      "cache": false
+    },
+    "test:integration": {
+      "dependsOn": [],
+      "inputs": [
+        "src/**",
+        "vitest.integration.config.ts",
+        "tsconfig.json"
+      ],
+      "outputs": ["coverage/**"],
+      "cache": false
+    },
+    "lint": {
+      "inputs": ["src/**", "biome.json"],
+      "outputs": [],
+      "cache": true
+    }
+  }
+}

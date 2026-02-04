@@ -239,6 +239,8 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.8",
+		"ignore-loader": "^0.1.2",
+		"turbo": "^2.4.4",
 		"@playwright/test": "^1.57.0",
 		"@testcontainers/clickhouse": "^10.10.0",
 		"@testcontainers/redis": "^10.10.0",
