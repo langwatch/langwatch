@@ -66,6 +66,17 @@ vi.mock("../../ModelSelector", () => ({
   }),
 }));
 
+// Create a variable for mock that can be modified per test
+let mockHasEnabledProviders = true;
+
+// Mock useModelProvidersSettings
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    hasEnabledProviders: mockHasEnabledProviders,
+    isLoading: false,
+  }),
+}));
+
 // Mock toaster
 const mockToasterCreate = vi.fn();
 vi.mock("../../ui/toaster", () => ({
@@ -99,6 +110,8 @@ describe("<ScenarioCreateModal/>", () => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
     mockToasterCreate.mockClear();
+    // Reset to having providers by default
+    mockHasEnabledProviders = true;
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
@@ -372,6 +385,46 @@ describe("<ScenarioCreateModal/>", () => {
         (d: HTMLElement) => d.getAttribute("data-state") === "open"
       );
       expect(openDialogs.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when no model providers are configured", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
+      mockToasterCreate.mockClear();
+      // Set to no providers
+      mockHasEnabledProviders = false;
+    });
+
+    it("shows warning message instead of form", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
+    });
+
+    it("hides textarea", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    });
+
+    it("hides generate button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
     });
   });
 });

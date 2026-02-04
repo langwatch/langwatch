@@ -3,12 +3,13 @@ import {
   Button,
   HStack,
   Icon,
+  Link,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AlertCircle, Sparkles } from "lucide-react";
+import { AlertCircle, AlertTriangle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/dialog";
 
@@ -40,6 +41,8 @@ export interface AICreateModalProps {
   maxLength?: number;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
+  /** Whether model providers are configured (default: true) */
+  hasModelProviders?: boolean;
 }
 
 type ModalState = "idle" | "generating" | "error";
@@ -68,6 +71,7 @@ export function AICreateModal({
   onSkip,
   maxLength = DEFAULT_MAX_LENGTH,
   generatingText = DEFAULT_GENERATING_TEXT,
+  hasModelProviders = true,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
   const [modalState, setModalState] = useState<ModalState>("idle");
@@ -158,7 +162,11 @@ export function AICreateModal({
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          {modalState === "idle" && (
+          {!hasModelProviders && (
+            <NoModelProvidersWarning />
+          )}
+
+          {hasModelProviders && modalState === "idle" && (
             <IdleState
               description={description}
               placeholder={placeholder}
@@ -170,14 +178,18 @@ export function AICreateModal({
             />
           )}
 
-          {modalState === "generating" && <GeneratingState text={generatingText} />}
+          {hasModelProviders && modalState === "generating" && <GeneratingState text={generatingText} />}
 
-          {modalState === "error" && (
+          {hasModelProviders && modalState === "error" && (
             <ErrorState errorMessage={errorMessage} />
           )}
         </Dialog.Body>
         <Dialog.Footer>
-          {modalState === "idle" && (
+          {!hasModelProviders && (
+            <NoModelProvidersFooter onSkip={onSkip} />
+          )}
+
+          {hasModelProviders && modalState === "idle" && (
             <IdleFooter
               onSkip={onSkip}
               onGenerate={handleGenerate}
@@ -185,7 +197,7 @@ export function AICreateModal({
             />
           )}
 
-          {modalState === "error" && (
+          {hasModelProviders && modalState === "error" && (
             <ErrorFooter onSkip={onSkip} onTryAgain={handleTryAgain} />
           )}
         </Dialog.Footer>
@@ -328,6 +340,50 @@ function ErrorFooter({ onSkip, onTryAgain }: ErrorFooterProps) {
       </Button>
       <Button colorPalette="blue" onClick={onTryAgain}>
         Try again
+      </Button>
+    </HStack>
+  );
+}
+
+function NoModelProvidersWarning() {
+  return (
+    <VStack gap={4} py={8} align="center" justify="center">
+      <Box
+        p={3}
+        borderRadius="full"
+        bg="orange.100"
+        color="orange.600"
+      >
+        <Icon as={AlertTriangle} boxSize={6} />
+      </Box>
+      <VStack gap={1}>
+        <Text fontWeight="semibold">No model provider configured</Text>
+        <Text color="fg.muted" fontSize="sm" textAlign="center">
+          Scenarios require a model provider to run. Please configure one to get started.{" "}
+          <Link
+            href="/settings/model-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="blue.500"
+            fontWeight="medium"
+          >
+            Configure model provider
+          </Link>
+        </Text>
+      </VStack>
+    </VStack>
+  );
+}
+
+interface NoModelProvidersFooterProps {
+  onSkip: () => void;
+}
+
+function NoModelProvidersFooter({ onSkip }: NoModelProvidersFooterProps) {
+  return (
+    <HStack gap={2} justify="center" width="100%">
+      <Button variant="ghost" onClick={onSkip}>
+        I'll write it myself
       </Button>
     </HStack>
   );

@@ -661,4 +661,227 @@ describe("<AICreateModal/>", () => {
       expect(openDialog).toBeDefined();
     });
   });
+
+  describe("when hasModelProviders is false", () => {
+    it("displays warning message", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByText("No model provider configured")
+      ).toBeInTheDocument();
+    });
+
+    it("does not render textarea", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    });
+
+    it("does not render Generate with AI button", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).queryByRole("button", { name: /generate with ai/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render example template pills", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByText("Customer Support")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("RAG Q&A")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("Tool-calling Agent")).not.toBeInTheDocument();
+    });
+
+    it("renders I'll write it myself button", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByRole("button", { name: /i'll write it myself/i })
+      ).toBeInTheDocument();
+    });
+
+    it("renders link to model provider settings", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const link = within(dialog).getByRole("link", { name: /model provider/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+    });
+
+    it("calls onSkip when I'll write it myself is clicked", () => {
+      const onSkip = vi.fn();
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={onSkip}
+          hasModelProviders={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /i'll write it myself/i })
+      );
+
+      expect(onSkip).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when hasModelProviders is true", () => {
+    it("does not display warning message", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).queryByText(/no model provider/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders textarea", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).getByRole("textbox")).toBeInTheDocument();
+    });
+
+    it("renders Generate with AI button", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByRole("button", { name: /generate with ai/i })
+      ).toBeInTheDocument();
+    });
+
+    it("renders example template pills", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
+      expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
+      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
+    });
+  });
 });

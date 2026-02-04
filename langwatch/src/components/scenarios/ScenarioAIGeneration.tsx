@@ -4,14 +4,16 @@ import {
   Card,
   HStack,
   Icon,
+  Link,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Check, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
+import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
@@ -127,6 +129,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { history, addPrompt, hasHistory } = usePromptHistory();
   const { generate, status } = useScenarioGeneration(project?.id);
 
+  // Check if any model providers are configured
+  const { hasEnabledProviders } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
+
   // Check if the default model is enabled
   const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
   const { modelOption } = useModelSelectionOptions(
@@ -209,6 +216,39 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   // "Prompt" view - initial state with CTA
   if (viewMode === "prompt") {
+    // Show warning when no model providers are configured
+    if (!hasEnabledProviders) {
+      return (
+        <Card.Root>
+          <Card.Body>
+            <VStack align="stretch" gap={3}>
+              <HStack gap={3}>
+                <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
+                  <Icon as={AlertTriangle} boxSize={4} />
+                </Box>
+                <Text fontWeight="semibold" fontSize="sm">
+                  Model Provider Required
+                </Text>
+              </HStack>
+
+              <Text fontSize="xs" color="fg.muted">
+                Scenarios require a model provider to run.{" "}
+                <Link
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="blue.500"
+                  fontWeight="medium"
+                >
+                  Configure model provider
+                </Link>
+              </Text>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      );
+    }
+
     return (
       <Card.Root>
         <Card.Body>

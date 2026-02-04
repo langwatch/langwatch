@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { ModelMetadataForFrontend } from "../server/api/routers/modelProviders";
 import { api } from "../utils/api";
 
@@ -13,13 +14,32 @@ export function useModelProvidersSettings(params: {
     { enabled: Boolean(projectId) },
   );
 
+  const providers = modelProviders.data?.providers;
+  const isLoading = modelProviders.isLoading;
+
+  const hasEnabledProviders = useMemo(() => {
+    // Default to true while loading or if providers data is not yet available
+    // This prevents false positive warnings during initial load
+    if (isLoading || !providers) return true;
+
+    return Object.values(providers).some(
+      (provider) =>
+        typeof provider === "object" &&
+        provider !== null &&
+        "enabled" in provider &&
+        provider.enabled
+    );
+  }, [providers, isLoading]);
+
   return {
     /** Model providers configuration (enabled/disabled, custom keys, etc.) */
-    providers: modelProviders.data?.providers,
+    providers,
     /** Metadata for all available models (supportedParameters, contextLength, etc.) */
     modelMetadata: modelProviders.data?.modelMetadata,
-    isLoading: modelProviders.isLoading,
+    isLoading,
     refetch: modelProviders.refetch,
+    /** Whether at least one model provider is enabled */
+    hasEnabledProviders,
   } as const;
 }
 
