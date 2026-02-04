@@ -30,7 +30,9 @@ Create a git worktree for a branch. Worktrees go in `../../worktrees/` (sibling 
 7. Create worktree (from langwatch dir):
    - Existing: `git worktree add "$DIR" "$BRANCH"`
    - New: `git worktree add -b "$BRANCH" "$DIR" origin/main`
-8. Copy .env if it exists: `cp .env "$DIR/.env"` (we're already in langwatch dir)
+8. Copy .env files:
+   - `cp ../.env "$DIR/../.env"` (langwatch-saas level .env)
+   - `cp langwatch_nlp/.env "$DIR/langwatch_nlp/.env"` (NLP service .env)
 9. Report: branch name, absolute directory path, and linked issue
 
 ### For Existing Branches (`/worktree feat/existing-branch`)
@@ -40,7 +42,9 @@ Create a git worktree for a branch. Worktrees go in `../../worktrees/` (sibling 
 3. Derive directory from branch (replace `/` with `-`): `worktree-feat-existing-branch`
 4. Set directory: `../../worktrees/$DIRNAME`
 5. Create worktree: `git worktree add "$DIR" "$ARGUMENTS"`
-6. Copy .env if it exists: `cp .env "$DIR/.env"`
+6. Copy .env files:
+   - `cp ../.env "$DIR/../.env"` (langwatch-saas level .env)
+   - `cp langwatch_nlp/.env "$DIR/langwatch_nlp/.env"` (NLP service .env)
 7. Report absolute path to user
 
 ### For New Feature Names (`/worktree my-new-feature`)
@@ -50,7 +54,9 @@ Create a git worktree for a branch. Worktrees go in `../../worktrees/` (sibling 
 3. Set branch name: `feat/$ARGUMENTS`
 4. Set directory: `../../worktrees/worktree-feat-$ARGUMENTS`
 5. Create worktree: `git worktree add -b "$BRANCH" "$DIR" origin/main`
-6. Copy .env if it exists: `cp .env "$DIR/.env"`
+6. Copy .env files:
+   - `cp ../.env "$DIR/../.env"` (langwatch-saas level .env)
+   - `cp langwatch_nlp/.env "$DIR/langwatch_nlp/.env"` (NLP service .env)
 7. Report absolute path to user
 
 ## Examples
