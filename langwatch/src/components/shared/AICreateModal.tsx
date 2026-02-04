@@ -347,7 +347,7 @@ function ErrorFooter({ onSkip, onTryAgain }: ErrorFooterProps) {
 
 function NoModelProvidersWarning() {
   return (
-    <VStack gap={4} py={4}>
+    <VStack gap={4} py={8} align="center" justify="center">
       <Box
         p={3}
         borderRadius="full"
@@ -379,7 +379,7 @@ interface NoModelProvidersFooterProps {
 
 function NoModelProvidersFooter({ onSkip }: NoModelProvidersFooterProps) {
   return (
-    <HStack gap={2} justify="flex-end">
+    <HStack gap={2} justify="center" width="100%">
       <Button variant="ghost" onClick={onSkip}>
         I'll write it myself
       </Button>
