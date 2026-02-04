@@ -26,12 +26,15 @@ const mockLoggerWarn = vi.fn();
 const mockLoggerInfo = vi.fn();
 const mockLoggerError = vi.fn();
 
-vi.mock("~/utils/logger", () => ({
-  createLogger: vi.fn(() => ({
-    info: mockLoggerInfo,
-    warn: mockLoggerWarn,
-    error: mockLoggerError,
-  })),
+const createMockLogger = () => ({
+  info: mockLoggerInfo,
+  warn: mockLoggerWarn,
+  error: mockLoggerError,
+  child: vi.fn(() => createMockLogger()),
+});
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => createMockLogger()),
 }));
 
 // Mock processor dependencies
@@ -57,6 +60,7 @@ vi.mock("../../db", () => ({
 
 describe("startScenarioProcessor", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
   });
 
