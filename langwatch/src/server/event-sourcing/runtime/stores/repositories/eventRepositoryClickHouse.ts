@@ -287,7 +287,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         "Inserted event records to ClickHouse",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.debug(
         {
           recordCount: records.length,
           tenantIds: [...new Set(records.map((r) => r.TenantId))],

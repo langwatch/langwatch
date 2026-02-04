@@ -320,7 +320,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
         "Inserted checkpoint record to ClickHouse",
       );
     } catch (error) {
-      this.logger.error(
+      this.logger.debug(
         {
           processorName: record.ProcessorName,
           processorType: record.ProcessorType,

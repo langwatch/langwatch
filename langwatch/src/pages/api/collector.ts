@@ -55,7 +55,7 @@ async function handleCollectorRequest(
     (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
-    logger.error(
+    logger.warn(
       "collector request is not authenticated, no auth token provided",
     );
 
@@ -82,7 +82,7 @@ async function handleCollectorRequest(
   });
 
   if (!project) {
-    logger.error("collector request is not authenticated, invalid auth token");
+    logger.warn("collector request is not authenticated, invalid auth token");
 
     return res.status(401).json({ message: "Invalid auth token." });
   }
