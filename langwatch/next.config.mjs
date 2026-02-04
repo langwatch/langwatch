@@ -45,10 +45,19 @@ const config = {
   logging: false,
   distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
 
+
   typescript: {
     // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
     ignoreBuildErrors: true,
   },
+
+  // Disable output file tracing in CI to speed up builds
+  // This saves ~2 minutes by skipping the "Collecting build traces" phase
+  ...(process.env.CI && {
+    output: "standalone",
+    outputFileTracingRoot: undefined,
+  }),
+
   turbopack: {
     rules: {
       "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
@@ -89,6 +98,16 @@ const config = {
       "react-feather",
       "@zag-js",
       "@mui",
+      // Additional packages for better tree-shaking
+      "lodash-es",
+      "@opentelemetry/api",
+      "@opentelemetry/semantic-conventions",
+      "date-fns",
+      "recharts",
+      "@tanstack/react-query",
+      "@trpc/client",
+      "@trpc/server",
+      "@trpc/react-query",
     ],
   },
 
@@ -158,26 +177,39 @@ const config = {
       };
     }
 
+    // Optimize string-replace-loader to only process files in saas-src
+    // These replacements are only needed for files that reference @langwatch-oss paths
+    const saasSrcPath = path.join(__dirname, "saas-src");
+    if (fs.existsSync(saasSrcPath)) {
+      config.module.rules.push({
+        test: /\.(js|jsx|ts|tsx)$/,
+        include: [saasSrcPath],
+        use: [
+          {
+            loader: "string-replace-loader",
+            options: {
+              search: /@langwatch-oss\/node_modules\//g,
+              replace: "",
+              flags: "g",
+            },
+          },
+          {
+            loader: "string-replace-loader",
+            options: {
+              search: /@langwatch-oss\/src\//g,
+              replace: "~/",
+              flags: "g",
+            },
+          },
+        ],
+      });
+    }
+
+    // Exclude test files from being processed/bundled
+    // This prevents *.test.ts, *.spec.ts, *.integration.test.ts, etc. from being built as routes
     config.module.rules.push({
-      test: /\.(js|jsx|ts|tsx)$/,
-      use: [
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/node_modules\//g,
-            replace: "",
-            flags: "g",
-          },
-        },
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/src\//g,
-            replace: "~/",
-            flags: "g",
-          },
-        },
-      ],
+      test: /\.(test|spec)\.(ts|tsx|js|jsx)$/,
+      loader: "ignore-loader",
     });
 
     // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
