@@ -18,6 +18,7 @@ import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
@@ -269,13 +270,11 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               <Button
                 colorPalette="blue"
                 onClick={() => {
-                  // Check workflows limit first (creating workflow agent creates a workflow first)
-                  workflowEnforcement.checkAndProceed(() => {
-                    // Then check agents limit
-                    agentEnforcement.checkAndProceed(() =>
-                      void handleSubmit(onSubmit)()
-                    );
-                  });
+                  // Check both workflows and agents limits before proceeding
+                  checkCompoundLimits(
+                    [workflowEnforcement, agentEnforcement],
+                    () => void handleSubmit(onSubmit)()
+                  );
                 }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}

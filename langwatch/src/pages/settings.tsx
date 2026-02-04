@@ -542,7 +542,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select PII redaction level" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
+                  <Select.Content width="300px" paddingY={2}>
                     {piiRedactionLevelCollection.items.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
@@ -600,7 +600,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select captured input visibility" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
+                  <Select.Content width="300px" paddingY={2}>
                     {capturedInputVisibilityCollection.items.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
@@ -657,7 +657,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select captured output visibility" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
+                  <Select.Content width="300px" paddingY={2}>
                     {capturedOutputVisibilityCollection.items.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
@@ -772,17 +772,17 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 align="start"
                 gap={2}
                 padding={4}
-                backgroundColor="orange.50"
+                backgroundColor="orange.subtle"
                 borderWidth="1px"
-                borderColor="orange.200"
+                borderColor="orange.muted"
                 borderRadius="md"
               >
                 <HStack gap={2}>
-                  <Text fontWeight="semibold" color="orange.700">
+                  <Text fontWeight="semibold" color="orange.fg">
                     ⚠️ Warning
                   </Text>
                 </HStack>
-                <Text fontSize="sm" color="orange.700">
+                <Text fontSize="sm" color="orange.fg">
                   This action will <b>immediately revoke</b> all existing shared
                   trace links. Anyone with previously shared trace URLs will{" "}
                   <b>no longer be able to access them</b>.
