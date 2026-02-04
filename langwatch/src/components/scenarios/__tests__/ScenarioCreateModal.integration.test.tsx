@@ -66,14 +66,13 @@ vi.mock("../../ModelSelector", () => ({
   }),
 }));
 
-// Mock useModelProvidersSettings - default to having providers
-const mockProviders = {
-  openai: { enabled: true, provider: "openai" },
-};
+// Create a variable for mock that can be modified per test
+let mockHasEnabledProviders = true;
 
+// Mock useModelProvidersSettings
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
-    providers: mockProviders,
+    hasEnabledProviders: mockHasEnabledProviders,
     isLoading: false,
   }),
 }));
@@ -111,6 +110,8 @@ describe("<ScenarioCreateModal/>", () => {
     vi.clearAllMocks();
     mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
     mockToasterCreate.mockClear();
+    // Reset to having providers by default
+    mockHasEnabledProviders = true;
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
@@ -388,56 +389,51 @@ describe("<ScenarioCreateModal/>", () => {
   });
 });
 
-// Separate test suite with no model providers configured
-describe("<ScenarioCreateModal/> when no model providers configured", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
-    mockToasterCreate.mockClear();
+describe("<ScenarioCreateModal/>", () => {
+  describe("when no model providers are configured", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
+      mockToasterCreate.mockClear();
+      // Set to no providers
+      mockHasEnabledProviders = false;
+    });
 
-    // Override the mock to simulate no providers
-    vi.doMock("~/hooks/useModelProvidersSettings", () => ({
-      useModelProvidersSettings: () => ({
-        providers: {},
-        isLoading: false,
-      }),
-    }));
-  });
+    it("shows warning message instead of form", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
 
-  // Note: These tests require reimporting the component after changing the mock.
-  // Since vitest hoists vi.mock, we need to use a different approach.
-  // The actual integration behavior should be verified in the AICreateModal tests
-  // which already cover the hasModelProviders prop behavior.
+      const dialogs = screen.queryAllByRole("dialog");
+      const dialog = dialogs[dialogs.length - 1]!;
 
-  it("passes hasModelProviders as false when no providers are configured", async () => {
-    // This test verifies the integration by checking that the warning appears
-    // We need to re-mock the module for this specific test
+      // Should show warning message when no providers configured
+      expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
+    });
 
-    // Reset modules to pick up new mock
-    vi.resetModules();
+    it("hides textarea", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
 
-    // Mock with no providers
-    vi.doMock("~/hooks/useModelProvidersSettings", () => ({
-      useModelProvidersSettings: () => ({
-        providers: {},
-        isLoading: false,
-      }),
-    }));
+      const dialogs = screen.queryAllByRole("dialog");
+      const dialog = dialogs[dialogs.length - 1]!;
 
-    // Re-import with fresh mocks
-    const { ScenarioCreateModal: FreshScenarioCreateModal } = await import("../ScenarioCreateModal");
+      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    });
 
-    render(
-      <FreshScenarioCreateModal open={true} onClose={vi.fn()} />,
-      { wrapper: Wrapper }
-    );
+    it("hides generate button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
 
-    const dialogs = screen.queryAllByRole("dialog");
-    const dialog = dialogs[dialogs.length - 1]!;
+      const dialogs = screen.queryAllByRole("dialog");
+      const dialog = dialogs[dialogs.length - 1]!;
 
-    // Should show warning message when no providers configured
-    expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+    });
   });
 });

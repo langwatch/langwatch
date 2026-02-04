@@ -1,6 +1,6 @@
 import { Link, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
@@ -29,16 +29,9 @@ export function useRunScenario({
   const [isPolling, setIsPolling] = useState(false);
 
   // Check if any model providers are configured
-  const { providers, isLoading: isLoadingProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders } = useModelProvidersSettings({
     projectId,
   });
-
-  const hasModelProviders = useMemo(() => {
-    if (isLoadingProviders || !providers) return true; // Default to true while loading
-    return Object.values(providers).some((provider) =>
-      typeof provider === 'object' && provider !== null && 'enabled' in provider && provider.enabled
-    );
-  }, [providers, isLoadingProviders]);
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
@@ -46,7 +39,7 @@ export function useRunScenario({
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
-      if (!hasModelProviders) {
+      if (!hasEnabledProviders) {
         toaster.create({
           title: "No model provider configured",
           description: (
@@ -136,7 +129,7 @@ export function useRunScenario({
         setIsPolling(false);
       }
     },
-    [projectId, projectSlug, hasModelProviders, runMutation, router, utils],
+    [projectId, projectSlug, hasEnabledProviders, runMutation, router, utils],
   );
 
   return {

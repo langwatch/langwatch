@@ -56,15 +56,13 @@ vi.mock("~/utils/routes", () => ({
   buildRoutePath: vi.fn().mockReturnValue("/mock/route"),
 }));
 
-// Create a variable for mock providers that can be modified per test
-let mockProviders: Record<string, { enabled: boolean; provider: string }> = {
-  openai: { enabled: true, provider: "openai" },
-};
+// Create a variable for mock that can be modified per test
+let mockHasEnabledProviders = true;
 
 // Mock useModelProvidersSettings
 vi.mock("../useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
-    providers: mockProviders,
+    hasEnabledProviders: mockHasEnabledProviders,
     isLoading: false,
   }),
 }));
@@ -77,7 +75,7 @@ describe("useRunScenario()", () => {
       batchRunId: "batch-123",
     });
     // Reset to having providers by default
-    mockProviders = { openai: { enabled: true, provider: "openai" } };
+    mockHasEnabledProviders = true;
   });
 
   describe("when model providers are configured", () => {
@@ -100,7 +98,7 @@ describe("useRunScenario()", () => {
 
   describe("when no model providers are configured", () => {
     beforeEach(() => {
-      mockProviders = {};
+      mockHasEnabledProviders = false;
     });
 
     it("shows error toast", async () => {
