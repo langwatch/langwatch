@@ -359,7 +359,7 @@ function NoModelProvidersWarning() {
       <VStack gap={1}>
         <Text fontWeight="semibold">No model provider configured</Text>
         <Text color="fg.muted" fontSize="sm" textAlign="center">
-          To use AI generation, you need to configure a model provider.{" "}
+          Scenarios require a model provider to run. Please configure one to get started.{" "}
           <Link
             href="/settings/model-providers"
             color="blue.500"
