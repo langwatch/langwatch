@@ -153,7 +153,7 @@ export class ScenarioExecutionOrchestrator {
   }
 
   private notFound(entity: string, id: string): ScenarioExecutionResult {
-    logger.error({ entity, id }, `${entity} not found`);
+    logger.warn({ entity, id }, `${entity} not found`);
     return { success: false, error: `${entity} ${id} not found` };
   }
 

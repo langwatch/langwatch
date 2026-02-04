@@ -21,6 +21,18 @@ import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
+
+/**
+ * Error class for user configuration issues.
+ * These errors are logged as WARN rather than ERROR since they represent
+ * user misconfiguration, not system failures.
+ */
+class UserConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserConfigError";
+  }
+}
 import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
@@ -125,7 +137,7 @@ const buildThreadData = async (
   }
   const threadId = trace.metadata?.thread_id;
   if (!threadId) {
-    throw new Error(
+    throw new UserConfigError(
       "Trace does not have a thread_id for thread-based evaluation",
     );
   }
@@ -484,16 +496,18 @@ export const runEvaluation = async ({
       throw `Provider ${provider} is not configured`;
     }
     if (!modelProvider.enabled) {
-      throw `Provider ${provider} is not enabled`;
+      throw new UserConfigError(`Provider ${provider} is not enabled`);
     }
     const model_ = model.split("/").slice(1).join("/");
     const modelList = embeddings
       ? modelProvider.embeddingsModels
       : modelProvider.models;
     if (modelList && modelList.length > 0 && !modelList.includes(model_)) {
-      throw `Model ${model_} is not in the ${
-        embeddings ? "embedding models" : "models"
-      } list for ${provider}, please select another model for running this evaluation`;
+      throw new UserConfigError(
+        `Model ${model_} is not in the ${
+          embeddings ? "embedding models" : "models"
+        } list for ${provider}, please select another model for running this evaluation`,
+      );
     }
     const params = await prepareLitellmParams({
       model,
@@ -771,12 +785,16 @@ export const startEvaluationsWorker = (
 
   traceChecksWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
-    logger.error({ jobId: job?.id, error: err }, "job failed");
-    await withScope((scope) => {
-      scope.setTag?.("worker", "traceChecks");
-      scope.setExtra?.("job", job?.data);
-      captureException(err);
-    });
+    if (err instanceof UserConfigError) {
+      logger.warn({ jobId: job?.id, error: err }, "job failed due to user configuration");
+    } else {
+      logger.error({ jobId: job?.id, error: err }, "job failed");
+      await withScope((scope) => {
+        scope.setTag?.("worker", "traceChecks");
+        scope.setExtra?.("job", job?.data);
+        captureException(err);
+      });
+    }
   });
 
   logger.info("trace checks worker registered");
