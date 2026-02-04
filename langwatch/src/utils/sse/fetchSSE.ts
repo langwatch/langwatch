@@ -45,32 +45,42 @@ export async function fetchSSE<T>({
   headers = {},
   onError,
 }: FetchSSEOptions<T>): Promise<void> {
-  const controller = new AbortController();
-  let timeoutId: NodeJS.Timeout | undefined;
+  // Wrap in a Promise so timeout errors can properly reject
+  // instead of becoming unhandled exceptions
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+    let isSettled = false;
 
-  const cleanup = () => {
-    controller.abort();
-    if (timeoutId) clearTimeout(timeoutId);
-  };
+    const cleanup = () => {
+      controller.abort();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
 
-  const setResetableTimeout = (timeout: number) => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
+    const handleError = (error: Error) => {
+      if (isSettled) return;
+      isSettled = true;
       cleanup();
-      const error = new FetchSSETimeoutError(
-        `Connection timed out with timeout ${timeout}ms waiting for the next event`,
-      );
-      logger.error(error);
       if (onError) {
         onError(error);
+        resolve();
       } else {
-        throw error;
+        reject(error);
       }
-    }, timeout);
-  };
+    };
 
-  try {
-    await fetchEventSource(endpoint, {
+    const setResetableTimeout = (timeoutMs: number) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const error = new FetchSSETimeoutError(
+          `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
+        );
+        logger.error(error);
+        handleError(error);
+      }, timeoutMs);
+    };
+
+    fetchEventSource(endpoint, {
       openWhenHidden: true,
       method: "POST",
       headers: {
@@ -98,12 +108,7 @@ export async function fetchSSE<T>({
             ? `Server error: ${response.status} ${response.statusText}`
             : response.statusText,
         );
-
-        if (onError) {
-          onError(error);
-        } else {
-          throw error;
-        }
+        handleError(error);
       },
 
       onmessage(ev) {
@@ -112,29 +117,37 @@ export async function fetchSSE<T>({
         onEvent(event);
 
         if (shouldStopProcessing?.(event)) {
-          cleanup();
+          if (!isSettled) {
+            isSettled = true;
+            cleanup();
+            resolve();
+          }
         }
       },
 
       onclose() {
-        cleanup();
+        if (!isSettled) {
+          isSettled = true;
+          cleanup();
+          resolve();
+        }
       },
 
       onerror(error) {
-        cleanup();
-        throw error; // Propagate to main try-catch
+        handleError(error instanceof Error ? error : new Error(String(error)));
       },
-    });
-  } catch (error) {
-    const processedError =
-      error instanceof Error ? error : new Error(String(error));
-
-    cleanup();
-
-    if (onError) {
-      onError(processedError);
-    } else {
-      throw processedError;
-    }
-  }
+    })
+      .then(() => {
+        if (!isSettled) {
+          isSettled = true;
+          cleanup();
+          resolve();
+        }
+      })
+      .catch((error) => {
+        handleError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      });
+  });
 }

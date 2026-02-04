@@ -35,7 +35,7 @@ describe("fetchSSE", () => {
       typeof vi.fn
     >;
 
-    // Default successful connection
+    // Default successful connection - calls onclose to properly resolve
     mockFetchEventSource.mockImplementation(
       (_url: string, options: FetchEventSourceMockOptions) => {
         void Promise.resolve().then(async () => {
@@ -47,10 +47,16 @@ describe("fetchSSE", () => {
             ok: true,
             headers: { get: () => "text/event-stream" },
           });
+          // Call onclose to properly end the connection
+          options.onclose();
         });
         return Promise.resolve();
       },
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("should make request with correct parameters", async () => {
@@ -86,6 +92,7 @@ describe("fetchSSE", () => {
         });
         options.onmessage({ data: JSON.stringify({ type: "test", value: 1 }) });
         options.onmessage({ data: JSON.stringify({ type: "stop", value: 2 }) });
+        // Don't call onclose - shouldStopProcessing will resolve the promise
         return Promise.resolve();
       },
     );
@@ -140,7 +147,13 @@ describe("fetchSSE", () => {
               ok: true,
               headers: { get: () => "text/event-stream" },
             });
-            options.onmessage({ data: "invalid json" });
+            // This will throw a JSON parsing error
+            try {
+              options.onmessage({ data: "invalid json" });
+            } catch (e) {
+              // The error is caught inside fetchSSE and passed to onerror
+              options.onerror(e);
+            }
             return Promise.resolve();
           },
         );
@@ -159,6 +172,18 @@ describe("fetchSSE", () => {
         vi.useFakeTimers();
         const onError = vi.fn();
 
+        // Mock that never closes - will timeout
+        mockFetchEventSource.mockImplementation(
+          (_url: string, options: FetchEventSourceMockOptions) => {
+            void options.onopen({
+              ok: true,
+              headers: { get: () => "text/event-stream" },
+            });
+            // Don't call onclose or onmessage - let it timeout
+            return new Promise(() => {}); // Never resolves
+          },
+        );
+
         const ssePromise = fetchSSE({
           endpoint: "/api/test",
           payload: {},
@@ -167,11 +192,14 @@ describe("fetchSSE", () => {
           timeout: 100,
         });
 
+        // Attach a catch handler to prevent unhandled rejection warnings
+        // (even though onError handles it, the promise resolves, not rejects)
+        ssePromise.catch(() => {});
+
         await vi.advanceTimersByTimeAsync(101);
         await ssePromise;
 
         expect(onError).toHaveBeenCalledWith(expect.any(FetchSSETimeoutError));
-        vi.useRealTimers();
       });
     });
 
@@ -183,7 +211,12 @@ describe("fetchSSE", () => {
               ok: true,
               headers: { get: () => "text/event-stream" },
             });
-            options.onmessage({ data: "invalid json" });
+            // This will throw a JSON parsing error
+            try {
+              options.onmessage({ data: "invalid json" });
+            } catch (e) {
+              options.onerror(e);
+            }
             return Promise.resolve();
           },
         );
@@ -200,18 +233,33 @@ describe("fetchSSE", () => {
       it("should throw timeout errors when no onError callback is provided", async () => {
         vi.useFakeTimers();
 
-        await expect(async () => {
-          void fetchSSE({
-            endpoint: "/api/test",
-            payload: {},
-            onEvent: vi.fn(),
-            timeout: 100,
-          });
+        // Mock that never closes - will timeout
+        mockFetchEventSource.mockImplementation(
+          (_url: string, options: FetchEventSourceMockOptions) => {
+            void options.onopen({
+              ok: true,
+              headers: { get: () => "text/event-stream" },
+            });
+            // Don't call onclose - let it timeout
+            return new Promise(() => {}); // Never resolves
+          },
+        );
 
-          await vi.advanceTimersByTimeAsync(101);
-        }).rejects.toThrow(FetchSSETimeoutError);
+        const ssePromise = fetchSSE({
+          endpoint: "/api/test",
+          payload: {},
+          onEvent: vi.fn(),
+          timeout: 100,
+        });
 
-        vi.useRealTimers();
+        // Attach the rejection handler BEFORE advancing timers
+        // to avoid unhandled rejection warnings
+        const rejectionPromise = expect(ssePromise).rejects.toThrow(
+          FetchSSETimeoutError,
+        );
+
+        await vi.advanceTimersByTimeAsync(101);
+        await rejectionPromise;
       });
     });
   });
