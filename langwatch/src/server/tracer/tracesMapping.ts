@@ -175,7 +175,7 @@ export const TRACE_MAPPINGS = {
       const spans = traces
         .flatMap((trace) => trace.spans ?? [])
         .filter((span) => getSpanNameOrModel(span) === key);
-      return Object.keys(spans[0] ?? {})
+      return Object.keys(spans[0] || {})
         .filter((key) =>
           ["input", "output", "generated", "params", "contexts"].includes(key),
         )
@@ -221,7 +221,7 @@ export const TRACE_MAPPINGS = {
   metadata: {
     keys: (traces: TraceWithAnnotations[]) => {
       const allKeys = Array.from(
-        new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {}))),
+        new Set(traces.flatMap((trace) => Object.keys(trace.metadata || {}))),
       );
 
       const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
@@ -269,7 +269,7 @@ export const TRACE_MAPPINGS = {
       const evaluation = traces
         .flatMap((trace) => trace.evaluations ?? [])
         .find((evaluation) => evaluation.evaluator_id === key);
-      return Object.keys(evaluation ?? {})
+      return Object.keys(evaluation || {})
         .filter((key) =>
           ["passed", "score", "label", "details", "status", "error"].includes(
             key,
