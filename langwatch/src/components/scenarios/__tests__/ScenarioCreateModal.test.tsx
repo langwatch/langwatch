@@ -35,8 +35,14 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 // Mock upgrade modal store (used by useLicenseEnforcement)
+const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
-  useUpgradeModalStore: () => vi.fn(),
+  useUpgradeModalStore: (selector: unknown) => {
+    if (typeof selector === "function") {
+      return (selector as (state: { open: typeof mockOpenUpgradeModal }) => unknown)({ open: mockOpenUpgradeModal });
+    }
+    return { open: mockOpenUpgradeModal };
+  },
 }));
 
 // Mock tRPC

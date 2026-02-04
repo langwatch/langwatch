@@ -28,6 +28,8 @@ export function RoleCard({
   onViewPermissions?: () => void;
   hasPermission: (permission: Permission) => boolean;
 }) {
+  const canManage = hasPermission("organization:manage");
+
   return (
     <Card.Root
       width="100%"
@@ -40,8 +42,8 @@ export function RoleCard({
       transition="all 0.2s"
       display="flex"
       flexDirection="column"
-      cursor={onViewPermissions ? "pointer" : "default"}
-      onClick={onViewPermissions ? onViewPermissions : undefined}
+      cursor={onViewPermissions && canManage ? "pointer" : "default"}
+      onClick={onViewPermissions && canManage ? onViewPermissions : undefined}
       position="relative"
     >
       {/* Action buttons - absolutely positioned to center vertically */}

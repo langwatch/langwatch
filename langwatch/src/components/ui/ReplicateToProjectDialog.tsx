@@ -106,7 +106,7 @@ export function ReplicateToProjectDialog({
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
-        <Dialog.Body>
+        <Dialog.Body paddingBottom={6}>
           <VStack gap={4} align={"start"}>
             <Field.Root>
               <Field.Label>Target Project</Field.Label>
@@ -125,7 +125,7 @@ export function ReplicateToProjectDialog({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="1600">
+                <Select.Content zIndex="popover" paddingY={2}>
                   {projectCollection.items.map((proj) => {
                     const perm = proj.hasCreatePermission;
                     return (

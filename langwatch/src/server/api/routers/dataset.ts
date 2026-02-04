@@ -237,6 +237,8 @@ export const datasetRouter = createTRPCRouter({
     .use(checkProjectPermission("datasets:create"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      await enforceLicenseLimit(ctx, input.projectId, "datasets");
+
       // Check that the user has at least datasets:create permission on the source project
       // (having create permission implies you can view/copy from that project)
       const hasSourcePermission = await hasProjectPermission(

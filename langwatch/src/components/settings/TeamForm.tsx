@@ -145,7 +145,7 @@ export const TeamForm = ({
               </Table.Header>
               <Table.Body>
                 {members.fields.map((member, index) => (
-                  <Table.Row key={index}>
+                  <Table.Row key={member.id}>
                     <Table.Cell>
                       <HStack width="full">
                         {member.saved ? (

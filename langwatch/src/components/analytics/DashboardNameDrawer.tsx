@@ -5,6 +5,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -19,7 +20,7 @@ export function DashboardNameDrawer({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const projectSlug = router.query.project as string;
+  const projectSlug = project?.slug ?? "";
   const { closeDrawer } = useDrawer();
   const { checkAndProceed } = useLicenseEnforcement("dashboards");
   const queryClient = api.useContext();
@@ -36,7 +37,8 @@ export function DashboardNameDrawer({
   const [dashboardName, setDashboardName] = useState(defaultName);
 
   useEffect(() => {
-    setDashboardName(defaultName);
+    if (!open) return;
+    setDashboardName((current) => (current.trim() ? current : defaultName));
   }, [defaultName, open]);
 
   const handleClose = () => {
@@ -62,7 +64,8 @@ export function DashboardNameDrawer({
             );
             handleClose();
           },
-          onError: () => {
+          onError: (error) => {
+            if (isHandledByGlobalLicenseHandler(error)) return;
             toaster.create({
               title: "Error creating dashboard",
               type: "error",
