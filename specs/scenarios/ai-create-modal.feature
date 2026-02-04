@@ -11,7 +11,7 @@ Feature: AI Create Modal for Scenarios
   # Happy Path - Generate with AI
   # ============================================================================
 
-  @e2e
+  @integration
   Scenario: Open AI create modal from scenarios list
     When I click the "New Scenario" button
     Then I see the AI create modal
@@ -31,7 +31,7 @@ Feature: AI Create Modal for Scenarios
     Then I am navigated to the scenario editor
     And the editor is pre-filled with the generated scenario
 
-  @e2e
+  @integration
   Scenario: Use example template to generate scenario
     When I click the "New Scenario" button
     And I click the "Customer Support" example pill
@@ -158,6 +158,52 @@ Feature: AI Create Modal for Scenarios
     And I see "API keys not configured" in the error message
     And I see guidance to configure API keys in Settings
 
+  # ============================================================================
+  # No Model Provider Warning (Proactive)
+  # ============================================================================
+
+  @integration
+  Scenario: Warning replaces AI generation area when no model providers configured
+    Given I have no model providers configured
+    When I click the "New Scenario" button
+    Then I see the AI create modal
+    And the AI generation area is replaced with a warning message
+    And I do not see the textarea for description
+    And I do not see the "Generate with AI" button
+    And I do not see the example template pills
+    And I see "I'll write it myself" button
+
+  @integration
+  Scenario: Warning message includes link to model provider settings
+    Given I have no model providers configured
+    When I click the "New Scenario" button
+    Then I see a warning explaining that model providers must be configured
+    And the warning contains a link to the model provider settings page
+
+  @integration
+  Scenario: Navigate to model provider settings from warning
+    Given I have no model providers configured
+    When I click the "New Scenario" button
+    And I click the link to configure model providers
+    Then I am navigated to the model provider settings page
+
+  @integration
+  Scenario: Manual scenario creation available despite no providers
+    Given I have no model providers configured
+    When I click the "New Scenario" button
+    And I click "I'll write it myself"
+    Then a new empty scenario is created
+    And I am navigated to the scenario editor
+
+  @integration
+  Scenario: Normal AI generation UI when model providers are configured
+    Given I have "openai" provider configured with valid API keys
+    When I click the "New Scenario" button
+    Then I see the AI create modal
+    And I see the textarea for description
+    And I see the "Generate with AI" button
+    And I see the example template pills
+
   @integration
   Scenario: Generation times out after 60 seconds
     Given the AI generation service does not respond
@@ -236,3 +282,22 @@ Feature: AI Create Modal for Scenarios
     When rendered with custom example templates
     Then it displays the custom example pills
     And clicking a pill fills the textarea with the template text
+
+  @unit
+  Scenario: AICreateModal shows warning state when hasModelProviders is false
+    Given an AICreateModal component
+    When rendered with hasModelProviders set to false
+    Then the warning message is visible
+    And the textarea is not rendered
+    And the "Generate with AI" button is not rendered
+    And the example template pills are not rendered
+    And the "I'll write it myself" button is visible
+
+  @unit
+  Scenario: AICreateModal shows normal UI when hasModelProviders is true
+    Given an AICreateModal component
+    When rendered with hasModelProviders set to true
+    Then the warning message is not visible
+    And the textarea is rendered
+    And the "Generate with AI" button is rendered
+    And the example template pills are rendered

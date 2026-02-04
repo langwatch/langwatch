@@ -1,10 +1,12 @@
+import { Link, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
 import { pollForScenarioRun } from "../utils/pollForScenarioRun";
 import { buildRoutePath } from "../utils/routes";
+import { useModelProvidersSettings } from "./useModelProvidersSettings";
 
 interface UseRunScenarioOptions {
   projectId: string | undefined;
@@ -26,10 +28,47 @@ export function useRunScenario({
   const runMutation = api.scenarios.run.useMutation();
   const [isPolling, setIsPolling] = useState(false);
 
+  // Check if any model providers are configured
+  const { providers, isLoading: isLoadingProviders } = useModelProvidersSettings({
+    projectId,
+  });
+
+  const hasModelProviders = useMemo(() => {
+    if (isLoadingProviders || !providers) return true; // Default to true while loading
+    return Object.values(providers).some((provider) =>
+      typeof provider === 'object' && provider !== null && 'enabled' in provider && provider.enabled
+    );
+  }, [providers, isLoadingProviders]);
+
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
       const { scenarioId, target, setId } = params;
       if (!projectId || !projectSlug || !target) return;
+
+      // Check if model providers are configured before attempting to run
+      if (!hasModelProviders) {
+        toaster.create({
+          title: "No model provider configured",
+          description: (
+            <VStack align="start" gap={1}>
+              <Text>
+                A model provider must be configured to run scenarios.
+              </Text>
+              <Link
+                href="/settings/model-providers"
+                color="blue.200"
+                fontWeight="medium"
+                _hover={{ color: "blue.100" }}
+              >
+                Configure model providers
+              </Link>
+            </VStack>
+          ),
+          type: "error",
+          meta: { closable: true },
+        });
+        return;
+      }
 
       try {
         const { setId: returnedSetId, batchRunId } = await runMutation.mutateAsync({
@@ -97,7 +136,7 @@ export function useRunScenario({
         setIsPolling(false);
       }
     },
-    [projectId, projectSlug, runMutation, router, utils],
+    [projectId, projectSlug, hasModelProviders, runMutation, router, utils],
   );
 
   return {

@@ -66,6 +66,18 @@ vi.mock("../../ModelSelector", () => ({
   }),
 }));
 
+// Mock useModelProvidersSettings - default to having providers
+const mockProviders = {
+  openai: { enabled: true, provider: "openai" },
+};
+
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    providers: mockProviders,
+    isLoading: false,
+  }),
+}));
+
 // Mock toaster
 const mockToasterCreate = vi.fn();
 vi.mock("../../ui/toaster", () => ({
@@ -373,5 +385,59 @@ describe("<ScenarioCreateModal/>", () => {
       );
       expect(openDialogs.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// Separate test suite with no model providers configured
+describe("<ScenarioCreateModal/> when no model providers configured", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
+    mockToasterCreate.mockClear();
+
+    // Override the mock to simulate no providers
+    vi.doMock("~/hooks/useModelProvidersSettings", () => ({
+      useModelProvidersSettings: () => ({
+        providers: {},
+        isLoading: false,
+      }),
+    }));
+  });
+
+  // Note: These tests require reimporting the component after changing the mock.
+  // Since vitest hoists vi.mock, we need to use a different approach.
+  // The actual integration behavior should be verified in the AICreateModal tests
+  // which already cover the hasModelProviders prop behavior.
+
+  it("passes hasModelProviders as false when no providers are configured", async () => {
+    // This test verifies the integration by checking that the warning appears
+    // We need to re-mock the module for this specific test
+
+    // Reset modules to pick up new mock
+    vi.resetModules();
+
+    // Mock with no providers
+    vi.doMock("~/hooks/useModelProvidersSettings", () => ({
+      useModelProvidersSettings: () => ({
+        providers: {},
+        isLoading: false,
+      }),
+    }));
+
+    // Re-import with fresh mocks
+    const { ScenarioCreateModal: FreshScenarioCreateModal } = await import("../ScenarioCreateModal");
+
+    render(
+      <FreshScenarioCreateModal open={true} onClose={vi.fn()} />,
+      { wrapper: Wrapper }
+    );
+
+    const dialogs = screen.queryAllByRole("dialog");
+    const dialog = dialogs[dialogs.length - 1]!;
+
+    // Should show warning message when no providers configured
+    expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
   });
 });

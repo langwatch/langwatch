@@ -1,7 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -59,6 +60,18 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
+
+  // Check if any model providers are configured
+  const { providers, isLoading: isLoadingProviders } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
+
+  const hasModelProviders = useMemo(() => {
+    if (isLoadingProviders || !providers) return true; // Default to true while loading
+    return Object.values(providers).some((provider) =>
+      typeof provider === 'object' && provider !== null && 'enabled' in provider && provider.enabled
+    );
+  }, [providers, isLoadingProviders]);
 
   // Check if the default model has API keys configured
   const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
@@ -169,6 +182,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={handleGenerate}
       onSkip={handleSkip}
       generatingText={GENERATING_TEXT}
+      hasModelProviders={hasModelProviders}
     />
   );
 }
