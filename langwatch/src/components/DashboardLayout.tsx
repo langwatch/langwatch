@@ -497,46 +497,47 @@ export const DashboardLayout = ({
                   </Alert.Content>
                 </Alert.Root>
               )}
-            {usage.data?.messageLimitInfo.status !== "ok" && (
-              <Alert.Root
-                status={
-                  usage.data.messageLimitInfo.status === "exceeded"
-                    ? "error"
-                    : "warning"
-                }
-                width="full"
-                borderBottom="1px solid"
-                borderBottomColor={
-                  usage.data.messageLimitInfo.status === "exceeded"
-                    ? "red.300"
-                    : "yellow.300"
-                }
-              >
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Text>
-                    {usage.data.messageLimitInfo.message}{" "}
-                    <Link
-                      href={planManagementUrl}
-                      textDecoration="underline"
-                      _hover={{
-                        textDecoration: "none",
-                      }}
-                      onClick={() => {
-                        trackEvent("subscription_hook_click", {
-                          project_id: project?.id,
-                          hook:
-                            usage.data?.messageLimitInfo.status === "exceeded"
-                              ? "messages_limit_reached"
-                              : "messages_limit_warning",
-                        });
-                      }}
-                    >
-                      Click here
-                    </Link>{" "}
-                    to upgrade your plan.
-                  </Text>
-                </Alert.Content>
+            {usage.data?.messageLimitInfo &&
+              usage.data.messageLimitInfo.status !== "ok" && (
+                <Alert.Root
+                  status={
+                    usage.data.messageLimitInfo.status === "exceeded"
+                      ? "error"
+                      : "warning"
+                  }
+                  width="full"
+                  borderBottom="1px solid"
+                  borderBottomColor={
+                    usage.data.messageLimitInfo.status === "exceeded"
+                      ? "red.300"
+                      : "yellow.300"
+                  }
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Text>
+                      {usage.data.messageLimitInfo.message}{" "}
+                      <Link
+                        href={planManagementUrl}
+                        textDecoration="underline"
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                        onClick={() => {
+                          trackEvent("subscription_hook_click", {
+                            project_id: project?.id,
+                            hook:
+                              usage.data?.messageLimitInfo.status === "exceeded"
+                                ? "messages_limit_reached"
+                                : "messages_limit_warning",
+                          });
+                        }}
+                      >
+                        Click here
+                      </Link>{" "}
+                      to upgrade your plan.
+                    </Text>
+                  </Alert.Content>
               </Alert.Root>
             )}
             {usage.data &&
