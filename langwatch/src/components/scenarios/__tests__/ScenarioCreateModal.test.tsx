@@ -12,9 +12,15 @@ const mockProject = {
   slug: "my-project",
 };
 
+const mockOrganization = {
+  id: "org-123",
+  name: "Test Org",
+};
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: mockProject,
+    organization: mockOrganization,
   }),
 }));
 
@@ -26,6 +32,11 @@ vi.mock("~/hooks/useDrawer", () => ({
     closeDrawer: vi.fn(),
     drawerOpen: vi.fn().mockReturnValue(false),
   }),
+}));
+
+// Mock upgrade modal store (used by useLicenseEnforcement)
+vi.mock("~/stores/upgradeModalStore", () => ({
+  useUpgradeModalStore: () => vi.fn(),
 }));
 
 // Mock tRPC
@@ -44,6 +55,14 @@ vi.mock("~/utils/api", () => ({
       getAllForProject: {
         useQuery: () => ({
           data: [],
+          isLoading: false,
+        }),
+      },
+    },
+    licenseEnforcement: {
+      checkLimit: {
+        useQuery: () => ({
+          data: { allowed: true, current: 0, max: 100 },
           isLoading: false,
         }),
       },
