@@ -3,6 +3,7 @@ import { TRPCClientError } from "@trpc/client";
 import {
   extractLimitExceededInfo,
   isHandledByGlobalLicenseHandler,
+  markAsHandledByLicenseHandler,
 } from "../trpcError";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 
@@ -219,7 +220,7 @@ describe("Global mutation error handler", () => {
 
     it("returns true for errors marked by global handler", () => {
       const error = new Error("Limit exceeded");
-      (error as { _handledByGlobalLicenseHandler?: boolean })._handledByGlobalLicenseHandler = true;
+      markAsHandledByLicenseHandler(error);
       expect(isHandledByGlobalLicenseHandler(error)).toBe(true);
     });
 

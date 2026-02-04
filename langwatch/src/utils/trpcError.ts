@@ -12,6 +12,17 @@ export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
   return false;
 };
 
+// Track handled errors without mutating them
+const handledLicenseErrors = new WeakSet<Error>();
+
+/**
+ * Mark an error as handled by the global license handler.
+ * Called internally by the MutationCache onError handler.
+ */
+export function markAsHandledByLicenseHandler(error: Error): void {
+  handledLicenseErrors.add(error);
+}
+
 /**
  * Check if an error was already handled by the global license limit handler.
  * Use this in component-level onError callbacks to avoid showing duplicate
@@ -28,8 +39,7 @@ export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
  * ```
  */
 export function isHandledByGlobalLicenseHandler(error: unknown): boolean {
-  return !!(error as { _handledByGlobalLicenseHandler?: boolean })
-    ?._handledByGlobalLicenseHandler;
+  return error instanceof Error && handledLicenseErrors.has(error);
 }
 
 export interface LimitExceededInfo {

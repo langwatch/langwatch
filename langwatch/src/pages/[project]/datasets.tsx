@@ -47,6 +47,7 @@ function DatasetsPage() {
   const hasDatasetsDeletePermission = hasPermission("datasets:delete");
   const router = useRouter();
   const { openDrawer } = useDrawer();
+  const queryClient = api.useContext();
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -75,6 +76,8 @@ function DatasetsPage() {
       {
         onSuccess: () => {
           void datasets.refetch();
+          void queryClient.limits.getUsage.invalidate();
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
           toaster.create({
             title: `Dataset ${name} deleted`,
             description: (
@@ -95,6 +98,8 @@ function DatasetsPage() {
                       {
                         onSuccess: () => {
                           void datasets.refetch();
+                          void queryClient.limits.getUsage.invalidate();
+                          void queryClient.licenseEnforcement.checkLimit.invalidate();
                           toaster.create({
                             title: "Dataset restored",
                             description: "The dataset has been restored.",

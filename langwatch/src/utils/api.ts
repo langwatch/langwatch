@@ -17,7 +17,10 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import { sseLink } from "./sseLink";
-import { extractLimitExceededInfo } from "./trpcError";
+import {
+  extractLimitExceededInfo,
+  markAsHandledByLicenseHandler,
+} from "./trpcError";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
 const getBaseUrl = () => {
@@ -88,7 +91,7 @@ export const api = createTRPCNext<AppRouter>({
          * This handler intercepts all tRPC mutation errors and:
          * 1. Checks if the error is a LIMIT_EXCEEDED FORBIDDEN error
          * 2. If so, opens the upgrade modal with limit details
-         * 3. Marks the error with `_handledByGlobalLicenseHandler = true`
+         * 3. Marks the error via WeakSet so component-level handlers can skip it
          *
          * Components using `onError` callbacks should check `isHandledByGlobalLicenseHandler(error)`
          * to avoid showing duplicate error UI (toast + modal) for license errors.
@@ -101,7 +104,9 @@ export const api = createTRPCNext<AppRouter>({
             const limitInfo = extractLimitExceededInfo(error);
             if (limitInfo) {
               // Mark as handled so component-level handlers can skip it
-              (error as { _handledByGlobalLicenseHandler?: boolean })._handledByGlobalLicenseHandler = true;
+              if (error instanceof Error) {
+                markAsHandledByLicenseHandler(error);
+              }
 
               useUpgradeModalStore
                 .getState()

@@ -128,6 +128,7 @@ export function DatasetSelectionItem({
   }, []);
 
   const { project } = useOrganizationTeamProject();
+  const queryClient = api.useContext();
   const datasetDelete = api.dataset.deleteById.useMutation();
 
   const deleteDataset = ({ id, name }: { id: string; name: string }) => {
@@ -136,6 +137,8 @@ export function DatasetSelectionItem({
       {
         onSuccess: () => {
           void query.refetch();
+          void queryClient.limits.getUsage.invalidate();
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
           toaster.create({
             title: `Dataset ${name} deleted`,
             description: (
@@ -160,6 +163,8 @@ export function DatasetSelectionItem({
                       {
                         onSuccess: () => {
                           void query.refetch();
+                          void queryClient.limits.getUsage.invalidate();
+                          void queryClient.licenseEnforcement.checkLimit.invalidate();
                           toaster.create({
                             title: "Dataset restored",
                             description: "The dataset has been restored.",
