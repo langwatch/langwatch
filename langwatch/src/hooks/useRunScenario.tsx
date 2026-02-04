@@ -1,4 +1,4 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
@@ -47,18 +47,23 @@ export function useRunScenario({
               <Text>
                 A model provider must be configured to run scenarios.
               </Text>
-              <Button
-                as="a"
+              <a
                 href="/settings/model-providers"
                 target="_blank"
-                size="xs"
-                bg="white"
-                color="red.600"
-                mt={1}
-                _hover={{ bg: "gray.100" }}
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-block",
+                  padding: "4px 8px",
+                  marginTop: "4px",
+                  fontSize: "12px",
+                  backgroundColor: "white",
+                  color: "#c53030",
+                  borderRadius: "4px",
+                  textDecoration: "none",
+                }}
               >
                 Configure model providers
-              </Button>
+              </a>
             </VStack>
           ),
           type: "error",
