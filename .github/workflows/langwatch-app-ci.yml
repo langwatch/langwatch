@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -75,7 +75,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -171,7 +171,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -305,7 +305,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # Use pnpm store caching instead of node_modules for better cache efficiency
       - name: Get pnpm store directory
