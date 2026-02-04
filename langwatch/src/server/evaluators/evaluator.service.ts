@@ -28,10 +28,11 @@ export interface EvaluatorField {
 }
 
 /**
- * Evaluator with computed fields.
+ * Evaluator with computed fields and copy count for replica UI.
  * This is what the API returns - the raw Evaluator plus derived fields.
  */
 export type EvaluatorWithFields = Evaluator & {
+  _count?: { copiedEvaluators: number };
   /** Input fields required by the evaluator */
   fields: EvaluatorField[];
   /** Output fields produced by the evaluator (for evaluator-as-target mapping) */

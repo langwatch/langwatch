@@ -108,7 +108,7 @@ services:
   # =============================================================================
 
   init:
-    image: node:20
+    image: node:24
     working_dir: /app
     volumes:
       - ./langwatch:/app
@@ -134,7 +134,7 @@ services:
   # =============================================================================
 
   app:
-    image: node:20
+    image: node:24
     working_dir: /app
     volumes:
       - ./langwatch:/app
@@ -172,7 +172,7 @@ services:
   # =============================================================================
 
   workers:
-    image: node:20
+    image: node:24
     working_dir: /app
     profiles: [workers, scenarios, full]
     volumes:
@@ -238,7 +238,7 @@ services:
   # =============================================================================
 
   bullboard:
-    image: node:20
+    image: node:24
     working_dir: /app
     profiles: [debug, scenarios, full]
     volumes:
@@ -264,7 +264,7 @@ services:
   # =============================================================================
 
   ai-server:
-    image: node:20
+    image: node:24
     working_dir: /app
     profiles: [test, scenarios, full]
     volumes:
@@ -288,9 +288,14 @@ services:
 
 volumes:
   db-data:
+    name: langwatch-db-data # Shared across all worktrees
   redis-data:
+    name: langwatch-redis-data # Shared across all worktrees
   opensearch-data:
+    name: langwatch-opensearch-data # Shared across all worktrees
   app_modules:
+    name: langwatch-app-modules # Shared across all worktrees
   pnpm_store:
-    name: langwatch-pnpm-store  # Shared across all worktrees
+    name: langwatch-pnpm-store # Shared across all worktrees
   bullboard_modules:
+    name: langwatch-bullboard-modules # Shared across all worktrees

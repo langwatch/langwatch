@@ -104,6 +104,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
       auth: httpConfig.auth,
     } as HttpComponentConfig,
     workflowId: null,
+    copiedFromAgentId: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

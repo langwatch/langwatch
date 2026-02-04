@@ -8,6 +8,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { sortScenarioSets } from "~/features/simulations/sort-scenario-sets";
 
 function SimulationsPageContent() {
   const router = useRouter();
@@ -45,7 +46,7 @@ function SimulationsPageContent() {
       return undefined;
     }
 
-    return [...scenarioSetsData].sort((a, b) => b.lastRunAt - a.lastRunAt);
+    return sortScenarioSets(scenarioSetsData);
   }, [scenarioSetsData]);
 
   const handleSetClick = (scenarioSetId: string) => {

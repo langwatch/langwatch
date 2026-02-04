@@ -7,10 +7,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { CheckSquare, Plus } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
-import { DashboardLayout } from "~/components/DashboardLayout";
+import { CopyEvaluatorDialog } from "~/components/evaluators/CopyEvaluatorDialog";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
+import { PushToCopiesDialog } from "~/components/evaluators/PushToCopiesDialog";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -25,15 +27,56 @@ import { api } from "~/utils/api";
  * This is a hidden page for managing database-backed evaluators.
  */
 function Page() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
+
+  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
   // State for tracking which evaluator is being deleted
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
+
+  // State for replicate / push dialogs
+  const [evaluatorForCopy, setEvaluatorForCopy] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [evaluatorForPush, setEvaluatorForPush] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const syncFromSource = api.evaluators.syncFromSource.useMutation({
+    onSuccess: (_, variables) => {
+      void utils.evaluators.getAll.invalidate({
+        projectId: variables.projectId,
+      });
+      toaster.create({
+        title: "Evaluator updated",
+        description: "Evaluator has been updated from source.",
+        type: "success",
+        meta: { closable: true },
+      });
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Error updating evaluator",
+        description: error.message ?? "Please try again later.",
+        type: "error",
+      });
+    },
+  });
+
+  const handleSyncFromSource = useCallback(
+    (evaluatorId: string) => {
+      if (!project?.id) return;
+      syncFromSource.mutate({ projectId: project.id, evaluatorId });
+    },
+    [project?.id, syncFromSource],
+  );
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -195,6 +238,19 @@ function Page() {
                 onClick={() => handleEditEvaluator(evaluator)}
                 onEdit={() => handleEditEvaluator(evaluator)}
                 onDelete={() => handleDeleteEvaluator(evaluator)}
+                onReplicate={() =>
+                  setEvaluatorForCopy({ id: evaluator.id, name: evaluator.name })
+                }
+                onPushToCopies={() =>
+                  setEvaluatorForPush({
+                    id: evaluator.id,
+                    name: evaluator.name,
+                  })
+                }
+                onSyncFromSource={() =>
+                  handleSyncFromSource(evaluator.id)
+                }
+                hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
           </Grid>
@@ -215,6 +271,25 @@ function Page() {
             : [],
           monitors: relatedEntitiesQuery.data?.monitors,
         }}
+      />
+
+      <CopyEvaluatorDialog
+        open={!!evaluatorForCopy}
+        onClose={() => setEvaluatorForCopy(null)}
+        onSuccess={() =>
+          void utils.evaluators.getAll.invalidate({
+            projectId: project?.id ?? "",
+          })
+        }
+        evaluatorId={evaluatorForCopy?.id ?? ""}
+        evaluatorName={evaluatorForCopy?.name ?? ""}
+      />
+
+      <PushToCopiesDialog
+        open={!!evaluatorForPush}
+        onClose={() => setEvaluatorForPush(null)}
+        evaluatorId={evaluatorForPush?.id ?? ""}
+        evaluatorName={evaluatorForPush?.name ?? ""}
       />
     </DashboardLayout>
   );

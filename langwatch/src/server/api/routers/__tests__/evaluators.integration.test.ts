@@ -4,11 +4,20 @@
  * Integration tests for Evaluators tRPC endpoints.
  * Tests the actual CRUD operations through the tRPC layer.
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+// Mock license enforcement to avoid limits during tests
+vi.mock("../../../license-enforcement", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  return {
+    ...actual,
+    enforceLicenseLimit: vi.fn(),
+  };
+});
 
 describe("Evaluators Endpoints", () => {
   const projectId = "test-project-id";
@@ -339,6 +348,175 @@ describe("Evaluators Endpoints", () => {
       });
 
       expect(found).toBeNull();
+    });
+  });
+
+  describe("getCopies, copy, pushToCopies, syncFromSource", () => {
+    const sourceProjectId = "test-project-id";
+    const targetProjectId = "test-project-id-copy-target";
+
+    beforeAll(async () => {
+      const user = await getTestUser();
+      const teamUser = await prisma.teamUser.findFirst({
+        where: { userId: user.id },
+        include: { team: true },
+      });
+      if (!teamUser) {
+        throw new Error("Test user must have a team");
+      }
+
+      const targetProjectExists = await prisma.project.findUnique({
+        where: { id: targetProjectId },
+      });
+      if (!targetProjectExists) {
+        await prisma.project.create({
+          data: {
+            id: targetProjectId,
+            name: "Test Project Copy Target",
+            slug: "test-project-copy-target",
+            apiKey: "test-api-key-evaluator-copy-target",
+            teamId: teamUser.team.id,
+            language: "en",
+            framework: "test-framework",
+          },
+        });
+      }
+
+      await prisma.evaluator.deleteMany({
+        where: {
+          projectId: { in: [sourceProjectId, targetProjectId] },
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.evaluator.deleteMany({
+        where: { projectId: targetProjectId },
+      });
+    });
+
+    it("copy replicates an evaluator to another project and sets copiedFromEvaluatorId atomically", async () => {
+      const source = await caller.evaluators.create({
+        projectId: sourceProjectId,
+        name: "Source Evaluator",
+        type: "evaluator",
+        config: { evaluatorType: "langevals/exact_match", settings: {} },
+      });
+
+      const copied = await caller.evaluators.copy({
+        evaluatorId: source.id,
+        projectId: targetProjectId,
+        sourceProjectId,
+      });
+
+      expect(copied.id).not.toBe(source.id);
+      expect(copied.projectId).toBe(targetProjectId);
+      expect(copied.name).toBe("Source Evaluator");
+      expect(copied.copiedFromEvaluatorId).toBe(source.id);
+
+      const inDb = await prisma.evaluator.findUnique({
+        where: { id: copied.id },
+      });
+      expect(inDb?.copiedFromEvaluatorId).toBe(source.id);
+    });
+
+    it("getCopies returns only copies the caller is allowed to view", async () => {
+      const source = await caller.evaluators.create({
+        projectId: sourceProjectId,
+        name: "Evaluator With Copy",
+        type: "evaluator",
+        config: { evaluatorType: "test" },
+      });
+
+      await caller.evaluators.copy({
+        evaluatorId: source.id,
+        projectId: targetProjectId,
+        sourceProjectId,
+      });
+
+      const copies = await caller.evaluators.getCopies({
+        projectId: sourceProjectId,
+        evaluatorId: source.id,
+      });
+
+      expect(copies.length).toBeGreaterThanOrEqual(1);
+      const targetCopy = copies.find((c) => c.projectId === targetProjectId);
+      expect(targetCopy).toBeDefined();
+      expect(targetCopy!.projectId).toBe(targetProjectId);
+      expect((targetCopy!.fullPath as string).includes("Test Project Copy Target")).toBe(true);
+    });
+
+    it("pushToCopies updates selected copies with source name and config", async () => {
+      const source = await caller.evaluators.create({
+        projectId: sourceProjectId,
+        name: "Push Source",
+        type: "evaluator",
+        config: { evaluatorType: "test", value: 1 },
+      });
+
+      const copied = await caller.evaluators.copy({
+        evaluatorId: source.id,
+        projectId: targetProjectId,
+        sourceProjectId,
+      });
+
+      await caller.evaluators.update({
+        id: source.id,
+        projectId: sourceProjectId,
+        name: "Push Source Updated",
+        config: { evaluatorType: "test", value: 2 },
+      });
+
+      const result = await caller.evaluators.pushToCopies({
+        projectId: sourceProjectId,
+        evaluatorId: source.id,
+        copyIds: [copied.id],
+      });
+
+      expect(result.pushedTo).toBe(1);
+
+      const copyAfter = await caller.evaluators.getById({
+        id: copied.id,
+        projectId: targetProjectId,
+      });
+      expect(copyAfter?.name).toBe("Push Source Updated");
+      expect(copyAfter?.config).toMatchObject({ evaluatorType: "test", value: 2 });
+    });
+
+    it("syncFromSource updates a copy from its source", async () => {
+      const source = await caller.evaluators.create({
+        projectId: sourceProjectId,
+        name: "Sync Source",
+        type: "evaluator",
+        config: { evaluatorType: "test", v: "original" },
+      });
+
+      const copied = await caller.evaluators.copy({
+        evaluatorId: source.id,
+        projectId: targetProjectId,
+        sourceProjectId,
+      });
+
+      await caller.evaluators.update({
+        id: source.id,
+        projectId: sourceProjectId,
+        name: "Sync Source Synced",
+        config: { evaluatorType: "test", v: "synced" },
+      });
+
+      const result = await caller.evaluators.syncFromSource({
+        projectId: targetProjectId,
+        evaluatorId: copied.id,
+      });
+
+      expect(result.ok).toBe(true);
+
+      const copyAfter = await caller.evaluators.getById({
+        id: copied.id,
+        projectId: targetProjectId,
+      });
+      expect(copyAfter?.name).toBe("Sync Source Synced");
+      expect(copyAfter?.config).toMatchObject({ evaluatorType: "test", v: "synced" });
     });
   });
 });

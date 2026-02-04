@@ -119,6 +119,7 @@ const TestAutosaveComponent = () => {
 describe("Navigation and autosave interaction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     mockRouterQuery = { slug: "existing-evaluation" };
     mockExistingExperimentData = null;
     mockExistingExperimentLoading = true;
@@ -128,6 +129,7 @@ describe("Navigation and autosave interaction", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   describe("Loading existing evaluation", () => {
@@ -139,11 +141,9 @@ describe("Navigation and autosave interaction", () => {
 
       render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait a bit longer than debounce
+      // Advance past debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 500);
       });
 
       // Should NOT have called save while loading
@@ -161,7 +161,7 @@ describe("Navigation and autosave interaction", () => {
 
       // Wait for initial render
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        vi.advanceTimersByTime(100);
       });
 
       // Now simulate query completing with data
@@ -231,11 +231,9 @@ describe("Navigation and autosave interaction", () => {
 
       render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait longer than debounce - autosave should NOT trigger
+      // Advance past debounce - autosave should NOT trigger
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
       });
 
       // CRITICAL: Should NOT have saved while loading
@@ -263,11 +261,9 @@ describe("Navigation and autosave interaction", () => {
 
       render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait longer than debounce
+      // Advance past debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
       });
 
       // Should NOT save - the slug mismatch means we're loading a different evaluation
@@ -287,7 +283,7 @@ describe("Navigation and autosave interaction", () => {
 
       // Should not save while loading
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        vi.advanceTimersByTime(500);
       });
       expect(mockSaveMutateAsync).not.toHaveBeenCalled();
 
@@ -392,11 +388,9 @@ describe("Navigation and autosave interaction", () => {
 
       render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait longer than autosave debounce
+      // Advance past autosave debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
       });
 
       // CRITICAL: Should NOT have saved blank state while loading
@@ -449,11 +443,9 @@ describe("Navigation and autosave interaction", () => {
         useEvaluationsV3Store.getState().setName("Accidentally editing blank");
       });
 
-      // Wait for autosave debounce
+      // Advance past autosave debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 500);
       });
 
       // Should NOT save because we're still loading the real evaluation
@@ -505,11 +497,9 @@ describe("Navigation and autosave interaction", () => {
       // After reset, experimentId should be undefined
       expect(useEvaluationsV3Store.getState().experimentId).toBeUndefined();
 
-      // Wait for potential autosave debounce
+      // Advance past potential autosave debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 500);
       });
 
       // CRITICAL: autosave should NOT be called because experimentId is undefined
@@ -548,11 +538,9 @@ describe("Navigation and autosave interaction", () => {
 
       render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
-      // Wait for autosave debounce
+      // Advance past autosave debounce
       await act(async () => {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
-        );
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 500);
       });
 
       // CRITICAL: Should NOT save because URL slug doesn't match store slug

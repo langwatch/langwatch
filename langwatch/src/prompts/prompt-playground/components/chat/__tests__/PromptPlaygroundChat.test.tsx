@@ -33,7 +33,7 @@ const localStorageMock = (() => {
   };
 })();
 
-global.localStorage = localStorageMock as Storage;
+vi.stubGlobal("localStorage", localStorageMock);
 
 const TEST_PROJECT_ID = "test-project";
 const TEST_TAB_ID = "test-tab-123";

@@ -8,8 +8,10 @@ import {
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
+import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
+import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -28,13 +30,54 @@ import { api } from "~/utils/api";
  * Note: Prompt-based agents are no longer supported - use the Prompts page instead.
  */
 function Page() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const utils = api.useContext();
   const router = useRouter();
 
+  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
+
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
+
+  // State for replicate / push dialogs
+  const [agentForCopy, setAgentForCopy] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [agentForPush, setAgentForPush] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const syncFromSource = api.agents.syncFromSource.useMutation({
+    onSuccess: (_, variables) => {
+      void utils.agents.getAll.invalidate({
+        projectId: variables.projectId,
+      });
+      toaster.create({
+        title: "Agent updated",
+        description: "Agent has been updated from source.",
+        type: "success",
+        meta: { closable: true },
+      });
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Error updating agent",
+        description: error.message ?? "Please try again later.",
+        type: "error",
+      });
+    },
+  });
+
+  const handleSyncFromSource = useCallback(
+    (agentId: string) => {
+      if (!project?.id) return;
+      syncFromSource.mutate({ projectId: project.id, agentId });
+    },
+    [project?.id, syncFromSource],
+  );
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -199,6 +242,14 @@ function Page() {
                     ? () => handleOpenWorkflow(agent)
                     : undefined
                 }
+                onReplicate={() =>
+                  setAgentForCopy({ id: agent.id, name: agent.name })
+                }
+                onPushToCopies={() =>
+                  setAgentForPush({ id: agent.id, name: agent.name })
+                }
+                onSyncFromSource={() => handleSyncFromSource(agent.id)}
+                hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
           </Grid>
@@ -220,6 +271,25 @@ function Page() {
             ? [relatedEntitiesQuery.data.workflow]
             : [],
         }}
+      />
+
+      <CopyAgentDialog
+        open={!!agentForCopy}
+        onClose={() => setAgentForCopy(null)}
+        onSuccess={() =>
+          void utils.agents.getAll.invalidate({
+            projectId: project?.id ?? "",
+          })
+        }
+        agentId={agentForCopy?.id ?? ""}
+        agentName={agentForCopy?.name ?? ""}
+      />
+
+      <PushToCopiesDialog
+        open={!!agentForPush}
+        onClose={() => setAgentForPush(null)}
+        agentId={agentForPush?.id ?? ""}
+        agentName={agentForPush?.name ?? ""}
       />
     </DashboardLayout>
   );
