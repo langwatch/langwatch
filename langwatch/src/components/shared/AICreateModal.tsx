@@ -363,6 +363,7 @@ function NoModelProvidersWarning() {
           <Link
             href="/settings/model-providers"
             target="_blank"
+            rel="noopener noreferrer"
             color="blue.500"
             fontWeight="medium"
           >
