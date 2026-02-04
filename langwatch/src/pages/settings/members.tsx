@@ -322,6 +322,11 @@ function MembersList({
     [organization.members, user?.id],
   );
 
+  const canDeleteMember = (memberId: string) =>
+    hasOrganizationManagePermission &&
+    organization.members.length > 1 &&
+    memberId !== user?.id;
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
@@ -412,17 +417,16 @@ function MembersList({
                                 <LuPencil size={16} />
                                 Edit
                               </Menu.Item>
-                              {hasOrganizationManagePermission &&
-                                organization.members.length > 1 && (
-                                  <Menu.Item
-                                    value="delete"
-                                    color="red.500"
-                                    onClick={() => deleteMember(member.userId)}
-                                  >
-                                    <LuTrash size={16} />
-                                    Delete
-                                  </Menu.Item>
-                                )}
+                              {canDeleteMember(member.userId) && (
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.500"
+                                  onClick={() => deleteMember(member.userId)}
+                                >
+                                  <LuTrash size={16} />
+                                  Delete
+                                </Menu.Item>
+                              )}
                             </Menu.Content>
                           </Menu.Root>
                         </Box>
