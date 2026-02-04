@@ -1208,7 +1208,8 @@ class CheckInputTypes(dspy.Module):
         instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = instance(
         question=json.dumps(
-            ["What is the capital of France?", "What is the capital of Germany?"]
+            ["What is the capital of France?", "What is the capital of Germany?"],
+            ensure_ascii=False,
         ),
         gold_answer="170",
     )

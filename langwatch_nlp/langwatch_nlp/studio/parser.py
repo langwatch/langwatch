@@ -597,7 +597,7 @@ def generate_pydantic_type_for_json_schema_field(
     code_buffer = io.StringIO()
     with redirect_stdout(code_buffer):
         datamodel_code_generator.generate(
-            json.dumps(json_schema),
+            json.dumps(json_schema, ensure_ascii=False),
             input_file_type=datamodel_code_generator.InputFileType.JsonSchema,
             class_name=model_name,
         )

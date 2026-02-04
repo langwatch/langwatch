@@ -1,6 +1,6 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { Filter } from "lucide-react";
-import { FilterDisplay } from "~/components/triggers/FilterDisplay";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { FilterField } from "~/server/filters/types";
 

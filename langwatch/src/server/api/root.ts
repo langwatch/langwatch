@@ -40,7 +40,7 @@ import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
-import { triggerRouter } from "./routers/triggers";
+import { automationRouter } from "./routers/automations";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 /**
@@ -70,7 +70,7 @@ export const appRouter = createTRPCRouter({
   evaluations: evaluationsRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
-  trigger: triggerRouter,
+  automation: automationRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,

@@ -158,7 +158,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
-      // Don't log ordering/lock/replication-lag errors at ERROR level - they're expected behavior
+      // All errors are already logged with full details in processJob().
+      // This handler only logs at DEBUG level to avoid duplicate ERROR logs.
+      // Expected errors (ordering/lock/replication-lag) get a specific message,
+      // unexpected errors just note that the job failed.
       if (this.isExpectedError(error)) {
         this.logger.debug(
           {
@@ -171,13 +174,13 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         return;
       }
 
-      this.logger.error(
+      this.logger.debug(
         {
           queueName: this.queueName,
           jobId: job?.id,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Event-sourced queue job failed",
+        "Event-sourced queue job failed (details logged above)",
       );
     });
 

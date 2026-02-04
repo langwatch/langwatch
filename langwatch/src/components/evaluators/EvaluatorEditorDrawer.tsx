@@ -34,10 +34,15 @@ import {
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import {
+  getTraceAvailableSources,
+  getThreadAvailableSources,
+} from "~/server/tracer/tracesMapping";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
@@ -47,10 +52,22 @@ import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
  * Mapping configuration for showing evaluator input mappings.
  * This is provided by the caller (e.g., Evaluations V3, Optimization Studio)
  * to enable context-specific mapping UI without this component knowing the details.
+ *
+ * Two modes are supported:
+ * 1. Online evaluation: provide `level` and the component fetches trace/thread sources
+ * 2. Dataset evaluation: provide `availableSources` directly (e.g., dataset columns)
  */
 export type EvaluatorMappingsConfig = {
-  /** Available sources for variable mapping */
-  availableSources: AvailableSource[];
+  /**
+   * For online evaluation: specify level and sources will be fetched automatically.
+   * This avoids race conditions when the drawer opens before data loads.
+   */
+  level?: "trace" | "thread";
+  /**
+   * For dataset evaluation: provide sources directly (dataset columns, signature fields).
+   * If both level and availableSources are provided, availableSources takes precedence.
+   */
+  availableSources?: AvailableSource[];
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
@@ -497,18 +514,18 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                 )}
 
                 {/* Mappings section - shown when caller provides mappingsConfig */}
-                {mappingsConfig &&
-                  mappingsConfig.availableSources.length > 0 && (
-                    <Box paddingTop={4}>
-                      <EvaluatorMappingsSection
-                        evaluatorDef={effectiveEvaluatorDef}
-                        availableSources={mappingsConfig.availableSources}
-                        initialMappings={mappingsConfig.initialMappings}
-                        onMappingChange={mappingsConfig.onMappingChange}
-                        scrollToMissingOnMount={true}
-                      />
-                    </Box>
-                  )}
+                {mappingsConfig && (
+                  <Box paddingTop={4}>
+                    <EvaluatorMappingsSection
+                      evaluatorDef={effectiveEvaluatorDef}
+                      level={mappingsConfig.level}
+                      providedSources={mappingsConfig.availableSources}
+                      initialMappings={mappingsConfig.initialMappings}
+                      onMappingChange={mappingsConfig.onMappingChange}
+                      scrollToMissingOnMount={true}
+                    />
+                  </Box>
+                )}
               </VStack>
             </FormProvider>
           )}
@@ -546,7 +563,15 @@ type EvaluatorMappingsSectionProps = {
         optionalFields?: string[];
       }
     | undefined;
-  availableSources: AvailableSource[];
+  /**
+   * For online evaluation: specify level and sources will be fetched automatically.
+   */
+  level?: "trace" | "thread";
+  /**
+   * For dataset evaluation: provide sources directly.
+   * If provided, takes precedence over level-based fetching.
+   */
+  providedSources?: AvailableSource[];
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
@@ -562,14 +587,40 @@ type EvaluatorMappingsSectionProps = {
  * Sub-component for evaluator input mappings.
  * Manages local state for immediate UI feedback, persists via onMappingChange.
  * Computes missingMappingIds reactively from local state.
+ *
+ * Supports two modes:
+ * 1. Level-based: fetches span names/metadata keys internally (avoids race conditions)
+ * 2. Provided sources: uses the sources passed directly (for dataset evaluations)
  */
 function EvaluatorMappingsSection({
   evaluatorDef,
-  availableSources,
+  level,
+  providedSources,
   initialMappings,
   onMappingChange,
   scrollToMissingOnMount = false,
 }: EvaluatorMappingsSectionProps) {
+  const { project } = useOrganizationTeamProject();
+
+  // Fetch span names and metadata keys for level-based mode
+  // Only used when providedSources is not given
+  const { spanNames, metadataKeys } = useProjectSpanNames(
+    providedSources ? undefined : project?.id
+  );
+
+  // Build availableSources - use providedSources if given, otherwise fetch based on level
+  const availableSources = useMemo(() => {
+    // If sources are provided directly, use them (dataset evaluation mode)
+    if (providedSources) {
+      return providedSources;
+    }
+    // Otherwise, fetch based on level (online evaluation mode)
+    if (level === "thread") {
+      return getThreadAvailableSources() as AvailableSource[];
+    }
+    return getTraceAvailableSources(spanNames, metadataKeys) as AvailableSource[];
+  }, [providedSources, level, spanNames, metadataKeys]);
+
   // Local state for mappings - source of truth for UI
   const [localMappings, setLocalMappings] =
     useState<Record<string, UIFieldMapping>>(initialMappings);

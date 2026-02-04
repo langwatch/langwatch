@@ -43,7 +43,7 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
         if type(value) == str:
             return value
         try:
-            return json.dumps(value, cls=SerializableWithPydanticAndPredictEncoder)
+            return json.dumps(value, cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False)
         except Exception:
             if isinstance(value, object):
                 return repr(value)
@@ -64,7 +64,7 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
     if field.type == FieldType.dict and isinstance(value, BaseModel):
         return json.loads(
             json.dumps(
-                value.model_dump(), cls=SerializableWithPydanticAndPredictEncoder
+                value.model_dump(), cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False
             )
         )
     if field.type == FieldType.llm:

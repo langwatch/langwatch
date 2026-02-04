@@ -426,19 +426,41 @@ export class PublishingError extends NonCriticalError {
 /**
  * Determines if an error is a sequential ordering violation.
  * These are critical errors that must cause the operation to fail.
+ *
+ * Note: Uses property checks in addition to instanceof to handle cases where
+ * bundling/code-splitting causes class identity issues across module boundaries.
  */
 export function isSequentialOrderingError(
   error: unknown,
 ): error is SequentialOrderingError {
-  return error instanceof SequentialOrderingError;
+  if (error instanceof SequentialOrderingError) {
+    return true;
+  }
+  // Fallback: check for unique property that only SequentialOrderingError has
+  return (
+    error instanceof Error &&
+    "previousSequenceNumber" in error &&
+    typeof (error as SequentialOrderingError).previousSequenceNumber === "number"
+  );
 }
 
 /**
  * Type guard to check if an error is a LockError.
  * Lock errors are expected when concurrent processes try to update the same resource.
+ *
+ * Note: Uses property checks in addition to instanceof to handle cases where
+ * bundling/code-splitting causes class identity issues across module boundaries.
  */
 export function isLockError(error: unknown): error is LockError {
-  return error instanceof LockError;
+  if (error instanceof LockError) {
+    return true;
+  }
+  // Fallback: check for unique property that only LockError has
+  return (
+    error instanceof Error &&
+    "lockKey" in error &&
+    typeof (error as LockError).lockKey === "string"
+  );
 }
 
 /**
@@ -449,7 +471,7 @@ export function isLockError(error: unknown): error is LockError {
  * @returns The previous sequence number, or null if not found
  */
 export function extractPreviousSequenceNumber(error: unknown): number | null {
-  if (error instanceof SequentialOrderingError) {
+  if (isSequentialOrderingError(error)) {
     return error.previousSequenceNumber;
   }
   return null;
@@ -459,11 +481,25 @@ export function extractPreviousSequenceNumber(error: unknown): number | null {
  * Type guard to check if an error is a NoEventsFoundError.
  * This error occurs when events haven't yet become visible in ClickHouse
  * due to replication lag, even though a checkpoint was created for them.
+ *
+ * Note: Uses property checks in addition to instanceof to handle cases where
+ * bundling/code-splitting causes class identity issues across module boundaries.
  */
 export function isNoEventsFoundError(
   error: unknown,
 ): error is NoEventsFoundError {
-  return error instanceof NoEventsFoundError;
+  if (error instanceof NoEventsFoundError) {
+    return true;
+  }
+  // Fallback: check for unique combination of properties
+  // NoEventsFoundError has aggregateId but NOT lockKey or previousSequenceNumber
+  return (
+    error instanceof Error &&
+    "aggregateId" in error &&
+    typeof (error as NoEventsFoundError).aggregateId === "string" &&
+    !("lockKey" in error) &&
+    !("previousSequenceNumber" in error)
+  );
 }
 
 /**

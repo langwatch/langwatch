@@ -33,13 +33,13 @@ class CustomNode(dspy.Module):
         response = httpx.post(
             url,
             headers={"X-Auth-Token": self.api_key, "Content-Type": "application/json"},
-            content=json.dumps(kwargs, cls=SerializableWithPydanticAndPredictEncoder),
+            content=json.dumps(kwargs, cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False),
             timeout=600,  # 10 minutes
         )
 
         result = response.json()
         if "result" not in result:
-            raise Exception(json.dumps(result))
+            raise Exception(json.dumps(result, ensure_ascii=False))
         return result["result"]
 
 

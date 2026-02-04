@@ -6,7 +6,7 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
-export const triggerRouter = createTRPCRouter({
+export const automationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({

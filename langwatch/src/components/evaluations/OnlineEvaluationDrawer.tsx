@@ -18,10 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import type {
-  AvailableSource,
-  FieldMapping as UIFieldMapping,
-} from "~/components/variables";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
@@ -35,13 +32,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
 import {
-  buildMetadataFieldChildren,
-  buildSpanFieldChildren,
   type MappingState,
-  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
-import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -67,128 +60,6 @@ const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
   contexts: "contexts",
   "contexts.string_list": "contexts.string_list",
 };
-
-/**
- * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
- * Provides dynamic children for metadata and spans based on project traces.
- *
- * @param spanNames - Dynamic span names extracted from project traces
- * @param metadataKeys - Dynamic metadata keys extracted from project traces
- */
-function getTraceAvailableSources(
-  spanNames: Array<{ key: string; label: string }>,
-  metadataKeys: Array<{ key: string; label: string }>
-): AvailableSource[] {
-  // Filter out "threads" from trace-level sources - it's confusing at trace level
-  // (threads is for getting all traces in a thread, which is a thread-level concept)
-  const traceFields = Object.entries(TRACE_MAPPINGS)
-    .filter(([key]) => key !== "threads")
-    .map(([key, config]) => {
-      const hasKeys = "keys" in config && typeof config.keys === "function";
-
-      // Provide dynamic children for metadata
-      if (key === "metadata") {
-        return {
-          name: key,
-          type: "dict" as const,
-          // Use dynamic metadata keys with "* (any key)" always available
-          children: buildMetadataFieldChildren(metadataKeys),
-          // Allow selecting metadata itself (returns full metadata object)
-          isComplete: true,
-          isCompleteLabel: "All metadata",
-        };
-      }
-
-      if (key === "spans") {
-        return {
-          name: key,
-          type: "list" as const,
-          // Use dynamic span names with "* (any span)" always available
-          children: buildSpanFieldChildren(spanNames),
-          // Allow selecting spans itself (returns all spans array)
-          isComplete: true,
-          isCompleteLabel: "Full spans array",
-        };
-      }
-
-      // Other fields with keys() function - mark as complete (no nested selection needed)
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    });
-
-  return [
-    {
-      id: "trace",
-      name: "Trace",
-      type: "dataset",
-      fields: traceFields,
-    },
-  ];
-}
-
-/**
- * Static children for thread traces field.
- * These are the common trace fields that can be extracted from each trace in a thread.
- */
-const THREAD_TRACES_CHILDREN = [
-  { name: "input", type: "str" as const },
-  { name: "output", type: "str" as const },
-  { name: "contexts", type: "list" as const },
-  { name: "timestamp", type: "str" as const },
-  { name: "trace_id", type: "str" as const },
-];
-
-/**
- * Convert THREAD_MAPPINGS to AvailableSource format for the mapping UI.
- */
-function getThreadAvailableSources(): AvailableSource[] {
-  return [
-    {
-      id: "thread",
-      name: "Thread",
-      type: "dataset",
-      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-        // Special handling for "traces" - provide nested children for field selection
-        if (key === "traces") {
-          return {
-            name: key,
-            type: "list" as const,
-            children: THREAD_TRACES_CHILDREN,
-            // Allow selecting traces itself (returns all trace data)
-            isComplete: true,
-          };
-        }
-
-        const hasKeys = "keys" in config && typeof config.keys === "function";
-
-        // For thread mappings, most fields are complete selections
-        if (hasKeys) {
-          return {
-            name: key,
-            type: "dict" as const,
-            isComplete: true,
-          };
-        }
-
-        return {
-          name: key,
-          type: "str" as const,
-        };
-      }),
-    },
-  ];
-}
-
 /**
  * Get all field identifiers from an evaluator.
  * Fields are pre-computed by the API for both built-in and workflow evaluators.
@@ -276,9 +147,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // License enforcement for online evaluation creation
   const { checkAndProceed } = useLicenseEnforcement("onlineEvaluations");
-
-  // Fetch dynamic span names and metadata keys from project traces
-  const { spanNames, metadataKeys } = useProjectSpanNames(project?.id);
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -444,14 +312,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Invalid if: required fields missing OR no fields mapped (when there are fields)
   const hasPendingMappings =
     selectedEvaluator !== null && !mappingValidation.isValid;
-
-  // Get available sources based on level (empty if no level selected)
-  const availableSources = useMemo(() => {
-    if (!level) return [];
-    return level === "trace"
-      ? getTraceAvailableSources(spanNames, metadataKeys)
-      : getThreadAvailableSources();
-  }, [level, spanNames, metadataKeys]);
 
   // Track if we've already loaded the monitor data (to prevent re-loading on remount)
   const monitorDataLoadedRef = useRef(false);
@@ -699,7 +559,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     if (!selectedEvaluator) return;
 
     const mappingsConfig: EvaluatorMappingsConfig = {
-      availableSources,
+      level: level ?? undefined,
       initialMappings: mappings,
       onMappingChange: handleMappingChange,
     };
@@ -710,7 +570,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
   }, [
     selectedEvaluator,
-    availableSources,
+    level,
     mappings,
     handleMappingChange,
     openDrawer,
@@ -750,10 +610,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
         // Build mappings config and navigate to evaluator editor
         const newMappingsConfig: EvaluatorMappingsConfig = {
-          availableSources:
-            level === "trace"
-              ? getTraceAvailableSources(spanNames, metadataKeys)
-              : getThreadAvailableSources(),
+          level: level ?? undefined,
           initialMappings: autoMappings,
           onMappingChange: handleMappingChange,
         };
@@ -772,7 +629,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     });
 
     const mappingsConfig: EvaluatorMappingsConfig = {
-      availableSources,
+      level: level ?? undefined,
       initialMappings: mappings,
       onMappingChange: handleMappingChange,
     };
@@ -789,7 +646,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     level,
     sample,
     preconditions,
-    availableSources,
     mappings,
     handleMappingChange,
     openDrawer,
@@ -826,10 +682,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
-        availableSources:
-          level === "trace"
-            ? getTraceAvailableSources(spanNames, metadataKeys)
-            : getThreadAvailableSources(),
+        level: level ?? undefined,
         initialMappings: autoMappings,
         onMappingChange: handleMappingChange,
       };

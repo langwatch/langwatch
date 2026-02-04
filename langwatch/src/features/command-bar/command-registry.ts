@@ -193,13 +193,13 @@ export const navigationCommands: Command[] = [
     path: "/[project]/datasets",
   },
   {
-    id: "nav-triggers",
-    label: "Triggers",
-    description: "Manage triggers",
+    id: "nav-automations",
+    label: "Automations",
+    description: "Manage automations",
     icon: Bell,
     category: "navigation",
     keywords: ["alert", "notification", "trigger", "automation"],
-    path: "/[project]/triggers",
+    path: "/[project]/automations",
   },
 
   // Settings pages
