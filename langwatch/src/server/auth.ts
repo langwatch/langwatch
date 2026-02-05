@@ -51,6 +51,17 @@ declare module "next-auth" {
 export const authOptions = (
   req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
 ): NextAuthOptions => ({
+  logger: {
+    error(code, metadata) {
+      logger.error({ code, metadata }, "next-auth error");
+    },
+    warn(code) {
+      logger.warn({ code }, "next-auth warning");
+    },
+    debug(code, metadata) {
+      logger.debug({ code, metadata }, "next-auth debug");
+    },
+  },
   session: {
     strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
     maxAge: 30 * 24 * 60 * 60, // 30 days
