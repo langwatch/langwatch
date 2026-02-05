@@ -211,6 +211,7 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+          featureEventSourcingTraceIngestion: true,
         },
       });
 
@@ -623,9 +624,8 @@ export const projectRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
-      const { scheduleTopicClusteringForProject } = await import(
-        "../../background/queues/topicClusteringQueue"
-      );
+      const { scheduleTopicClusteringForProject } =
+        await import("../../background/queues/topicClusteringQueue");
 
       try {
         // Add the job directly to the queue for immediate processing
