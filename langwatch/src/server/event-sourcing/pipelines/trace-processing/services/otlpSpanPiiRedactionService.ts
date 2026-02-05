@@ -47,6 +47,10 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
   clearPII: ClearPIIFunction;
   /** Set of attribute keys known to contain PII-bearing content */
   piiBearingAttributeKeys: Set<string>;
+  /** Whether LANGEVALS_ENDPOINT is configured (truthy check) */
+  isLangevalsConfigured: boolean;
+  /** Whether running in production (NODE_ENV === "production") */
+  isProduction: boolean;
 }
 
 /** Cached default dependencies, lazily initialized */
@@ -58,6 +62,8 @@ function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
     cachedDefaultDependencies = {
       clearPII: defaultClearPII,
       piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+      isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
+      isProduction: env.NODE_ENV === "production",
     };
   }
   return cachedDefaultDependencies;
@@ -105,10 +111,10 @@ export class OtlpSpanPiiRedactionService {
     }
 
     // In production, enforce PII redaction (errors fail); otherwise warn and continue
-    const piiEnforced = env.NODE_ENV === "production";
+    const piiEnforced = this.deps.isProduction;
 
     // Mirror cleanupPIIs pre-check: presidio requires LANGEVALS_ENDPOINT
-    if (!env.LANGEVALS_ENDPOINT) {
+    if (!this.deps.isLangevalsConfigured) {
       if (piiEnforced) {
         throw new Error(
           "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",

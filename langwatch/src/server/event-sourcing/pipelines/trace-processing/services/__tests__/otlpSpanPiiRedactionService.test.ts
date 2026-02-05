@@ -8,18 +8,6 @@ import {
   type ClearPIIFunction,
 } from "../otlpSpanPiiRedactionService";
 
-// Use vi.hoisted to ensure mockEnv is available when vi.mock is hoisted
-const mockEnv = vi.hoisted(() => ({
-  NODE_ENV: "test" as string,
-  LANGEVALS_ENDPOINT: "http://mock-langevals",
-}));
-
-vi.mock("~/env.mjs", () => ({
-  get env() {
-    return mockEnv;
-  },
-}));
-
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({
   clearPII: vi.fn(),
 }));
@@ -80,10 +68,13 @@ describe("OtlpSpanPiiRedactionService", () => {
     vi.clearAllMocks();
     // Reset env vars to avoid pollution between tests
     delete process.env.DISABLE_PII_REDACTION;
-    mockEnv.NODE_ENV = "test";
     const { mockClearPII, clearPIISpy: spy } = createMockClearPII();
     clearPIISpy = spy;
-    service = new OtlpSpanPiiRedactionService({ clearPII: mockClearPII });
+    service = new OtlpSpanPiiRedactionService({
+      clearPII: mockClearPII,
+      isLangevalsConfigured: true,
+      isProduction: false,
+    });
   });
 
   afterEach(() => {
@@ -302,9 +293,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         ]);
 
         // Should not throw
-        await expect(
-          service.redactSpan(span, "STRICT"),
-        ).resolves.not.toThrow();
+        await expect(service.redactSpan(span, "STRICT")).resolves.not.toThrow();
         // clearPII should not be called for null stringValue
         expect(clearPIISpy).not.toHaveBeenCalled();
       });
@@ -419,10 +408,14 @@ describe("OtlpSpanPiiRedactionService", () => {
 
     describe("error handling", () => {
       it("propagates errors from clearPII", async () => {
-        const errorClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
+        const errorClearPII = vi
+          .fn()
+          .mockRejectedValue(new Error("PII service unavailable"));
         const errorService = new OtlpSpanPiiRedactionService({
           clearPII: errorClearPII,
           piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+          isLangevalsConfigured: true,
+          isProduction: false,
         });
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "test" } },
@@ -443,11 +436,16 @@ describe("OtlpSpanPiiRedactionService", () => {
       const customService = new OtlpSpanPiiRedactionService({
         clearPII: mockClearPII,
         piiBearingAttributeKeys: customKeys,
+        isLangevalsConfigured: true,
+        isProduction: false,
       });
 
       const span = createMockOtlpSpan([
         { key: "custom.pii.field", value: { stringValue: "sensitive" } },
-        { key: "gen_ai.prompt", value: { stringValue: "should not be scanned" } },
+        {
+          key: "gen_ai.prompt",
+          value: { stringValue: "should not be scanned" },
+        },
       ]);
 
       await customService.redactSpan(span, "STRICT");
@@ -455,7 +453,9 @@ describe("OtlpSpanPiiRedactionService", () => {
       // Only custom key should be scanned
       expect(clearPIISpy).toHaveBeenCalledTimes(1);
       expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
-      expect(span.attributes[1]!.value.stringValue).toBe("should not be scanned");
+      expect(span.attributes[1]!.value.stringValue).toBe(
+        "should not be scanned",
+      );
     });
 
     it("exports default keys for extension", () => {
