@@ -27,6 +27,9 @@ export default defineConfig({
        */
       BUILD_TIME: "1",
     },
+    experimental: {
+      fsModuleCache: true,
+    },
   },
   esbuild: {
     jsx: "automatic",
