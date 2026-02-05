@@ -1,107 +1,64 @@
-# Test environment with isolated ports
-# Infrastructure services only - run Next.js app locally
+# E2E test environment — extends compose.dev.yml with test-specific overrides
 #
 # Usage (from agentic-e2e-tests/ directory):
-#   docker compose up -d
-#   cd ../langwatch && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
-#   cd ../agentic-e2e-tests && pnpm test
-#   docker compose down
+#   docker compose up -d          # Start everything including app
+#   pnpm test                     # Run tests against localhost:5570
+#   docker compose down           # Stop all services
 #
-# The Next.js app runs on the host at localhost:5570 (set via PORT=5570)
+# Shares node_modules and pnpm store volumes with dev for fast startup.
+# Uses isolated DB (testdb), isolated ports, and test-specific env vars.
+
+include:
+  - path: ../compose.dev.yml
 
 services:
-  # Note: The app service is commented out - run Next.js locally for faster iteration
-  # Uncomment and use `build: .` if you need a fully containerized test environment
-  #
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     NODE_OPTIONS: "--max-old-space-size=4096"
-  #     ...
-
-  langwatch_nlp:
-    image: langwatch/langwatch_nlp:latest
+  # Override app: different port, test DB, test env vars
+  app:
     ports:
-      - "5563:5561"  # Test port (dev uses 5561)
-    restart: always
+      - "5570:5560"
     environment:
-      - LANGWATCH_ENDPOINT=http://host.docker.internal:5570
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NODE_ENV: development
+      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/testdb
+      REDIS_URL: redis://redis:6379
+      OPENSEARCH_NODE_URL: http://opensearch:9200
+      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
+      LANGEVALS_ENDPOINT: http://langevals:5562
+      NEXTAUTH_SECRET: test-secret-for-e2e
+      NEXTAUTH_URL: http://localhost:5570
+      SKIP_CLICKHOUSE_MIGRATE: "true"
 
-  langevals:
-    image: langwatch/langevals:latest
-    ports:
-      - "5564:5562"  # Test port (dev uses 5562)
-    restart: always
-    environment:
-      - DISABLE_EVALUATORS_PRELOAD=true
-
+  # Override postgres: use testdb instead of mydb
   postgres:
-    image: postgres:16
-    restart: always
     environment:
       POSTGRES_DB: testdb
       POSTGRES_USER: prisma
       POSTGRES_PASSWORD: prisma
     ports:
-      - "5433:5432"  # Test port (dev uses 5432)
-    volumes:
-      - test-db-data:/var/lib/postgresql/data
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prisma -d testdb"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Override redis: different host port
   redis:
-    image: redis:alpine
     ports:
-      - "6380:6379"  # Test port (dev uses 6379)
-    volumes:
-      - test-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "6380:6379"
 
+  # Override opensearch: different host port, enable for e2e
   opensearch:
-    image: langwatch/opensearch-lite:latest
-    environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
-      - "cluster.routing.allocation.disk.threshold_enabled=false"
-      - "bootstrap.memory_lock=false"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=test-password-for-e2e
-      - "node.store.allow_mmap=false"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
     ports:
-      - "9201:9200"  # Test port (dev uses 9200)
+      - "9201:9200"
       - "9601:9600"
-    volumes:
-      - test-opensearch-data:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-          cpus: "1.0"
-    restart: always
 
-volumes:
-  test-db-data:
-  test-redis-data:
-  test-opensearch-data:
+  # Enable NLP for e2e
+  langwatch_nlp:
+    ports:
+      - "5563:5561"
+
+  # Enable langevals for e2e
+  langevals:
+    ports:
+      - "5564:5562"
