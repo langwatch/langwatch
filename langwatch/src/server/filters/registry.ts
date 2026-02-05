@@ -1472,6 +1472,108 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "sentiment.input_sentiment": {
+    name: "Input Sentiment",
+    urlKey: "sentiment",
+    query: (values) => {
+      const rangeQueries: QueryDslQueryContainer[] = [];
+      for (const value of values) {
+        if (value === "positive") {
+          rangeQueries.push({
+            range: {
+              "input.satisfaction_score": {
+                gte: 0.1,
+              },
+            },
+          });
+        } else if (value === "negative") {
+          rangeQueries.push({
+            range: {
+              "input.satisfaction_score": {
+                lte: -0.1,
+              },
+            },
+          });
+        } else if (value === "neutral") {
+          rangeQueries.push({
+            range: {
+              "input.satisfaction_score": {
+                gt: -0.1,
+                lt: 0.1,
+              },
+            },
+          });
+        }
+      }
+      // Guard against empty or all-invalid values: return match_all as safe no-op filter
+      if (rangeQueries.length === 0) {
+        return { match_all: {} };
+      }
+      return {
+        bool: {
+          should: rangeQueries,
+          minimum_should_match: 1,
+        } as QueryDslBoolQuery,
+      };
+    },
+    listMatch: {
+      aggregation: () => ({
+        sentiment_categories: {
+          filters: {
+            filters: {
+              positive: {
+                script: {
+                  script: {
+                    source:
+                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value >= 0.1",
+                    lang: "painless",
+                  },
+                },
+              },
+              negative: {
+                script: {
+                  script: {
+                    source:
+                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value <= -0.1",
+                    lang: "painless",
+                  },
+                },
+              },
+              neutral: {
+                script: {
+                  script: {
+                    source:
+                      "doc['input.satisfaction_score'].size() == 0 ? false : (doc['input.satisfaction_score'].value < 0.1 && doc['input.satisfaction_score'].value > -0.1)",
+                    lang: "painless",
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        const buckets = result.sentiment_categories?.buckets ?? {};
+        return [
+          {
+            field: "positive",
+            label: "Positive",
+            count: buckets.positive?.doc_count ?? 0,
+          },
+          {
+            field: "negative",
+            label: "Negative",
+            count: buckets.negative?.doc_count ?? 0,
+          },
+          {
+            field: "neutral",
+            label: "Neutral",
+            count: buckets.neutral?.doc_count ?? 0,
+          },
+        ];
+      },
+    },
+  },
 };
 
 const metadataKey = (key: string | undefined) => {

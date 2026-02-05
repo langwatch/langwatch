@@ -37,15 +37,19 @@ import {
   YAxis,
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
+import { useRouter } from "next/router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
+import { availableFilters } from "~/server/filters/registry";
 import {
   useColorModeValue,
   useColorRawValue,
 } from "../../components/ui/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import {
   getGroup,
   getMetric,
@@ -123,12 +127,20 @@ export function CustomGraph({
   titleProps,
   hideGroupLabel = false,
   filters,
+  onDataPointClick,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
   size?: "sm" | "md";
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  onDataPointClick?: (params: {
+    evaluatorId?: string;
+    groupKey?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => void;
 }) {
   const publicEnv = usePublicEnv();
 
@@ -149,6 +161,7 @@ export function CustomGraph({
       hideGroupLabel={hideGroupLabel}
       load={!!publicEnv.data}
       filters={filters}
+      onDataPointClick={onDataPointClick}
     />
   );
 }
@@ -161,6 +174,7 @@ const CustomGraph_ = React.memo(
     load = true,
     size,
     filters,
+    onDataPointClick,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -172,10 +186,105 @@ const CustomGraph_ = React.memo(
     load?: boolean;
     size?: "sm" | "md";
     filters?: Record<FilterField, string[] | Record<string, string[]>>;
+    onDataPointClick?: (params: {
+      evaluatorId?: string;
+      groupKey?: string;
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+    }) => void;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
     const { daysDifference } = usePeriodSelector();
+    const router = useRouter();
+    const { project } = useOrganizationTeamProject();
+
+    // Default handler for drill-down on pie/donut and summary bar charts
+    const defaultOnDataPointClick = useCallback(
+      (params: {
+        evaluatorId?: string;
+        groupKey?: string;
+        date?: string;
+        startDate?: string;
+        endDate?: string;
+      }) => {
+        if (!project || !params.groupKey || !input.groupBy) {
+          return;
+        }
+
+        // Build filter params based on groupBy field
+        let filterParams: Record<string, string | string[]> = {};
+
+        // Map groupBy to filter field and urlKey
+        // Special case: metadata.model maps to spans.model filter (urlKey: "model")
+        if (input.groupBy === "metadata.model") {
+          filterParams.model = params.groupKey;
+        } else if (input.groupBy.startsWith("metadata.")) {
+          const metadataKey = input.groupBy.replace("metadata.", "");
+          const metadataFilters = buildMetadataFilterParams(
+            metadataKey,
+            params.groupKey,
+            params.groupKey,
+          );
+          filterParams = { ...filterParams, ...metadataFilters };
+        } else if (input.groupBy === "sentiment.input_sentiment") {
+          // Use sentiment filter (urlKey: "sentiment")
+          filterParams.sentiment = params.groupKey;
+        } else {
+          // Look up the filter in the registry to get the correct urlKey
+          const filter = availableFilters[input.groupBy as FilterField];
+          if (filter) {
+            // Use the filter's urlKey for the query parameter
+            filterParams[filter.urlKey] = params.groupKey;
+          } else {
+            // Fallback: use groupBy as-is if not found in registry
+            filterParams[input.groupBy] = params.groupKey;
+          }
+        }
+
+        // Include active date range as ISO strings for navigation query
+        if (params.startDate != null) {
+          filterParams.startDate =
+            typeof params.startDate === "number"
+              ? new Date(params.startDate).toISOString()
+              : String(params.startDate);
+        }
+        if (params.endDate != null) {
+          filterParams.endDate =
+            typeof params.endDate === "number"
+              ? new Date(params.endDate).toISOString()
+              : String(params.endDate);
+        }
+
+        // Navigate to messages page with filter
+        void router.push(
+          {
+            pathname: `/${project.slug}/messages`,
+            query: filterParams,
+          },
+          undefined,
+          { shallow: false },
+        );
+      },
+      [project, router, input.groupBy],
+    );
+
+    // Use custom handler if provided, otherwise use default for summary charts
+    const handleDataPointClick = useMemo(() => {
+      if (onDataPointClick) {
+        return onDataPointClick;
+      }
+      // Enable default handler for pie/donut charts and summary bar charts
+      if (
+        ["pie", "donnut"].includes(input.graphType) ||
+        (["bar", "horizontal_bar"].includes(input.graphType) &&
+          input.timeScale === "full")
+      ) {
+        return defaultOnDataPointClick;
+      }
+      return undefined;
+    }, [onDataPointClick, input.graphType, input.timeScale, defaultOnDataPointClick]);
 
     const timeScale = useMemo(() => {
       // Force "full" only for summary charts to get aggregated data
@@ -563,6 +672,20 @@ const CustomGraph_ = React.memo(
               labelLine={false}
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
+              onClick={(data: any, index: number) => {
+                if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
+                  const entry = pieData[index]!;
+                  const { series, groupKey } = getSeries(seriesByKey, entry.key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
+                  handleDataPointClick({
+                    evaluatorId,
+                    groupKey,
+                  });
+                }
+              }}
+              style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
               {pieData.map((entry, index) => (
                 <Cell
@@ -659,7 +782,23 @@ const CustomGraph_ = React.memo(
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
-            <Bar dataKey="value">
+            <Bar
+              dataKey="value"
+              onClick={(item: any) => {
+                if (handleDataPointClick && item && item.payload && item.payload.key) {
+                  const key = item.payload.key;
+                  const { series, groupKey } = getSeries(seriesByKey, key);
+                  // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
+                  handleDataPointClick({
+                    evaluatorId,
+                    groupKey,
+                  });
+                }
+              }}
+              style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
+            >
               {summaryData.current.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
@@ -760,6 +899,10 @@ const CustomGraph_ = React.memo(
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
+            const { series, groupKey } = getSeries(seriesByKey, aggKey);
+            // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
+            const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
             return (
               <React.Fragment key={aggKey}>
                 {/* @ts-ignore */}
@@ -785,6 +928,43 @@ const CustomGraph_ = React.memo(
                       ? true
                       : undefined
                   }
+                  onClick={(data: any) => {
+                    if (onDataPointClick && data) {
+                      // Extract date from data - check multiple possible locations
+                      let date: string | undefined;
+                      if (["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType)) {
+                        // For bar charts, check multiple possible locations for the date
+                        date = data.payload?.date || data.date || data.activePayload?.[0]?.payload?.date;
+                      } else {
+                        // For other chart types (line, area, etc.), use existing logic
+                        date = data.date || data.payload?.date;
+                      }
+
+                      // Calculate date range based on timeScale for bar charts (not summary)
+                      let startDate: string | undefined;
+                      let endDate: string | undefined;
+                      if (
+                        date &&
+                        ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType) &&
+                        typeof timeScale === "number"
+                      ) {
+                        const clickedDate = new Date(date);
+                        startDate = clickedDate.toISOString();
+                        // Calculate endDate by adding the timeScale in minutes
+                        const endDateObj = new Date(clickedDate.getTime() + timeScale * 60 * 1000);
+                        endDate = endDateObj.toISOString();
+                      }
+
+                      onDataPointClick({
+                        evaluatorId,
+                        groupKey,
+                        date,
+                        startDate,
+                        endDate,
+                      });
+                    }
+                  }}
+                  style={{ cursor: onDataPointClick ? "pointer" : "default" }}
                 />
                 {input.includePrevious && (
                   // @ts-ignore
@@ -826,7 +1006,8 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps)
+      JSON.stringify(nextProps.titleProps) &&
+      prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
 );

@@ -66,6 +66,9 @@ export const clickHouseFilterConditions: Record<
     params: { [`${paramId}_values`]: values },
   }),
 
+  // Sentiment - input satisfaction score not exposed as filterable column in ClickHouse
+  "sentiment.input_sentiment": null,
+
   // Annotations
   "annotations.hasAnnotation": (values, _paramId) => {
     const hasTrue = values.includes("true");

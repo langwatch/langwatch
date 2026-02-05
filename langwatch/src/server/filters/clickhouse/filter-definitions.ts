@@ -311,6 +311,9 @@ export const clickHouseFilters: Record<
     extractResults: extractStandardResults,
   },
 
+  // Sentiment - input satisfaction score not exposed as filterable in ClickHouse
+  "sentiment.input_sentiment": null,
+
   // Annotation filters
   "annotations.hasAnnotation": {
     tableName: "trace_summaries",
