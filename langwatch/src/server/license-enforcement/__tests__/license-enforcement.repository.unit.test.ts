@@ -148,14 +148,14 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 
-  describe("getScenarioCount", () => {
-    it("queries scenarios with organization filter (no archive filter)", async () => {
+  describe("getActiveScenarioCount", () => {
+    it("queries only active (non-archived) scenarios with organization filter", async () => {
       mockPrisma.scenario.count.mockResolvedValue(7);
 
-      const result = await repository.getScenarioCount(organizationId);
+      const result = await repository.getActiveScenarioCount(organizationId);
 
       expect(mockPrisma.scenario.count).toHaveBeenCalledWith({
-        where: { project: { team: { organizationId } } },
+        where: { project: { team: { organizationId } }, archivedAt: null },
       });
       expect(result).toBe(7);
     });
@@ -163,7 +163,7 @@ describe("LicenseEnforcementRepository", () => {
     it("returns zero when no scenarios exist", async () => {
       mockPrisma.scenario.count.mockResolvedValue(0);
 
-      const result = await repository.getScenarioCount(organizationId);
+      const result = await repository.getActiveScenarioCount(organizationId);
 
       expect(result).toBe(0);
     });
@@ -682,11 +682,11 @@ describe("LicenseEnforcementRepository", () => {
       expect(call?.where).not.toHaveProperty("archivedAt");
     });
 
-    it("scenario query does not have archivedAt filter", async () => {
-      await repository.getScenarioCount(organizationId);
+    it("scenario query excludes archived scenarios", async () => {
+      await repository.getActiveScenarioCount(organizationId);
 
       const call = mockPrisma.scenario.count.mock.calls[0]?.[0];
-      expect(call?.where).not.toHaveProperty("archivedAt");
+      expect(call?.where).toHaveProperty("archivedAt", null);
     });
 
     it("agent query excludes archived agents", async () => {

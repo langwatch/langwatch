@@ -69,7 +69,19 @@ function ScenarioLibraryPage() {
   });
 
   const batchArchiveMutation = api.scenarios.batchArchive.useMutation({
-    onSuccess: handleArchiveSuccess,
+    onSuccess: (result) => {
+      if (result.failed.length > 0) {
+        toaster.create({
+          title: "Some scenarios couldn't be deleted",
+          description: `${result.failed.length} failed. Please retry.`,
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+      void utils.scenarios.getAll.invalidate();
+      deselectAll();
+      setArchiveTarget(null);
+    },
     onError: (err) => {
       toaster.create({
         title: "Failed to archive scenarios",

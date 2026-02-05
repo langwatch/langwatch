@@ -43,7 +43,7 @@ To use Firefox, `args` needs `"--browser", "firefox"`. If it doesn't match, tell
 
 ### 1. Navigate to the app
 
-```
+```text
 browser_navigate → http://localhost:<port>
 ```
 
@@ -64,7 +64,7 @@ Use `browser_wait_for` when you need to wait for async operations (toasts, loadi
 
 After walking through all scenarios, report a summary:
 
-```
+```text
 ## Browser Test Results
 
 **App:** http://localhost:<port>

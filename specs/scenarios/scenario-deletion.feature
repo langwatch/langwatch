@@ -124,43 +124,43 @@ Feature: Scenario Archiving
   # ============================================================================
 
   @integration
-  Scenario: Archived scenario has archivedAt timestamp set
+  Scenario: Archived scenario is soft-deleted, not permanently removed
     Given I am authenticated in project "test-project"
     And scenario "To Archive" exists
-    When I call the archive endpoint for "To Archive"
-    Then the scenario record has an archivedAt timestamp set
-    And the scenario record still exists in the database
+    When I archive "To Archive"
+    Then "To Archive" is marked as archived
+    And "To Archive" still exists in the database
 
   @integration
-  Scenario: Archived scenario does not appear in list queries
+  Scenario: Archived scenario does not appear in the scenario list
     Given I am authenticated in project "test-project"
     And scenario "Archived Scenario" has been archived
-    When I call scenario.getAll for the project
-    Then "Archived Scenario" is not in the results
+    When I view the scenario list for the project
+    Then "Archived Scenario" is not in the list
 
   @integration
-  Scenario: Archived scenario is still found by ID for internal lookups
+  Scenario: Archived scenario is still accessible for historical lookups
     Given I am authenticated in project "test-project"
     And scenario "Archived Scenario" has been archived
-    When I call scenario.getById for "Archived Scenario" including archived
-    Then the scenario is returned with archivedAt set
+    When I look up "Archived Scenario" including archived
+    Then "Archived Scenario" is returned and marked as archived
 
   @integration
-  Scenario: Batch archive sets archivedAt on all selected scenarios
+  Scenario: Batch archive marks all selected scenarios as archived
     Given I am authenticated in project "test-project"
     And scenarios "Scenario A" and "Scenario B" exist
-    When I call the batch archive endpoint for both scenarios
-    Then both scenario records have archivedAt timestamps set
-    And neither appears in list queries
+    When I archive "Scenario A" and "Scenario B" together
+    Then both scenarios are marked as archived
+    And neither appears in the scenario list
 
   @integration
   Scenario: Batch archive reports individual failures
     Given I am authenticated in project "test-project"
     And scenario "Valid Scenario" exists
     And scenario "nonexistent-id" does not exist
-    When I call the batch archive endpoint for both IDs
+    When I archive "Valid Scenario" and "nonexistent-id" together
     Then "Valid Scenario" is archived successfully
-    And the response reports "nonexistent-id" as failed
+    And "nonexistent-id" is reported as failed
 
   # ============================================================================
   # Integration: Archived Scenario Guardrails
@@ -190,20 +190,20 @@ Feature: Scenario Archiving
   Scenario: Archiving an already-archived scenario is idempotent
     Given I am authenticated in project "test-project"
     And scenario "Already Archived" has been archived
-    When I call the archive endpoint for "Already Archived"
+    When I archive "Already Archived"
     Then the request succeeds without error
 
   @integration
   Scenario: Cannot archive a scenario from a different project
     Given I am authenticated in project "project-a"
     And scenario "Foreign Scenario" exists in project "project-b"
-    When I call the archive endpoint for "Foreign Scenario"
+    When I archive "Foreign Scenario"
     Then I receive a not found error
 
   @integration
   Scenario: Archiving a non-existent scenario returns not found
     Given I am authenticated in project "test-project"
-    When I call the archive endpoint for "nonexistent-id"
+    When I archive "nonexistent-id"
     Then I receive a not found error
 
   # ============================================================================
@@ -211,31 +211,31 @@ Feature: Scenario Archiving
   # ============================================================================
 
   @unit
-  Scenario: Toggle individual selection adds scenario to selected set
+  Scenario: Toggling selection adds a scenario
     Given no scenarios are selected
-    When I toggle selection for scenario "scen_1"
-    Then the selected set contains "scen_1"
+    When I toggle selection for "scen_1"
+    Then "scen_1" is selected
 
   @unit
-  Scenario: Toggle individual selection removes already-selected scenario
-    Given scenario "scen_1" is selected
-    When I toggle selection for scenario "scen_1"
-    Then the selected set is empty
+  Scenario: Toggling selection removes an already-selected scenario
+    Given "scen_1" is selected
+    When I toggle selection for "scen_1"
+    Then no scenarios are selected
 
   @unit
-  Scenario: Select all adds all visible scenario IDs to selected set
-    Given 5 scenarios are visible with IDs "scen_1" through "scen_5"
+  Scenario: Select all selects all visible scenarios
+    Given 5 scenarios are visible
     And no scenarios are selected
     When I select all
-    Then the selected set contains all 5 IDs
+    Then all 5 scenarios are selected
 
   @unit
-  Scenario: Deselect all clears the selected set
+  Scenario: Deselect all clears the selection
     Given 3 scenarios are selected
     When I deselect all
-    Then the selected set is empty
+    Then no scenarios are selected
 
   @unit
   Scenario: Selection count reflects number of selected scenarios
-    Given scenarios "scen_1" and "scen_2" are selected
+    Given "scen_1" and "scen_2" are selected
     Then the selection count is 2

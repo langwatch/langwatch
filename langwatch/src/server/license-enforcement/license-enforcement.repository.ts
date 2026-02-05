@@ -86,7 +86,7 @@ export interface ILicenseEnforcementRepository {
   getWorkflowCount(organizationId: string): Promise<number>;
   getPromptCount(organizationId: string): Promise<number>;
   getEvaluatorCount(organizationId: string): Promise<number>;
-  getScenarioCount(organizationId: string): Promise<number>;
+  getActiveScenarioCount(organizationId: string): Promise<number>;
   getProjectCount(organizationId: string): Promise<number>;
   getTeamCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
@@ -151,7 +151,7 @@ export class LicenseEnforcementRepository
    * Counts active (non-archived) scenarios for license enforcement.
    * Only active scenarios count against the license limit.
    */
-  async getScenarioCount(organizationId: string): Promise<number> {
+  async getActiveScenarioCount(organizationId: string): Promise<number> {
     return this.prisma.scenario.count({
       where: {
         project: { team: { organizationId } },

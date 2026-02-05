@@ -39,7 +39,7 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
     getMax: (plan) => plan.maxEvaluators,
   },
   scenarios: {
-    getCount: (repo, orgId) => repo.getScenarioCount(orgId),
+    getCount: (repo, orgId) => repo.getActiveScenarioCount(orgId),
     getMax: (plan) => plan.maxScenarios,
   },
   projects: {

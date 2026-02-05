@@ -254,7 +254,7 @@ describe("ScenarioService", () => {
         await service.archive({ id: toArchive.id, projectId });
 
         // Count should only include active scenarios
-        const count = await licenseRepo.getScenarioCount(organization!.id);
+        const count = await licenseRepo.getActiveScenarioCount(organization!.id);
         expect(count).toBe(2);
       });
     });
