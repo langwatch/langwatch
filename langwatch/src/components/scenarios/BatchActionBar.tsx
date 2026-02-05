@@ -1,5 +1,5 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { Archive } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 /**
  * Action bar that appears when one or more table rows are selected.
@@ -32,8 +32,8 @@ export function BatchActionBar({
         colorPalette="red"
         onClick={onArchive}
       >
-        <Archive size={14} />
-        Archive
+        <Trash2 size={14} />
+        Delete
       </Button>
     </HStack>
   );

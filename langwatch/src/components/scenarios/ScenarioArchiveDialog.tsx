@@ -30,8 +30,8 @@ export function ScenarioArchiveDialog({
 }) {
   const isBatch = scenarios.length > 1;
   const title = isBatch
-    ? `Archive ${scenarios.length} scenarios?`
-    : "Archive scenario?";
+    ? `Delete ${scenarios.length} scenarios?`
+    : "Delete scenario?";
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
@@ -62,7 +62,7 @@ export function ScenarioArchiveDialog({
               )
             )}
             <Text color="fg.muted" fontSize="sm">
-              This action can be undone by an administrator.
+              This action cannot be undone.
             </Text>
           </VStack>
         </Dialog.Body>
@@ -86,7 +86,7 @@ export function ScenarioArchiveDialog({
             }}
             disabled={isLoading}
           >
-            {isLoading ? <Spinner size="sm" /> : "Archive"}
+            {isLoading ? <Spinner size="sm" /> : "Delete"}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

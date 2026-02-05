@@ -12,7 +12,7 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreVertical, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Checkbox } from "../ui/checkbox";
@@ -135,8 +135,8 @@ export function ScenarioTable({
                   onArchive(row.original);
                 }}
               >
-                <Archive size={14} />
-                Archive
+                <Trash2 size={14} />
+                Delete
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
