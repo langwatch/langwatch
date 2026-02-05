@@ -13,7 +13,7 @@ import { prisma } from "../../../src/server/db"; // Adjust the import based on y
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 const thumbsUpDownSchema = z.object({
   trace_id: z.string(),

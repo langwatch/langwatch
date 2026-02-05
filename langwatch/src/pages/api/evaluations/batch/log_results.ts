@@ -21,7 +21,7 @@ import {
   eSBatchEvaluationTargetTypeSchema,
 } from "../../../../server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger/server";
 import { safeTruncate } from "../../../../utils/truncate";
 import { findOrCreateExperiment } from "../../experiment/init";
 

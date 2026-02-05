@@ -242,6 +242,14 @@ export const organizationRouter = createTRPCRouter({
       const { userId, organizationId } = input;
       const prisma = ctx.prisma;
 
+      // Prevent self-deletion
+      if (userId === ctx.session.user.id) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot remove yourself from the organization",
+        });
+      }
+
       await prisma.organizationUser.delete({
         where: {
           userId_organizationId: {

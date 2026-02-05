@@ -1,10 +1,11 @@
 import {
   Badge,
+  Box,
   Button,
+  Card,
   Flex,
   Heading,
   HStack,
-  LinkBox,
   Spacer,
   Spinner,
   Table,
@@ -13,8 +14,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { Mail, MoreVertical, Plus, Trash } from "react-feather";
+import { MoreVertical } from "react-feather";
+import { LuMail, LuPencil, LuTrash } from "react-icons/lu";
 import type { SubmitHandler } from "react-hook-form";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -22,6 +26,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import type { MembersForm } from "../../components/AddMembersForm";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import { CopyInput } from "../../components/CopyInput";
+import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
@@ -30,6 +35,7 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
+import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -40,27 +46,9 @@ import type {
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 
-const selectOptions = [
-  {
-    label: "Admin",
-    value: OrganizationUserRole.ADMIN,
-    description: "Can manage organization and add or remove members",
-  },
-  {
-    label: "Member",
-    value: OrganizationUserRole.MEMBER,
-    description: "Can manage their own projects and view other projects",
-  },
-  {
-    label: "Lite Member",
-    value: OrganizationUserRole.EXTERNAL,
-    description: "Can only view projects they are invited to, cannot see costs",
-  },
-];
-
 // Create a Map for fast O(1) lookups instead of O(n) .find() in render
 const roleLabelMap = new Map(
-  selectOptions.map((option) => [option.value, option.label]),
+  orgRoleOptions.map((option) => [option.value, option.label]),
 );
 
 function Members() {
@@ -109,14 +97,13 @@ function MembersList({
 }) {
   const { data: session } = useRequiredSession();
   const { hasPermission } = useOrganizationTeamProject();
+  const router = useRouter();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
   // License enforcement for both member types
-  const { checkAndProceed: checkMembersLimit } =
-    useLicenseEnforcement("members");
-  const { checkAndProceed: checkMembersLiteLimit } =
-    useLicenseEnforcement("membersLite");
+  const membersEnforcement = useLicenseEnforcement("members");
+  const membersLiteEnforcement = useLicenseEnforcement("membersLite");
 
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -234,22 +221,13 @@ function MembersList({
       (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
     );
 
-    // Chain the limit checks based on what types of members are being added
-    const proceedAfterLiteCheck = () => performInviteMutation(data);
+    // Build enforcement list based on what types of members are being added
+    const enforcements = [
+      ...(hasNewFullMembers ? [membersEnforcement] : []),
+      ...(hasNewLiteMembers ? [membersLiteEnforcement] : []),
+    ];
 
-    const proceedAfterMembersCheck = () => {
-      if (hasNewLiteMembers) {
-        checkMembersLiteLimit(proceedAfterLiteCheck);
-      } else {
-        proceedAfterLiteCheck();
-      }
-    };
-
-    if (hasNewFullMembers) {
-      checkMembersLimit(proceedAfterMembersCheck);
-    } else {
-      proceedAfterMembersCheck();
-    }
+    checkCompoundLimits(enforcements, () => performInviteMutation(data));
   };
 
   const deleteMember = (userId: string) => {
@@ -344,6 +322,11 @@ function MembersList({
     [organization.members, user?.id],
   );
 
+  const canDeleteMember = (memberId: string) =>
+    hasOrganizationManagePermission &&
+    organization.members.length > 1 &&
+    memberId !== user?.id;
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
@@ -373,183 +356,161 @@ function MembersList({
             </PageLayout.HeaderButton>
           </Tooltip>
         </HStack>
-        <Table.Root borderCollapse="unset" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader />
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Email</Table.ColumnHeader>
-              <Table.ColumnHeader>Teams</Table.ColumnHeader>
-              <Table.ColumnHeader>Actions</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {sortedMembers.map((member) => {
-              const roleLabel = roleLabelMap.get(member.role) ?? member.role;
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0}>
+            <Table.Root variant="line" size="md" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader width="56px" />
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                  <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {sortedMembers.map((member) => {
+                  const roleLabel = roleLabelMap.get(member.role) ?? member.role;
 
-              return (
-                <LinkBox as={Table.Row} key={member.userId}>
-                  <Table.Cell>
-                    <RandomColorAvatar
-                      size="2xs"
-                      name={member.user.name ?? ""}
-                    />
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Link href={`/settings/members/${member.userId}`}>
-                      {member.user.name}{" "}
-                      <Text
-                        as="span"
-                        whiteSpace="nowrap"
-                      >{`(Organization ${roleLabel})`}</Text>
-                    </Link>
-                  </Table.Cell>
-                  <Table.Cell>{member.user.email}</Table.Cell>
-                  <Table.Cell>
-                    <TeamMembershipsDisplay
-                      teamMemberships={member.user.teamMemberships}
-                      organizationId={organization.id}
-                    />
-                  </Table.Cell>
-                  <Table.Cell>
-                    <HStack gap={2}>
-                      <Link href={`/settings/members/${member.userId}`}>
-                        <Button size="sm" variant="outline">
-                          View
-                        </Button>
-                      </Link>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button variant={"ghost"}>
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Tooltip
-                            content={
-                              !hasOrganizationManagePermission
-                                ? "You need organization:manage permission to remove members"
-                                : organization.members.length === 1
-                                  ? "Cannot remove the last member"
-                                  : undefined
-                            }
-                            disabled={
-                              hasOrganizationManagePermission &&
-                              organization.members.length > 1
-                            }
-                            positioning={{ placement: "right" }}
-                            showArrow
-                          >
-                            <Menu.Item
-                              value="remove"
-                              color="red.600"
-                              disabled={
-                                !hasOrganizationManagePermission ||
-                                organization.members.length === 1
-                              }
-                              onClick={() => {
-                                if (hasOrganizationManagePermission) {
-                                  deleteMember(member.userId);
-                                }
-                              }}
-                            >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Remove Member
-                            </Menu.Item>
-                          </Tooltip>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </HStack>
-                  </Table.Cell>
-                </LinkBox>
-              );
-            })}
-          </Table.Body>
-        </Table.Root>
+                  return (
+                    <Table.Row key={member.userId}>
+                      <Table.Cell>
+                        <RandomColorAvatar
+                          size="2xs"
+                          name={member.user.name ?? ""}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Link href={`/settings/members/${member.userId}`}>
+                          {member.user.name}{" "}
+                          <Text
+                            as="span"
+                            whiteSpace="nowrap"
+                          >{`(Organization ${roleLabel})`}</Text>
+                        </Link>
+                      </Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell>
+                        <TeamMembershipsDisplay
+                          teamMemberships={member.user.teamMemberships}
+                          organizationId={organization.id}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Box
+                          width="full"
+                          height="full"
+                          display="flex"
+                          justifyContent="end"
+                        >
+                          <Menu.Root>
+                            <Menu.Trigger>
+                              <MoreVertical size={16} />
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={() => {
+                                  void router.push(`/settings/members/${member.userId}`);
+                                }}
+                              >
+                                <LuPencil size={16} />
+                                Edit
+                              </Menu.Item>
+                              {canDeleteMember(member.userId) && (
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.500"
+                                  onClick={() => deleteMember(member.userId)}
+                                >
+                                  <LuTrash size={16} />
+                                  Delete
+                                </Menu.Item>
+                              )}
+                            </Menu.Content>
+                          </Menu.Root>
+                        </Box>
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
 
         {pendingInvites.data && pendingInvites.data.length > 0 && (
           <VStack align="start" gap={4} paddingTop={4} width="full">
             <Heading>Pending Invites</Heading>
 
-            <Table.Root size="md">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="56px" />
-                  <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
-                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
-                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {pendingInvites.data?.map((invite) => (
-                  <Table.Row key={invite.id}>
-                    <Table.Cell>
-                      <RandomColorAvatar size="2xs" name={invite.email} />
-                    </Table.Cell>
-                    <Table.Cell>{invite.email}</Table.Cell>
-                    <Table.Cell>
-                      {selectOptions.find(
-                        (option) => option.value === invite.role,
-                      )?.label ?? invite.role}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button variant={"ghost"}>
-                            {deleteInviteMutation.isLoading &&
-                            invite.id ===
-                              deleteInviteMutation.variables?.inviteId ? (
-                              <Spinner size="sm" />
-                            ) : (
-                              <MoreVertical />
-                            )}
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Tooltip
-                            content={
-                              !hasOrganizationManagePermission
-                                ? "You need organization:manage permission to delete invites"
-                                : undefined
-                            }
-                            disabled={hasOrganizationManagePermission}
-                            positioning={{ placement: "right" }}
-                            showArrow
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0}>
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader width="56px" />
+                      <Table.ColumnHeader>Email</Table.ColumnHeader>
+                      <Table.ColumnHeader>Role</Table.ColumnHeader>
+                      <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                      <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {pendingInvites.data?.map((invite) => (
+                      <Table.Row key={invite.id}>
+                        <Table.Cell>
+                          <RandomColorAvatar size="2xs" name={invite.email} />
+                        </Table.Cell>
+                        <Table.Cell>{invite.email}</Table.Cell>
+                        <Table.Cell>
+                          {orgRoleOptions.find(
+                            (option) => option.value === invite.role,
+                          )?.label ?? invite.role}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Box
+                            width="full"
+                            height="full"
+                            display="flex"
+                            justifyContent="end"
                           >
-                            <Menu.Item
-                              value="delete"
-                              color="red.600"
-                              onClick={() => {
-                                if (hasOrganizationManagePermission) {
-                                  deleteInvite(invite.id);
-                                }
-                              }}
-                              disabled={!hasOrganizationManagePermission}
-                            >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Delete
-                            </Menu.Item>
-                          </Tooltip>
-                          <Menu.Item
-                            value="view"
-                            onClick={() =>
-                              viewInviteLink(invite.inviteCode, invite.email)
-                            }
-                          >
-                            <Mail size={14} style={{ marginRight: "8px" }} />
-                            View Invite Link
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                            <Menu.Root>
+                              <Menu.Trigger>
+                                <MoreVertical size={16} />
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="view-link"
+                                  onClick={() =>
+                                    viewInviteLink(invite.inviteCode, invite.email)
+                                  }
+                                >
+                                  <LuMail size={16} />
+                                  View invite link
+                                </Menu.Item>
+                                {hasOrganizationManagePermission && (
+                                  <Menu.Item
+                                    value="delete"
+                                    color="red.500"
+                                    onClick={() => deleteInvite(invite.id)}
+                                  >
+                                    <LuTrash size={16} />
+                                    Delete
+                                  </Menu.Item>
+                                )}
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Box>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
           </VStack>
         )}
       </VStack>
@@ -610,7 +571,7 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
-              orgRoleOptions={selectOptions}
+              orgRoleOptions={orgRoleOptions}
               organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={createInvitesMutation.isLoading}
@@ -646,7 +607,7 @@ const TeamMembershipsDisplay = ({
         .filter((m) => m.organizationId === organizationId)
         .map((m) => (
           <Link href={`/settings/teams/${m.slug}`} key={m.id}>
-            <Badge size="xs" variant="surface">
+            <Badge size="sm" variant="surface">
               {m.name}
             </Badge>
           </Link>
@@ -674,7 +635,7 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
 
         return (
           <Link href={`/settings/teams/${team.slug}`} key={teamId}>
-            <Badge size="xs" variant="surface">
+            <Badge size="sm" variant="surface">
               {team.name}
             </Badge>
           </Link>

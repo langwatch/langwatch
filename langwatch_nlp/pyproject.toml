@@ -32,6 +32,7 @@ dependencies = [
     "tenacity>=8.5.0,<9",
     "uvicorn>=0.31.1",
     "watchdog>=5.0.3",
+    "structlog>=24.1.0",
 ]
 
 [project.optional-dependencies]

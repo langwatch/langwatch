@@ -1,6 +1,8 @@
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
+import { withJobContext } from "../../context/asyncContext";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { createLogger } from "../../../utils/logger/server";
 import {
@@ -73,10 +75,11 @@ export const startUsageStatsWorker = () => {
 
   const usageStatsWorker = new Worker<UsageStatsJob, void, string>(
     USAGE_STATS_QUEUE.NAME,
-    runUsageStatsJob,
+    withJobContext(runUsageStatsJob),
     {
       connection,
       concurrency: 1, // Only one job at a time since it's a daily task
+      telemetry: new BullMQOtel(USAGE_STATS_QUEUE.NAME),
     },
   );
 

@@ -1,7 +1,7 @@
 import { setEnvironment } from "@langwatch/ksuid";
 import { loadEnvConfig } from "@next/env";
 import { WorkersRestart } from "./server/background/errors";
-import { createLogger } from "./utils/logger";
+import { createLogger } from "./utils/logger/server";
 
 loadEnvConfig(process.cwd());
 setEnvironment(process.env.ENVIRONMENT ?? "local");

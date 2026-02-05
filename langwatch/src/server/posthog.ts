@@ -1,5 +1,8 @@
 import { PostHog } from "posthog-node";
+import { createLogger } from "~/utils/logger/server";
 import { env } from "../env.mjs";
+
+const logger = createLogger("langwatch:posthog:client");
 
 // Create a private singleton instance
 const _posthogInstance = env.POSTHOG_KEY
@@ -19,7 +22,7 @@ export function getPostHogInstance(): PostHog | null {
 // Ensure events are flushed on application shutdown
 function handleShutdown() {
   if (_posthogInstance) {
-    console.log("Shutting down PostHog client...");
+    logger.info("Shutting down PostHog client");
     void _posthogInstance.shutdown();
   }
 }

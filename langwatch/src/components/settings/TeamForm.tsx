@@ -2,10 +2,10 @@ import {
   Box,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
   HStack,
-  Icon,
   Input,
   Spacer,
   Spinner,
@@ -14,8 +14,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { Select as MultiSelect } from "chakra-react-select";
-import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
+import { HelpCircle, Plus, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 import {
   Controller,
   type SubmitHandler,
@@ -30,7 +30,7 @@ import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { PageLayout } from "../ui/layouts/PageLayout";
+import { Select } from "../ui/select";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,
@@ -71,6 +71,20 @@ export const TeamForm = ({
   const users = api.organization.getAllOrganizationMembers.useQuery({
     organizationId: organizationId,
   });
+
+  const userOptions = useMemo(
+    () =>
+      users.data?.map((user) => ({
+        label: `${user.name} (${user.email})`,
+        value: user.id,
+      })) ?? [],
+    [users.data],
+  );
+
+  const userCollection = useMemo(
+    () => createListCollection({ items: userOptions }),
+    [userOptions],
+  );
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -119,132 +133,145 @@ export const TeamForm = ({
             </Link>
           )}
         </HStack>
-        <Table.Root variant="line" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Team Role</Table.ColumnHeader>
-              <Table.ColumnHeader width="38px" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {members.fields.map((member, index) => (
-              <Table.Row key={index}>
-                <Table.Cell>
-                  <HStack width="full">
-                    {member.saved ? (
-                      <>
-                        <Link
-                          href={`/settings/members/${member.userId?.value}`}
-                        >
-                          {member.userId?.label}
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        <Controller
-                          control={control}
-                          name={`members.${index}.userId`}
-                          rules={{ required: "User is required" }}
-                          render={({ field }) => (
-                            <MultiSelect
-                              {...field}
-                              options={
-                                users.data?.map((user) => ({
-                                  label: `${user.name} (${user.email})`,
-                                  value: user.id,
-                                })) ?? []
-                              }
-                              hideSelectedOptions={false}
-                              chakraStyles={{
-                                container: (base) => ({
-                                  ...base,
-                                  background: "white",
-                                  width: "100%",
-                                  borderRadius: "5px",
-                                }),
-                              }}
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Team Role</Table.ColumnHeader>
+                  <Table.ColumnHeader width="60px" />
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {members.fields.map((member, index) => (
+                  <Table.Row key={member.id}>
+                    <Table.Cell>
+                      <HStack width="full">
+                        {member.saved ? (
+                          <>
+                            <Link
+                              href={`/settings/members/${member.userId?.value}`}
+                            >
+                              {member.userId?.label}
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <Controller
+                              control={control}
+                              name={`members.${index}.userId`}
+                              rules={{ required: "User is required" }}
+                              render={({ field }) => (
+                                <Select.Root
+                                  collection={userCollection}
+                                  value={field.value ? [field.value.value] : []}
+                                  onValueChange={(details) => {
+                                    const selectedValue = details.value[0];
+                                    if (selectedValue) {
+                                      const selectedOption = userOptions.find(
+                                        (o) => o.value === selectedValue,
+                                      );
+                                      if (selectedOption) {
+                                        field.onChange(selectedOption);
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Select.Trigger width="full" background="bg">
+                                    <Select.ValueText placeholder="Select..." />
+                                  </Select.Trigger>
+                                  <Select.Content paddingY={2} zIndex="popover">
+                                    {userOptions.map((option) => (
+                                      <Select.Item key={option.value} item={option}>
+                                        {option.label}
+                                      </Select.Item>
+                                    ))}
+                                  </Select.Content>
+                                </Select.Root>
+                              )}
                             />
-                          )}
-                        />
-                        <Tooltip
-                          content={
-                            <>
-                              <Text>
-                                Those are existing members of your organization.
-                              </Text>
-                              <Text paddingTop={2}>
-                                Want to add a team member that is not listed
-                                yet? You can create the team first and invite
-                                them later to the organization
-                              </Text>
-                            </>
-                          }
-                          positioning={{ placement: "top" }}
-                          showArrow
+                            <Tooltip
+                              content={
+                                <>
+                                  <Text>
+                                    Those are existing members of your organization.
+                                  </Text>
+                                  <Text paddingTop={2}>
+                                    Want to add a team member that is not listed
+                                    yet? You can create the team first and invite
+                                    them later to the organization
+                                  </Text>
+                                </>
+                              }
+                              positioning={{ placement: "top" }}
+                              showArrow
+                            >
+                              <Box>
+                                <HelpCircle width="14px" />
+                              </Box>
+                            </Tooltip>
+                          </>
+                        )}
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Controller
+                        control={control}
+                        name={`members.${index}.role`}
+                        rules={{ required: "User role is required" }}
+                        render={({ field }) =>
+                          canManageOrganization ? (
+                            <TeamRoleSelect
+                              organizationId={organizationId}
+                              value={field.value}
+                              onChange={field.onChange}
+                            />
+                          ) : (
+                            <Text>{field.value?.label ?? "—"}</Text>
+                          )
+                        }
+                      />
+                    </Table.Cell>
+                    <Table.Cell paddingLeft={0} paddingY={2}>
+                      {canManageOrganization && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          color="red.fg"
+                          disabled={members.fields.length === 1}
+                          onClick={() => members.remove(index)}
                         >
-                          <Box>
-                            <HelpCircle width="14px" />
-                          </Box>
-                        </Tooltip>
-                      </>
-                    )}
-                  </HStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Controller
-                    control={control}
-                    name={`members.${index}.role`}
-                    rules={{ required: "User role is required" }}
-                    render={({ field }) =>
-                      canManageOrganization ? (
-                        <TeamRoleSelect
-                          organizationId={organizationId}
-                          field={field}
-                        />
-                      ) : (
-                        <Text>{field.value?.label ?? "—"}</Text>
-                      )
-                    }
-                  />
-                </Table.Cell>
-                <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                  {canManageOrganization && (
-                    <Button
-                      type="button"
-                      colorPalette="red"
-                      disabled={members.fields.length === 1}
-                      onClick={() => members.remove(index)}
-                    >
-                      <Trash size={18} />
-                    </Button>
-                  )}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-            {canManageOrganization && (
-              <Table.Row>
-                <Table.Cell colSpan={4}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      members.append({
-                        userId: undefined,
-                        role: teamRolesOptions[TeamUserRole.MEMBER],
-                        saved: false,
-                      });
-                    }}
-                    marginTop={2}
-                  >
-                    <Plus size={18} /> Add Another
-                  </Button>
-                </Table.Cell>
-              </Table.Row>
-            )}
-          </Table.Body>
-        </Table.Root>
+                          <Trash2 size={18} />
+                        </Button>
+                      )}
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+                {canManageOrganization && (
+                  <Table.Row>
+                    <Table.Cell colSpan={4}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          members.append({
+                            userId: undefined,
+                            role: teamRolesOptions[TeamUserRole.MEMBER],
+                            saved: false,
+                          });
+                        }}
+                      >
+                        <Plus size={18} /> Add Another
+                      </Button>
+                    </Table.Cell>
+                  </Table.Row>
+                )}
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
         {!team && (
           <HStack width="full">
             <Spacer />
@@ -256,15 +283,19 @@ export const TeamForm = ({
         {team && (
           <>
             <TeamFormProjects team={team} />
-            <Table.Root variant="line" width="full" size="md">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                  <Table.Cell textAlign="right"></Table.Cell>
-                </Table.Row>
-              </Table.Header>
-              <TeamProjectsList team={team} />
-            </Table.Root>
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0}>
+                <Table.Root variant="line" width="full" size="md">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <TeamProjectsList team={team} />
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
           </>
         )}
       </VStack>

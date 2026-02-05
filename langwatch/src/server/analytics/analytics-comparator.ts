@@ -6,7 +6,7 @@
  * during comparison mode.
  */
 
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import type {
   TimeseriesResult,
   FilterDataResult,
@@ -69,7 +69,10 @@ export class AnalyticsComparator {
   findDiscrepancies<T>(esResult: T, chResult: T): string[] {
     const discrepancies: string[] = [];
 
-    if (this.isTimeseriesResult(esResult) && this.isTimeseriesResult(chResult)) {
+    if (
+      this.isTimeseriesResult(esResult) &&
+      this.isTimeseriesResult(chResult)
+    ) {
       this.compareTimeseriesResults(esResult, chResult, discrepancies);
     } else if (
       this.isFilterDataResult(esResult) &&
@@ -136,11 +139,15 @@ export class AnalyticsComparator {
 
         // Report missing keys
         if (esValue === undefined && chValue !== undefined) {
-          discrepancies.push(`Bucket ${i} key ${key}: missing in ES, CH=${chValue}`);
+          discrepancies.push(
+            `Bucket ${i} key ${key}: missing in ES, CH=${chValue}`,
+          );
           continue;
         }
         if (chValue === undefined && esValue !== undefined) {
-          discrepancies.push(`Bucket ${i} key ${key}: ES=${esValue}, missing in CH`);
+          discrepancies.push(
+            `Bucket ${i} key ${key}: ES=${esValue}, missing in CH`,
+          );
           continue;
         }
 
@@ -186,11 +193,15 @@ export class AnalyticsComparator {
 
         // Report missing keys
         if (esValue === undefined && chValue !== undefined) {
-          discrepancies.push(`Previous bucket ${i} key ${key}: missing in ES, CH=${chValue}`);
+          discrepancies.push(
+            `Previous bucket ${i} key ${key}: missing in ES, CH=${chValue}`,
+          );
           continue;
         }
         if (chValue === undefined && esValue !== undefined) {
-          discrepancies.push(`Previous bucket ${i} key ${key}: ES=${esValue}, missing in CH`);
+          discrepancies.push(
+            `Previous bucket ${i} key ${key}: ES=${esValue}, missing in CH`,
+          );
           continue;
         }
 
@@ -440,7 +451,8 @@ export class AnalyticsComparator {
         optionCount: result.options.length,
         firstOptions: result.options.slice(0, 3).map((opt) => ({
           field: opt.field,
-          countBucket: opt.count > 100 ? "100+" : opt.count > 10 ? "10-100" : "<10",
+          countBucket:
+            opt.count > 100 ? "100+" : opt.count > 10 ? "10-100" : "<10",
         })),
       };
     }

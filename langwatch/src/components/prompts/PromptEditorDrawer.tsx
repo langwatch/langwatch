@@ -52,6 +52,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
@@ -547,6 +548,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error creating prompt",
         description: error.message,

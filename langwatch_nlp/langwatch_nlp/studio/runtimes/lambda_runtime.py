@@ -23,9 +23,9 @@ def stop_process(trace_id: str, s3_cache_key: str):
         # Create an empty file in the kill directory
         kill_key = f"kill/{s3_cache_key}/{trace_id}"
         s3_client.put_object(Bucket=bucket_name, Key=kill_key, Body=b"")  # empty file
-        logger.info(f"Created kill file at s3://{bucket_name}/{kill_key}")
+        logger.info("Created kill file", s3_path=f"s3://{bucket_name}/{kill_key}")
     except Exception as e:
-        logger.error(f"Failed to create kill file in S3: {str(e)}")
+        logger.error("Failed to create kill file in S3", error=str(e))
         raise Exception(f"Failed kill process")
 
 
@@ -44,9 +44,7 @@ def setup_kill_signal_watcher(
     def watch_for_kill_signal():
         s3_client, bucket_name = s3_client_and_bucket()
         if not bucket_name:
-            logger.warning(
-                "Warning: CACHE_BUCKET not set, kill signal watcher disabled"
-            )
+            logger.warning("CACHE_BUCKET not set, kill signal watcher disabled")
             return
 
         kill_key = f"kill/{s3_cache_key}/{trace_id}"
@@ -55,13 +53,13 @@ def setup_kill_signal_watcher(
             try:
                 # Attempt to fetch the kill file
                 s3_client.head_object(Bucket=bucket_name, Key=kill_key)
-                logger.info(f"Kill signal detected for trace_id {trace_id}. Exiting...")
+                logger.info("Kill signal detected, exiting", trace_id=trace_id)
                 from langwatch_nlp.studio.app import handle_interruption
 
                 task = handle_interruption(event)
 
                 if stop_event := asyncio.run(task):
-                    logger.info(f"Sending end event: {stop_event}")
+                    logger.info("Sending end event", event=str(stop_event))
                     # Empty the queue to send the stop event right away
                     while not queue.empty():
                         try:
@@ -77,14 +75,14 @@ def setup_kill_signal_watcher(
                     # Kill the process group
                     os.killpg(os.getpgid(0), signal.SIGKILL)
                 except Exception as e:
-                    logger.error(f"killpg failed: {str(e)}")
+                    logger.error("killpg failed", error=str(e))
 
                 try:
                     # Kill all python processes
                     subprocess.run(["killall", "-9", "python"], check=False)
                     subprocess.run(["killall", "-9", "python3"], check=False)
                 except Exception as e:
-                    logger.error(f"killall failed: {str(e)}")
+                    logger.error("killall failed", error=str(e))
 
                 # If we're still alive, exit
                 os._exit(1)
@@ -96,7 +94,7 @@ def setup_kill_signal_watcher(
                     # Kill file not found, continue watching
                     pass
                 else:
-                    logger.error(f"Error checking for kill signal: {str(e)}")
+                    logger.error("Error checking for kill signal", error=str(e))
 
             # Sleep for a short period before checking again
             time.sleep(0.5)

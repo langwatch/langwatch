@@ -17,6 +17,10 @@ export const limitTypes = [
   "agents",
   "experiments",
   "onlineEvaluations",
+  "datasets",
+  "dashboards",
+  "customGraphs",
+  "automations",
 ] as const;
 
 export type LimitType = (typeof limitTypes)[number];

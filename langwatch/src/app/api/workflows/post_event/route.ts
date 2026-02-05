@@ -18,11 +18,13 @@ import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { createLogger } from "../../../../utils/logger/server";
 import { loggerMiddleware } from "../../middleware/logger";
+import { tracerMiddleware } from "../../middleware/tracer";
 import { studioBackendPostEvent } from "./post-event";
 
 const logger = createLogger("langwatch:post_message");
 
 const app = new Hono().basePath("/api/workflows");
+app.use(tracerMiddleware({ name: "workflows-post-event" }));
 app.use(loggerMiddleware());
 
 app.post(

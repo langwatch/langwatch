@@ -25,10 +25,15 @@ import type {
   FeedbacksResult,
 } from "./types";
 import type { TimeseriesInputType } from "./registry";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 // Re-export types for backward compatibility
-export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksResult };
+export type {
+  TimeseriesResult,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+};
 
 /**
  * Elasticsearch Analytics Service
@@ -38,7 +43,9 @@ export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksR
  */
 export class ElasticsearchAnalyticsService {
   private readonly logger = createLogger("langwatch:analytics:elasticsearch");
-  private readonly tracer = getLangWatchTracer("langwatch.analytics.elasticsearch");
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.analytics.elasticsearch",
+  );
 
   /**
    * Elasticsearch is always available as the default backend
@@ -327,7 +334,8 @@ export class ElasticsearchAnalyticsService {
                                     must: [
                                       {
                                         term: {
-                                          "events.event_details.key": "feedback",
+                                          "events.event_details.key":
+                                            "feedback",
                                         },
                                       },
                                     ] as QueryDslQueryContainer[],
@@ -347,9 +355,15 @@ export class ElasticsearchAnalyticsService {
         });
 
         const events: ElasticSearchEvent[] = result.hits.hits
-          .flatMap((hit: { _source?: ElasticSearchTrace }) => hit._source!.events ?? [])
+          .flatMap(
+            (hit: { _source?: ElasticSearchTrace }) =>
+              hit._source!.events ?? [],
+          )
           .filter((event: ElasticSearchEvent) =>
-            event.event_details?.some((detail: { key: string; value: string }) => detail.key === "feedback"),
+            event.event_details?.some(
+              (detail: { key: string; value: string }) =>
+                detail.key === "feedback",
+            ),
           )
           .map((event: ElasticSearchEvent) => ({
             ...event,

@@ -1,5 +1,7 @@
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type { TrackEventJob } from "~/server/background/types";
+import { withJobContext } from "../../context/asyncContext";
 import type {
   ElasticSearchEvent,
   ElasticSearchTrace,
@@ -115,10 +117,11 @@ export const startTrackEventsWorker = () => {
 
   const trackEventsWorker = new Worker<TrackEventJob, void, string>(
     TRACK_EVENTS_QUEUE.NAME,
-    runTrackEventJob,
+    withJobContext(runTrackEventJob),
     {
       connection,
       concurrency: 3,
+      telemetry: new BullMQOtel(TRACK_EVENTS_QUEUE.NAME),
     },
   );
 

@@ -62,7 +62,7 @@ async function cleanupScenarioEvents(
 }
 
 // Mock the logger to avoid console noise in tests
-vi.mock("~/utils/logger", () => ({
+vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

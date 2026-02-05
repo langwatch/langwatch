@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { MenuLink } from "~/components/MenuLink";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -26,6 +27,8 @@ export function CustomDashboardsSection({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const currentDashboardId = router.query.dashboard as string | undefined;
+  const { openDrawer } = useDrawer();
+  const queryClient = api.useContext();
 
   const [editingDashboardId, setEditingDashboardId] = useState<string | null>(
     null,
@@ -38,7 +41,6 @@ export function CustomDashboardsSection({
     { enabled: !!projectId },
   );
 
-  const createDashboard = api.dashboards.create.useMutation();
   const renameDashboard = api.dashboards.rename.useMutation();
   const deleteDashboard = api.dashboards.delete.useMutation();
   const reorderDashboards = api.dashboards.reorderDashboards.useMutation();
@@ -54,31 +56,7 @@ export function CustomDashboardsSection({
   }, [editingDashboardId]);
 
   const handleCreateDashboard = () => {
-    const name = prompt(
-      "Enter dashboard name:",
-      `Dashboard ${dashboards.length + 1}`,
-    );
-    if (!name) return;
-
-    createDashboard.mutate(
-      { projectId, name },
-      {
-        onSuccess: (newDashboard) => {
-          void dashboardsQuery.refetch();
-          void router.push(
-            `/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`,
-          );
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error creating dashboard",
-            type: "error",
-            duration: 3000,
-            meta: { closable: true },
-          });
-        },
-      },
-    );
+    openDrawer("dashboardName");
   };
 
   const handleStartRename = (dashboardId: string, currentName: string) => {
@@ -171,6 +149,7 @@ export function CustomDashboardsSection({
       {
         onSuccess: () => {
           void dashboardsQuery.refetch();
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
           // If we deleted the current dashboard, redirect to the first dashboard
           if (currentDashboardId === dashboardId) {
             const remainingDashboards = dashboards.filter(
@@ -263,7 +242,7 @@ export function CustomDashboardsSection({
                       padding={1}
                       cursor="pointer"
                       color="fg.muted"
-                      _hover={{ color: "gray.700" }}
+                      _hover={{ color: "fg.default" }}
                     >
                       <MoreVertical size={14} />
                     </Box>
@@ -318,7 +297,6 @@ export function CustomDashboardsSection({
         width="full"
         variant="ghost"
         onClick={handleCreateDashboard}
-        opacity={createDashboard.isPending ? 0.5 : 1}
       >
         <Plus size={14} /> Add Dashboard
       </Button>

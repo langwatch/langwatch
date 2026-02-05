@@ -10,7 +10,7 @@ import { getWorkerMetricsPort } from "./server/background/config";
 import { getClickHouseClient } from "./server/clickhouse/client";
 import { initializeEventSourcing } from "./server/event-sourcing";
 import { connection as redis } from "./server/redis";
-import { createLogger } from "./utils/logger";
+import { createLogger } from "./utils/logger/server";
 
 const logger = createLogger("langwatch:start");
 

@@ -20,6 +20,7 @@ import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
 import { AlertDrawer } from "./analytics/AlertDrawer";
+import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
@@ -62,6 +63,7 @@ export const drawers = {
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   customGraphAlert: AlertDrawer,
+  dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
   promptList: PromptListDrawer,

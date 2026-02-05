@@ -10,6 +10,7 @@
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
+import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { prisma } from "~/server/db";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
 import { createLogger } from "~/utils/logger/server";
@@ -17,6 +18,7 @@ import { createLogger } from "~/utils/logger/server";
 const logger = createLogger("langwatch:evaluations-v3:runs");
 
 const app = new Hono().basePath("/api/evaluations/v3/runs");
+app.use(tracerMiddleware({ name: "evaluations-v3-runs" }));
 app.use(loggerMiddleware());
 
 /**

@@ -94,6 +94,10 @@ export interface ILicenseEnforcementRepository {
   getAgentCount(organizationId: string): Promise<number>;
   getExperimentCount(organizationId: string): Promise<number>;
   getOnlineEvaluationCount(organizationId: string): Promise<number>;
+  getDatasetCount(organizationId: string): Promise<number>;
+  getDashboardCount(organizationId: string): Promise<number>;
+  getCustomGraphCount(organizationId: string): Promise<number>;
+  getAutomationCount(organizationId: string): Promise<number>;
   getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
@@ -413,6 +417,80 @@ export class LicenseEnforcementRepository
     return this.prisma.monitor.count({
       where: {
         projectId: { in: projectIds },
+      },
+    });
+  }
+
+  /**
+   * Counts active (non-archived) datasets for license enforcement.
+   * Only active datasets count against the license limit.
+   *
+   * Note: Dataset model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getDatasetCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.dataset.count({
+      where: {
+        projectId: { in: projectIds },
+        archivedAt: null,
+      },
+    });
+  }
+
+  /**
+   * Counts all dashboards for license enforcement.
+   * Dashboards do not support archival - all dashboards count against limits.
+   *
+   * Note: Dashboard model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getDashboardCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.dashboard.count({
+      where: {
+        projectId: { in: projectIds },
+      },
+    });
+  }
+
+  /**
+   * Counts all custom graphs for license enforcement.
+   * Custom graphs do not support archival - all graphs count against limits.
+   *
+   * Note: CustomGraph model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getCustomGraphCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.customGraph.count({
+      where: {
+        projectId: { in: projectIds },
+      },
+    });
+  }
+
+  /**
+   * Counts active (non-deleted) automations for license enforcement.
+   * Only active automations count against the license limit.
+   *
+   * Note: Trigger model has RLS policy requiring direct projectId filter,
+   * so we first get project IDs then filter by them.
+   */
+  async getAutomationCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+
+    return this.prisma.trigger.count({
+      where: {
+        projectId: { in: projectIds },
+        deleted: false,
       },
     });
   }

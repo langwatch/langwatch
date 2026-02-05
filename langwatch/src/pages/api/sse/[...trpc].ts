@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import superjson from "superjson";
 import { appRouter } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:sse");
 

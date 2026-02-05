@@ -1,6 +1,8 @@
 import { CostReferenceType, CostType } from "@prisma/client";
 import { type Job, Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import { nanoid } from "nanoid";
+import { withJobContext } from "../../context/asyncContext";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Protections } from "~/server/elasticsearch/protections";
@@ -145,7 +147,7 @@ const buildThreadData = async (
   logger.info(
     {
       threadId,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       projectId,
     },
     "Fetching thread traces",
@@ -298,7 +300,7 @@ const buildDataForEvaluation = async (
   logger.info(
     {
       evaluatorType,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
       isThreadLevel,
       mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
@@ -310,7 +312,7 @@ const buildDataForEvaluation = async (
     // Use thread-based data extraction
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
         threadId: trace.metadata?.thread_id,
       },
       "Using thread-based data extraction",
@@ -320,7 +322,7 @@ const buildDataForEvaluation = async (
     // Use regular trace-based mapping
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
       },
       "Using regular trace-based mapping",
     );
@@ -662,120 +664,123 @@ export const startEvaluationsWorker = (
 
   const traceChecksWorker = new Worker<EvaluationJob, any, EvaluatorTypes>(
     EVALUATIONS_QUEUE.NAME,
-    async (job) => {
-      if (
-        env.NODE_ENV !== "test" &&
-        job.data.trace.trace_id.includes("test-trace")
-      ) {
-        return;
-      }
+    withJobContext(
+      async (job) => {
+        if (
+          env.NODE_ENV !== "test" &&
+          job.data.trace.trace_id.includes("test-trace")
+        ) {
+          return;
+        }
 
-      getJobProcessingCounter("evaluation", "processing").inc();
-      const start = Date.now();
+        getJobProcessingCounter("evaluation", "processing").inc();
+        const start = Date.now();
 
-      try {
-        logger.info({ jobId: job.id, data: job.data }, "processing job");
+        try {
+          logger.info({ jobId: job.id, data: job.data }, "processing job");
 
-        let processed = false;
-        const timeout = new Promise((resolve, reject) => {
-          setTimeout(
-            () => {
-              if (processed) {
-                resolve(undefined);
-              } else {
-                reject(new Error("Job timed out after 5 minutes"));
-              }
-            },
-            5 * 60 * 1000,
-          );
-        });
-
-        const result = (await Promise.race([
-          processFn(job),
-          timeout,
-        ])) as EvaluationResultWithThreadId;
-        processed = true;
-
-        if ("cost" in result && result.cost) {
-          await prisma.cost.create({
-            data: {
-              id: `cost_${nanoid()}`,
-              projectId: job.data.trace.project_id,
-              costType: CostType.TRACE_CHECK,
-              costName: job.data.check.name,
-              referenceType: CostReferenceType.CHECK,
-              referenceId: job.data.check.evaluator_id,
-              amount: result.cost.amount,
-              currency: result.cost.currency,
-              extraInfo: {
-                evaluation_id: job.data.check.evaluation_id,
+          let processed = false;
+          const timeout = new Promise((resolve, reject) => {
+            setTimeout(
+              () => {
+                if (processed) {
+                  resolve(undefined);
+                } else {
+                  reject(new Error("Job timed out after 5 minutes"));
+                }
               },
-            },
+              5 * 60 * 1000,
+            );
           });
-        }
 
-        await updateEvaluationStatusInES({
-          check: job.data.check,
-          trace: job.data.trace,
-          status: result.status,
-          ...(result.evaluation_thread_id && {
-            evaluation_thread_id: result.evaluation_thread_id,
-          }),
-          ...(result.inputs && { inputs: result.inputs }),
-          ...(result.status === "error"
-            ? {
-                error: {
-                  message: result.details,
-                  stack: result.traceback,
+          const result = (await Promise.race([
+            processFn(job),
+            timeout,
+          ])) as EvaluationResultWithThreadId;
+          processed = true;
+
+          if ("cost" in result && result.cost) {
+            await prisma.cost.create({
+              data: {
+                id: `cost_${nanoid()}`,
+                projectId: job.data.trace.project_id,
+                costType: CostType.TRACE_CHECK,
+                costName: job.data.check.name,
+                referenceType: CostReferenceType.CHECK,
+                referenceId: job.data.check.evaluator_id,
+                amount: result.cost.amount,
+                currency: result.cost.currency,
+                extraInfo: {
+                  evaluation_id: job.data.check.evaluation_id,
                 },
-              }
-            : {}),
-          ...(result.status === "processed"
-            ? {
-                score: result.score,
-                passed: result.passed,
-                label: result.label,
-              }
-            : {}),
-          details: "details" in result ? (result.details ?? "") : "",
-        });
-        logger.info({ jobId: job.id }, "successfully processed job");
+              },
+            });
+          }
 
-        const duration = Date.now() - start;
-        getJobProcessingDurationHistogram("evaluation").observe(duration);
-        getJobProcessingCounter("evaluation", "completed").inc();
-      } catch (error) {
-        await updateEvaluationStatusInES({
-          check: job.data.check,
-          trace: job.data.trace,
-          status: "error",
-          error: error,
-        });
-        // Note: Logging is handled by the 'failed' event handler to avoid double logging
+          await updateEvaluationStatusInES({
+            check: job.data.check,
+            trace: job.data.trace,
+            status: result.status,
+            ...(result.evaluation_thread_id && {
+              evaluation_thread_id: result.evaluation_thread_id,
+            }),
+            ...(result.inputs && { inputs: result.inputs }),
+            ...(result.status === "error"
+              ? {
+                  error: {
+                    message: result.details,
+                    stack: result.traceback,
+                  },
+                }
+              : {}),
+            ...(result.status === "processed"
+              ? {
+                  score: result.score,
+                  passed: result.passed,
+                  label: result.label,
+                }
+              : {}),
+            details: "details" in result ? (result.details ?? "") : "",
+          });
+          logger.info({ jobId: job.id }, "successfully processed job");
 
-        if (
-          typeof error === "object" &&
-          (error as any).message?.includes("504 Gateway Timeout")
-        ) {
+          const duration = Date.now() - start;
+          getJobProcessingDurationHistogram("evaluation").observe(duration);
+          getJobProcessingCounter("evaluation", "completed").inc();
+        } catch (error) {
+          await updateEvaluationStatusInES({
+            check: job.data.check,
+            trace: job.data.trace,
+            status: "error",
+            error: error,
+          });
+          // Note: Logging is handled by the 'failed' event handler to avoid double logging
+
+          if (
+            typeof error === "object" &&
+            (error as any).message?.includes("504 Gateway Timeout")
+          ) {
+            throw error;
+          }
+
+          if (
+            (typeof (error as any).status === "number" &&
+              (error as any).status >= 400 &&
+              (error as any).status < 500) ||
+            (error as any).toString().startsWith("422")
+          ) {
+            throw error;
+          }
+
           throw error;
         }
-
-        if (
-          (typeof (error as any).status === "number" &&
-            (error as any).status >= 400 &&
-            (error as any).status < 500) ||
-          (error as any).toString().startsWith("422")
-        ) {
-          throw error;
-        }
-
-        throw error;
-      }
-    },
+      },
+    ),
     {
       connection,
       concurrency: 3,
       stalledInterval: 10 * 60 * 1000, // 10 minutes
+      telemetry: new BullMQOtel(EVALUATIONS_QUEUE.NAME),
     },
   );
 

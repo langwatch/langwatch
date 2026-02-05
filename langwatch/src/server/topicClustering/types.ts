@@ -31,12 +31,14 @@ export type TopicClusteringTraceTopicMap = {
 };
 
 export type BatchClusteringParams = {
+  project_id: string;
   litellm_params: Record<string, string>;
   embeddings_litellm_params: Record<string, any>;
   traces: TopicClusteringTrace[];
 };
 
 export type IncrementalClusteringParams = {
+  project_id: string;
   litellm_params: Record<string, string>;
   embeddings_litellm_params: Record<string, any>;
   topics: TopicClusteringTopic[];

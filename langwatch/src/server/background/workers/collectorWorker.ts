@@ -1,5 +1,6 @@
 import type { Project } from "@prisma/client";
 import { Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
@@ -11,6 +12,7 @@ import {
 } from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger/server";
+import { withJobContext } from "../../context/asyncContext";
 import {
   captureException,
   getCurrentScope,
@@ -245,7 +247,7 @@ const processCollectorJob_ = async (
   logger.info(
     {
       jobId: id,
-      ...(data.traceId && { traceId: data.traceId }),
+      ...(data.traceId && { observedTraceId: data.traceId }),
       ...(data.projectId && { projectId: data.projectId }),
       ...(data.spans?.length && { spanCount: data.spans.length }),
     },
@@ -881,7 +883,7 @@ export const processCollectorCheckAndAdjustJob = async (
       input,
     });
   } catch {
-    logger.debug({ traceId }, "failed to score satisfaction for");
+    logger.debug({ observedTraceId: traceId }, "failed to score satisfaction for");
   }
 };
 
@@ -895,27 +897,30 @@ export const startCollectorWorker = () => {
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,
-    async (job) => {
-      const jobLog = (message: string) => {
-        void job.log(message);
-      };
+    withJobContext(
+      async (job) => {
+        const jobLog = (message: string) => {
+          void job.log(message);
+        };
 
-      jobLog(
-        `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
-      );
+        jobLog(
+          `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
+        );
 
-      try {
-        await processCollectorJob(job.id, job.data);
-        jobLog(`Completed successfully`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        jobLog(`Failed: ${message}`);
-        throw error;
-      }
-    },
+        try {
+          await processCollectorJob(job.id, job.data);
+          jobLog(`Completed successfully`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          jobLog(`Failed: ${message}`);
+          throw error;
+        }
+      },
+    ),
     {
       connection,
       concurrency: 20,
+      telemetry: new BullMQOtel(COLLECTOR_QUEUE.NAME),
     },
   );
 

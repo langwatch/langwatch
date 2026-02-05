@@ -11,7 +11,7 @@ import { getClickHouseClient } from "../../clickhouse/client";
 import type { FilterField } from "../../filters/types";
 import type { TimeseriesInputType, SeriesInputType } from "../registry";
 import { currentVsPreviousDates } from "../../api/routers/analytics/common";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import {
   buildTimeseriesQuery,
   buildDataForFilterQuery,
@@ -36,7 +36,12 @@ const MINUTES_PER_DAY = 24 * 60;
 const MS_PER_MINUTE = 1000 * 60;
 
 // Re-export types for backward compatibility
-export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksResult };
+export type {
+  TimeseriesResult,
+  FilterDataResult,
+  TopDocumentsResult,
+  FeedbacksResult,
+};
 
 /**
  * ClickHouse Analytics Service
@@ -46,7 +51,9 @@ export type { TimeseriesResult, FilterDataResult, TopDocumentsResult, FeedbacksR
 export class ClickHouseAnalyticsService {
   private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:analytics:clickhouse");
-  private readonly tracer = getLangWatchTracer("langwatch.analytics.clickhouse");
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.analytics.clickhouse",
+  );
 
   constructor() {
     this.clickHouseClient = getClickHouseClient();
@@ -122,7 +129,13 @@ export class ClickHouseAnalyticsService {
                   metric: s.metric,
                   aggregation: s.aggregation,
                   pipeline: s.pipeline,
-                  alias: buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey),
+                  alias: buildMetricAlias(
+                    i,
+                    s.metric,
+                    s.aggregation,
+                    s.key,
+                    s.subkey,
+                  ),
                 })),
                 rowCount: rows.length,
                 sampleRow: rows[0],
@@ -191,7 +204,7 @@ export class ClickHouseAnalyticsService {
       const dateKey =
         timeScale === "full"
           ? "full"
-          : (row.date as string) ?? new Date().toISOString();
+          : ((row.date as string) ?? new Date().toISOString());
 
       const targetMap =
         period === "current" ? bucketMap.current : bucketMap.previous;
@@ -321,7 +334,12 @@ export class ClickHouseAnalyticsService {
         const value = bucket[key];
 
         // Handle grouped metrics (nested objects)
-        if (groupBy && key === groupBy && typeof value === "object" && value !== null) {
+        if (
+          groupBy &&
+          key === groupBy &&
+          typeof value === "object" &&
+          value !== null
+        ) {
           const groupData = value as Record<string, Record<string, number>>;
           for (const [groupKey, metrics] of Object.entries(groupData)) {
             if (!allGroupedMetricKeys.has(groupKey)) {
@@ -349,7 +367,10 @@ export class ClickHouseAnalyticsService {
 
       // Normalize grouped metrics
       if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
-        const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
+        const groupData = bucket[groupBy] as Record<
+          string,
+          Record<string, number>
+        >;
 
         // Ensure all group keys exist
         for (const [groupKey, metricKeys] of allGroupedMetricKeys) {
@@ -428,7 +449,9 @@ export class ClickHouseAnalyticsService {
               field: row.field,
               label: row.label,
               count:
-                typeof row.count === "string" ? parseInt(row.count, 10) : row.count,
+                typeof row.count === "string"
+                  ? parseInt(row.count, 10)
+                  : row.count,
             })),
           };
         } catch (error) {
@@ -601,8 +624,14 @@ export class ClickHouseAnalyticsService {
 
             for (const [key, value] of Object.entries(row.attributes)) {
               // Check for metric keys - both plain and namespaced forms
-              const isVoteKey = key === "vote" || key === "metrics.vote" || key === "event.metrics.vote";
-              const isScoreKey = key === "score" || key === "metrics.score" || key === "event.metrics.score";
+              const isVoteKey =
+                key === "vote" ||
+                key === "metrics.vote" ||
+                key === "event.metrics.vote";
+              const isScoreKey =
+                key === "score" ||
+                key === "metrics.score" ||
+                key === "event.metrics.score";
 
               if (isVoteKey || isScoreKey) {
                 // Use the plain key name for consistency with ES format

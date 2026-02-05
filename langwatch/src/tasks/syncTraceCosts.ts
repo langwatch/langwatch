@@ -1,5 +1,5 @@
 import { esClient, TRACE_INDEX, traceIndexId } from "../server/elasticsearch";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:tasks:syncTraceCosts");
 
@@ -87,7 +87,7 @@ export default async function execute() {
 
         // Skip if no trace ID, project ID, or spans
         if (!traceId || !projectId || !Array.isArray(spans)) {
-          logger.warn({ traceId, projectId }, "Invalid trace data, skipping");
+          logger.warn({ observedTraceId: traceId, projectId }, "Invalid trace data, skipping");
           totalSkippedCount++;
           continue;
         }
@@ -135,7 +135,7 @@ export default async function execute() {
                   // Optimized script to calculate total cost from spans
                   double totalCost = 0.0;
                   boolean hasValidCosts = false;
-                  
+
                   if (ctx._source.spans instanceof List) {
                     for (span in ctx._source.spans) {
                       if (span?.metrics?.cost != null) {
@@ -144,7 +144,7 @@ export default async function execute() {
                       }
                     }
                   }
-                  
+
                   // Update trace metrics only if we have valid costs
                   if (hasValidCosts) {
                     if (!ctx._source.containsKey('metrics')) {

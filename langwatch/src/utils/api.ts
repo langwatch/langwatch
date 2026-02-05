@@ -12,10 +12,16 @@ import {
   TRPCClientError,
 } from "@trpc/client";
 import { createTRPCNext } from "@trpc/next";
+import { MutationCache } from "@tanstack/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import { sseLink } from "./sseLink";
+import {
+  extractLimitExceededInfo,
+  markAsHandledByLicenseHandler,
+} from "./trpcError";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -79,6 +85,36 @@ export const api = createTRPCNext<AppRouter>({
       ],
 
       queryClientConfig: {
+        /**
+         * Global mutation error handler for license limit enforcement.
+         *
+         * This handler intercepts all tRPC mutation errors and:
+         * 1. Checks if the error is a LIMIT_EXCEEDED FORBIDDEN error
+         * 2. If so, opens the upgrade modal with limit details
+         * 3. Marks the error via WeakSet so component-level handlers can skip it
+         *
+         * Components using `onError` callbacks should check `isHandledByGlobalLicenseHandler(error)`
+         * to avoid showing duplicate error UI (toast + modal) for license errors.
+         *
+         * @see isHandledByGlobalLicenseHandler in trpcError.ts
+         * @see extractLimitExceededInfo in trpcError.ts
+         */
+        mutationCache: new MutationCache({
+          onError: (error, _variables, _context, _mutation) => {
+            const limitInfo = extractLimitExceededInfo(error);
+            if (limitInfo) {
+              // Mark as handled so component-level handlers can skip it
+              if (error instanceof Error) {
+                markAsHandledByLicenseHandler(error);
+              }
+
+              useUpgradeModalStore
+                .getState()
+                .open(limitInfo.limitType, limitInfo.current, limitInfo.max);
+            }
+            // Non-license errors bubble up to component-level handlers
+          },
+        }),
         defaultOptions: {
           mutations: {
             networkMode: "always",

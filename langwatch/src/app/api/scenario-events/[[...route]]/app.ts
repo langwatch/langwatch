@@ -9,6 +9,7 @@ import {
   blockTraceUsageExceededMiddleware,
   handleError,
   loggerMiddleware,
+  tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { ScenarioEventService } from "./scenario-event.service";
@@ -27,6 +28,7 @@ export const app = new Hono<{
 }>().basePath("/api/scenario-events");
 
 // Middleware
+app.use(tracerMiddleware({ name: "scenario-events" }));
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
 app.use("/*", blockTraceUsageExceededMiddleware);

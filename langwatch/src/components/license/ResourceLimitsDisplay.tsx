@@ -37,16 +37,7 @@ export const RESOURCE_LABELS: Record<ResourceKey, string> = {
 const RESOURCE_ORDER: ResourceKey[] = [
   "members",
   "membersLite",
-  "teams",
-  "projects",
-  "prompts",
-  "workflows",
-  "scenarios",
-  "evaluators",
-  "agents",
-  "experiments",
   "messagesPerMonth",
-  "evaluationsCredit",
 ] as const;
 
 export interface ResourceLimits {
@@ -173,7 +164,7 @@ export function ResourceLimitsDisplay({ limits }: ResourceLimitsDisplayProps) {
       maxWidth="md"
     >
       <VStack align="start" gap={2}>
-        {RESOURCE_ORDER.filter((key) => key === "messagesPerMonth" || limits[key].max < 99_999).map((key) => (
+        {RESOURCE_ORDER.map((key) => (
           <ResourceLimitRow
             key={key}
             label={RESOURCE_LABELS[key]}

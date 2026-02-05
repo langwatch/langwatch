@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Card,
   Heading,
@@ -26,11 +27,13 @@ import {
 import SettingsLayout from "../../components/SettingsLayout";
 import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const router = useRouter();
 
   // Date range selector
@@ -117,11 +120,30 @@ function AuditLogPage() {
       },
     );
 
-  if (!organization) {
+  if (!organization || isPlanLoading) {
     return (
       <SettingsLayout>
         <VStack align="center" justify="center" width="full" height="200px">
           <Spinner />
+        </VStack>
+      </SettingsLayout>
+    );
+  }
+
+  if (!isEnterprise) {
+    return (
+      <SettingsLayout>
+        <VStack gap={6} width="full" align="start">
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Enterprise Feature</Alert.Title>
+              <Alert.Description>
+                Audit logs are available on Enterprise plans. Contact sales to
+                upgrade.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         </VStack>
       </SettingsLayout>
     );

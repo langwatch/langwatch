@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -24,6 +25,7 @@ import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
@@ -37,12 +39,32 @@ import { api } from "../../utils/api";
  */
 function RolesSettings() {
   const { organization, hasPermission } = useOrganizationTeamProject();
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
 
-  if (!organization) {
+  if (!organization || isPlanLoading) {
     return (
       <SettingsLayout>
         <VStack align="center" justify="center" width="full" height="200px">
           <Spinner />
+        </VStack>
+      </SettingsLayout>
+    );
+  }
+
+  if (!isEnterprise) {
+    return (
+      <SettingsLayout>
+        <VStack gap={6} width="full" align="start">
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Enterprise Feature</Alert.Title>
+              <Alert.Description>
+                Custom roles are available on Enterprise plans. Contact sales to
+                upgrade.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         </VStack>
       </SettingsLayout>
     );

@@ -3,10 +3,13 @@ import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
+import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
@@ -37,6 +40,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectSlug: project?.slug,
   });
   const scenarioId = params.scenarioId;
+
+  // License enforcement for scenario creation
+  const scenarioEnforcement = useLicenseEnforcement("scenarios");
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -73,7 +79,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
       props.onSuccess?.(data);
     },
-    onError: (error: { message: string }) => {
+    onError: (error) => {
+      // Skip toast if already handled by global license handler (shows modal instead)
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Failed to create scenario",
         description: error.message,
@@ -91,7 +99,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       });
       props.onSuccess?.(data);
     },
-    onError: (error: { message: string }) => {
+    onError: (error) => {
+      // Skip toast if already handled by global license handler (shows modal instead)
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Failed to update scenario",
         description: error.message,
@@ -110,13 +120,29 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           ...data,
         });
       } else {
-        return createMutation.mutateAsync({
-          projectId: project.id,
-          ...data,
+        // Check license limit before creating a new scenario
+        return new Promise((resolve) => {
+          checkCompoundLimits([scenarioEnforcement], async () => {
+            try {
+              const result = await createMutation.mutateAsync({
+                projectId: project.id,
+                ...data,
+              });
+              resolve(result);
+            } catch {
+              // Error already handled by global mutation cache if license error
+              resolve(null);
+            }
+          });
+
+          // If limit exceeded, modal is shown and callback won't run - resolve null
+          if (!scenarioEnforcement.isAllowed) {
+            resolve(null);
+          }
         });
       }
     },
-    [project?.id, scenario, createMutation, updateMutation],
+    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {

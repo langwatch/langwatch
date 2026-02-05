@@ -21,7 +21,7 @@ from langwatch_nlp.topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
-from langwatch_nlp.logger import get_logger
+from langwatch_nlp.logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.batch")
 
@@ -84,6 +84,7 @@ def build_hierarchy(
 
 
 class BatchClusteringParams(BaseModel):
+    project_id: str
     traces: list[Trace]
     deployment_name: Optional[str] = None
     litellm_params: dict[str, str]
@@ -95,46 +96,55 @@ def setup_endpoints(app: FastAPI):
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
-        logger.info(f"Starting batch clustering for {len(params.traces)} traces")
+        try:
+            set_log_context(project_id=params.project_id)
+            logger.info("Starting batch clustering", trace_count=len(params.traces))
 
-        model = params.litellm_params["model"]
-        if model.startswith("azure/") and params.deployment_name:
-            model = f"azure/{params.deployment_name}"
+            model = params.litellm_params["model"]
+            if model.startswith("azure/") and params.deployment_name:
+                model = f"azure/{params.deployment_name}"
 
-        logger.info("Step 1/4: Generating embeddings for traces...")
-        traces_with_embeddings = fill_embeddings(
-            params.traces, params.embeddings_litellm_params
-        )
-        logger.info(
-            f"Step 1/4: Embeddings complete - {len(traces_with_embeddings)} traces with valid embeddings"
-        )
+            logger.info("Generating embeddings for traces", step="1/4")
+            traces_with_embeddings = fill_embeddings(
+                params.traces, params.embeddings_litellm_params
+            )
+            logger.info(
+                "Embeddings complete",
+                step="1/4",
+                traces_with_embeddings=len(traces_with_embeddings),
+            )
 
-        logger.info("Step 2/4: Building hierarchy from embeddings...")
-        hierarchy = build_hierarchy(
-            traces_with_embeddings, COPHENETIC_DISTANCES_FOR_TOPICS
-        )
-        logger.info(f"Step 2/4: Hierarchy built - {len(hierarchy)} topics identified")
+            logger.info("Building hierarchy from embeddings", step="2/4")
+            hierarchy = build_hierarchy(
+                traces_with_embeddings, COPHENETIC_DISTANCES_FOR_TOPICS
+            )
+            logger.info("Hierarchy built", step="2/4", topics_identified=len(hierarchy))
 
-        logger.info("Step 3/4: Generating topic and subtopic names...")
-        topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
-            model=model,
-            litellm_params=params.litellm_params,
-            embeddings_litellm_params=params.embeddings_litellm_params,
-            hierarchy=hierarchy,
-        )
-        logger.info(f"Step 3/4: Names generated for {len(topic_names)} topics")
+            logger.info("Generating topic and subtopic names", step="3/4")
+            topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
+                model=model,
+                litellm_params=params.litellm_params,
+                embeddings_litellm_params=params.embeddings_litellm_params,
+                hierarchy=hierarchy,
+            )
+            logger.info("Names generated", step="3/4", topic_count=len(topic_names))
 
-        logger.info("Step 4/4: Building final response...")
-        topics, subtopics, traces_to_assign = build_response(
-            hierarchy, topic_names, subtopic_names
-        )
-        logger.info(
-            f"Batch clustering complete - {len(topics)} topics, {len(subtopics)} subtopics, {len(traces_to_assign)} trace assignments"
-        )
+            logger.info("Building final response", step="4/4")
+            topics, subtopics, traces_to_assign = build_response(
+                hierarchy, topic_names, subtopic_names
+            )
+            logger.info(
+                "Batch clustering complete",
+                topic_count=len(topics),
+                subtopic_count=len(subtopics),
+                trace_assignment_count=len(traces_to_assign),
+            )
 
-        return {
-            "topics": topics,
-            "subtopics": subtopics,
-            "traces": traces_to_assign,
-            "cost": cost,
-        }
+            return {
+                "topics": topics,
+                "subtopics": subtopics,
+                "traces": traces_to_assign,
+                "cost": cost,
+            }
+        finally:
+            clear_log_context()

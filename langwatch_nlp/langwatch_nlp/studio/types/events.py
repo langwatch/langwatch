@@ -283,3 +283,10 @@ def get_trace_id(event: StudioClientEvent):
             else None
         )
     )
+
+
+def get_project_id(event: StudioClientEvent) -> Optional[str]:
+    """Extract project_id from event workflow if available."""
+    if hasattr(event.payload, "workflow") and hasattr(event.payload.workflow, "project_id"):
+        return event.payload.workflow.project_id  # type: ignore
+    return None

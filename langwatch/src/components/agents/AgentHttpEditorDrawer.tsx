@@ -40,6 +40,7 @@ import type {
   TypedAgent,
 } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
 import {
   AuthConfigSection,
   BodyTemplateEditor,
@@ -312,6 +313,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error creating agent",
         description: error.message,

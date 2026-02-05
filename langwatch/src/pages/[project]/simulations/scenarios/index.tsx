@@ -14,14 +14,12 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
-  const { checkAndProceed } = useLicenseEnforcement("scenarios");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const {
@@ -46,9 +44,7 @@ function ScenarioLibraryPage() {
   };
 
   const handleNewScenario = () => {
-    checkAndProceed(() => {
-      setIsCreateModalOpen(true);
-    });
+    setIsCreateModalOpen(true);
   };
 
   return (

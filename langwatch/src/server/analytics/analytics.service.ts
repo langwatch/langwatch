@@ -21,8 +21,11 @@ import type {
 import type { TimeseriesInputType } from "./registry";
 import { getElasticsearchAnalyticsService } from "./elasticsearch-analytics.service";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
-import { AnalyticsComparator, getAnalyticsComparator } from "./analytics-comparator";
-import { createLogger } from "../../utils/logger";
+import {
+  AnalyticsComparator,
+  getAnalyticsComparator,
+} from "./analytics-comparator";
+import { createLogger } from "../../utils/logger/server";
 
 /**
  * Configuration for comparison mode
@@ -127,7 +130,10 @@ export class AnalyticsService {
         const useClickHouse = await this.isClickHouseEnabled(projectId);
         const comparisonMode = this.isComparisonModeEnabled();
 
-        span.setAttribute("backend", useClickHouse ? "clickhouse" : "elasticsearch");
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
         span.setAttribute("comparison.mode", comparisonMode);
 
         if (comparisonMode && this.chService.isAvailable()) {
@@ -277,9 +283,19 @@ export class AnalyticsService {
       projectId,
       { projectId, startDate, endDate },
       () =>
-        this.esService.getTopUsedDocuments(projectId, startDate, endDate, filters),
+        this.esService.getTopUsedDocuments(
+          projectId,
+          startDate,
+          endDate,
+          filters,
+        ),
       () =>
-        this.chService.getTopUsedDocuments(projectId, startDate, endDate, filters),
+        this.chService.getTopUsedDocuments(
+          projectId,
+          startDate,
+          endDate,
+          filters,
+        ),
     );
   }
 
