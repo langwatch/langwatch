@@ -28,7 +28,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 import { safeTruncate } from "../../../utils/truncate";
 import { findOrCreateExperiment } from "../experiment/init";
 

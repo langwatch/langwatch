@@ -22,7 +22,7 @@ vi.mock("~/server/elasticsearch", () => ({
   esClient: vi.fn(),
 }));
 
-vi.mock("~/utils/logger", () => ({
+vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -78,9 +78,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         { index: "test-index" },
         { query: { test: "query" } },
@@ -138,9 +137,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         { index: "test-index" },
         { query: { test: "query" } },
@@ -184,9 +182,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         { index: "test-index" },
         { query: { test: "query" } },
@@ -250,9 +247,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         { index: "test-index" },
         { query: { test: "query" } },
@@ -364,9 +360,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         { index: "test-index" },
         { query: { test: "query" } },
@@ -418,9 +413,8 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const { esClient } = await import("~/server/elasticsearch");
       (esClient as any).mockResolvedValue(mockEsClient);
 
-      const { createScenarioAnalyticsQueriesForAllEventTypes } = await import(
-        "~/server/scenario-analytics"
-      );
+      const { createScenarioAnalyticsQueriesForAllEventTypes } =
+        await import("~/server/scenario-analytics");
       (createScenarioAnalyticsQueriesForAllEventTypes as any).mockReturnValue([
         // Project 1 queries (6 objects: 3 event types × 2 objects each)
         { index: "test-index" },

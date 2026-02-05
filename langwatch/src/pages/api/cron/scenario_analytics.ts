@@ -4,7 +4,7 @@ import { prisma } from "~/server/db";
 import { esClient } from "~/server/elasticsearch";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
 import { ANALYTICS_KEYS } from "~/types";
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:cron:scenario-analytics");
 

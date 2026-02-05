@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 import { normalizeHeaderValue } from "../../../utils/headers";
 
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:annotations:index");
 

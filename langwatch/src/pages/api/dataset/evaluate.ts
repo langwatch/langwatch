@@ -24,7 +24,7 @@ import {
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:guardrail:evaluate");
 

@@ -11,7 +11,7 @@ import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { normalizeHeaderValue } from "../../utils/headers";
 
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 const _logger = createLogger("langwatch:analytics");
 

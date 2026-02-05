@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:annotations:id");
 
