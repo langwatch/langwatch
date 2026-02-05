@@ -9,69 +9,36 @@ Feature: SubscriptionHandler License Integration
     And an organization exists
 
   # ============================================================================
-  # Default Behavior (LICENSE_ENFORCEMENT_ENABLED not set or false)
-  # Backward compatible: always returns UNLIMITED_PLAN
+  # License-Based Plan Resolution
   # ============================================================================
 
-  Scenario: Returns OPEN_SOURCE type when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is not set
-    And the organization has no license
-    When I call SubscriptionHandler.getActivePlan
-    Then the plan type is "OPEN_SOURCE"
-
-  Scenario: Allows unlimited members when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is not set
-    When I call SubscriptionHandler.getActivePlan
-    Then maxMembers is 99999
-
-  Scenario: Overrides adding limitations when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is not set
-    When I call SubscriptionHandler.getActivePlan
-    Then overrideAddingLimitations is true
-
-  Scenario: Ignores valid license when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is not set
-    And the organization has a valid license with maxMembers 10
-    When I call SubscriptionHandler.getActivePlan
-    Then the plan type is "OPEN_SOURCE"
-
-  # ============================================================================
-  # Enforcement Enabled: LICENSE_ENFORCEMENT_ENABLED=true
-  # ============================================================================
-
-  Scenario: Returns FREE type when no license and enforcement enabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has no license
+  Scenario: Returns FREE type when no license
+    Given the organization has no license
     When I call SubscriptionHandler.getActivePlan
     Then the plan type is "FREE"
 
-  Scenario: Limits to 2 members when no license and enforcement enabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has no license
+  Scenario: Limits to 1 member when no license
+    Given the organization has no license
     When I call SubscriptionHandler.getActivePlan
-    Then maxMembers is 2
+    Then maxMembers is 1
 
-  Scenario: Limits to 2 projects when no license and enforcement enabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has no license
+  Scenario: Limits to 2 projects when no license
+    Given the organization has no license
     When I call SubscriptionHandler.getActivePlan
     Then maxProjects is 2
 
   Scenario: Returns license plan type when valid license exists
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has a valid license with plan type "GROWTH"
+    Given the organization has a valid license with plan type "GROWTH"
     When I call SubscriptionHandler.getActivePlan
     Then the plan type is "GROWTH"
 
   Scenario: Returns FREE type when license is expired
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has an expired license
+    Given the organization has an expired license
     When I call SubscriptionHandler.getActivePlan
     Then the plan type is "FREE"
 
   Scenario: Returns FREE type when license is invalid
-    Given LICENSE_ENFORCEMENT_ENABLED is "true"
-    And the organization has an invalid license
+    Given the organization has an invalid license
     When I call SubscriptionHandler.getActivePlan
     Then the plan type is "FREE"
 
@@ -200,7 +167,7 @@ Feature: SubscriptionHandler License Integration
     Given the organization has no license
     When I call getActivePlan
     Then the plan type is "FREE"
-    And maxMembers is 2
+    And maxMembers is 1
 
   Scenario: getActivePlan returns license plan when valid
     Given the organization has a valid license with plan type "GROWTH" and maxMembers 25

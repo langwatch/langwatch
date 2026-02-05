@@ -33,56 +33,21 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited when enforcement disabled)
-  # ============================================================================
-
-  Scenario: No license allows unlimited members when enforcement disabled
-    Given the organization has 3 accepted members
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  Scenario: No license with 100 existing members still allows invites when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 accepted members
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  # ============================================================================
   # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
   Scenario: Expired license enforces FREE tier member limit
     Given the organization has an expired license
-    And the organization has 2 accepted members
+    And the organization has 1 accepted member
     When I invite user "new@example.com" to the organization
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of invites allowed"
 
-  Scenario: Invalid license enforces FREE tier member limit
+  Scenario: Invalid license blocks at FREE tier limit
     Given the organization has an invalid license signature
     And the organization has 1 accepted member
     When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
-
-  Scenario: Invalid license blocks at FREE tier limit
-    Given the organization has an invalid license signature
-    And the organization has 2 accepted members
-    When I invite user "new@example.com" to the organization
     Then the request fails with FORBIDDEN
-
-  # ============================================================================
-  # Feature Flag Override
-  # ============================================================================
-
-  Scenario: Feature flag disabled allows unlimited even with license
-    Given the organization has 3 accepted members
-    And the organization has a license with maxMembers 3
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    When I invite user "new@example.com" to the organization
-    Then the invite is created successfully
 
   # ============================================================================
   # Bulk Invites

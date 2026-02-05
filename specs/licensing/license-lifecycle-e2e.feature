@@ -10,7 +10,6 @@ Feature: License Lifecycle End-to-End
 
   Scenario: Complete license activation and enforcement flow
     Given a fresh LangWatch self-hosted deployment
-    And LICENSE_ENFORCEMENT_ENABLED is "true"
     And an organization "Acme Corp" exists with 3 members and 2 projects
     And I am logged in as an admin of the organization
 
@@ -80,25 +79,11 @@ Feature: License Lifecycle End-to-End
     And the organization has 3 members and 3 projects
     When I check the active plan via API
     Then the plan type is "FREE"
-    And maxMembers is 2
+    And maxMembers is 1
     And maxProjects is 2
 
     When I try to invite a new member
     Then the invite fails because member limit is exceeded
-
-  # ============================================================================
-  # Feature Flag Behavior
-  # ============================================================================
-
-  Scenario: Feature flag disables enforcement
-    Given the organization has a license with maxMembers 2
-    And the organization has 3 members
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    When I try to invite a new member
-    Then the invite is created successfully
-
-    When I navigate to the license settings page
-    Then I still see the license status displayed
 
   # ============================================================================
   # API Access with License

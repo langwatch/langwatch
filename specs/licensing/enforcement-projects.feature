@@ -33,17 +33,6 @@ Feature: Project Limit Enforcement with License
     Then the request fails with FORBIDDEN
 
   # ============================================================================
-  # No License (Unlimited when enforcement disabled)
-  # ============================================================================
-
-  Scenario: No license allows unlimited projects when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 projects
-    When I create a project named "New Project"
-    Then the project is created successfully
-
-  # ============================================================================
   # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
@@ -62,17 +51,6 @@ Feature: Project Limit Enforcement with License
   Scenario: Invalid license allows creation under FREE tier limit
     Given the organization has an invalid license signature
     And the organization has 1 project
-    When I create a project named "New Project"
-    Then the project is created successfully
-
-  # ============================================================================
-  # Feature Flag Override
-  # ============================================================================
-
-  Scenario: Feature flag disabled allows unlimited projects
-    Given the organization has a license with maxProjects 2
-    And the organization has 5 projects
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
     When I create a project named "New Project"
     Then the project is created successfully
 
