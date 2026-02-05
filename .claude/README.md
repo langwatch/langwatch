@@ -36,6 +36,7 @@ User Request
 │   ├── coder.md
 │   ├── repo-sherpa.md
 │   ├── uncle-bob-reviewer.md
+│   ├── devils-advocate.md            # Stress-test proposals and plans
 │   ├── playwright-test-planner.md    # E2E: explores app, creates plans
 │   ├── playwright-test-generator.md  # E2E: generates tests from plans
 │   ├── playwright-test-healer.md     # E2E: fixes failing tests
@@ -46,6 +47,7 @@ User Request
 │   ├── code/           # Delegates to coder agent
 │   ├── test-review/    # Delegates to test-reviewer agent
 │   ├── review/         # Delegates to uncle-bob-reviewer
+│   ├── challenge/      # Delegates to devils-advocate
 │   ├── sherpa/         # Delegates to repo-sherpa
 │   └── e2e/            # Coordinates E2E test generation workflow
 └── commands/       # Slash commands (non-agent utilities)
@@ -61,6 +63,7 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 |-------|---------|-------|
 | `coder` | TDD implementation, self-verification | Opus |
 | `uncle-bob-reviewer` | SOLID/Clean Code review | Opus |
+| `devils-advocate` | Stress-test proposals, plans, and architecture decisions | Opus |
 | `repo-sherpa` | Documentation, DX, meta-layer | Opus |
 | `playwright-test-planner` | Explore live app, create test plans | Opus |
 | `playwright-test-generator` | Generate Playwright tests from plans | Sonnet |
@@ -215,6 +218,12 @@ ORCHESTRATOR (main thread)
 │                  - Test pyramid placement
 │                  - Clean code inspection
 │
+├── /challenge ──► DEVILS-ADVOCATE
+│                  - Stress-test proposals and plans
+│                  - Find hidden assumptions
+│                  - Failure mode analysis
+│                  - Alternative approaches
+│
 ├── /e2e  ───────► E2E WORKFLOW (coordinates agents)
 │                  ├── playwright-test-planner
 │                  │   - Explore live app
@@ -252,6 +261,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/test-review <path>` | test-reviewer | Review specs and tests for pyramid placement |
 | `/code <task>` | coder | Implement with TDD |
 | `/review <focus>` | uncle-bob + cupid + test-reviewer | Quality review (parallel) |
+| `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
 | `/e2e <feature>` | (coordinates e2e agents) | Generate and verify E2E tests |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
