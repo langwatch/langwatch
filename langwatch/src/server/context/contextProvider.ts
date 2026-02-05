@@ -6,7 +6,7 @@
  * its getLogContext function here, and the logger calls getContext().
  */
 
-type ContextGetter = () => Record<string, string | null>;
+type ContextGetter = () => Record<string, string | undefined>;
 
 let contextGetter: ContextGetter | null = null;
 
@@ -22,7 +22,7 @@ export function registerContextProvider(getter: ContextGetter): void {
  * Gets the current request context for logging.
  * Returns an empty object if no context provider is registered.
  */
-export function getContext(): Record<string, string | null> {
+export function getContext(): Record<string, string | undefined> {
   if (contextGetter) {
     return contextGetter();
   }

@@ -17,6 +17,7 @@ import { streamSSE } from "hono/streaming";
 import { handle } from "hono/vercel";
 import type { z } from "zod";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
+import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import {
   createInitialUIState,
   type EvaluationsV3State,
@@ -36,6 +37,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 const logger = createLogger("langwatch:evaluations-v3:run");
 
 const app = new Hono().basePath("/api/evaluations/v3");
+app.use(tracerMiddleware({ name: "evaluations-v3-run" }));
 app.use(loggerMiddleware());
 
 /**

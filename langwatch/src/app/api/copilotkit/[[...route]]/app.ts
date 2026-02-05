@@ -19,6 +19,7 @@ import {
   authMiddleware,
   handleError,
   loggerMiddleware,
+  tracerMiddleware,
 } from "../../middleware";
 import { PromptStudioAdapter } from "./service-adapter";
 
@@ -36,6 +37,7 @@ export const app = new Hono<{
 }>().basePath("/api/copilotkit");
 
 // Middleware
+app.use(tracerMiddleware({ name: "copilotkit" }));
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
 app.onError(handleError);

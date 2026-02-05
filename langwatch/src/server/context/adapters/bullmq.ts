@@ -7,6 +7,8 @@ import {
   runWithContext,
 } from "../core";
 
+// Note: getCurrentContext is used by getJobContextMetadata for business context
+
 /**
  * Type for job data that includes the optional __context field.
  * Used by QueueWithFallback to propagate context through queues.
@@ -18,17 +20,13 @@ export type JobDataWithContext<T> = T & {
 /**
  * Creates a RequestContext for job processing.
  *
- * Trace/span IDs come from getCurrentContext() (OTel instrumentation).
+ * Trace/span IDs come from OTel (via BullMQ-otel instrumentation).
  * Business context (org/project/user) comes from propagated metadata.
  */
 export function createContextFromJobData(
   metadata?: JobContextMetadata,
 ): RequestContext {
-  const currentContext = getCurrentContext();
-
   return {
-    traceId: currentContext?.traceId,
-    spanId: currentContext?.spanId,
     organizationId: metadata?.organizationId,
     projectId: metadata?.projectId,
     userId: metadata?.userId,
