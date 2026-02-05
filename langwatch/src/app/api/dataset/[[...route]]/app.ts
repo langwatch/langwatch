@@ -7,6 +7,7 @@ import type { DatasetColumns } from "../../../../server/datasets/types";
 import { prisma } from "../../../../server/db";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { loggerMiddleware } from "../../middleware/logger";
+import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import {
   BadRequestError,
@@ -24,6 +25,7 @@ patchZodOpenapi();
 
 export const app = new Hono()
   .basePath("/api/dataset")
+  .use(tracerMiddleware({ name: "dataset" }))
   .use(loggerMiddleware())
   .onError(handleDatasetError)
 

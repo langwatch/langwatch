@@ -6,6 +6,7 @@ import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
+import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import {
   createInitialUIState,
   type EvaluationsV3State,
@@ -25,6 +26,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 const logger = createLogger("langwatch:evaluations-v3:execute");
 
 const app = new Hono().basePath("/api/evaluations/v3");
+app.use(tracerMiddleware({ name: "evaluations-v3-execute" }));
 app.use(loggerMiddleware());
 
 /**

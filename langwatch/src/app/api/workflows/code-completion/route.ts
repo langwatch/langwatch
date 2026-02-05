@@ -11,10 +11,12 @@ import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger/server";
 import { loggerMiddleware } from "../../middleware/logger";
+import { tracerMiddleware } from "../../middleware/tracer";
 
 const _logger = createLogger("langwatch:code-completion");
 
 const app = new Hono().basePath("/api/workflows");
+app.use(tracerMiddleware({ name: "workflows-code-completion" }));
 app.use(loggerMiddleware());
 
 app.post("/code-completion", async (c) => {

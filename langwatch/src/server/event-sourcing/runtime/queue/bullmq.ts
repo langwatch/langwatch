@@ -345,9 +345,7 @@ export class EventSourcedQueueProcessorBullMq<
         {
           queueName: this.queueName,
           jobId: job.id,
-          traceId: requestContext.traceId,
-          organizationId: requestContext.organizationId,
-          projectId: requestContext.projectId,
+          // traceId, spanId, organizationId, projectId are added by logger mixin
         },
         "Processing queue job",
       );
