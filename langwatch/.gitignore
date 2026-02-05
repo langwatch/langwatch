@@ -18,6 +18,9 @@
 /out/
 next-env.d.ts
 
+# turbo
+.turbo
+
 # production
 /build
 /build-websocket

@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -75,7 +75,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -88,8 +88,20 @@ jobs:
         run: pnpm start:prepare:files
 
       - name: Run unit tests with coverage
+        id: unit-tests
         working-directory: langwatch
-        run: pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: |
+          pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
+          # Extract failures for notification comparison
+          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+
+      - name: Notify Slack on new failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: langwatch
+        run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -171,7 +183,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
@@ -262,8 +274,20 @@ jobs:
         run: pnpm clickhouse:migrate
 
       - name: Run integration tests with coverage
+        id: integration-tests
         working-directory: langwatch
-        run: pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: |
+          pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
+          # Extract failures for notification comparison
+          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+
+      - name: Notify Slack on new failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: langwatch
+        run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -289,6 +313,10 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    env:
+      # Disable telemetry and optimize build for CI
+      NEXT_TELEMETRY_DISABLED: 1
+      CI: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -301,41 +329,54 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
-      - name: Cache node_modules
+      # Use pnpm store caching instead of node_modules for better cache efficiency
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+        id: pnpm-cache
+
+      - name: Cache pnpm store
         uses: actions/cache@v4
-        id: modules-cache
         with:
-          path: langwatch/node_modules
-          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-modules-
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
+      # Cache Prisma client separately for faster regeneration
+      - name: Cache Prisma client
+        uses: actions/cache@v4
+        with:
+          path: langwatch/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
+
+      # Cache Next.js build artifacts
       - name: Cache Next.js
-        id: next-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v4
         with:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/next.config.mjs') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nextjs-
+
+      # Cache Turbo build outputs
+      - name: Cache Turbo
+        uses: actions/cache@v4
+        with:
+          path: langwatch/.turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
 
       - name: Install dependencies
-        if: steps.modules-cache.outputs.cache-hit != 'true'
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
       - name: Build
         working-directory: langwatch
         run: pnpm build
-
-      - name: Save Next.js cache
-        if: steps.next-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            langwatch/.next/cache/webpack
-            langwatch/.next/cache/swc
-          key: ${{ steps.next-cache.outputs.cache-primary-key }}

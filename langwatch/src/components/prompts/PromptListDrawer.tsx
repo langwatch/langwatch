@@ -42,7 +42,7 @@ export type PromptListDrawerProps = {
  * Handles folder-prefixed names like "shared/my-prompt" -> "my-prompt"
  */
 const getDisplayHandle = (handle?: string | null): string => {
-  if (!handle) return "Untitled";
+  if (!handle) return "New Prompt";
   return handle.includes("/") ? handle.split("/")[1]! : handle;
 };
 
@@ -118,7 +118,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
     // that's the expected behavior for selection-then-edit flows.
     onSelect?.({
       id: prompt.id,
-      name: prompt.handle ?? "Untitled",
+      name: prompt.handle ?? "New Prompt",
       version: fullPrompt?.version,
       versionId: fullPrompt?.versionId,
       inputs: fullPrompt?.inputs,

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.1...python-sdk@v0.10.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* tests, handle wildcard (*) in spans and metadata trace mappings and allow log_response() without explicit target context  ([#1291](https://github.com/langwatch/langwatch/issues/1291)) ([af5d77f](https://github.com/langwatch/langwatch/commit/af5d77fade37ea9ca157965e7d1ac8e4e73f2dcf))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.0...python-sdk@v1.0.0) (2026-02-01)
 
 

@@ -303,6 +303,8 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       DroppedAttributesCount: normalizedSpan.droppedAttributesCount,
       DroppedEventsCount: normalizedSpan.droppedEventsCount,
       DroppedLinksCount: normalizedSpan.droppedLinksCount,
+      CreatedAt: Date.now(),
+      UpdatedAt: Date.now(),
     } satisfies ClickHouseSpan;
   }
 
@@ -423,8 +425,8 @@ interface ClickHouseSpan {
   ParentTraceId: string | null;
   ParentIsRemote: boolean | null;
   Sampled: boolean;
-  StartTime: number;
-  EndTime: number;
+  StartTime: number; // event time
+  EndTime: number; // event time
   DurationMs: number;
   SpanName: string;
   SpanKind: number;
@@ -444,4 +446,6 @@ interface ClickHouseSpan {
   DroppedAttributesCount: 0;
   DroppedEventsCount: 0;
   DroppedLinksCount: 0;
+  CreatedAt: number; // record time
+  UpdatedAt: number; // record time
 }

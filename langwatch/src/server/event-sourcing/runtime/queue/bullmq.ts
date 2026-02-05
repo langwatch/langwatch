@@ -181,12 +181,13 @@ export class EventSourcedQueueProcessorBullMq<
     });
 
     this.worker.on("failed", (job, error) => {
-      // All errors are already logged with full details in processJob().
-      // This handler only logs at DEBUG level to avoid duplicate ERROR logs.
-      // Expected errors (ordering/lock/replication-lag) get a specific message,
-      // unexpected errors just note that the job failed.
+      // Expected errors (ordering/lock/replication-lag) are logged at DEBUG level
+      // since they are normal during concurrent event processing.
+      // Lock contention is logged at WARN level since it may indicate high contention.
+      // Unexpected errors are logged at ERROR level.
       if (this.isExpectedError(error)) {
-        this.logger.debug(
+        const logLevel = isLockError(error) ? "warn" : "debug";
+        this.logger[logLevel](
           {
             queueName: this.queueName,
             jobId: job?.id,
@@ -197,13 +198,15 @@ export class EventSourcedQueueProcessorBullMq<
         return;
       }
 
-      this.logger.debug(
+      // Non-expected errors are actual failures that need attention
+      this.logger.error(
         {
           queueName: this.queueName,
           jobId: job?.id,
           error: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : void 0,
         },
-        "Event-sourced queue job failed (details logged above)",
+        "Event-sourced queue job failed",
       );
     });
 
@@ -432,17 +435,9 @@ export class EventSourcedQueueProcessorBullMq<
           throw new DelayedError();
         }
 
-        // Non-expected errors are actual failures
-        this.logger.error(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            error: error instanceof Error ? error.message : String(error),
-            errorStack: error instanceof Error ? error.stack : void 0,
-          },
-          "Queue job processing failed",
-        );
-
+        // Non-expected errors are actual failures - they will be logged by the
+        // worker.on("failed") handler, so we don't need to log here to avoid
+        // duplicate ERROR logs.
         throw error;
       }
     });

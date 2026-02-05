@@ -3,11 +3,11 @@ import { getDisplayHandle } from "../PublishedPromptsList";
 
 describe("getDisplayHandle", () => {
   describe("when handle is missing or nullish", () => {
-    it("returns 'Untitled' for undefined", () => {
-      expect(getDisplayHandle(undefined)).toBe("Untitled");
+    it("returns 'New Prompt' for undefined", () => {
+      expect(getDisplayHandle(undefined)).toBe("New Prompt");
     });
-    it("returns 'Untitled' for null", () => {
-      expect(getDisplayHandle(null)).toBe("Untitled");
+    it("returns 'New Prompt' for null", () => {
+      expect(getDisplayHandle(null)).toBe("New Prompt");
     });
   });
 

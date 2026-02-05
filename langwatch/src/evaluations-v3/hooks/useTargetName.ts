@@ -19,7 +19,7 @@ export const useTargetName = (target: TargetConfig): string => {
       },
       {
         enabled: target.type === "prompt" && !!target.promptId && !!project?.id,
-      }
+      },
     );
 
   // Fetch agent name for agent targets
@@ -30,7 +30,7 @@ export const useTargetName = (target: TargetConfig): string => {
     },
     {
       enabled: target.type === "agent" && !!target.dbAgentId && !!project?.id,
-    }
+    },
   );
 
   // Fetch evaluator name for evaluator targets
@@ -45,13 +45,13 @@ export const useTargetName = (target: TargetConfig): string => {
           target.type === "evaluator" &&
           !!target.targetEvaluatorId &&
           !!project?.id,
-      }
+      },
     );
 
   // Return empty string while loading, then the name once loaded
   if (target.type === "prompt") {
-    if (promptLoading) return "";
-    return prompt?.name ?? "";
+    if (target.promptId && promptLoading) return "";
+    return target.promptId ? prompt?.handle ?? "" : "New Prompt";
   }
   if (target.type === "agent") {
     if (agentLoading) return "";

@@ -48,10 +48,10 @@ export const FeedbacksTable = () => {
           )}
 
           {feedbacks.data?.events.map((event, index) => {
-            const vote = event.metrics.find(
+            const vote = event.metrics?.find(
               (metric) => metric.key === "vote",
             )?.value;
-            const feedback = event.event_details.find(
+            const feedback = event.event_details?.find(
               (detail) => detail.key === "feedback",
             )?.value;
 

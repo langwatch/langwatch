@@ -18,11 +18,49 @@ import type {
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
-// Instantiates a client using the environment variable
-const credentials = env.GOOGLE_APPLICATION_CREDENTIALS
-  ? JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS)
-  : undefined;
-const dlp = new DlpServiceClient({ credentials });
+// Lazy initialization - env vars accessed only when getCredentials() is called
+// null = not yet initialized, undefined = initialized but no credentials
+let cachedCredentials: { project_id: string } | undefined | null = null;
+
+function getCredentials(): { project_id: string } | undefined {
+  if (cachedCredentials === null) {
+    if (!env.GOOGLE_APPLICATION_CREDENTIALS) {
+      cachedCredentials = undefined;
+    } else {
+      try {
+        const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
+        if (
+          typeof parsed?.project_id !== "string" ||
+          !parsed.project_id.trim()
+        ) {
+          logger.error(
+            "GOOGLE_APPLICATION_CREDENTIALS missing valid project_id",
+          );
+          cachedCredentials = undefined;
+        } else {
+          cachedCredentials = parsed;
+        }
+      } catch (e) {
+        logger.error(
+          { error: e },
+          "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
+        );
+        cachedCredentials = undefined;
+      }
+    }
+  }
+  return cachedCredentials ?? undefined;
+}
+
+// Lazy DLP client - created only when getDlpClient() is called
+let dlpClient: DlpServiceClient | undefined;
+
+function getDlpClient(): DlpServiceClient {
+  if (!dlpClient) {
+    dlpClient = new DlpServiceClient({ credentials: getCredentials() });
+  }
+  return dlpClient;
+}
 
 const strictInfoTypes = {
   google_dlp: [
@@ -112,8 +150,8 @@ const dlpCheck = async (
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
-  const [response] = await dlp.inspectContent({
-    parent: `projects/${credentials.project_id}/locations/global`,
+  const [response] = await getDlpClient().inspectContent({
+    parent: `projects/${getCredentials()!.project_id}/locations/global`,
     inspectConfig: {
       infoTypes: (piiRedactionLevel === "ESSENTIAL"
         ? essentialInfoTypes
@@ -170,7 +208,7 @@ export const clearPII = async (
   } catch (e) {
     if (
       secondMethod === "google_dlp"
-        ? !credentials
+        ? !getCredentials()
         : !process.env.LANGEVALS_ENDPOINT
     ) {
       if (enforced) {
@@ -311,7 +349,7 @@ export const cleanupPIIs = async (
   return await startSpan({ name: "cleanupPIIs" }, async () => {
     const { enforced, mainMethod } = options;
 
-    if (!credentials && mainMethod === "google_dlp") {
+    if (!getCredentials() && mainMethod === "google_dlp") {
       if (enforced) {
         throw new Error(
           "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed",

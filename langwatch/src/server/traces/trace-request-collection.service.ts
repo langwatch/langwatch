@@ -121,7 +121,7 @@ export class TraceRequestCollectionService {
             for (const otelSpan of scopeSpan?.spans ?? []) {
               const spanParseResult = spanSchema.safeParse(otelSpan);
               if (!spanParseResult.success) {
-                this.logger.error(
+                this.logger.warn(
                   {
                     result: spanParseResult,
                     tenantId,

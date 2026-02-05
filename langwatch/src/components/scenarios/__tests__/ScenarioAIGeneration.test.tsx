@@ -36,6 +36,15 @@ vi.mock("../../ModelSelector", () => ({
   }),
 }));
 
+// Mock useModelProvidersSettings
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    providers: { openai: { enabled: true } },
+    hasEnabledProviders: true,
+    isLoading: false,
+  }),
+}));
+
 // Mock toaster
 vi.mock("../../ui/toaster", () => ({
   toaster: {

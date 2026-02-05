@@ -131,6 +131,39 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Labels/Tags
+    // SDK may send as langwatch.tags, normalize to langwatch.labels
+    // ─────────────────────────────────────────────────────────────────────────
+    const labels =
+      attrs.take(ATTR_KEYS.LANGWATCH_LABELS) ??
+      attrs.take(ATTR_KEYS.LANGWATCH_TAGS);
+    if (labels !== undefined) {
+      ctx.setAttr(ATTR_KEYS.LANGWATCH_LABELS, labels);
+      ctx.recordRule(`${this.id}:labels`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Metadata JSON - Extract labels from metadata attribute
+    // SDK may send labels inside a metadata JSON object: { labels: [...] }
+    // Read without consuming so aggregation service can still access it
+    // ─────────────────────────────────────────────────────────────────────────
+    const metadataJson = attrs.get("metadata");
+    if (typeof metadataJson === "string") {
+      const parsed = safeJsonParse(metadataJson);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const parsedObj = parsed as Record<string, unknown>;
+        // Extract labels if not already set
+        if (Array.isArray(parsedObj.labels)) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.LANGWATCH_LABELS,
+            JSON.stringify(parsedObj.labels),
+          );
+          ctx.recordRule(`${this.id}:metadata.labels`);
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Params (passthrough)
     // May be computed upstream
     // ─────────────────────────────────────────────────────────────────────────

@@ -1006,15 +1006,15 @@ export class ClickHouseTraceService {
         // Build WHERE conditions
         const conditions: string[] = ["ts.TenantId = {tenantId:String}"];
 
-        // Date range filters
+        // Date range filters (use OccurredAt for event time filtering)
         if (startDate) {
           conditions.push(
-            "ts.CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
+            "ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
           );
         }
         if (endDate) {
           conditions.push(
-            "ts.CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
+            "ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
           );
         }
 
@@ -1040,12 +1040,12 @@ export class ClickHouseTraceService {
           if (sortDirection === "desc") {
             // For descending order: get records BEFORE the cursor
             conditions.push(
-              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})`,
+              `(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})`,
             );
           } else {
             // For ascending order: get records AFTER the cursor
             conditions.push(
-              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})`,
+              `(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})`,
             );
           }
         }
@@ -1099,11 +1099,12 @@ export class ClickHouseTraceService {
           ts.SubTopicId AS ts_SubTopicId,
           ts.HasAnnotation AS ts_HasAnnotation,
           ts.Attributes AS ts_Attributes,
+          toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt
         FROM trace_summaries ts FINAL
         WHERE ${whereClause}
-        ORDER BY ts.CreatedAt ${orderDirection}, ts.TraceId ${orderDirection}
+        ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
         LIMIT {pageSize:UInt32}
       `,
           query_params: {
@@ -1190,6 +1191,7 @@ export class ClickHouseTraceService {
       SubTopicId: row.ts_SubTopicId,
       HasAnnotation: row.ts_HasAnnotation,
       Attributes: row.ts_Attributes,
+      OccurredAt: row.ts_OccurredAt,
       CreatedAt: row.ts_CreatedAt,
       LastUpdatedAt: row.ts_LastUpdatedAt,
     };
@@ -1280,6 +1282,7 @@ export class ClickHouseTraceService {
           ts.SubTopicId AS ts_SubTopicId,
           ts.HasAnnotation AS ts_HasAnnotation,
           ts.Attributes AS ts_Attributes,
+          toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt,
 
@@ -1388,6 +1391,7 @@ export class ClickHouseTraceService {
       SubTopicId: row.ts_SubTopicId,
       HasAnnotation: row.ts_HasAnnotation,
       Attributes: row.ts_Attributes,
+      OccurredAt: row.ts_OccurredAt,
       CreatedAt: row.ts_CreatedAt,
       LastUpdatedAt: row.ts_LastUpdatedAt,
     };
@@ -1509,6 +1513,7 @@ interface TraceSummaryRecord {
   SubTopicId: string | null;
   HasAnnotation: boolean | null;
   Attributes: Record<string, string>;
+  OccurredAt: number;
   CreatedAt: number;
   LastUpdatedAt: number;
 }
@@ -1538,6 +1543,7 @@ interface TraceSummaryRow {
   ts_SubTopicId: string | null;
   ts_HasAnnotation: boolean | null;
   ts_Attributes: Record<string, string>;
+  ts_OccurredAt: number;
   ts_CreatedAt: number;
   ts_LastUpdatedAt: number;
 }

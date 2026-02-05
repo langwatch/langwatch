@@ -248,15 +248,14 @@ describe("ExperimentFromPlaygroundButton", () => {
       });
     });
 
-    it("shows plural message for multiple prompts", async () => {
+    it("shows plural message for multiple prompts in comparison mode", async () => {
       const user = userEvent.setup();
-      // Add two tabs in same window
+      // Add tab and split to create comparison mode (multiple windows)
       store.getState().addTab({
         data: createTabData({ title: "Prompt 1", configId: "prompt-1" }),
       });
-      store.getState().addTab({
-        data: createTabData({ title: "Prompt 2", configId: "prompt-2" }),
-      });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      store.getState().splitTab({ tabId: tabId! });
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
@@ -366,9 +365,10 @@ describe("ExperimentFromPlaygroundButton", () => {
       });
     });
 
-    it("creates multiple targets from multiple prompts", async () => {
+    it("creates multiple targets from multiple prompts in comparison mode", async () => {
       const user = userEvent.setup();
 
+      // Add first tab with saved prompt
       store.getState().addTab({
         data: createTabData({
           title: "Saved Prompt",
@@ -377,12 +377,24 @@ describe("ExperimentFromPlaygroundButton", () => {
           versionId: "v1",
         }),
       });
-      store.getState().addTab({
-        data: createTabData({
-          title: "New Prompt",
-          // No configId = unsaved
-        }),
-      });
+
+      // Split to create comparison mode (multiple windows)
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      store.getState().splitTab({ tabId: tabId! });
+
+      // Update the duplicated tab in the second window to be an unsaved prompt
+      const secondWindow = store.getState().windows[1];
+      const secondTabId = secondWindow?.tabs[0]?.id;
+      if (secondTabId) {
+        store.getState().updateTabData({
+          tabId: secondTabId,
+          updater: () =>
+            createTabData({
+              title: "New Prompt",
+              // No configId = unsaved
+            }),
+        });
+      }
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 

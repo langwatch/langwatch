@@ -122,7 +122,7 @@ export class QueueWithFallback<
 
           return job as Job<DataType, ResultType, NameType>;
         } catch (error) {
-          logger.error(
+          logger.warn(
             { error, projectId: contextMetadata.projectId },
             `failed sending to redis ${this.name} inserting trace directly, attempting to process job synchronously`,
           );

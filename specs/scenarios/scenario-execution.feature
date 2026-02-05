@@ -16,7 +16,8 @@ Feature: Scenario Execution
     And prompt "Support Agent" is configured as target
     When I click "Run"
     Then the run starts
-    And I navigate to the run visualization page
+    And I am navigated to the run visualization page
+    And I see the conversation begin
 
   @e2e
   Scenario: Run scenario with HTTP agent target
@@ -87,3 +88,25 @@ Feature: Scenario Execution
     When I click "Run Again"
     Then I am prompted to select a target
     And I can optionally remember my choice
+
+  # ============================================================================
+  # Error Handling - Model Provider Configuration
+  # ============================================================================
+
+  @integration
+  Scenario: Error toast when running scenario without model provider configured
+    Given I have no model providers configured
+    And scenario "Refund Flow" exists
+    When I attempt to run the scenario
+    Then I see an error toast
+    And the toast explains that a model provider must be configured
+    And the toast contains a link to the model provider settings page
+
+  @integration
+  Scenario: Navigate to settings from error toast
+    Given I have no model providers configured
+    And scenario "Refund Flow" exists
+    When I attempt to run the scenario
+    And I see the error toast
+    And I click the link in the toast
+    Then I am navigated to the model provider settings page

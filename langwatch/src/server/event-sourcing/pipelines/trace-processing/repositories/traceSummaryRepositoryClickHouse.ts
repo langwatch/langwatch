@@ -32,8 +32,9 @@ interface ClickHouseSummaryRecord {
   Version: string;
   Attributes: Record<string, string>;
 
-  CreatedAt: string; // DateTime64(3) - millisecond precision
-  LastUpdatedAt: string;
+  OccurredAt: string; // DateTime64(3) - trace execution start time
+  CreatedAt: string; // DateTime64(3) - record creation time
+  LastUpdatedAt: string; // DateTime64(3) - record update time
 
   // I/O
   ComputedIOSchemaVersion: string;
@@ -47,9 +48,9 @@ interface ClickHouseSummaryRecord {
   TokensPerSecond: number | null;
   SpanCount: number;
 
-  // Status
-  ContainsErrorStatus: boolean;
-  ContainsOKStatus: boolean;
+  // Status (stored as UInt8 in ClickHouse: 0 or 1)
+  ContainsErrorStatus: number;
+  ContainsOKStatus: number;
   ErrorMessage: string | null;
   Models: string[];
 
@@ -62,7 +63,7 @@ interface ClickHouseSummaryRecord {
   // Trace intelligence
   TopicId: string | null;
   SubTopicId: string | null;
-  HasAnnotation: boolean | null;
+  HasAnnotation: number | null; // stored as UInt8 in ClickHouse: 0 or 1
 }
 
 /**
@@ -118,8 +119,8 @@ export class TraceSummaryRepositoryClickHouse<
       TimeToLastTokenMs: record.TimeToLastTokenMs,
       TokensPerSecond: record.TokensPerSecond,
 
-      ContainsErrorStatus: record.ContainsErrorStatus,
-      ContainsOKStatus: record.ContainsOKStatus,
+      ContainsErrorStatus: record.ContainsErrorStatus === 1,
+      ContainsOKStatus: record.ContainsOKStatus === 1,
       ErrorMessage: record.ErrorMessage,
       Models: record.Models,
 
@@ -130,10 +131,12 @@ export class TraceSummaryRepositoryClickHouse<
 
       TopicId: record.TopicId,
       SubTopicId: record.SubTopicId,
-      HasAnnotation: record.HasAnnotation,
+      HasAnnotation:
+        record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
 
       Attributes: record.Attributes ?? {},
 
+      OccurredAt: dateTime64ToTimestamp(record.OccurredAt),
       CreatedAt: dateTime64ToTimestamp(record.CreatedAt),
       LastUpdatedAt: dateTime64ToTimestamp(record.LastUpdatedAt),
     };
@@ -153,6 +156,7 @@ export class TraceSummaryRepositoryClickHouse<
       Version: projectionVersion,
       Attributes: data.Attributes,
 
+      OccurredAt: timestampToDateTime64(data.OccurredAt),
       CreatedAt: timestampToDateTime64(data.CreatedAt),
       LastUpdatedAt: timestampToDateTime64(data.LastUpdatedAt),
 
@@ -166,8 +170,8 @@ export class TraceSummaryRepositoryClickHouse<
       TokensPerSecond: data.TokensPerSecond,
       SpanCount: data.SpanCount,
 
-      ContainsErrorStatus: data.ContainsErrorStatus,
-      ContainsOKStatus: data.ContainsOKStatus,
+      ContainsErrorStatus: data.ContainsErrorStatus ? 1 : 0,
+      ContainsOKStatus: data.ContainsOKStatus ? 1 : 0,
       ErrorMessage: data.ErrorMessage,
       Models: data.Models,
 
@@ -178,7 +182,7 @@ export class TraceSummaryRepositoryClickHouse<
 
       TopicId: data.TopicId,
       SubTopicId: data.SubTopicId,
-      HasAnnotation: data.HasAnnotation,
+      HasAnnotation: data.HasAnnotation != null ? (data.HasAnnotation ? 1 : 0) : null,
     };
   }
 
@@ -212,6 +216,7 @@ export class TraceSummaryRepositoryClickHouse<
                 TraceId,
                 Version,
                 Attributes,
+                toString(OccurredAt) AS OccurredAt,
                 toString(CreatedAt) AS CreatedAt,
                 toString(LastUpdatedAt) AS LastUpdatedAt,
                 ComputedIOSchemaVersion,

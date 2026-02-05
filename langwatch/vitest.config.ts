@@ -26,6 +26,12 @@ export default defineConfig({
        * This is to prevent the redis connection from being established during the test run.
        */
       BUILD_TIME: "1",
+      // Skip t3-oss/env-nextjs validation - it throws when server env vars are
+      // accessed from jsdom context (which it considers "client")
+      SKIP_ENV_VALIDATION: "1",
+    },
+    experimental: {
+      fsModuleCache: true,
     },
   },
   esbuild: {
