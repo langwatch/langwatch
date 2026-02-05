@@ -1,7 +1,7 @@
 import type { Annotation } from "@prisma/client";
 import { prisma } from "../server/db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../server/elasticsearch";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:tasks:syncAnnotations");
 

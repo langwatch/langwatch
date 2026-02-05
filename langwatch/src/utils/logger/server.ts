@@ -1,4 +1,4 @@
-import pino, { type LoggerOptions, type Logger as PinoLogger } from "pino";
+import pino, { type LoggerOptions, type Logger as PinoLogger, type DestinationStream } from "pino";
 import { getLogContext } from "../../server/context/logging";
 
 export interface CreateLoggerOptions {
@@ -6,6 +6,48 @@ export interface CreateLoggerOptions {
    * Disable automatic context injection (traceId, spanId, organizationId, projectId, userId).
    */
   disableContext?: boolean;
+}
+
+// Singleton transport instance to avoid spawning multiple worker threads.
+// Each pino.transport() call adds exit listeners; sharing one prevents
+// MaxListenersExceededWarning.
+let sharedTransport: DestinationStream | null = null;
+let transportInitialized = false;
+
+function getSharedTransport(): DestinationStream | null {
+  if (transportInitialized) {
+    return sharedTransport;
+  }
+  transportInitialized = true;
+
+  const isDevMode = process.env.NODE_ENV !== "production";
+  const isTest = process.env.NODE_ENV === "test";
+
+  // In test mode, skip transports to avoid spawning worker threads
+  if (isTest) {
+    return null;
+  }
+
+  const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
+  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
+
+  try {
+    sharedTransport = buildTransport({
+      isDevMode,
+      otelLogsEnabled,
+      consoleLevel,
+      otelLevel,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to create pino transport, falling back to stdout:",
+      error,
+    );
+    sharedTransport = null;
+  }
+
+  return sharedTransport;
 }
 
 /**
@@ -20,13 +62,8 @@ export const createLogger = (
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger => {
-  const isDevMode = process.env.NODE_ENV !== "production";
-  const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
-
   const isTest = process.env.NODE_ENV === "test";
   const defaultLevel = isTest ? "error" : "debug";
-  const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? (isTest ? "error" : "info");
-  const otelLevel = process.env.PINO_OTEL_LEVEL ?? "debug";
   const baseLevel = process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
 
   const pinoOptions: LoggerOptions = {
@@ -41,27 +78,12 @@ export const createLogger = (
     mixin: options?.disableContext ? undefined : () => getLogContext(),
   };
 
-  // In test mode, skip transports to avoid spawning worker threads
-  // (which add exit listeners and cause MaxListenersExceededWarning)
-  if (isTest) {
-    return pino(pinoOptions, process.stdout);
+  const transport = getSharedTransport();
+  if (transport) {
+    return pino(pinoOptions, transport);
   }
 
-  try {
-    const transport = buildTransport({
-      isDevMode,
-      otelLogsEnabled,
-      consoleLevel,
-      otelLevel,
-    });
-    return pino(pinoOptions, transport);
-  } catch (error) {
-    console.error(
-      "Failed to create pino transport, falling back to stdout:",
-      error,
-    );
-    return pino(pinoOptions, process.stdout);
-  }
+  return pino(pinoOptions, process.stdout);
 };
 
 function buildTransport(config: {

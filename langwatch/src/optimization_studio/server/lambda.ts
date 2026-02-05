@@ -12,7 +12,7 @@ import {
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../types/events";
 

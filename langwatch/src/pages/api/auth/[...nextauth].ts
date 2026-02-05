@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import NextAuth from "next-auth";
 
 import { authOptions } from "~/server/auth";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("auth");
 

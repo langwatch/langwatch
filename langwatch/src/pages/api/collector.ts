@@ -27,7 +27,7 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { TraceUsageService } from "../../server/traces/trace-usage.service";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
 

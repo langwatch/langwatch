@@ -6,7 +6,7 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:dspy:init");
 

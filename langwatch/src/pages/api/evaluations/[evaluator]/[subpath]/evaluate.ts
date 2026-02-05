@@ -26,7 +26,7 @@ import {
   evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
 import { getEvaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,

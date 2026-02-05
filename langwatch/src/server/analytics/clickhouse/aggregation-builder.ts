@@ -8,18 +8,17 @@
 import type { AggregationTypes } from "../types";
 import type { SeriesInputType } from "../registry";
 import type { FilterField } from "../../filters/types";
-import {
-  type CHTable,
-  buildJoinClause,
-  tableAliases,
-} from "./field-mappings";
+import { type CHTable, buildJoinClause, tableAliases } from "./field-mappings";
 import {
   type MetricTranslation,
   translateMetric,
   translatePipelineAggregation,
 } from "./metric-translator";
-import { translateAllFilters, type FilterTranslation } from "./filter-translator";
-import { createLogger } from "../../../utils/logger";
+import {
+  translateAllFilters,
+  type FilterTranslation,
+} from "./filter-translator";
+import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:analytics:aggregation-builder");
 
@@ -114,7 +113,9 @@ interface GroupByExpression {
  *
  * @param groupByKey - Optional key to filter results (e.g., specific evaluator ID)
  */
-const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupByExpression>> = {
+const groupByExpressions: Partial<
+  Record<string, (groupByKey?: string) => GroupByExpression>
+> = {
   "topics.topics": () => ({
     column: `${tableAliases.trace_summaries}.TopicId`,
     requiredJoins: [],
@@ -504,7 +505,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       selectExprs.push(`${groupByColumn} AS group_key`);
     } else {
       // Convert NULL to 'unknown' for ES `missing: "unknown"` behavior
-      selectExprs.push(`if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`);
+      selectExprs.push(
+        `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`,
+      );
     }
   }
 
@@ -613,7 +616,9 @@ function buildArrayJoinTimeseriesQuery(
   cteSelectExprs.push(`${ts}.TotalCost AS trace_total_cost`);
   cteSelectExprs.push(`${ts}.TotalDurationMs AS trace_duration_ms`);
   cteSelectExprs.push(`${ts}.TotalPromptTokenCount AS trace_prompt_tokens`);
-  cteSelectExprs.push(`${ts}.TotalCompletionTokenCount AS trace_completion_tokens`);
+  cteSelectExprs.push(
+    `${ts}.TotalCompletionTokenCount AS trace_completion_tokens`,
+  );
 
   // Build outer SELECT expressions
   const outerSelectExprs: string[] = ["period"];
@@ -626,7 +631,10 @@ function buildArrayJoinTimeseriesQuery(
   // count() becomes uniqExact(trace_id), sum/avg work on first value per trace
   for (const metric of simpleMetrics) {
     // Transform the metric expression for the deduplicated context
-    const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
+    const transformedExpr = transformMetricForDedup(
+      metric.selectExpression,
+      metric.alias,
+    );
     outerSelectExprs.push(transformedExpr);
   }
 
@@ -792,7 +800,7 @@ function buildSubqueryTimeseriesQuery(
     const quotedAlias = quoteIdentifier(metric.alias);
     const quotedExpression = metric.selectExpression.replace(
       ` AS ${metric.alias}`,
-      ` AS ${quotedAlias}`
+      ` AS ${quotedAlias}`,
     );
     simpleSelectExprs.push(quotedExpression);
   }
@@ -833,8 +841,12 @@ function buildSubqueryTimeseriesQuery(
   for (const metric of simpleMetrics) {
     if (simpleMetrics.length > 0) {
       const quotedAlias = quoteIdentifier(metric.alias);
-      currentSelectExprs.push(`coalesce((SELECT ${quotedAlias} FROM simple_metrics_current), 0) AS ${quotedAlias}`);
-      previousSelectExprs.push(`coalesce((SELECT ${quotedAlias} FROM simple_metrics_previous), 0) AS ${quotedAlias}`);
+      currentSelectExprs.push(
+        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_current), 0) AS ${quotedAlias}`,
+      );
+      previousSelectExprs.push(
+        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_previous), 0) AS ${quotedAlias}`,
+      );
     }
   }
 
@@ -843,8 +855,12 @@ function buildSubqueryTimeseriesQuery(
   for (const metric of subqueryMetrics) {
     const cteName = `cte_${metric.alias}`;
     const quotedAlias = quoteIdentifier(metric.alias);
-    currentSelectExprs.push(`coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`);
-    previousSelectExprs.push(`coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`);
+    currentSelectExprs.push(
+      `coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`,
+    );
+    previousSelectExprs.push(
+      `coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`,
+    );
   }
 
   const sql = `
@@ -921,7 +937,7 @@ const AGGREGATION_HANDLERS: Array<{
  */
 function transformMetricForDedup(
   selectExpression: string,
-  alias: string
+  alias: string,
 ): string {
   // Handle count() -> uniqExact(trace_id)
   if (/\bcount\s*\(\s*\*?\s*\)/.test(selectExpression)) {
