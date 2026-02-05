@@ -195,7 +195,7 @@ export function AICreateModal({
         </Dialog.Body>
         <Dialog.Footer>
           {!hasModelProviders && (
-            <NoModelProvidersFooter onSkip={onSkip} />
+            <NoModelProvidersFooter />
           )}
 
           {hasModelProviders && modalState === "idle" && (
@@ -384,16 +384,6 @@ function NoModelProvidersWarning() {
   );
 }
 
-interface NoModelProvidersFooterProps {
-  onSkip: () => void;
-}
-
-function NoModelProvidersFooter({ onSkip }: NoModelProvidersFooterProps) {
-  return (
-    <HStack gap={2} justify="center" width="100%">
-      <Button variant="ghost" onClick={onSkip}>
-        I'll write it myself
-      </Button>
-    </HStack>
-  );
+function NoModelProvidersFooter() {
+  return null;
 }
