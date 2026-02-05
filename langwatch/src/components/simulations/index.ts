@@ -1,5 +1,6 @@
 export * from "./CustomCopilotKitChat";
 export * from "./PreviousRunsList";
+export * from "./ScenarioRunActions";
 export * from "./ScenarioRunHeader";
 export * from "./SetCard";
 export * from "./SimulationCard";
