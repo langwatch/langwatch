@@ -434,7 +434,7 @@ export type TrackEventRESTParamsValidator = Omit<
   "event_id" | "project_id" | "timestamps" | "event_details"
 > & {
   event_id?: string; // auto generated unless you want to guarantee idempotency
-  event_details?: Record<string, string>;
+  event_details?: Record<string, string | null>;
   timestamp?: number; // The timestamp when the event occurred
 };
 

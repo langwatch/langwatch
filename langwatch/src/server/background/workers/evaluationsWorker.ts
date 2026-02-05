@@ -303,7 +303,7 @@ const buildDataForEvaluation = async (
       observedTraceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
       isThreadLevel,
-      mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
+      mappingKeys: mappings?.mapping ? Object.keys(mappings.mapping) : [],
     },
     "Building data for evaluation",
   );
