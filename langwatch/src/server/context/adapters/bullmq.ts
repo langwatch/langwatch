@@ -69,6 +69,33 @@ export function getJobContextMetadata(): JobContextMetadata {
  * );
  * ```
  */
+/**
+ * Legacy job data format where payload was wrapped in __payload.
+ * Used for migration of stuck jobs from old format.
+ */
+type LegacyJobData<T> = {
+  __payload: T;
+  __context?: JobContextMetadata;
+};
+
+/**
+ * Normalizes job data by unwrapping legacy __payload format if present.
+ * Old jobs have: { __payload: { traceId, spans, ... }, __context?: {...} }
+ * New jobs have: { traceId, spans, ..., __context?: {...} }
+ */
+function normalizeJobData<DataType extends Record<string, unknown>>(
+  data: DataType | LegacyJobData<DataType>,
+): JobDataWithContext<DataType> {
+  if ("__payload" in data && data.__payload !== undefined) {
+    const legacyData = data as LegacyJobData<DataType>;
+    return {
+      ...legacyData.__payload,
+      __context: legacyData.__context,
+    } as JobDataWithContext<DataType>;
+  }
+  return data as JobDataWithContext<DataType>;
+}
+
 export function withJobContext<
   DataType extends Record<string, unknown>,
   ResultType,
@@ -77,8 +104,14 @@ export function withJobContext<
   processor: (job: Job<DataType, ResultType, NameType>) => Promise<ResultType>,
 ): (job: Job<DataType, ResultType, NameType>) => Promise<ResultType> {
   return async (job: Job<DataType, ResultType, NameType>) => {
-    const jobData = job.data as JobDataWithContext<DataType>;
-    const contextMetadata = jobData.__context;
+    // Normalize legacy job data format (unwrap __payload if present)
+    const normalizedData = normalizeJobData(job.data);
+    const contextMetadata = normalizedData.__context;
+
+    // Update job.data in place so processor sees the normalized data
+    if ("__payload" in job.data) {
+      (job as any).data = normalizedData;
+    }
 
     const requestContext = createContextFromJobData(contextMetadata);
 
