@@ -83,7 +83,7 @@ def _convert_keys_to_camel_case(
 def _configure_structlog() -> None:
     """Configure structlog based on environment."""
     is_test = os.environ.get("NODE_ENV") == "test" or os.environ.get("PYTEST_CURRENT_TEST")
-    is_prod = os.environ.get("NODE_ENV") == "production"
+    is_prod = os.environ.get("NODE_ENV") == "production" or os.environ.get("ENVIRONMENT") == "production"
     log_level_str = os.environ.get("LOG_LEVEL", "INFO" if not is_test else "ERROR")
     log_level = getattr(logging, log_level_str.upper(), logging.INFO)
 
