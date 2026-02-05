@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
-import { createInitialState, type DatasetReference } from "~/evaluations-v3/types";
+import {
+  createInitialState,
+  type DatasetReference,
+} from "~/evaluations-v3/types";
 import { extractPersistedState } from "~/evaluations-v3/types/persistence";
 import { inferAllTargetMappings } from "~/evaluations-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -24,7 +27,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
  * Used when a prompt has unsaved changes or is brand new.
  */
 const convertToLocalPromptConfig = (
-  tabData: TabData
+  tabData: TabData,
 ): LocalPromptConfig | undefined => {
   const configData = tabData.form.currentValues.version?.configData;
   if (!configData) return undefined;
@@ -38,8 +41,8 @@ const convertToLocalPromptConfig = (
   const filteredLitellmParams = llm?.litellmParams
     ? Object.fromEntries(
         Object.entries(llm.litellmParams).filter(
-          (entry): entry is [string, string] => entry[1] !== undefined
-        )
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
       )
     : undefined;
 
@@ -82,7 +85,7 @@ const convertToLocalPromptConfig = (
  */
 const hasUnsavedChanges = (
   tabData: TabData,
-  savedPrompt: VersionedPrompt | null | undefined
+  savedPrompt: VersionedPrompt | null | undefined,
 ): boolean => {
   const configId = tabData.form.currentValues.configId;
   const currentValues = tabData.form.currentValues;
@@ -126,7 +129,7 @@ const convertTabToTarget = (
   tabData: TabData,
   index: number,
   datasets: DatasetReference[],
-  savedPrompt: VersionedPrompt | null | undefined
+  savedPrompt: VersionedPrompt | null | undefined,
 ): TargetConfig => {
   const configId = tabData.form.currentValues.configId;
   const versionId = tabData.form.currentValues.versionMetadata?.versionId;
@@ -158,7 +161,9 @@ const convertTabToTarget = (
     promptVersionId: versionId ?? undefined,
     promptVersionNumber: configId ? tabData.meta.versionNumber : undefined,
     // Only include localPromptConfig if there are unsaved changes
-    localPromptConfig: hasChanges ? convertToLocalPromptConfig(tabData) : undefined,
+    localPromptConfig: hasChanges
+      ? convertToLocalPromptConfig(tabData)
+      : undefined,
     inputs,
     outputs,
     mappings: {},
@@ -193,9 +198,18 @@ export function ExperimentFromPlaygroundButton({
   const utils = api.useContext();
 
   // Get all tabs from all windows
-  const allTabs = useDraggableTabsBrowserStore((state) =>
-    state.windows.flatMap((w) => w.tabs)
-  );
+  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore((state) => {
+    const activeWindow = state.windows.find(
+      (w) => w.id === state.activeWindowId,
+    );
+    return {
+      isComparing: state.windows.length > 1,
+      allTabs: state.windows.flatMap((w) => w.tabs),
+      activeTab: activeWindow?.tabs.find(
+        (t) => t.id === activeWindow?.activeTabId,
+      ),
+    };
+  });
 
   const promptCount = allTabs.length;
   const isDisabled = promptCount === 0 || !hasPermission("evaluations:manage");
@@ -212,7 +226,7 @@ export function ExperimentFromPlaygroundButton({
   const savedPromptsQueries = api.useQueries((t) =>
     savedPromptIds.map((configId) => {
       const tab = allTabs.find(
-        (tab) => tab.data.form.currentValues.configId === configId
+        (tab) => tab.data.form.currentValues.configId === configId,
       );
       const versionId = tab?.data.form.currentValues.versionMetadata?.versionId;
 
@@ -226,9 +240,9 @@ export function ExperimentFromPlaygroundButton({
           enabled: !!project?.id && isDialogOpen,
           // Keep stale data to avoid flickering
           staleTime: 60_000,
-        }
+        },
       );
-    })
+    }),
   );
 
   // Check if all queries are loading
@@ -272,10 +286,15 @@ export function ExperimentFromPlaygroundButton({
     initialState.name = experimentName;
 
     // Convert all tabs to targets with auto-mapping
-    const targets = allTabs.map((tab, index) => {
+    const targets = (isComparing ? allTabs : [activeTab]).map((tab, index) => {
       const configId = tab.data.form.currentValues.configId;
       const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
-      return convertTabToTarget(tab.data, index, initialState.datasets, savedPrompt);
+      return convertTabToTarget(
+        tab.data,
+        index,
+        initialState.datasets,
+        savedPrompt,
+      );
     });
     initialState.targets = targets;
 
@@ -298,7 +317,9 @@ export function ExperimentFromPlaygroundButton({
         <PageLayout.HeaderButton
           onClick={() => setIsDialogOpen(true)}
           disabled={isDisabled}
-          title={isDisabled ? "Open a prompt to create an experiment" : undefined}
+          title={
+            isDisabled ? "Open a prompt to create an experiment" : undefined
+          }
         >
           <FlaskConical size="18px" />
           {!iconOnly && "Experiment"}
@@ -315,7 +336,7 @@ export function ExperimentFromPlaygroundButton({
           </Dialog.Header>
           <Dialog.Body>
             <Text>
-              {promptCount === 1
+              {!isComparing || promptCount === 1
                 ? "Create new experiment with this prompt?"
                 : `Create new experiment with these prompts? (${promptCount} prompts)`}
             </Text>

@@ -538,7 +538,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
       onSave?.({
         id: prompt.id,
-        name: prompt.handle ?? "Untitled",
+        name: prompt.handle ?? "New Prompt",
         version: prompt.version,
         versionId: prompt.versionId,
         inputs: prompt.inputs,
@@ -588,7 +588,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
       onSave?.({
         id: prompt.id,
-        name: prompt.handle ?? "Untitled",
+        name: prompt.handle ?? "New Prompt",
         version: prompt.version,
         versionId: prompt.versionId,
         inputs: prompt.inputs,
