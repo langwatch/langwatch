@@ -286,7 +286,7 @@ export function ExperimentFromPlaygroundButton({
     initialState.name = experimentName;
 
     // Convert all tabs to targets with auto-mapping
-    const targets = (isComparing ? allTabs : [activeTab]).map((tab, index) => {
+    const targets = (isComparing || !activeTab ? allTabs : [activeTab]).map((tab, index) => {
       const configId = tab.data.form.currentValues.configId;
       const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
       return convertTabToTarget(
