@@ -20,6 +20,10 @@ export const PRO_TEMPLATE: LicensePlanLimits = {
   maxAgents: 50,
   maxExperiments: 50,
   maxOnlineEvaluations: 50,
+  maxDatasets: 50,
+  maxDashboards: 50,
+  maxCustomGraphs: 50,
+  maxAutomations: 50,
   canPublish: true,
 };
 
@@ -43,6 +47,10 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxAgents: 1000,
   maxExperiments: 1000,
   maxOnlineEvaluations: 1000,
+  maxDatasets: 1000,
+  maxDashboards: 1000,
+  maxCustomGraphs: 1000,
+  maxAutomations: 1000,
   canPublish: true,
 };
 

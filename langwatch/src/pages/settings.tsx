@@ -36,6 +36,7 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
+import { useActivePlan } from "../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
@@ -291,6 +292,7 @@ type ProjectFormData = {
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
+  const { isFree } = useActivePlan();
 
   const piiRedactionLevelCollection = createListCollection({
     items: [
@@ -325,16 +327,19 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         label: "Redacted to All",
         value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
         description: "Redacts captured input for all users",
+        isPaidOnly: true,
       },
       {
         label: "Visible to Admin",
         value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
         description: "Redacts captured input for all users except admins",
+        isPaidOnly: true,
       },
       {
         label: "Visible to All",
         value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         description: "Does not redact any captured input",
+        isPaidOnly: false,
       },
     ],
   });
@@ -345,16 +350,19 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         label: "Redacted to All",
         value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
         description: "Redacts captured output for all users",
+        isPaidOnly: true,
       },
       {
         label: "Visible to Admin",
         value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
         description: "Redacts captured output for all users except admins",
+        isPaidOnly: true,
       },
       {
         label: "Visible to All",
         value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         description: "Does not redact any captured output",
+        isPaidOnly: false,
       },
     ],
   });
@@ -542,7 +550,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select PII redaction level" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
+                  <Select.Content width="300px" paddingY={2}>
                     {piiRedactionLevelCollection.items.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         <VStack align="start" gap={0}>
@@ -593,6 +601,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   onChange={undefined}
                   value={[field.value]}
                   onValueChange={(e) => {
+                    const selected = capturedInputVisibilityCollection.items.find(
+                      (item) => item.value === e.value[0],
+                    );
+                    if (selected?.isPaidOnly && isFree) return;
                     field.onChange(e.value[0]);
                   }}
                   disabled={!userIsAdmin}
@@ -600,17 +612,32 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select captured input visibility" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
-                    {capturedInputVisibilityCollection.items.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        <VStack align="start" gap={0}>
-                          <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="fg.muted">
-                            {option.description}
-                          </Text>
-                        </VStack>
-                      </Select.Item>
-                    ))}
+                  <Select.Content width="300px" paddingY={2}>
+                    {capturedInputVisibilityCollection.items.map((option) => {
+                      const isDisabled = option.isPaidOnly && isFree;
+                      return (
+                        <Select.Item
+                          key={option.value}
+                          item={option}
+                          opacity={isDisabled ? 0.5 : 1}
+                          cursor={isDisabled ? "not-allowed" : "pointer"}
+                        >
+                          <VStack align="start" gap={0}>
+                            <HStack>
+                              <Text>{option.label}</Text>
+                              {option.isPaidOnly && isFree && (
+                                <Badge colorPalette="orange" size="xs">
+                                  Paid
+                                </Badge>
+                              )}
+                            </HStack>
+                            <Text fontSize="13px" color="fg.muted">
+                              {option.description}
+                            </Text>
+                          </VStack>
+                        </Select.Item>
+                      );
+                    })}
                   </Select.Content>
                 </Select.Root>
               )}
@@ -650,6 +677,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   onChange={undefined}
                   value={[field.value]}
                   onValueChange={(e) => {
+                    const selected = capturedOutputVisibilityCollection.items.find(
+                      (item) => item.value === e.value[0],
+                    );
+                    if (selected?.isPaidOnly && isFree) return;
                     field.onChange(e.value[0]);
                   }}
                   disabled={!userIsAdmin}
@@ -657,17 +688,32 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Select.Trigger width="full">
                     <Select.ValueText placeholder="Select captured output visibility" />
                   </Select.Trigger>
-                  <Select.Content width="300px">
-                    {capturedOutputVisibilityCollection.items.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        <VStack align="start" gap={0}>
-                          <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="fg.muted">
-                            {option.description}
-                          </Text>
-                        </VStack>
-                      </Select.Item>
-                    ))}
+                  <Select.Content width="300px" paddingY={2}>
+                    {capturedOutputVisibilityCollection.items.map((option) => {
+                      const isDisabled = option.isPaidOnly && isFree;
+                      return (
+                        <Select.Item
+                          key={option.value}
+                          item={option}
+                          opacity={isDisabled ? 0.5 : 1}
+                          cursor={isDisabled ? "not-allowed" : "pointer"}
+                        >
+                          <VStack align="start" gap={0}>
+                            <HStack>
+                              <Text>{option.label}</Text>
+                              {option.isPaidOnly && isFree && (
+                                <Badge colorPalette="orange" size="xs">
+                                  Paid
+                                </Badge>
+                              )}
+                            </HStack>
+                            <Text fontSize="13px" color="fg.muted">
+                              {option.description}
+                            </Text>
+                          </VStack>
+                        </Select.Item>
+                      );
+                    })}
                   </Select.Content>
                 </Select.Root>
               )}
@@ -772,17 +818,17 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 align="start"
                 gap={2}
                 padding={4}
-                backgroundColor="orange.50"
+                backgroundColor="orange.subtle"
                 borderWidth="1px"
-                borderColor="orange.200"
+                borderColor="orange.muted"
                 borderRadius="md"
               >
                 <HStack gap={2}>
-                  <Text fontWeight="semibold" color="orange.700">
+                  <Text fontWeight="semibold" color="orange.fg">
                     ⚠️ Warning
                   </Text>
                 </HStack>
-                <Text fontSize="sm" color="orange.700">
+                <Text fontSize="sm" color="orange.fg">
                   This action will <b>immediately revoke</b> all existing shared
                   trace links. Anyone with previously shared trace URLs will{" "}
                   <b>no longer be able to access them</b>.

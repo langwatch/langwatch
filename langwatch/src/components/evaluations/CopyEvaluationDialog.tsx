@@ -13,6 +13,7 @@ import {
   teamRoleHasPermission,
 } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
@@ -109,6 +110,8 @@ export const CopyEvaluationDialog = ({
 
       onClose();
     } catch (error) {
+      // Skip toast if the global license handler already showed the upgrade modal
+      if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
         title: "Error replicating evaluation",
         description: error instanceof Error ? error.message : "Unknown error",

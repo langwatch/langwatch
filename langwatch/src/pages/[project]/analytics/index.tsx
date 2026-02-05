@@ -32,11 +32,11 @@ function AnalyticsContent() {
         <Alert.Root status="warning" marginBottom={6}>
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Setup pending</Alert.Title>
+            <Alert.Title>No traces received yet</Alert.Title>
             <Alert.Description>
               <Text as="span">
                 {
-                  "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
+                  "Tracing is not integrated yet, so there's no data to display. Go to the "
                 }
               </Text>
               <Link

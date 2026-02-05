@@ -24,6 +24,10 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
   agents: "agents",
   experiments: "experiments",
   onlineEvaluations: "online evaluations",
+  datasets: "datasets",
+  dashboards: "dashboards",
+  customGraphs: "custom graphs",
+  automations: "automations",
 } as const;
 
 /**
@@ -48,4 +52,8 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   agents: "Agents",
   experiments: "Experiments",
   onlineEvaluations: "Online Evaluations",
+  datasets: "Datasets",
+  dashboards: "Dashboards",
+  customGraphs: "Custom Graphs",
+  automations: "Automations",
 } as const;

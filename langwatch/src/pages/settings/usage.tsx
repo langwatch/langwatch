@@ -3,7 +3,6 @@ import {
   Button,
   Heading,
   HStack,
-  Progress,
   Skeleton,
   Spacer,
   Text,
@@ -113,33 +112,28 @@ function Usage() {
         <VStack width="full" gap={4} align="start">
           {usage.data && isSaaS && (
             <>
-              <Heading>Trace Usage</Heading>
-              <Progress.Root
-                defaultValue={0}
-                max={usage.data?.activePlan.maxMessagesPerMonth}
-                value={Math.min(
-                  usage.data?.currentMonthMessagesCount,
-                  usage.data?.activePlan.maxMessagesPerMonth,
+              <HStack gap={3}>
+                <Heading size="md" as="h2">
+                  Resource Limits
+                </Heading>
+                {activePlan.data?.free && (
+                  <Badge
+                    colorPalette="gray"
+                    fontSize="sm"
+                    paddingX={2}
+                    paddingY={1}
+                  >
+                    Free
+                  </Badge>
                 )}
-                maxW="sm"
-                colorPalette="orange"
-                width="full"
-              >
-                <Progress.Label fontSize="xs"></Progress.Label>
-                <Progress.Track flex="1">
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
-              <Text>
-                You have used{" "}
-                <b>{usage.data?.currentMonthMessagesCount.toLocaleString()}</b>{" "}
-                traces out of{" "}
-                <b>
-                  {usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()}
-                </b>{" "}
-                traces this month.
+              </HStack>
+              <Text color="fg.muted" fontSize="sm" marginBottom={2}>
+                Current usage versus {activePlan.data?.free ? "free tier" : "your plan"} limits
               </Text>
-              <Button asChild marginBottom={2}>
+              <ResourceLimitsDisplay
+                limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
+              />
+              <Button asChild marginTop={2}>
                 <Link href={planManagementUrl}>{planButtonLabel}</Link>
               </Button>
             </>

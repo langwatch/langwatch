@@ -37,20 +37,21 @@ export function useLicenseEnforcement(limitType: LimitType) {
 
   /**
    * Check if the action is allowed, and either proceed or show upgrade modal.
+   * Returns the result of onAllowed if allowed, undefined if blocked.
    * @param onAllowed - Callback to execute if the action is allowed
    */
   const checkAndProceed = useCallback(
-    (onAllowed: () => void) => {
+    <T,>(onAllowed: () => T): T | undefined => {
       if (!checkResult.data) {
         // Data not yet loaded - allow action (optimistic)
-        onAllowed();
-        return;
+        return onAllowed();
       }
 
       if (checkResult.data.allowed) {
-        onAllowed();
+        return onAllowed();
       } else {
         openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
+        return undefined;
       }
     },
     [checkResult.data, openUpgradeModal, limitType],

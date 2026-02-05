@@ -93,6 +93,7 @@ function Page() {
   const deleteMutation = api.agents.delete.useMutation({
     onSuccess: () => {
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
     },
   });
 
@@ -100,6 +101,7 @@ function Page() {
     onSuccess: (result) => {
       setAgentToDelete(null);
       void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.licenseEnforcement.checkLimit.invalidate();
 
       toaster.create({
         title: `Agent deleted`,

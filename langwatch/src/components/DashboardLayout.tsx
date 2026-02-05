@@ -497,24 +497,26 @@ export const DashboardLayout = ({
                   </Alert.Content>
                 </Alert.Root>
               )}
-            {usage.data &&
-              usage.data.currentMonthMessagesCount >=
-                usage.data.activePlan.maxMessagesPerMonth && (
+            {usage.data?.messageLimitInfo &&
+              usage.data.messageLimitInfo.status !== "ok" && (
                 <Alert.Root
-                  status="warning"
+                  status={
+                    usage.data.messageLimitInfo.status === "exceeded"
+                      ? "error"
+                      : "warning"
+                  }
                   width="full"
                   borderBottom="1px solid"
-                  borderBottomColor="yellow.300"
+                  borderBottomColor={
+                    usage.data.messageLimitInfo.status === "exceeded"
+                      ? "red.300"
+                      : "yellow.300"
+                  }
                 >
                   <Alert.Indicator />
                   <Alert.Content>
                     <Text>
-                      You reached the limit of{" "}
-                      {numeral(
-                        usage.data.activePlan.maxMessagesPerMonth,
-                      ).format()}{" "}
-                      messages for this month, new messages will not be
-                      processed.{" "}
+                      {usage.data.messageLimitInfo.message}{" "}
                       <Link
                         href={planManagementUrl}
                         textDecoration="underline"
@@ -524,7 +526,10 @@ export const DashboardLayout = ({
                         onClick={() => {
                           trackEvent("subscription_hook_click", {
                             project_id: project?.id,
-                            hook: "new_messages_limit_reached",
+                            hook:
+                              usage.data?.messageLimitInfo.status === "exceeded"
+                                ? "messages_limit_reached"
+                                : "messages_limit_warning",
                           });
                         }}
                       >
@@ -533,8 +538,8 @@ export const DashboardLayout = ({
                       to upgrade your plan.
                     </Text>
                   </Alert.Content>
-                </Alert.Root>
-              )}
+              </Alert.Root>
+            )}
             {usage.data &&
               usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
                 <Alert.Root
