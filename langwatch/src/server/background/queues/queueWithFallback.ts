@@ -11,22 +11,13 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../utils/logger/server";
 import { connection } from "../../redis";
 import {
-  type JobContextMetadata,
+  type JobDataWithContext,
   createContextFromJobData,
   getJobContextMetadata,
   runWithContext,
 } from "../../context/asyncContext";
 
 const logger = createLogger("langwatch:queueWithFallback");
-
-/**
- * Container type for job data that wraps the payload and context metadata.
- * Used to propagate request context through the queue.
- */
-type JobContainer<DataType> = {
-  __payload: DataType;
-  __context?: JobContextMetadata;
-};
 
 // Queue that falls back to calling the worker directly if the queue is not available
 export class QueueWithFallback<
@@ -72,11 +63,11 @@ export class QueueWithFallback<
         },
       },
       async () => {
-        // Wrap data with context for propagation
-        const wrappedData = {
-          __payload: data,
+        // Add context to data for propagation
+        const dataWithContext = {
+          ...data,
           __context: contextMetadata,
-        } as unknown as DataType;
+        } as JobDataWithContext<DataType>;
 
         if (!connection) {
           await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
@@ -105,7 +96,7 @@ export class QueueWithFallback<
 
           const job = await Promise.race([
             timeoutPromise,
-            super.add(name, wrappedData, opts).then((job) => {
+            super.add(name, dataWithContext as DataType, opts).then((job) => {
               timeoutState.state = "resolved";
               return job;
             }),
@@ -164,13 +155,13 @@ export class QueueWithFallback<
           });
         }
 
-        // Wrap each job's data with context
-        const wrappedJobs = jobs.map((job) => ({
+        // Add context to each job's data
+        const jobsWithContext = jobs.map((job) => ({
           ...job,
           data: {
-            __payload: job.data,
+            ...job.data,
             __context: contextMetadata,
-          } as unknown as DataType,
+          } as DataType,
         }));
 
         logger.info(
@@ -182,7 +173,7 @@ export class QueueWithFallback<
           "Bulk jobs scheduled",
         );
 
-        return await super.addBulk(wrappedJobs);
+        return await super.addBulk(jobsWithContext);
       },
     );
   }

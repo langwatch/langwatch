@@ -14,7 +14,9 @@ export interface RequestContext {
 }
 
 /**
- * Job context metadata that is attached to job payloads for trace correlation.
+ * Context metadata attached to job payloads for propagation.
+ * Trace/span IDs are optional - used for OTel span linking in event-sourcing.
+ * Business context (org/project/user) is always propagated.
  */
 export interface JobContextMetadata {
   traceId?: string;
@@ -101,7 +103,7 @@ export function generateSpanId(): string {
 
 /**
  * Gets the current OTel span context if available.
- * Returns undefined if no active span exists.
+ * Used by framework adapters to extract trace/span from incoming requests.
  */
 export function getOtelSpanContext(): { traceId: string; spanId: string } | undefined {
   const span = trace.getSpan(otContext.active());
@@ -114,3 +116,4 @@ export function getOtelSpanContext(): { traceId: string; spanId: string } | unde
   }
   return undefined;
 }
+

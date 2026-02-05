@@ -11,6 +11,7 @@ import {
 } from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger/server";
+import { withJobContext } from "../../context/asyncContext";
 import {
   captureException,
   getCurrentScope,
@@ -895,24 +896,30 @@ export const startCollectorWorker = () => {
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,
-    async (job) => {
-      const jobLog = (message: string) => {
-        void job.log(message);
-      };
+    withJobContext(
+      async (job) => {
+        const jobLog = (message: string) => {
+          void job.log(message);
+        };
 
-      jobLog(
-        `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
-      );
+        jobLog(
+          `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
+        );
 
-      try {
-        await processCollectorJob(job.id, job.data);
-        jobLog(`Completed successfully`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        jobLog(`Failed: ${message}`);
-        throw error;
-      }
-    },
+        try {
+          await processCollectorJob(job.id, job.data);
+          jobLog(`Completed successfully`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          jobLog(`Failed: ${message}`);
+          throw error;
+        }
+      },
+      {
+        // Use projectId from job data if not in context metadata
+        getContextFromData: (data) => ({ projectId: data.projectId }),
+      },
+    ),
     {
       connection,
       concurrency: 20,
