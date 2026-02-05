@@ -185,7 +185,7 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getByIdOrHandle: {
         useQuery: vi.fn(() => ({
-          data: { id: "prompt-123", name: "My Prompt" },
+          data: { id: "prompt-123", name: "My Prompt", handle: "My Prompt" },
           isLoading: false,
         })),
       },
