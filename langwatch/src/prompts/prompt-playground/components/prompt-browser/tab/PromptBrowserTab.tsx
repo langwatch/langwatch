@@ -34,7 +34,7 @@ function PromptBrowserTabView({
     <HStack gap={2} height="full" {...rest}>
       <HStack>
         <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
-          {meta.title ?? "Untitled"}
+          {meta.title ?? "New Prompt"}
         </Text>
         {hasUnsavedChanges && (
           <Box>
