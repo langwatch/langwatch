@@ -14,24 +14,27 @@ import structlog
 from structlog.typing import EventDict, WrappedLogger
 
 # Context variable for request-scoped data (like project_id)
-_log_context: ContextVar[dict[str, Any]] = ContextVar("log_context", default={})
+# Using None as default to avoid sharing a mutable dict across contexts
+_log_context: ContextVar[Optional[dict[str, Any]]] = ContextVar("log_context", default=None)
 
 
 def get_log_context() -> dict[str, Any]:
     """Get the current log context."""
-    return _log_context.get().copy()
+    current = _log_context.get()
+    return (current or {}).copy()
 
 
 def set_log_context(**kwargs: Any) -> None:
     """Set values in the log context for the current async context."""
-    current = _log_context.get().copy()
-    current.update(kwargs)
-    _log_context.set(current)
+    current = _log_context.get() or {}
+    updated = current.copy()
+    updated.update(kwargs)
+    _log_context.set(updated)
 
 
 def clear_log_context() -> None:
     """Clear the log context."""
-    _log_context.set({})
+    _log_context.set(None)
 
 
 def _add_context_processor(
@@ -102,6 +105,7 @@ def _configure_structlog() -> None:
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.UnicodeDecoder(),
+        structlog.processors.CallsiteParameterAdder(),
     ]
 
     if is_prod:
@@ -116,7 +120,7 @@ def _configure_structlog() -> None:
             ],
             wrapper_class=structlog.stdlib.BoundLogger,
             context_class=dict,
-            logger_factory=structlog.PrintLoggerFactory(),
+            logger_factory=structlog.stdlib.LoggerFactory(),
             cache_logger_on_first_use=True,
         )
     else:
@@ -128,7 +132,7 @@ def _configure_structlog() -> None:
             ],
             wrapper_class=structlog.stdlib.BoundLogger,
             context_class=dict,
-            logger_factory=structlog.PrintLoggerFactory(),
+            logger_factory=structlog.stdlib.LoggerFactory(),
             cache_logger_on_first_use=True,
         )
 
