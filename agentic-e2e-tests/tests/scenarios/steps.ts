@@ -384,3 +384,94 @@ export function getScenarioSetIdFromUrl(page: Page): string {
   const match = url.match(/simulations\/([^/]+)/);
   return match?.[1] ?? "";
 }
+
+// =============================================================================
+// Scenario Archive Steps
+// =============================================================================
+
+/**
+ * When I open the row action menu for "<name>"
+ */
+export async function whenIOpenRowActionMenuFor(page: Page, name: string) {
+  await page.getByLabel(`Actions for ${name}`).click();
+}
+
+/**
+ * When I click "Archive" in the row action menu
+ */
+export async function whenIClickArchiveInMenu(page: Page) {
+  // Wait for menu to be visible before clicking
+  // Filter by visible text to avoid stale elements from closed menus
+  const archiveOption = page.getByText("Archive", { exact: true }).filter({ hasText: /^Archive$/ });
+  await expect(archiveOption.first()).toBeVisible({ timeout: 5000 });
+  await archiveOption.first().click();
+}
+
+/**
+ * Then I see a confirmation modal asking to archive "<name>"
+ */
+export async function thenISeeArchiveConfirmationModal(page: Page, name: string) {
+  await expect(page.getByText("Archive scenario?").last()).toBeVisible();
+  await expect(page.getByText(name).last()).toBeVisible();
+  await expect(page.getByText("This action can be undone by an administrator.").last()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Archive" }).last()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel" }).last()).toBeVisible();
+}
+
+/**
+ * When I confirm the archival
+ */
+export async function whenIConfirmArchival(page: Page) {
+  await page.getByRole("button", { name: "Archive" }).last().click();
+  // Wait for dialog to close
+  await expect(page.getByText(/Archive.*scenario/).last()).not.toBeVisible({ timeout: 10000 });
+  // Wait a moment for the backend to process and UI to update
+  await page.waitForTimeout(1000);
+}
+
+/**
+ * Then "<name>" no longer appears in the scenarios list
+ */
+export async function thenScenarioDoesNotAppearInList(page: Page, name: string) {
+  // Wait for the table to update after deletion
+  // Use a more specific selector that looks for the text within table context
+  const scenarioText = page.getByText(name, { exact: true }).first();
+  await expect(scenarioText).not.toBeVisible({ timeout: 10000 });
+}
+
+/**
+ * When I select the checkbox for "<name>"
+ */
+export async function whenISelectCheckboxFor(page: Page, name: string) {
+  const checkbox = page.getByLabel(`Select ${name}`);
+  await expect(checkbox).toBeVisible({ timeout: 5000 });
+  await checkbox.click();
+}
+
+/**
+ * Then I see a batch action bar showing "<count> selected"
+ */
+export async function thenISeeTheBatchActionBar(page: Page, count: number) {
+  await expect(page.getByTestId("batch-action-bar")).toBeVisible();
+  await expect(page.getByText(`${count} selected`)).toBeVisible();
+}
+
+/**
+ * When I click the "Archive" button in the batch action bar
+ */
+export async function whenIClickArchiveInBatchBar(page: Page) {
+  const archiveButton = page.getByTestId("batch-action-bar").getByRole("button", { name: "Archive" });
+  await expect(archiveButton).toBeVisible({ timeout: 5000 });
+  await archiveButton.click();
+}
+
+/**
+ * Then I see a confirmation modal listing the scenarios
+ */
+export async function thenISeeArchiveConfirmationModalListing(page: Page, names: string[]) {
+  await expect(page.getByText(`Archive ${names.length} scenarios?`).last()).toBeVisible();
+  for (const name of names) {
+    await expect(page.getByText(name).last()).toBeVisible();
+  }
+  await expect(page.getByText("This action can be undone by an administrator.").last()).toBeVisible();
+}
