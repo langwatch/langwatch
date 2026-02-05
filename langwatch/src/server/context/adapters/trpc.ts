@@ -1,13 +1,9 @@
-import {
-  type RequestContext,
-  generateTraceId,
-  generateSpanId,
-  getOtelSpanContext,
-} from "../core";
+import { type RequestContext } from "../core";
 
 /**
  * Creates a RequestContext from tRPC context and input.
- * Extracts user from session, project/org from input.
+ * Extracts business context (user from session, project/org from input).
+ * Trace/span IDs come from OTel, not stored in RequestContext.
  */
 export function createContextFromTRPC(
   ctx: {
@@ -15,11 +11,7 @@ export function createContextFromTRPC(
   },
   input?: { projectId?: string; organizationId?: string },
 ): RequestContext {
-  const spanContext = getOtelSpanContext();
-
   return {
-    traceId: spanContext?.traceId ?? generateTraceId(),
-    spanId: spanContext?.spanId ?? generateSpanId(),
     organizationId: input?.organizationId,
     projectId: input?.projectId,
     userId: ctx.session?.user?.id,

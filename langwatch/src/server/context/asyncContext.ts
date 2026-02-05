@@ -20,8 +20,6 @@ export {
   getCurrentContext,
   runWithContext,
   updateCurrentContext,
-  generateTraceId,
-  generateSpanId,
 } from "./core";
 
 // Re-export adapters

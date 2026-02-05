@@ -3,6 +3,7 @@ import {
   type RequestContext,
   type JobContextMetadata,
   getCurrentContext,
+  getOtelSpanContext,
   runWithContext,
 } from "../core";
 
@@ -36,14 +37,16 @@ export function createContextFromJobData(
 
 /**
  * Extracts context metadata for job propagation.
- * Includes trace/span IDs for OTel span linking (used by event-sourcing).
+ * - Trace/span from OTel for span linking (event-sourcing)
+ * - Business context from ALS for logging
  */
 export function getJobContextMetadata(): JobContextMetadata {
+  const spanContext = getOtelSpanContext();
   const ctx = getCurrentContext();
 
   return {
-    traceId: ctx?.traceId,
-    parentSpanId: ctx?.spanId,
+    traceId: spanContext?.traceId,
+    parentSpanId: spanContext?.spanId,
     organizationId: ctx?.organizationId,
     projectId: ctx?.projectId,
     userId: ctx?.userId,

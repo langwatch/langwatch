@@ -42,10 +42,10 @@ export class QueueWithFallback<
     opts?: QueueOptions,
   ) {
     // Add BullMQ OTel instrumentation for automatic trace context propagation
-    const optsWithTelemetry = {
+    const optsWithTelemetry: QueueOptions = {
       ...opts,
       telemetry: new BullMQOtel(name),
-    };
+    } as QueueOptions;
     super(name, optsWithTelemetry, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;
   }
