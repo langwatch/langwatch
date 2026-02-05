@@ -243,6 +243,20 @@ const CustomGraph_ = React.memo(
           }
         }
 
+        // Include active date range as ISO strings for navigation query
+        if (params.startDate != null) {
+          filterParams.startDate =
+            typeof params.startDate === "number"
+              ? new Date(params.startDate).toISOString()
+              : String(params.startDate);
+        }
+        if (params.endDate != null) {
+          filterParams.endDate =
+            typeof params.endDate === "number"
+              ? new Date(params.endDate).toISOString()
+              : String(params.endDate);
+        }
+
         // Navigate to messages page with filter
         void router.push(
           {
