@@ -147,7 +147,7 @@ const buildThreadData = async (
   logger.info(
     {
       threadId,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       projectId,
     },
     "Fetching thread traces",
@@ -300,7 +300,7 @@ const buildDataForEvaluation = async (
   logger.info(
     {
       evaluatorType,
-      traceId: trace.trace_id,
+      observedTraceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
       isThreadLevel,
       mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
@@ -312,7 +312,7 @@ const buildDataForEvaluation = async (
     // Use thread-based data extraction
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
         threadId: trace.metadata?.thread_id,
       },
       "Using thread-based data extraction",
@@ -322,7 +322,7 @@ const buildDataForEvaluation = async (
     // Use regular trace-based mapping
     logger.info(
       {
-        traceId: trace.trace_id,
+        observedTraceId: trace.trace_id,
       },
       "Using regular trace-based mapping",
     );

@@ -247,7 +247,7 @@ const processCollectorJob_ = async (
   logger.info(
     {
       jobId: id,
-      ...(data.traceId && { traceId: data.traceId }),
+      ...(data.traceId && { observedTraceId: data.traceId }),
       ...(data.projectId && { projectId: data.projectId }),
       ...(data.spans?.length && { spanCount: data.spans.length }),
     },
@@ -883,7 +883,7 @@ export const processCollectorCheckAndAdjustJob = async (
       input,
     });
   } catch {
-    logger.debug({ traceId }, "failed to score satisfaction for");
+    logger.debug({ observedTraceId: traceId }, "failed to score satisfaction for");
   }
 };
 

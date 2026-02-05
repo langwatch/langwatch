@@ -372,7 +372,7 @@ export const cleanupPIIs = async (
       return;
     }
 
-    logger.debug({ traceId: trace.trace_id }, "checking PII for trace");
+    logger.debug({ observedTraceId: trace.trace_id }, "checking PII for trace");
 
     const clearPIIPromises = [
       clearPII(trace, ["input", "value"], options),
