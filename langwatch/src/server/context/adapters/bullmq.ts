@@ -12,8 +12,9 @@ import {
 /**
  * Type for job data that includes the optional __context field.
  * Used by QueueWithFallback to propagate context through queues.
+ * T must be an object type to allow spreading with __context.
  */
-export type JobDataWithContext<T> = T & {
+export type JobDataWithContext<T extends Record<string, unknown>> = T & {
   __context?: JobContextMetadata;
 };
 
@@ -68,7 +69,11 @@ export function getJobContextMetadata(): JobContextMetadata {
  * );
  * ```
  */
-export function withJobContext<DataType, ResultType, NameType extends string>(
+export function withJobContext<
+  DataType extends Record<string, unknown>,
+  ResultType,
+  NameType extends string,
+>(
   processor: (job: Job<DataType, ResultType, NameType>) => Promise<ResultType>,
 ): (job: Job<DataType, ResultType, NameType>) => Promise<ResultType> {
   return async (job: Job<DataType, ResultType, NameType>) => {

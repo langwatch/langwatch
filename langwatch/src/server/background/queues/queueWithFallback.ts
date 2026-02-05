@@ -22,7 +22,7 @@ const logger = createLogger("langwatch:queueWithFallback");
 
 // Queue that falls back to calling the worker directly if the queue is not available
 export class QueueWithFallback<
-  DataType,
+  DataType extends Record<string, unknown>,
   ResultType,
   NameType extends string,
 > extends Queue<

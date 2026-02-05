@@ -210,16 +210,16 @@ describe("asyncContext", () => {
   });
 
   describe("getLogContext", () => {
-    it("returns undefined values when no context is set and no OTel span", () => {
+    it("returns null values when no context is set and no OTel span", () => {
       const logCtx = getLogContext();
 
       // trace/span come from OTel (mocked to return undefined)
       // business context comes from ALS (not set)
-      expect(logCtx.traceId).toBeUndefined();
-      expect(logCtx.spanId).toBeUndefined();
-      expect(logCtx.organizationId).toBeUndefined();
-      expect(logCtx.projectId).toBeUndefined();
-      expect(logCtx.userId).toBeUndefined();
+      expect(logCtx.traceId).toBeNull();
+      expect(logCtx.spanId).toBeNull();
+      expect(logCtx.organizationId).toBeNull();
+      expect(logCtx.projectId).toBeNull();
+      expect(logCtx.userId).toBeNull();
     });
 
     it("returns business context values when set", () => {
@@ -231,9 +231,9 @@ describe("asyncContext", () => {
 
       runWithContext(testCtx, () => {
         const logCtx = getLogContext();
-        // trace/span come from OTel (mocked to return undefined)
-        expect(logCtx.traceId).toBeUndefined();
-        expect(logCtx.spanId).toBeUndefined();
+        // trace/span come from OTel (mocked to return null when no span)
+        expect(logCtx.traceId).toBeNull();
+        expect(logCtx.spanId).toBeNull();
         // business context comes from our ALS
         expect(logCtx.organizationId).toBe("log-org");
         expect(logCtx.projectId).toBe("log-proj");

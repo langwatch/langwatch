@@ -19,14 +19,14 @@ describe("contextProvider", () => {
     it("registers a context getter function", () => {
       const testGetter = () => ({
         testKey: "testValue",
-        anotherKey: undefined,
+        anotherKey: null,
       });
 
       registerContextProvider(testGetter);
       const ctx = getContext();
 
       expect(ctx.testKey).toBe("testValue");
-      expect(ctx.anotherKey).toBeUndefined();
+      expect(ctx.anotherKey).toBeNull();
     });
 
     it("replaces previous provider when called again", () => {
