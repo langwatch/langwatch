@@ -213,6 +213,43 @@ const auditLogMutations = t.middleware(
   },
 );
 
+export const tracerMiddleware = t.middleware(
+  async ({ path, type, next }) => {
+    const { trace, SpanKind, SpanStatusCode } = await import(
+      "@opentelemetry/api"
+    );
+
+    const tracer = trace.getTracer("langwatch:trpc");
+    const spanName = `trpc.${path}`;
+
+    return tracer.startActiveSpan(
+      spanName,
+      {
+        kind: SpanKind.SERVER,
+        attributes: {
+          "rpc.system": "trpc",
+          "rpc.method": path,
+          "rpc.type": type,
+        },
+      },
+      async (span) => {
+        try {
+          return await next();
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        } finally {
+          span.end();
+        }
+      },
+    );
+  },
+);
+
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
@@ -317,6 +354,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
     },
     use: (middleware) => {
       return procedure
+        .use(tracerMiddleware as any)
         .use(loggerMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)

@@ -34,10 +34,12 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
       value,
     })),
     event_details: job.data.event.event_details
-      ? Object.entries(job.data.event.event_details).map(([key, value]) => ({
-          key,
-          value,
-        }))
+      ? Object.entries(job.data.event.event_details)
+          .filter(([, value]) => value != null)
+          .map(([key, value]) => ({
+            key,
+            value: value!,
+          }))
       : [],
     timestamps: {
       started_at: job.data.event.timestamp,
