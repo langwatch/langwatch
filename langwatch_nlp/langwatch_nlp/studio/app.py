@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import os
 import signal
 import langwatch_nlp.studio.runtimes.lambda_runtime as lambda_runtime
-from langwatch_nlp.logger import get_logger
+from langwatch_nlp.logger import get_logger, set_log_context, clear_log_context
 from langwatch_nlp.studio.s3_cache import s3_client_and_bucket
 from langwatch_nlp.studio.runtimes.base_runtime import BaseRuntime
 import langwatch_nlp.error_tracking
@@ -41,6 +41,7 @@ from langwatch_nlp.studio.types.events import (
     ErrorPayload,
     component_error_event,
     get_trace_id,
+    get_project_id,
 )
 from langwatch_nlp.studio.utils import (
     SerializableWithPydanticAndPredictEncoder,
@@ -147,63 +148,74 @@ async def stop_process(event: StudioClientEvent, s3_cache_key: str | None = None
 async def execute_event_on_a_subprocess(
     event: StudioClientEvent, s3_cache_key: str | None = None
 ):
-    if (
-        isinstance(event, StopExecution)
-        or isinstance(event, StopEvaluationExecution)
-        or isinstance(event, StopOptimizationExecution)
-    ):
-        if stop_event := await stop_process(event, s3_cache_key):
-            yield stop_event
-        return
-
-    process, queue = await runtime.submit(event)
-
-    if s3_cache_key and (trace_id := get_trace_id(event)):
-        lambda_runtime.setup_kill_signal_watcher(event, queue, s3_cache_key, trace_id)
-
-    process = cast(Any, process)
-
-    timeout_without_messages = 120  # seconds
-    if isinstance(event, ExecuteOptimization):
-        # TODO: temporary until we actually send events in the middle of optimization process
-        timeout_without_messages = 120 * 60  # 120 minutes
+    # Set log context for this execution
+    project_id = get_project_id(event)
+    trace_id = get_trace_id(event)
+    if project_id:
+        set_log_context(project_id=project_id)
+    if trace_id:
+        set_log_context(trace_id=trace_id)
 
     try:
-        done = False
-        last_message_time = time.time()
-        time_since_last_message = 0
-        while time_since_last_message < timeout_without_messages:
-            time_since_last_message = time.time() - last_message_time
-            try:
-                result = queue.get_nowait()
-                yield result
-                last_message_time = time.time()
+        if (
+            isinstance(event, StopExecution)
+            or isinstance(event, StopEvaluationExecution)
+            or isinstance(event, StopOptimizationExecution)
+        ):
+            if stop_event := await stop_process(event, s3_cache_key):
+                yield stop_event
+            return
 
-                if isinstance(result, Done):
-                    done = True
-                    break
-            except (Empty, asyncio.QueueEmpty):
-                if timeout_without_messages > 10 and not runtime.is_process_alive(
-                    process
-                ):
-                    raise Exception("Runtime crashed")
+        process, queue = await runtime.submit(event)
 
-                await asyncio.sleep(0.1)
+        if s3_cache_key and (trace_id := get_trace_id(event)):
+            lambda_runtime.setup_kill_signal_watcher(event, queue, s3_cache_key, trace_id)
 
-        if not done:
-            # Timeout occurred
-            yield Error(payload=ErrorPayload(message="Execution timed out"))
-            runtime.kill_process(process)
+        process = cast(Any, process)
 
-    except Exception as e:
-        import traceback
+        timeout_without_messages = 120  # seconds
+        if isinstance(event, ExecuteOptimization):
+            # TODO: temporary until we actually send events in the middle of optimization process
+            timeout_without_messages = 120 * 60  # 120 minutes
 
-        traceback.print_exc()
-        yield Error(payload=ErrorPayload(message=f"Unexpected error: {repr(e)}"))
+        try:
+            done = False
+            last_message_time = time.time()
+            time_since_last_message = 0
+            while time_since_last_message < timeout_without_messages:
+                time_since_last_message = time.time() - last_message_time
+                try:
+                    result = queue.get_nowait()
+                    yield result
+                    last_message_time = time.time()
+
+                    if isinstance(result, Done):
+                        done = True
+                        break
+                except (Empty, asyncio.QueueEmpty):
+                    if timeout_without_messages > 10 and not runtime.is_process_alive(
+                        process
+                    ):
+                        raise Exception("Runtime crashed")
+
+                    await asyncio.sleep(0.1)
+
+            if not done:
+                # Timeout occurred
+                yield Error(payload=ErrorPayload(message="Execution timed out"))
+                runtime.kill_process(process)
+
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            yield Error(payload=ErrorPayload(message=f"Unexpected error: {repr(e)}"))
+        finally:
+            # Ensure the process is terminated and resources are cleaned up
+            trace_id = get_trace_id(event)
+            runtime.cleanup(trace_id, process)
     finally:
-        # Ensure the process is terminated and resources are cleaned up
-        trace_id = get_trace_id(event)
-        runtime.cleanup(trace_id, process)
+        clear_log_context()
 
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
