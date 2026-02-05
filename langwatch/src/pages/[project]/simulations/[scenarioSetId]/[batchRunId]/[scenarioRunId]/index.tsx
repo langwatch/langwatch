@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, Clock, Edit2, Play } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import { useCallback, useState } from "react";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -7,6 +7,7 @@ import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import {
   CustomCopilotKitChat,
   PreviousRunsList,
+  ScenarioRunActions,
   ScenarioRunHeader,
   SimulationConsole,
   SimulationLayout,
@@ -48,11 +49,12 @@ export default function IndividualScenarioRunPage() {
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
 
-  // Check if the scenario exists in our database
-  const { data: scenarioExists } = api.scenarios.getById.useQuery(
-    { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project?.id && !!scenarioId },
-  );
+  // Fetch scenario metadata including archived status for guardrails
+  const { data: scenarioData } =
+    api.scenarios.getByIdIncludingArchived.useQuery(
+      { projectId: project?.id ?? "", id: scenarioId ?? "" },
+      { enabled: !!project?.id && !!scenarioId },
+    );
 
   // Target selection persistence for "Run Again"
   const {
@@ -129,31 +131,16 @@ export default function IndividualScenarioRunPage() {
               )}
 
               <HStack gap={2}>
-                {scenarioExists && (
-                  <>
-                    <Button
-                      colorPalette="blue"
-                      size="sm"
-                      onClick={handleRunAgainClick}
-                      loading={isRunning}
-                    >
-                      <Play size={14} />
-                      Run Again
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        openDrawer("scenarioEditor", {
-                          urlParams: { scenarioId: scenarioId ?? "" },
-                        });
-                      }}
-                    >
-                      <Edit2 size={14} />
-                      Edit Scenario
-                    </Button>
-                  </>
-                )}
+                <ScenarioRunActions
+                  scenario={scenarioData}
+                  isRunning={isRunning}
+                  onRunAgain={handleRunAgainClick}
+                  onEditScenario={() => {
+                    openDrawer("scenarioEditor", {
+                      urlParams: { scenarioId: scenarioId ?? "" },
+                    });
+                  }}
+                />
                 <Button
                   variant="outline"
                   size="sm"

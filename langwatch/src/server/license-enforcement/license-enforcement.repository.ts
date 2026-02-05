@@ -148,12 +148,15 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all scenarios for license enforcement.
-   * Scenarios do not support archival - all count against limits.
+   * Counts active (non-archived) scenarios for license enforcement.
+   * Only active scenarios count against the license limit.
    */
   async getScenarioCount(organizationId: string): Promise<number> {
     return this.prisma.scenario.count({
-      where: { project: { team: { organizationId } } },
+      where: {
+        project: { team: { organizationId } },
+        archivedAt: null,
+      },
     });
   }
 
