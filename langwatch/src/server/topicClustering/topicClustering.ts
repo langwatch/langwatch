@@ -403,6 +403,7 @@ export const batchClusterTraces = async (
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
+    project_id: project.id,
     litellm_params: await prepareLitellmParams({
       model: topicModel.model,
       modelProvider: topicModel.modelProvider,
@@ -468,6 +469,7 @@ export const incrementalClustering = async (
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
+    project_id: project.id,
     litellm_params: await prepareLitellmParams({
       model: topicModel.model,
       modelProvider: topicModel.modelProvider,
