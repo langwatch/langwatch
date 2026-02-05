@@ -55,6 +55,7 @@ export const addEnvs = async (
     ...(event.payload.workflow as Workflow),
     workflow_id,
     api_key: apiKey,
+    project_id: projectId,
     nodes: await Promise.all(
       (event.payload.workflow.nodes as Workflow["nodes"]).map(async (node) => {
         const parameters = await Promise.all(

@@ -47,6 +47,7 @@ llm_field = Field(
 
 simple_workflow = Workflow(
     workflow_id="simple-rag",
+    project_id="test-project",
     api_key="",
     spec_version="1.3",
     name="Simple RAG",
@@ -337,6 +338,7 @@ def test_parse_parallel_execution_workflow():
     disable_dsp_caching()
     workflow = Workflow(
         workflow_id="simple-rag",
+        project_id="test-project",
         api_key="",
         spec_version="1.3",
         name="Simple RAG",

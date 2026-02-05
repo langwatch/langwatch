@@ -22,6 +22,7 @@ from langwatch_nlp.studio.types.dsl import (
 
 basic_workflow = Workflow(
     workflow_id="basic",
+    project_id="test-project",
     api_key="",
     spec_version="1.3",
     name="Basic",

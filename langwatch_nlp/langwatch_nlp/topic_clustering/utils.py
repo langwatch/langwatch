@@ -51,7 +51,7 @@ def _generate_single_embedding(
             target_dim=dimensions,
         )
     except Exception as e:
-        logger.warning(f"Error generating single embedding: {e} | Text: {text[:100]}...")
+        logger.error("Error generating single embedding", error=str(e), text_preview=text[:100])
         raise e  # Re-raise the exception to be handled by the caller
 
 
@@ -73,7 +73,7 @@ def generate_embeddings_threaded(
     # Process in smaller chunks to handle errors properly
     chunk_size = 20
     total_chunks = (len(texts) + chunk_size - 1) // chunk_size
-    logger.info(f"Generating embeddings (threaded) for {len(texts)} texts in {total_chunks} chunks...")
+    logger.info("Generating embeddings (threaded)", text_count=len(texts), chunk_count=total_chunks)
 
     for chunk_idx, i in enumerate(range(0, len(texts), chunk_size)):
         chunk = texts[i:i + chunk_size]
@@ -93,16 +93,16 @@ def generate_embeddings_threaded(
                     embeddings.append(None)
                     errors += 1
                     last_error = e
-                    logger.warning(f"Error generating embedding: {e}")
+                    logger.warning("Error generating embedding", error=str(e))
                     if errors >= 3:
-                        logger.warning("Too many errors generating embeddings, reraising")
+                        logger.error("Too many errors generating embeddings, reraising", error_count=errors)
                         raise e
 
         if (chunk_idx + 1) % 5 == 0 or chunk_idx == total_chunks - 1:
-            logger.info(f"Embeddings progress (threaded): {chunk_idx + 1}/{total_chunks} chunks")
+            logger.info("Embeddings progress (threaded)", chunks_processed=chunk_idx + 1, total_chunks=total_chunks)
 
     if last_error and errors == len(texts):
-        logger.warning("All embeddings failed to generate, reraising last error")
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
         raise last_error
 
     return embeddings
@@ -122,7 +122,7 @@ def generate_embeddings(
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
         del embeddings_litellm_params["dimensions"]
 
-    logger.info(f"Generating embeddings for {len(texts)} texts in {total_batches} batches...")
+    logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
     for batch_idx, i in enumerate(batches):
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
@@ -148,17 +148,17 @@ def generate_embeddings(
 
             errors += 1
             last_error = e
-            logger.warning(f"Error generating embeddings: {e} | Batch: {batch[:3]}...")
+            logger.warning("Error generating embeddings", error=str(e), batch_preview=batch[:3])
             if errors >= 3:
-                logger.warning("Too many errors generating embeddings, reraising")
+                logger.error("Too many errors generating embeddings, reraising", error_count=errors)
                 raise e
 
         # Log progress every 5 batches or at the end
         if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
-            logger.info(f"Embeddings progress: {batch_idx + 1}/{total_batches} batches ({len(embeddings)}/{len(texts)} texts)")
+            logger.info("Embeddings progress", batches_processed=batch_idx + 1, total_batches=total_batches, embeddings_generated=len(embeddings), total_texts=len(texts))
 
     if last_error and errors == len(batches):
-        logger.warning("All embeddings failed to generate, reraising last error")
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
         raise last_error
 
     return embeddings
