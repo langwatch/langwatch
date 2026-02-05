@@ -4,10 +4,13 @@ import { context as otContext, trace } from "@opentelemetry/api";
 /**
  * Request context that can be propagated across async boundaries.
  * This enables correlation of logs and traces from HTTP requests through to background jobs.
+ *
+ * Trace/span IDs come from OTel instrumentation when available.
+ * Business context (org/project/user) is propagated through job payloads.
  */
 export interface RequestContext {
-  traceId: string;
-  spanId: string;
+  traceId?: string;
+  spanId?: string;
   organizationId?: string;
   projectId?: string;
   userId?: string;

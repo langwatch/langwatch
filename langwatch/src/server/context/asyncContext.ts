@@ -36,7 +36,6 @@ export {
   getJobContextMetadata,
   withJobContext,
   type JobDataWithContext,
-  type WithJobContextOptions,
 } from "./adapters/bullmq";
 
 // Re-export logging utilities

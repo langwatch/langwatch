@@ -1,5 +1,6 @@
 import type { Project } from "@prisma/client";
 import { Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
@@ -915,14 +916,11 @@ export const startCollectorWorker = () => {
           throw error;
         }
       },
-      {
-        // Use projectId from job data if not in context metadata
-        getContextFromData: (data) => ({ projectId: data.projectId }),
-      },
     ),
     {
       connection,
       concurrency: 20,
+      telemetry: new BullMQOtel(COLLECTOR_QUEUE.NAME),
     },
   );
 

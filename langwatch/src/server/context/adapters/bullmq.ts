@@ -3,8 +3,6 @@ import {
   type RequestContext,
   type JobContextMetadata,
   getCurrentContext,
-  generateTraceId,
-  generateSpanId,
   runWithContext,
 } from "../core";
 
@@ -19,18 +17,17 @@ export type JobDataWithContext<T> = T & {
 /**
  * Creates a RequestContext for job processing.
  *
- * Trace/span IDs come from getCurrentContext() (which checks OTel).
+ * Trace/span IDs come from getCurrentContext() (OTel instrumentation).
  * Business context (org/project/user) comes from propagated metadata.
  */
 export function createContextFromJobData(
   metadata?: JobContextMetadata,
 ): RequestContext {
-  // Get current context - trace/span come from OTel, business context from metadata
   const currentContext = getCurrentContext();
 
   return {
-    traceId: currentContext?.traceId ?? generateTraceId(),
-    spanId: currentContext?.spanId ?? generateSpanId(),
+    traceId: currentContext?.traceId,
+    spanId: currentContext?.spanId,
     organizationId: metadata?.organizationId,
     projectId: metadata?.projectId,
     userId: metadata?.userId,
@@ -54,18 +51,10 @@ export function getJobContextMetadata(): JobContextMetadata {
 }
 
 /**
- * Options for the withJobContext wrapper.
- */
-export type WithJobContextOptions<DataType> = {
-  /**
-   * Extract additional context fields from job data.
-   * Use when job data contains context (like projectId) not in the original request.
-   */
-  getContextFromData?: (data: DataType) => Partial<JobContextMetadata>;
-};
-
-/**
  * Wraps a BullMQ job processor to automatically restore request context.
+ *
+ * Trace/span IDs come from OTel (BullMQ-otel instrumentation).
+ * Business context (org/project/user) comes from propagated __context metadata.
  *
  * @example
  * ```typescript
@@ -74,25 +63,18 @@ export type WithJobContextOptions<DataType> = {
  *   withJobContext(async (job) => {
  *     logger.info("Processing job"); // Will have traceId, projectId, etc.
  *   }),
- *   { connection }
+ *   { connection, telemetry: new BullMQOtel(QUEUE_NAME) }
  * );
  * ```
  */
 export function withJobContext<DataType, ResultType, NameType extends string>(
   processor: (job: Job<DataType, ResultType, NameType>) => Promise<ResultType>,
-  options?: WithJobContextOptions<DataType>,
 ): (job: Job<DataType, ResultType, NameType>) => Promise<ResultType> {
   return async (job: Job<DataType, ResultType, NameType>) => {
     const jobData = job.data as JobDataWithContext<DataType>;
     const contextMetadata = jobData.__context;
 
-    // Merge propagated context with additional context from job data
-    const additionalContext = options?.getContextFromData?.(job.data);
-
-    const requestContext = createContextFromJobData({
-      ...contextMetadata,
-      ...additionalContext,
-    });
+    const requestContext = createContextFromJobData(contextMetadata);
 
     return await runWithContext(requestContext, async () => {
       return await processor(job);
