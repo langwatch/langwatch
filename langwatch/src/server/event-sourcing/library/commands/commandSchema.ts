@@ -1,6 +1,7 @@
 import type { ZodSchema, z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import type { CommandType } from "../domain/commandType";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:event-sourcing:command-schema");
 
@@ -58,11 +59,7 @@ export function defineCommandSchema<
         logger.error(
           {
             commandType: type,
-            zodIssues: result.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              code: issue.code,
-              message: issue.message,
-            })),
+            zodIssues: mapZodIssuesToLogContext(result.error.issues),
           },
           "Command payload validation failed",
         );

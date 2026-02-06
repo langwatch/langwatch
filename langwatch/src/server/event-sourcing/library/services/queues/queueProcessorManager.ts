@@ -28,6 +28,7 @@ import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import type { DistributedLock } from "../../utils/distributedLock";
 import { ConfigurationError, ValidationError } from "../errorHandling";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
 
@@ -194,11 +195,7 @@ function createCommandDispatcher<
           undefined,
           {
             commandType,
-            zodIssues: validation.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              code: issue.code,
-              message: issue.message,
-            })),
+            zodIssues: mapZodIssuesToLogContext(validation.error.issues),
           },
         );
       }
@@ -280,9 +277,9 @@ function createCommandDispatcher<
             {
               commandType,
               index: i,
-              validationErrors:
+              zodIssues:
                 parseResult.success === false
-                  ? parseResult.error.issues
+                  ? mapZodIssuesToLogContext(parseResult.error.issues)
                   : void 0,
             },
           );
@@ -308,11 +305,7 @@ function createCommandDispatcher<
           undefined,
           {
             commandType,
-            zodIssues: validation.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              code: issue.code,
-              message: issue.message,
-            })),
+            zodIssues: mapZodIssuesToLogContext(validation.error.issues),
           },
         );
       }
