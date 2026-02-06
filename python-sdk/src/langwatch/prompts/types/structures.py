@@ -1,37 +1,46 @@
 """
 API-related types and structures for prompts.
 
-Contains TypedDict classes that match the API structure for messages,
+Contains Pydantic models that match the API structure for messages,
 inputs, outputs, and response formats.
 """
 
-from typing import TypedDict, Literal, Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any
+
+from pydantic import BaseModel
 
 
-class MessageDict(TypedDict):
-    """Message dictionary that matches the API structure."""
+class Message(BaseModel):
+    """Message model that matches the API structure."""
 
     role: Literal["system", "user", "assistant"]
     content: str
 
 
-class InputDict(TypedDict):
-    """Input dictionary that matches the API structure."""
+class Input(BaseModel):
+    """Input model that matches the API structure."""
 
     identifier: str
     type: Literal["str", "int", "float", "bool", "json"]
 
 
-class OutputDict(TypedDict):
-    """Output dictionary that matches the API structure."""
+class Output(BaseModel):
+    """Output model that matches the API structure."""
 
     identifier: str
     type: Literal["str", "int", "float", "bool", "json"]
-    json_schema: Optional[Dict[str, Any]]
+    json_schema: Optional[Dict[str, Any]] = None
 
 
-class ResponseFormatDict(TypedDict, total=False):
-    """Response format dictionary for structured outputs."""
+class ResponseFormat(BaseModel):
+    """Response format model for structured outputs."""
 
     type: Literal["json_schema"]
-    json_schema: Optional[Dict[str, Any]]
+    json_schema: Optional[Dict[str, Any]] = None
+
+
+# Backward compatibility aliases
+MessageDict = Message
+InputDict = Input
+OutputDict = Output
+ResponseFormatDict = ResponseFormat

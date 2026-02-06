@@ -11,6 +11,7 @@ import tempfile
 import os
 
 import langwatch
+from langwatch.prompts.local_loader import LocalPromptLoader
 
 
 @pytest.fixture
@@ -44,6 +45,10 @@ def clean_langwatch():
     if "prompts" in langwatch.__dict__:
         del langwatch.__dict__["prompts"]
 
+    # Reset LocalPromptLoader class-level caches
+    LocalPromptLoader._cached_project_root = None
+    LocalPromptLoader._warned_no_prompts_path = False
+
     # Setup langwatch client with test configuration
     langwatch.setup(api_key="test-api-key", endpoint_url=os.getenv("LANGWATCH_ENDPOINT", "https://app.langwatch.ai"))
 
@@ -55,3 +60,7 @@ def clean_langwatch():
 
     # Reset the global instance
     set_instance(None)
+
+    # Reset LocalPromptLoader class-level caches
+    LocalPromptLoader._cached_project_root = None
+    LocalPromptLoader._warned_no_prompts_path = False
