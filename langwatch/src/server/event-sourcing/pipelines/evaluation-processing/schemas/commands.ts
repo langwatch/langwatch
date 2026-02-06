@@ -41,11 +41,11 @@ export const completeEvaluationCommandDataSchema = z.object({
   tenantId: z.string(),
   evaluationId: z.string(),
   status: z.enum(["processed", "error", "skipped"]),
-  score: z.number().optional(),
-  passed: z.boolean().optional(),
+  score: z.number().nullable().optional(),
+  passed: z.boolean().nullable().optional(),
   label: z.string().nullable().optional(),
-  details: z.string().optional(),
-  error: z.string().optional(),
+  details: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
 });
 
 export type CompleteEvaluationCommandData = z.infer<
