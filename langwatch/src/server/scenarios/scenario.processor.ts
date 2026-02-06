@@ -180,24 +180,15 @@ export function buildChildProcessEnv(
 }
 
 /**
- * Container type for job data that wraps the payload and context metadata.
- * Used to extract context propagated from the queue.
- */
-type JobContainer<DataType> = {
-  __payload: DataType;
-  __context?: JobContextMetadata;
-};
-
-/**
  * Process a scenario job by spawning an isolated child process.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
 ): Promise<ScenarioJobResult> {
-  // Extract payload and context from the container (if wrapped)
-  const container = job.data as unknown as JobContainer<ScenarioJob>;
-  const jobData = container.__payload ?? job.data;
-  const contextMetadata = container.__context;
+  // Extract context metadata propagated from the queue (flat format: { ...payload, __context })
+  const { __context: contextMetadata, ...jobData } = job.data as ScenarioJob & {
+    __context?: JobContextMetadata;
+  };
 
   if (job.timestamp) {
     getBullMQJobWaitDurationHistogram("scenario").observe(Date.now() - job.timestamp);
