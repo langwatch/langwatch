@@ -25,15 +25,45 @@ class LocalPromptLoader:
     """Loads prompts from local files in CLI format."""
 
     _warned_no_prompts_path: bool = False
+    _cached_project_root: Optional[Path] = None
+
+    PROMPTS_CONFIG_FILE = "prompts.json"
 
     def __init__(self, base_path: Optional[Path] = None):
-        """Initialize with base path (defaults to current working directory at load time)."""
+        """Initialize with base path (defaults to walking up from cwd to find prompts.json)."""
         self._base_path = base_path
 
     @property
     def base_path(self) -> Path:
-        """Get the base path, defaulting to current working directory if not set."""
-        return self._base_path or Path.cwd()
+        """Get the base path. If explicitly set, use that. Otherwise walk up from cwd to find prompts.json."""
+        if self._base_path is not None:
+            return self._base_path
+        return self._find_project_root()
+
+    @classmethod
+    def _find_project_root(cls) -> Path:
+        """
+        Walk up the directory tree from cwd looking for prompts.json.
+
+        Matches the TypeScript SDK behavior: starts at cwd and checks each
+        parent directory until prompts.json is found or the filesystem root
+        is reached. Result is cached for subsequent calls.
+        """
+        if cls._cached_project_root is not None:
+            return cls._cached_project_root
+
+        current_dir = Path.cwd().resolve()
+        root = Path(current_dir.anchor)
+
+        while current_dir != root:
+            if (current_dir / cls.PROMPTS_CONFIG_FILE).exists():
+                cls._cached_project_root = current_dir
+                return current_dir
+            current_dir = current_dir.parent
+
+        # Fallback to cwd if no prompts.json found anywhere
+        cls._cached_project_root = Path.cwd()
+        return cls._cached_project_root
 
     def load_prompt(self, prompt_id: str) -> Optional[PromptData]:
         """
