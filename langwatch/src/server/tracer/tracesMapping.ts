@@ -18,6 +18,21 @@ type TraceWithAnnotations = BaseTrace & {
 };
 
 /**
+ * Lazily imports server-only dependencies and formats a trace as an AI-readable digest.
+ * Uses dynamic import to avoid pulling Node.js-only OTel SDK into the frontend bundle,
+ * since this file is also imported by frontend components for mapping definitions.
+ */
+let _formatSpansDigest: typeof import("./spanToReadableSpan").formatSpansDigest | null = null;
+
+function getFormatSpansDigest() {
+  if (!_formatSpansDigest) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _formatSpansDigest = (require("./spanToReadableSpan") as typeof import("./spanToReadableSpan")).formatSpansDigest;
+  }
+  return _formatSpansDigest;
+}
+
+/**
  * Span subfield type for UI components
  */
 export type SpanSubfield = {
@@ -474,6 +489,11 @@ export const TRACE_MAPPINGS = {
       return threadTraces;
     },
   },
+  formatted_trace: {
+    mapping: (trace: TraceWithAnnotations) => {
+      return getFormatSpansDigest()(trace.spans ?? []);
+    },
+  },
 } satisfies Record<
   string,
   {
@@ -603,6 +623,17 @@ export const THREAD_MAPPINGS = {
       thread: { thread_id: string; traces: TraceWithAnnotations[] },
       selectedFields: (keyof typeof TRACE_MAPPINGS)[] = [],
     ) => extractTracesFields(thread.traces, selectedFields),
+  },
+  formatted_traces: {
+    mapping: (thread: {
+      thread_id: string;
+      traces: TraceWithAnnotations[];
+    }) => {
+      const format = getFormatSpansDigest();
+      return thread.traces
+        .map((trace) => format(trace.spans ?? []))
+        .join("\n\n---\n\n");
+    },
   },
 } as const;
 
@@ -897,6 +928,22 @@ const THREAD_TRACES_CHILDREN = [
 ];
 
 /**
+ * Human-readable labels for trace mapping sources.
+ * Keys not listed here will use their key name as the label.
+ */
+const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
+  formatted_trace: "Full Trace (AI-Readable)",
+};
+
+/**
+ * Human-readable labels for thread mapping sources.
+ * Keys not listed here will use their key name as the label.
+ */
+const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
+  formatted_traces: "Full Traces (AI-Readable)",
+};
+
+/**
  * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
  * Provides dynamic children for metadata and spans based on project traces.
  *
@@ -913,6 +960,15 @@ export function getTraceAvailableSources(
     .filter(([key]) => key !== "threads")
     .map(([key, config]) => {
       const hasKeys = "keys" in config && typeof config.keys === "function";
+      const label = TRACE_MAPPING_LABELS[key];
+
+      if (key === "formatted_trace") {
+        return {
+          name: key,
+          label,
+          type: "str" as const,
+        };
+      }
 
       // Provide dynamic children for metadata
       if (key === "metadata") {
@@ -974,6 +1030,8 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
       name: "Thread",
       type: "dataset",
       fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
+        const label = THREAD_MAPPING_LABELS[key];
+
         // Special handling for "traces" - provide nested children for field selection
         if (key === "traces") {
           return {
@@ -982,6 +1040,14 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
             children: THREAD_TRACES_CHILDREN,
             // Allow selecting traces itself (returns all trace data)
             isComplete: true,
+          };
+        }
+
+        if (key === "formatted_traces") {
+          return {
+            name: key,
+            label,
+            type: "str" as const,
           };
         }
 
