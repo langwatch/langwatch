@@ -27,6 +27,7 @@ import httpx
 import pytest
 
 import langwatch
+from langwatch.prompts.local_loader import LocalPromptLoader
 from langwatch.prompts.types import FetchPolicy
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,12 @@ class TestFetchPoliciesE2E:
     @pytest.fixture(autouse=True)
     def setup_langwatch(self, api_key):
         """Set up LangWatch for each test."""
+        LocalPromptLoader._cached_project_root = None
+        LocalPromptLoader._warned_no_prompts_path = False
         langwatch.setup(api_key=api_key)
+        yield
+        LocalPromptLoader._cached_project_root = None
+        LocalPromptLoader._warned_no_prompts_path = False
 
     def test_materialized_first_prefers_local_with_zero_api_calls(self, temp_workspace):
         """
