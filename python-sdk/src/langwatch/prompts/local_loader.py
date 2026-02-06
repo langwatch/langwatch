@@ -45,9 +45,9 @@ class LocalPromptLoader:
         """
         Walk up the directory tree from cwd looking for prompts.json.
 
-        Matches the TypeScript SDK behavior: starts at cwd and checks each
-        parent directory until prompts.json is found or the filesystem root
-        is reached. Result is cached for subsequent calls.
+        Starts at cwd and checks each parent directory until prompts.json
+        is found or the filesystem root is reached. Result is cached for
+        subsequent calls.
         """
         if cls._cached_project_root is not None:
             return cls._cached_project_root

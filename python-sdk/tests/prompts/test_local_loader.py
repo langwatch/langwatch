@@ -445,7 +445,7 @@ def test_find_project_root_falls_back_to_cwd():
             os.chdir(temp_dir)
 
             root = LocalPromptLoader._find_project_root()
-            assert root == Path(temp_dir)
+            assert root == Path(temp_dir).resolve()
         finally:
             os.chdir(original_cwd)
             LocalPromptLoader._cached_project_root = None

@@ -85,7 +85,7 @@ class PromptData(BaseModel):
         )
         if raw_response_format:
             response_format = ResponseFormat(
-                type="json_schema", json_schema=raw_response_format
+                type="json_schema", json_schema=raw_response_format.json_schema
             )
 
         raw_version = _unset_to_none(response.version)
