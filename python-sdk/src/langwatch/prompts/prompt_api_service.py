@@ -8,7 +8,7 @@ Uses TypedDict for clean interfaces and from_dict methods for type safety.
 
 This service is responsible only for API operations and does not handle local file loading.
 """
-from typing import Dict, List, Literal, Optional, Any
+from typing import Dict, List, Literal, Optional
 from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -60,7 +60,6 @@ from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_
     DeleteApiPromptsByIdResponse200,
 )
 
-from pydantic import BaseModel
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .errors import unwrap_response
@@ -138,31 +137,24 @@ class PromptApiService:
         Returns:
             PromptData dictionary containing the created prompt data
         """
-        # Convert to API models (handle both Pydantic models and dicts)
         api_messages = UNSET
         if messages:
             api_messages = [
-                PostApiPromptsBodyMessagesItem.from_dict(
-                    msg.model_dump() if isinstance(msg, BaseModel) else msg
-                )
+                PostApiPromptsBodyMessagesItem.from_dict(msg.model_dump())
                 for msg in messages
             ]
 
         api_inputs = UNSET
         if inputs:
             api_inputs = [
-                PostApiPromptsBodyInputsItem.from_dict(
-                    inp.model_dump() if isinstance(inp, BaseModel) else inp
-                )
+                PostApiPromptsBodyInputsItem.from_dict(inp.model_dump())
                 for inp in inputs
             ]
 
         api_outputs = UNSET
         if outputs:
             api_outputs = [
-                PostApiPromptsBodyOutputsItem.from_dict(
-                    out.model_dump() if isinstance(out, BaseModel) else out
-                )
+                PostApiPromptsBodyOutputsItem.from_dict(out.model_dump())
                 for out in outputs
             ]
 
@@ -214,47 +206,38 @@ class PromptApiService:
         Returns:
             PromptData dictionary containing the updated prompt data
         """
-        # Convert to API models (handle both Pydantic models and dicts)
         api_messages = UNSET
         if messages:
             api_messages = [
-                PutApiPromptsByIdBodyMessagesItem.from_dict(
-                    msg.model_dump() if isinstance(msg, BaseModel) else msg
-                )
+                PutApiPromptsByIdBodyMessagesItem.from_dict(msg.model_dump())
                 for msg in messages
             ]
 
         api_inputs = UNSET
         if inputs:
             api_inputs = [
-                PutApiPromptsByIdBodyInputsItem.from_dict(
-                    inp.model_dump() if isinstance(inp, BaseModel) else inp
-                )
+                PutApiPromptsByIdBodyInputsItem.from_dict(inp.model_dump())
                 for inp in inputs
             ]
 
         api_outputs = UNSET
         if outputs:
             api_outputs = [
-                PutApiPromptsByIdBodyOutputsItem.from_dict(
-                    out.model_dump() if isinstance(out, BaseModel) else out
-                )
+                PutApiPromptsByIdBodyOutputsItem.from_dict(out.model_dump())
                 for out in outputs
             ]
-
-        body = PutApiPromptsByIdBody(
-            handle=handle or UNSET,
-            scope=PutApiPromptsByIdBodyScope[scope],
-            prompt=prompt or UNSET,
-            messages=api_messages,
-            inputs=api_inputs,
-            outputs=api_outputs,
-        )
 
         resp = put_api_prompts_by_id.sync_detailed(
             id=prompt_id_or_handle,
             client=self._client,
-            body=body,
+            body=PutApiPromptsByIdBody(
+                handle=handle or UNSET,
+                scope=PutApiPromptsByIdBodyScope[scope],
+                prompt=prompt or UNSET,
+                messages=api_messages,
+                inputs=api_inputs,
+                outputs=api_outputs,
+            ),
         )
 
         ok = unwrap_response(
