@@ -225,7 +225,7 @@ export class LicenseHandler {
       this.repository.getProjectCount(organizationId),
       this.repository.getPromptCount(organizationId),
       this.repository.getWorkflowCount(organizationId),
-      this.repository.getScenarioCount(organizationId),
+      this.repository.getActiveScenarioCount(organizationId),
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),

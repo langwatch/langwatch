@@ -741,7 +741,7 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).queryByText("Tool-calling Agent")).not.toBeInTheDocument();
     });
 
-    it("renders I'll write it myself button", () => {
+    it("does not render I'll write it myself button", () => {
       render(
         <AICreateModal
           open={true}
@@ -757,8 +757,8 @@ describe("<AICreateModal/>", () => {
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i })
-      ).toBeInTheDocument();
+        within(dialog).queryByRole("button", { name: /i'll write it myself/i })
+      ).not.toBeInTheDocument();
     });
 
     it("renders link to model provider settings", () => {
@@ -781,28 +781,6 @@ describe("<AICreateModal/>", () => {
       expect(link).toHaveAttribute("href", "/settings/model-providers");
     });
 
-    it("calls onSkip when I'll write it myself is clicked", () => {
-      const onSkip = vi.fn();
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={onSkip}
-          hasModelProviders={false}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i })
-      );
-
-      expect(onSkip).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe("when hasModelProviders is true", () => {

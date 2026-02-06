@@ -1,4 +1,4 @@
-import { HStack, Table, Text } from "@chakra-ui/react";
+import { HStack, IconButton, Table, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import {
   type ColumnFiltersState,
@@ -8,18 +8,24 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreVertical, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { Checkbox } from "../ui/checkbox";
+import { Menu } from "../ui/menu";
 
-type ScenarioTableProps = {
+export type ScenarioTableProps = {
   scenarios: Scenario[];
   columnFilters: ColumnFiltersState;
   onColumnFiltersChange: (filters: ColumnFiltersState) => void;
   onRowClick: (scenarioId: string) => void;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: (selection: RowSelectionState) => void;
+  onArchive: (scenario: Scenario) => void;
 };
 
 const columnHelper = createColumnHelper<Scenario>();
@@ -36,18 +42,42 @@ const labelsFilterFn: FilterFn<Scenario> = (row, columnId, filterValue) => {
 };
 
 /**
- * Table component for displaying scenarios with sorting and filtering.
+ * Table component for displaying scenarios with sorting, filtering,
+ * row selection, and row action menus.
  */
 export function ScenarioTable({
   scenarios,
   columnFilters,
   onColumnFiltersChange,
   onRowClick,
+  rowSelection,
+  onRowSelectionChange,
+  onArchive,
 }: ScenarioTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(
     () => [
+      columnHelper.display({
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            aria-label="Select all"
+            checked={table.getIsAllPageRowsSelected()}
+            onChange={() => table.toggleAllPageRowsSelected()}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            aria-label={`Select ${row.original.name}`}
+            checked={row.getIsSelected()}
+            onChange={() => row.toggleSelected()}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+        enableSorting: false,
+      }),
       columnHelper.accessor("name", {
         header: "Name",
         cell: (info) => <Text fontWeight="medium">{info.getValue()}</Text>,
@@ -81,14 +111,52 @@ export function ScenarioTable({
           </Text>
         ),
       }),
+      columnHelper.display({
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <IconButton
+                aria-label={`Actions for ${row.original.name}`}
+                variant="ghost"
+                size="sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical size={16} />
+              </IconButton>
+            </Menu.Trigger>
+            <Menu.Content portalled={false}>
+              <Menu.Item
+                value="archive"
+                color="red.500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onArchive(row.original);
+                }}
+              >
+                <Trash2 size={14} />
+                Delete
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        ),
+        enableSorting: false,
+      }),
     ],
-    [],
+    [onArchive],
   );
 
   const table = useReactTable({
     data: scenarios,
     columns,
-    state: { sorting, columnFilters },
+    state: { sorting, columnFilters, rowSelection },
+    enableRowSelection: true,
+    onRowSelectionChange: (updater) => {
+      const newSelection =
+        typeof updater === "function" ? updater(rowSelection) : updater;
+      onRowSelectionChange(newSelection);
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: (updater) => {
       const newFilters =
@@ -112,6 +180,7 @@ export function ScenarioTable({
                 cursor={header.column.getCanSort() ? "pointer" : "default"}
                 onClick={header.column.getToggleSortingHandler()}
                 userSelect="none"
+                width={header.id === "select" ? "40px" : header.id === "actions" ? "48px" : undefined}
               >
                 <HStack gap={1}>
                   {flexRender(

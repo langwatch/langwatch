@@ -150,6 +150,11 @@ services:
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
+      # Override .env so Auth0 callback matches the dynamic host port
+      BASE_HOST: http://localhost:${APP_PORT:-5560}
+      NEXTAUTH_URL: http://localhost:${APP_PORT:-5560}
+      # Enable scenarios UI in dev
+      RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
     env_file:
       - langwatch/.env
     depends_on:

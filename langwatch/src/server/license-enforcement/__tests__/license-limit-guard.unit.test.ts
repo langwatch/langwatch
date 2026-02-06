@@ -20,7 +20,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       getWorkflowCount: vi.fn(),
       getPromptCount: vi.fn(),
       getEvaluatorCount: vi.fn(),
-      getScenarioCount: vi.fn(),
+      getActiveScenarioCount: vi.fn(),
       getProjectCount: vi.fn(),
       getTeamCount: vi.fn(),
       getAgentCount: vi.fn(),
