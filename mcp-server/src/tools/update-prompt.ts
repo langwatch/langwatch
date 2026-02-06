@@ -2,6 +2,7 @@ import {
   updatePrompt as apiUpdatePrompt,
   createPromptVersion as apiCreateVersion,
 } from "../langwatch-api.js";
+import type { PromptMutationResponse } from "../langwatch-api.js";
 
 /**
  * Handles the update_prompt MCP tool invocation.
@@ -19,7 +20,7 @@ export async function handleUpdatePrompt(params: {
 }): Promise<string> {
   const { idOrHandle, createVersion, ...data } = params;
 
-  let result: any;
+  let result: PromptMutationResponse;
   if (createVersion) {
     result = await apiCreateVersion(idOrHandle, data);
   } else {

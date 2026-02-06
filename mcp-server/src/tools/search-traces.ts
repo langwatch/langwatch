@@ -1,19 +1,5 @@
 import { searchTraces as apiSearchTraces } from "../langwatch-api.js";
-
-function parseRelativeDate(input: string): number {
-  const now = Date.now();
-  const match = input.match(/^(\d+)(h|d|w|m)$/);
-  if (!match) return Date.parse(input) || now;
-
-  const [, amount, unit] = match;
-  const ms: Record<string, number> = {
-    h: 3600000,
-    d: 86400000,
-    w: 604800000,
-    m: 2592000000,
-  };
-  return now - parseInt(amount!) * (ms[unit!] ?? 86400000);
-}
+import { parseRelativeDate } from "../utils/date-parsing.js";
 
 /**
  * Handles the search_traces MCP tool invocation.
@@ -35,16 +21,16 @@ export async function handleSearchTraces(params: {
     : now - 86400000;
   const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
 
-  const result = (await apiSearchTraces({
+  const result = await apiSearchTraces({
     query: params.query,
     filters: params.filters,
     startDate,
     endDate,
     pageSize: params.pageSize ?? 25,
     scrollId: params.scrollId,
-  })) as any;
+  });
 
-  const traces = result.traces || [];
+  const traces = result.traces ?? [];
   if (traces.length === 0) {
     return "No traces found matching your query.";
   }

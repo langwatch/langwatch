@@ -10,7 +10,7 @@ export async function handleGetPrompt(params: {
   idOrHandle: string;
   version?: number;
 }): Promise<string> {
-  const prompt = (await apiGetPrompt(params.idOrHandle)) as any;
+  const prompt = await apiGetPrompt(params.idOrHandle);
 
   const lines: string[] = [];
   lines.push(
@@ -30,7 +30,7 @@ export async function handleGetPrompt(params: {
     lines.push(`**Provider**: ${version.modelProvider}`);
 
   // Show messages
-  const messages = version.messages || version.prompt || [];
+  const messages = version.messages || prompt.prompt || [];
   if (Array.isArray(messages) && messages.length > 0) {
     lines.push("\n## Messages");
     for (const msg of messages) {

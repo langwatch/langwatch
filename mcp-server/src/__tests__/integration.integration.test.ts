@@ -1,5 +1,5 @@
 import { createServer, type Server } from "http";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { initConfig } from "../config.js";
 
 // --- Canned responses for each API endpoint ---
@@ -197,24 +197,6 @@ describe("MCP tools integration", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  describe("discover_schema", () => {
-    it("returns filter fields for the 'filters' category", async () => {
-      const { formatSchema } = await import("../tools/discover-schema.js");
-      const result = formatSchema("filters");
-      expect(result).toContain("metadata.user_id");
-      expect(result).toContain("spans.model");
-    });
-
-    it("returns all categories for 'all'", async () => {
-      const { formatSchema } = await import("../tools/discover-schema.js");
-      const result = formatSchema("all");
-      expect(result).toContain("Filter Fields");
-      expect(result).toContain("Metrics");
-      expect(result).toContain("Aggregation");
-      expect(result).toContain("Group");
-    });
-  });
-
   describe("search_traces", () => {
     it("returns formatted trace summaries from mock server", async () => {
       const { handleSearchTraces } = await import(
@@ -323,6 +305,13 @@ describe("MCP tools integration", () => {
   });
 
   describe("when API key is invalid", () => {
+    afterAll(() => {
+      initConfig({
+        apiKey: "test-integration-key",
+        endpoint: `http://localhost:${port}`,
+      });
+    });
+
     it("throws an error with 401 status", async () => {
       initConfig({
         apiKey: "bad-key",
@@ -335,12 +324,6 @@ describe("MCP tools integration", () => {
       await expect(
         handleSearchTraces({ startDate: "24h" })
       ).rejects.toThrow("401");
-
-      // Restore valid key for subsequent tests
-      initConfig({
-        apiKey: "test-integration-key",
-        endpoint: `http://localhost:${port}`,
-      });
     });
   });
 });

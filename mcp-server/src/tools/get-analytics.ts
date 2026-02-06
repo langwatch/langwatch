@@ -1,18 +1,5 @@
 import { getAnalyticsTimeseries as apiGetAnalytics } from "../langwatch-api.js";
-
-function parseRelativeDate(input: string): number {
-  const now = Date.now();
-  const match = input.match(/^(\d+)(h|d|w|m)$/);
-  if (!match) return Date.parse(input) || now;
-  const [, amount, unit] = match;
-  const ms: Record<string, number> = {
-    h: 3600000,
-    d: 86400000,
-    w: 604800000,
-    m: 2592000000,
-  };
-  return now - parseInt(amount!) * (ms[unit!] ?? 86400000);
-}
+import { parseRelativeDate } from "../utils/date-parsing.js";
 
 /**
  * Handles the get_analytics MCP tool invocation.
@@ -42,14 +29,14 @@ export async function handleGetAnalytics(params: {
   const metricKey = `${category}.${name}`;
   const aggregation = params.aggregation ?? "avg";
 
-  const result = (await apiGetAnalytics({
+  const result = await apiGetAnalytics({
     series: [{ metric: metricKey, aggregation }],
     startDate,
     endDate,
     timeZone: params.timeZone ?? "UTC",
     groupBy: params.groupBy,
     filters: params.filters,
-  })) as any;
+  });
 
   const lines: string[] = [];
   lines.push(`# Analytics: ${metricKey} (${aggregation})\n`);
@@ -59,7 +46,7 @@ export async function handleGetAnalytics(params: {
   if (params.groupBy) lines.push(`Grouped by: ${params.groupBy}`);
   lines.push("");
 
-  const currentPeriod = result.currentPeriod || [];
+  const currentPeriod = result.currentPeriod ?? [];
   if (currentPeriod.length === 0) {
     lines.push("No data available for this period.");
   } else {

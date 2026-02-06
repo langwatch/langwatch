@@ -12,15 +12,13 @@ import {
   toLLMModeTrace,
 } from "~/server/traces/trace-formatting";
 import { TraceService } from "~/server/traces/trace.service";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 import { getAllForProjectInput } from "~/server/api/routers/traces";
 
 const logger = createLogger("langwatch:api:traces");
-
-patchZodOpenapi();
 
 // Define types for our Hono context variables
 type Variables = AuthMiddlewareVariables;
@@ -40,18 +38,8 @@ const traceSearchBodySchema = getAllForProjectInput
     endDate: true,
   })
   .extend({
-    startDate: z.union([
-      z.number(),
-      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
-        message: "Invalid date format for startDate",
-      }),
-    ]),
-    endDate: z.union([
-      z.number(),
-      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
-        message: "Invalid date format for endDate",
-      }),
-    ]),
+    startDate: flexibleDateSchema,
+    endDate: flexibleDateSchema,
     scrollId: z.string().optional().nullable(),
     llmMode: z.boolean().optional().default(false),
   });
@@ -97,14 +85,8 @@ app.post(
       {
         ...params,
         projectId: project.id,
-        startDate:
-          typeof params.startDate === "string"
-            ? Date.parse(params.startDate)
-            : params.startDate,
-        endDate:
-          typeof params.endDate === "string"
-            ? Date.parse(params.endDate)
-            : params.endDate,
+        startDate: coerceToEpoch(params.startDate),
+        endDate: coerceToEpoch(params.endDate),
         pageSize,
       },
       protections,

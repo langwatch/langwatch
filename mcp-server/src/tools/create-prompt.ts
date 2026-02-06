@@ -14,7 +14,7 @@ export async function handleCreatePrompt(params: {
   modelProvider: string;
   description?: string;
 }): Promise<string> {
-  const result = (await apiCreatePrompt(params)) as any;
+  const result = await apiCreatePrompt(params);
 
   const lines: string[] = [];
   lines.push("Prompt created successfully!\n");

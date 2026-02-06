@@ -7,7 +7,7 @@ import { listPrompts as apiListPrompts } from "../langwatch-api.js";
  * AI-readable markdown table.
  */
 export async function handleListPrompts(): Promise<string> {
-  const prompts = (await apiListPrompts()) as any[];
+  const prompts = await apiListPrompts();
 
   if (!Array.isArray(prompts) || prompts.length === 0) {
     return "No prompts found in this project.";

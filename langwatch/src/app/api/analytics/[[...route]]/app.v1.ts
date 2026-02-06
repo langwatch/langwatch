@@ -7,14 +7,12 @@ import { z } from "zod";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:analytics");
-
-patchZodOpenapi();
 
 type Variables = AuthMiddlewareVariables;
 
@@ -28,18 +26,8 @@ const analyticsBodySchema = sharedFiltersInputSchema
   .omit({ projectId: true })
   .extend(timeseriesSeriesInput.shape)
   .extend({
-    startDate: z.union([
-      z.number(),
-      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
-        message: "Invalid date format for startDate",
-      }),
-    ]),
-    endDate: z.union([
-      z.number(),
-      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
-        message: "Invalid date format for endDate",
-      }),
-    ]),
+    startDate: flexibleDateSchema,
+    endDate: flexibleDateSchema,
   });
 
 // POST /timeseries - Query analytics timeseries
@@ -76,14 +64,8 @@ app.post(
     const input = {
       ...params,
       projectId: project.id,
-      startDate:
-        typeof params.startDate === "string"
-          ? Date.parse(params.startDate)
-          : params.startDate,
-      endDate:
-        typeof params.endDate === "string"
-          ? Date.parse(params.endDate)
-          : params.endDate,
+      startDate: coerceToEpoch(params.startDate),
+      endDate: coerceToEpoch(params.endDate),
     };
 
     try {

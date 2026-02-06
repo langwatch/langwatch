@@ -9,7 +9,7 @@ import { getTraceById as apiGetTraceById } from "../langwatch-api.js";
 export async function handleGetTrace(params: {
   traceId: string;
 }): Promise<string> {
-  const result = (await apiGetTraceById(params.traceId)) as any;
+  const result = await apiGetTraceById(params.traceId);
 
   const lines: string[] = [];
   lines.push(`# Trace: ${params.traceId}\n`);
