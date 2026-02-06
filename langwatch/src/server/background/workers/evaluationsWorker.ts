@@ -176,8 +176,14 @@ const buildThreadData = async (
   for (const [targetField, mappingConfig] of Object.entries(
     mappingState.mapping,
   )) {
-    if ("type" in mappingConfig && mappingConfig.type === "thread") {
-      const source = mappingConfig.source;
+    const isThreadMapping =
+      ("type" in mappingConfig && mappingConfig.type === "thread") ||
+      // Backward compat: source in THREAD_MAPPINGS without explicit type
+      ("source" in mappingConfig &&
+        mappingConfig.source in THREAD_MAPPINGS);
+
+    if (isThreadMapping && "source" in mappingConfig) {
+      const source = mappingConfig.source as keyof typeof THREAD_MAPPINGS;
 
       // Skip empty source
       if (!source) {
@@ -185,7 +191,10 @@ const buildThreadData = async (
       }
 
       // Use the mapping function from THREAD_MAPPINGS dynamically
-      const selectedFields = mappingConfig.selectedFields ?? [];
+      const selectedFields =
+        ("selectedFields" in mappingConfig
+          ? mappingConfig.selectedFields
+          : undefined) ?? [];
       result[targetField] = THREAD_MAPPINGS[source].mapping(
         { thread_id: threadId, traces: threadTraces },
         selectedFields as (keyof typeof TRACE_MAPPINGS)[],

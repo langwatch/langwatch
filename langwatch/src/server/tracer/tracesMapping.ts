@@ -564,13 +564,22 @@ export const TRACE_EXPANSIONS = {
  * Extract selected fields from traces based on trace mapping configuration
  * Single Responsibility: Transform traces array into field values based on selectedFields
  */
+const DEFAULT_TRACE_FIELDS: (keyof typeof TRACE_MAPPINGS)[] = [
+  "trace_id",
+  "input",
+  "output",
+];
+
 export const extractTracesFields = (
   traces: TraceWithAnnotations[],
   selectedFields: (keyof typeof TRACE_MAPPINGS)[],
 ): Record<string, any>[] => {
+  // When no fields are selected, extract default fields so the data is useful
+  const fields =
+    selectedFields.length > 0 ? selectedFields : DEFAULT_TRACE_FIELDS;
   return traces.map((trace) => {
     const result: Record<string, any> = {};
-    for (const field of selectedFields) {
+    for (const field of fields) {
       const traceMapping = TRACE_MAPPINGS[field];
       if (traceMapping) {
         result[field] = traceMapping.mapping(trace as any, "", "", {});

@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode } from "@prisma/client";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import { AlertTriangle, HelpCircle, Spool, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
@@ -33,6 +33,7 @@ import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { CheckPrecondition } from "~/server/evaluations/types";
 import {
   type MappingState,
+  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
@@ -140,7 +141,7 @@ export const clearOnlineEvaluationDrawerState = () => {
  */
 export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
@@ -381,8 +382,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     onlineEvaluationDrawerState = null;
     setHasUnsavedChanges(false);
     monitorDataLoadedRef.current = false; // Reset so data reloads next time
-    onClose();
-  }, [onClose, hasUnsavedChanges]);
+    if (canGoBack) {
+      goBack();
+    } else {
+      onClose();
+    }
+  }, [onClose, hasUnsavedChanges, canGoBack, goBack]);
 
   // Load existing monitor data - only once when data first becomes available
   // Skip if we already have persisted state for this monitor (user navigated away and back)
@@ -430,8 +435,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         )) {
           if (mapping.source) {
             const pathParts: string[] = [mapping.source as string];
-            if (mapping.key) pathParts.push(mapping.key);
-            if (mapping.subkey) pathParts.push(mapping.subkey);
+            if ("type" in mapping && mapping.type === "thread") {
+              // Thread mappings use selectedFields instead of key/subkey
+              if (
+                "selectedFields" in mapping &&
+                mapping.selectedFields?.length
+              ) {
+                pathParts.push(...mapping.selectedFields);
+              }
+            } else {
+              if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
+              if ("subkey" in mapping && mapping.subkey)
+                pathParts.push(mapping.subkey);
+            }
             uiMappings[field] = {
               type: "source",
               sourceId: monitorLevel === "trace" ? "trace" : "thread",
@@ -857,11 +873,26 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     for (const [field, mapping] of Object.entries(mappings)) {
       if (mapping.type === "source" && mapping.path.length > 0) {
         const parts = mapping.path;
-        mappingState.mapping[field] = {
-          source: parts[0] as keyof typeof TRACE_MAPPINGS,
-          key: parts[1],
-          subkey: parts[2],
-        };
+        const source = parts[0]!;
+
+        // Check if this is a thread-level mapping source (e.g., "traces", "thread_id")
+        if (source in THREAD_MAPPINGS) {
+          // For "traces" with sub-paths like "traces.input", "traces.output",
+          // convert to selectedFields format
+          const selectedFields =
+            parts.length > 1 ? parts.slice(1) : undefined;
+          mappingState.mapping[field] = {
+            type: "thread" as const,
+            source: source as keyof typeof THREAD_MAPPINGS,
+            selectedFields,
+          };
+        } else {
+          mappingState.mapping[field] = {
+            source: source as keyof typeof TRACE_MAPPINGS,
+            key: parts[1],
+            subkey: parts[2],
+          };
+        }
       }
     }
 
@@ -936,9 +967,22 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading size="md">
-            {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
-          </Heading>
+          <HStack gap={2}>
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+              >
+                <ArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading size="md">
+              {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
+            </Heading>
+          </HStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={0} align="stretch">
