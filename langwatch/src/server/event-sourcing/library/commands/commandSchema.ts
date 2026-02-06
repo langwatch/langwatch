@@ -57,8 +57,12 @@ export function defineCommandSchema<
       if (!result.success) {
         logger.error(
           {
-            error: result.error,
-            payload,
+            commandType: type,
+            zodIssues: result.error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              code: issue.code,
+              message: issue.message,
+            })),
           },
           "Command payload validation failed",
         );

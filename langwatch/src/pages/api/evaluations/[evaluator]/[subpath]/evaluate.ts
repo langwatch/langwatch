@@ -188,16 +188,15 @@ export async function handleEvaluatorCall(
   try {
     params = evaluationInputSchema.parse(req.body);
   } catch (error) {
+    const validationError = fromZodError(error as ZodError);
     logger.error(
-      { error, body: req.body, projectId: project.id },
+      { validationError: validationError.message, projectId: project.id },
       "invalid evaluation params received",
     );
 
-    const validationError = fromZodError(error as ZodError);
     captureException(error, {
       extra: {
         projectId: project.id,
-        body: req.body,
         validationError: validationError.message,
       },
     });
@@ -241,16 +240,15 @@ export async function handleEvaluatorCall(
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
+    const validationError = fromZodError(error as ZodError);
     logger.error(
-      { error, body: req.body, projectId: project.id },
+      { validationError: validationError.message, projectId: project.id },
       "invalid settings received for the evaluator",
     );
 
-    const validationError = fromZodError(error as ZodError);
     captureException(error, {
       extra: {
         projectId: project.id,
-        body: req.body,
         validationError: validationError.message,
       },
     });
@@ -266,13 +264,13 @@ export async function handleEvaluatorCall(
       params.data as Record<string, any>,
     );
   } catch (error) {
+    const validationError = fromZodError(error as ZodError);
     logger.error(
-      { error, body: req.body, projectId: project.id },
+      { validationError: validationError.message, projectId: project.id },
       "invalid evaluation data received",
     );
     captureException(error, { extra: { projectId: project.id } });
 
-    const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
 
@@ -330,7 +328,14 @@ export async function handleEvaluatorCall(
         extra: { projectId: project.id, evaluationId, event: "started" },
       });
       logger.error(
-        { error: eventError, projectId: project.id, evaluationId },
+        {
+          error:
+            eventError instanceof Error
+              ? eventError.message
+              : String(eventError),
+          projectId: project.id,
+          evaluationId,
+        },
         "Failed to emit evaluation started event",
       );
     }
@@ -350,11 +355,13 @@ export async function handleEvaluatorCall(
     captureException(error, {
       extra: {
         projectId: project.id,
-        body: req.body,
       },
     });
     logger.error(
-      { error, body: req.body, projectId: project.id },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        projectId: project.id,
+      },
       "error running evaluation",
     );
     result = {
@@ -390,7 +397,14 @@ export async function handleEvaluatorCall(
         extra: { projectId: project.id, evaluationId, event: "completed" },
       });
       logger.error(
-        { error: eventError, projectId: project.id, evaluationId },
+        {
+          error:
+            eventError instanceof Error
+              ? eventError.message
+              : String(eventError),
+          projectId: project.id,
+          evaluationId,
+        },
         "Failed to emit evaluation completed event",
       );
     }
