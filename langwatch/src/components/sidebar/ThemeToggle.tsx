@@ -2,6 +2,7 @@ import { Box, HStack } from "@chakra-ui/react";
 import { useTheme } from "next-themes";
 import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
 import { useColorModeValue } from "../ui/color-mode";
+import { MENU_ITEM_HEIGHT } from "./SideMenuLink";
 
 export type ThemeToggleProps = {
   showLabel?: boolean;
@@ -24,13 +25,47 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
   const { theme, setTheme } = useTheme();
 
   const selectedIndex = themeOptions.findIndex((o) => o.value === theme);
+  const safeIndex = selectedIndex === -1 ? 0 : selectedIndex;
+  const currentOption = themeOptions[safeIndex]!;
   const pillShadow = useColorModeValue(
     "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
     "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
   );
 
-  if (!isDarkModeEnabled) return null;
+  if (!isDarkModeEnabled || !currentOption) return null;
 
+  const cycleTheme = () => {
+    const nextIndex = (safeIndex + 1) % themeOptions.length;
+    setTheme(themeOptions[nextIndex]!.value);
+  };
+
+  // Collapsed mode: single icon that cycles through themes on click
+  if (!showLabel) {
+    return (
+      <Box width="full" py={1}>
+        <HStack
+          as="button"
+          width="auto"
+          height={MENU_ITEM_HEIGHT}
+          paddingX={3}
+          borderRadius="lg"
+          bg="bg.muted"
+          border="1px solid"
+          borderColor="border"
+          color="fg.subtle"
+          cursor="pointer"
+          transition="all 0.15s ease-in-out"
+          _hover={{ color: "fg.muted", bg: "nav.bgHover" }}
+          onClick={cycleTheme}
+          aria-label={`Current theme: ${currentOption.value}. Click to change.`}
+        >
+          {currentOption.icon}
+        </HStack>
+      </Box>
+    );
+  }
+
+  // Expanded mode: 3-button selector with animated pill indicator
   return (
     <Box width="full" px={2} py={3}>
       <HStack
@@ -41,7 +76,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
         p="3px"
         gap={0}
         justify="center"
-        width={showLabel ? "full" : "auto"}
+        width="full"
         position="relative"
       >
         {/* Animated background pill */}
@@ -55,14 +90,14 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
           borderRadius="md"
           boxShadow={pillShadow}
           transition="transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
-          transform={`translateX(${selectedIndex * 100}%)`}
+          transform={`translateX(${safeIndex * 100}%)`}
           zIndex={0}
         />
         {themeOptions.map((option) => (
           <Box
             key={option.value}
             as="button"
-            flex={showLabel ? 1 : undefined}
+            flex={1}
             display="flex"
             alignItems="center"
             justifyContent="center"
