@@ -512,11 +512,14 @@ def forceful_exit(self):
 
 @contextmanager
 def optional_langwatch_trace(
-    do_not_trace=False, trace_id=None, skip_root_span=False, metadata=None
+    name,
+    type,
+    do_not_trace=False,
+    metadata=None
 ):
     with langwatch.trace(
-        trace_id=trace_id,
-        skip_root_span=skip_root_span,
+        name=name,
+        type=type,
         metadata=metadata,
         disable_sending=do_not_trace,
     ) as trace:

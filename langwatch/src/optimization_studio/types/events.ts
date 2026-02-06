@@ -8,6 +8,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("execute_component"),
     payload: z.object({
       trace_id: z.string(),
+      thread_id: z.string().optional(),
       workflow: workflowJsonSchema,
       node_id: z.string(),
       inputs: z.record(z.string(), z.any()),

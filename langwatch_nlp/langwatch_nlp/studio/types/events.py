@@ -23,6 +23,7 @@ class IsAlive(BaseModel):
 
 class ExecuteComponentPayload(BaseModel):
     trace_id: str
+    thread_id: Optional[str] = None
     workflow: Workflow
     node_id: str
     workflow_id: Optional[str] = None

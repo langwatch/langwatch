@@ -62,9 +62,9 @@ async def execute_flow(
     yield start_workflow_event(workflow, trace_id)
 
     with optional_langwatch_trace(
+        name="execute_flow",
+        type="workflow",
         do_not_trace=do_not_trace,
-        trace_id=event.trace_id,
-        skip_root_span=True,
         metadata={
             "platform": "optimization_studio",
             "environment": "development" if manual_execution_mode else "production",

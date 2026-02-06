@@ -125,6 +125,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         payload: {
           enable_tracing: true,
           trace_id: traceId,
+          thread_id: threadId,
           workflow,
           node_id: nodeId,
           inputs: {

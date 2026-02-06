@@ -14,7 +14,7 @@ client = OpenAI()
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
     langwatch.get_current_trace().update(
-        metadata={"labels": ["openai"]},
+        metadata={"labels": ["openai"], "thread_id": "my-test-thread"},
     )
 
     msg = cl.Message(
