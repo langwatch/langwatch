@@ -18,24 +18,24 @@ Feature: Scenario Archiving
   # ============================================================================
 
   @e2e
-  Scenario: Delete a single scenario via row action menu
+  Scenario: Archive a single scenario via row action menu
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
-    And I click "Delete"
-    Then I see a confirmation modal asking to delete "Angry double-charge refund"
-    When I confirm the deletion
+    And I click "Archive"
+    Then I see a confirmation modal asking to archive "Angry double-charge refund"
+    When I confirm the archive
     Then "Angry double-charge refund" no longer appears in the scenarios list
     And the remaining 4 scenarios are still visible
 
   @e2e
-  Scenario: Batch delete multiple selected scenarios
+  Scenario: Batch archive multiple selected scenarios
     When I am on the scenarios list page
     And I select the checkbox for "Cross-doc synthesis question"
     And I select the checkbox for "Failed booking escalation"
     Then I see a batch action bar showing "2 selected"
-    When I click the "Delete" button in the batch action bar
+    When I click the "Archive" button in the batch action bar
     Then I see a confirmation modal listing both scenarios
-    When I confirm the deletion
+    When I confirm the archive
     Then neither scenario appears in the scenarios list
     And the remaining 3 scenarios are still visible
 
@@ -71,26 +71,26 @@ Feature: Scenario Archiving
   # ============================================================================
 
   @integration
-  Scenario: Row action menu contains delete option
+  Scenario: Row action menu contains archive option
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
-    Then I see a "Delete" option in the menu
+    Then I see an "Archive" option in the menu
 
   @integration
-  Scenario: Single delete confirmation modal shows scenario name
+  Scenario: Single archive confirmation modal shows scenario name
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
-    And I click "Delete"
-    Then I see a confirmation modal with title "Delete scenario?"
+    And I click "Archive"
+    Then I see a confirmation modal with title "Archive scenario?"
     And the modal displays the scenario name "Angry double-charge refund"
-    And the modal shows "This action cannot be undone."
-    And the modal has "Cancel" and "Delete" buttons
+    And the modal shows "Archived scenarios will no longer appear in the library."
+    And the modal has "Cancel" and "Archive" buttons
 
   @integration
-  Scenario: Cancel single delete dismisses modal without deleting
+  Scenario: Cancel single archive dismisses modal without archiving
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
-    And I click "Delete"
+    And I click "Archive"
     And I click "Cancel" in the confirmation modal
     Then the modal closes
     And "Angry double-charge refund" still appears in the scenarios list
@@ -100,20 +100,20 @@ Feature: Scenario Archiving
   # ============================================================================
 
   @integration
-  Scenario: Batch delete confirmation modal lists all selected scenarios
+  Scenario: Batch archive confirmation modal lists all selected scenarios
     When I am on the scenarios list page
     And I select 2 scenarios
-    And I click the "Delete" button in the batch action bar
-    Then I see a confirmation modal with title "Delete 2 scenarios?"
+    And I click the "Archive" button in the batch action bar
+    Then I see a confirmation modal with title "Archive 2 scenarios?"
     And the modal lists each selected scenario by name
-    And the modal shows "This action cannot be undone."
-    And the modal has "Cancel" and "Delete" buttons
+    And the modal shows "Archived scenarios will no longer appear in the library."
+    And the modal has "Cancel" and "Archive" buttons
 
   @integration
-  Scenario: Cancel batch delete dismisses modal and preserves selection
+  Scenario: Cancel batch archive dismisses modal and preserves selection
     When I am on the scenarios list page
     And I select 2 scenarios
-    And I click the "Delete" button in the batch action bar
+    And I click the "Archive" button in the batch action bar
     And I click "Cancel" in the confirmation modal
     Then the modal closes
     And the 2 scenarios remain selected
