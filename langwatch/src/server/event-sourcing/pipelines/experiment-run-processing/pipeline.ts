@@ -20,7 +20,7 @@ import type { ExperimentRunProcessingEvent } from "./schemas/events";
  * - Stored in experiment_runs ClickHouse table
  *
  * Event Handler: experimentRunResultStorage
- * - Writes individual results to experiment_run_results for query-optimized access
+ * - Writes individual results to experiment_run_items for query-optimized access
  * - Enables efficient filtering/sorting of detailed results
  *
  * Commands:

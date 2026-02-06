@@ -13,21 +13,11 @@ import {
   isEvaluatorResultEvent,
   isTargetResultEvent,
 } from "../schemas/events";
+import type { ExperimentRunTarget } from "../schemas/shared";
 
 const logger = createLogger(
   "langwatch:experiment-run-processing:run-state-projection",
 );
-
-export interface ExperimentRunTarget {
-  id: string;
-  name: string;
-  type: string;
-  prompt_id?: string | null;
-  prompt_version?: number | null;
-  agent_id?: string | null;
-  model?: string | null;
-  metadata?: Record<string, string | number | boolean> | null;
-}
 
 export interface ExperimentRunStateData {
   RunId: string;
