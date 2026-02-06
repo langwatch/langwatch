@@ -64,6 +64,8 @@ function EvaluatorInputsTooltip({
 
   return (
     <Tooltip
+      interactive
+      closeDelay={100}
       content={
         <VStack align="start" gap={1} maxWidth="400px">
           <Text fontWeight="semibold" fontSize="xs">
