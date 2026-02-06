@@ -6,7 +6,7 @@ import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { TraceService } from "../../../server/traces/trace.service";
-import { toLLMModeTrace } from "./[id]";
+import { toLLMModeTrace } from "~/server/traces/trace-formatting";
 
 export const config = {
   api: {
