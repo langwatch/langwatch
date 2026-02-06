@@ -246,6 +246,10 @@ const adaptiveReindex = async (
           index: TRACE_INDEX.alias,
           query: query,
           size: throttle.size,
+          _source: {
+            // @ts-ignore
+            excludes: ["evaluations.inputs"],
+          },
         },
         dest: {
           index: TRACE_COLD_INDEX.base,
