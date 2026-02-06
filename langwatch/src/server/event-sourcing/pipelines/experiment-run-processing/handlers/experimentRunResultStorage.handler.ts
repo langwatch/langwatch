@@ -8,7 +8,7 @@ import type { EvaluatorResultEvent, TargetResultEvent } from "../schemas/events"
 import { isEvaluatorResultEvent, isTargetResultEvent } from "../schemas/typeGuards";
 import { IdUtils } from "../utils/id.utils";
 
-const TABLE_NAME = "experiment_run_results" as const;
+const TABLE_NAME = "experiment_run_items" as const;
 
 interface ClickHouseExperimentRunResultRecord {
   Id: string;

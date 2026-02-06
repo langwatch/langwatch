@@ -7,9 +7,10 @@ export const targetSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string(),
-  prompt_id: z.string().nullable().optional(),
-  prompt_version: z.number().nullable().optional(),
-  agent_id: z.string().nullable().optional(),
+  promptId: z.string().nullable().optional(),
+  promptVersion: z.number().nullable().optional(),
+  agentId: z.string().nullable().optional(),
+  evaluatorId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   metadata: z
     .record(z.union([z.string(), z.number(), z.boolean()]))

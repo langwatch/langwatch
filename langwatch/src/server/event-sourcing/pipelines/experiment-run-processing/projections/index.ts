@@ -2,5 +2,5 @@ export {
   ExperimentRunStateProjectionHandler,
   type ExperimentRunState,
   type ExperimentRunStateData,
-  type ExperimentRunTarget,
 } from "./experimentRunState.projection.handler";
+export type { ExperimentRunTarget } from "../schemas/shared";
