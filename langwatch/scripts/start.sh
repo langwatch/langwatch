@@ -9,8 +9,10 @@ fi
 
 START_APP_COMMAND="pnpm run start:app"
 
-# Workers are started via separate deployment (production) or separate container (docker compose)
-# This script only starts the app process
+START_WORKERS_COMMAND=""
+if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
+  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+fi
 
 START_QUICKWIT_COMMAND=""
 if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEARCH_NODE_URL" ] && [[ "$ELASTICSEARCH_NODE_URL" =~ ^quickwit:// ]]); then
@@ -28,6 +30,10 @@ fi
 
 COMMANDS=()
 NAMES=()
+if [ -n "$START_WORKERS_COMMAND" ]; then
+  COMMANDS+=("\"$RUNTIME_ENV $START_WORKERS_COMMAND\"")
+  NAMES+=("workers")
+fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
   NAMES+=("app")
