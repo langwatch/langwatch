@@ -684,7 +684,7 @@ export const startEvaluationsWorker = (
           return;
         }
 
-        getJobProcessingCounter("evaluation", "processing").inc();
+        getJobProcessingCounter("evaluations", "processing").inc();
         const start = Date.now();
 
         try {
@@ -756,8 +756,8 @@ export const startEvaluationsWorker = (
           logger.info({ jobId: job.id }, "successfully processed job");
 
           const duration = Date.now() - start;
-          getJobProcessingDurationHistogram("evaluation").observe(duration);
-          getJobProcessingCounter("evaluation", "completed").inc();
+          getJobProcessingDurationHistogram("evaluations").observe(duration);
+          getJobProcessingCounter("evaluations", "completed").inc();
         } catch (error) {
           await updateEvaluationStatusInES({
             check: job.data.check,
@@ -800,7 +800,7 @@ export const startEvaluationsWorker = (
   });
 
   traceChecksWorker.on("failed", async (job, err) => {
-    getJobProcessingCounter("evaluation", "failed").inc();
+    getJobProcessingCounter("evaluations", "failed").inc();
     if (err instanceof UserConfigError) {
       logger.warn({ jobId: job?.id, error: err }, "job failed due to user configuration");
     } else {

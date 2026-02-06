@@ -26,7 +26,11 @@ import {
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
-import { recordJobWaitDuration } from "../metrics";
+import {
+  recordJobWaitDuration,
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../metrics";
 import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
@@ -209,6 +213,7 @@ export async function processScenarioJob(
   // Run the job processing within the restored context
   return runWithContext(requestContext, async () => {
     const startTime = Date.now();
+    getJobProcessingCounter("scenario", "processing").inc();
     jobLogger.info("Processing scenario job");
 
     // Pre-fetch all data needed for child process
@@ -245,11 +250,14 @@ export async function processScenarioJob(
     const childDurationMs = Date.now() - childStartTime;
 
     if (result.success) {
+      getJobProcessingCounter("scenario", "completed").inc();
+      getJobProcessingDurationHistogram("scenario").observe(totalDurationMs);
       jobLogger.info(
         { success: true, totalDurationMs, childDurationMs },
         "Scenario job completed",
       );
     } else {
+      getJobProcessingCounter("scenario", "failed").inc();
       jobLogger.warn(
         { success: false, error: result.error, totalDurationMs, childDurationMs },
         "Scenario job completed with failure",

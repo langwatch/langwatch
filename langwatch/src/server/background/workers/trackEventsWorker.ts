@@ -24,9 +24,9 @@ import { TRACK_EVENTS_QUEUE } from "../queues/trackEventsQueue";
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
-  recordJobWaitDuration(job, "track_event");
+  recordJobWaitDuration(job, "track_events");
   logger.info({ jobId: job.id, data: job.data }, "processing job");
-  getJobProcessingCounter("track_event", "processing").inc();
+  getJobProcessingCounter("track_events", "processing").inc();
   const start = Date.now();
   let event: ElasticSearchEvent = {
     ...job.data.event,
@@ -108,9 +108,9 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
     },
     refresh: true,
   });
-  getJobProcessingCounter("track_event", "completed").inc();
+  getJobProcessingCounter("track_events", "completed").inc();
   const duration = Date.now() - start;
-  getJobProcessingDurationHistogram("track_event").observe(duration);
+  getJobProcessingDurationHistogram("track_events").observe(duration);
 }
 
 export const startTrackEventsWorker = () => {
@@ -135,7 +135,7 @@ export const startTrackEventsWorker = () => {
 
   trackEventsWorker.on("failed", async (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
-    getJobProcessingCounter("track_event", "failed").inc();
+    getJobProcessingCounter("track_events", "failed").inc();
     await withScope((scope) => {
       scope.setTag?.("worker", "trackEvents");
       scope.setExtra?.("job", job?.data);

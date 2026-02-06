@@ -83,11 +83,12 @@ export const collectorIndexDelayHistogram = new Histogram({
 type JobType =
   | "collector"
   | "collector_check_and_adjust"
-  | "evaluation"
-  | "track_event"
+  | "evaluations"
+  | "track_events"
   | "topic_clustering"
   | "usage_stats"
-  | "event_sourcing";
+  | "event_sourcing"
+  | "scenario";
 
 type JobStatus = "processing" | "completed" | "failed";
 
