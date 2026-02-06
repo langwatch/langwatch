@@ -1,24 +1,21 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Flex,
   Heading,
   HStack,
+  IconButton,
   Spacer,
-  Spinner,
   Table,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { MoreVertical } from "react-feather";
-import { LuMail, LuPencil, LuTrash } from "react-icons/lu";
 import type { SubmitHandler } from "react-hook-form";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -26,7 +23,8 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import type { MembersForm } from "../../components/AddMembersForm";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import { CopyInput } from "../../components/CopyInput";
-import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
+import { orgRoleOptions } from "../../components/settings/orgRoleOptions";
+import { RoleBadge } from "../../components/settings/RoleBadge";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
@@ -45,11 +43,6 @@ import type {
 } from "../../server/api/routers/organization";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
-
-// Create a Map for fast O(1) lookups instead of O(n) .find() in render
-const roleLabelMap = new Map(
-  orgRoleOptions.map((option) => [option.value, option.label]),
-);
 
 function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -274,11 +267,6 @@ function MembersList({
     );
   };
 
-  const viewInviteLink = (inviteCode: string, email: string) => {
-    setSelectedInvites([{ inviteCode, email }]);
-    onInviteLinkOpen();
-  };
-
   const onInviteModalClose = () => {
     setSelectedInvites([]);
     onInviteLinkClose();
@@ -362,17 +350,15 @@ function MembersList({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader width="56px" />
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader width="270px">Name</Table.ColumnHeader>
+                  <Table.ColumnHeader width="100px">Role</Table.ColumnHeader>
+                  <Table.ColumnHeader width="120px">Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {sortedMembers.map((member) => {
-                  const roleLabel = roleLabelMap.get(member.role) ?? member.role;
-
-                  return (
+                {sortedMembers.map((member) => (
                     <Table.Row key={member.userId}>
                       <Table.Cell>
                         <RandomColorAvatar
@@ -382,20 +368,19 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>
                         <Link href={`/settings/members/${member.userId}`}>
-                          {member.user.name}{" "}
-                          <Text
-                            as="span"
-                            whiteSpace="nowrap"
-                          >{`(Organization ${roleLabel})`}</Text>
+                          {member.user.name}
                         </Link>
                       </Table.Cell>
-                      <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell>
+                        <RoleBadge role={member.role} />
+                      </Table.Cell>
                       <Table.Cell>
                         <TeamMembershipsDisplay
                           teamMemberships={member.user.teamMemberships}
                           organizationId={organization.id}
                         />
                       </Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
                         <Box
                           width="full"
@@ -414,7 +399,7 @@ function MembersList({
                                   void router.push(`/settings/members/${member.userId}`);
                                 }}
                               >
-                                <LuPencil size={16} />
+                                <Pencil size={16} />
                                 Edit
                               </Menu.Item>
                               {canDeleteMember(member.userId) && (
@@ -423,7 +408,7 @@ function MembersList({
                                   color="red.500"
                                   onClick={() => deleteMember(member.userId)}
                                 >
-                                  <LuTrash size={16} />
+                                  <Trash2 size={16} />
                                   Delete
                                 </Menu.Item>
                               )}
@@ -432,8 +417,7 @@ function MembersList({
                         </Box>
                       </Table.Cell>
                     </Table.Row>
-                  );
-                })}
+                ))}
               </Table.Body>
             </Table.Root>
           </Card.Body>
@@ -449,9 +433,10 @@ function MembersList({
                   <Table.Header>
                     <Table.Row>
                       <Table.ColumnHeader width="56px" />
-                      <Table.ColumnHeader>Email</Table.ColumnHeader>
-                      <Table.ColumnHeader>Role</Table.ColumnHeader>
-                      <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                      <Table.ColumnHeader width="270px">Email</Table.ColumnHeader>
+                      <Table.ColumnHeader width="100px">Role</Table.ColumnHeader>
+                      <Table.ColumnHeader width="120px">Teams</Table.ColumnHeader>
+                      <Table.ColumnHeader>Invite Link</Table.ColumnHeader>
                       <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
@@ -463,47 +448,31 @@ function MembersList({
                         </Table.Cell>
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>
-                          {orgRoleOptions.find(
-                            (option) => option.value === invite.role,
-                          )?.label ?? invite.role}
+                          <RoleBadge role={invite.role} />
                         </Table.Cell>
                         <Table.Cell>
                           <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
                         </Table.Cell>
                         <Table.Cell>
-                          <Box
-                            width="full"
-                            height="full"
-                            display="flex"
-                            justifyContent="end"
-                          >
-                            <Menu.Root>
-                              <Menu.Trigger>
-                                <MoreVertical size={16} />
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="view-link"
-                                  onClick={() =>
-                                    viewInviteLink(invite.inviteCode, invite.email)
-                                  }
-                                >
-                                  <LuMail size={16} />
-                                  View invite link
-                                </Menu.Item>
-                                {hasOrganizationManagePermission && (
-                                  <Menu.Item
-                                    value="delete"
-                                    color="red.500"
-                                    onClick={() => deleteInvite(invite.id)}
-                                  >
-                                    <LuTrash size={16} />
-                                    Delete
-                                  </Menu.Item>
-                                )}
-                              </Menu.Content>
-                            </Menu.Root>
-                          </Box>
+                          <CopyInput
+                            value={`${typeof window !== "undefined" ? window.location.origin : ""}/invite/accept?inviteCode=${invite.inviteCode}`}
+                            label="Invite Link"
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          {hasOrganizationManagePermission && (
+                            <IconButton
+                              type="button"
+                              variant="ghost"
+                              size="xs"
+                              color="red.500"
+                              _hover={{ color: "red.600" }}
+                              onClick={() => deleteInvite(invite.id)}
+                              aria-label={`Delete invite for ${invite.email}`}
+                            >
+                              <Trash2 size={16} />
+                            </IconButton>
+                          )}
                         </Table.Cell>
                       </Table.Row>
                     ))}
