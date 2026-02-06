@@ -198,7 +198,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        err: error,
+        error: message,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
@@ -261,7 +261,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        err: error,
+        error: message,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
@@ -296,7 +296,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        err: error,
+        error: message,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
