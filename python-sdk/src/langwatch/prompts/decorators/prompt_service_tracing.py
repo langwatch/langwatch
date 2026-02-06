@@ -48,11 +48,9 @@ class PromptServiceTracing:
 
                     span.set_attributes(
                         {
-                            AttributeKey.LangWatchPromptId: result.get("id"),
-                            AttributeKey.LangWatchPromptVersionId: result.get(
-                                "version_id"
-                            ),
-                            AttributeKey.LangWatchPromptHandle: result.get("handle"),
+                            AttributeKey.LangWatchPromptId: result.id,
+                            AttributeKey.LangWatchPromptVersionId: result.version_id,
+                            AttributeKey.LangWatchPromptHandle: result.handle,
                         }
                     )
                     return result

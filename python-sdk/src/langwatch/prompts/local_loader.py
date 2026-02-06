@@ -16,7 +16,7 @@ import warnings
 
 import yaml
 
-from .types import PromptData, MessageDict, ResponseFormatDict
+from .types import PromptData, Message, ResponseFormat
 
 logger = logging.getLogger(__name__)
 
@@ -153,14 +153,14 @@ class LocalPromptLoader:
             messages = []
             if "messages" in prompt_data:
                 messages = [
-                    MessageDict(role=msg["role"], content=msg["content"])
+                    Message(role=msg["role"], content=msg["content"])
                     for msg in prompt_data["messages"]
                 ]
 
             # Convert response format if present
             response_format = None
             if "response_format" in prompt_data and prompt_data["response_format"]:
-                response_format = ResponseFormatDict(
+                response_format = ResponseFormat(
                     type="json_schema", json_schema=prompt_data["response_format"]
                 )
 

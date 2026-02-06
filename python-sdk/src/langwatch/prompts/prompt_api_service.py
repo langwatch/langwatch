@@ -60,11 +60,12 @@ from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_
     DeleteApiPromptsByIdResponse200,
 )
 
+from pydantic import BaseModel
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .errors import unwrap_response
 from .decorators.prompt_service_tracing import prompt_service_tracing
-from .types import PromptData, MessageDict, InputDict, OutputDict
+from .types import PromptData, Message, Input, Output, MessageDict, InputDict, OutputDict
 
 
 class PromptApiService:
@@ -137,21 +138,32 @@ class PromptApiService:
         Returns:
             PromptData dictionary containing the created prompt data
         """
-        # Convert dicts to API models using from_dict
+        # Convert to API models (handle both Pydantic models and dicts)
         api_messages = UNSET
         if messages:
             api_messages = [
-                PostApiPromptsBodyMessagesItem.from_dict(msg) for msg in messages
+                PostApiPromptsBodyMessagesItem.from_dict(
+                    msg.model_dump() if isinstance(msg, BaseModel) else msg
+                )
+                for msg in messages
             ]
 
         api_inputs = UNSET
         if inputs:
-            api_inputs = [PostApiPromptsBodyInputsItem.from_dict(inp) for inp in inputs]
+            api_inputs = [
+                PostApiPromptsBodyInputsItem.from_dict(
+                    inp.model_dump() if isinstance(inp, BaseModel) else inp
+                )
+                for inp in inputs
+            ]
 
         api_outputs = UNSET
         if outputs:
             api_outputs = [
-                PostApiPromptsBodyOutputsItem.from_dict(out) for out in outputs
+                PostApiPromptsBodyOutputsItem.from_dict(
+                    out.model_dump() if isinstance(out, BaseModel) else out
+                )
+                for out in outputs
             ]
 
         resp = post_api_prompts.sync_detailed(
@@ -202,23 +214,32 @@ class PromptApiService:
         Returns:
             PromptData dictionary containing the updated prompt data
         """
-        # Convert dicts to API models using from_dict
+        # Convert to API models (handle both Pydantic models and dicts)
         api_messages = UNSET
         if messages:
             api_messages = [
-                PutApiPromptsByIdBodyMessagesItem.from_dict(msg) for msg in messages
+                PutApiPromptsByIdBodyMessagesItem.from_dict(
+                    msg.model_dump() if isinstance(msg, BaseModel) else msg
+                )
+                for msg in messages
             ]
 
         api_inputs = UNSET
         if inputs:
             api_inputs = [
-                PutApiPromptsByIdBodyInputsItem.from_dict(inp) for inp in inputs
+                PutApiPromptsByIdBodyInputsItem.from_dict(
+                    inp.model_dump() if isinstance(inp, BaseModel) else inp
+                )
+                for inp in inputs
             ]
 
         api_outputs = UNSET
         if outputs:
             api_outputs = [
-                PutApiPromptsByIdBodyOutputsItem.from_dict(out) for out in outputs
+                PutApiPromptsByIdBodyOutputsItem.from_dict(
+                    out.model_dump() if isinstance(out, BaseModel) else out
+                )
+                for out in outputs
             ]
 
         body = PutApiPromptsByIdBody(

@@ -16,7 +16,7 @@ def test_load_prompt_from_local_files():
     """
     GIVEN local prompt files exist in CLI format
     WHEN LocalPromptLoader.load_prompt() is called
-    THEN it should return a properly formatted API response
+    THEN it should return a properly formatted PromptData
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -58,13 +58,13 @@ messages:
 
     # Verify the result
     assert result is not None
-    assert result["handle"] == "my-prompt"  # Local files use handle, not id
-    assert result["model"] == "openai/gpt-4"
-    assert len(result["messages"]) == 2
-    assert result["messages"][0]["role"] == "system"
-    assert result["messages"][0]["content"] == "You are a helpful assistant."
-    assert result["messages"][1]["role"] == "user"
-    assert result["messages"][1]["content"] == "{{input}}"
+    assert result.handle == "my-prompt"
+    assert result.model == "openai/gpt-4"
+    assert len(result.messages) == 2
+    assert result.messages[0].role == "system"
+    assert result.messages[0].content == "You are a helpful assistant."
+    assert result.messages[1].role == "user"
+    assert result.messages[1].content == "{{input}}"
 
 
 def test_load_prompt_returns_none_when_no_prompts_json():

@@ -21,7 +21,7 @@ from .prompt import Prompt
 from .types import FetchPolicy
 from .prompt_api_service import PromptApiService
 from .local_loader import LocalPromptLoader
-from .types import MessageDict, InputDict, OutputDict
+from .types import Message, Input, Output, MessageDict, InputDict, OutputDict
 from logging import getLogger
 
 logger = getLogger(__name__)

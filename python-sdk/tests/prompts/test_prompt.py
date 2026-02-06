@@ -23,11 +23,11 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 def test_prompt_delegates_config_attributes(prompt: Prompt, prompt_data):
     """Test that Prompt has the expected attributes from PromptData"""
     # Test that key attributes are accessible on the Prompt instance
-    assert prompt.id == prompt_data["id"]
-    assert prompt.model == prompt_data["model"]
-    assert prompt.version == prompt_data["version"]
-    assert prompt.handle == prompt_data["handle"]
-    assert prompt.messages == prompt_data["messages"]
+    assert prompt.id == prompt_data.id
+    assert prompt.model == prompt_data.model
+    assert prompt.version == prompt_data.version
+    assert prompt.handle == prompt_data.handle
+    assert prompt.messages == prompt_data.messages
 
     # Test that the raw data is accessible
     assert prompt.raw == prompt_data

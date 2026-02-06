@@ -61,7 +61,7 @@ messages:
 
             assert result is not None
             assert result.model == "openai/gpt-4"
-            assert result.messages[0]["content"] == "Test prompt from custom path"
+            assert result.messages[0].content == "Test prompt from custom path"
             mock_request.assert_not_called()
 
 
