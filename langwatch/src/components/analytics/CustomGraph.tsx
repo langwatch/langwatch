@@ -513,9 +513,8 @@ const CustomGraph_ = React.memo(
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-    const maxValue = Math.max(
-      ...Object.values(keysToValues).flatMap((values) => values),
-    );
+    const allValues = Object.values(keysToValues).flatMap((values) => values);
+    const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
     const getColor = useGetRotatingColorForCharts();
     const gray400 = useColorRawValue("gray.400");
