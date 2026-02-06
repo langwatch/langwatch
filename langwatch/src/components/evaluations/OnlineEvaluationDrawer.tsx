@@ -269,6 +269,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       void utils.monitors.getAllForProject.invalidate({
         projectId: project?.id ?? "",
       });
+      if (monitorId) {
+        void utils.monitors.getById.invalidate({
+          id: monitorId,
+          projectId: project?.id ?? "",
+        });
+      }
       // Clear persisted state after successful save
       onlineEvaluationDrawerState = null;
       onSave?.();
