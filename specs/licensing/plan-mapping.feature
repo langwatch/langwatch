@@ -86,9 +86,9 @@ Feature: License to PlanInfo Mapping
     Then the plan type is "FREE"
     And the plan name is "Free"
     And the plan free is true
-    And maxMembers is 2
+    And maxMembers is 1
     And maxProjects is 2
     And maxMessagesPerMonth is 1000
     And evaluationsCredit is 2
-    And maxWorkflows is 1
+    And maxWorkflows is 3
     And canPublish is false

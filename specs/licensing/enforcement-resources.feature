@@ -9,7 +9,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And I am authenticated as an admin of "org-123"
     And a team "team-456" exists in the organization
     And a project "proj-789" exists in the team
-    And LICENSE_ENFORCEMENT_ENABLED is "true"
 
   # ============================================================================
   # Workflows: Backend Enforcement
@@ -418,50 +417,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And no upgrade modal is displayed
 
   # ============================================================================
-  # No License / Enforcement Disabled
-  # ============================================================================
-
-  @integration
-  Scenario: No license allows unlimited workflows when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 workflows
-    When I create a workflow in project "proj-789"
-    Then the workflow is created successfully
-
-  @integration
-  Scenario: No license allows unlimited prompts when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 prompts
-    When I create a prompt in project "proj-789"
-    Then the prompt is created successfully
-
-  @integration
-  Scenario: No license allows unlimited evaluators when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 evaluators
-    When I create an evaluator in project "proj-789"
-    Then the evaluator is created successfully
-
-  @integration
-  Scenario: No license allows unlimited scenarios when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 scenarios
-    When I create a scenario in project "proj-789"
-    Then the scenario is created successfully
-
-  @integration
-  Scenario: No license allows unlimited teams when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 teams
-    When I create a team in the organization
-    Then the team is created successfully
-
-  # ============================================================================
   # Invalid/Expired License Falls to FREE Tier
   # ============================================================================
 
@@ -561,18 +516,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then an upgrade modal is displayed
     And the modal shows "Experiments: 3 / 3"
 
-  # ============================================================================
-  # Experiments: No License / Enforcement Disabled
-  # ============================================================================
-
-  @integration
-  Scenario: No license allows unlimited experiments when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 experiments
-    When I create an experiment in project "proj-789"
-    Then the experiment is created successfully
-
   @integration
   Scenario: Expired license enforces FREE tier experiment limit
     Given the organization has an expired license
@@ -667,18 +610,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the agent is updated successfully
     And no upgrade modal is shown
 
-  # ============================================================================
-  # Agents: No License / Enforcement Disabled
-  # ============================================================================
-
-  @integration
-  Scenario: No license allows unlimited agents when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 agents
-    When I create an agent in project "proj-789"
-    Then the agent is created successfully
-
   @integration
   Scenario: Expired license enforces FREE tier agent limit
     Given the organization has an expired license
@@ -725,8 +656,8 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   Scenario: Updating existing online evaluation does not enforce limit
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations across all projects
-    And I have an existing online evaluation "monitor-123"
-    When I update online evaluation "monitor-123" in project "proj-789"
+    And I have an existing online evaluation "online-eval-123"
+    When I update online evaluation "online-eval-123" in project "proj-789"
     Then the online evaluation is updated successfully
 
   # ============================================================================
@@ -772,18 +703,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And I click "Save"
     Then the online evaluation is updated successfully
     And no upgrade modal is shown
-
-  # ============================================================================
-  # Online Evaluations: No License / Enforcement Disabled
-  # ============================================================================
-
-  @integration
-  Scenario: No license allows unlimited online evaluations when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 100 online evaluations
-    When I create an online evaluation in project "proj-789"
-    Then the online evaluation is created successfully
 
   @integration
   Scenario: Expired license enforces FREE tier online evaluation limit

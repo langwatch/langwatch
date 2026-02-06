@@ -42,17 +42,6 @@ Feature: Message/Trace Limit Enforcement with License
       | planName            | PRO    |
 
   # ============================================================================
-  # No License (Unlimited when enforcement disabled)
-  # ============================================================================
-
-  Scenario: No license allows unlimited traces when enforcement disabled
-    Given LICENSE_ENFORCEMENT_ENABLED is "false"
-    And the organization has no license
-    And the organization has 1000000 traces this month
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
-
-  # ============================================================================
   # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
@@ -73,17 +62,6 @@ Feature: Message/Trace Limit Enforcement with License
     And the organization has 1000 traces this month
     When I check the trace limit for team "team-456"
     Then exceeded is true
-
-  # ============================================================================
-  # Feature Flag Override
-  # ============================================================================
-
-  Scenario: Feature flag disabled allows unlimited traces
-    Given the organization has a license with maxMessagesPerMonth 1000
-    And the organization has 50000 traces this month
-    And LICENSE_ENFORCEMENT_ENABLED is "false"
-    When I check the trace limit for team "team-456"
-    Then exceeded is false
 
   # ============================================================================
   # Caching Behavior
