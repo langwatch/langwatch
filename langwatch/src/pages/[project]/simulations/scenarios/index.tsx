@@ -72,7 +72,7 @@ function ScenarioLibraryPage() {
     onSuccess: (result) => {
       if (result.failed.length > 0) {
         toaster.create({
-          title: "Some scenarios couldn't be deleted",
+          title: "Some scenarios couldn't be archived",
           description: `${result.failed.length} failed. Please retry.`,
           type: "error",
           meta: { closable: true },

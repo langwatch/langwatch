@@ -7,7 +7,7 @@
  * - Select all checkbox toggles all visible rows
  * - Select all with active filter only selects visible rows
  * - Deselecting all rows hides the batch action bar
- * - Row action menu contains archive option
+ * - Row action menu contains Archive option
  * - Single archive confirmation modal shows scenario name
  * - Cancel single archive dismisses modal without archiving
  * - Batch archive confirmation modal lists all selected scenarios
@@ -176,7 +176,7 @@ describe("<ScenarioTable/>", () => {
   // --------------------------------------------------------------------------
 
   describe("when row action menu is opened", () => {
-    it("contains a Delete option", async () => {
+    it("contains an Archive option", async () => {
       const user = userEvent.setup();
       renderTable();
 
@@ -184,11 +184,11 @@ describe("<ScenarioTable/>", () => {
       await user.click(actionButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Delete")).toBeInTheDocument();
+        expect(screen.getByText("Archive")).toBeInTheDocument();
       });
     });
 
-    it("calls onArchive with the scenario when Delete is clicked", async () => {
+    it("calls onArchive with the scenario when Archive is clicked", async () => {
       const user = userEvent.setup();
       const onArchive = vi.fn();
       renderTable({ onArchive });
@@ -197,10 +197,10 @@ describe("<ScenarioTable/>", () => {
       await user.click(actionButton);
 
       await waitFor(() => {
-        expect(screen.getByText("Delete")).toBeInTheDocument();
+        expect(screen.getByText("Archive")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText("Delete"));
+      await user.click(screen.getByText("Archive"));
       expect(onArchive).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "scen_4",
@@ -258,15 +258,15 @@ describe("<BatchActionBar/>", () => {
       expect(screen.getByText("3 selected")).toBeInTheDocument();
     });
 
-    it("displays a Delete button", () => {
+    it("displays an Archive button", () => {
       render(<BatchActionBar selectedCount={2} onArchive={vi.fn()} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("Delete")).toBeInTheDocument();
+      expect(screen.getByText("Archive")).toBeInTheDocument();
     });
 
-    it("calls onArchive when Delete button is clicked", async () => {
+    it("calls onArchive when Archive button is clicked", async () => {
       const user = userEvent.setup();
       const onArchive = vi.fn();
 
@@ -274,7 +274,7 @@ describe("<BatchActionBar/>", () => {
         wrapper: Wrapper,
       });
 
-      await user.click(screen.getByText("Delete"));
+      await user.click(screen.getByText("Archive"));
       expect(onArchive).toHaveBeenCalledTimes(1);
     });
   });
@@ -309,7 +309,7 @@ describe("<ScenarioArchiveDialog/>", () => {
   describe("when archiving a single scenario", () => {
     const singleScenario = [{ id: "scen_4", name: "Angry double-charge refund" }];
 
-    it("displays 'Delete scenario?' as the title", async () => {
+    it("displays 'Archive scenario?' as the title", async () => {
       render(
         <ScenarioArchiveDialog
           open={true}
@@ -321,7 +321,7 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Delete scenario?")).toBeInTheDocument();
+        expect(screen.getByText("Archive scenario?")).toBeInTheDocument();
       });
     });
 
@@ -354,12 +354,12 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("This action cannot be undone."),
+          screen.getByText("Archived scenarios will no longer appear in the library."),
         ).toBeInTheDocument();
       });
     });
 
-    it("has Cancel and Delete buttons", async () => {
+    it("has Cancel and Archive buttons", async () => {
       render(
         <ScenarioArchiveDialog
           open={true}
@@ -372,7 +372,7 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
-        expect(screen.getByText("Delete")).toBeInTheDocument();
+        expect(screen.getByText("Archive")).toBeInTheDocument();
       });
     });
 
@@ -398,7 +398,7 @@ describe("<ScenarioArchiveDialog/>", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("calls onConfirm when Delete is clicked", async () => {
+    it("calls onConfirm when Archive is clicked", async () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
 
@@ -413,10 +413,10 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Delete")).toBeInTheDocument();
+        expect(screen.getByText("Archive")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole("button", { name: "Delete" }));
+      await user.click(screen.getByRole("button", { name: "Archive" }));
 
       expect(onConfirm).toHaveBeenCalledTimes(1);
     });
@@ -450,7 +450,7 @@ describe("<ScenarioArchiveDialog/>", () => {
       { id: "scen_3", name: "Failed booking escalation" },
     ];
 
-    it("displays 'Delete 2 scenarios?' as the title", async () => {
+    it("displays 'Archive 2 scenarios?' as the title", async () => {
       render(
         <ScenarioArchiveDialog
           open={true}
@@ -462,7 +462,7 @@ describe("<ScenarioArchiveDialog/>", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Delete 2 scenarios?")).toBeInTheDocument();
+        expect(screen.getByText("Archive 2 scenarios?")).toBeInTheDocument();
       });
     });
 
@@ -496,12 +496,12 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText("This action cannot be undone."),
+          screen.getByText("Archived scenarios will no longer appear in the library."),
         ).toBeInTheDocument();
       });
     });
 
-    it("has Cancel and Delete buttons", async () => {
+    it("has Cancel and Archive buttons", async () => {
       render(
         <ScenarioArchiveDialog
           open={true}
@@ -514,7 +514,7 @@ describe("<ScenarioArchiveDialog/>", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Cancel")).toBeInTheDocument();
-        expect(screen.getByText("Delete")).toBeInTheDocument();
+        expect(screen.getByText("Archive")).toBeInTheDocument();
       });
     });
 
@@ -555,7 +555,7 @@ describe("<ScenarioArchiveDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("Delete scenario?")).not.toBeInTheDocument();
+      expect(screen.queryByText("Archive scenario?")).not.toBeInTheDocument();
     });
   });
 });

@@ -11,6 +11,7 @@ type ScenarioToArchive = {
  *
  * - Single scenario: shows "Archive scenario?" with the scenario name.
  * - Multiple scenarios: shows "Archive N scenarios?" with a list of names.
+ * - Uses orange (warning) color rather than red (danger) since archiving is reversible.
  *
  * Note: All interactive elements use stopPropagation() to prevent event bubbling,
  * since this dialog may be rendered inside clickable parent elements.
@@ -30,8 +31,8 @@ export function ScenarioArchiveDialog({
 }) {
   const isBatch = scenarios.length > 1;
   const title = isBatch
-    ? `Delete ${scenarios.length} scenarios?`
-    : "Delete scenario?";
+    ? `Archive ${scenarios.length} scenarios?`
+    : "Archive scenario?";
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
@@ -62,7 +63,7 @@ export function ScenarioArchiveDialog({
               )
             )}
             <Text color="fg.muted" fontSize="sm">
-              This action cannot be undone.
+              Archived scenarios will no longer appear in the library.
             </Text>
           </VStack>
         </Dialog.Body>
@@ -79,14 +80,14 @@ export function ScenarioArchiveDialog({
             Cancel
           </Button>
           <Button
-            colorPalette="red"
+            colorPalette="orange"
             onClick={(e) => {
               e.stopPropagation();
               onConfirm();
             }}
             disabled={isLoading}
           >
-            {isLoading ? <Spinner size="sm" /> : "Delete"}
+            {isLoading ? <Spinner size="sm" /> : "Archive"}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
