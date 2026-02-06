@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
+  extractTracesFields,
   SPAN_SUBFIELDS,
+  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "../tracesMapping";
 
@@ -293,5 +295,90 @@ describe("TRACE_MAPPINGS.metadata.mapping", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+});
+
+describe("extractTracesFields", () => {
+  const mockTraces = [
+    {
+      trace_id: "trace-1",
+      timestamps: { started_at: Date.now() },
+      input: { type: "text", value: "Hello" },
+      output: { type: "text", value: "World" },
+      metadata: { thread_id: "thread-1" },
+    },
+    {
+      trace_id: "trace-2",
+      timestamps: { started_at: Date.now() },
+      input: { type: "text", value: "Foo" },
+      output: { type: "text", value: "Bar" },
+      metadata: { thread_id: "thread-1" },
+    },
+  ] as any[];
+
+  it("extracts default fields (trace_id, input, output) when no selectedFields provided", () => {
+    const result = extractTracesFields(mockTraces, []);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({
+      trace_id: "trace-1",
+      input: "Hello",
+      output: "World",
+    });
+    expect(result[1]).toEqual({
+      trace_id: "trace-2",
+      input: "Foo",
+      output: "Bar",
+    });
+  });
+
+  it("extracts only specified fields when selectedFields provided", () => {
+    const result = extractTracesFields(mockTraces, ["input"]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ input: "Hello" });
+    expect(result[1]).toEqual({ input: "Foo" });
+  });
+
+  it("extracts multiple specified fields", () => {
+    const result = extractTracesFields(mockTraces, ["input", "output"]);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ input: "Hello", output: "World" });
+    expect(result[1]).toEqual({ input: "Foo", output: "Bar" });
+  });
+});
+
+describe("THREAD_MAPPINGS", () => {
+  const mockThread = {
+    thread_id: "thread-1",
+    traces: [
+      {
+        trace_id: "trace-1",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Hello" },
+        output: { type: "text", value: "World" },
+      },
+    ] as any[],
+  };
+
+  it("thread_id mapping returns the thread id", () => {
+    expect(THREAD_MAPPINGS.thread_id.mapping(mockThread)).toBe("thread-1");
+  });
+
+  it("traces mapping with no selectedFields returns traces with default fields", () => {
+    const result = THREAD_MAPPINGS.traces.mapping(mockThread);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveProperty("trace_id", "trace-1");
+    expect(result[0]).toHaveProperty("input", "Hello");
+    expect(result[0]).toHaveProperty("output", "World");
+  });
+
+  it("traces mapping with selectedFields returns only those fields", () => {
+    const result = THREAD_MAPPINGS.traces.mapping(mockThread, ["input"]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ input: "Hello" });
   });
 });

@@ -52,10 +52,12 @@ export function TraceDetails(props: {
   const canViewMessages = true;
 
   const { openDrawer, closeDrawer } = useDrawer();
+  const { trace } = useTraceDetailsState(props.traceId);
 
   const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
     number | undefined
   >();
+  const [evaluationsPollingStart] = useState(() => Date.now());
 
   const evaluations = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: props.traceId },
@@ -67,20 +69,36 @@ export function TraceDetails(props: {
   );
 
   useEffect(() => {
-    if (evaluations.data) {
-      const pendingChecks = evaluations.data.filter(
-        (check) =>
-          (check.status == "scheduled" || check.status == "in_progress") &&
-          (check.timestamps.inserted_at ?? 0) >
-            new Date().getTime() - 1000 * 60 * 60 * 1,
-      );
-      if (pendingChecks.length > 0) {
-        setEvaluationsCheckInterval(2000);
-      } else {
-        setEvaluationsCheckInterval(undefined);
-      }
+    if (!evaluations.data) return;
+
+    const now = Date.now();
+    const pollingTooLong = now - evaluationsPollingStart > 5 * 60 * 1000;
+
+    // Give up after 5 minutes of polling
+    if (pollingTooLong) {
+      setEvaluationsCheckInterval(undefined);
+      return;
     }
-  }, [evaluations.data]);
+
+    const hasPendingEvals = evaluations.data.some(
+      (check) =>
+        (check.status === "scheduled" || check.status === "in_progress") &&
+        (check.timestamps.inserted_at ?? 0) > now - 1000 * 60 * 60,
+    );
+
+    const traceIsFresh =
+      trace.data?.timestamps.inserted_at &&
+      now - trace.data.timestamps.inserted_at < 2 * 60 * 1000;
+
+    const noEvalsYetOnFreshTrace =
+      evaluations.data.length === 0 && traceIsFresh;
+
+    if (hasPendingEvals || noEvalsYetOnFreshTrace) {
+      setEvaluationsCheckInterval(2000);
+    } else {
+      setEvaluationsCheckInterval(undefined);
+    }
+  }, [evaluations.data, evaluationsPollingStart, trace.data?.timestamps.inserted_at]);
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
@@ -131,7 +149,6 @@ export function TraceDetails(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedTab]);
 
-  const { trace } = useTraceDetailsState(props.traceId);
   const queueDrawerOpen = useDisclosure();
 
   const queueItem = api.annotation.createQueueItem.useMutation();

@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { evaluationPassed } from "../checks/EvaluationStatus";
@@ -35,15 +35,19 @@ export function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
       </Text>
     );
   return (
-    <VStack align="start" gap={2}>
-      <>
-        {evaluations?.map((evaluation) => (
-          <EvaluationStatusItem
-            key={evaluation.evaluation_id}
-            check={evaluation}
-          />
-        ))}
-      </>
+    <VStack align="start" gap={0} width="full">
+      {evaluations?.map((evaluation, index) => (
+        <Box key={evaluation.evaluation_id} width="full">
+          {index > 0 && (
+            <Box
+              borderTopWidth="1px"
+              borderTopColor="border.subtle"
+              marginY={3}
+            />
+          )}
+          <EvaluationStatusItem check={evaluation} />
+        </Box>
+      ))}
     </VStack>
   );
 }
@@ -65,15 +69,19 @@ export const Guardrails = (trace: TraceEval) => {
       </Text>
     );
   return (
-    <VStack align="start" gap={2}>
-      <>
-        {guardrails?.map((evaluation) => (
-          <EvaluationStatusItem
-            key={evaluation.evaluation_id}
-            check={evaluation}
-          />
-        ))}
-      </>
+    <VStack align="start" gap={0} width="full">
+      {guardrails?.map((evaluation, index) => (
+        <Box key={evaluation.evaluation_id} width="full">
+          {index > 0 && (
+            <Box
+              borderTopWidth="1px"
+              borderTopColor="border.subtle"
+              marginY={3}
+            />
+          )}
+          <EvaluationStatusItem check={evaluation} />
+        </Box>
+      ))}
     </VStack>
   );
 };

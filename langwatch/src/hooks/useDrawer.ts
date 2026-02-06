@@ -299,6 +299,20 @@ export const useDrawer = () => {
         if (drawerStack.length === 0 && currentDrawerNow) {
           drawerStack.push({ drawer: currentDrawerNow, params: {} });
         }
+
+        // Snapshot current URL params for the top-of-stack drawer so goBack
+        // restores the full state (e.g. selectedTab set after initial open)
+        const topEntry = drawerStack[drawerStack.length - 1];
+        if (topEntry && topEntry.drawer === currentDrawerNow) {
+          const currentUrlParams: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(router.query)) {
+            if (key.startsWith("drawer.") && key !== "drawer.open") {
+              currentUrlParams[key.replace("drawer.", "")] = value;
+            }
+          }
+          topEntry.params = currentUrlParams;
+        }
+
         drawerStack.push({ drawer, params: allParams });
       }
 
