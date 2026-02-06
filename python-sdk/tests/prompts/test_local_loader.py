@@ -67,6 +67,56 @@ messages:
     assert result.messages[1].content == "{{input}}"
 
 
+def test_load_prompt_with_response_format():
+    """
+    GIVEN a local prompt file with response_format
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should parse response_format into a ResponseFormat model
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+
+        prompt_content = """model: openai/gpt-4
+messages:
+  - role: system
+    content: You are a helpful assistant.
+response_format:
+  name: my_schema
+  schema:
+    type: object
+    properties:
+      answer:
+        type: string
+"""
+        (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
+
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+
+    assert result is not None
+    assert result.response_format is not None
+    assert result.response_format.type == "json_schema"
+    assert result.response_format.json_schema["name"] == "my_schema"
+    assert result.response_format.json_schema["schema"]["type"] == "object"
+
+
 def test_load_prompt_returns_none_when_no_prompts_json():
     """
     GIVEN no prompts.json file exists
