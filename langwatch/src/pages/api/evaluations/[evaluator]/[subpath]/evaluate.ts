@@ -198,7 +198,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        error: message,
+        err: error,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
@@ -261,7 +261,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        error: message,
+        err: error,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
@@ -296,7 +296,7 @@ export async function handleEvaluatorCall(
           : String(error);
     logger.error(
       {
-        error: message,
+        err: error,
         ...(error instanceof ZodError
           ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
           : {}),
@@ -304,7 +304,9 @@ export async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(error, {
+      extra: { projectId: project.id, validationError: message },
+    });
 
     return res.status(400).json({ error: message });
   }
@@ -364,10 +366,7 @@ export async function handleEvaluatorCall(
       });
       logger.error(
         {
-          error:
-            eventError instanceof Error
-              ? eventError.message
-              : String(eventError),
+          err: eventError,
           projectId: project.id,
           evaluationId,
         },
@@ -394,7 +393,7 @@ export async function handleEvaluatorCall(
     });
     logger.error(
       {
-        error: error instanceof Error ? error.message : String(error),
+        err: error,
         projectId: project.id,
       },
       "error running evaluation",
@@ -433,10 +432,7 @@ export async function handleEvaluatorCall(
       });
       logger.error(
         {
-          error:
-            eventError instanceof Error
-              ? eventError.message
-              : String(eventError),
+          err: eventError,
           projectId: project.id,
           evaluationId,
         },
