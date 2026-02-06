@@ -48,6 +48,7 @@ import {
 } from "../../evaluations/evaluationMappings";
 import {
   evaluationDurationHistogram,
+  getBullMQJobWaitDurationHistogram,
   getEvaluationStatusCounter,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
@@ -675,6 +676,9 @@ export const startEvaluationsWorker = (
     EVALUATIONS_QUEUE.NAME,
     withJobContext(
       async (job) => {
+        if (job.timestamp) {
+          getBullMQJobWaitDurationHistogram("evaluations").observe(Date.now() - job.timestamp);
+        }
         if (
           env.NODE_ENV !== "test" &&
           job.data.trace.trace_id.includes("test-trace")

@@ -10,6 +10,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
+  getBullMQJobWaitDurationHistogram,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -24,6 +25,9 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
     return;
   }
 
+  if (job.timestamp) {
+    getBullMQJobWaitDurationHistogram("usage_stats").observe(Date.now() - job.timestamp);
+  }
   logger.info({ jobId: job.id, data: job.data }, "processing usage stats job");
   getJobProcessingCounter("usage_stats", "processing").inc();
   const start = Date.now();

@@ -26,6 +26,7 @@ import {
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
+import { getBullMQJobWaitDurationHistogram } from "../metrics";
 import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
@@ -197,6 +198,10 @@ export async function processScenarioJob(
   const container = job.data as unknown as JobContainer<ScenarioJob>;
   const jobData = container.__payload ?? job.data;
   const contextMetadata = container.__context;
+
+  if (job.timestamp) {
+    getBullMQJobWaitDurationHistogram("scenario").observe(Date.now() - job.timestamp);
+  }
 
   const { projectId, scenarioId, target, setId, batchRunId } = jobData;
 
