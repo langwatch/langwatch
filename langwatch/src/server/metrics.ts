@@ -204,6 +204,17 @@ export const bullmqJobWaitDurationHistogram = new Histogram({
 export const getBullMQJobWaitDurationHistogram = (queueName: string) =>
   bullmqJobWaitDurationHistogram.labels(queueName);
 
+export function recordJobWaitDuration(
+  job: { timestamp?: number },
+  queueName: string,
+): void {
+  if (job.timestamp) {
+    getBullMQJobWaitDurationHistogram(queueName).observe(
+      Date.now() - job.timestamp,
+    );
+  }
+}
+
 // Counter for stalled jobs
 register.removeSingleMetric("bullmq_job_stalled_total");
 const bullmqJobStalledTotal = new Counter({

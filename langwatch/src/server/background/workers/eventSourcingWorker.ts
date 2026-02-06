@@ -6,7 +6,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -25,9 +25,7 @@ export type EventSourcingJob = {
 export async function runEventSourcingJob(
   job: Job<EventSourcingJob, void, string>,
 ) {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram("event_sourcing").observe(Date.now() - job.timestamp);
-  }
+  recordJobWaitDuration(job, "event_sourcing");
   logger.info(
     { jobId: job.id, data: job.data },
     "processing event sourcing job",

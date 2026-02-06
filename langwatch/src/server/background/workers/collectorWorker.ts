@@ -28,7 +28,7 @@ import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
   collectorIndexDelayHistogram,
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
   getPayloadSizeHistogram,
@@ -900,9 +900,7 @@ export const startCollectorWorker = () => {
     COLLECTOR_QUEUE.NAME,
     withJobContext(
       async (job) => {
-        if (job.timestamp) {
-          getBullMQJobWaitDurationHistogram("collector").observe(Date.now() - job.timestamp);
-        }
+        recordJobWaitDuration(job, "collector");
         const jobLog = (message: string) => {
           void job.log(message);
         };

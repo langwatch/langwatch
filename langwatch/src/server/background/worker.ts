@@ -47,12 +47,7 @@ import type {
   ScenarioJob,
   ScenarioJobResult,
 } from "../scenarios/scenario.queue";
-import { scenarioQueue } from "../scenarios/scenario.queue";
-import { collectorQueue } from "./queues/collectorQueue";
-import { evaluationsQueue } from "./queues/evaluationsQueue";
-import { topicClusteringQueue } from "./queues/topicClusteringQueue";
-import { trackEventsQueue } from "./queues/trackEventsQueue";
-import { usageStatsQueue } from "./queues/usageStatsQueue";
+import { monitoredQueues } from "./queues";
 
 const logger = createLogger("langwatch:workers");
 
@@ -262,15 +257,6 @@ const incrementWorkerRestartCount = () => {
 const QUEUE_METRICS_INTERVAL_MS = 15_000;
 let queueMetricsInterval: ReturnType<typeof setInterval> | null = null;
 
-const queues = [
-  { name: "collector", queue: collectorQueue },
-  { name: "evaluations", queue: evaluationsQueue },
-  { name: "topic_clustering", queue: topicClusteringQueue },
-  { name: "track_events", queue: trackEventsQueue },
-  { name: "usage_stats", queue: usageStatsQueue },
-  { name: "scenario", queue: scenarioQueue },
-];
-
 async function collectQueueMetrics(): Promise<void> {
   const states: BullMQQueueState[] = [
     "waiting",
@@ -284,7 +270,7 @@ async function collectQueueMetrics(): Promise<void> {
   ];
 
   await Promise.all(
-    queues.map(async ({ name, queue }) => {
+    monitoredQueues.map(async ({ name, queue }) => {
       try {
         const counts = await queue.getJobCounts(...states);
         for (const state of states) {
@@ -301,6 +287,7 @@ async function collectQueueMetrics(): Promise<void> {
 }
 
 function startQueueMetrics(): void {
+  stopQueueMetrics();
   if (!redis) return;
   void collectQueueMetrics();
   queueMetricsInterval = setInterval(() => {

@@ -23,7 +23,7 @@ import {
 } from "../../../context/asyncContext";
 import {
   type BullMQQueueState,
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   setBullMQJobCount,
 } from "../../../metrics";
 import type {
@@ -317,10 +317,7 @@ export class EventSourcedQueueProcessorBullMq<
     const requestContext = createContextFromJobData(contextMetadata);
 
     // Record job wait time (time from enqueue to processing start)
-    if (job.timestamp) {
-      const waitTimeMs = Date.now() - job.timestamp;
-      getBullMQJobWaitDurationHistogram(this.queueName).observe(waitTimeMs);
-    }
+    recordJobWaitDuration(job, this.queueName);
 
     // Run the job processing within the restored context
     return runWithContext(requestContext, async () => {

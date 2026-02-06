@@ -505,6 +505,130 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
     });
   });
 
+  describeIfRedis("when processing different job formats", () => {
+    it("unwraps new flat format payload correctly", async () => {
+      const queueName = generateQueueName("flat-format");
+      queueNames.push(queueName);
+
+      const processedPayloads: Record<string, unknown>[] = [];
+      const processFn = vi
+        .fn()
+        .mockImplementation(async (payload: Record<string, unknown>) => {
+          processedPayloads.push(payload);
+        });
+
+      const definition: EventSourcedQueueDefinition<Record<string, unknown>> = {
+        name: queueName,
+        process: processFn,
+      };
+
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
+      processors.push(processor);
+
+      await processor.waitUntilReady();
+
+      // send() produces the new flat format: { ...payload, __context }
+      await processor.send({ id: "evt-1", value: 42 });
+
+      const startTime = Date.now();
+      while (processedPayloads.length < 1 && Date.now() - startTime < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(processFn).toHaveBeenCalledTimes(1);
+      // Processor receives unwrapped payload (no __context leak)
+      expect(processedPayloads[0]).toMatchObject({ id: "evt-1", value: 42 });
+      expect(processedPayloads[0]).not.toHaveProperty("__context");
+    });
+
+    it("unwraps legacy __payload format correctly", async () => {
+      const queueName = generateQueueName("legacy-format");
+      queueNames.push(queueName);
+
+      const processedPayloads: Record<string, unknown>[] = [];
+      const processFn = vi
+        .fn()
+        .mockImplementation(async (payload: Record<string, unknown>) => {
+          processedPayloads.push(payload);
+        });
+
+      const definition: EventSourcedQueueDefinition<Record<string, unknown>> = {
+        name: queueName,
+        process: processFn,
+      };
+
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
+      processors.push(processor);
+
+      await processor.waitUntilReady();
+
+      // Enqueue directly using raw Queue with legacy format
+      const rawQueue = new Queue(queueName, { connection: connection! });
+      await rawQueue.add("queue", {
+        __payload: { id: "evt-legacy", value: 99 },
+        __context: { organizationId: "org-1", projectId: "proj-1" },
+      });
+
+      const startTime = Date.now();
+      while (processedPayloads.length < 1 && Date.now() - startTime < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      await rawQueue.close();
+
+      expect(processFn).toHaveBeenCalledTimes(1);
+      expect(processedPayloads[0]).toMatchObject({
+        id: "evt-legacy",
+        value: 99,
+      });
+      expect(processedPayloads[0]).not.toHaveProperty("__payload");
+      expect(processedPayloads[0]).not.toHaveProperty("__context");
+    });
+
+    it("unwraps legacy __payload format without __context", async () => {
+      const queueName = generateQueueName("legacy-no-context");
+      queueNames.push(queueName);
+
+      const processedPayloads: Record<string, unknown>[] = [];
+      const processFn = vi
+        .fn()
+        .mockImplementation(async (payload: Record<string, unknown>) => {
+          processedPayloads.push(payload);
+        });
+
+      const definition: EventSourcedQueueDefinition<Record<string, unknown>> = {
+        name: queueName,
+        process: processFn,
+      };
+
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
+      processors.push(processor);
+
+      await processor.waitUntilReady();
+
+      // Enqueue directly using raw Queue with legacy format (no __context)
+      const rawQueue = new Queue(queueName, { connection: connection! });
+      await rawQueue.add("queue", {
+        __payload: { id: "evt-no-ctx", value: 7 },
+      });
+
+      const startTime = Date.now();
+      while (processedPayloads.length < 1 && Date.now() - startTime < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      await rawQueue.close();
+
+      expect(processFn).toHaveBeenCalledTimes(1);
+      expect(processedPayloads[0]).toMatchObject({
+        id: "evt-no-ctx",
+        value: 7,
+      });
+      expect(processedPayloads[0]).not.toHaveProperty("__payload");
+      expect(processedPayloads[0]).not.toHaveProperty("__context");
+    });
+  });
+
   describeIfRedis("job deduplication and batching", () => {
     it("replaces waiting job when same jobId is sent multiple times", async () => {
       const queueName = generateQueueName("deduplication");

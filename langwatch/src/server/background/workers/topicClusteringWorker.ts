@@ -8,7 +8,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -21,9 +21,7 @@ const logger = createLogger("langwatch:workers:topicClusteringWorker");
 export async function runTopicClusteringJob(
   job: Job<TopicClusteringJob, void, string>,
 ) {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram("topic_clustering").observe(Date.now() - job.timestamp);
-  }
+  recordJobWaitDuration(job, "topic_clustering");
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
   logger.info({ jobId: job.id, data: job.data }, "processing job");

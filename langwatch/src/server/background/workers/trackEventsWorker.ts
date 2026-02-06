@@ -13,7 +13,7 @@ import {
 } from "../../../utils/posthogErrorCapture";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -24,9 +24,7 @@ import { TRACK_EVENTS_QUEUE } from "../queues/trackEventsQueue";
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram("track_event").observe(Date.now() - job.timestamp);
-  }
+  recordJobWaitDuration(job, "track_event");
   logger.info({ jobId: job.id, data: job.data }, "processing job");
   getJobProcessingCounter("track_event", "processing").inc();
   const start = Date.now();
