@@ -25,7 +25,7 @@ const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
   if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram("track_events").observe(Date.now() - job.timestamp);
+    getBullMQJobWaitDurationHistogram("track_event").observe(Date.now() - job.timestamp);
   }
   logger.info({ jobId: job.id, data: job.data }, "processing job");
   getJobProcessingCounter("track_event", "processing").inc();
