@@ -6,14 +6,17 @@
  * Note: scheduleScenarioRun tests are in simulation-runner.integration.test.ts
  * because importing scenario.queue triggers module initialization that requires
  * database/Redis connections.
+ *
+ * @see specs/scenarios/scenario-job-id-uniqueness.feature
  */
 
 import { describe, expect, it } from "vitest";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { buildScenarioJobId } from "../scenario.queue.jobId";
 
 // Test the batch ID generation pattern directly without importing the module
-// (importing scenario.queue triggers processScenarioJob → database connections)
+// (importing scenario.queue triggers processScenarioJob -> database connections)
 describe("generateBatchRunId pattern", () => {
   // Mirror the implementation for unit testing
   const generateBatchRunId = () =>
@@ -38,26 +41,132 @@ describe("generateBatchRunId pattern", () => {
   });
 });
 
-describe("scenario job ID pattern", () => {
-  // Mirror the implementation for unit testing
-  const buildJobId = (projectId: string, scenarioId: string, batchRunId: string) =>
-    `scenario_${projectId}_${scenarioId}_${batchRunId}`;
+describe("buildScenarioJobId()", () => {
+  describe("given a single target", () => {
+    it("creates deterministic job ID from params", () => {
+      const jobId = buildScenarioJobId({
+        projectId: "proj_123",
+        scenarioId: "scen_456",
+        targetReferenceId: "prompt_A",
+        batchRunId: "batch_789",
+        index: 0,
+      });
+      expect(jobId).toBe(
+        "scenario_proj_123_scen_456_prompt_A_batch_789_0",
+      );
+    });
 
-  it("creates deterministic job ID from params", () => {
-    const jobId = buildJobId("proj_123", "scen_456", "batch_789");
-    expect(jobId).toBe("scenario_proj_123_scen_456_batch_789");
+    it("creates same ID for same params (idempotent)", () => {
+      const params = {
+        projectId: "p1",
+        scenarioId: "s1",
+        targetReferenceId: "prompt_A",
+        batchRunId: "b1",
+        index: 0,
+      };
+      const id1 = buildScenarioJobId(params);
+      const id2 = buildScenarioJobId(params);
+      expect(id1).toBe(id2);
+    });
+
+    it("creates different IDs for different scenarios", () => {
+      const id1 = buildScenarioJobId({
+        projectId: "proj",
+        scenarioId: "scenario_a",
+        targetReferenceId: "prompt_A",
+        batchRunId: "batch",
+        index: 0,
+      });
+      const id2 = buildScenarioJobId({
+        projectId: "proj",
+        scenarioId: "scenario_b",
+        targetReferenceId: "prompt_A",
+        batchRunId: "batch",
+        index: 0,
+      });
+      expect(id1).not.toBe(id2);
+    });
   });
 
-  it("creates same ID for same params (idempotent)", () => {
-    const params = { projectId: "p1", scenarioId: "s1", batchRunId: "b1" };
-    const id1 = buildJobId(params.projectId, params.scenarioId, params.batchRunId);
-    const id2 = buildJobId(params.projectId, params.scenarioId, params.batchRunId);
-    expect(id1).toBe(id2);
+  // @see specs/scenarios/scenario-job-id-uniqueness.feature
+  // Scenario: Scheduling same scenario against two different targets produces distinct job IDs
+  describe("when scheduling against two different targets", () => {
+    it("produces distinct job IDs", () => {
+      const idA = buildScenarioJobId({
+        projectId: "proj_1",
+        scenarioId: "refund_flow",
+        targetReferenceId: "prompt_A",
+        batchRunId: "batch_1",
+        index: 0,
+      });
+      const idB = buildScenarioJobId({
+        projectId: "proj_1",
+        scenarioId: "refund_flow",
+        targetReferenceId: "prompt_B",
+        batchRunId: "batch_1",
+        index: 0,
+      });
+      expect(idA).not.toBe(idB);
+    });
   });
 
-  it("creates different IDs for different scenarios", () => {
-    const id1 = buildJobId("proj", "scenario_a", "batch");
-    const id2 = buildJobId("proj", "scenario_b", "batch");
-    expect(id1).not.toBe(id2);
+  // Scenario: Job ID includes target reference ID
+  describe("when scheduled against a target", () => {
+    it("includes the target reference ID in the job ID", () => {
+      const jobId = buildScenarioJobId({
+        projectId: "proj_1",
+        scenarioId: "refund_flow",
+        targetReferenceId: "prompt_A",
+        batchRunId: "batch_1",
+        index: 0,
+      });
+      expect(jobId).toContain("prompt_A");
+    });
+  });
+
+  // Scenario: Scheduling same scenario three times in one batch produces three distinct job IDs
+  describe("when scheduling same scenario 3 times in one batch", () => {
+    it("produces three distinct job IDs", () => {
+      const ids = [0, 1, 2].map((index) =>
+        buildScenarioJobId({
+          projectId: "proj_1",
+          scenarioId: "refund_flow",
+          targetReferenceId: "prompt_A",
+          batchRunId: "batch_1",
+          index,
+        }),
+      );
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(3);
+    });
+  });
+
+  // Scenario: Running scenario against two targets with repeat=2 produces four distinct jobs
+  describe("when running against two targets with 2 repeats each", () => {
+    it("produces 4 unique job IDs", () => {
+      const targets = ["prompt_A", "prompt_B"];
+      const repeats = 2;
+      const ids: string[] = [];
+
+      let index = 0;
+      for (const target of targets) {
+        for (let r = 0; r < repeats; r++) {
+          ids.push(
+            buildScenarioJobId({
+              projectId: "proj_1",
+              scenarioId: "refund_flow",
+              targetReferenceId: target,
+              batchRunId: "batch_1",
+              index,
+            }),
+          );
+          index++;
+        }
+      }
+
+      expect(ids).toHaveLength(4);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(4);
+    });
   });
 });

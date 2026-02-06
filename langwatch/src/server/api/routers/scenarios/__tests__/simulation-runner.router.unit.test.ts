@@ -250,6 +250,7 @@ describe("simulationRunnerRouter.run", () => {
           target: { type: "prompt", referenceId: "prompt_123" },
           setId: expectedSetId,
           batchRunId: "batch_test_123",
+          index: 0,
         });
       });
 
@@ -280,6 +281,7 @@ describe("simulationRunnerRouter.run", () => {
           target: { type: "prompt", referenceId: "prompt_123" },
           setId: "production-tests",
           batchRunId: "batch_test_123",
+          index: 0,
         });
       });
 

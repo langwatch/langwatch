@@ -99,6 +99,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         target: input.target,
         setId,
         batchRunId,
+        index: 0,
       });
 
       logger.info({ jobId: job.id, batchRunId }, "Scenario scheduled");
