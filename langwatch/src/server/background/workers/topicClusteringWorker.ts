@@ -8,6 +8,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -20,6 +21,7 @@ const logger = createLogger("langwatch:workers:topicClusteringWorker");
 export async function runTopicClusteringJob(
   job: Job<TopicClusteringJob, void, string>,
 ) {
+  recordJobWaitDuration(job, "topic_clustering");
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
   logger.info({ jobId: job.id, data: job.data }, "processing job");

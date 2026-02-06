@@ -24,7 +24,11 @@ import fs from "fs";
 import http from "http";
 import path from "path";
 import { register } from "prom-client";
-import { workerRestartsCounter } from "../metrics";
+import {
+  type BullMQQueueState,
+  setBullMQJobCount,
+  workerRestartsCounter,
+} from "../metrics";
 import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
 import type { EventSourcingJob } from "./types";
@@ -43,6 +47,7 @@ import type {
   ScenarioJob,
   ScenarioJobResult,
 } from "../scenarios/scenario.queue";
+import { monitoredQueues } from "./queues";
 
 const logger = createLogger("langwatch:workers");
 
@@ -156,6 +161,12 @@ export const start = (
       close: () => stopStorageStatsCollection(),
     });
 
+    // Start BullMQ queue metrics collection
+    startQueueMetrics();
+    registerCloseable("queueMetrics", {
+      close: () => stopQueueMetrics(),
+    });
+
     incrementWorkerRestartCount();
 
     const closingListener = () => {
@@ -238,6 +249,58 @@ const incrementWorkerRestartCount = () => {
     logger.error({ error }, "error incrementing worker restart count");
   }
 };
+
+// ============================================================================
+// BullMQ Queue Metrics Collection
+// ============================================================================
+
+const QUEUE_METRICS_INTERVAL_MS = 15_000;
+let queueMetricsInterval: ReturnType<typeof setInterval> | null = null;
+
+async function collectQueueMetrics(): Promise<void> {
+  const states: BullMQQueueState[] = [
+    "waiting",
+    "active",
+    "completed",
+    "failed",
+    "delayed",
+    "paused",
+    "prioritized",
+    "waiting-children",
+  ];
+
+  await Promise.all(
+    monitoredQueues.map(async ({ name, queue }) => {
+      try {
+        const counts = await queue.getJobCounts(...states);
+        for (const state of states) {
+          setBullMQJobCount(name, state, counts[state] ?? 0);
+        }
+      } catch (error) {
+        logger.debug(
+          { queueName: name, error: error instanceof Error ? error.message : String(error) },
+          "Failed to collect queue metrics",
+        );
+      }
+    }),
+  );
+}
+
+function startQueueMetrics(): void {
+  stopQueueMetrics();
+  if (!redis) return;
+  void collectQueueMetrics();
+  queueMetricsInterval = setInterval(() => {
+    void collectQueueMetrics();
+  }, QUEUE_METRICS_INTERVAL_MS);
+}
+
+function stopQueueMetrics(): void {
+  if (queueMetricsInterval) {
+    clearInterval(queueMetricsInterval);
+    queueMetricsInterval = null;
+  }
+}
 
 const startMetricsServer = (): http.Server => {
   const port = getWorkerMetricsPort();

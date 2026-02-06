@@ -12,7 +12,7 @@ import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
-import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
+import { trackEventsQueue, TRACK_EVENTS_QUEUE } from "../../server/background/queues/trackEventsQueue";
 import { createLogger } from "../../utils/logger/server";
 
 const thumbsUpDownSchema = z.object({
@@ -205,7 +205,7 @@ export default async function handler(
   }
 
   await trackEventsQueue.add(
-    "track_event",
+    TRACK_EVENTS_QUEUE.JOB,
     {
       project_id: project.id,
       postpone_count: 0,

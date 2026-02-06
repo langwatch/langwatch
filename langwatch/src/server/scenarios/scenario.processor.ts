@@ -26,6 +26,11 @@ import {
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
+import {
+  recordJobWaitDuration,
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../metrics";
 import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.constants";
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
@@ -179,24 +184,17 @@ export function buildChildProcessEnv(
 }
 
 /**
- * Container type for job data that wraps the payload and context metadata.
- * Used to extract context propagated from the queue.
- */
-type JobContainer<DataType> = {
-  __payload: DataType;
-  __context?: JobContextMetadata;
-};
-
-/**
  * Process a scenario job by spawning an isolated child process.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
 ): Promise<ScenarioJobResult> {
-  // Extract payload and context from the container (if wrapped)
-  const container = job.data as unknown as JobContainer<ScenarioJob>;
-  const jobData = container.__payload ?? job.data;
-  const contextMetadata = container.__context;
+  // Extract context metadata propagated from the queue (flat format: { ...payload, __context })
+  const { __context: contextMetadata, ...jobData } = job.data as ScenarioJob & {
+    __context?: JobContextMetadata;
+  };
+
+  recordJobWaitDuration(job, "scenario");
 
   const { projectId, scenarioId, target, setId, batchRunId } = jobData;
 
@@ -215,6 +213,7 @@ export async function processScenarioJob(
   // Run the job processing within the restored context
   return runWithContext(requestContext, async () => {
     const startTime = Date.now();
+    getJobProcessingCounter("scenario", "processing").inc();
     jobLogger.info("Processing scenario job");
 
     // Pre-fetch all data needed for child process
@@ -251,11 +250,14 @@ export async function processScenarioJob(
     const childDurationMs = Date.now() - childStartTime;
 
     if (result.success) {
+      getJobProcessingCounter("scenario", "completed").inc();
+      getJobProcessingDurationHistogram("scenario").observe(totalDurationMs);
       jobLogger.info(
         { success: true, totalDurationMs, childDurationMs },
         "Scenario job completed",
       );
     } else {
+      getJobProcessingCounter("scenario", "failed").inc();
       jobLogger.warn(
         { success: false, error: result.error, totalDurationMs, childDurationMs },
         "Scenario job completed with failure",

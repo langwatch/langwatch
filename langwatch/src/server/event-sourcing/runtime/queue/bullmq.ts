@@ -23,7 +23,7 @@ import {
 } from "../../../context/asyncContext";
 import {
   type BullMQQueueState,
-  getBullMQJobWaitDurationHistogram,
+  recordJobWaitDuration,
   setBullMQJobCount,
 } from "../../../metrics";
 import type {
@@ -84,9 +84,10 @@ const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 const QUEUE_METRICS_INTERVAL_MS = 15000;
 
 /**
- * Container type for job data that wraps the payload and context metadata.
+ * Legacy container type where payload was wrapped in __payload.
+ * Only used for reading jobs that were enqueued before the format change.
  */
-type JobContainer<Payload> = {
+type LegacyJobContainer<Payload> = {
   __payload: Payload;
   __context?: JobContextMetadata;
 };
@@ -295,19 +296,28 @@ export class EventSourcedQueueProcessorBullMq<
    * Processes a single job from the queue.
    */
   private async processJob(job: Job<Payload>): Promise<void> {
-    // Extract payload and context from the container
-    const container = job.data as unknown as JobContainer<Payload>;
-    const payload = container.__payload;
-    const contextMetadata = container.__context;
+    // Extract payload and context, supporting both legacy __payload wrapper and new flat format
+    const rawData = job.data as Record<string, unknown>;
+    let payload: Payload;
+    let contextMetadata: JobContextMetadata | undefined;
+
+    if ("__payload" in rawData && rawData.__payload !== undefined) {
+      // Legacy format: { __payload: {...}, __context?: {...} }
+      const legacy = rawData as unknown as LegacyJobContainer<Payload>;
+      payload = legacy.__payload;
+      contextMetadata = legacy.__context;
+    } else {
+      // New flat format: { ...payload, __context?: {...} }
+      const { __context, ...rest } = rawData;
+      payload = rest as Payload;
+      contextMetadata = __context as JobContextMetadata | undefined;
+    }
 
     // Create request context from job metadata
     const requestContext = createContextFromJobData(contextMetadata);
 
     // Record job wait time (time from enqueue to processing start)
-    if (job.timestamp) {
-      const waitTimeMs = Date.now() - job.timestamp;
-      getBullMQJobWaitDurationHistogram(this.queueName).observe(waitTimeMs);
-    }
+    recordJobWaitDuration(job, this.queueName);
 
     // Run the job processing within the restored context
     return runWithContext(requestContext, async () => {
@@ -518,10 +528,9 @@ export class EventSourcedQueueProcessorBullMq<
     span?.setAttributes({ ...customAttributes });
 
     // Get current context metadata and attach it to the job payload for trace correlation
-    // Always wrap in a container to avoid issues with primitive payloads being spread
     const contextMetadata = getJobContextMetadata();
     const payloadWithContext = {
-      __payload: payload,
+      ...(payload as Record<string, unknown>),
       __context: contextMetadata,
     } as unknown as Payload;
 

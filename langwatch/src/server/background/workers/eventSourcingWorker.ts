@@ -6,6 +6,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -24,6 +25,7 @@ export type EventSourcingJob = {
 export async function runEventSourcingJob(
   job: Job<EventSourcingJob, void, string>,
 ) {
+  recordJobWaitDuration(job, "event_sourcing");
   logger.info(
     { jobId: job.id, data: job.data },
     "processing event sourcing job",

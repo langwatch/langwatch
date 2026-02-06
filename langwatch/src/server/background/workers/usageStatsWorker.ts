@@ -10,6 +10,7 @@ import {
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
+  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
@@ -24,6 +25,7 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
     return;
   }
 
+  recordJobWaitDuration(job, "usage_stats");
   logger.info({ jobId: job.id, data: job.data }, "processing usage stats job");
   getJobProcessingCounter("usage_stats", "processing").inc();
   const start = Date.now();
