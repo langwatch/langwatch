@@ -5,7 +5,8 @@ import { parseRelativeDate } from "../utils/date-parsing.js";
  * Handles the search_traces MCP tool invocation.
  *
  * Searches LangWatch traces with optional filters, text query, and date range.
- * Returns an AI-readable markdown summary of matching traces.
+ * In digest mode (default), returns AI-readable formatted digests per trace.
+ * In json mode, returns the full raw JSON.
  */
 export async function handleSearchTraces(params: {
   query?: string;
@@ -14,12 +15,14 @@ export async function handleSearchTraces(params: {
   endDate?: string;
   pageSize?: number;
   scrollId?: string;
+  format?: "digest" | "json";
 }): Promise<string> {
   const now = Date.now();
   const startDate = params.startDate
     ? parseRelativeDate(params.startDate)
     : now - 86400000;
   const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
+  const format = params.format ?? "digest";
 
   const result = await apiSearchTraces({
     query: params.query,
@@ -28,11 +31,16 @@ export async function handleSearchTraces(params: {
     endDate,
     pageSize: params.pageSize ?? 25,
     scrollId: params.scrollId,
+    format,
   });
 
   const traces = result.traces ?? [];
   if (traces.length === 0) {
     return "No traces found matching your query.";
+  }
+
+  if (format === "json") {
+    return JSON.stringify(result, null, 2);
   }
 
   const lines: string[] = [];
@@ -41,19 +49,25 @@ export async function handleSearchTraces(params: {
   );
 
   for (const trace of traces) {
-    const input = trace.input?.value
-      ? String(trace.input.value).slice(0, 100)
-      : "N/A";
-    const output = trace.output?.value
-      ? String(trace.output.value).slice(0, 100)
-      : "N/A";
     lines.push(`### Trace: ${trace.trace_id}`);
-    lines.push(
-      `- **Input**: ${input}${(trace.input?.value?.length ?? 0) > 100 ? "..." : ""}`
-    );
-    lines.push(
-      `- **Output**: ${output}${(trace.output?.value?.length ?? 0) > 100 ? "..." : ""}`
-    );
+
+    if (trace.formatted_trace) {
+      lines.push(trace.formatted_trace);
+    } else {
+      const input = trace.input?.value
+        ? String(trace.input.value).slice(0, 100)
+        : "N/A";
+      const output = trace.output?.value
+        ? String(trace.output.value).slice(0, 100)
+        : "N/A";
+      lines.push(
+        `- **Input**: ${input}${(trace.input?.value?.length ?? 0) > 100 ? "..." : ""}`
+      );
+      lines.push(
+        `- **Output**: ${output}${(trace.output?.value?.length ?? 0) > 100 ? "..." : ""}`
+      );
+    }
+
     if (trace.timestamps) {
       lines.push(`- **Time**: ${trace.timestamps.started_at || "N/A"}`);
     }
@@ -70,7 +84,7 @@ export async function handleSearchTraces(params: {
   }
 
   lines.push(
-    "\n> Tip: Use `get_trace` with a trace_id for full details. Use `discover_schema` to see available filter fields."
+    '\n> Tip: Use `get_trace` with a trace_id for full details. Use `search_traces` with `format: "json"` for raw data. Use `discover_schema` to see available filter fields.'
   );
 
   return lines.join("\n");

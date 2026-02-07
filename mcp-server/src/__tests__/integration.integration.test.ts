@@ -8,6 +8,7 @@ const CANNED_TRACES_SEARCH = {
   traces: [
     {
       trace_id: "trace-001",
+      formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
       input: { value: "Hello, how are you?" },
       output: { value: "I am fine, thank you!" },
       timestamps: { started_at: 1700000000000 },
@@ -19,28 +20,12 @@ const CANNED_TRACES_SEARCH = {
 
 const CANNED_TRACE_DETAIL = {
   trace_id: "trace-001",
-  input: { value: "Hello, how are you?" },
-  output: { value: "I am fine, thank you!" },
+  formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello\n    Output: Hi there",
   timestamps: {
     started_at: 1700000000000,
     inserted_at: 1700000001000,
   },
   metadata: { user_id: "user-42", thread_id: "thread-1" },
-  spans: [
-    {
-      span_id: "span-001",
-      name: "LLM Call",
-      type: "llm",
-      input: { value: "Hello" },
-      output: { value: "Hi there" },
-      timestamps: { started_at: 1700000000000, finished_at: 1700000000500 },
-      metrics: {
-        completion_tokens: 10,
-        prompt_tokens: 5,
-        tokens_estimated: false,
-      },
-    },
-  ],
   evaluations: [
     {
       evaluator_id: "eval-1",
@@ -49,7 +34,6 @@ const CANNED_TRACE_DETAIL = {
       passed: true,
     },
   ],
-  ascii_tree: "LLM Call [llm] (500ms)",
 };
 
 const CANNED_ANALYTICS = {
@@ -130,7 +114,7 @@ function createMockServer(): Server {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACES_SEARCH));
       } else if (
-        url.match(/^\/api\/traces\/[^/]+\?/) &&
+        url.match(/^\/api\/traces\/[^/]+(\?|$)/) &&
         req.method === "GET"
       ) {
         res.writeHead(200);
@@ -198,7 +182,7 @@ describe("MCP tools integration", () => {
   });
 
   describe("search_traces", () => {
-    it("returns formatted trace summaries from mock server", async () => {
+    it("returns formatted trace digests from mock server", async () => {
       const { handleSearchTraces } = await import(
         "../tools/search-traces.js"
       );
@@ -207,19 +191,19 @@ describe("MCP tools integration", () => {
         endDate: "now",
       });
       expect(result).toContain("trace-001");
-      expect(result).toContain("Hello, how are you?");
+      expect(result).toContain("LLM Call [llm] 500ms");
       expect(result).toContain("1 trace");
     });
   });
 
   describe("get_trace", () => {
-    it("returns formatted trace details from mock server", async () => {
+    it("returns formatted trace digest from mock server", async () => {
       const { handleGetTrace } = await import("../tools/get-trace.js");
       const result = await handleGetTrace({ traceId: "trace-001" });
       expect(result).toContain("trace-001");
-      expect(result).toContain("Hello, how are you?");
-      expect(result).toContain("I am fine, thank you!");
-      expect(result).toContain("LLM Call");
+      expect(result).toContain("LLM Call [llm] 500ms");
+      expect(result).toContain("Faithfulness");
+      expect(result).toContain("PASSED");
     });
   });
 

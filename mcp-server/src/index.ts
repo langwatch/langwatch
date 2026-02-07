@@ -108,7 +108,7 @@ server.tool(
 
 server.tool(
   "search_traces",
-  "Search LangWatch traces with filters, text query, and date range. Returns AI-readable summaries. Use discover_schema to see available filter fields.",
+  "Search LangWatch traces with filters, text query, and date range. Returns AI-readable trace digests by default. Use format: 'json' for full raw data.",
   {
     query: z.string().optional().describe("Text search query"),
     filters: z
@@ -135,6 +135,12 @@ server.tool(
       .string()
       .optional()
       .describe("Pagination token from previous search"),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
   },
   async (params) => {
     const { requireApiKey } = await import("./config.js");
@@ -148,16 +154,22 @@ server.tool(
 
 server.tool(
   "get_trace",
-  "Get full details of a single trace by ID, formatted for AI readability. Includes span tree, inputs/outputs, evaluations, and metadata.",
+  "Get full details of a single trace by ID. Returns AI-readable trace digest by default. Use format: 'json' for full raw data including all spans.",
   {
     traceId: z.string().describe("The trace ID to retrieve"),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
   },
-  async ({ traceId }) => {
+  async (params) => {
     const { requireApiKey } = await import("./config.js");
     requireApiKey();
     const { handleGetTrace } = await import("./tools/get-trace.js");
     return {
-      content: [{ type: "text", text: await handleGetTrace({ traceId }) }],
+      content: [{ type: "text", text: await handleGetTrace(params) }],
     };
   }
 );

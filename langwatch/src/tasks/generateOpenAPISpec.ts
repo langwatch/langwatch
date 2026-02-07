@@ -3,7 +3,7 @@ import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
 
-import { app as analyticsApp } from "../app/api/analytics/[[...route]]/app";
+import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";

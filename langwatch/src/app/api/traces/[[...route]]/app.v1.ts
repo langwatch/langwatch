@@ -6,11 +6,9 @@ import { z } from "zod";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
 import { getTraceById } from "~/server/elasticsearch/traces";
-import type { LLMModeTrace, Span, Trace } from "~/server/tracer/types";
-import {
-  generateAsciiTree,
-  toLLMModeTrace,
-} from "~/server/traces/trace-formatting";
+import type { Span, Trace } from "~/server/tracer/types";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import { generateAsciiTree } from "~/server/traces/trace-formatting";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -30,7 +28,7 @@ export const app = new Hono<{
 
 // Body schema for the search endpoint: reuses getAllForProjectInput but adjusts
 // startDate/endDate to accept ISO strings alongside epoch numbers, and adds
-// scrollId and llmMode fields.
+// scrollId and format fields. llmMode is kept for backward compatibility.
 const traceSearchBodySchema = getAllForProjectInput
   .omit({
     projectId: true,
@@ -41,7 +39,13 @@ const traceSearchBodySchema = getAllForProjectInput
     startDate: flexibleDateSchema,
     endDate: flexibleDateSchema,
     scrollId: z.string().optional().nullable(),
-    llmMode: z.boolean().optional().default(false),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)"
+      ),
+    llmMode: z.boolean().optional(),
   });
 
 // POST /search - Search traces for a project
@@ -73,17 +77,24 @@ app.post(
   async (c) => {
     const project = c.get("project");
     const params = c.req.valid("json");
+    const {
+      format: formatParam,
+      llmMode,
+      scrollId,
+      ...searchFields
+    } = params;
+    const format = formatParam ?? (llmMode ? "digest" : "json");
 
     logger.info({ projectId: project.id }, "Searching traces for project");
 
-    const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+    const pageSize = Math.min(searchFields.pageSize ?? 1000, 1000);
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
     const traceService = TraceService.create(prisma);
     const results = await traceService.getAllTracesForProject(
       {
-        ...params,
+        ...searchFields,
         projectId: project.id,
         startDate: coerceToEpoch(params.startDate),
         endDate: coerceToEpoch(params.endDate),
@@ -91,22 +102,27 @@ app.post(
       },
       protections,
       {
-        downloadMode: !params.llmMode,
-        scrollId: params.scrollId ?? undefined,
+        downloadMode: true,
+        includeSpans: format === "digest",
+        scrollId: scrollId ?? undefined,
       },
     );
 
-    let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
+    const rawTraces = results.groups.flat() as (Trace & { spans?: Span[] })[];
 
-    if (params.llmMode) {
-      const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map(
-        (trace) => ({
-          ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
-          spans: [],
-          evaluations: undefined,
-        }),
-      );
-      traces = llmModeTraces;
+    let traces: unknown[];
+    if (format === "digest") {
+      traces = rawTraces.map((trace) => ({
+        trace_id: trace.trace_id,
+        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        input: trace.input,
+        output: trace.output,
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        error: trace.error,
+      }));
+    } else {
+      traces = rawTraces;
     }
 
     return c.json({
@@ -123,7 +139,7 @@ app.post(
 app.get(
   "/:traceId",
   describeRoute({
-    description: "Get a single trace by ID with spans, evaluations, and ASCII tree",
+    description: "Get a single trace by ID. Defaults to AI-readable digest format.",
     parameters: [
       {
         name: "traceId",
@@ -133,10 +149,17 @@ app.get(
         schema: { type: "string" },
       },
       {
-        name: "llmMode",
+        name: "format",
         in: "query",
         description:
-          "When true, returns human-readable timestamps and ASCII tree in the root object",
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
+        required: false,
+        schema: { type: "string", enum: ["digest", "json"] },
+      },
+      {
+        name: "llmMode",
+        in: "query",
+        description: "Deprecated: use format=digest instead",
         required: false,
         schema: { type: "string", enum: ["true", "false", "1", "0"] },
       },
@@ -166,8 +189,11 @@ app.get(
   async (c) => {
     const project = c.get("project");
     const { traceId } = c.req.param();
+    const formatParam = c.req.query("format");
     const llmModeParam = c.req.query("llmMode");
-    const llmMode = llmModeParam === "true" || llmModeParam === "1";
+    const format =
+      formatParam ??
+      (llmModeParam === "true" || llmModeParam === "1" ? "digest" : "json");
 
     logger.info(
       { projectId: project.id, traceId },
@@ -191,11 +217,18 @@ app.get(
       });
     }
 
-    // Generate ASCII tree representation
-    const asciiTree = generateAsciiTree(trace.spans);
+    if (format === "digest") {
+      return c.json({
+        trace_id: traceId,
+        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        evaluations: trace.evaluations,
+      });
+    }
 
+    const asciiTree = generateAsciiTree(trace.spans);
     return c.json({
-      ...(llmMode ? toLLMModeTrace(trace, asciiTree) : {}),
       spans: trace.spans,
       evaluations: trace.evaluations,
       ascii_tree: asciiTree,

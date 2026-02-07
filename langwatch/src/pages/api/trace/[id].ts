@@ -6,6 +6,7 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "~/server/traces/trace-formatting";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 
 export default async function handler(
   req: NextApiRequest,
@@ -31,7 +32,13 @@ export default async function handler(
   }
 
   const traceId = req.query.id as string;
+  const formatParam = req.query.format as string | undefined;
   const llmMode = req.query.llmMode === "true" || req.query.llmMode === "1";
+  const format = formatParam ?? (llmMode ? "digest" : "json");
+
+  // Signal deprecation — consumers should migrate to /api/traces/:traceId
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
 
   const protections = await getProtectionsForProject(prisma, {
     projectId: project?.id,
@@ -45,6 +52,16 @@ export default async function handler(
   });
   if (!trace) {
     return res.status(404).json({ message: "Trace not found." });
+  }
+
+  if (format === "digest") {
+    return res.status(200).json({
+      trace_id: traceId,
+      formatted_trace: formatSpansDigest(trace.spans ?? []),
+      timestamps: trace.timestamps,
+      metadata: trace.metadata,
+      evaluations: trace.evaluations,
+    });
   }
 
   // Generate ASCII tree representation

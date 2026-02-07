@@ -4,6 +4,7 @@ import { getConfig, requireApiKey } from "./config.js";
 
 export interface TraceSearchResult {
   trace_id: string;
+  formatted_trace?: string;
   input?: { value: string };
   output?: { value: string };
   timestamps?: { started_at?: string | number };
@@ -21,6 +22,7 @@ export interface SearchTracesResponse {
 
 export interface TraceDetailResponse {
   trace_id: string;
+  formatted_trace?: string;
   input?: { value: string };
   output?: { value: string };
   timestamps?: {
@@ -153,20 +155,23 @@ export async function searchTraces(params: {
   pageSize?: number;
   pageOffset?: number;
   scrollId?: string;
+  format?: "digest" | "json";
 }): Promise<SearchTracesResponse> {
+  const { format = "digest", ...rest } = params;
   return makeRequest("POST", "/api/traces/search", {
-    ...params,
-    llmMode: true,
+    ...rest,
+    format,
   }) as Promise<SearchTracesResponse>;
 }
 
 /** Retrieves a single trace by its ID. */
 export async function getTraceById(
-  traceId: string
+  traceId: string,
+  format: "digest" | "json" = "digest"
 ): Promise<TraceDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/traces/${traceId}?llmMode=true`
+    `/api/traces/${traceId}?format=${format}`
   ) as Promise<TraceDetailResponse>;
 }
 

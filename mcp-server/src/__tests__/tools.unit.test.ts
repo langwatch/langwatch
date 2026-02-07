@@ -44,12 +44,13 @@ beforeEach(() => {
 });
 
 describe("handleSearchTraces()", () => {
-  describe("when traces are found", () => {
-    it("formats trace summaries with input and output", async () => {
+  describe("when traces are found with formatted_trace (digest mode)", () => {
+    it("shows formatted digest per trace", async () => {
       mockSearchTraces.mockResolvedValue({
         traces: [
           {
             trace_id: "trace-1",
+            formatted_trace: "LLM Call [llm] 500ms\n  Input: Hello\n  Output: Hi",
             input: { value: "Hello world" },
             output: { value: "Hi there" },
             timestamps: { started_at: "2024-01-01T00:00:00Z" },
@@ -62,9 +63,28 @@ describe("handleSearchTraces()", () => {
 
       expect(result).toContain("Found 1 traces:");
       expect(result).toContain("### Trace: trace-1");
+      expect(result).toContain("LLM Call [llm] 500ms");
+      expect(result).toContain("**Time**: 2024-01-01T00:00:00Z");
+    });
+  });
+
+  describe("when traces have no formatted_trace", () => {
+    it("falls back to input/output truncation", async () => {
+      mockSearchTraces.mockResolvedValue({
+        traces: [
+          {
+            trace_id: "trace-2",
+            input: { value: "Hello world" },
+            output: { value: "Hi there" },
+          },
+        ],
+        pagination: { totalHits: 1 },
+      });
+
+      const result = await handleSearchTraces({});
+
       expect(result).toContain("**Input**: Hello world");
       expect(result).toContain("**Output**: Hi there");
-      expect(result).toContain("**Time**: 2024-01-01T00:00:00Z");
     });
 
     it("truncates long input/output to 100 characters", async () => {
@@ -84,36 +104,50 @@ describe("handleSearchTraces()", () => {
 
       expect(result).toContain("x".repeat(100) + "...");
     });
+  });
 
-    it("includes scroll ID when more results are available", async () => {
-      mockSearchTraces.mockResolvedValue({
-        traces: [{ trace_id: "trace-1", input: {}, output: {} }],
-        pagination: { totalHits: 100, scrollId: "scroll-abc" },
-      });
-
-      const result = await handleSearchTraces({});
-
-      expect(result).toContain('scrollId: "scroll-abc"');
-    });
-
-    it("shows error information when trace has errors", async () => {
-      mockSearchTraces.mockResolvedValue({
-        traces: [
-          {
-            trace_id: "trace-err",
-            input: {},
-            output: {},
-            error: { message: "timeout" },
-          },
-        ],
+  describe("when format is json", () => {
+    it("returns raw JSON string", async () => {
+      const responseData = {
+        traces: [{ trace_id: "trace-1", input: { value: "Hello" } }],
         pagination: { totalHits: 1 },
-      });
+      };
+      mockSearchTraces.mockResolvedValue(responseData);
 
-      const result = await handleSearchTraces({});
+      const result = await handleSearchTraces({ format: "json" });
 
-      expect(result).toContain("**Error**");
-      expect(result).toContain("timeout");
+      expect(JSON.parse(result)).toEqual(responseData);
     });
+  });
+
+  it("includes scroll ID when more results are available", async () => {
+    mockSearchTraces.mockResolvedValue({
+      traces: [{ trace_id: "trace-1", input: {}, output: {} }],
+      pagination: { totalHits: 100, scrollId: "scroll-abc" },
+    });
+
+    const result = await handleSearchTraces({});
+
+    expect(result).toContain('scrollId: "scroll-abc"');
+  });
+
+  it("shows error information when trace has errors", async () => {
+    mockSearchTraces.mockResolvedValue({
+      traces: [
+        {
+          trace_id: "trace-err",
+          input: {},
+          output: {},
+          error: { message: "timeout" },
+        },
+      ],
+      pagination: { totalHits: 1 },
+    });
+
+    const result = await handleSearchTraces({});
+
+    expect(result).toContain("**Error**");
+    expect(result).toContain("timeout");
   });
 
   describe("when no traces are found", () => {
@@ -161,7 +195,25 @@ describe("handleSearchTraces()", () => {
     });
   });
 
-  it("includes usage tip about get_trace and discover_schema", async () => {
+  it("passes format to the API", async () => {
+    mockSearchTraces.mockResolvedValue({ traces: [] });
+
+    await handleSearchTraces({ format: "json" });
+
+    const call = mockSearchTraces.mock.calls[0]![0] as any;
+    expect(call.format).toBe("json");
+  });
+
+  it("defaults format to digest", async () => {
+    mockSearchTraces.mockResolvedValue({ traces: [] });
+
+    await handleSearchTraces({});
+
+    const call = mockSearchTraces.mock.calls[0]![0] as any;
+    expect(call.format).toBe("digest");
+  });
+
+  it("includes usage tip about get_trace, format, and discover_schema", async () => {
     mockSearchTraces.mockResolvedValue({
       traces: [{ trace_id: "t1", input: {}, output: {} }],
       pagination: { totalHits: 1 },
@@ -171,42 +223,79 @@ describe("handleSearchTraces()", () => {
 
     expect(result).toContain("get_trace");
     expect(result).toContain("discover_schema");
+    expect(result).toContain('"json"');
   });
 });
 
 describe("handleGetTrace()", () => {
-  describe("when trace has full details", () => {
-    it("formats the trace header", async () => {
+  describe("when trace has formatted_trace (digest mode)", () => {
+    it("shows the formatted digest", async () => {
       mockGetTraceById.mockResolvedValue({
+        trace_id: "trace-abc",
+        formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
         timestamps: {
           started_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:01:00Z",
         },
-        input: { value: "What is AI?" },
-        output: { value: "AI is artificial intelligence." },
+        metadata: { user_id: "user-123" },
+        evaluations: [
+          { name: "Toxicity", passed: true, score: 0.95 },
+        ],
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
 
       expect(result).toContain("# Trace: trace-abc");
       expect(result).toContain("**Started**: 2024-01-01T00:00:00Z");
-      expect(result).toContain("**Updated**: 2024-01-01T00:01:00Z");
+      expect(result).toContain("**User**: user-123");
+      expect(result).toContain("## Evaluations");
+      expect(result).toContain("**Toxicity**: PASSED (score: 0.95)");
+      expect(result).toContain("## Trace Details");
+      expect(result).toContain("Root [server] 1200ms");
+      expect(result).toContain("LLM Call [llm] 800ms");
     });
 
-    it("formats input and output sections", async () => {
+    it("includes tip about json format", async () => {
       mockGetTraceById.mockResolvedValue({
-        input: { value: "What is AI?" },
-        output: { value: "AI is artificial intelligence." },
+        trace_id: "trace-abc",
+        formatted_trace: "some digest",
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
 
-      expect(result).toContain("## Input\nWhat is AI?");
-      expect(result).toContain("## Output\nAI is artificial intelligence.");
+      expect(result).toContain('"json"');
+      expect(result).toContain("get_trace");
+    });
+  });
+
+  describe("when format is json", () => {
+    it("returns raw JSON string", async () => {
+      const responseData = {
+        trace_id: "trace-abc",
+        spans: [{ span_id: "s1", name: "LLM Call" }],
+        evaluations: [],
+        metadata: {},
+      };
+      mockGetTraceById.mockResolvedValue(responseData);
+
+      const result = await handleGetTrace({ traceId: "trace-abc", format: "json" });
+
+      expect(JSON.parse(result)).toEqual(responseData);
     });
 
+    it("passes json format to the API", async () => {
+      mockGetTraceById.mockResolvedValue({ trace_id: "trace-abc" });
+
+      await handleGetTrace({ traceId: "trace-abc", format: "json" });
+
+      expect(mockGetTraceById).toHaveBeenCalledWith("trace-abc", "json");
+    });
+  });
+
+  describe("when trace has metadata fields", () => {
     it("formats metadata fields", async () => {
       mockGetTraceById.mockResolvedValue({
+        trace_id: "trace-abc",
         metadata: {
           user_id: "user-123",
           thread_id: "thread-456",
@@ -222,9 +311,12 @@ describe("handleGetTrace()", () => {
       expect(result).toContain("**Customer**: cust-789");
       expect(result).toContain("**Labels**: production, important");
     });
+  });
 
+  describe("when trace has evaluations", () => {
     it("formats evaluations", async () => {
       mockGetTraceById.mockResolvedValue({
+        trace_id: "trace-abc",
         evaluations: [
           { name: "Toxicity", passed: true, score: 0.95 },
           { evaluator_id: "eval-2", passed: false, label: "bad" },
@@ -238,78 +330,30 @@ describe("handleGetTrace()", () => {
       expect(result).toContain("**eval-2**: FAILED");
       expect(result).toContain("[bad]");
     });
+  });
 
-    it("formats span details with metrics", async () => {
+  describe("when trace has no formatted_trace", () => {
+    it("still renders header and metadata", async () => {
       mockGetTraceById.mockResolvedValue({
-        spans: [
-          {
-            type: "llm",
-            name: "gpt-call",
-            model: "gpt-4o",
-            input: { value: "prompt text" },
-            output: { value: "response text" },
-            metrics: {
-              completion_time_ms: 1500,
-              prompt_tokens: 100,
-              completion_tokens: 50,
-              cost: 0.003,
-            },
-          },
-        ],
+        trace_id: "trace-abc",
+        timestamps: { started_at: "2024-01-01" },
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
 
-      expect(result).toContain("## Spans Detail");
-      expect(result).toContain("### llm: gpt-call");
-      expect(result).toContain("**Model**: gpt-4o");
-      expect(result).toContain("**Duration**: 1500ms");
-      expect(result).toContain("**Tokens**: 100 in / 50 out");
-      expect(result).toContain("**Cost**: $0.003");
-    });
-
-    it("formats ascii_tree in a code block", async () => {
-      mockGetTraceById.mockResolvedValue({
-        ascii_tree: "root\n  child1\n  child2\n",
-      });
-
-      const result = await handleGetTrace({ traceId: "trace-abc" });
-
-      expect(result).toContain("## Span Tree");
-      expect(result).toContain("```\nroot\n  child1\n  child2\n```");
+      expect(result).toContain("# Trace: trace-abc");
+      expect(result).toContain("**Started**: 2024-01-01");
+      expect(result).not.toContain("## Trace Details");
     });
   });
 
-  describe("when trace has error", () => {
-    it("formats the error section", async () => {
-      mockGetTraceById.mockResolvedValue({
-        error: { message: "Connection refused", code: "ECONNREFUSED" },
-      });
+  describe("when digest format is used (default)", () => {
+    it("passes digest format to the API", async () => {
+      mockGetTraceById.mockResolvedValue({ trace_id: "trace-abc" });
 
-      const result = await handleGetTrace({ traceId: "trace-err" });
+      await handleGetTrace({ traceId: "trace-abc" });
 
-      expect(result).toContain("## Error");
-      expect(result).toContain("Connection refused");
-      expect(result).toContain("ECONNREFUSED");
-    });
-  });
-
-  describe("when span input/output exceeds 200 characters", () => {
-    it("truncates with ellipsis", async () => {
-      const longValue = "y".repeat(300);
-      mockGetTraceById.mockResolvedValue({
-        spans: [
-          {
-            span_id: "s1",
-            input: { value: longValue },
-            output: { value: longValue },
-          },
-        ],
-      });
-
-      const result = await handleGetTrace({ traceId: "trace-abc" });
-
-      expect(result).toContain("y".repeat(200) + "...");
+      expect(mockGetTraceById).toHaveBeenCalledWith("trace-abc", "digest");
     });
   });
 });

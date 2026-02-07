@@ -35,7 +35,7 @@ describe("langwatch-api", () => {
   }
 
   describe("searchTraces()", () => {
-    it("sends POST to /api/traces/search with llmMode", async () => {
+    it("sends POST to /api/traces/search with format digest by default", async () => {
       const { searchTraces } = await import("../langwatch-api.js");
       const responseData = { traces: [] };
       mockJsonResponse(responseData);
@@ -57,9 +57,23 @@ describe("langwatch-api", () => {
         query: "hello",
         startDate: 1000,
         endDate: 2000,
-        llmMode: true,
+        format: "digest",
       });
       expect(result).toEqual(responseData);
+    });
+
+    it("sends format json when specified", async () => {
+      const { searchTraces } = await import("../langwatch-api.js");
+      mockJsonResponse({ traces: [] });
+
+      await searchTraces({
+        startDate: 1000,
+        endDate: 2000,
+        format: "json",
+      });
+
+      const parsedBody = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+      expect(parsedBody.format).toBe("json");
     });
 
     describe("when response is not OK", () => {
@@ -75,7 +89,7 @@ describe("langwatch-api", () => {
   });
 
   describe("getTraceById()", () => {
-    it("sends GET to /api/traces/{id}?llmMode=true", async () => {
+    it("sends GET to /api/traces/{id}?format=digest by default", async () => {
       const { getTraceById } = await import("../langwatch-api.js");
       const responseData = { trace: { id: "abc" } };
       mockJsonResponse(responseData);
@@ -83,7 +97,7 @@ describe("langwatch-api", () => {
       const result = await getTraceById("abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/traces/abc?llmMode=true`,
+        `${TEST_ENDPOINT}/api/traces/abc?format=digest`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
@@ -92,6 +106,18 @@ describe("langwatch-api", () => {
         })
       );
       expect(result).toEqual(responseData);
+    });
+
+    it("sends format=json when specified", async () => {
+      const { getTraceById } = await import("../langwatch-api.js");
+      mockJsonResponse({});
+
+      await getTraceById("abc", "json");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${TEST_ENDPOINT}/api/traces/abc?format=json`,
+        expect.anything()
+      );
     });
 
     it("does not include Content-Type for GET requests", async () => {
