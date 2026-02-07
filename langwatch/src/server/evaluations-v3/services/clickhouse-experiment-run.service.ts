@@ -5,6 +5,7 @@ import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
+import { isClickHouseReadEnabled } from "./isClickHouseReadEnabled";
 import type {
   ClickHouseEvaluatorBreakdownRow,
   ClickHouseExperimentRunItemRow,
@@ -58,17 +59,11 @@ export class ClickHouseExperimentRunService {
           return false;
         }
 
-        const project = await this.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { featureClickHouseDataSourceEvaluations: true },
-        });
+        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
 
-        span.setAttribute(
-          "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceEvaluations === true,
-        );
+        span.setAttribute("project.feature.clickhouse", enabled);
 
-        return project?.featureClickHouseDataSourceEvaluations === true;
+        return enabled;
       },
     );
   }

@@ -7,6 +7,7 @@ import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationStateRow } from "./evaluation-state.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-state.mappers";
 import type { TraceEvaluation } from "./evaluation-state.types";
+import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClickHouseReadEnabled";
 
 /**
  * Service for fetching per-trace evaluation states from ClickHouse.
@@ -51,17 +52,14 @@ export class ClickHouseEvaluationService {
           return false;
         }
 
-        const project = await this.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { featureClickHouseDataSourceEvaluations: true },
-        });
+        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
 
         span.setAttribute(
           "project.feature.clickhouse.evaluations",
-          project?.featureClickHouseDataSourceEvaluations === true,
+          enabled,
         );
 
-        return project?.featureClickHouseDataSourceEvaluations === true;
+        return enabled;
       },
     );
   }

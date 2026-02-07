@@ -31,6 +31,7 @@ import {
   esClient,
 } from "../../elasticsearch";
 import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
+import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,
@@ -648,7 +649,7 @@ export const experimentsRouter = createTRPCRouter({
         .map((hit) => hit._source?.workflow_version_id)
         .filter((id): id is string => Boolean(id));
 
-      const versionsMap = await getVersionMap(input.projectId, versionIds);
+      const versionsMap = await getVersionMap(prisma, input.projectId, versionIds);
 
       const result: DSPyRunsSummary[] = (
         dspySteps.aggregations?.runs as any
@@ -1140,37 +1141,6 @@ const getExperimentById = async (projectId: string, experimentId: string) => {
   return experiment;
 };
 
-const getVersionMap = async (projectId: string, versionIds: string[]) => {
-  const versions = await prisma.workflowVersion.findMany({
-    where: {
-      projectId: projectId,
-      id: {
-        in: versionIds,
-      },
-    },
-    select: {
-      id: true,
-      version: true,
-      commitMessage: true,
-      author: {
-        select: {
-          name: true,
-          image: true,
-        },
-      },
-    },
-  });
-
-  const versionsMap = versions.reduce(
-    (acc, version) => {
-      acc[version.id] = version;
-      return acc;
-    },
-    {} as Record<string, (typeof versions)[number]>,
-  );
-
-  return versionsMap;
-};
 
 const findNextDraftName = async (projectId: string) => {
   const experiments = await prisma.experiment.findMany({

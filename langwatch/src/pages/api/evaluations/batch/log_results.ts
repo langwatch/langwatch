@@ -9,13 +9,7 @@ import {
   batchEvaluationId,
   esClient,
 } from "../../../../server/elasticsearch";
-import {
-  dispatchCompleteExperimentRun,
-  dispatchRecordEvaluatorResult,
-  dispatchRecordTargetResult,
-  dispatchStartExperimentRun,
-  isClickHouseEvaluationsEnabled,
-} from "../../../../server/evaluations-v3/dispatch";
+import { ExperimentRunDispatcher } from "../../../../server/evaluations-v3/dispatch";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -392,7 +386,8 @@ const dispatchToClickHouse = async (
   batchEvaluation: ESBatchEvaluation,
 ) => {
   try {
-    const enabled = await isClickHouseEvaluationsEnabled(project.id);
+    const dispatcher = ExperimentRunDispatcher.create();
+    const enabled = await dispatcher.isClickHouseEnabled(project.id);
     if (!enabled) return;
 
     const { run_id: runId } = batchEvaluation;
@@ -409,7 +404,7 @@ const dispatchToClickHouse = async (
       metadata: t.metadata ?? undefined,
     }));
 
-    await dispatchStartExperimentRun({
+    await dispatcher.startRun({
       tenantId: project.id,
       runId,
       experimentId,
@@ -419,7 +414,7 @@ const dispatchToClickHouse = async (
 
     // Dispatch target results for each dataset entry
     for (const entry of batchEvaluation.dataset) {
-      await dispatchRecordTargetResult({
+      await dispatcher.recordTargetResult({
         tenantId: project.id,
         runId,
         experimentId,
@@ -436,7 +431,7 @@ const dispatchToClickHouse = async (
 
     // Dispatch evaluator results for each evaluation entry
     for (const evaluation of batchEvaluation.evaluations) {
-      await dispatchRecordEvaluatorResult({
+      await dispatcher.recordEvaluatorResult({
         tenantId: project.id,
         runId,
         experimentId,
@@ -458,7 +453,7 @@ const dispatchToClickHouse = async (
       batchEvaluation.timestamps.finished_at ||
       batchEvaluation.timestamps.stopped_at
     ) {
-      await dispatchCompleteExperimentRun({
+      await dispatcher.completeRun({
         tenantId: project.id,
         runId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,

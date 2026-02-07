@@ -1,7 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseExperimentRunService } from "./clickhouse-experiment-run.service";
 import { ElasticsearchExperimentRunService } from "./elasticsearch-experiment-run.service";
 import type { ExperimentRun, ExperimentRunWithItems } from "./types";
@@ -13,7 +12,8 @@ import type { ExperimentRun, ExperimentRunWithItems } from "./types";
  * 1. Checks if ClickHouse evaluations data source is enabled for the project
  *    (via `featureClickHouseDataSourceEvaluations` flag)
  * 2. Routes requests to the appropriate backend based on the feature flag
- * 3. Falls back to Elasticsearch when ClickHouse returns null (not enabled)
+ *
+ * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
  *
  * @example
  * ```ts
@@ -22,9 +22,6 @@ import type { ExperimentRun, ExperimentRunWithItems } from "./types";
  * ```
  */
 export class ExperimentRunService {
-  private readonly logger = createLogger(
-    "langwatch:experiment-runs:service",
-  );
   private readonly tracer = getLangWatchTracer(
     "langwatch.experiment-runs.service",
   );
@@ -60,7 +57,7 @@ export class ExperimentRunService {
   /**
    * List experiment runs for one or more experiments.
    *
-   * Routes to ClickHouse when enabled, falling back to Elasticsearch otherwise.
+   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    * Returns runs grouped by experiment ID.
    *
    * @param params - Query parameters
@@ -91,13 +88,12 @@ export class ExperimentRunService {
 
         if (useClickHouse) {
           const result = await this.clickHouseService.listRuns(params);
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for listRuns — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId: params.projectId },
-            "ClickHouse enabled but returned null for listRuns, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.listRuns(params);
@@ -108,7 +104,7 @@ export class ExperimentRunService {
   /**
    * Get a single experiment run with all its items (dataset entries and evaluations).
    *
-   * Routes to ClickHouse when enabled, falling back to Elasticsearch otherwise.
+   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    *
    * @param params - Query parameters
    * @param params.projectId - The project ID
@@ -140,13 +136,12 @@ export class ExperimentRunService {
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getRun(params);
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getRun — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId: params.projectId, runId: params.runId },
-            "ClickHouse enabled but returned null for getRun, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getRun(params);
