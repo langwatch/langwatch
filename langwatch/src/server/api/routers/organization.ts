@@ -33,6 +33,7 @@ import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
+import { InviteService } from "../../invites/invite.service";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
@@ -843,13 +844,10 @@ export const organizationRouter = createTRPCRouter({
           }
 
           // Checks that a valid pending invite does not already exist for this email and organization
-          const existingInvite = await prisma.organizationInvite.findFirst({
-            where: {
-              email: invite.email,
-              organizationId: input.organizationId,
-              expiration: { gt: new Date() },
-              status: "PENDING",
-            },
+          const inviteService = new InviteService(prisma);
+          const existingInvite = await inviteService.checkDuplicateInvite({
+            email: invite.email,
+            organizationId: input.organizationId,
           });
 
           if (existingInvite) {
@@ -910,12 +908,189 @@ export const organizationRouter = createTRPCRouter({
       const invites = await prisma.organizationInvite.findMany({
         where: {
           organizationId: input.organizationId,
-          expiration: { gt: new Date() },
-          status: "PENDING",
+          status: { in: ["PENDING", "WAITING_APPROVAL"] },
+          OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+        },
+        include: {
+          requestedByUser: {
+            select: { id: true, name: true, email: true },
+          },
         },
       });
 
       return invites;
+    }),
+  createInviteRequest: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        invites: z.array(
+          z.object({
+            email: z.string().email(),
+            role: z.enum(["MEMBER", "EXTERNAL"]),
+            teamIds: z.string().optional(),
+            teams: z
+              .array(
+                z.object({
+                  teamId: z.string(),
+                  role: z.union([
+                    z.nativeEnum(TeamUserRole),
+                    z
+                      .string()
+                      .regex(
+                        /^custom:[a-zA-Z0-9_-]+$/,
+                        "Custom role must be in format 'custom:{roleId}'",
+                      ),
+                  ]),
+                  customRoleId: z.string().optional(),
+                }),
+              )
+              .optional(),
+          }),
+        ),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const inviteService = new InviteService(prisma);
+
+      // Check license limits for all invites at once
+      await inviteService.checkLicenseLimits({
+        organizationId: input.organizationId,
+        newInvites: input.invites.map((invite) => ({
+          role: invite.role as OrganizationUserRole,
+          teams: invite.teams,
+        })),
+        user: ctx.session.user,
+      });
+
+      const results = await Promise.all(
+        input.invites.map(async (invite) => {
+          // Check for duplicate invites across PENDING and WAITING_APPROVAL
+          const existingInvite = await inviteService.checkDuplicateInvite({
+            email: invite.email,
+            organizationId: input.organizationId,
+          });
+
+          if (existingInvite) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `An invitation for ${invite.email} already exists`,
+            });
+          }
+
+          // Validate team IDs
+          let teamIdsString = "";
+          let teamAssignments: Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }> = [];
+
+          if (invite.teams && invite.teams.length > 0) {
+            const teamIds = invite.teams.map((t) => t.teamId);
+            const validTeamIds = await inviteService.validateTeamIds({
+              teamIds,
+              organizationId: input.organizationId,
+            });
+
+            if (validTeamIds.length === 0) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "No valid teams provided",
+              });
+            }
+
+            teamAssignments = invite.teams
+              .filter((t) => validTeamIds.includes(t.teamId))
+              .map((t) => {
+                const isCustomRole =
+                  typeof t.role === "string" && t.role.startsWith("custom:");
+                return {
+                  teamId: t.teamId,
+                  role: isCustomRole
+                    ? ("CUSTOM" as TeamUserRole)
+                    : (t.role as TeamUserRole),
+                  customRoleId:
+                    isCustomRole && t.customRoleId
+                      ? t.customRoleId
+                      : undefined,
+                };
+              });
+
+            teamIdsString = validTeamIds.join(",");
+          } else if (invite.teamIds?.trim()) {
+            const teamIdArray = invite.teamIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            const validTeamIds = await inviteService.validateTeamIds({
+              teamIds: teamIdArray,
+              organizationId: input.organizationId,
+            });
+
+            if (validTeamIds.length === 0) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "No valid teams provided",
+              });
+            }
+
+            const organizationToTeamRoleMap: {
+              [K in OrganizationUserRole]: TeamUserRole;
+            } = {
+              [OrganizationUserRole.ADMIN]: "ADMIN" as TeamUserRole,
+              [OrganizationUserRole.MEMBER]: "MEMBER" as TeamUserRole,
+              [OrganizationUserRole.EXTERNAL]: "VIEWER" as TeamUserRole,
+            };
+
+            teamAssignments = validTeamIds.map((teamId) => ({
+              teamId,
+              role: organizationToTeamRoleMap[
+                invite.role as OrganizationUserRole
+              ],
+            }));
+
+            teamIdsString = validTeamIds.join(",");
+          } else {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "At least one team must be provided",
+            });
+          }
+
+          return inviteService.createMemberInviteRequest({
+            email: invite.email,
+            role: invite.role as OrganizationUserRole,
+            organizationId: input.organizationId,
+            teamIds: teamIdsString,
+            teamAssignments:
+              teamAssignments.length > 0 ? teamAssignments : undefined,
+            requestedBy: ctx.session.user.id,
+          });
+        }),
+      );
+
+      return results;
+    }),
+  approveInvite: protectedProcedure
+    .input(
+      z.object({
+        inviteId: z.string(),
+        organizationId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const inviteService = new InviteService(prisma);
+
+      return inviteService.approveInvite({
+        inviteId: input.inviteId,
+        organizationId: input.organizationId,
+      });
     }),
   acceptInvite: protectedProcedure
     .input(
@@ -932,7 +1107,10 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
-      if (!invite || invite.expiration < new Date()) {
+      if (
+        !invite ||
+        (invite.expiration !== null && invite.expiration < new Date())
+      ) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Invite not found or has expired",

@@ -1,0 +1,596 @@
+/**
+ * @vitest-environment node
+ *
+ * Integration tests for Invitation Approval Workflow.
+ * Tests the router layer for invite requests, approvals, and permission checks.
+ *
+ * Covers @integration scenarios from specs/members/update-pending-invitation.feature
+ */
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { prisma } from "../../../db";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { nanoid } from "nanoid";
+
+// vi.hoisted runs before vi.mock hoisting, so these are available in mock factories
+const { mockSendInviteEmail, mockGetActivePlan } = vi.hoisted(() => ({
+  mockSendInviteEmail: vi.fn(),
+  mockGetActivePlan: vi.fn(),
+}));
+
+// Mock sendInviteEmail to track email sending
+vi.mock("../../../mailer/inviteEmail", () => ({
+  sendInviteEmail: (...args: unknown[]) => mockSendInviteEmail(...args),
+}));
+
+// Mock SENDGRID_API_KEY to enable email sending path
+vi.mock("../../../../env.mjs", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../../../../env.mjs")>();
+  return {
+    ...original,
+    env: {
+      ...original.env,
+      SENDGRID_API_KEY: "test-sendgrid-key",
+      BASE_HOST: "http://localhost:3000",
+    },
+  };
+});
+
+// Mock subscription handler to control plan limits
+vi.mock("../../../../injection/dependencies.server", () => ({
+  dependencies: {
+    subscriptionHandler: {
+      getActivePlan: mockGetActivePlan,
+    },
+  },
+}));
+
+/** Default plan info for tests (all fields required by PlanInfo). */
+function makeTestPlan(overrides: Record<string, unknown> = {}) {
+  return {
+    type: "PRO",
+    name: "Pro",
+    free: false,
+    maxMembers: 10,
+    maxMembersLite: 10,
+    maxTeams: 10,
+    maxProjects: 20,
+    maxMessagesPerMonth: 100000,
+    evaluationsCredit: 500,
+    maxWorkflows: 50,
+    maxPrompts: 50,
+    maxEvaluators: 50,
+    maxScenarios: 50,
+    maxAgents: 50,
+    maxExperiments: 50,
+    maxOnlineEvaluations: 50,
+    maxDatasets: 50,
+    maxDashboards: 50,
+    maxCustomGraphs: 50,
+    maxAutomations: 50,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+    overrideAddingLimitations: false,
+    ...overrides,
+  };
+}
+
+describe("Organization Invites Integration", () => {
+  const testNamespace = `invite-test-${nanoid(8)}`;
+  let organizationId: string;
+  let teamId: string;
+  let adminUserId: string;
+  let memberUserId: string;
+  let adminCaller: ReturnType<typeof appRouter.createCaller>;
+  let memberCaller: ReturnType<typeof appRouter.createCaller>;
+
+  beforeAll(async () => {
+    // Create test organization
+    const organization = await prisma.organization.create({
+      data: {
+        name: "Invite Test Org",
+        slug: `--test-invite-org-${testNamespace}`,
+      },
+    });
+    organizationId = organization.id;
+
+    // Create test team
+    const team = await prisma.team.create({
+      data: {
+        name: "Invite Test Team",
+        slug: `--test-invite-team-${testNamespace}`,
+        organizationId,
+      },
+    });
+    teamId = team.id;
+
+    // Create admin user
+    const adminUser = await prisma.user.create({
+      data: {
+        email: `invite-admin-${testNamespace}@test.com`,
+        name: "Invite Admin",
+      },
+    });
+    adminUserId = adminUser.id;
+
+    // Add admin to organization
+    await prisma.organizationUser.create({
+      data: {
+        userId: adminUserId,
+        organizationId,
+        role: OrganizationUserRole.ADMIN,
+      },
+    });
+
+    // Add admin to team
+    await prisma.teamUser.create({
+      data: {
+        userId: adminUserId,
+        teamId,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+
+    // Create member user
+    const memberUser = await prisma.user.create({
+      data: {
+        email: `invite-member-${testNamespace}@test.com`,
+        name: "Invite Member",
+      },
+    });
+    memberUserId = memberUser.id;
+
+    // Add member to organization
+    await prisma.organizationUser.create({
+      data: {
+        userId: memberUserId,
+        organizationId,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+
+    // Add member to team
+    await prisma.teamUser.create({
+      data: {
+        userId: memberUserId,
+        teamId,
+        role: TeamUserRole.MEMBER,
+      },
+    });
+
+    // Set default plan mock
+    mockGetActivePlan.mockResolvedValue(makeTestPlan());
+
+    // Create admin caller
+    const adminCtx = createInnerTRPCContext({
+      session: {
+        user: { id: adminUserId },
+        expires: "1",
+      },
+    });
+    adminCaller = appRouter.createCaller(adminCtx);
+
+    // Create member caller
+    const memberCtx = createInnerTRPCContext({
+      session: {
+        user: { id: memberUserId },
+        expires: "1",
+      },
+    });
+    memberCaller = appRouter.createCaller(memberCtx);
+  });
+
+  afterEach(async () => {
+    // Clean up invites after each test
+    await prisma.organizationInvite.deleteMany({
+      where: { organizationId },
+    });
+    mockSendInviteEmail.mockClear();
+    mockGetActivePlan.mockReset();
+    mockGetActivePlan.mockResolvedValue(makeTestPlan());
+  });
+
+  afterAll(async () => {
+    // Cleanup all test data
+    await prisma.organizationInvite.deleteMany({
+      where: { organizationId },
+    });
+    await prisma.teamUser.deleteMany({
+      where: { teamId },
+    });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId },
+    });
+    await prisma.team.deleteMany({
+      where: { organizationId },
+    });
+    await prisma.organization.deleteMany({
+      where: { id: organizationId },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: [
+            `invite-admin-${testNamespace}@test.com`,
+            `invite-member-${testNamespace}@test.com`,
+          ],
+        },
+      },
+    });
+  });
+
+  // ============================================================================
+  // createInviteRequest
+  // ============================================================================
+
+  describe("createInviteRequest", () => {
+    describe("when member requests invitation with ADMIN role", () => {
+      it("fails with validation error", async () => {
+        await expect(
+          memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              {
+                email: "user@example.com",
+                // @ts-expect-error - intentionally passing invalid role to test Zod validation
+                role: "ADMIN",
+                teamIds: teamId,
+              },
+            ],
+          })
+        ).rejects.toThrow();
+      });
+    });
+
+    describe("when member requests invitation with MEMBER role", () => {
+      it("creates invitation with WAITING_APPROVAL status", async () => {
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        expect(results[0]!.invite.status).toBe("WAITING_APPROVAL");
+      });
+
+      it("sets requestedBy to the requesting user's ID", async () => {
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        expect(results[0]!.invite.requestedBy).toBe(memberUserId);
+      });
+
+      it("creates invitation with null expiration", async () => {
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        expect(results[0]!.invite.expiration).toBeNull();
+      });
+
+      it("does not send invitation email", async () => {
+        await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        expect(mockSendInviteEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when member requests multiple invitations at once", () => {
+      it("creates a WAITING_APPROVAL record for each email", async () => {
+        const results = await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "multi-a@example.com", role: "MEMBER", teamIds: teamId },
+            { email: "multi-b@example.com", role: "MEMBER", teamIds: teamId },
+            { email: "multi-c@example.com", role: "EXTERNAL", teamIds: teamId },
+          ],
+        });
+
+        expect(results).toHaveLength(3);
+        expect(results[0]!.invite.email).toBe("multi-a@example.com");
+        expect(results[0]!.invite.status).toBe("WAITING_APPROVAL");
+        expect(results[1]!.invite.email).toBe("multi-b@example.com");
+        expect(results[1]!.invite.status).toBe("WAITING_APPROVAL");
+        expect(results[2]!.invite.email).toBe("multi-c@example.com");
+        expect(results[2]!.invite.status).toBe("WAITING_APPROVAL");
+      });
+    });
+
+    describe("when duplicate invitation exists with WAITING_APPROVAL status", () => {
+      it("fails with duplicate invitation error", async () => {
+        // Create initial WAITING_APPROVAL invite
+        await memberCaller.organization.createInviteRequest({
+          organizationId,
+          invites: [
+            { email: "existing@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        // Try to create another for the same email
+        await expect(
+          memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              {
+                email: "existing@example.com",
+                role: "MEMBER",
+                teamIds: teamId,
+              },
+            ],
+          })
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining("already exists"),
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // approveInvite
+  // ============================================================================
+
+  describe("approveInvite", () => {
+    describe("when admin approves a WAITING_APPROVAL invitation", () => {
+      it("transitions status to PENDING", async () => {
+        // Create WAITING_APPROVAL invite
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          });
+
+        const result = await adminCaller.organization.approveInvite({
+          inviteId: results[0]!.invite.id,
+          organizationId,
+        });
+
+        expect(result.invite.status).toBe("PENDING");
+      });
+
+      it("sets 48-hour expiration", async () => {
+        const beforeApproval = Date.now();
+
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          });
+
+        const result = await adminCaller.organization.approveInvite({
+          inviteId: results[0]!.invite.id,
+          organizationId,
+        });
+
+        const expiration = result.invite.expiration!;
+        const expectedMin = beforeApproval + 2 * 24 * 60 * 60 * 1000 - 5000; // 48h - 5s tolerance
+        const expectedMax = Date.now() + 2 * 24 * 60 * 60 * 1000 + 5000; // 48h + 5s tolerance
+
+        expect(expiration.getTime()).toBeGreaterThanOrEqual(expectedMin);
+        expect(expiration.getTime()).toBeLessThanOrEqual(expectedMax);
+      });
+
+      it("sends invitation email", async () => {
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          });
+
+        await adminCaller.organization.approveInvite({
+          inviteId: results[0]!.invite.id,
+          organizationId,
+        });
+
+        expect(mockSendInviteEmail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: "user@example.com",
+          })
+        );
+      });
+    });
+
+    describe("when non-admin tries to approve an invitation", () => {
+      it("fails with permission error", async () => {
+        // Create WAITING_APPROVAL invite directly in DB
+        const invite = await prisma.organizationInvite.create({
+          data: {
+            email: "user@example.com",
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "WAITING_APPROVAL",
+            requestedBy: memberUserId,
+          },
+        });
+
+        await expect(
+          memberCaller.organization.approveInvite({
+            inviteId: invite.id,
+            organizationId,
+          })
+        ).rejects.toMatchObject({
+          code: "UNAUTHORIZED",
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // deleteInvite (reject WAITING_APPROVAL)
+  // ============================================================================
+
+  describe("deleteInvite", () => {
+    describe("when admin deletes a WAITING_APPROVAL invitation", () => {
+      it("removes the invitation successfully", async () => {
+        // Create WAITING_APPROVAL invite
+        const invite = await prisma.organizationInvite.create({
+          data: {
+            email: "remove@example.com",
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "WAITING_APPROVAL",
+            requestedBy: memberUserId,
+          },
+        });
+
+        await adminCaller.organization.deleteInvite({
+          inviteId: invite.id,
+          organizationId,
+        });
+
+        const deleted = await prisma.organizationInvite.findFirst({
+          where: { id: invite.id, organizationId },
+        });
+
+        expect(deleted).toBeNull();
+      });
+    });
+  });
+
+  // ============================================================================
+  // getOrganizationPendingInvites
+  // ============================================================================
+
+  describe("getOrganizationPendingInvites", () => {
+    describe("when both PENDING and WAITING_APPROVAL invites exist", () => {
+      it("returns invites with both statuses", async () => {
+        // Create PENDING invite
+        await prisma.organizationInvite.create({
+          data: {
+            email: "pending@example.com",
+            inviteCode: nanoid(),
+            expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "PENDING",
+          },
+        });
+
+        // Create WAITING_APPROVAL invite
+        await prisma.organizationInvite.create({
+          data: {
+            email: "waiting@example.com",
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "WAITING_APPROVAL",
+            requestedBy: memberUserId,
+          },
+        });
+
+        const invites =
+          await adminCaller.organization.getOrganizationPendingInvites({
+            organizationId,
+          });
+
+        const emails = invites.map((i) => i.email);
+        expect(emails.includes("pending@example.com")).toBe(true);
+        expect(emails.includes("waiting@example.com")).toBe(true);
+      });
+
+      it("includes requestedByUser data for WAITING_APPROVAL invites", async () => {
+        await prisma.organizationInvite.create({
+          data: {
+            email: "waiting-req@example.com",
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "WAITING_APPROVAL",
+            requestedBy: memberUserId,
+          },
+        });
+
+        const invites =
+          await adminCaller.organization.getOrganizationPendingInvites({
+            organizationId,
+          });
+
+        const waitingInvite = invites.find(
+          (i) => i.email === "waiting-req@example.com"
+        );
+        expect(waitingInvite?.requestedByUser).toBeDefined();
+        expect(waitingInvite?.requestedByUser?.name).toBe("Invite Member");
+      });
+    });
+  });
+
+  // ============================================================================
+  // License limit enforcement with WAITING_APPROVAL
+  // ============================================================================
+
+  describe("license limits", () => {
+    describe("when WAITING_APPROVAL invites count toward member limits", () => {
+      it("rejects new invite when limit is reached", async () => {
+        // Override the subscription handler to set a low limit
+        const limitedPlan = makeTestPlan({ maxMembers: 3 });
+        mockGetActivePlan.mockResolvedValue(limitedPlan);
+
+        // Organization already has 2 members (admin + member) and we have a low limit of 3
+        // Create a WAITING_APPROVAL invite to use the last slot
+        await prisma.organizationInvite.create({
+          data: {
+            email: "waiting-limit@example.com",
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: teamId,
+            role: OrganizationUserRole.MEMBER,
+            status: "WAITING_APPROVAL",
+            requestedBy: memberUserId,
+          },
+        });
+
+        await expect(
+          memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "new@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          })
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+      });
+    });
+  });
+});

@@ -72,6 +72,7 @@ model User {
     createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
     llmPromptConfigVersions LlmPromptConfigVersion[]
     scenarios               Scenario[]
+    inviteRequests          OrganizationInvite[]
 }
 
 model VerificationToken {
@@ -258,23 +259,27 @@ model Project {
 enum INVITE_STATUS {
     PENDING
     ACCEPTED
+    WAITING_APPROVAL
 }
 
 model OrganizationInvite {
     id              String               @id @default(nanoid())
     email           String
     inviteCode      String               @unique
-    expiration      DateTime
+    expiration      DateTime?
     status          INVITE_STATUS        @default(PENDING)
     organizationId  String
     organization    Organization         @relation(fields: [organizationId], references: [id])
     teamIds         String
     teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
     role            OrganizationUserRole
+    requestedBy     String?
+    requestedByUser User?                @relation(fields: [requestedBy], references: [id])
     createdAt       DateTime             @default(now())
     updatedAt       DateTime             @default(now()) @updatedAt
 
     @@index([organizationId])
+    @@index([requestedBy])
 }
 
 enum EvaluationExecutionMode {
