@@ -94,11 +94,11 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 }
 
 // =============================================================================
-// Pending Approval Action Steps
+// Invitation Action Steps
 // =============================================================================
 
 /**
- * Approve the invitation for a given email in the Pending Approval section.
+ * Approve the invitation for a given email in the Invites table.
  */
 export async function whenIApproveInvitationFor(page: Page, email: string) {
   const row = page
@@ -108,7 +108,7 @@ export async function whenIApproveInvitationFor(page: Page, email: string) {
 }
 
 /**
- * Reject the invitation for a given email in the Pending Approval section.
+ * Reject the invitation for a given email in the Invites table.
  */
 export async function whenIRejectInvitationFor(page: Page, email: string) {
   const row = page
@@ -122,28 +122,33 @@ export async function whenIRejectInvitationFor(page: Page, email: string) {
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Sent Invites" section.
+ * Assert that an email appears in the "Invites" list with an invited badge.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  // Find the Sent Invites heading, then look for the email in the table below it
-  const sentInvitesHeading = page.getByRole("heading", {
-    name: "Sent Invites",
-  });
-  await expect(sentInvitesHeading).toBeVisible({ timeout: 10000 });
+  const invitesHeading = page.getByRole("heading", { name: "Invites" });
+  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
 
-  // The email should appear in a row within the Sent Invites section
-  await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
+  const invitesSection = invitesHeading.locator("..");
+  const row = invitesSection.getByRole("row").filter({ hasText: email });
+
+  await expect(row).toBeVisible({ timeout: 5000 });
+  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
 }
 
 /**
- * Assert that an email appears in the "Pending Approval" section.
+ * Assert that an email appears in the "Invites" list with a pending badge.
  */
 export async function thenISeePendingApprovalFor(page: Page, email: string) {
-  const pendingHeading = page.getByRole("heading", {
-    name: "Pending Approval",
+  const invitesHeading = page.getByRole("heading", { name: "Invites" });
+  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+
+  const invitesSection = invitesHeading.locator("..");
+  const row = invitesSection.getByRole("row").filter({ hasText: email });
+
+  await expect(row).toBeVisible({ timeout: 5000 });
+  await expect(row.getByText("Pending Approval")).toBeVisible({
+    timeout: 5000,
   });
-  await expect(pendingHeading).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText(email)).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -163,11 +168,11 @@ export async function thenISeeSuccessToast(page: Page, titleText: string) {
 }
 
 /**
- * Assert that the Pending Approval section is NOT visible.
+ * Assert that the Invites section is NOT visible.
  */
 export async function thenPendingApprovalSectionIsHidden(page: Page) {
   await expect(
-    page.getByRole("heading", { name: "Pending Approval" })
+    page.getByRole("heading", { name: "Invites" })
   ).not.toBeVisible({ timeout: 5000 });
 }
 

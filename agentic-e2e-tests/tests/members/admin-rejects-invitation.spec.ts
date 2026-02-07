@@ -30,7 +30,7 @@ test.describe("Invitation Approval - Admin Rejects Request", () => {
     const { organizationId, teamId } = await getOrgAndTeamIds(page);
     await seedWaitingApprovalInvite(page, email, organizationId, teamId);
 
-    // Navigate and verify the invite appears in Pending Approval
+    // Navigate and verify the invite appears in Invites with Pending Approval badge
     await givenIAmOnTheMembersPage(page);
     await thenISeePendingApprovalFor(page, email);
 

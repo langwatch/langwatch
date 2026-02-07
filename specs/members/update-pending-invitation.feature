@@ -13,7 +13,7 @@ Feature: Invitation Approval Workflow
     And I am on the members page
     When I invite "newuser@example.com" with role "MEMBER"
     Then I see a success message "Invitation sent for approval"
-    And the invitation for "newuser@example.com" appears in the "Pending Approval" section
+    And the invitation for "newuser@example.com" appears in the "Invites" list with a "Pending Approval" badge
 
   @e2e
   Scenario: Admin creates an immediate invite
@@ -21,7 +21,7 @@ Feature: Invitation Approval Workflow
     And I am on the members page
     When I invite "direct@example.com" with role "MEMBER"
     Then I see a success message "Invitations sent"
-    And the invitation for "direct@example.com" appears in the "Sent Invites" list
+    And the invitation for "direct@example.com" appears in the "Invites" list with an "Invited" badge
 
   @e2e
   Scenario: Admin approves an invitation request
@@ -30,7 +30,7 @@ Feature: Invitation Approval Workflow
     When I go to the members page
     And I approve the invitation for "waiting@example.com"
     Then I see a success message "Invitation approved"
-    And the invitation for "waiting@example.com" moves to the "Sent Invites" list
+    And the invitation for "waiting@example.com" appears in the "Invites" list with an "Invited" badge
 
   @e2e
   Scenario: Admin rejects an invitation request
@@ -39,7 +39,7 @@ Feature: Invitation Approval Workflow
     When I go to the members page
     And I reject the invitation for "reject@example.com"
     Then I see a success message "Invitation rejected"
-    And the invitation for "reject@example.com" is removed from the list
+    And the invitation for "reject@example.com" is removed from the "Invites" list
 
   # ============================================================================
   # Integration: Backend Edge Cases, Error Handling, and Rendered Components
@@ -120,22 +120,29 @@ Feature: Invitation Approval Workflow
   Scenario: Non-admin sees only their own pending approval requests
     Given I am a "MEMBER" user on the members page
     And there are pending approval requests from multiple users
-    When I view the "Pending Approval" section
-    Then I only see requests that I created
+    When I view the "Invites" list
+    Then I only see pending approval requests that I created
 
   @integration
   Scenario: Admin sees all pending approval requests
     Given I am an "ADMIN" user on the members page
     And there are pending approval requests from multiple users
-    When I view the "Pending Approval" section
+    When I view the "Invites" list
     Then I see all pending approval requests
 
   @integration
-  Scenario: Pending approval requests display the requester name
+  Scenario: Pending approval requests display a badge
     Given I am an "ADMIN" user on the members page
-    And there is a pending approval request from "Alice"
-    When I view the "Pending Approval" section
-    Then the request shows "Alice" as the requester
+    And there is a pending approval request for "newuser@example.com"
+    When I view the "Invites" list
+    Then the invitation for "newuser@example.com" shows a "Pending Approval" badge
+
+  @integration
+  Scenario: Sent invites display a badge
+    Given I am an "ADMIN" user on the members page
+    And there is a sent invite for "newuser@example.com"
+    When I view the "Invites" list
+    Then the invitation for "newuser@example.com" shows an "Invited" badge
 
   # ============================================================================
   # Unit: Pure Logic and Display Branches
@@ -163,12 +170,11 @@ Feature: Invitation Approval Workflow
     Then I see "Admin", "Member", and "Lite Member" as role options
 
   @unit
-  Scenario: Non-admin sees waiting status instead of action buttons
+  Scenario: Non-admin sees no action buttons for pending requests
     Given I am a "MEMBER" user on the members page
     And I have a pending approval request
     When I view my pending approval request
-    Then I see "Waiting for admin approval" text
-    And I do not see approve or reject buttons
+    Then I do not see approve or reject buttons
 
   @unit
   Scenario: Admin sees approve and reject buttons for pending requests
