@@ -173,9 +173,13 @@ export class AnalyticsService {
       this.logComparisonErrors(operationName, esResult, chResult);
     }
 
-    if (useClickHouse && chData) return chData;
-    if (esData) return esData;
-    throw new Error(`Both ES and CH ${operationName} queries failed`);
+    const primaryData = useClickHouse ? chData : esData;
+    if (!primaryData) {
+      throw new Error(
+        `${useClickHouse ? "ClickHouse" : "Elasticsearch"} ${operationName} query failed in comparison mode`,
+      );
+    }
+    return primaryData;
   }
 
   /**
