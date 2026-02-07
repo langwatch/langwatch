@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.3...mcp-server@v0.4.0) (2026-02-07)
+
+
+### Features
+
+* add CI/CD execution support for evaluations v3 ([#1118](https://github.com/langwatch/langwatch/issues/1118)) ([d28adac](https://github.com/langwatch/langwatch/commit/d28adaceeb87921d9c7c0f1cf76b5e03f3b90fbd))
+
+
+### Bug Fixes
+
+* **mcp-server:** skip integration test in CI ([#1300](https://github.com/langwatch/langwatch/issues/1300)) ([c16f232](https://github.com/langwatch/langwatch/commit/c16f2320b5c99818324d506a64ed3588085d8517))
+
 ## [0.3.3](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.2...mcp-server@v0.3.3) (2025-12-18)
 
 
