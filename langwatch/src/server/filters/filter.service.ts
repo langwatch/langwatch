@@ -1,7 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseFilterService } from "./clickhouse-filter.service";
 import {
   ElasticsearchFilterService,
@@ -18,7 +17,8 @@ export type { FilterOption };
  * This service acts as a facade that:
  * 1. Checks if ClickHouse is enabled for the project (via featureClickHouseDataSourceTraces flag)
  * 2. Routes requests to the appropriate backend based on the feature flag
- * 3. Falls back to Elasticsearch if ClickHouse doesn't support the filter or returns null
+ *
+ * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
  *
  * @example
  * ```ts
@@ -33,7 +33,6 @@ export type { FilterOption };
  * ```
  */
 export class FilterServiceFacade {
-  private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
   private readonly clickHouseService: ClickHouseFilterService;
   private readonly elasticsearchService: ElasticsearchFilterService;
@@ -60,8 +59,7 @@ export class FilterServiceFacade {
   /**
    * Get filter options for a specific filter field.
    *
-   * Routes to ClickHouse if enabled and the filter is supported,
-   * otherwise falls back to Elasticsearch.
+   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    *
    * @param input - Query parameters including project ID, field, and filters
    * @returns Array of filter options with field, label, and count
@@ -85,7 +83,7 @@ export class FilterServiceFacade {
         );
 
         if (useClickHouse) {
-          const result = await this.clickHouseService.getFilterOptions(
+          return this.clickHouseService.getFilterOptions(
             input.projectId,
             input.field,
             {
@@ -97,19 +95,6 @@ export class FilterServiceFacade {
               scopeFilters: input.scopeFilters,
             },
           );
-
-          if (result !== null) {
-            span.setAttribute("backend.used", "clickhouse");
-            return result;
-          }
-
-          // Fall back to Elasticsearch if ClickHouse returns null (filter not supported)
-          this.logger.debug(
-            { projectId: input.projectId, field: input.field },
-            "ClickHouse enabled but returned null for filter, falling back to Elasticsearch",
-          );
-          span.setAttribute("backend.used", "elasticsearch");
-          span.setAttribute("clickhouse.fallback", true);
         }
 
         return this.elasticsearchService.getFilterOptions(input);

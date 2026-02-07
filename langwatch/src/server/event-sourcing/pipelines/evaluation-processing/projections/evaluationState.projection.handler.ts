@@ -12,6 +12,7 @@ import {
   isEvaluationScheduledEvent,
   isEvaluationStartedEvent,
 } from "../schemas/events";
+import { IdUtils } from "../utils/id.utils";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:evaluation-state-projection",
@@ -95,6 +96,14 @@ export class EvaluationStateProjectionHandler implements ProjectionHandler<
     let startedAt: number | null = null;
     let completedAt: number | null = null;
 
+    // Get the first event timestamp for deterministic ID generation
+    // The framework guarantees at least 1 event (throws NoEventsFoundError otherwise)
+    const firstEvent = events[0];
+    if (!firstEvent) {
+      throw new Error("No events in stream - this should never happen");
+    }
+    const firstEventTimestamp = firstEvent.timestamp;
+
     // Process events in order to build current state
     for (const event of events) {
       if (isEvaluationScheduledEvent(event)) {
@@ -152,8 +161,12 @@ export class EvaluationStateProjectionHandler implements ProjectionHandler<
       }
     }
 
-    // Generate deterministic projection ID
-    const projectionId = `eval_state:${tenantId}:${evaluationId}`;
+    // Generate deterministic projection ID using KSUID
+    const projectionId = IdUtils.generateDeterministicEvaluationStateId(
+      tenantId,
+      evaluationId,
+      firstEventTimestamp,
+    );
 
     logger.debug(
       {

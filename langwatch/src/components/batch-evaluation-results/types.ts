@@ -5,10 +5,7 @@
  * and V3 evaluations (multiple targets, inline evaluators per target).
  */
 
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationTarget,
-} from "~/server/experiments/types";
+import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
 
 /**
  * Run data with color assignment for comparison mode
@@ -128,16 +125,15 @@ export type BatchEvaluationData = {
 };
 
 /**
- * Transforms raw ESBatchEvaluation data into the row-based format
+ * Transforms raw ExperimentRunWithItems data into the row-based format
  * needed for TanStack Table display.
  */
 export const transformBatchEvaluationData = (
-  data: ESBatchEvaluation,
+  data: ExperimentRunWithItems,
 ): BatchEvaluationData => {
   const {
-    project_id,
-    experiment_id,
-    run_id,
+    experimentId,
+    runId,
     dataset,
     evaluations,
     targets,
@@ -170,7 +166,7 @@ export const transformBatchEvaluationData = (
 
   // Check if there are row-level errors without any target_id
   const hasRowLevelErrorsWithoutTarget = dataset.some(
-    (entry) => entry.error && !entry.target_id,
+    (entry) => entry.error && !entry.targetId,
   );
 
   if (targets && targets.length > 0) {
@@ -178,11 +174,11 @@ export const transformBatchEvaluationData = (
     targetColumns = targets.map((target) => ({
       id: target.id,
       name: target.name,
-      type: target.type === "custom" ? "custom" : target.type,
-      promptId: target.prompt_id,
-      promptVersion: target.prompt_version,
-      agentId: target.agent_id,
-      evaluatorId: target.evaluator_id,
+      type: target.type === "custom" ? "custom" : (target.type as BatchTargetColumn["type"]),
+      promptId: target.promptId,
+      promptVersion: target.promptVersion,
+      agentId: target.agentId,
+      evaluatorId: target.evaluatorId,
       model: target.model,
       metadata: target.metadata,
       outputFields: detectOutputFields(dataset, target.id),
@@ -242,8 +238,8 @@ export const transformBatchEvaluationData = (
   // Build evaluator info
   const evaluatorMap = new Map<string, string>();
   for (const evaluation of evaluations) {
-    const key = evaluation.target_id
-      ? `${evaluation.target_id}:${evaluation.evaluator}`
+    const key = evaluation.targetId
+      ? `${evaluation.targetId}:${evaluation.evaluator}`
       : evaluation.evaluator;
     if (!evaluatorMap.has(key)) {
       evaluatorMap.set(key, evaluation.name ?? evaluation.evaluator);
@@ -255,7 +251,7 @@ export const transformBatchEvaluationData = (
   for (const entry of dataset) {
     // For V3, we might have multiple entries per index (one per target)
     // We need to handle this appropriately
-    if (!datasetByIndex.has(entry.index) || !entry.target_id) {
+    if (!datasetByIndex.has(entry.index) || !entry.targetId) {
       datasetByIndex.set(entry.index, entry);
     }
   }
@@ -266,7 +262,7 @@ export const transformBatchEvaluationData = (
     (typeof evaluations)[number][]
   >();
   for (const evaluation of evaluations) {
-    const key = `${evaluation.index}:${evaluation.target_id ?? ""}`;
+    const key = `${evaluation.index}:${evaluation.targetId ?? ""}`;
     const existing = evaluationsByIndexAndTarget.get(key) ?? [];
     existing.push(evaluation);
     evaluationsByIndexAndTarget.set(key, existing);
@@ -275,7 +271,7 @@ export const transformBatchEvaluationData = (
   // Group dataset entries by index and target for V3
   const datasetByIndexAndTarget = new Map<string, (typeof dataset)[number]>();
   for (const entry of dataset) {
-    const key = `${entry.index}:${entry.target_id ?? ""}`;
+    const key = `${entry.index}:${entry.targetId ?? ""}`;
     datasetByIndexAndTarget.set(key, entry);
   }
 
@@ -367,7 +363,7 @@ export const transformBatchEvaluationData = (
           details: ev.details,
           cost: ev.cost,
           duration: ev.duration,
-          inputs: ev.inputs,
+          inputs: ev.inputs ?? undefined,
         }),
       );
 
@@ -377,7 +373,7 @@ export const transformBatchEvaluationData = (
         cost: targetEntry?.cost ?? null,
         duration: targetEntry?.duration ?? null,
         error: targetEntry?.error ?? null,
-        traceId: targetEntry?.trace_id ?? null,
+        traceId: targetEntry?.traceId ?? null,
         evaluatorResults,
       };
     }
@@ -390,12 +386,12 @@ export const transformBatchEvaluationData = (
   }
 
   return {
-    runId: run_id,
-    experimentId: experiment_id,
-    projectId: project_id,
-    createdAt: timestamps.created_at,
-    finishedAt: timestamps.finished_at,
-    stoppedAt: timestamps.stopped_at,
+    runId,
+    experimentId,
+    projectId: data.projectId,
+    createdAt: timestamps.createdAt,
+    finishedAt: timestamps.finishedAt,
+    stoppedAt: timestamps.stoppedAt,
     progress,
     total,
     datasetColumns,
@@ -410,12 +406,12 @@ export const transformBatchEvaluationData = (
  * Detect output fields for a specific target from the dataset
  */
 const detectOutputFields = (
-  dataset: ESBatchEvaluation["dataset"],
+  dataset: ExperimentRunWithItems["dataset"],
   targetId: string,
 ): string[] => {
   const fields = new Set<string>();
   for (const entry of dataset) {
-    if (entry.target_id === targetId && entry.predicted) {
+    if (entry.targetId === targetId && entry.predicted) {
       for (const key of Object.keys(entry.predicted)) {
         fields.add(key);
       }
@@ -429,14 +425,15 @@ const detectOutputFields = (
  * Used when creating virtual targets per evaluator for API evaluations
  */
 const detectEvaluatorOutputFieldsForEvaluator = (
-  evaluations: ESBatchEvaluation["evaluations"],
+  evaluations: ExperimentRunWithItems["evaluations"],
   evaluatorId: string,
 ): string[] => {
   const fields = new Set<string>();
   for (const evaluation of evaluations) {
-    if (evaluation.evaluator === evaluatorId && evaluation.inputs) {
+    const inputs = evaluation.inputs;
+    if (evaluation.evaluator === evaluatorId && inputs) {
       // Add all input fields - we'll display the full data
-      for (const key of Object.keys(evaluation.inputs)) {
+      for (const key of Object.keys(inputs)) {
         fields.add(key);
       }
     }
@@ -453,14 +450,13 @@ const detectEvaluatorOutputFieldsForEvaluator = (
  * Returns all inputs as the "output" for display
  */
 const extractOutputFromEvaluatorInputsForEvaluator = (
-  evaluations: ESBatchEvaluation["evaluations"],
+  evaluations: ExperimentRunWithItems["evaluations"],
   evaluatorId: string,
 ): Record<string, unknown> | null => {
   for (const evaluation of evaluations) {
     if (evaluation.evaluator !== evaluatorId) continue;
-    if (!evaluation.inputs) continue;
-
     const inputs = evaluation.inputs;
+    if (!inputs) continue;
     const keys = Object.keys(inputs);
 
     // If there's only one key and it's a common output field, unwrap it
@@ -491,7 +487,7 @@ const extractOutputFromEvaluatorInputsForEvaluator = (
  * Returns a map of node name to field names
  */
 const detectPredictedColumns = (
-  dataset: ESBatchEvaluation["dataset"],
+  dataset: ExperimentRunWithItems["dataset"],
 ): Record<string, Set<string>> => {
   const columns: Record<string, Set<string>> = {};
 
@@ -538,7 +534,7 @@ const detectPredictedColumns = (
  * Detect if a column might contain image URLs based on all entries
  */
 const detectHasImages = (
-  dataset: ESBatchEvaluation["dataset"],
+  dataset: ExperimentRunWithItems["dataset"],
   columnName: string,
 ): boolean => {
   // Check up to first 10 entries for image URLs

@@ -9,6 +9,7 @@ import {
   batchEvaluationId,
   esClient,
 } from "../../../../server/elasticsearch";
+import { ExperimentRunDispatcher } from "../../../../server/evaluations-v3/dispatch";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -362,4 +363,99 @@ const processBatchEvaluation = async (
     },
     retry_on_conflict: 5,
   });
+
+  // Dual-write to ClickHouse via event sourcing when enabled
+  await dispatchToClickHouse(project, experiment.id, batchEvaluation);
+};
+
+/**
+ * Fire event-sourcing commands for ClickHouse dual-write.
+ * Fire-and-forget — errors are logged but don't affect the main execution.
+ */
+const dispatchToClickHouse = async (
+  project: Project,
+  experimentId: string,
+  batchEvaluation: ESBatchEvaluation,
+) => {
+  try {
+    const dispatcher = ExperimentRunDispatcher.create();
+    const enabled = await dispatcher.isClickHouseEnabled(project.id);
+    if (!enabled) return;
+
+    const { run_id: runId } = batchEvaluation;
+
+    // Map targets from snake_case (ES) to camelCase (event-sourcing)
+    const targets = (batchEvaluation.targets ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      promptId: t.prompt_id ?? undefined,
+      promptVersion: t.prompt_version ?? undefined,
+      agentId: t.agent_id ?? undefined,
+      model: t.model ?? undefined,
+      metadata: t.metadata ?? undefined,
+    }));
+
+    await dispatcher.startRun({
+      tenantId: project.id,
+      runId,
+      experimentId,
+      total: batchEvaluation.total ?? batchEvaluation.dataset.length,
+      targets,
+    });
+
+    // Dispatch target results for each dataset entry
+    for (const entry of batchEvaluation.dataset) {
+      await dispatcher.recordTargetResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: entry.index,
+        targetId: entry.target_id ?? "default",
+        entry: entry.entry,
+        predicted: entry.predicted ?? undefined,
+        cost: entry.cost ?? undefined,
+        duration: entry.duration ?? undefined,
+        error: entry.error ?? undefined,
+        traceId: entry.trace_id ?? undefined,
+      });
+    }
+
+    // Dispatch evaluator results for each evaluation entry
+    for (const evaluation of batchEvaluation.evaluations) {
+      await dispatcher.recordEvaluatorResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: evaluation.index,
+        targetId: evaluation.target_id ?? "default",
+        evaluatorId: evaluation.evaluator,
+        evaluatorName: evaluation.name ?? undefined,
+        status: evaluation.status,
+        score: evaluation.score ?? undefined,
+        label: evaluation.label ?? undefined,
+        passed: evaluation.passed ?? undefined,
+        details: evaluation.details ?? undefined,
+        cost: evaluation.cost ?? undefined,
+      });
+    }
+
+    // Dispatch completion if finished or stopped
+    if (
+      batchEvaluation.timestamps.finished_at ||
+      batchEvaluation.timestamps.stopped_at
+    ) {
+      await dispatcher.completeRun({
+        tenantId: project.id,
+        runId,
+        finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
+        stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
+      });
+    }
+  } catch (error) {
+    logger.warn(
+      { error, runId: batchEvaluation.run_id, projectId: project.id },
+      "Failed to dispatch batch evaluation to ClickHouse (non-fatal)",
+    );
+  }
 };
