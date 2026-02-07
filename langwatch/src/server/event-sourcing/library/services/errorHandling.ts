@@ -37,7 +37,7 @@ export abstract class BaseEventSourcingError extends Error {
     cause?: unknown,
   ) {
     super(message);
-    this.name = this.constructor.name;
+    this.name = "EventSourcingError";
     this.category = category;
     this.context = context;
     this.cause = cause;
@@ -105,6 +105,7 @@ export abstract class NonCriticalError extends BaseEventSourcingError {
  * Indicates that a previous event has not been processed yet.
  */
 export class SequentialOrderingError extends CriticalError {
+  override readonly name = "SequentialOrderingError";
   readonly previousSequenceNumber: number;
   readonly currentSequenceNumber: number;
   readonly eventId: string;
@@ -140,6 +141,7 @@ export class SequentialOrderingError extends CriticalError {
  * Error thrown for security violations, particularly tenant isolation issues.
  */
 export class SecurityError extends CriticalError {
+  override readonly name = "SecurityError";
   readonly operation: string;
   readonly tenantId?: string;
 
@@ -163,6 +165,7 @@ export class SecurityError extends CriticalError {
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {
+  override readonly name = "ValidationError";
   readonly field?: string;
   readonly value?: unknown;
   readonly reason: string;
@@ -192,6 +195,7 @@ export class ValidationError extends CriticalError {
  * Error thrown for configuration issues (missing handlers, invalid setup, etc.).
  */
 export class ConfigurationError extends CriticalError {
+  override readonly name = "ConfigurationError";
   readonly component: string;
   readonly details: string;
 
@@ -214,6 +218,7 @@ export class ConfigurationError extends CriticalError {
  * Error thrown for checkpoint key validation and format errors.
  */
 export class CheckpointError extends CriticalError {
+  override readonly name = "CheckpointError";
   readonly component: string;
   readonly value: string;
 
@@ -238,6 +243,7 @@ export class CheckpointError extends CriticalError {
  * Can be critical or recoverable depending on the operation.
  */
 export class StoreError extends BaseEventSourcingError {
+  override readonly name = "StoreError";
   readonly operation: string;
   readonly store: string;
 
@@ -268,6 +274,7 @@ export class StoreError extends BaseEventSourcingError {
  * Error thrown when distributed lock acquisition fails.
  */
 export class LockError extends RecoverableError {
+  override readonly name = "LockError";
   readonly lockKey: string;
   readonly operation: string;
 
@@ -293,6 +300,7 @@ export class LockError extends RecoverableError {
  * but aren't yet visible. This is a recoverable condition that should be retried.
  */
 export class NoEventsFoundError extends RecoverableError {
+  override readonly name = "NoEventsFoundError";
   readonly aggregateId: string;
   readonly tenantId: string;
 
@@ -315,6 +323,7 @@ export class NoEventsFoundError extends RecoverableError {
  * Error thrown for queue operation failures.
  */
 export class QueueError extends RecoverableError {
+  override readonly name = "QueueError";
   readonly queueName: string;
   readonly operation: string;
 
@@ -343,6 +352,7 @@ export class QueueError extends RecoverableError {
  * Error thrown when handler execution fails.
  */
 export class HandlerError extends NonCriticalError {
+  override readonly name = "HandlerError";
   readonly handlerName: string;
   readonly eventId: string;
 
@@ -371,6 +381,7 @@ export class HandlerError extends NonCriticalError {
  * Error thrown when projection execution fails.
  */
 export class ProjectionError extends NonCriticalError {
+  override readonly name = "ProjectionError";
   readonly projectionName: string;
   readonly eventId: string;
 
@@ -399,6 +410,7 @@ export class ProjectionError extends NonCriticalError {
  * Error thrown when event publishing fails.
  */
 export class PublishingError extends NonCriticalError {
+  override readonly name = "PublishingError";
   readonly eventId: string;
   readonly channel?: string;
 

@@ -28,6 +28,7 @@ import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import type { DistributedLock } from "../../utils/distributedLock";
 import { ConfigurationError, ValidationError } from "../errorHandling";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
 
@@ -191,8 +192,11 @@ function createCommandDispatcher<
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
-          payload,
-          { commandType, validationError: validation.error },
+          undefined,
+          {
+            commandType,
+            zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+          },
         );
       }
 
@@ -229,7 +233,7 @@ function createCommandDispatcher<
           `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
           "events",
           void 0,
-          { commandType, payload },
+          { commandType },
         );
       }
 
@@ -237,8 +241,8 @@ function createCommandDispatcher<
         throw new ValidationError(
           `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
           "events",
-          events,
-          { commandType, payload },
+          undefined,
+          { commandType },
         );
       }
 
@@ -249,8 +253,8 @@ function createCommandDispatcher<
           throw new ValidationError(
             `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
             "events",
-            events,
-            { commandType, payload, index: i },
+            undefined,
+            { commandType, index: i },
           );
         }
 
@@ -267,18 +271,15 @@ function createCommandDispatcher<
               : "Unknown validation error";
 
           throw new ValidationError(
-            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(
-              event,
-            )}`,
+            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
             "events",
-            event,
+            undefined,
             {
               commandType,
-              payload,
               index: i,
-              validationErrors:
+              zodIssues:
                 parseResult.success === false
-                  ? parseResult.error.issues
+                  ? mapZodIssuesToLogContext(parseResult.error.issues)
                   : void 0,
             },
           );
@@ -301,8 +302,11 @@ function createCommandDispatcher<
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
-          payload,
-          { commandType },
+          undefined,
+          {
+            commandType,
+            zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+          },
         );
       }
       // If validation passes, queue the job

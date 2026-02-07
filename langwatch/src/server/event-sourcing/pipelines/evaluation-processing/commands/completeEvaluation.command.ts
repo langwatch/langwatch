@@ -84,8 +84,8 @@ export class CompleteEvaluationCommand
     return {
       "payload.evaluation.id": payload.evaluationId,
       "payload.status": payload.status,
-      ...(payload.score !== undefined && { "payload.score": payload.score }),
-      ...(payload.passed !== undefined && { "payload.passed": payload.passed }),
+      ...(payload.score != null && { "payload.score": payload.score }),
+      ...(payload.passed != null && { "payload.passed": payload.passed }),
     };
   }
 
