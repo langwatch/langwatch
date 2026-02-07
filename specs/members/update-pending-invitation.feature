@@ -1,0 +1,179 @@
+Feature: Invitation Approval Workflow
+  As a member of an organization
+  I want to request invitations for new users
+  So that admins can approve them and new collaborators can join
+
+  # ============================================================================
+  # E2E: Happy Paths - Full User Workflows
+  # ============================================================================
+
+  @e2e
+  Scenario: Member creates an invitation request that requires approval
+    Given I am logged in as a "MEMBER"
+    And I am on the members page
+    When I invite "newuser@example.com" with role "MEMBER"
+    Then I see a success message "Invitation sent for approval"
+    And the invitation for "newuser@example.com" appears in the "Pending Approval" section
+
+  @e2e
+  Scenario: Admin creates an immediate invite
+    Given I am logged in as an "ADMIN"
+    And I am on the members page
+    When I invite "direct@example.com" with role "MEMBER"
+    Then I see a success message "Invitations sent"
+    And the invitation for "direct@example.com" appears in the "Sent Invites" list
+
+  @e2e
+  Scenario: Admin approves an invitation request
+    Given I am logged in as an "ADMIN"
+    And there is a pending approval request for "waiting@example.com"
+    When I go to the members page
+    And I approve the invitation for "waiting@example.com"
+    Then I see a success message "Invitation approved"
+    And the invitation for "waiting@example.com" moves to the "Sent Invites" list
+
+  @e2e
+  Scenario: Admin rejects an invitation request
+    Given I am logged in as an "ADMIN"
+    And there is a pending approval request for "reject@example.com"
+    When I go to the members page
+    And I reject the invitation for "reject@example.com"
+    Then I see a success message "Invitation rejected"
+    And the invitation for "reject@example.com" is removed from the list
+
+  # ============================================================================
+  # Integration: Backend Edge Cases, Error Handling, and Rendered Components
+  # ============================================================================
+
+  @integration
+  Scenario: Member cannot request invitation with ADMIN role
+    Given I am authenticated as a "MEMBER" of the organization
+    When I request an invitation for "user@example.com" with role "ADMIN"
+    Then the request fails with a validation error
+    And the error indicates the role is not allowed
+
+  @integration
+  Scenario: Member request sets requestedBy to the requesting user
+    Given I am authenticated as a "MEMBER" of the organization
+    When I request an invitation for "user@example.com" with role "MEMBER"
+    Then the invitation is created with status "WAITING_APPROVAL"
+    And the invitation has the requesting user's ID as requestedBy
+
+  @integration
+  Scenario: Invitation request has no expiration while awaiting approval
+    Given I am authenticated as a "MEMBER" of the organization
+    When I request an invitation for "user@example.com" with role "MEMBER"
+    Then the invitation is created with a null expiration
+
+  @integration
+  Scenario: Approving an invitation sets expiration and status
+    Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
+    And I am authenticated as an "ADMIN" of the organization
+    When I approve the invitation for "user@example.com"
+    Then the invitation status changes to "PENDING"
+    And the invitation receives a 48-hour expiration
+
+  @integration
+  Scenario: No email is sent when a member creates an invitation request
+    Given I am authenticated as a "MEMBER" of the organization
+    When I request an invitation for "user@example.com" with role "MEMBER"
+    Then no invitation email is sent to "user@example.com"
+
+  @integration
+  Scenario: Email is sent when admin approves an invitation request
+    Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
+    And I am authenticated as an "ADMIN" of the organization
+    When I approve the invitation for "user@example.com"
+    Then an invitation email is sent to "user@example.com"
+
+  @integration
+  Scenario: WAITING_APPROVAL invites count toward license member limits
+    Given the organization has 4 accepted members
+    And the organization has 1 invitation with status "WAITING_APPROVAL"
+    And the organization has a license with maxMembers 5
+    When I invite user "new@example.com" to the organization
+    Then the request fails with FORBIDDEN
+    And the error message contains "Over the limit of invites allowed"
+
+  @integration
+  Scenario: Duplicate detection across PENDING and WAITING_APPROVAL statuses
+    Given there is a "WAITING_APPROVAL" invitation for "existing@example.com"
+    And I am authenticated as a "MEMBER" of the organization
+    When I request an invitation for "existing@example.com" with role "MEMBER"
+    Then the request fails with a duplicate invitation error
+
+  @integration
+  Scenario: Deleting a WAITING_APPROVAL invitation works the same as PENDING
+    Given there is a "WAITING_APPROVAL" invitation for "remove@example.com"
+    And I am authenticated as an "ADMIN" of the organization
+    When I delete the invitation for "remove@example.com"
+    Then the invitation is removed successfully
+
+  @integration
+  Scenario: Non-admin cannot approve invitations
+    Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
+    And I am authenticated as a "MEMBER" of the organization
+    When I try to approve the invitation for "user@example.com"
+    Then the request fails with a permission error
+
+  @integration
+  Scenario: Non-admin sees only their own pending approval requests
+    Given I am a "MEMBER" user on the members page
+    And there are pending approval requests from multiple users
+    When I view the "Pending Approval" section
+    Then I only see requests that I created
+
+  @integration
+  Scenario: Admin sees all pending approval requests
+    Given I am an "ADMIN" user on the members page
+    And there are pending approval requests from multiple users
+    When I view the "Pending Approval" section
+    Then I see all pending approval requests
+
+  @integration
+  Scenario: Pending approval requests display the requester name
+    Given I am an "ADMIN" user on the members page
+    And there is a pending approval request from "Alice"
+    When I view the "Pending Approval" section
+    Then the request shows "Alice" as the requester
+
+  # ============================================================================
+  # Unit: Pure Logic and Display Branches
+  # ============================================================================
+
+  @unit
+  Scenario: Pending invites query returns both PENDING and WAITING_APPROVAL invites
+    Given there is a "PENDING" invitation for "pending@example.com"
+    And there is a "WAITING_APPROVAL" invitation for "waiting@example.com"
+    When I query the organization's pending invites
+    Then the results include "pending@example.com"
+    And the results include "waiting@example.com"
+
+  @unit
+  Scenario: Non-admin user sees restricted role options in invite form
+    Given I am a "MEMBER" user viewing the invite form
+    When I view the role dropdown options
+    Then I see "Member" and "Lite Member" as role options
+    And I do not see "Admin" as a role option
+
+  @unit
+  Scenario: Admin user sees all role options in invite form
+    Given I am an "ADMIN" user viewing the invite form
+    When I view the role dropdown options
+    Then I see "Admin", "Member", and "Lite Member" as role options
+
+  @unit
+  Scenario: Non-admin sees waiting status instead of action buttons
+    Given I am a "MEMBER" user on the members page
+    And I have a pending approval request
+    When I view my pending approval request
+    Then I see "Waiting for admin approval" text
+    And I do not see approve or reject buttons
+
+  @unit
+  Scenario: Admin sees approve and reject buttons for pending requests
+    Given I am an "ADMIN" user on the members page
+    And there is a pending approval request
+    When I view the pending approval request
+    Then I see an "Approve" button
+    And I see a "Reject" button

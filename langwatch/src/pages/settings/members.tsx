@@ -1,41 +1,36 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Flex,
   Heading,
   HStack,
   Spacer,
-  Spinner,
   Table,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { MoreVertical } from "react-feather";
 import { LuMail, LuPencil, LuTrash } from "react-icons/lu";
-import type { SubmitHandler } from "react-hook-form";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type { MembersForm } from "../../components/AddMembersForm";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import { CopyInput } from "../../components/CopyInput";
 import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
+import { getOrgRoleOptionsForUser } from "../../components/members/getOrgRoleOptionsForUser";
+import { PendingApprovalSection } from "../../components/members/PendingApprovalSection";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
-import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
+import { useInviteActions } from "../../hooks/useInviteActions";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -101,10 +96,6 @@ function MembersList({
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
-  // License enforcement for both member types
-  const membersEnforcement = useLicenseEnforcement("members");
-  const membersLiteEnforcement = useLicenseEnforcement("membersLite");
-
   const teamOptions = teams.map((team) => ({
     label: team.name,
     value: team.id,
@@ -130,9 +121,7 @@ function MembersList({
       },
       { enabled: !!organization },
     );
-  const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
-  const deleteInviteMutation = api.organization.deleteInvite.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -148,87 +137,20 @@ function MembersList({
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  const performInviteMutation = (data: MembersForm) => {
-    createInvitesMutation.mutate(
-      {
-        organizationId: organization.id,
-        invites: data.invites.map((invite) => ({
-          email: invite.email.toLowerCase(),
-          role: invite.orgRole,
-          teams: invite.teams.map((team) => ({
-            teamId: team.teamId,
-            role: team.role,
-            customRoleId: team.customRoleId,
-          })),
-        })),
-      },
-      {
-        onSuccess: (data) => {
-          const newInvites = data.reduce(
-            (acc, invite) => {
-              if (invite?.invite && invite.noEmailProvider) {
-                acc.push({
-                  inviteCode: invite.invite.inviteCode,
-                  email: invite.invite.email,
-                });
-              }
-              return acc;
-            },
-            [] as { inviteCode: string; email: string }[],
-          );
-
-          setSelectedInvites(newInvites);
-
-          const description = hasEmailProvider
-            ? "All invites have been sent."
-            : "All invites have been created. View invite link under actions menu.";
-
-          toaster.create({
-            title: `${
-              newInvites.length > 1 ? "Invites" : "Invite"
-            } created successfully`,
-            description: description,
-            type: "success",
-            duration: 2000,
-            meta: {
-              closable: true,
-            },
-          });
-          onAddMembersClose();
-          void pendingInvites.refetch();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: {
-              closable: true,
-            },
-          });
-        },
-      },
-    );
-  };
-
-  const onSubmit: SubmitHandler<MembersForm> = (data) => {
-    // Count new invites by member type
-    const hasNewFullMembers = data.invites.some(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
-    );
-    const hasNewLiteMembers = data.invites.some(
-      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
-    );
-
-    // Build enforcement list based on what types of members are being added
-    const enforcements = [
-      ...(hasNewFullMembers ? [membersEnforcement] : []),
-      ...(hasNewLiteMembers ? [membersLiteEnforcement] : []),
-    ];
-
-    checkCompoundLimits(enforcements, () => performInviteMutation(data));
-  };
+  const {
+    onSubmit,
+    approveInvite,
+    rejectInvite,
+    deleteInvite,
+    isSubmitting,
+  } = useInviteActions({
+    organizationId: organization.id,
+    isAdmin: hasOrganizationManagePermission,
+    hasEmailProvider: hasEmailProvider ?? false,
+    onInviteCreated: setSelectedInvites,
+    onClose: onAddMembersClose,
+    refetchInvites: () => void pendingInvites.refetch(),
+  });
 
   const deleteMember = (userId: string) => {
     deleteMemberMutation.mutate(
@@ -247,7 +169,6 @@ function MembersList({
               closable: true,
             },
           });
-          // how to refect this organizationWithMembers
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
             .catch((error) => {
@@ -284,26 +205,6 @@ function MembersList({
     onInviteLinkClose();
   };
 
-  const deleteInvite = (inviteId: string) => {
-    deleteInviteMutation.mutate(
-      { inviteId, organizationId: organization.id },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Invite deleted successfully",
-            description: "The invite has been deleted.",
-            type: "success",
-            duration: 5000,
-            meta: {
-              closable: true,
-            },
-          });
-          void pendingInvites.refetch();
-        },
-      },
-    );
-  };
-
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
@@ -312,20 +213,31 @@ function MembersList({
     [organization.members],
   );
 
-  const currentUserIsAdmin = useMemo(
-    () =>
-      organization.members.some(
-        (member) =>
-          member.userId === user?.id &&
-          member.role === OrganizationUserRole.ADMIN,
-      ),
-    [organization.members, user?.id],
-  );
-
   const canDeleteMember = (memberId: string) =>
     hasOrganizationManagePermission &&
     organization.members.length > 1 &&
     memberId !== user?.id;
+
+  const filteredOrgRoleOptions = useMemo(
+    () => getOrgRoleOptionsForUser({ isAdmin: hasOrganizationManagePermission }),
+    [hasOrganizationManagePermission],
+  );
+
+  const sentInvites = useMemo(
+    () =>
+      (pendingInvites.data ?? []).filter(
+        (invite) => invite.status === "PENDING",
+      ),
+    [pendingInvites.data],
+  );
+
+  const waitingApprovalInvites = useMemo(
+    () =>
+      (pendingInvites.data ?? []).filter(
+        (invite) => invite.status === "WAITING_APPROVAL",
+      ),
+    [pendingInvites.data],
+  );
 
   return (
     <SettingsLayout>
@@ -339,22 +251,10 @@ function MembersList({
               (Admin Override) Add members
             </PageLayout.HeaderButton>
           )}
-          <Tooltip
-            content={
-              !currentUserIsAdmin
-                ? "You need admin privileges to add members"
-                : undefined
-            }
-            positioning={{ placement: "top" }}
-          >
-            <PageLayout.HeaderButton
-              onClick={onAddMembersOpen}
-              disabled={!currentUserIsAdmin}
-            >
-              <Plus size={20} />
-              Add members
-            </PageLayout.HeaderButton>
-          </Tooltip>
+          <PageLayout.HeaderButton onClick={onAddMembersOpen}>
+            <Plus size={20} />
+            Add members
+          </PageLayout.HeaderButton>
         </HStack>
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
@@ -439,9 +339,17 @@ function MembersList({
           </Card.Body>
         </Card.Root>
 
-        {pendingInvites.data && pendingInvites.data.length > 0 && (
+        <PendingApprovalSection
+          invites={waitingApprovalInvites}
+          isAdmin={hasOrganizationManagePermission}
+          currentUserId={user?.id ?? ""}
+          onApprove={approveInvite}
+          onReject={rejectInvite}
+        />
+
+        {sentInvites.length > 0 && (
           <VStack align="start" gap={4} paddingTop={4} width="full">
-            <Heading>Pending Invites</Heading>
+            <Heading>Sent Invites</Heading>
 
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0}>
@@ -456,7 +364,7 @@ function MembersList({
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {pendingInvites.data?.map((invite) => (
+                    {sentInvites.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>
                           <RandomColorAvatar size="2xs" name={invite.email} />
@@ -571,10 +479,10 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
-              orgRoleOptions={orgRoleOptions}
+              orgRoleOptions={filteredOrgRoleOptions}
               organizationId={organization.id}
               onSubmit={onSubmit}
-              isLoading={createInvitesMutation.isLoading}
+              isLoading={isSubmitting}
               hasEmailProvider={hasEmailProvider ?? false}
               onClose={onAddMembersClose}
             />
