@@ -2,7 +2,6 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseEvaluationService } from "./clickhouse-evaluation.service";
 import { ElasticsearchEvaluationService } from "./elasticsearch-evaluation.service";
 import type { TraceEvaluation } from "./evaluation-state.types";
@@ -15,7 +14,8 @@ import type { TraceEvaluation } from "./evaluation-state.types";
  * 1. Checks if ClickHouse Evaluations Data Source is enabled for the project
  *    (via featureClickHouseDataSourceEvaluations flag)
  * 2. Routes requests to the appropriate backend based on the feature flag
- * 3. Falls back to Elasticsearch when ClickHouse returns null (not enabled)
+ *
+ * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
  *
  * @example
  * ```ts
@@ -30,7 +30,6 @@ import type { TraceEvaluation } from "./evaluation-state.types";
 export class EvaluationService {
   private readonly clickHouseService: ClickHouseEvaluationService;
   private readonly elasticsearchService: ElasticsearchEvaluationService;
-  private readonly logger = createLogger("langwatch:evaluations:service");
   private readonly tracer = getLangWatchTracer(
     "langwatch.evaluations.service",
   );
@@ -64,8 +63,7 @@ export class EvaluationService {
   /**
    * Get evaluations for a single trace.
    *
-   * Checks the ClickHouse feature flag first. If CH returns data, uses it;
-   * if CH returns null (not enabled), falls back to Elasticsearch.
+   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    *
    * @param params.projectId - The project ID
    * @param params.traceId - The trace ID
@@ -97,13 +95,12 @@ export class EvaluationService {
               projectId,
               traceId,
             });
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getEvaluationsForTrace — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId, traceId },
-            "ClickHouse enabled but returned null for getEvaluationsForTrace, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getEvaluationsForTrace({
@@ -118,8 +115,7 @@ export class EvaluationService {
   /**
    * Get evaluations for multiple traces, grouped by trace ID.
    *
-   * Checks the ClickHouse feature flag first. If CH returns data, uses it;
-   * if CH returns null (not enabled), falls back to Elasticsearch.
+   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    *
    * @param params.projectId - The project ID
    * @param params.traceIds - Array of trace IDs
@@ -156,13 +152,12 @@ export class EvaluationService {
               projectId,
               traceIds,
             });
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getEvaluationsMultiple — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId, traceIdCount: traceIds.length },
-            "ClickHouse enabled but returned null for getEvaluationsMultiple, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getEvaluationsMultiple({

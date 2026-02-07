@@ -19,13 +19,7 @@ import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import {
-  dispatchCompleteExperimentRun,
-  dispatchRecordEvaluatorResult,
-  dispatchRecordTargetResult,
-  dispatchStartExperimentRun,
-  isClickHouseEvaluationsEnabled,
-} from "../dispatch";
+import { ExperimentRunDispatcher } from "../dispatch";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -530,7 +524,8 @@ export async function* runOrchestrator(
   await abortManager.setRunning(runId);
 
   // Check if ClickHouse dual-write is enabled for this project
-  const clickHouseEnabled = await isClickHouseEvaluationsEnabled(projectId);
+  const dispatcher = ExperimentRunDispatcher.create();
+  const clickHouseEnabled = await dispatcher.isClickHouseEnabled(projectId);
 
   // Get repository and initialize storage if enabled
   const repository =
@@ -602,7 +597,7 @@ export async function* runOrchestrator(
 
     // Dispatch event to ClickHouse for dual-write (if enabled)
     if (clickHouseEnabled) {
-      void dispatchStartExperimentRun({
+      void dispatcher.startRun({
         tenantId: projectId,
         runId,
         experimentId,
@@ -663,7 +658,7 @@ export async function* runOrchestrator(
 
       // Dispatch event to ClickHouse for dual-write (if enabled)
       if (clickHouseEnabled) {
-        void dispatchRecordTargetResult({
+        void dispatcher.recordTargetResult({
           tenantId: projectId,
           runId,
           experimentId,
@@ -696,7 +691,7 @@ export async function* runOrchestrator(
 
         // Dispatch error as target result to ClickHouse (if enabled)
         if (clickHouseEnabled) {
-          void dispatchRecordTargetResult({
+          void dispatcher.recordTargetResult({
             tenantId: projectId,
             runId,
             experimentId,
@@ -743,7 +738,7 @@ export async function* runOrchestrator(
 
       // Dispatch event to ClickHouse for dual-write (if enabled)
       if (clickHouseEnabled) {
-        void dispatchRecordEvaluatorResult({
+        void dispatcher.recordEvaluatorResult({
           tenantId: projectId,
           runId,
           experimentId,
@@ -997,7 +992,7 @@ export async function* runOrchestrator(
 
         // Dispatch completion event to ClickHouse for dual-write (if enabled)
         if (clickHouseEnabled) {
-          void dispatchCompleteExperimentRun({
+          void dispatcher.completeRun({
             tenantId: projectId,
             runId,
             finishedAt: aborted ? null : finishedAt,
