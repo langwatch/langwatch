@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.2...python-sdk@v0.11.0) (2026-02-07)
+
+
+### Features
+
+* pass thread_id through execute_component to LangWatch tracing ([ac986cc](https://github.com/langwatch/langwatch/commit/ac986cc3ca0e5e37fa8e71ae304e2cad63cb6b14))
+
+
+### Code Refactoring
+
+* migrate python-sdk prompts to Pydantic + walk up directory tree for prompts.json ([#1392](https://github.com/langwatch/langwatch/issues/1392)) ([66cb286](https://github.com/langwatch/langwatch/commit/66cb286a853964be3d614a509d08a9f38126b42b))
+
 ## [0.10.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.10.1...python-sdk@v0.10.2) (2026-02-05)
 
 
