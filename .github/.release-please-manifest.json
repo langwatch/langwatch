@@ -2,6 +2,6 @@
   "sdk-go": "0.2.0",
   "typescript-sdk": "0.13.0",
   "python-sdk": "0.10.2",
-  "mcp-server": "0.3.3",
+  "mcp-server": "0.4.0",
   ".": "2.0.2"
 }
