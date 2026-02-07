@@ -11,11 +11,9 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { MoreVertical } from "react-feather";
-import { LuMail, LuPencil, LuTrash } from "react-icons/lu";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -23,7 +21,7 @@ import { AddMembersForm } from "../../components/AddMembersForm";
 import { CopyInput } from "../../components/CopyInput";
 import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
 import { getOrgRoleOptionsForUser } from "../../components/members/getOrgRoleOptionsForUser";
-import { PendingApprovalSection } from "../../components/members/PendingApprovalSection";
+import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
@@ -264,6 +262,7 @@ function MembersList({
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
@@ -282,14 +281,11 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>
                         <Link href={`/settings/members/${member.userId}`}>
-                          {member.user.name}{" "}
-                          <Text
-                            as="span"
-                            whiteSpace="nowrap"
-                          >{`(Organization ${roleLabel})`}</Text>
+                          {member.user.name}
                         </Link>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell>{roleLabel}</Table.Cell>
                       <Table.Cell>
                         <TeamMembershipsDisplay
                           teamMemberships={member.user.teamMemberships}
@@ -314,7 +310,7 @@ function MembersList({
                                   void router.push(`/settings/members/${member.userId}`);
                                 }}
                               >
-                                <LuPencil size={16} />
+                                <Pencil size={16} />
                                 Edit
                               </Menu.Item>
                               {canDeleteMember(member.userId) && (
@@ -323,7 +319,7 @@ function MembersList({
                                   color="red.500"
                                   onClick={() => deleteMember(member.userId)}
                                 >
-                                  <LuTrash size={16} />
+                                  <Trash2 size={16} />
                                   Delete
                                 </Menu.Item>
                               )}
@@ -339,88 +335,17 @@ function MembersList({
           </Card.Body>
         </Card.Root>
 
-        <PendingApprovalSection
-          invites={waitingApprovalInvites}
+        <InvitesTable
+          waitingApprovalInvites={waitingApprovalInvites}
+          sentInvites={sentInvites}
           isAdmin={hasOrganizationManagePermission}
           currentUserId={user?.id ?? ""}
+          teams={teams}
           onApprove={approveInvite}
           onReject={rejectInvite}
+          onViewInviteLink={viewInviteLink}
+          onDeleteInvite={deleteInvite}
         />
-
-        {sentInvites.length > 0 && (
-          <VStack align="start" gap={4} paddingTop={4} width="full">
-            <Heading>Sent Invites</Heading>
-
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
-                <Table.Root variant="line" size="md" width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader width="56px" />
-                      <Table.ColumnHeader>Email</Table.ColumnHeader>
-                      <Table.ColumnHeader>Role</Table.ColumnHeader>
-                      <Table.ColumnHeader>Teams</Table.ColumnHeader>
-                      <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {sentInvites.map((invite) => (
-                      <Table.Row key={invite.id}>
-                        <Table.Cell>
-                          <RandomColorAvatar size="2xs" name={invite.email} />
-                        </Table.Cell>
-                        <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>
-                          {orgRoleOptions.find(
-                            (option) => option.value === invite.role,
-                          )?.label ?? invite.role}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Box
-                            width="full"
-                            height="full"
-                            display="flex"
-                            justifyContent="end"
-                          >
-                            <Menu.Root>
-                              <Menu.Trigger>
-                                <MoreVertical size={16} />
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="view-link"
-                                  onClick={() =>
-                                    viewInviteLink(invite.inviteCode, invite.email)
-                                  }
-                                >
-                                  <LuMail size={16} />
-                                  View invite link
-                                </Menu.Item>
-                                {hasOrganizationManagePermission && (
-                                  <Menu.Item
-                                    value="delete"
-                                    color="red.500"
-                                    onClick={() => deleteInvite(invite.id)}
-                                  >
-                                    <LuTrash size={16} />
-                                    Delete
-                                  </Menu.Item>
-                                )}
-                              </Menu.Content>
-                            </Menu.Root>
-                          </Box>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
-              </Card.Body>
-            </Card.Root>
-          </VStack>
-        )}
       </VStack>
 
       <Dialog.Root
@@ -520,35 +445,6 @@ const TeamMembershipsDisplay = ({
             </Badge>
           </Link>
         ))}
-    </Flex>
-  );
-};
-
-interface TeamIdsDisplayProps {
-  teamIds: string;
-  teams: Array<{ id: string; name: string; slug: string }>;
-}
-
-/**
- * Reusable component to display team IDs as clickable badges
- * Single Responsibility: Renders team IDs as a list of clickable badges
- */
-const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
-  return (
-    <Flex gap={2} flexWrap="wrap">
-      {teamIds.split(",").map((teamId) => {
-        const team = teams.find((team) => team.id === teamId);
-
-        if (!team) return null;
-
-        return (
-          <Link href={`/settings/teams/${team.slug}`} key={teamId}>
-            <Badge size="sm" variant="surface">
-              {team.name}
-            </Badge>
-          </Link>
-        );
-      })}
     </Flex>
   );
 };

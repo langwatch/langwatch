@@ -6,7 +6,7 @@
  * Covers the @unit scenarios from specs/members/update-pending-invitation.feature:
  * - Non-admin user sees restricted role options in invite form
  * - Admin user sees all role options in invite form
- * - Non-admin sees waiting status instead of action buttons
+ * - Non-admin sees no action buttons for pending requests
  * - Admin sees approve and reject buttons for pending requests
  */
 import { cleanup, render, screen } from "@testing-library/react";
@@ -60,21 +60,7 @@ describe("<WaitingApprovalActions/>", () => {
   });
 
   describe("when user is a non-admin", () => {
-    it("displays 'Waiting for admin approval' text", () => {
-      render(
-        <WaitingApprovalActions
-          isAdmin={false}
-          inviteId="inv-1"
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("Waiting for admin approval")).toBeTruthy();
-    });
-
-    it("does not display approve or reject buttons", () => {
+    it("does not display approve buttons", () => {
       render(
         <WaitingApprovalActions
           isAdmin={false}
@@ -86,6 +72,19 @@ describe("<WaitingApprovalActions/>", () => {
       );
 
       expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
+    });
+
+    it("does not display reject buttons", () => {
+      render(
+        <WaitingApprovalActions
+          isAdmin={false}
+          inviteId="inv-1"
+          onApprove={vi.fn()}
+          onReject={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
       expect(screen.queryByRole("button", { name: /reject/i })).toBeNull();
     });
   });

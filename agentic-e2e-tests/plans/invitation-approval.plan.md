@@ -32,7 +32,7 @@ Members page: `/settings/members`
 5. Click "Create invites"
 6. Wait for success toast
 7. Close invite link dialog if shown
-8. Verify `direct@example.com` appears in "Sent Invites" section
+8. Verify `direct@example.com` appears in "Invites" list with "Invited" badge
 
 ## Suite 2: Admin Approves Pending Request
 
@@ -44,10 +44,10 @@ Members page: `/settings/members`
 
 1. **Seed:** Create WAITING_APPROVAL invite for `waiting@example.com` via tRPC API
 2. Navigate to `/settings/members`
-3. Verify "Pending Approval" section visible
+3. Verify "Invites" list visible with "Pending Approval" badge
 4. Click "Approve" button in `waiting@example.com` row
 5. Wait for "Invitation approved" toast
-6. Verify `waiting@example.com` moves to "Sent Invites"
+6. Verify `waiting@example.com` appears with "Invited" badge
 
 ## Suite 3: Admin Rejects Pending Request
 
@@ -59,7 +59,7 @@ Members page: `/settings/members`
 
 1. **Seed:** Create WAITING_APPROVAL invite for `reject@example.com` via tRPC API
 2. Navigate to `/settings/members`
-3. Verify "Pending Approval" section visible
+3. Verify "Invites" list visible with "Pending Approval" badge
 4. Click "Reject" button in `reject@example.com` row
 5. Wait for "Invitation rejected" toast
 6. Verify `reject@example.com` removed from all sections
@@ -80,8 +80,7 @@ Members page: `/settings/members`
 4. Verify role dropdown shows only "Member" and "Lite Member"
 5. Click "Create invites"
 6. Wait for "Invitation sent for approval" toast
-7. Verify `newuser@example.com` appears in "Pending Approval" section
-8. Verify row shows "Waiting for admin approval" text
+7. Verify `newuser@example.com` appears in "Invites" list with "Pending Approval" badge
 
 ## Step Definitions
 
@@ -93,8 +92,8 @@ whenISelectOrgRole(page, role)      // Select role dropdown
 whenIClickCreateInvites(page)       // Click submit button
 whenIApproveInvitationFor(page, email)  // Click Approve in row
 whenIRejectInvitationFor(page, email)   // Click Reject in row
-thenISeeSentInviteFor(page, email)      // Assert in Sent Invites
-thenISeePendingApprovalFor(page, email) // Assert in Pending Approval
+thenISeeSentInviteFor(page, email)      // Assert in Invites list with "Invited" badge
+thenISeePendingApprovalFor(page, email) // Assert in Invites list with badge
 thenISeeSuccessToast(page, title)       // Assert toast appears
 seedWaitingApprovalInvite(page, email)  // Create via tRPC API
 ```

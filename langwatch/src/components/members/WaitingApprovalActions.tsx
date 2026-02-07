@@ -1,5 +1,5 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
-import { LuCheck, LuX } from "react-icons/lu";
+import { HStack, IconButton } from "@chakra-ui/react";
+import { Check, X } from "lucide-react";
 
 interface WaitingApprovalActionsProps {
   isAdmin: boolean;
@@ -10,7 +10,7 @@ interface WaitingApprovalActionsProps {
 
 /**
  * Renders action buttons for WAITING_APPROVAL invites.
- * Admins see Approve/Reject buttons; non-admins see a status message.
+ * Admins see Approve/Reject buttons; non-admins see no actions.
  */
 export function WaitingApprovalActions({
   isAdmin,
@@ -19,35 +19,29 @@ export function WaitingApprovalActions({
   onReject,
 }: WaitingApprovalActionsProps) {
   if (!isAdmin) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        Waiting for admin approval
-      </Text>
-    );
+    return null;
   }
 
   return (
     <HStack gap={2}>
-      <Button
-        size="sm"
-        colorPalette="green"
-        variant="outline"
-        onClick={() => onApprove(inviteId)}
+      <IconButton
         aria-label="Approve"
-      >
-        <LuCheck size={14} />
-        Approve
-      </Button>
-      <Button
+        variant="ghost"
         size="sm"
-        colorPalette="red"
-        variant="outline"
-        onClick={() => onReject(inviteId)}
-        aria-label="Reject"
+        color="green.500"
+        onClick={() => onApprove(inviteId)}
       >
-        <LuX size={14} />
-        Reject
-      </Button>
+        <Check size={16} />
+      </IconButton>
+      <IconButton
+        aria-label="Reject"
+        variant="ghost"
+        size="sm"
+        color="red.500"
+        onClick={() => onReject(inviteId)}
+      >
+        <X size={16} />
+      </IconButton>
     </HStack>
   );
 }
