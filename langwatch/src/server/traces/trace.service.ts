@@ -5,7 +5,6 @@ import type { Protections } from "~/server/elasticsearch/protections";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-state.mappers";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import type {
@@ -24,7 +23,8 @@ import type {
  * This service acts as a facade that:
  * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via featureClickHouseDataSourceTraces flag)
  * 2. Routes requests to the appropriate backend based on the feature flag
- * 3. Applies consistent protections/redaction to all responses
+ *
+ * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
  *
  * @example
  * ```ts
@@ -33,7 +33,6 @@ import type {
  * ```
  */
 export class TraceService {
-  private readonly logger = createLogger("langwatch:traces:service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
@@ -176,14 +175,12 @@ export class TraceService {
             threadId,
             protections,
           );
-          if (traces !== null) {
-            return traces;
+          if (traces === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getTracesByThreadId — check ClickHouse client configuration",
+            );
           }
-          // Fall back to Elasticsearch if ClickHouse returns null
-          this.logger.warn(
-            { projectId, threadId },
-            "ClickHouse enabled but returned null for getTracesByThreadId, falling back to Elasticsearch",
-          );
+          return traces;
         }
 
         return this.elasticsearchService.getTracesByThreadId(
@@ -227,14 +224,12 @@ export class TraceService {
             input,
             protections,
           );
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
+            );
           }
-          // If ClickHouse returns null (e.g., client not available), fall back
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getAllTracesForProject(
@@ -318,14 +313,12 @@ export class TraceService {
               threadIds,
               protections,
             );
-          if (traces !== null) {
-            return traces;
+          if (traces === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getTracesWithSpansByThreadIds — check ClickHouse client configuration",
+            );
           }
-          // Fall back to Elasticsearch if ClickHouse returns null
-          this.logger.warn(
-            { projectId, threadIds },
-            "ClickHouse enabled but returned null for getTracesWithSpansByThreadIds, falling back to Elasticsearch",
-          );
+          return traces;
         }
 
         return this.elasticsearchService.getTracesWithSpansByThreadIds(
@@ -358,13 +351,12 @@ export class TraceService {
 
         if (useClickHouse) {
           const result = await this.clickHouseService.getTopicCounts(input);
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getTopicCounts — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getTopicCounts, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getTopicCounts(input);
@@ -394,13 +386,12 @@ export class TraceService {
         if (useClickHouse) {
           const result =
             await this.clickHouseService.getCustomersAndLabels(input);
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getCustomersAndLabels — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId: input.projectId },
-            "ClickHouse enabled but returned null for getCustomersAndLabels, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getCustomersAndLabels(input);
@@ -480,18 +471,10 @@ export class TraceService {
         );
 
         if (useClickHouse) {
-          const result = await this.clickHouseService.getSpanForPromptStudio(
+          return this.clickHouseService.getSpanForPromptStudio(
             projectId,
             spanId,
             protections,
-          );
-          if (result !== null) {
-            return result;
-          }
-          // Fall back to Elasticsearch - span might not be found in ClickHouse
-          this.logger.debug(
-            { projectId, spanId },
-            "Span not found in ClickHouse, falling back to Elasticsearch",
           );
         }
 

@@ -45,7 +45,7 @@ export class ClickHouseFilterService {
 
   /**
    * Get filter definition if the filter is supported in ClickHouse.
-   * Returns null if the filter is not supported (will fall back to Elasticsearch).
+   * Returns null if the filter is not supported.
    */
   private getFilterDefinition(
     field: FilterField,
@@ -106,7 +106,7 @@ export class ClickHouseFilterService {
    * @param projectId - The project ID
    * @param field - The filter field to query
    * @param options - Query options (query string, key, subkey, date range, scope filters)
-   * @returns Array of filter options, or null if not supported
+   * @returns Array of filter options
    */
   async getFilterOptions(
     projectId: string,
@@ -119,7 +119,7 @@ export class ClickHouseFilterService {
       endDate: number;
       scopeFilters?: Partial<Record<FilterField, FilterParam>>;
     },
-  ): Promise<FilterOption[] | null> {
+  ): Promise<FilterOption[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseFilterService.getFilterOptions",
       {
@@ -132,14 +132,16 @@ export class ClickHouseFilterService {
         // Check if ClickHouse is available
         if (!this.clickHouseClient) {
           span.setAttribute("clickhouse.available", false);
-          return null;
+          throw new Error(
+            "ClickHouse client is not available — check ClickHouse connection configuration",
+          );
         }
 
         // Check if this filter is supported in ClickHouse
         const filterDef = this.getFilterDefinition(field);
         if (!filterDef) {
           span.setAttribute("clickhouse.filter_supported", false);
-          return null;
+          return [];
         }
 
         span.setAttribute("clickhouse.filter_supported", true);
@@ -229,10 +231,8 @@ export class ClickHouseFilterService {
             },
             "Failed to fetch filter options from ClickHouse",
           );
-
-          // Return null to trigger Elasticsearch fallback
           span.setAttribute("clickhouse.error", true);
-          return null;
+          throw error;
         }
       },
     );
