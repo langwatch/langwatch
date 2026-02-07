@@ -18,21 +18,6 @@ type TraceWithAnnotations = BaseTrace & {
 };
 
 /**
- * Lazily imports server-only dependencies and formats a trace as an AI-readable digest.
- * Uses dynamic import to avoid pulling Node.js-only OTel SDK into the frontend bundle,
- * since this file is also imported by frontend components for mapping definitions.
- */
-let _formatSpansDigest: typeof import("./spanToReadableSpan").formatSpansDigest | null = null;
-
-function getFormatSpansDigest() {
-  if (!_formatSpansDigest) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    _formatSpansDigest = (require("./spanToReadableSpan") as typeof import("./spanToReadableSpan")).formatSpansDigest;
-  }
-  return _formatSpansDigest;
-}
-
-/**
  * Span subfield type for UI components
  */
 export type SpanSubfield = {
@@ -489,11 +474,6 @@ export const TRACE_MAPPINGS = {
       return threadTraces;
     },
   },
-  formatted_trace: {
-    mapping: (trace: TraceWithAnnotations) => {
-      return getFormatSpansDigest()(trace.spans ?? []);
-    },
-  },
 } satisfies Record<
   string,
   {
@@ -624,17 +604,6 @@ export const THREAD_MAPPINGS = {
       selectedFields: (keyof typeof TRACE_MAPPINGS)[] = [],
     ) => extractTracesFields(thread.traces, selectedFields),
   },
-  formatted_traces: {
-    mapping: (thread: {
-      thread_id: string;
-      traces: TraceWithAnnotations[];
-    }) => {
-      const format = getFormatSpansDigest();
-      return thread.traces
-        .map((trace) => format(trace.spans ?? []))
-        .join("\n\n---\n\n");
-    },
-  },
 } as const;
 
 export type TraceMapping = Record<
@@ -646,6 +615,22 @@ export type TraceMapping = Record<
   }
 >;
 
+/**
+ * Additional mapping source keys that are only executed server-side (e.g. in the evaluations worker).
+ * They appear in the UI and schema but their implementations live outside this shared module
+ * to avoid pulling Node.js-only dependencies into the frontend bundle.
+ */
+export const SERVER_ONLY_TRACE_SOURCES = ["formatted_trace"] as const;
+export const SERVER_ONLY_THREAD_SOURCES = ["formatted_traces"] as const;
+
+export type AllTraceMappingSources =
+  | keyof typeof TRACE_MAPPINGS
+  | (typeof SERVER_ONLY_TRACE_SOURCES)[number];
+
+export type AllThreadMappingSources =
+  | keyof typeof THREAD_MAPPINGS
+  | (typeof SERVER_ONLY_THREAD_SOURCES)[number];
+
 export const mappingStateSchema = z.object({
   mapping: z.record(
     z.string(),
@@ -653,9 +638,10 @@ export const mappingStateSchema = z.object({
       z
         .object({
           source: z.union([
-            z.enum(
-              Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS],
-            ),
+            z.enum([
+              ...(Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS]),
+              ...SERVER_ONLY_TRACE_SOURCES,
+            ]),
             z.literal(""),
           ]),
           key: z.string().optional(),
@@ -667,9 +653,12 @@ export const mappingStateSchema = z.object({
       z
         .object({
           source: z.union([
-            z.enum(
-              Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS],
-            ),
+            z.enum([
+              ...(Object.keys(THREAD_MAPPINGS) as [
+                keyof typeof THREAD_MAPPINGS,
+              ]),
+              ...SERVER_ONLY_THREAD_SOURCES,
+            ]),
             z.literal(""),
           ]),
           key: z.string().optional(),
@@ -940,7 +929,7 @@ const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
  * Keys not listed here will use their key name as the label.
  */
 const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
-  formatted_traces: "Full Traces (AI-Readable)",
+  formatted_traces: "Full Thread (AI-Readable)",
 };
 
 /**
@@ -956,59 +945,58 @@ export function getTraceAvailableSources(
 ): TraceAvailableSource[] {
   // Filter out "threads" from trace-level sources - it's confusing at trace level
   // (threads is for getting all traces in a thread, which is a thread-level concept)
-  const traceFields = Object.entries(TRACE_MAPPINGS)
-    .filter(([key]) => key !== "threads")
-    .map(([key, config]) => {
-      const hasKeys = "keys" in config && typeof config.keys === "function";
-      const label = TRACE_MAPPING_LABELS[key];
+  const traceFields: TraceAvailableSource["fields"] = [
+    // Server-only trace sources at the top for discoverability
+    ...SERVER_ONLY_TRACE_SOURCES.map((source) => ({
+      name: source,
+      label: TRACE_MAPPING_LABELS[source],
+      type: "str" as const,
+    })),
+    ...Object.entries(TRACE_MAPPINGS)
+      .filter(([key]) => key !== "threads")
+      .map(([key, config]) => {
+        const hasKeys = "keys" in config && typeof config.keys === "function";
 
-      if (key === "formatted_trace") {
+        // Provide dynamic children for metadata
+        if (key === "metadata") {
+          return {
+            name: key,
+            type: "dict" as const,
+            // Use dynamic metadata keys with "* (any key)" always available
+            children: buildMetadataFieldChildren(metadataKeys),
+            // Allow selecting metadata itself (returns full metadata object)
+            isComplete: true,
+            isCompleteLabel: "All metadata",
+          };
+        }
+
+        if (key === "spans") {
+          return {
+            name: key,
+            type: "list" as const,
+            // Use dynamic span names with "* (any span)" always available
+            children: buildSpanFieldChildren(spanNames),
+            // Allow selecting spans itself (returns all spans array)
+            isComplete: true,
+            isCompleteLabel: "Full spans array",
+          };
+        }
+
+        // Other fields with keys() function - mark as complete (no nested selection needed)
+        if (hasKeys) {
+          return {
+            name: key,
+            type: "dict" as const,
+            isComplete: true,
+          };
+        }
+
         return {
           name: key,
-          label,
           type: "str" as const,
         };
-      }
-
-      // Provide dynamic children for metadata
-      if (key === "metadata") {
-        return {
-          name: key,
-          type: "dict" as const,
-          // Use dynamic metadata keys with "* (any key)" always available
-          children: buildMetadataFieldChildren(metadataKeys),
-          // Allow selecting metadata itself (returns full metadata object)
-          isComplete: true,
-          isCompleteLabel: "All metadata",
-        };
-      }
-
-      if (key === "spans") {
-        return {
-          name: key,
-          type: "list" as const,
-          // Use dynamic span names with "* (any span)" always available
-          children: buildSpanFieldChildren(spanNames),
-          // Allow selecting spans itself (returns all spans array)
-          isComplete: true,
-          isCompleteLabel: "Full spans array",
-        };
-      }
-
-      // Other fields with keys() function - mark as complete (no nested selection needed)
-      if (hasKeys) {
-        return {
-          name: key,
-          type: "dict" as const,
-          isComplete: true,
-        };
-      }
-
-      return {
-        name: key,
-        type: "str" as const,
-      };
-    });
+      }),
+  ];
 
   return [
     {
@@ -1029,44 +1017,42 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
       id: "thread",
       name: "Thread",
       type: "dataset",
-      fields: Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-        const label = THREAD_MAPPING_LABELS[key];
+      fields: [
+        // Server-only thread sources at the top for discoverability
+        ...SERVER_ONLY_THREAD_SOURCES.map((source) => ({
+          name: source,
+          label: THREAD_MAPPING_LABELS[source],
+          type: "str" as const,
+        })),
+        ...Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
+          // Special handling for "traces" - provide nested children for field selection
+          if (key === "traces") {
+            return {
+              name: key,
+              type: "list" as const,
+              children: THREAD_TRACES_CHILDREN,
+              // Allow selecting traces itself (returns all trace data)
+              isComplete: true,
+            };
+          }
 
-        // Special handling for "traces" - provide nested children for field selection
-        if (key === "traces") {
+          const hasKeys = "keys" in config && typeof config.keys === "function";
+
+          // For thread mappings, most fields are complete selections
+          if (hasKeys) {
+            return {
+              name: key,
+              type: "dict" as const,
+              isComplete: true,
+            };
+          }
+
           return {
             name: key,
-            type: "list" as const,
-            children: THREAD_TRACES_CHILDREN,
-            // Allow selecting traces itself (returns all trace data)
-            isComplete: true,
-          };
-        }
-
-        if (key === "formatted_traces") {
-          return {
-            name: key,
-            label,
             type: "str" as const,
           };
-        }
-
-        const hasKeys = "keys" in config && typeof config.keys === "function";
-
-        // For thread mappings, most fields are complete selections
-        if (hasKeys) {
-          return {
-            name: key,
-            type: "dict" as const,
-            isComplete: true,
-          };
-        }
-
-        return {
-          name: key,
-          type: "str" as const,
-        };
-      }),
+        }),
+      ],
     },
   ];
 }

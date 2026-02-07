@@ -504,20 +504,6 @@ describe("formatSpansDigest", () => {
   });
 });
 
-describe("TRACE_MAPPINGS.formatted_trace", () => {
-  it("exists as a mapping key", () => {
-    expect(TRACE_MAPPINGS).toHaveProperty("formatted_trace");
-    expect(TRACE_MAPPINGS.formatted_trace).toHaveProperty("mapping");
-  });
-});
-
-describe("THREAD_MAPPINGS.formatted_traces", () => {
-  it("exists as a mapping key", () => {
-    expect(THREAD_MAPPINGS).toHaveProperty("formatted_traces");
-    expect(THREAD_MAPPINGS.formatted_traces).toHaveProperty("mapping");
-  });
-});
-
 describe("getTraceAvailableSources", () => {
   it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
     const sources = getTraceAvailableSources([], []);
@@ -543,7 +529,7 @@ describe("getTraceAvailableSources", () => {
 });
 
 describe("getThreadAvailableSources", () => {
-  it("includes formatted_traces with label 'Full Traces (AI-Readable)'", () => {
+  it("includes formatted_traces with label 'Full Thread (AI-Readable)'", () => {
     const sources = getThreadAvailableSources();
     const threadSource = sources[0]!;
     const formattedField = threadSource.fields.find(
@@ -551,7 +537,7 @@ describe("getThreadAvailableSources", () => {
     );
 
     expect(formattedField).toBeDefined();
-    expect(formattedField!.label).toBe("Full Traces (AI-Readable)");
+    expect(formattedField!.label).toBe("Full Thread (AI-Readable)");
     expect(formattedField!.type).toBe("str");
   });
 });

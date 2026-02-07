@@ -56,10 +56,13 @@ import { connection } from "../../redis";
 import {
   type MappingState,
   mapTraceToDatasetEntry,
+  SERVER_ONLY_THREAD_SOURCES,
+  SERVER_ONLY_TRACE_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../../tracer/tracesMapping";
+import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
   EVALUATIONS_QUEUE,
@@ -180,54 +183,80 @@ const buildThreadData = async (
       ("type" in mappingConfig && mappingConfig.type === "thread") ||
       // Backward compat: source in THREAD_MAPPINGS without explicit type
       ("source" in mappingConfig &&
-        mappingConfig.source in THREAD_MAPPINGS);
+        (mappingConfig.source in THREAD_MAPPINGS ||
+          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
+            mappingConfig.source,
+          )));
 
     if (isThreadMapping && "source" in mappingConfig) {
-      const source = mappingConfig.source as keyof typeof THREAD_MAPPINGS;
+      const source = mappingConfig.source;
 
       // Skip empty source
       if (!source) {
         continue;
       }
 
-      // Use the mapping function from THREAD_MAPPINGS dynamically
-      const selectedFields =
-        ("selectedFields" in mappingConfig
-          ? mappingConfig.selectedFields
-          : undefined) ?? [];
-      result[targetField] = THREAD_MAPPINGS[source].mapping(
-        { thread_id: threadId, traces: threadTraces },
-        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-      );
+      // Handle server-only thread sources (e.g. formatted_traces)
+      if (
+        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
+      ) {
+        if (source === "formatted_traces") {
+          result[targetField] = threadTraces
+            .map((t) => formatSpansDigest(t.spans ?? []))
+            .join("\n\n---\n\n");
+        }
+      } else {
+        // Use the mapping function from THREAD_MAPPINGS dynamically
+        const threadSource = source as keyof typeof THREAD_MAPPINGS;
+        const selectedFields =
+          ("selectedFields" in mappingConfig
+            ? mappingConfig.selectedFields
+            : undefined) ?? [];
+        result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
+          { thread_id: threadId, traces: threadTraces },
+          selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+        );
 
-      logger.info(
-        {
-          targetField,
-          source,
-          ...(selectedFields.length > 0 && { selectedFields }),
-          ...(source === "traces" && {
-            traceCount: (result[targetField] as any[]).length,
-          }),
-        },
-        "Mapped thread field",
-      );
+        logger.info(
+          {
+            targetField,
+            source,
+            ...(selectedFields.length > 0 && { selectedFields }),
+            ...(source === "traces" && {
+              traceCount: (result[targetField] as any[]).length,
+            }),
+          },
+          "Mapped thread field",
+        );
+      }
     } else {
       // Regular trace mapping - use current trace
       // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
       if ("source" in mappingConfig) {
-        const traceMappingConfig = {
-          source: mappingConfig.source,
-          key: mappingConfig.key,
-          subkey: mappingConfig.subkey,
-        };
-        const mapped = mapTraceToDatasetEntry(
-          trace,
-          { [targetField]: traceMappingConfig as any },
-          new Set(),
-          undefined,
-          undefined,
-        )[0];
-        result[targetField] = mapped?.[targetField];
+        // Handle server-only trace sources (e.g. formatted_trace)
+        if (
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+            mappingConfig.source,
+          )
+        ) {
+          if (mappingConfig.source === "formatted_trace") {
+            result[targetField] = formatSpansDigest(trace.spans ?? []);
+          }
+        } else {
+          const traceMappingConfig = {
+            source: mappingConfig.source,
+            key: mappingConfig.key,
+            subkey: mappingConfig.subkey,
+          };
+          const mapped = mapTraceToDatasetEntry(
+            trace,
+            { [targetField]: traceMappingConfig as any },
+            new Set(),
+            undefined,
+            undefined,
+          )[0];
+          result[targetField] = mapped?.[targetField];
+        }
         logger.info(
           {
             targetField,
@@ -339,6 +368,23 @@ const buildDataForEvaluation = async (
     if (!mappedData) {
       throw new Error("No mapped data found to run evaluator");
     }
+
+    // Fill in server-only trace sources that mapTraceToDatasetEntry doesn't handle
+    if (mappings?.mapping) {
+      for (const [field, config] of Object.entries(mappings.mapping)) {
+        if (
+          "source" in config &&
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+            config.source,
+          )
+        ) {
+          if (config.source === "formatted_trace") {
+            mappedData[field] = formatSpansDigest(trace.spans ?? []);
+          }
+        }
+      }
+    }
+
     data = mappedData;
   }
 
