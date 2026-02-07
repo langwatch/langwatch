@@ -2,6 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-state.mappers";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
@@ -262,13 +264,21 @@ export class TraceService {
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
-      async () => {
-        // Evaluations are only in Elasticsearch for now
-        return this.elasticsearchService.getEvaluationsMultiple(
+      async (span) => {
+        const evalService = EvaluationService.create(this.prisma);
+        const useClickHouse = await evalService.isClickHouseEnabled(projectId);
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
+
+        const result = await evalService.getEvaluationsMultiple({
           projectId,
           traceIds,
           protections,
-        );
+        });
+
+        return mapTraceEvaluationsToLegacyEvaluations(result);
       },
     );
   }

@@ -1,0 +1,222 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { PrismaClient } from "@prisma/client";
+import { getLangWatchTracer } from "langwatch";
+import { getClickHouseClient } from "~/server/clickhouse/client";
+import { prisma as defaultPrisma } from "~/server/db";
+import { createLogger } from "~/utils/logger/server";
+import type { ClickHouseEvaluationStateRow } from "./evaluation-state.mappers";
+import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-state.mappers";
+import type { TraceEvaluation } from "./evaluation-state.types";
+
+/**
+ * Service for fetching per-trace evaluation states from ClickHouse.
+ *
+ * Returns null when ClickHouse is not enabled for the project, allowing
+ * the caller to fall back to Elasticsearch.
+ *
+ * Queries the `evaluation_states` table using `FINAL` to collapse
+ * ReplacingMergeTree versions.
+ */
+export class ClickHouseEvaluationService {
+  private readonly clickHouseClient: ClickHouseClient | null;
+  private readonly logger = createLogger(
+    "langwatch:evaluations:clickhouse-service",
+  );
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.evaluations.clickhouse-service",
+  );
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.clickHouseClient = getClickHouseClient();
+  }
+
+  /**
+   * Static factory method for creating ClickHouseEvaluationService with default dependencies.
+   */
+  static create(
+    prisma: PrismaClient = defaultPrisma,
+  ): ClickHouseEvaluationService {
+    return new ClickHouseEvaluationService(prisma);
+  }
+
+  /**
+   * Check if ClickHouse evaluations data source is enabled for the given project.
+   */
+  async isClickHouseEnabled(projectId: string): Promise<boolean> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseEvaluationService.isClickHouseEnabled",
+      { attributes: { "tenant.id": projectId } },
+      async (span) => {
+        if (!this.clickHouseClient) {
+          return false;
+        }
+
+        const project = await this.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { featureClickHouseDataSourceEvaluations: true },
+        });
+
+        span.setAttribute(
+          "project.feature.clickhouse.evaluations",
+          project?.featureClickHouseDataSourceEvaluations === true,
+        );
+
+        return project?.featureClickHouseDataSourceEvaluations === true;
+      },
+    );
+  }
+
+  /**
+   * Get evaluations for a single trace.
+   *
+   * Returns null if ClickHouse is not enabled for the project.
+   *
+   * @param params.projectId - The project (tenant) ID
+   * @param params.traceId - The trace ID to fetch evaluations for
+   * @returns Array of TraceEvaluation, or null if CH is not enabled
+   */
+  async getEvaluationsForTrace({
+    projectId,
+    traceId,
+  }: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TraceEvaluation[] | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseEvaluationService.getEvaluationsForTrace",
+      { attributes: { "tenant.id": projectId, "trace.id": traceId } },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        this.logger.debug(
+          { projectId, traceId },
+          "Fetching evaluations for trace from ClickHouse",
+        );
+
+        try {
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT *
+              FROM evaluation_states FINAL
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+            `,
+            query_params: {
+              tenantId: projectId,
+              traceId,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows =
+            (await result.json()) as ClickHouseEvaluationStateRow[];
+
+          return rows.map(mapClickHouseEvaluationToTraceEvaluation);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              traceId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluations for trace from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluations for trace");
+        }
+      },
+    );
+  }
+
+  /**
+   * Get evaluations for multiple traces, grouped by trace ID.
+   *
+   * Returns null if ClickHouse is not enabled for the project.
+   *
+   * @param params.projectId - The project (tenant) ID
+   * @param params.traceIds - Array of trace IDs to fetch evaluations for
+   * @returns Record mapping traceId to TraceEvaluation[], or null if CH is not enabled
+   */
+  async getEvaluationsMultiple({
+    projectId,
+    traceIds,
+  }: {
+    projectId: string;
+    traceIds: string[];
+  }): Promise<Record<string, TraceEvaluation[]> | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseEvaluationService.getEvaluationsMultiple",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "trace.count": traceIds.length,
+        },
+      },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        if (traceIds.length === 0) {
+          return {};
+        }
+
+        this.logger.debug(
+          { projectId, traceIdCount: traceIds.length },
+          "Fetching evaluations for multiple traces from ClickHouse",
+        );
+
+        try {
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT *
+              FROM evaluation_states FINAL
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+            `,
+            query_params: {
+              tenantId: projectId,
+              traceIds,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows =
+            (await result.json()) as ClickHouseEvaluationStateRow[];
+
+          // Group by TraceId
+          const grouped: Record<string, TraceEvaluation[]> = {};
+          for (const traceId of traceIds) {
+            grouped[traceId] = [];
+          }
+          for (const row of rows) {
+            const traceId = row.TraceId;
+            if (traceId) {
+              if (!grouped[traceId]) {
+                grouped[traceId] = [];
+              }
+              grouped[traceId]!.push(
+                mapClickHouseEvaluationToTraceEvaluation(row),
+              );
+            }
+          }
+
+          return grouped;
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              traceIdCount: traceIds.length,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch evaluations for multiple traces from ClickHouse",
+          );
+          throw new Error("Failed to fetch evaluations for multiple traces");
+        }
+      },
+    );
+  }
+}
