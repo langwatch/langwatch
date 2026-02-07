@@ -3,10 +3,13 @@ import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
   extractTracesFields,
+  getThreadAvailableSources,
+  getTraceAvailableSources,
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "../tracesMapping";
+import { formatSpansDigest } from "../spanToReadableSpan";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {
@@ -380,5 +383,161 @@ describe("THREAD_MAPPINGS", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ input: "Hello" });
+  });
+});
+
+describe("formatSpansDigest", () => {
+  it("produces a string digest from spans", () => {
+    const spans = [
+      {
+        span_id: "span-1",
+        trace_id: "trace-1",
+        type: "agent" as const,
+        name: "my-agent",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000002000 },
+        input: { type: "text" as const, value: "Hello" },
+        output: { type: "text" as const, value: "Hi there" },
+        error: null,
+        metrics: null,
+        params: null,
+      },
+      {
+        span_id: "span-2",
+        parent_id: "span-1",
+        trace_id: "trace-1",
+        type: "llm" as const,
+        name: "gpt-4o",
+        model: "gpt-4o",
+        vendor: "openai",
+        timestamps: { started_at: 1700000000500, finished_at: 1700000001500 },
+        input: {
+          type: "chat_messages" as const,
+          value: [{ role: "user" as const, content: "Hello" }],
+        },
+        output: {
+          type: "chat_messages" as const,
+          value: [{ role: "assistant" as const, content: "Hi there" }],
+        },
+        error: null,
+        metrics: { prompt_tokens: 10, completion_tokens: 5 },
+        params: { temperature: 0.7 },
+      },
+    ];
+
+    const result = formatSpansDigest(spans);
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("my-agent");
+    expect(result).toContain("gpt-4o");
+  });
+
+  it("returns empty digest for empty spans array", () => {
+    const result = formatSpansDigest([]);
+    expect(typeof result).toBe("string");
+  });
+
+  it("includes error information in the digest", () => {
+    const spans = [
+      {
+        span_id: "span-err",
+        trace_id: "trace-1",
+        type: "tool" as const,
+        name: "failing-tool",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000001000 },
+        input: { type: "text" as const, value: "query" },
+        output: null,
+        error: {
+          has_error: true as const,
+          message: "Connection refused",
+          stacktrace: [],
+        },
+        metrics: null,
+        params: null,
+      },
+    ];
+
+    const result = formatSpansDigest(spans);
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("failing-tool");
+    expect(result).toContain("ERROR");
+  });
+
+  it("joins multiple trace digests with separator for thread use", () => {
+    const trace1Spans = [
+      {
+        span_id: "s1",
+        trace_id: "trace-1",
+        type: "span" as const,
+        name: "first-span",
+        timestamps: { started_at: 1700000000000, finished_at: 1700000001000 },
+        input: null,
+        output: null,
+        error: null,
+        metrics: null,
+        params: null,
+      },
+    ];
+    const trace2Spans = [
+      {
+        span_id: "s2",
+        trace_id: "trace-2",
+        type: "span" as const,
+        name: "second-span",
+        timestamps: { started_at: 1700000002000, finished_at: 1700000003000 },
+        input: null,
+        output: null,
+        error: null,
+        metrics: null,
+        params: null,
+      },
+    ];
+
+    const result = [trace1Spans, trace2Spans]
+      .map((spans) => formatSpansDigest(spans))
+      .join("\n\n---\n\n");
+
+    expect(typeof result).toBe("string");
+    expect(result).toContain("first-span");
+    expect(result).toContain("second-span");
+    expect(result).toContain("---");
+  });
+});
+
+describe("getTraceAvailableSources", () => {
+  it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
+    const sources = getTraceAvailableSources([], []);
+    const traceSource = sources[0]!;
+    const formattedField = traceSource.fields.find(
+      (f) => f.name === "formatted_trace",
+    );
+
+    expect(formattedField).toBeDefined();
+    expect(formattedField!.label).toBe("Full Trace (AI-Readable)");
+    expect(formattedField!.type).toBe("str");
+  });
+
+  it("does not include threads in trace-level sources", () => {
+    const sources = getTraceAvailableSources([], []);
+    const traceSource = sources[0]!;
+    const threadsField = traceSource.fields.find(
+      (f) => f.name === "threads",
+    );
+
+    expect(threadsField).toBeUndefined();
+  });
+});
+
+describe("getThreadAvailableSources", () => {
+  it("includes formatted_traces with label 'Full Thread (AI-Readable)'", () => {
+    const sources = getThreadAvailableSources();
+    const threadSource = sources[0]!;
+    const formattedField = threadSource.fields.find(
+      (f) => f.name === "formatted_traces",
+    );
+
+    expect(formattedField).toBeDefined();
+    expect(formattedField!.label).toBe("Full Thread (AI-Readable)");
+    expect(formattedField!.type).toBe("str");
   });
 });
