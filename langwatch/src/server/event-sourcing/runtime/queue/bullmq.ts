@@ -22,9 +22,8 @@ import {
   runWithContext,
 } from "../../../context/asyncContext";
 import {
-  type BullMQQueueState,
   recordJobWaitDuration,
-  setBullMQJobCount,
+  collectBullMQQueueMetrics,
 } from "../../../metrics";
 import type {
   DeduplicationConfig,
@@ -254,25 +253,10 @@ export class EventSourcedQueueProcessorBullMq<
    */
   private async collectQueueMetrics(): Promise<void> {
     try {
-      const counts = await this.queue.getJobCounts();
-
-      // Report each state as a gauge metric
-      const states: Array<{ state: BullMQQueueState; count: number }> = [
-        { state: "waiting", count: counts.waiting ?? 0 },
-        { state: "active", count: counts.active ?? 0 },
-        { state: "completed", count: counts.completed ?? 0 },
-        { state: "failed", count: counts.failed ?? 0 },
-        { state: "delayed", count: counts.delayed ?? 0 },
-        { state: "paused", count: counts.paused ?? 0 },
-        { state: "prioritized", count: counts.prioritized ?? 0 },
-        { state: "waiting-children", count: counts["waiting-children"] ?? 0 },
-      ];
-
-      for (const { state, count } of states) {
-        setBullMQJobCount(this.queueName, state, count);
-      }
+      const client = await this.queue.client;
+      await collectBullMQQueueMetrics(client, this.queueName);
     } catch (error) {
-      this.logger.debug(
+      this.logger.warn(
         {
           queueName: this.queueName,
           error: error instanceof Error ? error.message : String(error),

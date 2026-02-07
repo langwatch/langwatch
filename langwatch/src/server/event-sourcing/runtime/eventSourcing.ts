@@ -336,3 +336,21 @@ export const getTraceProcessingPipeline = createLazyPipeline(() =>
 export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(evaluationProcessingPipelineDefinition),
 );
+
+/**
+ * Returns the experiment run processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export const getExperimentRunProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(experimentRunProcessingPipelineDefinition),
+);
+
+/**
+ * Eagerly initializes all pipelines.
+ * Call at worker startup to ensure queue processors and metrics collection start immediately.
+ */
+export function initializeAllPipelines(): void {
+  getTraceProcessingPipeline();
+  getEvaluationProcessingPipeline();
+  getExperimentRunProcessingPipeline();
+}

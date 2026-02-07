@@ -11,12 +11,15 @@ import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../utils/logger/server";
 import { connection } from "../../redis";
+import { collectBullMQQueueMetrics } from "../../metrics";
 import {
   type JobDataWithContext,
   createContextFromJobData,
   getJobContextMetadata,
   runWithContext,
 } from "../../context/asyncContext";
+
+const QUEUE_METRICS_INTERVAL_MS = 15000;
 
 const logger = createLogger("langwatch:queueWithFallback");
 
@@ -36,6 +39,8 @@ export class QueueWithFallback<
   private worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>;
   private tracer = getLangWatchTracer("langwatch.queueWithFallback");
 
+  private metricsInterval: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     name: string,
     worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>,
@@ -48,6 +53,32 @@ export class QueueWithFallback<
     } as QueueOptions;
     super(name, optsWithTelemetry, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;
+
+    if (connection) {
+      this.startMetricsCollection();
+    }
+  }
+
+  private startMetricsCollection(): void {
+    void this.collectQueueMetrics();
+    this.metricsInterval = setInterval(() => {
+      void this.collectQueueMetrics();
+    }, QUEUE_METRICS_INTERVAL_MS);
+  }
+
+  private async collectQueueMetrics(): Promise<void> {
+    try {
+      const client = await this.client;
+      await collectBullMQQueueMetrics(client, this.name);
+    } catch (error) {
+      logger.warn(
+        {
+          queueName: this.name,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to collect queue metrics",
+      );
+    }
   }
 
   async add(

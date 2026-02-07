@@ -190,6 +190,46 @@ export const setBullMQJobCount = (
   count: number,
 ) => bullmqJobTotal.labels(queueName, state).set(count);
 
+/**
+ * Collects BullMQ queue metrics by querying Redis directly.
+ *
+ * Uses individual LLEN/ZCARD commands instead of BullMQ's getJobCounts()
+ * Lua script, which fails with CROSSSLOT errors in Redis Cluster when
+ * queue names lack hash tags.
+ */
+export async function collectBullMQQueueMetrics(
+  client: { llen(key: string): Promise<number>; zcard(key: string): Promise<number> },
+  queueName: string,
+  prefix = "bull",
+): Promise<void> {
+  const keyPrefix = `${prefix}:${queueName}`;
+
+  // BullMQ key suffix differs from state name for "waiting"
+  const stateKeyMap: Record<string, string> = { waiting: "wait" };
+
+  // States stored as lists (LLEN)
+  const listStates: BullMQQueueState[] = ["waiting", "active", "paused"];
+  // States stored as sorted sets (ZCARD)
+  const zsetStates: BullMQQueueState[] = [
+    "completed",
+    "failed",
+    "delayed",
+    "prioritized",
+    "waiting-children",
+  ];
+
+  for (const state of listStates) {
+    const key = `${keyPrefix}:${stateKeyMap[state] ?? state}`;
+    const count = await client.llen(key);
+    setBullMQJobCount(queueName, state, count);
+  }
+  for (const state of zsetStates) {
+    const key = `${keyPrefix}:${stateKeyMap[state] ?? state}`;
+    const count = await client.zcard(key);
+    setBullMQJobCount(queueName, state, count);
+  }
+}
+
 // Histogram for job wait time (time from enqueue to processing start)
 register.removeSingleMetric("bullmq_job_wait_duration_milliseconds");
 export const bullmqJobWaitDurationHistogram = new Histogram({

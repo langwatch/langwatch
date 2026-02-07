@@ -41,6 +41,7 @@ import {
   stopStorageStatsCollection,
 } from "../clickhouse/metrics";
 import { initializeEventSourcing } from "../event-sourcing";
+import { initializeAllPipelines } from "../event-sourcing/runtime/eventSourcing";
 import { connection as redis } from "../redis";
 import { startScenarioProcessor } from "../scenarios/scenario.processor";
 import type {
@@ -127,6 +128,10 @@ export const start = (
     clickHouseClient,
     redisConnection: redis,
   });
+
+  // Eagerly initialize ES pipelines so their BullMQ queue processors
+  // and metrics collection start at worker boot
+  initializeAllPipelines();
 
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
   if (clickHouseClient) {
