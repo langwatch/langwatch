@@ -19,13 +19,13 @@ import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import { getExperimentRunProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
-import type {
-  CompleteExperimentRunCommandData,
-  RecordEvaluatorResultCommandData,
-  RecordTargetResultCommandData,
-  StartExperimentRunCommandData,
-} from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
+import {
+  dispatchCompleteExperimentRun,
+  dispatchRecordEvaluatorResult,
+  dispatchRecordTargetResult,
+  dispatchStartExperimentRun,
+  isClickHouseEvaluationsEnabled,
+} from "../dispatch";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -59,92 +59,6 @@ const DEFAULT_CONCURRENCY = parseInt(
   process.env.EVAL_V3_CONCURRENCY ?? "10",
   10,
 );
-
-/**
- * Checks if ClickHouse dual-write is enabled for batch evaluations.
- * Uses the featureClickHouseDataSourceEvaluations project flag.
- */
-const isClickHouseEvaluationsEnabled = async (
-  projectId: string,
-): Promise<boolean> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { featureEventSourcingEvaluationIngestion: true },
-  });
-  return project?.featureEventSourcingEvaluationIngestion === true;
-};
-
-/**
- * Dispatches start experiment run command to ClickHouse via event sourcing.
- * Fire-and-forget - errors are logged but don't affect the main execution.
- */
-const dispatchStartExperimentRun = async (
-  payload: StartExperimentRunCommandData,
-): Promise<void> => {
-  try {
-    const pipeline = getExperimentRunProcessingPipeline();
-    await pipeline.commands.startExperimentRun.send(payload);
-  } catch (error) {
-    logger.warn(
-      { error, runId: payload.runId },
-      "Failed to dispatch start experiment run event to ClickHouse",
-    );
-  }
-};
-
-/**
- * Dispatches record target result command to ClickHouse via event sourcing.
- * Fire-and-forget - errors are logged but don't affect the main execution.
- */
-const dispatchRecordTargetResult = async (
-  payload: RecordTargetResultCommandData,
-): Promise<void> => {
-  try {
-    const pipeline = getExperimentRunProcessingPipeline();
-    await pipeline.commands.recordTargetResult.send(payload);
-  } catch (error) {
-    logger.warn(
-      { error, runId: payload.runId },
-      "Failed to dispatch record target result event to ClickHouse",
-    );
-  }
-};
-
-/**
- * Dispatches record evaluator result command to ClickHouse via event sourcing.
- * Fire-and-forget - errors are logged but don't affect the main execution.
- */
-const dispatchRecordEvaluatorResult = async (
-  payload: RecordEvaluatorResultCommandData,
-): Promise<void> => {
-  try {
-    const pipeline = getExperimentRunProcessingPipeline();
-    await pipeline.commands.recordEvaluatorResult.send(payload);
-  } catch (error) {
-    logger.warn(
-      { error, runId: payload.runId },
-      "Failed to dispatch record evaluator result event to ClickHouse",
-    );
-  }
-};
-
-/**
- * Dispatches complete experiment run command to ClickHouse via event sourcing.
- * Fire-and-forget - errors are logged but don't affect the main execution.
- */
-const dispatchCompleteExperimentRun = async (
-  payload: CompleteExperimentRunCommandData,
-): Promise<void> => {
-  try {
-    const pipeline = getExperimentRunProcessingPipeline();
-    await pipeline.commands.completeExperimentRun.send(payload);
-  } catch (error) {
-    logger.warn(
-      { error, runId: payload.runId },
-      "Failed to dispatch complete experiment run event to ClickHouse",
-    );
-  }
-};
 
 /**
  * Input data required to run the orchestrator.
