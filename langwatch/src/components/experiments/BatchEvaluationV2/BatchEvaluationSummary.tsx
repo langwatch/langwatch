@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { FormatMoney } from "../../../optimization_studio/components/FormatMoney";
 import type { AppRouter } from "../../../server/api/root";
-import type { ESBatchEvaluation } from "../../../server/experiments/types";
+import type { ExperimentRun } from "../../../server/evaluations-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { HoverableBigText } from "../../HoverableBigText";
@@ -41,9 +41,9 @@ export function BatchEvaluationV2EvaluationSummary({
   }, [run.timestamps, currentTimestamp]);
 
   const runtime = Math.max(
-    run.timestamps.created_at
+    run.timestamps.createdAt
       ? (finishedAt ?? currentTimestamp) -
-          new Date(run.timestamps.created_at).getTime()
+          new Date(run.timestamps.createdAt).getTime()
       : 0,
     0,
   );
@@ -100,8 +100,8 @@ export function BatchEvaluationV2EvaluationSummary({
           <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
-                (run.summary.dataset_average_cost ?? 0) +
-                (run.summary.evaluations_average_cost ?? 0)
+                (run.summary.datasetAverageCost ?? 0) +
+                (run.summary.evaluationsAverageCost ?? 0)
               }
               currency="USD"
               format="$0.00[00]"
@@ -109,10 +109,10 @@ export function BatchEvaluationV2EvaluationSummary({
                 <VStack align="start" gap={0}>
                   <Text>
                     Prediction mean cost:{" "}
-                    {run.summary.dataset_average_cost
+                    {run.summary.datasetAverageCost
                       ? formatMoney(
                           {
-                            amount: run.summary.dataset_average_cost,
+                            amount: run.summary.datasetAverageCost,
                             currency: "USD",
                           },
                           "$0.00[00]",
@@ -121,10 +121,10 @@ export function BatchEvaluationV2EvaluationSummary({
                   </Text>
                   <Text>
                     Evaluation mean cost:{" "}
-                    {run.summary.evaluations_average_cost
+                    {run.summary.evaluationsAverageCost
                       ? formatMoney(
                           {
-                            amount: run.summary.evaluations_average_cost,
+                            amount: run.summary.evaluationsAverageCost,
                             currency: "USD",
                           },
                           "$0.00[00]",
@@ -146,15 +146,15 @@ export function BatchEvaluationV2EvaluationSummary({
               <VStack align="start" gap={0}>
                 <Text>
                   Prediction mean duration:{" "}
-                  {run.summary.dataset_average_duration
-                    ? formatMilliseconds(run.summary.dataset_average_duration)
+                  {run.summary.datasetAverageDuration
+                    ? formatMilliseconds(run.summary.datasetAverageDuration)
                     : "-"}
                 </Text>
                 <Text>
                   Evaluation mean duration:{" "}
-                  {run.summary.evaluations_average_duration
+                  {run.summary.evaluationsAverageDuration
                     ? formatMilliseconds(
-                        run.summary.evaluations_average_duration,
+                        run.summary.evaluationsAverageDuration,
                       )
                     : "-"}
                 </Text>
@@ -164,8 +164,8 @@ export function BatchEvaluationV2EvaluationSummary({
           >
             <Text>
               {formatMilliseconds(
-                (run.summary.dataset_average_duration ?? 0) +
-                  (run.summary.evaluations_average_duration ?? 0),
+                (run.summary.datasetAverageDuration ?? 0) +
+                  (run.summary.evaluationsAverageDuration ?? 0),
               )}
             </Text>
           </Tooltip>
@@ -178,8 +178,8 @@ export function BatchEvaluationV2EvaluationSummary({
           <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
-                (run.summary.dataset_cost ?? 0) +
-                (run.summary.evaluations_cost ?? 0)
+                (run.summary.datasetCost ?? 0) +
+                (run.summary.evaluationsCost ?? 0)
               }
               currency="USD"
               format="$0.00[00]"
@@ -187,10 +187,10 @@ export function BatchEvaluationV2EvaluationSummary({
                 <VStack align="start" gap={0}>
                   <Text>
                     Prediction cost:{" "}
-                    {run.summary.dataset_cost
+                    {run.summary.datasetCost
                       ? formatMoney(
                           {
-                            amount: run.summary.dataset_cost,
+                            amount: run.summary.datasetCost,
                             currency: "USD",
                           },
                           "$0.00[00]",
@@ -199,10 +199,10 @@ export function BatchEvaluationV2EvaluationSummary({
                   </Text>
                   <Text>
                     Evaluation cost:{" "}
-                    {run.summary.evaluations_cost
+                    {run.summary.evaluationsCost
                       ? formatMoney(
                           {
-                            amount: run.summary.evaluations_cost,
+                            amount: run.summary.evaluationsCost,
                             currency: "USD",
                           },
                           "$0.00[00]",
@@ -223,7 +223,7 @@ export function BatchEvaluationV2EvaluationSummary({
             {numeral(runtime / 1000).format("00:00:00")}
           </Text>
         </VStack>
-        {run.timestamps.stopped_at && (
+        {run.timestamps.stoppedAt && (
           <>
             <Spacer />
             <HStack>
@@ -275,35 +275,35 @@ export function BatchEvaluationV2EvaluationSummary({
 }
 
 export const getFinishedAt = (
-  timestamps: ESBatchEvaluation["timestamps"],
+  timestamps: ExperimentRun["timestamps"],
   currentTimestamp: number,
 ) => {
-  if (timestamps.finished_at) {
-    return timestamps.finished_at;
+  if (timestamps.finishedAt) {
+    return timestamps.finishedAt;
   }
   if (
-    currentTimestamp - new Date(timestamps.updated_at).getTime() >
+    currentTimestamp - new Date(timestamps.updatedAt).getTime() >
     2 * 60 * 1000
   ) {
-    return new Date(timestamps.updated_at).getTime();
+    return new Date(timestamps.updatedAt).getTime();
   }
   return undefined;
 };
 
 export const formatEvaluationSummary = (
   evaluation: {
-    average_score: number;
-    average_passed?: number;
+    averageScore: number | null;
+    averagePassed?: number;
   },
   short = false,
 ): string => {
-  return evaluation.average_passed !== undefined
-    ? numeral(evaluation.average_passed).format("0.[0]%") +
+  return evaluation.averagePassed !== undefined
+    ? numeral(evaluation.averagePassed).format("0.[0]%") +
         (short ? " " : " pass") +
-        (short || evaluation.average_passed == evaluation.average_score
+        (short || evaluation.averagePassed == evaluation.averageScore
           ? ""
-          : ` (${numeral(evaluation.average_score).format(
+          : ` (${numeral(evaluation.averageScore).format(
               "0.0[0]",
             )} avg. score)`)
-    : numeral(evaluation.average_score).format("0.[00]");
+    : numeral(evaluation.averageScore).format("0.[00]");
 };

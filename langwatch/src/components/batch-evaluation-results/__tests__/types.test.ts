@@ -2,28 +2,27 @@
  * Tests for batch evaluation data transformer
  */
 import { describe, expect, it } from "vitest";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
+import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
 import { transformBatchEvaluationData } from "../types";
 
 // Helper to create base timestamps
 const createTimestamps = () => ({
-  created_at: Date.now(),
-  inserted_at: Date.now(),
-  updated_at: Date.now(),
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
 });
 
 describe("transformBatchEvaluationData", () => {
   describe("basic metadata", () => {
     it("extracts run metadata correctly", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [],
         evaluations: [],
         timestamps: {
           ...createTimestamps(),
-          finished_at: Date.now() + 1000,
+          finishedAt: Date.now() + 1000,
         },
       };
 
@@ -36,10 +35,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles progress for running evaluations", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [],
         evaluations: [],
         timestamps: createTimestamps(),
@@ -54,15 +53,15 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles stopped evaluation with stopped_at timestamp", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [],
         evaluations: [],
         timestamps: {
           ...createTimestamps(),
-          stopped_at: Date.now() + 500,
+          stoppedAt: Date.now() + 500,
         },
       };
 
@@ -74,10 +73,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("empty states", () => {
     it("handles empty dataset", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [],
         evaluations: [],
         timestamps: createTimestamps(),
@@ -91,10 +90,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles dataset with entries but no predictions", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           { index: 0, entry: { input: "hello" } },
           { index: 1, entry: { input: "world" } },
@@ -114,10 +113,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("V2 format (legacy, no targets)", () => {
     it("transforms V2 data with flat predicted values", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -125,7 +124,7 @@ describe("transformBatchEvaluationData", () => {
             predicted: { output: "4" },
             cost: 0.001,
             duration: 500,
-            trace_id: "trace-1",
+            traceId: "trace-1",
           },
         ],
         evaluations: [
@@ -168,10 +167,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("transforms V2 data with nested predicted values (node format)", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -195,10 +194,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles V2 evaluation error status", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
         ],
@@ -223,10 +222,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles V2 target execution error with virtual target", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -252,10 +251,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("V3 format (with explicit targets)", () => {
     it("transforms V3 data with multiple targets", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [
           { id: "target-1", name: "GPT-4o", type: "prompt", model: "gpt-4o" },
           { id: "target-2", name: "Claude", type: "prompt", model: "claude-3" },
@@ -263,21 +262,21 @@ describe("transformBatchEvaluationData", () => {
         dataset: [
           {
             index: 0,
-            target_id: "target-1",
+            targetId: "target-1",
             entry: { input: "Hello" },
             predicted: { response: "Hi from GPT!" },
             cost: 0.001,
             duration: 500,
-            trace_id: "trace-gpt",
+            traceId: "trace-gpt",
           },
           {
             index: 0,
-            target_id: "target-2",
+            targetId: "target-2",
             entry: { input: "Hello" },
             predicted: { response: "Hi from Claude!" },
             cost: 0.002,
             duration: 600,
-            trace_id: "trace-claude",
+            traceId: "trace-claude",
           },
         ],
         evaluations: [],
@@ -312,15 +311,15 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles V3 evaluations per target", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [{ id: "target-1", name: "GPT-4o", type: "prompt" }],
         dataset: [
           {
             index: 0,
-            target_id: "target-1",
+            targetId: "target-1",
             entry: { input: "2+2?" },
             predicted: { answer: "4" },
           },
@@ -329,7 +328,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "exact_match",
             name: "Exact Match",
-            target_id: "target-1",
+            targetId: "target-1",
             status: "processed",
             index: 0,
             score: 1.0,
@@ -338,7 +337,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "llm_judge",
             name: "LLM Judge",
-            target_id: "target-1",
+            targetId: "target-1",
             status: "processed",
             index: 0,
             score: 0.9,
@@ -368,22 +367,22 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles V3 with agent target type", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [
           {
             id: "agent-1",
             name: "Support Agent",
             type: "agent",
-            agent_id: "ag-123",
+            agentId: "ag-123",
           },
         ],
         dataset: [
           {
             index: 0,
-            target_id: "agent-1",
+            targetId: "agent-1",
             entry: { query: "Help me" },
             predicted: { response: "How can I assist?" },
           },
@@ -399,24 +398,24 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles V3 prompt target with version info", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [
           {
             id: "prompt-1",
             name: "My Prompt",
             type: "prompt",
-            prompt_id: "prompt-config-123",
-            prompt_version: 5,
+            promptId: "prompt-config-123",
+            promptVersion: 5,
             model: "gpt-4o",
           },
         ],
         dataset: [
           {
             index: 0,
-            target_id: "prompt-1",
+            targetId: "prompt-1",
             entry: { input: "test" },
             predicted: { output: "result" },
           },
@@ -435,10 +434,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("dataset column detection", () => {
     it("detects multiple dataset columns", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -463,10 +462,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("detects image URLs in dataset columns", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -501,10 +500,10 @@ describe("transformBatchEvaluationData", () => {
       ];
 
       for (const { url, expected } of testCases) {
-        const data: ESBatchEvaluation = {
-          project_id: "proj-1",
-          experiment_id: "exp-1",
-          run_id: "run-1",
+        const data: ExperimentRunWithItems = {
+          experimentId: "exp-1",
+          runId: "run-1",
+          projectId: "proj-1",
           dataset: [{ index: 0, entry: { img: url } }],
           evaluations: [],
           timestamps: createTimestamps(),
@@ -518,10 +517,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("multiple rows", () => {
     it("handles sparse row indices correctly", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           { index: 0, entry: { input: "row0" } },
           { index: 2, entry: { input: "row2" } },
@@ -542,10 +541,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("builds evaluator names map correctly", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
         ],
@@ -570,10 +569,10 @@ describe("transformBatchEvaluationData", () => {
 
   describe("API evaluations (derived target)", () => {
     it("derives a virtual target when no targets and no predicted values exist", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           { index: 0, entry: { question: "What is 2+2?" } },
           { index: 1, entry: { question: "What is 3+3?" } },
@@ -636,10 +635,10 @@ describe("transformBatchEvaluationData", () => {
       ];
 
       for (const { inputField, value } of testCases) {
-        const data: ESBatchEvaluation = {
-          project_id: "proj-1",
-          experiment_id: "exp-1",
-          run_id: "run-1",
+        const data: ExperimentRunWithItems = {
+          experimentId: "exp-1",
+          runId: "run-1",
+          projectId: "proj-1",
           dataset: [{ index: 0, entry: { input: "test" } }],
           evaluations: [
             {
@@ -664,10 +663,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("creates multiple virtual targets when multiple evaluators exist", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
         evaluations: [
           {
@@ -725,10 +724,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("displays arbitrary data as JSON when no common output field exists", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [{ index: 0, entry: { question: "What is 2+2?" } }],
         evaluations: [
           {
@@ -756,10 +755,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("does not derive target when dataset already has predicted values", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         dataset: [
           {
             index: 0,
@@ -788,10 +787,10 @@ describe("transformBatchEvaluationData", () => {
     it("creates a virtual Output target for row-level errors without any targets or evaluators", () => {
       // This is the case from SDK's evaluation.run() when the callback throws an error
       // No targets registered, no evaluations, just dataset rows with errors
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: null,
         dataset: [
           {
@@ -800,7 +799,7 @@ describe("transformBatchEvaluationData", () => {
             cost: null,
             duration: 4,
             error: "Not implemented",
-            trace_id: "trace-1",
+            traceId: "trace-1",
           },
           {
             index: 1,
@@ -808,7 +807,7 @@ describe("transformBatchEvaluationData", () => {
             cost: null,
             duration: 3,
             error: "Not implemented",
-            trace_id: "trace-2",
+            traceId: "trace-2",
           },
         ],
         evaluations: [],
@@ -838,10 +837,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("creates virtual target only when there are errors, not for empty dataset", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: null,
         dataset: [
           { index: 0, entry: { question: "What is 2+2?" } },
@@ -863,10 +862,10 @@ describe("transformBatchEvaluationData", () => {
       // This is the exact structure from the Python SDK when comparing multiple targets
       // Dataset entries are SHARED (no target_id on dataset)
       // Evaluations have target_id to associate with specific targets
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [
           {
             id: "gpt-4",
@@ -897,7 +896,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             status: "processed",
             index: 0,
             score: 0.95,
@@ -905,7 +904,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-3.5",
+            targetId: "gpt-3.5",
             status: "processed",
             index: 0,
             score: 0.7,
@@ -913,7 +912,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "claude-3",
+            targetId: "claude-3",
             status: "processed",
             index: 0,
             score: 0.5,
@@ -921,7 +920,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             status: "processed",
             index: 1,
             score: 0.9,
@@ -929,7 +928,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-3.5",
+            targetId: "gpt-3.5",
             status: "processed",
             index: 1,
             score: 0.6,
@@ -937,7 +936,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "claude-3",
+            targetId: "claude-3",
             status: "processed",
             index: 1,
             score: 0.4,
@@ -983,10 +982,10 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("handles multiple evaluators per target", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [
           { id: "gpt-4", name: "GPT-4", type: "custom" },
           { id: "claude-3", name: "Claude-3", type: "custom" },
@@ -997,7 +996,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "latency",
             name: "Latency",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             status: "processed",
             index: 0,
             score: 100,
@@ -1005,7 +1004,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             status: "processed",
             index: 0,
             score: 0.9,
@@ -1014,7 +1013,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "latency",
             name: "Latency",
-            target_id: "claude-3",
+            targetId: "claude-3",
             status: "processed",
             index: 0,
             score: 200,
@@ -1022,7 +1021,7 @@ describe("transformBatchEvaluationData", () => {
           {
             evaluator: "quality",
             name: "Quality",
-            target_id: "claude-3",
+            targetId: "claude-3",
             status: "processed",
             index: 0,
             score: 0.8,
@@ -1063,17 +1062,17 @@ describe("transformBatchEvaluationData", () => {
     });
 
     it("correctly builds evaluatorNames map for targets with target_id", () => {
-      const data: ESBatchEvaluation = {
-        project_id: "proj-1",
-        experiment_id: "exp-1",
-        run_id: "run-1",
+      const data: ExperimentRunWithItems = {
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "proj-1",
         targets: [{ id: "gpt-4", name: "GPT-4", type: "custom" }],
         dataset: [{ index: 0, entry: { question: "Test" } }],
         evaluations: [
           {
             evaluator: "quality",
             name: "Response Quality",
-            target_id: "gpt-4",
+            targetId: "gpt-4",
             status: "processed",
             index: 0,
             score: 0.9,
