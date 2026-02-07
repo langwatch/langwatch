@@ -22,8 +22,8 @@ const createRunSummary = (
 ): BatchRunSummary => ({
   runId: "run-1",
   timestamps: {
-    created_at: Date.now() - 60000, // 1 minute ago
-    finished_at: Date.now(),
+    createdAt: Date.now() - 60000, // 1 minute ago
+    finishedAt: Date.now(),
   },
   summary: {
     datasetCost: 0.01,
@@ -151,8 +151,8 @@ describe("BatchSummaryFooter", () => {
       const now = Date.now();
       const run = createRunSummary({
         timestamps: {
-          created_at: now - 65000, // 1:05 ago
-          finished_at: now,
+          createdAt: now - 65000, // 1:05 ago
+          finishedAt: now,
         },
       });
 
@@ -170,8 +170,8 @@ describe("BatchSummaryFooter", () => {
     it("shows stopped indicator", () => {
       const run = createRunSummary({
         timestamps: {
-          created_at: Date.now() - 60000,
-          stopped_at: Date.now() - 30000,
+          createdAt: Date.now() - 60000,
+          stoppedAt: Date.now() - 30000,
         },
       });
 
@@ -187,8 +187,8 @@ describe("BatchSummaryFooter", () => {
     it("shows progress bar when showProgress and running", () => {
       const run = createRunSummary({
         timestamps: {
-          created_at: Date.now() - 10000,
-          // No finished_at
+          createdAt: Date.now() - 10000,
+          // No finishedAt
         },
         progress: 5,
         total: 10,
@@ -205,8 +205,8 @@ describe("BatchSummaryFooter", () => {
     it("does not show progress bar when finished", () => {
       const run = createRunSummary({
         timestamps: {
-          created_at: Date.now() - 60000,
-          finished_at: Date.now(),
+          createdAt: Date.now() - 60000,
+          finishedAt: Date.now(),
         },
         progress: 10,
         total: 10,
@@ -225,7 +225,7 @@ describe("BatchSummaryFooter", () => {
       const onStop = vi.fn();
       const run = createRunSummary({
         timestamps: {
-          created_at: Date.now() - 10000,
+          createdAt: Date.now() - 10000,
         },
         progress: 3,
         total: 10,
@@ -243,7 +243,7 @@ describe("BatchSummaryFooter", () => {
       const onStop = vi.fn();
       const run = createRunSummary({
         timestamps: {
-          created_at: Date.now() - 10000,
+          createdAt: Date.now() - 10000,
         },
         progress: 3,
         total: 10,
