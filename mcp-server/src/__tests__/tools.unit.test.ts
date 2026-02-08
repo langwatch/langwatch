@@ -20,6 +20,7 @@ import {
   createPrompt,
   updatePrompt,
   createPromptVersion,
+  type PromptSummary,
 } from "../langwatch-api.js";
 
 import { handleSearchTraces } from "../tools/search-traces.js";
@@ -122,7 +123,7 @@ describe("handleSearchTraces()", () => {
 
   it("includes scroll ID when more results are available", async () => {
     mockSearchTraces.mockResolvedValue({
-      traces: [{ trace_id: "trace-1", input: {}, output: {} }],
+      traces: [{ trace_id: "trace-1", input: { value: "" }, output: { value: "" } }],
       pagination: { totalHits: 100, scrollId: "scroll-abc" },
     });
 
@@ -136,8 +137,8 @@ describe("handleSearchTraces()", () => {
       traces: [
         {
           trace_id: "trace-err",
-          input: {},
-          output: {},
+          input: { value: "" },
+          output: { value: "" },
           error: { message: "timeout" },
         },
       ],
@@ -215,7 +216,7 @@ describe("handleSearchTraces()", () => {
 
   it("includes usage tip about get_trace, format, and discover_schema", async () => {
     mockSearchTraces.mockResolvedValue({
-      traces: [{ trace_id: "t1", input: {}, output: {} }],
+      traces: [{ trace_id: "t1", input: { value: "" }, output: { value: "" } }],
       pagination: { totalHits: 1 },
     });
 
@@ -366,6 +367,7 @@ describe("handleGetAnalytics()", () => {
           { date: "2024-01-01", metric_0: 42 },
           { date: "2024-01-02", metric_0: 55 },
         ],
+        previousPeriod: [],
       });
 
       const result = await handleGetAnalytics({
@@ -381,7 +383,7 @@ describe("handleGetAnalytics()", () => {
     });
 
     it("shows groupBy when provided", async () => {
-      mockGetAnalytics.mockResolvedValue({ currentPeriod: [] });
+      mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
       const result = await handleGetAnalytics({
         metric: "metadata.trace_id",
@@ -392,7 +394,7 @@ describe("handleGetAnalytics()", () => {
     });
 
     it("uses the specified aggregation", async () => {
-      mockGetAnalytics.mockResolvedValue({ currentPeriod: [] });
+      mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
       const result = await handleGetAnalytics({
         metric: "performance.total_cost",
@@ -407,7 +409,7 @@ describe("handleGetAnalytics()", () => {
 
   describe("when no data is available", () => {
     it("returns a no-data message", async () => {
-      mockGetAnalytics.mockResolvedValue({ currentPeriod: [] });
+      mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
       const result = await handleGetAnalytics({
         metric: "performance.completion_time",
@@ -419,7 +421,7 @@ describe("handleGetAnalytics()", () => {
 
   describe("when metric has no dot", () => {
     it("defaults category to metadata", async () => {
-      mockGetAnalytics.mockResolvedValue({ currentPeriod: [] });
+      mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
       await handleGetAnalytics({ metric: "trace_id" });
 
@@ -429,7 +431,7 @@ describe("handleGetAnalytics()", () => {
   });
 
   it("includes discover_schema tip", async () => {
-    mockGetAnalytics.mockResolvedValue({ currentPeriod: [] });
+    mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
     const result = await handleGetAnalytics({
       metric: "performance.completion_time",
@@ -478,7 +480,7 @@ describe("handleListPrompts()", () => {
 
   describe("when API returns non-array", () => {
     it("returns a no-prompts message", async () => {
-      mockListPrompts.mockResolvedValue(null);
+      mockListPrompts.mockResolvedValue(null as unknown as PromptSummary[]);
 
       const result = await handleListPrompts();
 
