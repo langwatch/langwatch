@@ -171,7 +171,7 @@ export async function getTraceById(
 ): Promise<TraceDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/traces/${traceId}?format=${format}`
+    `/api/traces/${encodeURIComponent(traceId)}?format=${format}`
   ) as Promise<TraceDetailResponse>;
 }
 
@@ -204,11 +204,13 @@ export async function listPrompts(): Promise<PromptSummary[]> {
 
 /** Retrieves a single prompt by ID or handle. */
 export async function getPrompt(
-  idOrHandle: string
+  idOrHandle: string,
+  version?: number
 ): Promise<PromptDetailResponse> {
+  const query = version != null ? `?version=${version}` : "";
   return makeRequest(
     "GET",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}`
+    `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
   ) as Promise<PromptDetailResponse>;
 }
 

@@ -10,7 +10,7 @@ export async function handleGetPrompt(params: {
   idOrHandle: string;
   version?: number;
 }): Promise<string> {
-  const prompt = await apiGetPrompt(params.idOrHandle);
+  const prompt = await apiGetPrompt(params.idOrHandle, params.version);
 
   const lines: string[] = [];
   lines.push(

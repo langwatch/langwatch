@@ -54,17 +54,17 @@ export async function handleSearchTraces(params: {
     if (trace.formatted_trace) {
       lines.push(trace.formatted_trace);
     } else {
-      const input = trace.input?.value
-        ? String(trace.input.value).slice(0, 100)
+      const inputStr = trace.input?.value
+        ? String(trace.input.value)
         : "N/A";
-      const output = trace.output?.value
-        ? String(trace.output.value).slice(0, 100)
+      const outputStr = trace.output?.value
+        ? String(trace.output.value)
         : "N/A";
       lines.push(
-        `- **Input**: ${input}${(trace.input?.value?.length ?? 0) > 100 ? "..." : ""}`
+        `- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`
       );
       lines.push(
-        `- **Output**: ${output}${(trace.output?.value?.length ?? 0) > 100 ? "..." : ""}`
+        `- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`
       );
     }
 

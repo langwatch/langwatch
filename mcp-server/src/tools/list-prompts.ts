@@ -21,9 +21,10 @@ export async function handleListPrompts(): Promise<string> {
   for (const p of prompts) {
     const handle = p.handle || p.id || "N/A";
     const name = p.name || "Untitled";
-    const version = p.latestVersionNumber ?? p.version ?? "N/A";
+    const versionNum = p.latestVersionNumber ?? p.version;
+    const version = versionNum != null ? `v${versionNum}` : "N/A";
     const desc = (p.description || "").slice(0, 60);
-    lines.push(`| ${handle} | ${name} | v${version} | ${desc} |`);
+    lines.push(`| ${handle} | ${name} | ${version} | ${desc} |`);
   }
 
   lines.push(
