@@ -294,6 +294,38 @@ export const typedValueToText = (
     try {
       const json = typed.value as any;
 
+      // Handle arrays that look like chat messages (objects with "role" property)
+      // This covers cases where validation doesn't match chat_messages due to
+      // non-standard roles like "toolResult"
+      if (
+        Array.isArray(json) &&
+        json.length > 0 &&
+        typeof json[0] === "object" &&
+        json[0] !== null &&
+        "role" in json[0]
+      ) {
+        if (last) {
+          const lastMessage = json[json.length - 1];
+          const content = lastMessage?.content;
+          if (typeof content === "string") {
+            return content;
+          }
+          if (Array.isArray(content)) {
+            return content
+              .map((c: any) => ("text" in c ? c.text : JSON.stringify(c)))
+              .join("");
+          }
+          return lastMessage ? JSON.stringify(lastMessage) : "";
+        }
+        return json
+          .map((message: any) =>
+            typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message),
+          )
+          .join("");
+      }
+
       const value =
         Array.isArray(json) && json.length == 1
           ? typeof json[0] === "string"

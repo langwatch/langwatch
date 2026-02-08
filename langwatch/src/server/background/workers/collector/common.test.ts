@@ -1279,4 +1279,40 @@ describe("Span organizing and flattening tests", () => {
     );
     expect(input).toBe("how much is 2+2?");
   });
+
+  it("extracts text from json array of chat-message-like objects with non-standard roles", () => {
+    const spans: BaseSpan[] = [
+      {
+        ...commonSpanProps,
+        span_id: "1",
+        name: "chat_completion",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 500 },
+        input: {
+          type: "json",
+          value: [
+            { role: "system", content: "You are a helpful assistant" },
+            { role: "user", content: "hello there" },
+            { role: "assistant", content: "Hi! How can I help?" },
+            { role: "toolResult", content: '{"status": "ok"}' },
+            { role: "user", content: "what is the weather?" },
+          ],
+        },
+        output: {
+          type: "json",
+          value: [
+            { role: "system", content: "You are a helpful assistant" },
+            { role: "user", content: "what is the weather?" },
+            { role: "assistant", content: "The weather is sunny today!" },
+          ],
+        },
+      },
+    ];
+
+    const input = getFirstInputAsText(spans);
+    expect(input).toBe("what is the weather?");
+
+    const output = getLastOutputAsText(spans);
+    expect(output).toBe("The weather is sunny today!");
+  });
 });
