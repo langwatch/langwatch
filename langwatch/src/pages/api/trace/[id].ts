@@ -68,11 +68,8 @@ export default async function handler(
   const asciiTree = generateAsciiTree(trace?.spans);
 
   return res.status(200).json({
-    ...(llmMode ? toLLMModeTrace(trace, asciiTree) : {}),
-    spans: trace.spans,
-    evaluations: trace.evaluations,
+    ...trace,
     ascii_tree: asciiTree,
-    metadata: trace.metadata,
   });
 }
 

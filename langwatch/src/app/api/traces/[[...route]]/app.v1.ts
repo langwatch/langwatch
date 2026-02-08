@@ -229,10 +229,8 @@ app.get(
 
     const asciiTree = generateAsciiTree(trace.spans);
     return c.json({
-      spans: trace.spans,
-      evaluations: trace.evaluations,
+      ...trace,
       ascii_tree: asciiTree,
-      metadata: trace.metadata,
     });
   },
 );
