@@ -50,13 +50,13 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     }
     return topmostSpan?.name ?? "";
   }
-  const text = typedValueToText(input, true);
+  const text = typedValueToText(input, true, "user");
   if (
     !text &&
     topmostInputs[0]?.name?.startsWith("RunnableSequence") &&
     topmostInputs[1]?.input
   ) {
-    return typedValueToText(topmostInputs[1].input, true);
+    return typedValueToText(topmostInputs[1].input, true, "user");
   }
   return text;
 };
@@ -134,6 +134,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
 export const typedValueToText = (
   typed: SpanInputOutput,
   last = false,
+  preferRole?: string,
 ): string => {
   const stringified = (value_: any) => {
     if (typeof value_ === "string") {
@@ -305,7 +306,10 @@ export const typedValueToText = (
         "role" in json[0]
       ) {
         if (last) {
-          const lastMessage = json[json.length - 1];
+          const preferredMessage = preferRole
+            ? json.findLast((m: any) => m?.role === preferRole)
+            : undefined;
+          const lastMessage = preferredMessage ?? json[json.length - 1];
           const content = lastMessage?.content;
           if (typeof content === "string") {
             return content;

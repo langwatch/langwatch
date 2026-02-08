@@ -1294,8 +1294,8 @@ describe("Span organizing and flattening tests", () => {
             { role: "system", content: "You are a helpful assistant" },
             { role: "user", content: "hello there" },
             { role: "assistant", content: "Hi! How can I help?" },
-            { role: "toolResult", content: '{"status": "ok"}' },
             { role: "user", content: "what is the weather?" },
+            { role: "toolResult", content: '{"status": "ok"}' },
           ],
         },
         output: {
