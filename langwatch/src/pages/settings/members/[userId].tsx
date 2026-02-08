@@ -416,13 +416,34 @@ export default function UserDetailsPage() {
           return;
         }
 
-        for (const teamRoleUpdate of teamRoleUpdates) {
-          await updateTeamMemberRole.mutateAsync({
-            teamId: teamRoleUpdate.teamId,
-            userId: teamRoleUpdate.userId,
-            role: teamRoleUpdate.role,
-            customRoleId: teamRoleUpdate.customRoleId,
+        const updateResults = await Promise.allSettled(
+          teamRoleUpdates.map((teamRoleUpdate) =>
+            updateTeamMemberRole.mutateAsync({
+              teamId: teamRoleUpdate.teamId,
+              userId: teamRoleUpdate.userId,
+              role: teamRoleUpdate.role,
+              customRoleId: teamRoleUpdate.customRoleId,
+            }),
+          ),
+        );
+
+        const failedTeamIds = updateResults
+          .map((result, index) =>
+            result.status === "rejected" ? teamRoleUpdates[index]?.teamId : undefined,
+          )
+          .filter((teamId): teamId is string => Boolean(teamId));
+
+        if (failedTeamIds.length > 0) {
+          const successfulUpdates = teamRoleUpdates.length - failedTeamIds.length;
+
+          await apiContext.organization.getMemberById.invalidate();
+          await apiContext.organization.getAll.invalidate();
+          toaster.create({
+            title: "Some team roles were not updated",
+            description: `${successfulUpdates} updated, ${failedTeamIds.length} failed (${failedTeamIds.join(", ")})`,
+            type: "error",
           });
+          return;
         }
       }
 

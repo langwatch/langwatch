@@ -90,6 +90,22 @@ type TransactionClient = Omit<
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
+const customTeamRoleInputSchema = z
+  .string()
+  .regex(
+    /^custom:[a-zA-Z0-9_-]+$/,
+    "Custom role must be in format 'custom:{roleId}'",
+  );
+const builtInTeamRoleInputSchema = z.enum([
+  TeamUserRole.ADMIN,
+  TeamUserRole.MEMBER,
+  TeamUserRole.VIEWER,
+]);
+const teamRoleInputSchema = z.union([
+  builtInTeamRoleInputSchema,
+  customTeamRoleInputSchema,
+]);
+
 /**
  * Gets permissions for a custom role by its ID.
  */
@@ -636,15 +652,7 @@ export const organizationRouter = createTRPCRouter({
               .array(
                 z.object({
                   teamId: z.string(),
-                  role: z.union([
-                    z.nativeEnum(TeamUserRole),
-                    z
-                      .string()
-                      .regex(
-                        /^custom:[a-zA-Z0-9_-]+$/,
-                        "Custom role must be in format 'custom:{roleId}'",
-                      ),
-                  ]),
+                  role: teamRoleInputSchema,
                   customRoleId: z.string().optional(),
                 }),
               )
@@ -1085,15 +1093,7 @@ export const organizationRouter = createTRPCRouter({
         .object({
           teamId: z.string(),
           userId: z.string(),
-          role: z.union([
-            z.nativeEnum(TeamUserRole),
-            z
-              .string()
-              .regex(
-                /^custom:[a-zA-Z0-9_-]+$/,
-                "Custom role must be in format 'custom:{roleId}'",
-              ),
-          ]),
+          role: teamRoleInputSchema,
           customRoleId: z.string().optional(),
         })
         .superRefine((data, ctx) => {
@@ -1451,7 +1451,7 @@ export const organizationRouter = createTRPCRouter({
             z.object({
               teamId: z.string(),
               userId: z.string(),
-              role: z.string(),
+              role: teamRoleInputSchema,
               customRoleId: z.string().optional(),
             }),
           )
