@@ -1,9 +1,7 @@
-import { createListCollection, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { useMemo, useState } from "react";
-import { api } from "../../utils/api";
+import { useMemo } from "react";
 import { Select } from "../ui/select";
-import { toaster } from "../ui/toaster";
 
 export type OrgRoleOption = {
   label: string;
@@ -31,80 +29,30 @@ export const orgRoleOptions: OrgRoleOption[] = [
 
 /**
  * OrganizationUserRoleField
- * Single Responsibility: Render a dropdown to change a user's organization role (Admin/Member)
+ * Single Responsibility: Render a dropdown to choose a user's organization role
  */
 export function OrganizationUserRoleField({
-  organizationId,
-  userId,
-  defaultRole,
+  value,
+  onChange,
 }: {
-  organizationId: string;
-  userId: string;
-  defaultRole: OrganizationUserRole;
+  value: OrganizationUserRole;
+  onChange: (role: OrganizationUserRole) => void;
 }) {
-  const updateOrganizationMemberRoleMutation =
-    api.organization.updateMemberRole.useMutation();
-
-  // Local state for optimistic updates
-  const [selectedRole, setSelectedRole] = useState<OrgRoleOption>(
-    () =>
-      orgRoleOptions.find((o) => o.value === defaultRole) ?? orgRoleOptions[0]!,
-  );
-
   const roleCollection = useMemo(
     () => createListCollection({ items: orgRoleOptions }),
     [],
   );
-
-  const handleRoleChange = (nextValue: string) => {
-    const next = nextValue as OrganizationUserRole;
-    if (next === selectedRole.value) return;
-
-    // Optimistic update - immediately update UI
-    const nextOption = orgRoleOptions.find((o) => o.value === next);
-    if (nextOption) {
-      setSelectedRole(nextOption);
-    }
-
-    updateOrganizationMemberRoleMutation.mutate(
-      { organizationId, userId, role: next },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Organization role updated",
-            description: `Role changed to ${
-              orgRoleOptions.find((o) => o.value === next)?.label ?? next
-            }`,
-            type: "success",
-            duration: 3000,
-          });
-        },
-        onError: (error) => {
-          // Revert optimistic update on error
-          setSelectedRole(
-            orgRoleOptions.find((o) => o.value === defaultRole) ??
-              orgRoleOptions[0]!,
-          );
-          toaster.create({
-            title: "Error updating role",
-            description: error.message ?? "Please try again",
-            type: "error",
-          });
-        },
-      },
-    );
-  };
 
   return (
     <VStack align="start">
       <HStack gap={6}>
         <Select.Root
           collection={roleCollection}
-          value={[selectedRole.value]}
+          value={[value]}
           onValueChange={(details) => {
             const selectedValue = details.value[0];
             if (selectedValue) {
-              handleRoleChange(selectedValue);
+              onChange(selectedValue as OrganizationUserRole);
             }
           }}
         >
@@ -124,9 +72,6 @@ export function OrganizationUserRoleField({
             ))}
           </Select.Content>
         </Select.Root>
-        {updateOrganizationMemberRoleMutation.isLoading && (
-          <Spinner size="sm" />
-        )}
       </HStack>
     </VStack>
   );
