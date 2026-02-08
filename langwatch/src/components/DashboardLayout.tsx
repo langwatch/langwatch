@@ -337,13 +337,27 @@ export const DashboardLayout = ({
 
       {/* Header bar - spans full width with gray background */}
       <HStack
+        position="relative"
         width="full"
         paddingX={4}
         paddingY={3}
         background="bg.page"
         justifyContent="space-between"
         gap={4}
+        overflow="hidden"
       >
+        {publicEnv.data?.NODE_ENV === "development" && (
+          <Box
+            position="absolute"
+            top={-5}
+            right="-100px"
+            bottom={0}
+            w="400px"
+            background="orange.300"
+            filter="blur(40px)"
+          ></Box>
+        )}
+
         {/* Left side: Logo + Project + Breadcrumbs */}
         <HStack gap={compactMenu ? 3 : 0} flex={1} alignItems="center">
           {/* Logo container - fixed width for expanded menu, natural for compact */}
@@ -385,7 +399,26 @@ export const DashboardLayout = ({
         </HStack>
 
         {/* Right side: Search, integrations, user */}
-        <HStack gap={2} justifyContent="flex-end">
+        <HStack gap={2} justifyContent="flex-end" overflow="hidden">
+          {publicEnv.data?.NODE_ENV === "development" && (
+            <Text
+              fontSize="11px"
+              fontWeight="bold"
+              color="white"
+              backgroundColor="blackAlpha.600"
+              border="1px solid"
+              borderColor="whiteAlpha.300"
+              borderRadius="full"
+              height="32px"
+              paddingX={3}
+              display="flex"
+              alignItems="center"
+              letterSpacing="wider"
+            >
+              DEV
+            </Text>
+          )}
+
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
 
@@ -538,8 +571,8 @@ export const DashboardLayout = ({
                       to upgrade your plan.
                     </Text>
                   </Alert.Content>
-              </Alert.Root>
-            )}
+                </Alert.Root>
+              )}
             {usage.data &&
               usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
                 <Alert.Root
