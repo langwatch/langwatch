@@ -112,6 +112,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
         })
       );
+      await expect(
+        assertMemberTypeLimitNotExceeded(
+          "lite-to-full",
+          organizationId,
+          mockRepo,
+          limits
+        )
+      ).rejects.toMatchObject({
+        cause: {
+          limitType: "members",
+          current: 5,
+          max: 5,
+        },
+      });
     });
 
     it("throws when over limit", async () => {
@@ -163,6 +177,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
         })
       );
+      await expect(
+        assertMemberTypeLimitNotExceeded(
+          "full-to-lite",
+          organizationId,
+          mockRepo,
+          limits
+        )
+      ).rejects.toMatchObject({
+        cause: {
+          limitType: "membersLite",
+          current: 10,
+          max: 10,
+        },
+      });
     });
 
     it("throws when over limit", async () => {

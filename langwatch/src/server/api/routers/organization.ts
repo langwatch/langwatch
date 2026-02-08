@@ -29,6 +29,7 @@ import {
 } from "../../license-enforcement/license-limit-guard";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
+import { isTeamRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
@@ -1163,46 +1164,10 @@ export const organizationRouter = createTRPCRouter({
           });
 
           if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
-            // Get the current team user to find old custom role
-            const currentTeamUser = await tx.teamUser.findUnique({
-              where: {
-                userId_teamId: {
-                  userId: input.userId,
-                  teamId: input.teamId,
-                },
-              },
-              select: { assignedRoleId: true },
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Lite Member users can only have Viewer team role",
             });
-
-            // Get old permissions
-            const oldPermissions = await getCustomRolePermissions(
-              tx,
-              currentTeamUser?.assignedRoleId
-            );
-
-            // New permissions from the role we're assigning
-            const newPermissions = role.permissions as string[] | undefined;
-
-            const changeType = getRoleChangeType(
-              OrganizationUserRole.EXTERNAL,
-              oldPermissions,
-              OrganizationUserRole.EXTERNAL,
-              newPermissions
-            );
-
-            // Check license limits for member type changes
-            const subscriptionLimits =
-              await dependencies.subscriptionHandler.getActivePlan(
-                team.organizationId,
-                ctx.session.user
-              );
-            const licenseRepo = new LicenseEnforcementRepository(prisma);
-            await assertMemberTypeLimitNotExceeded(
-              changeType,
-              team.organizationId,
-              licenseRepo,
-              subscriptionLimits
-            );
           }
 
           // Lock and validate admin count within transaction
@@ -1313,6 +1278,18 @@ export const organizationRouter = createTRPCRouter({
           });
 
           if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
+            if (
+              !isTeamRoleAllowedForOrganizationRole({
+                organizationRole: OrganizationUserRole.EXTERNAL,
+                teamRole: input.role,
+              })
+            ) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Lite Member users can only have Viewer team role",
+              });
+            }
+
             // Get the current team user to find old custom role
             const currentTeamUser = await tx.teamUser.findUnique({
               where: {
@@ -1551,6 +1528,41 @@ export const organizationRouter = createTRPCRouter({
           },
           data: { role: input.role },
         });
+
+        const organizationTeamIds = (
+          await tx.team.findMany({
+            where: { organizationId: input.organizationId },
+            select: { id: true },
+          })
+        ).map((team) => team.id);
+
+        if (input.role === OrganizationUserRole.EXTERNAL) {
+          await tx.teamUser.updateMany({
+            where: {
+              userId: input.userId,
+              teamId: { in: organizationTeamIds },
+              NOT: { role: TeamUserRole.VIEWER },
+            },
+            data: {
+              role: TeamUserRole.VIEWER,
+              assignedRoleId: null,
+            },
+          });
+        }
+
+        if (input.role === OrganizationUserRole.MEMBER) {
+          await tx.teamUser.updateMany({
+            where: {
+              userId: input.userId,
+              teamId: { in: organizationTeamIds },
+              role: TeamUserRole.VIEWER,
+            },
+            data: {
+              role: TeamUserRole.MEMBER,
+              assignedRoleId: null,
+            },
+          });
+        }
 
         // Post-update validation: ensure we still have at least one admin
         const finalAdminCount = await tx.organizationUser.count({
