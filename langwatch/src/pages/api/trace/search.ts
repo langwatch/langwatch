@@ -6,7 +6,8 @@ import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { TraceService } from "../../../server/traces/trace.service";
-import { toLLMModeTrace } from "./[id]";
+import { toLLMModeTrace } from "~/server/traces/trace-formatting";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 
 export const config = {
   api: {
@@ -34,6 +35,7 @@ const paramsSchema = getAllForProjectInput
       }),
     ]),
     scrollId: z.string().optional().nullable(),
+    format: z.enum(["digest", "json"]).optional(),
     llmMode: z.boolean().optional().default(false),
   });
 
@@ -68,6 +70,12 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
+  const format = params.format ?? (params.llmMode ? "digest" : "json");
+
+  // Signal deprecation — consumers should migrate to /api/traces/search
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Link", `</api/traces/search>; rel="successor-version"`);
+
   const pageSize = Math.min(params.pageSize ?? 1000, 1000);
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
@@ -89,19 +97,34 @@ export default async function handler(
     },
     protections,
     {
-      downloadMode: !params.llmMode,
+      downloadMode: true,
+      includeSpans: format === "digest",
       scrollId: params.scrollId ?? undefined,
     },
   );
-  let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
 
-  if (params.llmMode) {
-    const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map((trace) => ({
+  const rawTraces = results.groups.flat() as (Trace & { spans?: Span[] })[];
+
+  let traces: unknown[];
+  if (format === "digest") {
+    traces = rawTraces.map((trace) => ({
+      trace_id: trace.trace_id,
+      formatted_trace: formatSpansDigest(trace.spans ?? []),
+      input: trace.input,
+      output: trace.output,
+      timestamps: trace.timestamps,
+      metadata: trace.metadata,
+      error: trace.error,
+    }));
+  } else if (params.llmMode) {
+    // Legacy llmMode behavior (kept for backward compat, but format=digest is preferred)
+    traces = (rawTraces as Trace[]).map((trace) => ({
       ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: [],
       evaluations: undefined,
     }));
-    traces = llmModeTraces;
+  } else {
+    traces = rawTraces;
   }
 
   return res.status(200).json({
