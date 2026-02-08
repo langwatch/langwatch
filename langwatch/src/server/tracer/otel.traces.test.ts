@@ -1565,9 +1565,6 @@ describe("opentelemetry traces receiver", () => {
               agent: {
                 name: "Strands Agent",
               },
-              usage: {
-                total_tokens: 34,
-              },
             },
             agent: {
               name: "Strands Agent",
@@ -1818,6 +1815,18 @@ describe("opentelemetry traces receiver", () => {
                       key: "gen_ai.usage.total_tokens",
                       value: {
                         intValue: Long.fromString("218") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
                       },
                     },
                     {
@@ -2113,6 +2122,18 @@ describe("opentelemetry traces receiver", () => {
                       },
                     },
                     {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
+                      },
+                    },
+                    {
                       key: "gen_ai.server.time_to_first_token",
                       value: {
                         intValue: Long.fromString("3125") as unknown as number,
@@ -2361,15 +2382,15 @@ describe("opentelemetry traces receiver", () => {
                       },
                     },
                     {
-                      key: "gen_ai.usage.cache_read_input_tokens",
+                      key: "gen_ai.usage.cache_read.input_tokens",
                       value: {
-                        intValue: Long.fromString("0") as unknown as number,
+                        intValue: Long.fromString("150") as unknown as number,
                       },
                     },
                     {
-                      key: "gen_ai.usage.cache_write_input_tokens",
+                      key: "gen_ai.usage.cache_creation.input_tokens",
                       value: {
-                        intValue: Long.fromString("0") as unknown as number,
+                        intValue: Long.fromString("50") as unknown as number,
                       },
                     },
                   ],
@@ -2524,6 +2545,8 @@ describe("opentelemetry traces receiver", () => {
       unsigned: false,
     });
     expect(chatSpan?.type).toBe("llm");
+    expect(chatSpan?.metrics?.cache_read_input_tokens).toBe(150);
+    expect(chatSpan?.metrics?.cache_creation_input_tokens).toBe(50);
     expect(chatSpan?.timestamps.first_token_at).toBe(1762189177618);
 
     const firstSpan = trace.spans[0];
@@ -2946,5 +2969,53 @@ describe("opentelemetry traces receiver", () => {
         },
       ],
     });
+  });
+
+  it("infers type 'tool' when gen_ai.operation.name is 'tool'", async () => {
+    const toolRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: { attributes: [] },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abc123",
+                  spanId: "tool789",
+                  name: "get_weather",
+                  kind: 3, // CLIENT
+                  startTimeUnixNano: new Long(0, 1),
+                  endTimeUnixNano: new Long(0, 2),
+                  status: { code: 0 as EStatusCode },
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "tool" },
+                    },
+                    {
+                      key: "gen_ai.tool.name",
+                      value: { stringValue: "get_weather" },
+                    },
+                    {
+                      key: "gen_ai.tool.call.id",
+                      value: { stringValue: "call_abc123" },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(toolRequest);
+    expect(traces.length).toBe(1);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("tool");
+    expect(span.name).toBe("get_weather");
   });
 });

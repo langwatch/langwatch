@@ -121,6 +121,23 @@ describe("CanonicalizeSpanAttributesService", () => {
       );
     });
 
+    it("infers type 'tool' when gen_ai.operation.name is 'tool'", () => {
+      const result = service.canonicalize(
+        {
+          "gen_ai.operation.name": "tool",
+          "gen_ai.tool.name": "get_weather",
+          "gen_ai.tool.call.id": "call_abc123",
+        },
+        [],
+        {
+          ...stubSpan,
+          name: "get_weather",
+        } as any,
+      );
+
+      expect(result.attributes["langwatch.span.type"]).toBe("tool");
+    });
+
     it("does not overwrite existing gen_ai.input.messages with legacy fallback", () => {
       const inputMessages = JSON.stringify([
         { role: "user", content: "Hello" },

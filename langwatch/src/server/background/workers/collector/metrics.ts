@@ -19,6 +19,8 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let totalPromptTokens: number | null = null;
   let totalCompletionTokens: number | null = null;
   let totalReasoningTokens: number | null = null;
+  let totalCacheReadInputTokens: number | null = null;
+  let totalCacheCreationInputTokens: number | null = null;
   let tokensEstimated = false;
   let totalCost: number | null = null;
 
@@ -73,6 +75,24 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         }
         totalReasoningTokens += span.metrics.reasoning_tokens;
       }
+      if (
+        span.metrics.cache_read_input_tokens !== undefined &&
+        span.metrics.cache_read_input_tokens !== null
+      ) {
+        if (!totalCacheReadInputTokens) {
+          totalCacheReadInputTokens = 0;
+        }
+        totalCacheReadInputTokens += span.metrics.cache_read_input_tokens;
+      }
+      if (
+        span.metrics.cache_creation_input_tokens !== undefined &&
+        span.metrics.cache_creation_input_tokens !== null
+      ) {
+        if (!totalCacheCreationInputTokens) {
+          totalCacheCreationInputTokens = 0;
+        }
+        totalCacheCreationInputTokens += span.metrics.cache_creation_input_tokens;
+      }
       if (span.metrics.tokens_estimated) {
         tokensEstimated = true;
       }
@@ -97,6 +117,8 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
     prompt_tokens: totalPromptTokens,
     completion_tokens: totalCompletionTokens,
     reasoning_tokens: totalReasoningTokens,
+    cache_read_input_tokens: totalCacheReadInputTokens,
+    cache_creation_input_tokens: totalCacheCreationInputTokens,
     total_cost: totalCost,
     tokens_estimated: tokensEstimated,
   };

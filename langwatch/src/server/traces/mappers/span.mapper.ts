@@ -165,14 +165,26 @@ function extractMetrics(
     spanAttributes["llm.token_count.completion"] ??
     spanAttributes["llm.usage.completion_tokens"];
 
+  const reasoningTokens =
+    spanAttributes["gen_ai.usage.reasoning_tokens"];
+
   const cost =
     spanAttributes["gen_ai.usage.cost"] ?? spanAttributes["llm.usage.cost"];
   const tokensEstimated = spanAttributes["langwatch.tokens_estimated"];
 
+  // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
+  const cacheReadInputTokens =
+    spanAttributes["gen_ai.usage.cache_read.input_tokens"];
+  const cacheCreationInputTokens =
+    spanAttributes["gen_ai.usage.cache_creation.input_tokens"];
+
   if (
     promptTokens === void 0 &&
     completionTokens === void 0 &&
-    cost === void 0
+    reasoningTokens === void 0 &&
+    cost === void 0 &&
+    cacheReadInputTokens === void 0 &&
+    cacheCreationInputTokens === void 0
   ) {
     return null;
   }
@@ -181,6 +193,14 @@ function extractMetrics(
     prompt_tokens: typeof promptTokens === "number" ? promptTokens : null,
     completion_tokens:
       typeof completionTokens === "number" ? completionTokens : null,
+    reasoning_tokens:
+      typeof reasoningTokens === "number" ? reasoningTokens : null,
+    cache_read_input_tokens:
+      typeof cacheReadInputTokens === "number" ? cacheReadInputTokens : null,
+    cache_creation_input_tokens:
+      typeof cacheCreationInputTokens === "number"
+        ? cacheCreationInputTokens
+        : null,
     cost: typeof cost === "number" ? cost : null,
     tokens_estimated:
       typeof tokensEstimated === "boolean" ? tokensEstimated : null,

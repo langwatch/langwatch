@@ -426,6 +426,12 @@ const addOpenTelemetrySpanAsSpan = (
         ) {
           type = "llm";
         }
+        if (
+          (type === "span" || type === "client") &&
+          attributesMap.gen_ai?.operation?.name === "tool"
+        ) {
+          type = "tool";
+        }
 
         // Extract metadata for agent spans from strands-agents
         if (
@@ -936,8 +942,38 @@ const addOpenTelemetrySpanAsSpan = (
               attributesMap.gen_ai.usage.output_tokens,
             );
             delete attributesMap.gen_ai.usage.output_tokens;
-            delete attributesMap.gen_ai.usage.total_tokens;
           }
+          // Reasoning tokens (Traceloop/OpenLLMetry convention: gen_ai.usage.reasoning_tokens)
+          if (
+            attributesMap.gen_ai.usage.reasoning_tokens != null &&
+            !isNaN(Number(attributesMap.gen_ai.usage.reasoning_tokens))
+          ) {
+            metrics.reasoning_tokens = Number(
+              attributesMap.gen_ai.usage.reasoning_tokens,
+            );
+            delete attributesMap.gen_ai.usage.reasoning_tokens;
+          }
+          // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
+          if (
+            attributesMap.gen_ai.usage.cache_read?.input_tokens != null &&
+            !isNaN(Number(attributesMap.gen_ai.usage.cache_read.input_tokens))
+          ) {
+            metrics.cache_read_input_tokens = Number(
+              attributesMap.gen_ai.usage.cache_read.input_tokens,
+            );
+            delete attributesMap.gen_ai.usage.cache_read;
+          }
+          if (
+            attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
+            !isNaN(Number(attributesMap.gen_ai.usage.cache_creation.input_tokens))
+          ) {
+            metrics.cache_creation_input_tokens = Number(
+              attributesMap.gen_ai.usage.cache_creation.input_tokens,
+            );
+            delete attributesMap.gen_ai.usage.cache_creation;
+          }
+          // total_tokens is redundant (sum of input + output), clean it from params
+          delete attributesMap.gen_ai.usage.total_tokens;
         }
 
         // Params

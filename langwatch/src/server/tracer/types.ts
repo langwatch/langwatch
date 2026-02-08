@@ -141,6 +141,8 @@ export interface SpanMetrics {
   prompt_tokens?: number | null;
   completion_tokens?: number | null;
   reasoning_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
   tokens_estimated?: boolean | null;
   cost?: number | null;
 }
@@ -317,6 +319,8 @@ export type Trace = {
     prompt_tokens?: number | null;
     completion_tokens?: number | null;
     reasoning_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+    cache_creation_input_tokens?: number | null;
     total_cost?: number | null;
     tokens_estimated?: boolean | null;
   };
