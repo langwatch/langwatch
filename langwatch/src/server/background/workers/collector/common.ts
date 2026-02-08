@@ -130,6 +130,24 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   return typedValueToText(firstOutput, true);
 };
 
+/**
+ * Extract text from a content block, handling both OpenAI/Anthropic style
+ * ({type:"text", text:"..."}) and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
+ */
+const textFromContentBlock = (c: any): string => {
+  if ("text" in c && typeof c.text === "string") return c.text;
+  if ("content" in c && typeof c.content === "string") return c.content;
+  return JSON.stringify(c);
+};
+
+/**
+ * Get the content array from a message, checking both `content` and `parts`
+ * fields (Vercel AI SDK / pi-ai use `parts` instead of `content`).
+ */
+const getMessageContent = (message: any): unknown => {
+  return message.content ?? message.parts;
+};
+
 // TODO: test
 export const typedValueToText = (
   typed: SpanInputOutput,
@@ -152,18 +170,19 @@ export const typedValueToText = (
   } else if (typed.type == "chat_messages") {
     if (last) {
       const lastMessage = typed.value[typed.value.length - 1];
-      return lastMessage
-        ? typeof lastMessage.content === "string"
-          ? lastMessage.content
-          : Array.isArray(lastMessage.content)
-            ? lastMessage.content
-                .map((c) => ("text" in c ? c.text : JSON.stringify(c)))
-                .join("")
-            : JSON.stringify(lastMessage)
-        : "";
+      if (!lastMessage) return "";
+      const content = getMessageContent(lastMessage);
+      return typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content.map(textFromContentBlock).join("")
+          : JSON.stringify(lastMessage);
     } else {
       return typed.value
-        .map((message) => message.content ?? JSON.stringify(message))
+        .map((message) => {
+          const content = getMessageContent(message);
+          return content ?? JSON.stringify(message);
+        })
         .join("");
     }
   } else if (typed.type == "json") {
@@ -310,23 +329,24 @@ export const typedValueToText = (
             ? json.findLast((m: any) => m?.role === preferRole)
             : undefined;
           const lastMessage = preferredMessage ?? json[json.length - 1];
-          const content = lastMessage?.content;
+          const content = getMessageContent(lastMessage);
           if (typeof content === "string") {
             return content;
           }
           if (Array.isArray(content)) {
-            return content
-              .map((c: any) => ("text" in c ? c.text : JSON.stringify(c)))
-              .join("");
+            return content.map(textFromContentBlock).join("");
           }
           return lastMessage ? JSON.stringify(lastMessage) : "";
         }
         return json
-          .map((message: any) =>
-            typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message),
-          )
+          .map((message: any) => {
+            const content = getMessageContent(message);
+            return typeof content === "string"
+              ? content
+              : Array.isArray(content)
+                ? content.map(textFromContentBlock).join("")
+                : JSON.stringify(message);
+          })
           .join("");
       }
 

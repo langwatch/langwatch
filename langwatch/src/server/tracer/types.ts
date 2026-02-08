@@ -25,6 +25,8 @@ export type Contexts = {
 export interface ChatMessage {
   role?: ChatRole;
   content?: string | ChatRichContent[] | null;
+  /** Vercel AI SDK / pi-ai use `parts` instead of `content` */
+  parts?: ChatRichContent[];
   function_call?: FunctionCall | null;
   tool_calls?: ToolCall[] | null;
   tool_call_id?: string | null;
@@ -36,6 +38,11 @@ export type ChatRichContent =
   | {
       type: "text";
       text?: string;
+    }
+  | {
+      /** pi-ai uses `content` instead of `text` inside text blocks */
+      type: "text";
+      content?: string;
     }
   | {
       text: string;

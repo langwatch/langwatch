@@ -1280,6 +1280,125 @@ describe("Span organizing and flattening tests", () => {
     expect(input).toBe("how much is 2+2?");
   });
 
+  describe("when messages use 'parts' instead of 'content' (Vercel AI SDK / pi-ai pattern)", () => {
+    it("extracts text from chat_messages with parts field", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "openclaw.agent.turn",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content: [{ type: "text", content: "You are a helpful assistant." }],
+              },
+              {
+                role: "user",
+                parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                parts: [{ type: "text", content: "Hey Rogerio! What's up?" }],
+              },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("[Sun 2026-02-08 20:58 UTC] hi");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("Hey Rogerio! What's up?");
+    });
+
+    it("extracts text from content blocks using 'content' field instead of 'text'", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "chat claude-opus-4-6",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "system",
+                content: [
+                  { type: "text", content: "You are Snaps, a lobster AI." },
+                ],
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", content: "What is the weather?" },
+                ],
+              },
+            ],
+          },
+          output: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "assistant",
+                content: [
+                  { type: "text", content: "It's sunny at 22C!" },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("What is the weather?");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("It's sunny at 22C!");
+    });
+
+    it("extracts text from json array of messages with parts pattern", () => {
+      const spans: BaseSpan[] = [
+        {
+          ...commonSpanProps,
+          span_id: "1",
+          name: "agent turn",
+          parent_id: null,
+          timestamps: { started_at: 100, finished_at: 500 },
+          input: {
+            type: "json",
+            value: [
+              { role: "system", content: [{ type: "text", content: "Be helpful." }] },
+              { role: "user", parts: [{ type: "text", content: "hello there" }] },
+            ],
+          },
+          output: {
+            type: "json",
+            value: [
+              { role: "assistant", parts: [{ type: "text", content: "Hi! How can I help?" }] },
+            ],
+          },
+        },
+      ];
+
+      const input = getFirstInputAsText(spans);
+      expect(input).toBe("hello there");
+
+      const output = getLastOutputAsText(spans);
+      expect(output).toBe("Hi! How can I help?");
+    });
+  });
+
   it("extracts text from json array of chat-message-like objects with non-standard roles", () => {
     const spans: BaseSpan[] = [
       {

@@ -418,9 +418,10 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
-        // Strands chat LLM calls
+        // GenAI semantic convention chat LLM calls (Strands, OpenClaw, etc.)
+        // CLIENT span kind is standard for gen_ai LLM calls per the OTEL GenAI spec
         if (
-          type == "span" &&
+          (type === "span" || type === "client") &&
           attributesMap.gen_ai?.operation?.name === "chat"
         ) {
           type = "llm";
@@ -441,7 +442,10 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // infer for others otel gen_ai spec
-        if (type === "span" && attributesMap.gen_ai?.response?.model) {
+        if (
+          (type === "span" || type === "client") &&
+          attributesMap.gen_ai?.response?.model
+        ) {
           type = "llm";
         }
 
@@ -476,6 +480,35 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Input
+
+        // GenAI semantic convention: gen_ai.input.messages (e.g. OpenClaw, OTEL GenAI spec)
+        // We assign directly as chat_messages without Zod validation to avoid
+        // stripping content fields that use provider-specific formats (e.g.
+        // Anthropic tool_use/tool_result content blocks).
+        if (
+          !input &&
+          attributesMap.gen_ai?.input?.messages &&
+          Array.isArray(attributesMap.gen_ai.input.messages)
+        ) {
+          const messages: ChatMessage[] = [];
+          // Prepend system instructions as a system message
+          if (attributesMap.gen_ai?.system_instructions) {
+            const raw = attributesMap.gen_ai.system_instructions;
+            // Keep the original value shape: string stays string, array stays array
+            const sysContent =
+              typeof raw === "string"
+                ? raw
+                : (raw as unknown as ChatMessage["content"]);
+            messages.push({ role: "system", content: sysContent });
+            delete (attributesMap as any).gen_ai.system_instructions;
+          }
+          messages.push(
+            ...(attributesMap.gen_ai.input.messages as ChatMessage[]),
+          );
+          input = { type: "chat_messages", value: messages };
+          delete (attributesMap as any).gen_ai.input.messages;
+        }
+
         if (
           attributesMap.llm?.input_messages &&
           Array.isArray(attributesMap.llm.input_messages)
@@ -659,6 +692,21 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Output
+
+        // GenAI semantic convention: gen_ai.output.messages (e.g. OpenClaw, OTEL GenAI spec)
+        // Assign directly without Zod validation to preserve all content fields.
+        if (
+          !output &&
+          attributesMap.gen_ai?.output?.messages &&
+          Array.isArray(attributesMap.gen_ai.output.messages)
+        ) {
+          output = {
+            type: "chat_messages",
+            value: attributesMap.gen_ai.output.messages as ChatMessage[],
+          };
+          delete (attributesMap as any).gen_ai.output.messages;
+        }
+
         if (
           attributesMap.llm?.output_messages &&
           Array.isArray(attributesMap.llm.output_messages)
