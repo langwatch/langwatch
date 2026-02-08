@@ -1,23 +1,5 @@
 # Changelog
 
-## 0.4.0 (2026-02-06)
-
-### Added
-- `discover_schema` tool: Explore available filter fields, metrics, aggregation types, and group-by options
-- `search_traces` tool: Search and filter traces with text queries, filters, date ranges, and pagination
-- `get_trace` tool: Get full trace details with AI-readable formatting including ASCII span tree
-- `get_analytics` tool: Query timeseries analytics with any metric, aggregation, and grouping
-- `list_prompts` tool: List all prompts in the project
-- `get_prompt` tool: Get prompt details including messages, model config, and version history
-- `create_prompt` tool: Create new prompts with messages and model configuration
-- `update_prompt` tool: Update existing prompts or create new versions
-- API key authentication via `LANGWATCH_API_KEY` env var or `--apiKey` CLI arg
-- Configurable endpoint via `LANGWATCH_ENDPOINT` env var or `--endpoint` CLI arg
-- Progressive disclosure via `discover_schema` to keep tool definitions lean
-
-### Changed
-- Existing `fetch_langwatch_docs` and `fetch_scenario_docs` tools remain unchanged
-
 ## [0.3.3](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.2...mcp-server@v0.3.3) (2025-12-18)
 
 
