@@ -24,7 +24,10 @@ import { LuTrash } from "react-icons/lu";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
-import { TeamUserRoleField } from "../../../components/settings/TeamUserRoleField";
+import {
+  MISSING_CUSTOM_ROLE_VALUE,
+  TeamUserRoleField,
+} from "../../../components/settings/TeamUserRoleField";
 import { Link } from "../../../components/ui/link";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
@@ -69,8 +72,10 @@ function buildInitialPendingTeamRoles(params: {
         tm.teamId,
         {
           role:
-            tm.role === TeamUserRole.CUSTOM && tm.assignedRole
-              ? `custom:${tm.assignedRole.id}`
+            tm.role === TeamUserRole.CUSTOM
+              ? tm.assignedRole
+                ? `custom:${tm.assignedRole.id}`
+                : MISSING_CUSTOM_ROLE_VALUE
               : tm.role,
           customRoleId:
             tm.role === TeamUserRole.CUSTOM ? tm.assignedRole?.id : undefined,
@@ -91,8 +96,10 @@ function getTeamRoleUpdates(params: {
     if (!pending) return [];
 
     const currentRole =
-      teamMembership.role === TeamUserRole.CUSTOM && teamMembership.assignedRole
-        ? `custom:${teamMembership.assignedRole.id}`
+      teamMembership.role === TeamUserRole.CUSTOM
+        ? teamMembership.assignedRole
+          ? `custom:${teamMembership.assignedRole.id}`
+          : MISSING_CUSTOM_ROLE_VALUE
         : teamMembership.role;
     const currentCustomRoleId =
       teamMembership.role === TeamUserRole.CUSTOM
@@ -114,6 +121,62 @@ function getTeamRoleUpdates(params: {
         customRoleId: pending.customRoleId,
       },
     ];
+  });
+}
+
+function hasPendingRoleChanges(params: {
+  teamMemberships: TeamMembershipWithRole[];
+  pendingTeamRoles: PendingTeamRoleMap;
+  pendingOrganizationRole: OrganizationUserRole | null;
+  currentOrganizationRole: OrganizationUserRole;
+}): boolean {
+  const {
+    teamMemberships,
+    pendingTeamRoles,
+    pendingOrganizationRole,
+    currentOrganizationRole,
+  } = params;
+
+  if (
+    pendingOrganizationRole !== null &&
+    pendingOrganizationRole !== currentOrganizationRole
+  ) {
+    return true;
+  }
+
+  return teamMemberships.some((teamMembership) => {
+    const pending = pendingTeamRoles[teamMembership.teamId];
+    if (!pending) return false;
+
+    const currentRole =
+      teamMembership.role === TeamUserRole.CUSTOM
+        ? teamMembership.assignedRole
+          ? `custom:${teamMembership.assignedRole.id}`
+          : MISSING_CUSTOM_ROLE_VALUE
+        : teamMembership.role;
+
+    return (
+      pending.role !== currentRole ||
+      (pending.customRoleId ?? null) !== (teamMembership.assignedRole?.id ?? null)
+    );
+  });
+}
+
+function arePendingTeamRolesEqual(
+  left: PendingTeamRoleMap,
+  right: PendingTeamRoleMap,
+): boolean {
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+  if (leftEntries.length !== rightEntries.length) return false;
+
+  return leftEntries.every(([teamId, leftRole]) => {
+    const rightRole = right[teamId];
+    if (!rightRole) return false;
+    return (
+      leftRole.role === rightRole.role &&
+      (leftRole.customRoleId ?? null) === (rightRole.customRoleId ?? null)
+    );
   });
 }
 
@@ -252,39 +315,59 @@ export default function UserDetailsPage() {
     [member.data?.user.teamMemberships, organization?.id],
   );
 
+  const hasMissingCustomRoleAssignments = useMemo(
+    () =>
+      Object.values(pendingTeamRoles).some(
+        (pendingTeamRole) =>
+          pendingTeamRole.role === TeamUserRole.CUSTOM ||
+          pendingTeamRole.role === MISSING_CUSTOM_ROLE_VALUE,
+      ),
+    [pendingTeamRoles],
+  );
+
+  const hasPendingChanges = useMemo(
+    () =>
+      member.data
+        ? hasPendingRoleChanges({
+            teamMemberships: filteredTeamMemberships,
+            pendingTeamRoles,
+            pendingOrganizationRole,
+            currentOrganizationRole: member.data.role,
+          })
+        : false,
+    [member.data, filteredTeamMemberships, pendingTeamRoles, pendingOrganizationRole],
+  );
+
   useEffect(() => {
     if (!member.data) return;
-    setPendingOrganizationRole(member.data.role);
-    setPendingTeamRoles(
-      buildInitialPendingTeamRoles({
-        teamMemberships: member.data.user.teamMemberships,
-        organizationId: organization?.id,
-      }),
-    );
-  }, [member.data, organization?.id]);
-
-  const hasPendingChanges = useMemo(() => {
-    if (!member.data || pendingOrganizationRole === null) return false;
-    const currentOrganizationRole = pendingOrganizationRole;
-    if (currentOrganizationRole !== member.data.role) return true;
-
-    return filteredTeamMemberships.some((tm) => {
-      const currentRole =
-        tm.role === TeamUserRole.CUSTOM && tm.assignedRole
-          ? `custom:${tm.assignedRole.id}`
-          : tm.role;
-      const pending = pendingTeamRoles[tm.teamId];
-      if (!pending) return false;
-      return (
-        pending.role !== currentRole ||
-        (pending.customRoleId ?? null) !== (tm.assignedRole?.id ?? null)
-      );
+    const nextPendingTeamRoles = buildInitialPendingTeamRoles({
+      teamMemberships: member.data.user.teamMemberships,
+      organizationId: organization?.id,
     });
+    const isSyncedWithServer =
+      pendingOrganizationRole === member.data.role &&
+      arePendingTeamRolesEqual(pendingTeamRoles, nextPendingTeamRoles);
+    if (isSyncedWithServer) return;
+
+    if (
+      hasPendingRoleChanges({
+        teamMemberships: filteredTeamMemberships,
+        pendingTeamRoles,
+        pendingOrganizationRole,
+        currentOrganizationRole: member.data.role,
+      })
+    ) {
+      return;
+    }
+
+    setPendingOrganizationRole(member.data.role);
+    setPendingTeamRoles(nextPendingTeamRoles);
   }, [
     member.data,
-    pendingOrganizationRole,
+    organization?.id,
     filteredTeamMemberships,
     pendingTeamRoles,
+    pendingOrganizationRole,
   ]);
 
   const handleOrganizationRoleChange = (nextRole: OrganizationUserRole) => {
@@ -301,32 +384,46 @@ export default function UserDetailsPage() {
     void router.push("/settings/members");
   };
 
+  const goBack = () => {
+    router.back();
+  };
+
   const saveMemberChanges = async () => {
     if (!member.data || !organization || pendingOrganizationRole === null) return;
     const nextOrganizationRole = pendingOrganizationRole;
+    const teamRoleUpdates = getTeamRoleUpdates({
+      teamMemberships: filteredTeamMemberships,
+      pendingTeamRoles,
+      userId: member.data.userId,
+    });
+    const organizationRoleChanged = nextOrganizationRole !== member.data.role;
 
     try {
-      if (nextOrganizationRole !== member.data.role) {
+      if (canManageOrganization && (organizationRoleChanged || teamRoleUpdates.length > 0)) {
         await updateMemberRole.mutateAsync({
           organizationId: organization.id,
           userId: member.data.userId,
           role: nextOrganizationRole,
+          teamRoleUpdates,
         });
-      }
+      } else if (canManageTeams && teamRoleUpdates.length > 0) {
+        if (organizationRoleChanged) {
+          toaster.create({
+            title: "Cannot update organization role",
+            description: "You need organization permissions to change this role.",
+            type: "error",
+          });
+          return;
+        }
 
-      const teamRoleUpdates = getTeamRoleUpdates({
-        teamMemberships: filteredTeamMemberships,
-        pendingTeamRoles,
-        userId: member.data.userId,
-      });
-
-      for (const teamRoleUpdate of teamRoleUpdates) {
-        await updateTeamMemberRole.mutateAsync({
-          teamId: teamRoleUpdate.teamId,
-          userId: teamRoleUpdate.userId,
-          role: teamRoleUpdate.role,
-          customRoleId: teamRoleUpdate.customRoleId,
-        });
+        for (const teamRoleUpdate of teamRoleUpdates) {
+          await updateTeamMemberRole.mutateAsync({
+            teamId: teamRoleUpdate.teamId,
+            userId: teamRoleUpdate.userId,
+            role: teamRoleUpdate.role,
+            customRoleId: teamRoleUpdate.customRoleId,
+          });
+        }
       }
 
       toaster.create({
@@ -336,7 +433,6 @@ export default function UserDetailsPage() {
       });
       await apiContext.organization.getMemberById.invalidate();
       await apiContext.organization.getAll.invalidate();
-      goBackOrMembersList();
     } catch (error) {
       if (isHandledByGlobalLicenseHandler(error)) return;
       toaster.create({
@@ -350,6 +446,14 @@ export default function UserDetailsPage() {
 
   const handleSave = () => {
     if (!member.data || pendingOrganizationRole === null) return;
+    if (hasMissingCustomRoleAssignments) {
+      toaster.create({
+        title: "Cannot save member",
+        description: "Resolve missing custom roles before saving changes.",
+        type: "error",
+      });
+      return;
+    }
 
     const limitType = getLicenseLimitTypeForRoleChange({
       previousRole: member.data.role,
@@ -375,21 +479,7 @@ export default function UserDetailsPage() {
   const memberData = member.data;
   const currentOrganizationRole: OrganizationUserRole =
     pendingOrganizationRole ?? memberData.role;
-
-  if (!memberData) {
-    return (
-      <SettingsLayout>
-        <VStack paddingX={4} paddingY={6} gap={6} align="start">
-          <Heading size="lg" as="h1">
-            User not found
-          </Heading>
-          <Link href="/settings/members">
-            <Button variant="outline">Back to Members</Button>
-          </Link>
-        </VStack>
-      </SettingsLayout>
-    );
-  }
+  const canOnlyManageTeams = canManageTeams && !canManageOrganization;
 
   return (
     <SettingsLayout>
@@ -415,15 +505,17 @@ export default function UserDetailsPage() {
           </Heading>
           {(canManageOrganization || canManageTeams) ? (
             <HStack>
-              <Button variant="outline" onClick={goBackOrMembersList}>
+              <Button variant="outline" onClick={goBack}>
                 Cancel
               </Button>
               <Button
                 onClick={() => void handleSave()}
                 disabled={
                   !hasPendingChanges ||
+                  hasMissingCustomRoleAssignments ||
                   updateMemberRole.isLoading ||
-                  updateTeamMemberRole.isLoading
+                  updateTeamMemberRole.isLoading ||
+                  (canOnlyManageTeams && pendingOrganizationRole !== memberData.role)
                 }
               >
                 {updateMemberRole.isLoading || updateTeamMemberRole.isLoading ? (

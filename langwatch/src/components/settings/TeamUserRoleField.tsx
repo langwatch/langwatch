@@ -22,6 +22,8 @@ export type RoleOption = {
   customRoleId?: string;
 };
 
+export const MISSING_CUSTOM_ROLE_VALUE = "custom:missing";
+
 export const teamRolesOptions: Record<
   "ADMIN" | "MEMBER" | "VIEWER",
   RoleOption
@@ -100,10 +102,18 @@ export const TeamUserRoleField = ({
   const selectedRole: RoleOption =
     selectedRoleValue === TeamUserRole.CUSTOM
       ? {
-          label: "Custom Role",
-          value: TeamUserRole.MEMBER,
-          description: "Custom role assignment unavailable",
+          label: "Missing Custom Role",
+          value: MISSING_CUSTOM_ROLE_VALUE,
+          description:
+            "This member references a deleted or unavailable custom role",
         }
+      : selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE
+        ? {
+            label: "Missing Custom Role",
+            value: MISSING_CUSTOM_ROLE_VALUE,
+            description:
+              "This member references a deleted or unavailable custom role",
+          }
       : selectedRoleValue.startsWith("custom:")
         ? {
             label: customRole?.name ?? "Custom Role",
@@ -128,6 +138,11 @@ export const TeamUserRoleField = ({
           onChange={onChange}
         />
       </HStack>
+      {selectedRole.value === MISSING_CUSTOM_ROLE_VALUE ? (
+        <Text color="red.fg" fontSize="sm">
+          Resolve this role before saving changes.
+        </Text>
+      ) : null}
     </VStack>
   );
 };
@@ -141,18 +156,18 @@ export const TeamRoleSelect = ({
   value,
   onChange,
   organizationId,
-  organizationRole = OrganizationUserRole.ADMIN,
+  organizationRole,
 }: {
   value: RoleOption;
   onChange: (value: RoleOption) => void;
   organizationId: string;
-  organizationRole?: OrganizationUserRole;
+  organizationRole: OrganizationUserRole;
 }) => {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
   const allRoleOptions = useMemo(
-    () =>
-      [
+    () => {
+      const constrainedOptions = [
         ...Object.values(teamRolesOptions),
         ...(customRoles.data ?? []).map((role) => ({
           label: role.name,
@@ -167,8 +182,18 @@ export const TeamRoleSelect = ({
           organizationRole,
           teamRole: option.value,
         }),
-      ),
-    [customRoles.data, organizationRole],
+      );
+
+      if (
+        value.value === MISSING_CUSTOM_ROLE_VALUE &&
+        !constrainedOptions.some((option) => option.value === value.value)
+      ) {
+        return [value, ...constrainedOptions];
+      }
+
+      return constrainedOptions;
+    },
+    [customRoles.data, organizationRole, value],
   );
 
   const correctedSelectedRole = useMemo(() => {

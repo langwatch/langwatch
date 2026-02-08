@@ -7,7 +7,7 @@ import { OrganizationUserRole } from "@prisma/client";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import MemberDetailsPage from "../members/[userId]";
+import MemberDetailsPage from "../../pages/settings/members/[userId]";
 
 const mockPush = vi.fn();
 const mockUpdateMemberRoleMutateAsync = vi.fn();
@@ -33,7 +33,7 @@ vi.mock("next/router", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
+vi.mock("../../hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     hasOrgPermission: (permission: string) => permission === "organization:manage",
@@ -41,7 +41,7 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/useLicenseEnforcement", () => ({
+vi.mock("../../hooks/useLicenseEnforcement", () => ({
   useLicenseEnforcement: () => ({
     checkAndProceed: (callback: () => void) => callback(),
     isAllowed: true,
@@ -50,11 +50,11 @@ vi.mock("../../../hooks/useLicenseEnforcement", () => ({
   }),
 }));
 
-vi.mock("../../../components/SettingsLayout", () => ({
+vi.mock("../../components/SettingsLayout", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../components/settings/OrganizationUserRoleField", () => ({
+vi.mock("../../components/settings/OrganizationUserRoleField", () => ({
   OrganizationUserRoleField: ({
     value,
     onChange,
@@ -73,13 +73,13 @@ vi.mock("../../../components/settings/OrganizationUserRoleField", () => ({
   ),
 }));
 
-vi.mock("../../../components/ui/toaster", () => ({
+vi.mock("../../components/ui/toaster", () => ({
   toaster: {
     create: vi.fn(),
   },
 }));
 
-vi.mock("../../../utils/api", () => ({
+vi.mock("../../utils/api", () => ({
   api: {
     useContext: () => ({
       organization: {
@@ -151,6 +151,7 @@ describe("Member details page", () => {
           organizationId: "org-1",
           userId: "user-1",
           role: OrganizationUserRole.EXTERNAL,
+          teamRoleUpdates: [],
         });
       });
     });
