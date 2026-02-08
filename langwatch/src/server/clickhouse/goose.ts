@@ -495,9 +495,7 @@ export async function getMigrateStatus(
   return executeGoose("status", config, options);
 }
 
-export async function runMigrationsIfConfigured(
-  options: GooseOptions = {},
-): Promise<void> {
+export async function runMigrations(options: GooseOptions = {}): Promise<void> {
   if (process.env.ENABLE_CLICKHOUSE !== "true") {
     logger.info(
       "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",

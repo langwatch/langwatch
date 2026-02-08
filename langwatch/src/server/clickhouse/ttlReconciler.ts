@@ -22,13 +22,48 @@ export interface TableTTLEntry {
  * Resolution order: per-table env var > TIERED_STORAGE_DEFAULT_HOT_DAYS > hardcodedDefault
  */
 export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
-  { table: "event_log",              ttlColumn: "CreatedAt",      envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",             hardcodedDefault: 30 },
-  { table: "processor_checkpoints",  ttlColumn: "UpdatedAt",      envVar: "TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS", hardcodedDefault: 30 },
-  { table: "stored_spans",           ttlColumn: "EndTime",        envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",          hardcodedDefault: 30 },
-  { table: "trace_summaries",        ttlColumn: "LastUpdatedAt",  envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",       hardcodedDefault: 30 },
-  { table: "evaluation_states",      ttlColumn: "UpdatedAt",      envVar: "TIERED_EVALUATION_STATES_TABLE_HOT_DAYS",     hardcodedDefault: 30 },
-  { table: "experiment_runs",        ttlColumn: "CreatedAt",      envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",       hardcodedDefault: 30 },
-  { table: "experiment_run_results", ttlColumn: "CreatedAt",      envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",    hardcodedDefault: 30 },
+  {
+    table: "event_log",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "processor_checkpoints",
+    ttlColumn: "UpdatedAt",
+    envVar: "TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "stored_spans",
+    ttlColumn: "EndTime",
+    envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "trace_summaries",
+    ttlColumn: "LastUpdatedAt",
+    envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "evaluation_states",
+    ttlColumn: "UpdatedAt",
+    envVar: "TIERED_EVALUATION_STATES_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "experiment_runs",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "experiment_run_results",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
 ] as const;
 
 /**
@@ -72,7 +107,9 @@ export function resolveHotDays(config: TableTTLEntry): number {
  * Example engine_full containing TTL:
  *   "... TTL toDateTime(CreatedAt) + toIntervalDay(2) TO VOLUME 'cold' ..."
  */
-export function parseTTLDaysFromEngineMetadata(engineFull: string): number | null {
+export function parseTTLDaysFromEngineMetadata(
+  engineFull: string,
+): number | null {
   const match = engineFull.match(/toIntervalDay\((\d+)\)/);
   if (!match?.[1]) return null;
   return parseInt(match[1], 10);
@@ -81,7 +118,10 @@ export function parseTTLDaysFromEngineMetadata(engineFull: string): number | nul
 /**
  * Builds the desired TTL SQL expression for a table.
  */
-export function buildDesiredTTLExpression(config: TableTTLEntry, days: number): string {
+export function buildDesiredTTLExpression(
+  config: TableTTLEntry,
+  days: number,
+): string {
   return `toDateTime(${config.ttlColumn}) + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
@@ -113,9 +153,11 @@ export const TIERED_STORAGE_POLICY = "local_primary";
  *
  * Uses SET materialize_ttl_after_modify = 0 to make changes metadata-only (cheap).
  */
-export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void> {
+export async function reconcileTTL(
+  options: ReconcileOptions = {},
+): Promise<void> {
   // When called without an explicit connectionUrl (i.e. from production startup),
-  // respect the ENABLE_CLICKHOUSE feature gate — same as runMigrationsIfConfigured.
+  // respect the ENABLE_CLICKHOUSE feature gate — same as runMigrations.
   // Direct callers (e.g. integration tests) pass connectionUrl explicitly to bypass.
   if (!options.connectionUrl && process.env.ENABLE_CLICKHOUSE !== "true") {
     logger.info("ENABLE_CLICKHOUSE is not set, skipping TTL reconciliation.");
@@ -161,7 +203,10 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
       const tableInfo = tableInfoByName.get(config.table);
       if (!tableInfo) {
         if (options.verbose) {
-          logger.info({ table: config.table }, "Table not found, skipping TTL reconciliation");
+          logger.info(
+            { table: config.table },
+            "Table not found, skipping TTL reconciliation",
+          );
         }
         continue;
       }
@@ -187,7 +232,10 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
       if (currentDays === desiredDays) {
         skippedCount++;
         if (options.verbose) {
-          logger.debug({ table: config.table, days: currentDays }, "TTL already in sync");
+          logger.debug(
+            { table: config.table, days: currentDays },
+            "TTL already in sync",
+          );
         }
         continue;
       }
