@@ -95,7 +95,7 @@ whenIRejectInvitationFor(page, email)   // Click Reject in row
 thenISeeSentInviteFor(page, email)      // Assert in Invites list with "Invited" badge
 thenISeePendingApprovalFor(page, email) // Assert in Invites list with badge
 thenISeeSuccessToast(page, title)       // Assert toast appears
-seedWaitingApprovalInvite(page, email)  // Create via tRPC API
+seedWaitingApprovalInvite({ page, email, organizationId, teamId })  // Create via tRPC API
 ```
 
 ## Toast Messages (actual implementation)

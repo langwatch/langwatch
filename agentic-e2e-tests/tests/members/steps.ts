@@ -78,9 +78,13 @@ export async function whenICloseInviteLinkDialog(page: Page) {
   const inviteLinkHeading = page.getByRole("heading", {
     name: "Invite Link",
   });
-  const isVisible = await inviteLinkHeading
-    .isVisible({ timeout: 3000 })
-    .catch(() => false);
+  let isVisible = false;
+  try {
+    await expect(inviteLinkHeading).toBeVisible({ timeout: 3000 });
+    isVisible = true;
+  } catch {
+    isVisible = false;
+  }
 
   if (isVisible) {
     // Close the dialog
@@ -219,12 +223,17 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
 /**
  * Create a WAITING_APPROVAL invitation via tRPC API.
  */
-export async function seedWaitingApprovalInvite(
-  page: Page,
-  email: string,
-  organizationId: string,
-  teamId: string
-) {
+export async function seedWaitingApprovalInvite({
+  page,
+  email,
+  organizationId,
+  teamId,
+}: {
+  page: Page;
+  email: string;
+  organizationId: string;
+  teamId: string;
+}) {
   const response = await page.request.post(
     "/api/trpc/organization.createInviteRequest",
     {

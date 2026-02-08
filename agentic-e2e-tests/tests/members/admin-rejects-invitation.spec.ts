@@ -28,7 +28,7 @@ test.describe("Invitation Approval - Admin Rejects Request", () => {
 
     // Seed: create a WAITING_APPROVAL invite via API
     const { organizationId, teamId } = await getOrgAndTeamIds(page);
-    await seedWaitingApprovalInvite(page, email, organizationId, teamId);
+    await seedWaitingApprovalInvite({ page, email, organizationId, teamId });
 
     // Navigate and verify the invite appears in Invites with Pending Approval badge
     await givenIAmOnTheMembersPage(page);

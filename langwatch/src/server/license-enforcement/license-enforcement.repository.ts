@@ -1,6 +1,7 @@
 import {
   INVITE_STATUS,
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
@@ -110,7 +111,7 @@ export interface ILicenseEnforcementRepository {
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Counts active (non-archived) workflows for license enforcement.

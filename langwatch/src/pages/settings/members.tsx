@@ -249,10 +249,12 @@ function MembersList({
               (Admin Override) Add members
             </PageLayout.HeaderButton>
           )}
-          <PageLayout.HeaderButton onClick={onAddMembersOpen}>
-            <Plus size={20} />
-            Add members
-          </PageLayout.HeaderButton>
+          {!activePlan.overrideAddingLimitations && (
+            <PageLayout.HeaderButton onClick={onAddMembersOpen}>
+              <Plus size={20} />
+              Add members
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>

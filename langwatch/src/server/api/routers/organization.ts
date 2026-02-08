@@ -742,6 +742,7 @@ export const organizationRouter = createTRPCRouter({
         }
       }
 
+      const inviteService = new InviteService(prisma);
       const invites = await Promise.all(
         input.invites.map(async (invite) => {
           // Support both new teams array and legacy teamIds string
@@ -844,7 +845,6 @@ export const organizationRouter = createTRPCRouter({
           }
 
           // Checks that a valid pending invite does not already exist for this email and organization
-          const inviteService = new InviteService(prisma);
           const existingInvite = await inviteService.checkDuplicateInvite({
             email: invite.email,
             organizationId: input.organizationId,
@@ -965,20 +965,24 @@ export const organizationRouter = createTRPCRouter({
         user: ctx.session.user,
       });
 
-      const results = await Promise.all(
-        input.invites.map(async (invite) => {
-          // Check for duplicate invites across PENDING and WAITING_APPROVAL
-          const existingInvite = await inviteService.checkDuplicateInvite({
-            email: invite.email,
-            organizationId: input.organizationId,
-          });
+      const normalizedPayloadEmails = input.invites.map((invite) =>
+        invite.email.trim().toLowerCase(),
+      );
+      const duplicatePayloadEmails = normalizedPayloadEmails.filter(
+        (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
+      );
 
-          if (existingInvite) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `An invitation for ${invite.email} already exists`,
-            });
-          }
+      if (duplicatePayloadEmails.length > 0) {
+        const uniqueDuplicatePayloadEmails = [...new Set(duplicatePayloadEmails)];
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
+        });
+      }
+
+      const preparedInvites = await Promise.all(
+        input.invites.map(async (invite) => {
+          const normalizedEmail = invite.email.trim().toLowerCase();
 
           // Validate team IDs
           let teamIdsString = "";
@@ -1061,17 +1065,26 @@ export const organizationRouter = createTRPCRouter({
             });
           }
 
-          return inviteService.createMemberInviteRequest({
-            email: invite.email,
+          return {
+            email: normalizedEmail,
             role: invite.role as OrganizationUserRole,
             organizationId: input.organizationId,
             teamIds: teamIdsString,
             teamAssignments:
               teamAssignments.length > 0 ? teamAssignments : undefined,
             requestedBy: ctx.session.user.id,
-          });
+          };
         }),
       );
+
+      const results = await prisma.$transaction(async (tx) => {
+        const transactionalInviteService = new InviteService(tx);
+        return Promise.all(
+          preparedInvites.map((invite) =>
+            transactionalInviteService.createMemberInviteRequest(invite),
+          ),
+        );
+      });
 
       return results;
     }),

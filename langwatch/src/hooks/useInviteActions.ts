@@ -81,10 +81,10 @@ export function useInviteActions({
           onClose();
           refetchInvites();
         },
-        onError: () => {
+        onError: (error) => {
           toaster.create({
             title: "Sorry, something went wrong",
-            description: "Please try that again",
+            description: error.message ?? "Please try that again",
             type: "error",
             duration: 5000,
             meta: { closable: true },
@@ -224,6 +224,15 @@ export function useInviteActions({
             meta: { closable: true },
           });
           refetchInvites();
+        },
+        onError: (error) => {
+          toaster.create({
+            title: "Sorry, something went wrong",
+            description: error.message ?? "Please try that again",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
         },
       },
     );

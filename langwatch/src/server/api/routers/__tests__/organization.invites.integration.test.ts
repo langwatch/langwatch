@@ -317,6 +317,31 @@ describe("Organization Invites Integration", () => {
         expect(results[2]!.invite.email).toBe("multi-c@example.com");
         expect(results[2]!.invite.status).toBe("WAITING_APPROVAL");
       });
+
+      it("rejects duplicate emails in a single payload and creates no invites", async () => {
+        await expect(
+          memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "dupe@example.com", role: "MEMBER", teamIds: teamId },
+              { email: "dupe@example.com", role: "EXTERNAL", teamIds: teamId },
+            ],
+          }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining(
+            "Duplicate emails in request payload",
+          ),
+        });
+
+        const persistedInvites = await prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: "dupe@example.com",
+          },
+        });
+        expect(persistedInvites).toHaveLength(0);
+      });
     });
 
     describe("when duplicate invitation exists with WAITING_APPROVAL status", () => {
@@ -522,8 +547,8 @@ describe("Organization Invites Integration", () => {
           });
 
         const emails = invites.map((i) => i.email);
-        expect(emails.includes("pending@example.com")).toBe(true);
-        expect(emails.includes("waiting@example.com")).toBe(true);
+        expect(emails).toContain("pending@example.com");
+        expect(emails).toContain("waiting@example.com");
       });
 
       it("includes requestedByUser data for WAITING_APPROVAL invites", async () => {

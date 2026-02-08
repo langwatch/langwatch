@@ -1,6 +1,7 @@
 import {
   type OrganizationInvite,
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -63,7 +64,7 @@ interface ApproveInviteInput {
  * Extracted from the organization router to enable both admin and member invite flows.
  */
 export class InviteService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Validates that an invite can be created:
@@ -203,7 +204,7 @@ export class InviteService {
 
     if (!organization) {
       throw new TRPCError({
-        code: "FORBIDDEN",
+        code: "NOT_FOUND",
         message: "Organization not found",
       });
     }
@@ -246,6 +247,18 @@ export class InviteService {
   async createMemberInviteRequest(
     input: CreateMemberInviteRequestInput
   ): Promise<{ invite: OrganizationInvite }> {
+    const existingInvite = await this.checkDuplicateInvite({
+      email: input.email,
+      organizationId: input.organizationId,
+    });
+
+    if (existingInvite) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `An invitation for ${input.email} already exists`,
+      });
+    }
+
     const inviteCode = nanoid();
 
     const savedInvite = await this.prisma.organizationInvite.create({
@@ -303,13 +316,35 @@ export class InviteService {
       });
     }
 
-    const updatedInvite = await this.prisma.organizationInvite.update({
-      where: { id: invite.id, organizationId: input.organizationId },
+    const { count } = await this.prisma.organizationInvite.updateMany({
+      where: {
+        id: invite.id,
+        organizationId: input.organizationId,
+        status: "WAITING_APPROVAL",
+      },
       data: {
         status: "PENDING",
         expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 48 hours
       },
     });
+
+    if (count === 0) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Invitation was already approved or no longer waiting",
+      });
+    }
+
+    const updatedInvite = await this.prisma.organizationInvite.findFirst({
+      where: { id: invite.id, organizationId: input.organizationId },
+    });
+
+    if (!updatedInvite) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Invitation not found",
+      });
+    }
 
     if (env.SENDGRID_API_KEY) {
       await sendInviteEmail({
