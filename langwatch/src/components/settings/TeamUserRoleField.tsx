@@ -1,17 +1,17 @@
 import {
   createListCollection,
-  Field,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useMemo } from "react";
-import { Controller, type SubmitHandler, useForm } from "react-hook-form";
-import { toaster } from "../../components/ui/toaster";
 import type { TeamMemberWithUser } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import {
+  getAutoCorrectedTeamRoleForOrganizationRole,
+  isTeamRoleAllowedForOrganizationRole,
+} from "../../utils/memberRoleConstraints";
 import { Select } from "../ui/select";
 
 export type RoleOption = {
@@ -74,90 +74,60 @@ export const TeamRoleSelectItemContent = ({
 export const TeamUserRoleField = ({
   member,
   organizationId,
+  organizationRole,
   customRole,
+  value,
+  onChange,
 }: {
   member: TeamMemberWithUser;
   organizationId: string;
+  organizationRole: OrganizationUserRole;
   customRole?: {
     id: string;
     name: string;
     description: string | null;
     permissions: string[];
   };
+  value?: string;
+  onChange: (value: RoleOption) => void;
 }) => {
-  const defaultRole: RoleOption =
-    (customRole ?? member.role === TeamUserRole.CUSTOM)
-      ? ({
-          label: customRole?.name ?? "Custom Role",
-          value: `custom:${customRole?.id ?? ""}`,
-          description:
-            customRole?.description ??
-            `${customRole?.permissions.length ?? 0} permissions`,
-          isCustom: true,
-          customRoleId: customRole?.id,
-        } as RoleOption)
-      : teamRolesOptions[member.role];
+  const selectedRoleValue =
+    value ??
+    (member.role === TeamUserRole.CUSTOM && customRole
+      ? `custom:${customRole.id}`
+      : member.role);
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-    reset: resetForm,
-  } = useForm<TeamUserRoleForm>({
-    defaultValues: {
-      role: defaultRole,
-    },
-  });
-
-  const updateTeamMemberRoleMutation =
-    api.organization.updateTeamMemberRole.useMutation();
-
-  const onSubmit: SubmitHandler<TeamUserRoleForm> = (data) => {
-    updateTeamMemberRoleMutation.mutate(
-      {
-        teamId: member.teamId,
-        userId: member.userId,
-        role: data.role.value,
-        customRoleId: data.role.customRoleId,
-      },
-      {
-        onError: () => {
-          toaster.create({
-            title: "Failed to update user role",
+  const selectedRole: RoleOption =
+    selectedRoleValue === TeamUserRole.CUSTOM
+      ? {
+          label: "Custom Role",
+          value: TeamUserRole.MEMBER,
+          description: "Custom role assignment unavailable",
+        }
+      : selectedRoleValue.startsWith("custom:")
+        ? {
+            label: customRole?.name ?? "Custom Role",
+            value: selectedRoleValue,
             description:
-              "You need administrator permissions to update this user's role",
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-          resetForm();
-        },
-      },
-    );
-  };
+              customRole?.description ??
+              `${customRole?.permissions.length ?? 0} permissions`,
+            isCustom: true,
+            customRoleId: selectedRoleValue.replace("custom:", ""),
+          }
+        : teamRolesOptions[
+            selectedRoleValue as Exclude<TeamUserRole, "CUSTOM">
+          ];
 
   return (
     <VStack align="start">
-      <Controller
-        control={control}
-        name={`role`}
-        rules={{ required: "User role is required" }}
-        render={({ field }) => (
-          <HStack gap={6}>
-            <TeamRoleSelect
-              organizationId={organizationId}
-              value={field.value}
-              onChange={(value: RoleOption) => {
-                field.onChange(value);
-                void handleSubmit(onSubmit)();
-              }}
-            />
-            {updateTeamMemberRoleMutation.isLoading && <Spinner size="sm" />}
-          </HStack>
-        )}
-      />
-      <Field.ErrorText>{errors.role && "Role is required"}</Field.ErrorText>
+      <HStack gap={6}>
+        <TeamRoleSelect
+          organizationId={organizationId}
+          organizationRole={organizationRole}
+          value={selectedRole}
+          onChange={onChange}
+        />
+      </HStack>
     </VStack>
   );
 };
@@ -171,26 +141,43 @@ export const TeamRoleSelect = ({
   value,
   onChange,
   organizationId,
+  organizationRole = OrganizationUserRole.ADMIN,
 }: {
   value: RoleOption;
   onChange: (value: RoleOption) => void;
   organizationId: string;
+  organizationRole?: OrganizationUserRole;
 }) => {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const allRoleOptions: RoleOption[] = useMemo(
-    () => [
-      ...Object.values(teamRolesOptions),
-      ...(customRoles.data ?? []).map((role) => ({
-        label: role.name,
-        value: `custom:${role.id}`,
-        description: role.description ?? `${role.permissions.length} permissions`,
-        isCustom: true,
-        customRoleId: role.id,
-      })),
-    ],
-    [customRoles.data],
+  const allRoleOptions = useMemo(
+    () =>
+      [
+        ...Object.values(teamRolesOptions),
+        ...(customRoles.data ?? []).map((role) => ({
+          label: role.name,
+          value: `custom:${role.id}`,
+          description:
+            role.description ?? `${role.permissions.length} permissions`,
+          isCustom: true,
+          customRoleId: role.id,
+        })),
+      ].filter((option) =>
+        isTeamRoleAllowedForOrganizationRole({
+          organizationRole,
+          teamRole: option.value,
+        }),
+      ),
+    [customRoles.data, organizationRole],
   );
+
+  const correctedSelectedRole = useMemo(() => {
+    const correctedValue = getAutoCorrectedTeamRoleForOrganizationRole({
+      organizationRole,
+      currentTeamRole: value.value,
+    });
+    return allRoleOptions.find((option) => option.value === correctedValue);
+  }, [allRoleOptions, organizationRole, value.value]);
 
   const roleCollection = useMemo(
     () => createListCollection({ items: allRoleOptions }),
@@ -200,7 +187,7 @@ export const TeamRoleSelect = ({
   return (
     <Select.Root
       collection={roleCollection}
-      value={[value.value]}
+      value={[correctedSelectedRole?.value ?? value.value]}
       onValueChange={(details) => {
         const selectedValue = details.value[0];
         if (selectedValue) {

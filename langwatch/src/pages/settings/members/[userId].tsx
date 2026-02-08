@@ -5,12 +5,20 @@ import {
   Heading,
   HStack,
   Icon,
+  Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  type CustomRole,
+  OrganizationUserRole,
+  type Team,
+  TeamUserRole,
+  type TeamUser,
+} from "@prisma/client";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, MoreVertical } from "lucide-react";
 import { LuTrash } from "react-icons/lu";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
@@ -20,8 +28,140 @@ import { TeamUserRoleField } from "../../../components/settings/TeamUserRoleFiel
 import { Link } from "../../../components/ui/link";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
+import { checkCompoundLimits } from "../../../hooks/useCompoundLicenseCheck";
+import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import {
+  getAutoCorrectedTeamRoleForOrganizationRole,
+  getOrganizationRoleLabel,
+} from "../../../utils/memberRoleConstraints";
+import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
 import { api } from "../../../utils/api";
+
+type PendingTeamRole = {
+  role: string;
+  customRoleId?: string;
+};
+
+type PendingTeamRoleMap = Record<string, PendingTeamRole>;
+
+type TeamRoleUpdatePayload = {
+  teamId: string;
+  userId: string;
+  role: string;
+  customRoleId?: string;
+};
+
+type TeamMembershipWithRole = TeamUser & {
+  assignedRole?: CustomRole | null;
+  team: Team;
+};
+
+function buildInitialPendingTeamRoles(params: {
+  teamMemberships: TeamMembershipWithRole[];
+  organizationId?: string;
+}): PendingTeamRoleMap {
+  const { teamMemberships, organizationId } = params;
+  return Object.fromEntries(
+    teamMemberships
+      .filter((tm) => tm.team.organizationId === organizationId)
+      .map((tm) => [
+        tm.teamId,
+        {
+          role:
+            tm.role === TeamUserRole.CUSTOM && tm.assignedRole
+              ? `custom:${tm.assignedRole.id}`
+              : tm.role,
+          customRoleId:
+            tm.role === TeamUserRole.CUSTOM ? tm.assignedRole?.id : undefined,
+        },
+      ]),
+  );
+}
+
+function getTeamRoleUpdates(params: {
+  teamMemberships: TeamMembershipWithRole[];
+  pendingTeamRoles: PendingTeamRoleMap;
+  userId: string;
+}): TeamRoleUpdatePayload[] {
+  const { teamMemberships, pendingTeamRoles, userId } = params;
+
+  return teamMemberships.flatMap((teamMembership) => {
+    const pending = pendingTeamRoles[teamMembership.teamId];
+    if (!pending) return [];
+
+    const currentRole =
+      teamMembership.role === TeamUserRole.CUSTOM && teamMembership.assignedRole
+        ? `custom:${teamMembership.assignedRole.id}`
+        : teamMembership.role;
+    const currentCustomRoleId =
+      teamMembership.role === TeamUserRole.CUSTOM
+        ? teamMembership.assignedRole?.id
+        : undefined;
+
+    if (
+      pending.role === currentRole &&
+      (pending.customRoleId ?? undefined) === currentCustomRoleId
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        teamId: teamMembership.teamId,
+        userId,
+        role: pending.role,
+        customRoleId: pending.customRoleId,
+      },
+    ];
+  });
+}
+
+function getLicenseLimitTypeForRoleChange(params: {
+  previousRole: OrganizationUserRole;
+  nextRole: OrganizationUserRole;
+}): "members" | "membersLite" | null {
+  const { previousRole, nextRole } = params;
+
+  if (
+    previousRole === OrganizationUserRole.EXTERNAL &&
+    nextRole !== OrganizationUserRole.EXTERNAL
+  ) {
+    return "members";
+  }
+
+  if (
+    previousRole !== OrganizationUserRole.EXTERNAL &&
+    nextRole === OrganizationUserRole.EXTERNAL
+  ) {
+    return "membersLite";
+  }
+
+  return null;
+}
+
+function applyOrganizationRoleToPendingTeamRoles(params: {
+  organizationRole: OrganizationUserRole;
+  currentPendingTeamRoles: PendingTeamRoleMap;
+}): PendingTeamRoleMap {
+  const { organizationRole, currentPendingTeamRoles } = params;
+
+  return Object.fromEntries(
+    Object.entries(currentPendingTeamRoles).map(([teamId, teamRole]) => [
+      teamId,
+      {
+        role: getAutoCorrectedTeamRoleForOrganizationRole({
+          organizationRole,
+          currentTeamRole: teamRole.role,
+        }),
+        customRoleId:
+          organizationRole === OrganizationUserRole.EXTERNAL
+            ? undefined
+            : teamRole.customRoleId,
+      },
+    ]),
+  );
+}
 /**
  * UserDetailsPage
  * Single Responsibility: Display a user's details, allow changing org role, and list team memberships
@@ -33,6 +173,7 @@ export default function UserDetailsPage() {
     useOrganizationTeamProject();
 
   const canManageOrganization = hasOrgPermission("organization:manage");
+  const canManageTeams = hasPermission("team:manage");
 
   const apiContext = api.useContext();
 
@@ -48,6 +189,15 @@ export default function UserDetailsPage() {
   );
 
   const removeMemberFromTeam = api.team.removeMember.useMutation();
+  const updateMemberRole = api.organization.updateMemberRole.useMutation();
+  const updateTeamMemberRole = api.organization.updateTeamMemberRole.useMutation();
+  const membersEnforcement = useLicenseEnforcement("members");
+  const membersLiteEnforcement = useLicenseEnforcement("membersLite");
+  const [pendingOrganizationRole, setPendingOrganizationRole] =
+    useState<OrganizationUserRole | null>(null);
+  const [pendingTeamRoles, setPendingTeamRoles] = useState<PendingTeamRoleMap>(
+    {},
+  );
 
   /**
    * Remove user from team
@@ -102,11 +252,129 @@ export default function UserDetailsPage() {
     [member.data?.user.teamMemberships, organization?.id],
   );
 
+  useEffect(() => {
+    if (!member.data) return;
+    setPendingOrganizationRole(member.data.role);
+    setPendingTeamRoles(
+      buildInitialPendingTeamRoles({
+        teamMemberships: member.data.user.teamMemberships,
+        organizationId: organization?.id,
+      }),
+    );
+  }, [member.data, organization?.id]);
+
+  const hasPendingChanges = useMemo(() => {
+    if (!member.data || pendingOrganizationRole === null) return false;
+    const currentOrganizationRole = pendingOrganizationRole;
+    if (currentOrganizationRole !== member.data.role) return true;
+
+    return filteredTeamMemberships.some((tm) => {
+      const currentRole =
+        tm.role === TeamUserRole.CUSTOM && tm.assignedRole
+          ? `custom:${tm.assignedRole.id}`
+          : tm.role;
+      const pending = pendingTeamRoles[tm.teamId];
+      if (!pending) return false;
+      return (
+        pending.role !== currentRole ||
+        (pending.customRoleId ?? null) !== (tm.assignedRole?.id ?? null)
+      );
+    });
+  }, [
+    member.data,
+    pendingOrganizationRole,
+    filteredTeamMemberships,
+    pendingTeamRoles,
+  ]);
+
+  const handleOrganizationRoleChange = (nextRole: OrganizationUserRole) => {
+    setPendingOrganizationRole(nextRole);
+    setPendingTeamRoles((current) =>
+      applyOrganizationRoleToPendingTeamRoles({
+        organizationRole: nextRole,
+        currentPendingTeamRoles: current,
+      }),
+    );
+  };
+
+  const goBackOrMembersList = () => {
+    void router.push("/settings/members");
+  };
+
+  const saveMemberChanges = async () => {
+    if (!member.data || !organization || pendingOrganizationRole === null) return;
+    const nextOrganizationRole = pendingOrganizationRole;
+
+    try {
+      if (nextOrganizationRole !== member.data.role) {
+        await updateMemberRole.mutateAsync({
+          organizationId: organization.id,
+          userId: member.data.userId,
+          role: nextOrganizationRole,
+        });
+      }
+
+      const teamRoleUpdates = getTeamRoleUpdates({
+        teamMemberships: filteredTeamMemberships,
+        pendingTeamRoles,
+        userId: member.data.userId,
+      });
+
+      for (const teamRoleUpdate of teamRoleUpdates) {
+        await updateTeamMemberRole.mutateAsync({
+          teamId: teamRoleUpdate.teamId,
+          userId: teamRoleUpdate.userId,
+          role: teamRoleUpdate.role,
+          customRoleId: teamRoleUpdate.customRoleId,
+        });
+      }
+
+      toaster.create({
+        title: "Member updated",
+        type: "success",
+        duration: 2500,
+      });
+      await apiContext.organization.getMemberById.invalidate();
+      await apiContext.organization.getAll.invalidate();
+      goBackOrMembersList();
+    } catch (error) {
+      if (isHandledByGlobalLicenseHandler(error)) return;
+      toaster.create({
+        title: "Failed to update member",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        type: "error",
+      });
+    }
+  };
+
+  const handleSave = () => {
+    if (!member.data || pendingOrganizationRole === null) return;
+
+    const limitType = getLicenseLimitTypeForRoleChange({
+      previousRole: member.data.role,
+      nextRole: pendingOrganizationRole,
+    });
+
+    const enforcementByLimitType = {
+      members: membersEnforcement,
+      membersLite: membersLiteEnforcement,
+    } as const;
+
+    const enforcements = limitType ? [enforcementByLimitType[limitType]] : [];
+
+    checkCompoundLimits(enforcements, () => {
+      void saveMemberChanges();
+    });
+  };
+
   if (!organization || !member.data) {
     return <SettingsLayout />;
   }
 
   const memberData = member.data;
+  const currentOrganizationRole: OrganizationUserRole =
+    pendingOrganizationRole ?? memberData.role;
 
   if (!memberData) {
     return (
@@ -145,6 +413,34 @@ export default function UserDetailsPage() {
           <Heading size="lg" as="h1">
             Member
           </Heading>
+          {(canManageOrganization || canManageTeams) ? (
+            <HStack>
+              <Button variant="outline" onClick={goBackOrMembersList}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleSave()}
+                disabled={
+                  !hasPendingChanges ||
+                  updateMemberRole.isLoading ||
+                  updateTeamMemberRole.isLoading
+                }
+              >
+                {updateMemberRole.isLoading || updateTeamMemberRole.isLoading ? (
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text>Saving...</Text>
+                  </HStack>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </HStack>
+          ) : (
+            <Button variant="outline" onClick={goBackOrMembersList}>
+              Back
+            </Button>
+          )}
         </HStack>
 
         <Card.Root width="full">
@@ -159,19 +455,12 @@ export default function UserDetailsPage() {
               {canManageOrganization ? (
                 <Field.Root>
                   <OrganizationUserRoleField
-                    organizationId={organization.id}
-                    userId={memberData.userId}
-                    defaultRole={memberData.role}
+                    value={currentOrganizationRole}
+                    onChange={handleOrganizationRoleChange}
                   />
                 </Field.Root>
               ) : (
-                <Text>
-                  {memberData.role === "ADMIN"
-                    ? "Organization Admin"
-                    : memberData.role === "MEMBER"
-                      ? "Organization Member"
-                      : memberData.role}
-                </Text>
+                <Text>{getOrganizationRoleLabel(memberData.role)}</Text>
               )}
             </HorizontalFormControl>
           </Card.Body>
@@ -197,7 +486,7 @@ export default function UserDetailsPage() {
                       </Link>
                     </Table.Cell>
                     <Table.Cell>
-                      {hasPermission("team:manage") ? (
+                      {canManageTeams ? (
                         <Field.Root>
                           <TeamUserRoleField
                             member={{
@@ -205,6 +494,17 @@ export default function UserDetailsPage() {
                               user: memberData.user,
                             }}
                             organizationId={organization.id}
+                            organizationRole={currentOrganizationRole}
+                            value={pendingTeamRoles[tm.teamId]?.role}
+                            onChange={(nextRole) => {
+                              setPendingTeamRoles((current) => ({
+                                ...current,
+                                [tm.teamId]: {
+                                  role: nextRole.value,
+                                  customRoleId: nextRole.customRoleId,
+                                },
+                              }));
+                            }}
                             customRole={(() => {
                               // Check if this team membership has an assigned custom role
                               const assignedRole = tm.assignedRole;
@@ -235,7 +535,7 @@ export default function UserDetailsPage() {
                       )}
                     </Table.Cell>
                     <Table.Cell paddingRight={6}>
-                      {hasPermission("team:manage") && (
+                      {canManageTeams && (
                         <Menu.Root>
                           <Menu.Trigger asChild>
                             <Button variant="ghost" size="sm">

@@ -134,3 +134,38 @@ Feature: Member Role Team Restrictions
     And I have multiple team assignments with "Admin" team role
     When I change the Org Role to "Lite Member"
     Then all team assignments should have "Viewer" as the team role
+
+  # ============================================================================
+  # Member Edit Page Persistence and API Validation
+  # ============================================================================
+
+  @integration
+  Scenario: Editing a member does not persist organization role until save
+    Given I am on the member details page
+    And the organization role is "Member"
+    When I change the organization role to "Lite Member"
+    Then the change should remain pending
+    And the persisted organization role should stay "Member" until I click "Save"
+
+  @integration
+  Scenario: Saving a Lite Member update enforces Viewer team role in every team
+    Given I am editing a member with organization role "Member"
+    And the member has team roles "Admin" and "Member"
+    When I change the organization role to "Lite Member"
+    And I click "Save"
+    Then the member should be saved as "Lite Member"
+    And all of the member team roles should be "Viewer"
+
+  @integration
+  Scenario: API rejects non-Viewer team role assignments for Lite Members
+    Given a member has organization role "Lite Member"
+    When I try to set a team role to "Admin", "Member", or a custom role
+    Then the API should reject the update
+    And the member team role should remain "Viewer"
+
+  @integration
+  Scenario: Lite Member label is shown correctly on member details
+    Given I am a Lite Member viewing my own member details
+    When I look at the organization role field
+    Then I should see "Lite Member"
+    And I should not see "EXTERNAL"
