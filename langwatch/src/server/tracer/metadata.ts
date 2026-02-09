@@ -7,6 +7,7 @@ export const openTelemetryToLangWatchMetadataMapping: ReservedTraceMetadataMappi
     "telemetry.sdk.version": "telemetry_sdk_version",
 
     "thread.id": "thread_id",
+    "gen_ai.conversation.id": "thread_id",
     "user.id": "user_id",
     "customer.id": "customer_id",
     "topic.id": "topic_id",
