@@ -1,0 +1,85 @@
+# Redis Cluster for testing BullMQ CROSSSLOT fix
+# Usage: docker-compose -f docker-compose.redis-cluster.yml up -d
+#
+# This creates a 6-node Redis Cluster (3 masters, 3 replicas)
+# Required for testing BullMQ hash tag compatibility
+
+version: '3.8'
+
+services:
+  redis-node-1:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7000
+    ports:
+      - "7000:7000"
+    volumes:
+      - redis-node-1-data:/data
+
+  redis-node-2:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7001
+    ports:
+      - "7001:7001"
+    volumes:
+      - redis-node-2-data:/data
+
+  redis-node-3:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7002
+    ports:
+      - "7002:7002"
+    volumes:
+      - redis-node-3-data:/data
+
+  redis-node-4:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7003
+    ports:
+      - "7003:7003"
+    volumes:
+      - redis-node-4-data:/data
+
+  redis-node-5:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7004
+    ports:
+      - "7004:7004"
+    volumes:
+      - redis-node-5-data:/data
+
+  redis-node-6:
+    image: redis:7-alpine
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --port 7005
+    ports:
+      - "7005:7005"
+    volumes:
+      - redis-node-6-data:/data
+
+  redis-cluster-init:
+    image: redis:7-alpine
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+    command: >
+      sh -c "sleep 5 && redis-cli --cluster create 
+      host.docker.internal:7000 
+      host.docker.internal:7001 
+      host.docker.internal:7002 
+      host.docker.internal:7003 
+      host.docker.internal:7004 
+      host.docker.internal:7005 
+      --cluster-replicas 1 --cluster-yes"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  redis-node-1-data:
+  redis-node-2-data:
+  redis-node-3-data:
+  redis-node-4-data:
+  redis-node-5-data:
+  redis-node-6-data:
