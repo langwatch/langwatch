@@ -1001,6 +1001,14 @@ const addOpenTelemetrySpanAsSpan = (
           trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
           delete attributesMap.session.id;
         }
+        if (
+          attributesMap.gen_ai?.conversation?.id &&
+          typeof attributesMap.gen_ai.conversation.id === "string"
+        ) {
+          trace.reservedTraceMetadata.thread_id =
+            attributesMap.gen_ai.conversation.id;
+          delete attributesMap.gen_ai.conversation.id;
+        }
         if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
           trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
           delete attributesMap.tag.tags;
