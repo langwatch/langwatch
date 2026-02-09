@@ -105,8 +105,14 @@ async function main() {
       totalOrphaned += keys.length;
 
       if (cleanup) {
-        for (const key of keys) {
-          await connection.del(key);
+        // Use UNLINK for async deletion (non-blocking) and batch for throughput
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+          const batch = keys.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map((key) => connection.unlink(key)));
+          if (keys.length > BATCH_SIZE) {
+            console.log(`    … ${Math.min(i + BATCH_SIZE, keys.length)}/${keys.length} deleted`);
+          }
         }
         console.log(`    → deleted ${keys.length} keys`);
       }

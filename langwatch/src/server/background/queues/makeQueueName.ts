@@ -14,5 +14,10 @@
  *   makeQueueName("pipeline/handler") // → "{pipeline/handler}"
  */
 export function makeQueueName(name: string): string {
+  if (name.startsWith("{") && name.endsWith("}")) {
+    throw new Error(
+      `Queue name "${name}" is already wrapped in hash tags. Do not call makeQueueName twice.`,
+    );
+  }
   return `{${name}}`;
 }

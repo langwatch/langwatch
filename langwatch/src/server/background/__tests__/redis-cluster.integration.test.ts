@@ -51,6 +51,12 @@ describe("BullMQ Redis Cluster Compatibility", () => {
     it("wraps a path-style name in hash tags", () => {
       expect(makeQueueName("pipeline/handler/foo")).toBe("{pipeline/handler/foo}");
     });
+
+    it("throws when called with an already-wrapped name", () => {
+      expect(() => makeQueueName("{collector}")).toThrow(
+        /already wrapped in hash tags/,
+      );
+    });
   });
 
   describe("when checking background worker queue constants", () => {
