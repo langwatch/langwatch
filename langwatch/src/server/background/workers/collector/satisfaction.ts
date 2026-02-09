@@ -31,9 +31,10 @@ export const scoreSatisfactionFromInput = async ({
   }
 
   if (!input?.value) {
-    logger.warn(
-      { traceId },
-      "trace ID input is empty, skipping satisfaction score",
+    // "observedTraceId" = customer trace being processed, vs "traceId" = system OTEL context
+    logger.debug(
+      { observedTraceId: traceId },
+      "trace input is empty, skipping satisfaction score",
     );
     return;
   }

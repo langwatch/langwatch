@@ -6,6 +6,7 @@ import {
   getFirstInputAsText,
   getLastOutputAsText,
   organizeSpansIntoTree,
+  typedValueToText,
 } from "./common"; // replace with your actual module path
 
 const elasticSearchSpanToSpan = transformElasticSearchSpanToSpan(
@@ -1433,5 +1434,54 @@ describe("Span organizing and flattening tests", () => {
 
     const output = getLastOutputAsText(spans);
     expect(output).toBe("The weather is sunny today!");
+  });
+});
+
+describe("typedValueToText()", () => {
+  describe("when type is 'list'", () => {
+    it("recurses into the first item by default", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: [
+          { type: "text", value: "hello" },
+          { type: "text", value: "world" },
+        ],
+      });
+
+      expect(result).toBe("hello");
+    });
+
+    it("recurses into the last item when last=true", () => {
+      const result = typedValueToText(
+        {
+          type: "list",
+          value: [
+            { type: "text", value: "hello" },
+            { type: "text", value: "world" },
+          ],
+        },
+        true,
+      );
+
+      expect(result).toBe("world");
+    });
+
+    it("returns empty string when list is empty", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: [],
+      });
+
+      expect(result).toBe("");
+    });
+
+    it("returns empty string when list items lack type/value structure", () => {
+      const result = typedValueToText({
+        type: "list",
+        value: ["plain string", 42] as any,
+      });
+
+      expect(result).toBe("");
+    });
   });
 });
