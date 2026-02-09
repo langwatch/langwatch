@@ -34,6 +34,7 @@ import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
 import { scenarioRouter } from "./routers/scenarios";
+import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
@@ -86,6 +87,7 @@ export const appRouter = createTRPCRouter({
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
+  suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
   license: licenseRouter,
