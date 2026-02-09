@@ -311,7 +311,7 @@ const processCollectorJob_ = async (
     };
     if (esSpan.params && typeof span.params === "object") {
       esSpan.params = {
-        ...safeTruncate(esSpan.params),
+        ...safeTruncate(esSpan.params, 128 * 1024),
         _keys: flattenObjectKeys(esSpan.params),
       };
     } else {

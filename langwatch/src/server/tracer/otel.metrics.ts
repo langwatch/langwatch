@@ -26,7 +26,6 @@ const GENAI_METRICS = {
 export const openTelemetryMetricsRequestToTracesForCollection = async (
   otelMetrics: DeepPartial<IExportMetricsServiceRequest>,
 ): Promise<TraceForCollection[]> => {
-  console.log("otelMetrics", JSON.stringify(otelMetrics, undefined, 2));
   return await tracer.withActiveSpan(
     "openTelemetryMetricsRequestToTracesForCollection",
     { kind: SpanKind.INTERNAL },

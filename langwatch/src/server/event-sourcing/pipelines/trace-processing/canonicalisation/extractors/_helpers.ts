@@ -82,6 +82,25 @@ export const coerceToStringArray = (v: unknown): string[] | null => {
   return out.length ? out : null;
 };
 
+/**
+ * Extracts text from a content block, handling both standard ({type:"text", text:"..."})
+ * and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
+ */
+const textFromBlock = (p: unknown): string | null => {
+  if (!isRecord(p)) return null;
+  const rec = p as Record<string, unknown>;
+  if (typeof rec.text === "string") return rec.text;
+  if (typeof rec.content === "string") return rec.content;
+  return null;
+};
+
+/**
+ * Gets the content array from a message, checking both `content` and `parts`
+ * (Vercel AI SDK / pi-ai use `parts` instead of `content`).
+ */
+const getMessageContentOrParts = (msg: MessageLike): unknown =>
+  msg.content ?? (msg as Record<string, unknown>).parts;
+
 export const extractSystemInstructionFromMessages = (
   messages: unknown,
 ): string | null => {
@@ -94,7 +113,7 @@ export const extractSystemInstructionFromMessages = (
     return null;
   }
 
-  const content = first.content;
+  const content = getMessageContentOrParts(first);
   if (content == null) {
     return null;
   }
@@ -104,15 +123,11 @@ export const extractSystemInstructionFromMessages = (
   }
 
   if (Array.isArray(content)) {
-    const parts = content
-      .map((p) =>
-        isRecord(p) && typeof (p as Record<string, unknown>).text === "string"
-          ? ((p as Record<string, unknown>).text as string)
-          : null,
-      )
+    const texts = content
+      .map(textFromBlock)
       .filter((p): p is string => p !== null);
 
-    const extracted = parts.join("");
+    const extracted = texts.join("");
     return extracted.length > 0 ? extracted : null;
   }
 

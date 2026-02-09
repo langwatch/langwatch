@@ -34,11 +34,12 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Tool Call Detection
-    // Check for tool call indicators
+    // Check for tool call indicators (Vercel AI SDK, OTEL GenAI spec)
     // ─────────────────────────────────────────────────────────────────────────
     if (
       attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
-      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)
+      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
+      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool"
     ) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule(`${this.id}:tool`);

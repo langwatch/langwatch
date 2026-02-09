@@ -40,6 +40,7 @@ import {
   extractInputMessages,
   extractModelToBoth,
   extractOutputMessages,
+  extractSystemInstructionFromMessages,
   extractUsageTokens,
   isRecord,
   safeJsonParse,
@@ -114,7 +115,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Note: langwatch.input is handled by the LangWatch extractor which
     // directly produces gen_ai.input.messages when structured format is detected
     // ─────────────────────────────────────────────────────────────────────────
-    extractInputMessages(
+    const inputExtracted = extractInputMessages(
       ctx,
       [
         {
@@ -124,6 +125,28 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ],
       `${this.id}:input.messages`,
     );
+
+    // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
+    // GenAI spec), extractInputMessages skips it. Still extract system
+    // instruction from the existing messages if not already set.
+    if (
+      !inputExtracted &&
+      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION)
+    ) {
+      const existing = safeJsonParse(
+        attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES),
+      );
+      if (Array.isArray(existing)) {
+        const sysInstruction = extractSystemInstructionFromMessages(existing);
+        if (sysInstruction !== null) {
+          ctx.setAttr(
+            ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+            sysInstruction,
+          );
+          ctx.recordRule(`${this.id}:system_instruction(existing)`);
+        }
+      }
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Output Messages

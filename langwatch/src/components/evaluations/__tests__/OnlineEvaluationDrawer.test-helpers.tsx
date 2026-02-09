@@ -356,6 +356,7 @@ export function createApiMock() {
         },
         monitors: {
           getAllForProject: { invalidate: mockInvalidate },
+          getById: { invalidate: mockInvalidate },
         },
       })),
       modelProvider: {

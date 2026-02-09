@@ -1562,11 +1562,13 @@ describe("opentelemetry traces receiver", () => {
                 start_time: "2025-05-25T10:37:11.068343+00:00",
                 end_time: "2025-05-25T10:37:12.014098+00:00",
               },
+              usage: {
+                prompt_tokens: 24,
+                completion_tokens: 10,
+                total_tokens: 34,
+              },
               agent: {
                 name: "Strands Agent",
-              },
-              usage: {
-                total_tokens: 34,
               },
             },
             agent: {
@@ -1818,6 +1820,18 @@ describe("opentelemetry traces receiver", () => {
                       key: "gen_ai.usage.total_tokens",
                       value: {
                         intValue: Long.fromString("218") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
                       },
                     },
                     {
@@ -2113,6 +2127,18 @@ describe("opentelemetry traces receiver", () => {
                       },
                     },
                     {
+                      key: "gen_ai.usage.cache_read.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_creation.input_tokens",
+                      value: {
+                        intValue: Long.fromString("50") as unknown as number,
+                      },
+                    },
+                    {
                       key: "gen_ai.server.time_to_first_token",
                       value: {
                         intValue: Long.fromString("3125") as unknown as number,
@@ -2361,15 +2387,15 @@ describe("opentelemetry traces receiver", () => {
                       },
                     },
                     {
-                      key: "gen_ai.usage.cache_read_input_tokens",
+                      key: "gen_ai.usage.cache_read.input_tokens",
                       value: {
-                        intValue: Long.fromString("0") as unknown as number,
+                        intValue: Long.fromString("150") as unknown as number,
                       },
                     },
                     {
-                      key: "gen_ai.usage.cache_write_input_tokens",
+                      key: "gen_ai.usage.cache_creation.input_tokens",
                       value: {
-                        intValue: Long.fromString("0") as unknown as number,
+                        intValue: Long.fromString("50") as unknown as number,
                       },
                     },
                   ],
@@ -2524,6 +2550,8 @@ describe("opentelemetry traces receiver", () => {
       unsigned: false,
     });
     expect(chatSpan?.type).toBe("llm");
+    expect(chatSpan?.metrics?.cache_read_input_tokens).toBe(150);
+    expect(chatSpan?.metrics?.cache_creation_input_tokens).toBe(50);
     expect(chatSpan?.timestamps.first_token_at).toBe(1762189177618);
 
     const firstSpan = trace.spans[0];
@@ -2606,6 +2634,11 @@ describe("opentelemetry traces receiver", () => {
                 id: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
                 finish_reasons: ["STOP"],
               },
+              usage: {
+                input_tokens: "11",
+                output_tokens: "13",
+                total_tokens: "24",
+              },
               system: "openai",
               operation: {
                 name: "chat",
@@ -2631,5 +2664,368 @@ describe("opentelemetry traces receiver", () => {
         "telemetry.sdk.version": "1.30.0",
       },
     });
+  });
+
+  it("receives GenAI semantic convention trace with Anthropic-style content blocks", async () => {
+    // Realistic OpenClaw trace: Anthropic messages with content blocks, tool_use, tool_result
+    const genAiRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "openclaw" } },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abcdef1234567890abcdef1234567890",
+                  spanId: "1234567890abcdef",
+                  name: "chat claude-opus-4-6",
+                  kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
+                  startTimeUnixNano: "1700000000000000000",
+                  endTimeUnixNano: "1700000005000000000",
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "chat" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.response.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.provider.name",
+                      value: { stringValue: "anthropic" },
+                    },
+                    {
+                      key: "gen_ai.system_instructions",
+                      value: {
+                        // OpenClaw JSON.stringify's the system instructions;
+                        // Anthropic system can be an array of content blocks
+                        stringValue: JSON.stringify([
+                          { type: "text", text: "You are a helpful assistant." },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.input.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "user",
+                            content: [
+                              { type: "text", text: "What is the weather?" },
+                            ],
+                          },
+                          {
+                            role: "assistant",
+                            content: [
+                              { type: "text", text: "Let me check." },
+                              {
+                                type: "tool_use",
+                                id: "tool_abc",
+                                name: "get_weather",
+                                input: { location: "London" },
+                              },
+                            ],
+                          },
+                          {
+                            role: "tool",
+                            content: [
+                              {
+                                type: "tool_result",
+                                tool_use_id: "tool_abc",
+                                content: "Sunny, 22°C",
+                              },
+                            ],
+                          },
+                          {
+                            role: "user",
+                            content: "Thanks!",
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.output.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "assistant",
+                            content: [
+                              {
+                                type: "text",
+                                text: "The weather in London is sunny at 22°C.",
+                              },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("150") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("25") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("llm");
+    expect((span as any).model).toBe("claude-opus-4-6");
+
+    // Input must preserve ALL content — no stripping of tool_use, tool_result, etc.
+    expect(span.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "system",
+          content: [{ type: "text", text: "You are a helpful assistant." }],
+        },
+        {
+          role: "user",
+          content: [{ type: "text", text: "What is the weather?" }],
+        },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Let me check." },
+            {
+              type: "tool_use",
+              id: "tool_abc",
+              name: "get_weather",
+              input: { location: "London" },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool_abc",
+              content: "Sunny, 22°C",
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: "Thanks!",
+        },
+      ],
+    });
+
+    // Output must preserve full content blocks
+    expect(span.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "The weather in London is sunny at 22°C.",
+            },
+          ],
+        },
+      ],
+    });
+
+    // Metrics extracted
+    expect((span as any).metrics?.prompt_tokens).toBe(150);
+    expect((span as any).metrics?.completion_tokens).toBe(25);
+
+    // Cleaned from params
+    expect((span.params as any)?.gen_ai?.input?.messages).toBeUndefined();
+    expect((span.params as any)?.gen_ai?.output?.messages).toBeUndefined();
+    expect(
+      (span.params as any)?.gen_ai?.system_instructions,
+    ).toBeUndefined();
+  });
+
+  it("receives GenAI trace with 'parts' pattern (Vercel AI SDK / pi-ai style)", async () => {
+    const genAiRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: { attributes: [] },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abc123",
+                  spanId: "span456",
+                  name: "openclaw.agent.turn",
+                  kind: 3, // CLIENT
+                  startTimeUnixNano: new Long(0, 1),
+                  endTimeUnixNano: new Long(0, 2),
+                  status: { code: 0 as EStatusCode },
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "chat" },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "claude-opus-4-6" },
+                    },
+                    {
+                      key: "gen_ai.system_instructions",
+                      value: {
+                        stringValue: JSON.stringify([
+                          { type: "text", content: "You are Snaps the lobster." },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.input.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "user",
+                            parts: [
+                              { type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.output.messages",
+                      value: {
+                        stringValue: JSON.stringify([
+                          {
+                            role: "assistant",
+                            parts: [
+                              { type: "text", content: "Hey Rogerio! What's up?" },
+                            ],
+                          },
+                        ]),
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: { intValue: 50 },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: { intValue: 10 },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(genAiRequest);
+    expect(traces.length).toBe(1);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("llm");
+
+    // Input preserves parts as-is (no normalization to content)
+    expect(span.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "system",
+          content: [{ type: "text", content: "You are Snaps the lobster." }],
+        },
+        {
+          role: "user",
+          parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+        },
+      ],
+    });
+
+    // Output preserves parts as-is
+    expect(span.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "assistant",
+          parts: [{ type: "text", content: "Hey Rogerio! What's up?" }],
+        },
+      ],
+    });
+  });
+
+  it("infers type 'tool' when gen_ai.operation.name is 'tool'", async () => {
+    const toolRequest: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: { attributes: [] },
+          scopeSpans: [
+            {
+              scope: { name: "openclaw", version: "1.0.0" },
+              spans: [
+                {
+                  traceId: "abc123",
+                  spanId: "tool789",
+                  name: "get_weather",
+                  kind: 3, // CLIENT
+                  startTimeUnixNano: new Long(0, 1),
+                  endTimeUnixNano: new Long(0, 2),
+                  status: { code: 0 as EStatusCode },
+                  attributes: [
+                    {
+                      key: "gen_ai.operation.name",
+                      value: { stringValue: "tool" },
+                    },
+                    {
+                      key: "gen_ai.tool.name",
+                      value: { stringValue: "get_weather" },
+                    },
+                    {
+                      key: "gen_ai.tool.call.id",
+                      value: { stringValue: "call_abc123" },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(toolRequest);
+    expect(traces.length).toBe(1);
+    const span = traces[0]!.spans[0]!;
+
+    expect(span.type).toBe("tool");
+    expect(span.name).toBe("get_weather");
   });
 });
