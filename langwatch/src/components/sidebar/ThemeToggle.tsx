@@ -85,7 +85,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
           top="3px"
           bottom="3px"
           left="3px"
-          width={`calc((100% - 6px) / 3)`}
+          width={`calc((100% - 6px) / ${themeOptions.length})`}
           bg="bg.panel"
           borderRadius="md"
           boxShadow={pillShadow}
