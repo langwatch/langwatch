@@ -30,6 +30,46 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
+vi.mock("../../../../injection/dependencies.server", () => ({
+  dependencies: {
+    subscriptionHandler: {
+      getActivePlan: vi.fn().mockResolvedValue({
+        maxMembers: 100,
+        maxMembersLite: 100,
+        overrideAddingLimitations: true,
+      }),
+    },
+  },
+}));
+
+vi.mock("../../../license-enforcement/license-enforcement.repository", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement/license-enforcement.repository")>();
+  return {
+    ...actual,
+    LicenseEnforcementRepository: class {
+      constructor() {
+        // no-op stub
+      }
+    },
+  };
+});
+
+vi.mock("../../../license-enforcement/license-limit-guard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement/license-limit-guard")>();
+  return {
+    ...actual,
+    assertMemberTypeLimitNotExceeded: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+vi.mock("../../../license-enforcement/member-classification", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../license-enforcement/member-classification")>();
+  return {
+    ...actual,
+    getRoleChangeType: vi.fn().mockReturnValue("no-change"),
+  };
+});
+
 describe("organizationRouter member role validation", () => {
   let caller: ReturnType<typeof organizationRouter.createCaller>;
   let txMock: {
@@ -135,6 +175,104 @@ describe("organizationRouter member role validation", () => {
         }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
+      });
+    });
+
+    describe("when mutation reaches enforcement logic", () => {
+      let fullTxMock: Record<string, Record<string, ReturnType<typeof vi.fn>>>;
+
+      beforeEach(() => {
+        fullTxMock = {
+          team: {
+            findUnique: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
+            findMany: vi.fn().mockResolvedValue([{ id: "team-1" }]),
+          },
+          organizationUser: {
+            findUnique: vi.fn().mockResolvedValue({
+              role: OrganizationUserRole.MEMBER,
+            }),
+            count: vi.fn().mockResolvedValue(2),
+            update: vi.fn().mockResolvedValue({}),
+          },
+          teamUser: {
+            findMany: vi.fn().mockResolvedValue([
+              {
+                teamId: "team-1",
+                role: TeamUserRole.ADMIN,
+                userId: "member-1",
+                assignedRoleId: null,
+                assignedRole: null,
+              },
+            ]),
+            count: vi.fn().mockResolvedValue(2),
+            update: vi.fn().mockResolvedValue({}),
+          },
+          customRole: {
+            findUnique: vi.fn().mockResolvedValue({
+              organizationId: "org-1",
+              permissions: [],
+            }),
+          },
+        };
+
+        const prismaMock = {
+          $transaction: vi.fn(
+            async (callback: (tx: typeof fullTxMock) => unknown) =>
+              callback(fullTxMock),
+          ),
+        };
+
+        const ctx = createInnerTRPCContext({
+          session: {
+            user: { id: "admin-user-id" },
+            expires: "1",
+          },
+          permissionChecked: true,
+          publiclyShared: false,
+        });
+
+        ctx.prisma = prismaMock as unknown as PrismaClient;
+        caller = organizationRouter.createCaller(ctx);
+      });
+
+      describe("when target user is Lite Member", () => {
+        it("rejects non-Viewer team role via teamRoleUpdates", async () => {
+          await expect(
+            caller.updateMemberRole({
+              userId: "member-1",
+              organizationId: "org-1",
+              role: OrganizationUserRole.EXTERNAL,
+              teamRoleUpdates: [
+                {
+                  teamId: "team-1",
+                  userId: "member-1",
+                  role: TeamUserRole.ADMIN,
+                },
+              ],
+            }),
+          ).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+            message: "Lite Member users can only have Viewer team role",
+          });
+        });
+      });
+
+      describe("when changing org role to EXTERNAL without explicit team role updates", () => {
+        it("auto-corrects team roles to Viewer", async () => {
+          await caller.updateMemberRole({
+            userId: "member-1",
+            organizationId: "org-1",
+            role: OrganizationUserRole.EXTERNAL,
+          });
+
+          expect(fullTxMock.teamUser!.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                role: TeamUserRole.VIEWER,
+              }),
+            }),
+          );
+        });
       });
     });
   });
