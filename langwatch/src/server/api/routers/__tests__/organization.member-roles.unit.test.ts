@@ -76,6 +76,18 @@ describe("organizationRouter member role validation", () => {
   });
 
   describe("updateTeamMemberRole", () => {
+    it("rejects literal CUSTOM role payloads", async () => {
+      await expect(
+        caller.updateTeamMemberRole({
+          teamId: "team-1",
+          userId: "member-1",
+          role: TeamUserRole.CUSTOM,
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+    });
+
     describe("when target user is Lite Member", () => {
       it("rejects built-in roles different from Viewer", async () => {
         await expect(
@@ -102,6 +114,27 @@ describe("organizationRouter member role validation", () => {
           code: "BAD_REQUEST",
           message: "Lite Member users can only have Viewer team role",
         });
+      });
+    });
+  });
+
+  describe("updateMemberRole", () => {
+    it("rejects team role updates with literal CUSTOM role payloads", async () => {
+      await expect(
+        caller.updateMemberRole({
+          userId: "member-1",
+          organizationId: "org-1",
+          role: OrganizationUserRole.MEMBER,
+          teamRoleUpdates: [
+            {
+              teamId: "team-1",
+              userId: "member-1",
+              role: TeamUserRole.CUSTOM,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
       });
     });
   });

@@ -1,5 +1,7 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 
+export type TeamRoleValue = TeamUserRole | `custom:${string}`;
+
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";
@@ -8,7 +10,7 @@ export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
 
 export function isTeamRoleAllowedForOrganizationRole(params: {
   organizationRole: OrganizationUserRole;
-  teamRole: string;
+  teamRole: TeamRoleValue;
 }): boolean {
   const { organizationRole, teamRole } = params;
 
@@ -25,8 +27,8 @@ export function isTeamRoleAllowedForOrganizationRole(params: {
 
 export function getAutoCorrectedTeamRoleForOrganizationRole(params: {
   organizationRole: OrganizationUserRole;
-  currentTeamRole: string;
-}): string {
+  currentTeamRole: TeamRoleValue;
+}): TeamRoleValue {
   const { organizationRole, currentTeamRole } = params;
 
   if (organizationRole === OrganizationUserRole.EXTERNAL) {

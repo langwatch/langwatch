@@ -29,7 +29,7 @@ import {
 } from "../../license-enforcement/license-limit-guard";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { isTeamRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
+import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
@@ -89,6 +89,22 @@ type TransactionClient = Omit<
   PrismaClient,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
+
+const customTeamRoleInputSchema = z
+  .string()
+  .regex(
+    /^custom:[a-zA-Z0-9_-]+$/,
+    "Custom role must be in format 'custom:{roleId}'",
+  );
+const builtInTeamRoleInputSchema = z.enum([
+  TeamUserRole.ADMIN,
+  TeamUserRole.MEMBER,
+  TeamUserRole.VIEWER,
+]);
+const teamRoleInputSchema = z.union([
+  builtInTeamRoleInputSchema,
+  customTeamRoleInputSchema,
+]);
 
 /**
  * Gets permissions for a custom role by its ID.
@@ -636,15 +652,7 @@ export const organizationRouter = createTRPCRouter({
               .array(
                 z.object({
                   teamId: z.string(),
-                  role: z.union([
-                    z.nativeEnum(TeamUserRole),
-                    z
-                      .string()
-                      .regex(
-                        /^custom:[a-zA-Z0-9_-]+$/,
-                        "Custom role must be in format 'custom:{roleId}'",
-                      ),
-                  ]),
+                  role: teamRoleInputSchema,
                   customRoleId: z.string().optional(),
                 }),
               )
@@ -1085,15 +1093,7 @@ export const organizationRouter = createTRPCRouter({
         .object({
           teamId: z.string(),
           userId: z.string(),
-          role: z.union([
-            z.nativeEnum(TeamUserRole),
-            z
-              .string()
-              .regex(
-                /^custom:[a-zA-Z0-9_-]+$/,
-                "Custom role must be in format 'custom:{roleId}'",
-              ),
-          ]),
+          role: teamRoleInputSchema,
           customRoleId: z.string().optional(),
         })
         .superRefine((data, ctx) => {
@@ -1281,7 +1281,7 @@ export const organizationRouter = createTRPCRouter({
             if (
               !isTeamRoleAllowedForOrganizationRole({
                 organizationRole: OrganizationUserRole.EXTERNAL,
-                teamRole: input.role,
+                teamRole: input.role as TeamRoleValue,
               })
             ) {
               throw new TRPCError({
@@ -1446,6 +1446,16 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
         organizationId: z.string(),
         role: z.nativeEnum(OrganizationUserRole),
+        teamRoleUpdates: z
+          .array(
+            z.object({
+              teamId: z.string(),
+              userId: z.string(),
+              role: teamRoleInputSchema,
+              customRoleId: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:manage"))
@@ -1529,42 +1539,202 @@ export const organizationRouter = createTRPCRouter({
           data: { role: input.role },
         });
 
-        const organizationTeamIds = (
-          await tx.team.findMany({
-            where: { organizationId: input.organizationId },
-            select: { id: true },
-          })
-        ).map((team) => team.id);
+        const organizationTeams = await tx.team.findMany({
+          where: { organizationId: input.organizationId },
+          select: { id: true },
+        });
+        const organizationTeamIds = organizationTeams.map((team) => team.id);
+        const organizationTeamIdSet = new Set(organizationTeamIds);
 
-        if (input.role === OrganizationUserRole.EXTERNAL) {
-          await tx.teamUser.updateMany({
+        const currentMemberships = await tx.teamUser.findMany({
+          where: {
+            userId: input.userId,
+            teamId: { in: organizationTeamIds },
+          },
+          select: {
+            teamId: true,
+            role: true,
+            assignedRoleId: true,
+          },
+        });
+        const currentMembershipByTeamId = new Map(
+          currentMemberships.map((membership) => [membership.teamId, membership]),
+        );
+
+        const requestedTeamRoleUpdates = (input.teamRoleUpdates ?? []).reduce<
+          Array<{
+            teamId: string;
+            role: string;
+            customRoleId?: string;
+          }>
+        >((acc, teamRoleUpdate) => {
+          if (teamRoleUpdate.userId !== input.userId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Team role update user must match target member",
+            });
+          }
+          if (!organizationTeamIdSet.has(teamRoleUpdate.teamId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Team role update must belong to the organization",
+            });
+          }
+          acc.push({
+            teamId: teamRoleUpdate.teamId,
+            role: teamRoleUpdate.role,
+            customRoleId: teamRoleUpdate.customRoleId,
+          });
+          return acc;
+        }, []);
+
+        const effectiveTeamRoleUpdates = (() => {
+          if (requestedTeamRoleUpdates.length > 0) {
+            if (input.role !== OrganizationUserRole.EXTERNAL) {
+              return requestedTeamRoleUpdates;
+            }
+
+            const requestedTeamIdSet = new Set(
+              requestedTeamRoleUpdates.map((teamRoleUpdate) => teamRoleUpdate.teamId),
+            );
+            const externalFallbackUpdates = currentMemberships
+              .filter((membership) => !requestedTeamIdSet.has(membership.teamId))
+              .map((membership) => ({
+                teamId: membership.teamId,
+                role: TeamUserRole.VIEWER,
+                customRoleId: undefined,
+              }));
+
+            return [...requestedTeamRoleUpdates, ...externalFallbackUpdates];
+          }
+
+          if (input.role === OrganizationUserRole.EXTERNAL) {
+            return currentMemberships
+              .filter((membership) => membership.role !== TeamUserRole.VIEWER)
+              .map((membership) => ({
+                teamId: membership.teamId,
+                role: TeamUserRole.VIEWER,
+                customRoleId: undefined,
+              }));
+          }
+
+          if (input.role === OrganizationUserRole.MEMBER) {
+            return currentMemberships
+              .filter((membership) => membership.role === TeamUserRole.VIEWER)
+              .map((membership) => ({
+                teamId: membership.teamId,
+                role: TeamUserRole.MEMBER,
+                customRoleId: undefined,
+              }));
+          }
+
+          return [] as Array<{
+            teamId: string;
+            role: string;
+            customRoleId?: string;
+          }>;
+        })();
+
+        const dedupedTeamRoleUpdates = new Map(
+          effectiveTeamRoleUpdates.map((teamRoleUpdate) => [
+            teamRoleUpdate.teamId,
+            teamRoleUpdate,
+          ]),
+        );
+
+        /**
+         * Keep MEMBER + VIEWER allowed for backward compatibility.
+         * TODO(pricing): when user roles change, apply the corresponding charges.
+         */
+        for (const membership of currentMemberships) {
+          const desiredUpdate = dedupedTeamRoleUpdates.get(membership.teamId);
+          if (!desiredUpdate) continue;
+
+          if (
+            input.role === OrganizationUserRole.EXTERNAL &&
+            desiredUpdate.role !== TeamUserRole.VIEWER
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Lite Member users can only have Viewer team role",
+            });
+          }
+        }
+
+        for (const [teamId, teamRoleUpdate] of dedupedTeamRoleUpdates.entries()) {
+          const currentMembership = currentMembershipByTeamId.get(teamId);
+          if (!currentMembership) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "User is not a member of this team",
+            });
+          }
+
+          const isCustomRole = teamRoleUpdate.role.startsWith("custom:");
+          if (isCustomRole && !teamRoleUpdate.customRoleId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Custom role ID is required for custom role updates",
+            });
+          }
+
+          if (isCustomRole && teamRoleUpdate.customRoleId) {
+            const customRole = await tx.customRole.findUnique({
+              where: { id: teamRoleUpdate.customRoleId },
+              select: { organizationId: true },
+            });
+            if (!customRole || customRole.organizationId !== input.organizationId) {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Custom role not found",
+              });
+            }
+          }
+
+          const nextRole = isCustomRole
+            ? TeamUserRole.CUSTOM
+            : (teamRoleUpdate.role as TeamUserRole);
+          const shouldClearCustomRole = !isCustomRole;
+          const isDemotingLastAdmin =
+            currentMembership.role === TeamUserRole.ADMIN &&
+            nextRole !== TeamUserRole.ADMIN;
+
+          if (isDemotingLastAdmin) {
+            const teamAdminCount = await tx.teamUser.count({
+              where: { teamId, role: TeamUserRole.ADMIN },
+            });
+            if (teamAdminCount <= 1) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Cannot remove or demote the last admin from this team",
+              });
+            }
+          }
+
+          const roleUnchanged =
+            currentMembership.role === nextRole &&
+            (shouldClearCustomRole
+              ? currentMembership.assignedRoleId === null
+              : currentMembership.assignedRoleId === teamRoleUpdate.customRoleId);
+          if (roleUnchanged) continue;
+
+          await tx.teamUser.update({
             where: {
-              userId: input.userId,
-              teamId: { in: organizationTeamIds },
-              NOT: { role: TeamUserRole.VIEWER },
+              userId_teamId: {
+                userId: input.userId,
+                teamId,
+              },
             },
             data: {
-              role: TeamUserRole.VIEWER,
-              assignedRoleId: null,
+              role: nextRole,
+              assignedRoleId: shouldClearCustomRole
+                ? null
+                : teamRoleUpdate.customRoleId,
             },
           });
         }
 
-        if (input.role === OrganizationUserRole.MEMBER) {
-          await tx.teamUser.updateMany({
-            where: {
-              userId: input.userId,
-              teamId: { in: organizationTeamIds },
-              role: TeamUserRole.VIEWER,
-            },
-            data: {
-              role: TeamUserRole.MEMBER,
-              assignedRoleId: null,
-            },
-          });
-        }
-
-        // Post-update validation: ensure we still have at least one admin
+        // Post-update validation: ensure we still have at least one org admin
         const finalAdminCount = await tx.organizationUser.count({
           where: {
             organizationId: input.organizationId,

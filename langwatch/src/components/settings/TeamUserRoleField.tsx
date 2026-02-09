@@ -11,6 +11,7 @@ import { api } from "../../utils/api";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
+  type TeamRoleValue,
 } from "../../utils/memberRoleConstraints";
 import { Select } from "../ui/select";
 
@@ -21,6 +22,8 @@ export type RoleOption = {
   isCustom?: boolean;
   customRoleId?: string;
 };
+
+export const MISSING_CUSTOM_ROLE_VALUE = "custom:missing";
 
 export const teamRolesOptions: Record<
   "ADMIN" | "MEMBER" | "VIEWER",
@@ -48,9 +51,6 @@ export type TeamUserRoleForm = {
   role: RoleOption;
 };
 
-/**
- * Reusable component for rendering team role select item content
- */
 export const TeamRoleSelectItemContent = ({
   option,
 }: {
@@ -98,11 +98,13 @@ export const TeamUserRoleField = ({
       : member.role);
 
   const selectedRole: RoleOption =
-    selectedRoleValue === TeamUserRole.CUSTOM
+    selectedRoleValue === TeamUserRole.CUSTOM ||
+    selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE
       ? {
-          label: "Custom Role",
-          value: TeamUserRole.MEMBER,
-          description: "Custom role assignment unavailable",
+          label: "Missing Custom Role",
+          value: MISSING_CUSTOM_ROLE_VALUE,
+          description:
+            "This member references a deleted or unavailable custom role",
         }
       : selectedRoleValue.startsWith("custom:")
         ? {
@@ -128,31 +130,31 @@ export const TeamUserRoleField = ({
           onChange={onChange}
         />
       </HStack>
+      {selectedRole.value === MISSING_CUSTOM_ROLE_VALUE ? (
+        <Text color="red.fg" fontSize="sm">
+          Resolve this role before saving changes.
+        </Text>
+      ) : null}
     </VStack>
   );
 };
 
-/**
- * TeamRoleSelect component
- *
- * Single Responsibility: Renders a dropdown selector for team roles (built-in and custom)
- */
 export const TeamRoleSelect = ({
   value,
   onChange,
   organizationId,
-  organizationRole = OrganizationUserRole.ADMIN,
+  organizationRole,
 }: {
   value: RoleOption;
   onChange: (value: RoleOption) => void;
   organizationId: string;
-  organizationRole?: OrganizationUserRole;
+  organizationRole: OrganizationUserRole;
 }) => {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
   const allRoleOptions = useMemo(
-    () =>
-      [
+    () => {
+      const constrainedOptions = [
         ...Object.values(teamRolesOptions),
         ...(customRoles.data ?? []).map((role) => ({
           label: role.name,
@@ -165,16 +167,26 @@ export const TeamRoleSelect = ({
       ].filter((option) =>
         isTeamRoleAllowedForOrganizationRole({
           organizationRole,
-          teamRole: option.value,
+          teamRole: option.value as TeamRoleValue,
         }),
-      ),
-    [customRoles.data, organizationRole],
+      );
+
+      if (
+        value.value === MISSING_CUSTOM_ROLE_VALUE &&
+        !constrainedOptions.some((option) => option.value === value.value)
+      ) {
+        return [value, ...constrainedOptions];
+      }
+
+      return constrainedOptions;
+    },
+    [customRoles.data, organizationRole, value],
   );
 
   const correctedSelectedRole = useMemo(() => {
     const correctedValue = getAutoCorrectedTeamRoleForOrganizationRole({
       organizationRole,
-      currentTeamRole: value.value,
+      currentTeamRole: value.value as TeamRoleValue,
     });
     return allRoleOptions.find((option) => option.value === correctedValue);
   }, [allRoleOptions, organizationRole, value.value]);

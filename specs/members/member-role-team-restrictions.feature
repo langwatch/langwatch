@@ -160,7 +160,7 @@ Feature: Member Role Team Restrictions
   Scenario: API rejects non-Viewer team role assignments for Lite Members
     Given a member has organization role "Lite Member"
     When I try to set a team role to "Admin", "Member", or a custom role
-    Then the API should reject the update
+    Then the update should fail with an error
     And the member team role should remain "Viewer"
 
   @integration
@@ -169,3 +169,13 @@ Feature: Member Role Team Restrictions
     When I look at the organization role field
     Then I should see "Lite Member"
     And I should not see "EXTERNAL"
+
+  @integration
+  Scenario: Only organization administrators can save member role changes
+    Given I am on the member details page
+    And I do not have organization administrator permissions
+    When I view the member details page
+    Then the organization role field should be read-only
+    And the team role fields should be read-only
+    And I should not see Save or Cancel buttons
+    And I should see a Back button
