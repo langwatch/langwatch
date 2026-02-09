@@ -8,7 +8,10 @@ import { UsageLimitService } from "~/server/notifications/usage-limit.service";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { TraceUsageService } from "~/server/traces/trace-usage.service";
 import { ANALYTICS_KEYS } from "~/types";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+
+const logger = createLogger("langwatch:cron:trace-analytics");
 
 export default async function handler(
   req: NextApiRequest,
@@ -146,27 +149,24 @@ export default async function handler(
           data: newAnalyticsToCreate,
           skipDuplicates: true,
         });
-        console.log(
-          `[Trace Analytics] Created ${
-            newAnalyticsToCreate.length
-          } entries for ${yesterday.toISOString().split("T")[0]}`,
+        logger.info(
+          { count: newAnalyticsToCreate.length, date: yesterday.toISOString().split("T")[0] },
+          "created trace analytics entries",
         );
       } else {
-        console.log(
-          `[Trace Analytics] All entries exist for ${
-            yesterday.toISOString().split("T")[0]
-          }`,
+        logger.info(
+          { date: yesterday.toISOString().split("T")[0] },
+          "all trace analytics entries already exist",
         );
       }
     } else {
-      console.log(
-        `[Trace Analytics] No traces found for ${
-          yesterday.toISOString().split("T")[0]
-        }`,
+      logger.info(
+        { date: yesterday.toISOString().split("T")[0] },
+        "no traces found for date",
       );
     }
   } catch (error) {
-    console.error("[Trace Analytics] Error:", error);
+    logger.error({ error }, "trace analytics error");
   }
 
   // Check usage limits for all organizations and send notifications if needed
@@ -186,8 +186,9 @@ export default async function handler(
         try {
           const projectIds = await organizationRepository.getProjectIds(org.id);
           if (projectIds.length === 0) {
-            console.log(
-              `[Trace Analytics] Organization ${org.id} has no projects, skipping`,
+            logger.debug(
+              { organizationId: org.id },
+              "organization has no projects, skipping",
             );
             continue;
           }
@@ -204,8 +205,9 @@ export default async function handler(
             typeof activePlan.maxMessagesPerMonth !== "number" ||
             activePlan.maxMessagesPerMonth <= 0
           ) {
-            console.log(
-              `[Trace Analytics] Organization ${org.id} has invalid or missing plan configuration, skipping`,
+            logger.debug(
+              { organizationId: org.id },
+              "organization has invalid or missing plan configuration, skipping",
             );
             continue;
           }
@@ -218,12 +220,15 @@ export default async function handler(
               : 0;
 
           if (currentMonthMessagesCount > 1) {
-            console.log(
-              `[Trace Analytics] Organization ${
-                org.id
-              }: ${currentMonthMessagesCount.toLocaleString()} / ${maxMessagesPerMonth.toLocaleString()} messages (${usagePercentage.toFixed(
-                1,
-              )}%) - ${projectIds.length} project(s)`,
+            logger.info(
+              {
+                organizationId: org.id,
+                currentMonthMessagesCount,
+                maxMessagesPerMonth,
+                usagePercentage: Number(usagePercentage.toFixed(1)),
+                projectCount: projectIds.length,
+              },
+              "organization usage stats",
             );
           }
 
@@ -234,9 +239,9 @@ export default async function handler(
             maxMonthlyUsageLimit: maxMessagesPerMonth,
           });
         } catch (error) {
-          console.error(
-            `[Trace Analytics] Error checking usage limits for organization ${org.id}:`,
-            error,
+          logger.error(
+            { organizationId: org.id, error },
+            "error checking usage limits for organization",
           );
           captureException(error, {
             extra: { organizationId: org.id },
@@ -244,13 +249,11 @@ export default async function handler(
         }
       }
     } catch (error) {
-      console.error("[Trace Analytics] Error checking usage limits:", error);
+      logger.error({ error }, "error checking usage limits");
       captureException(error);
     }
   } else {
-    console.log(
-      "[Trace Analytics] Skipping usage limit notifications (not SaaS)",
-    );
+    logger.debug("skipping usage limit notifications (not SaaS)");
   }
 
   return res.status(200).json({ success: true });

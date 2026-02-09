@@ -30,6 +30,11 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
     "openTelemetryMetricsRequestToTracesForCollection",
     { kind: SpanKind.INTERNAL },
     async (span) => {
+      logger.debug(
+        { resourceMetricsCount: otelMetrics.resourceMetrics?.length ?? 0 },
+        "received otel metrics request",
+      );
+
       try {
         if (!otelMetrics.resourceMetrics) {
           span.setAttribute("resourceMetrics.count", 0);
