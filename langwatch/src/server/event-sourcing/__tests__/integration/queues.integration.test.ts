@@ -59,24 +59,24 @@ describe("BullMQ Queue - Integration Tests", () => {
     );
 
     // Check that queues exist in Redis (using unique pipeline name)
+    // Queue names are wrapped in hash tags by makeQueueName(), so Redis
+    // keys follow the pattern: bull:{pipelineName/type/name}:*
     if (redisConnection) {
       const pipelineName = pipeline.pipelineName;
       const commandQueueKeys = await redisConnection.keys(
-        `bull:${pipelineName}/command/testCommand:*`,
+        `bull:{${pipelineName}/command/testCommand}:*`,
       );
       const handlerQueueKeys = await redisConnection.keys(
-        `bull:${pipelineName}/handler/testHandler:*`,
+        `bull:{${pipelineName}/handler/testHandler}:*`,
       );
       const projectionQueueKeys = await redisConnection.keys(
-        `bull:${pipelineName}/projection/testProjection:*`,
+        `bull:{${pipelineName}/projection/testProjection}:*`,
       );
 
-      // Queues should have been created (keys may exist even if empty)
-      expect(
-        commandQueueKeys.length +
-          handlerQueueKeys.length +
-          projectionQueueKeys.length,
-      ).toBeGreaterThanOrEqual(0);
+      // Queues must have been created — at least one key per queue type
+      expect(commandQueueKeys.length).toBeGreaterThan(0);
+      expect(handlerQueueKeys.length).toBeGreaterThan(0);
+      expect(projectionQueueKeys.length).toBeGreaterThan(0);
     }
   });
 

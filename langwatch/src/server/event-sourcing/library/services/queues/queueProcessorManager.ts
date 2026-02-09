@@ -1,3 +1,4 @@
+import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
@@ -375,6 +376,14 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
+   * Builds a hash-tagged queue name for a pipeline component.
+   * Delegates to the shared makeQueueName utility.
+   */
+  private makePipelineQueueName(suffix: string): string {
+    return makeQueueName(`${this.pipelineName}/${suffix}`);
+  }
+
+  /**
    * Creates a default deduplication ID for event processing.
    * Format: ${event.tenantId}:${event.aggregateType}:${event.aggregateId}
    */
@@ -410,7 +419,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.pipelineName}/handler/${handlerName}`;
+      const queueName = this.makePipelineQueueName(`handler/${handlerName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -464,7 +473,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.pipelineName}/projection/${projectionName}`;
+      const queueName = this.makePipelineQueueName(`projection/${projectionName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -549,8 +558,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         );
       }
 
-      // Create queue name
-      const queueName = `${pipelineName}/command/${commandName}`;
+      const queueName = this.makePipelineQueueName(`command/${commandName}`);
 
       // Use per-command lockTtlMs if provided, otherwise use default
       const effectiveLockTtlMs = options.lockTtlMs ?? this.commandLockTtlMs;

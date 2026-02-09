@@ -16,6 +16,11 @@ import "../../event-sourcing/runtime/eventSourcing";
 
 const logger = createLogger("langwatch:workers:eventSourcingWorker");
 
+import { makeQueueName } from "../queues/makeQueueName";
+
+/** Queue name for the event sourcing maintenance worker */
+export const EVENT_SOURCING_QUEUE_NAME = makeQueueName("event_sourcing");
+
 // Define a simple job type for event sourcing maintenance tasks
 export type EventSourcingJob = {
   action: "maintenance" | "health_check";
@@ -77,7 +82,7 @@ export const startEventSourcingWorker = () => {
   }
 
   const eventSourcingWorker = new Worker<EventSourcingJob, void, string>(
-    "event-sourcing", // queue name
+    EVENT_SOURCING_QUEUE_NAME,
     runEventSourcingJob,
     {
       connection,

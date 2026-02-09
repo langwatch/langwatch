@@ -32,6 +32,7 @@ prompts/**
 
 # Claude Code personal settings
 **/.claude/settings.local.json
+**/.claude/agent-memory/
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
