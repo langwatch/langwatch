@@ -42,19 +42,20 @@ All queue name construction sites use this function:
 
 We use **per-queue hash tags** (each queue has its own tag) rather than a shared tag like `{bull}`. This distributes load across Redis Cluster slots instead of concentrating all queues on a single slot.
 
-### Deployment Strategy
+### Deployment & Migration Strategy
 
-This is a queue name rename. Deploying requires care to avoid job loss:
+This is a queue name rename. The migration script (`scripts/migrate-queue-names.ts`) handles the transition:
 
-1. **Drain queues** — Wait for in-flight jobs under old names to complete. Monitor via BullBoard or the migration script's dry-run mode.
-2. **Deploy atomically** — Workers and producers must be deployed together. In containerized deployments (ECS, Kubernetes), this happens naturally when both run in the same service. If separate, deploy workers first.
-3. **Clean up** — Run `scripts/migrate-queue-names.ts --cleanup` to remove orphaned keys under old names.
+1. **Dry-run** — `npx tsx scripts/migrate-queue-names.ts` reports orphaned keys under old queue names.
+2. **Migrate** — `npx tsx scripts/migrate-queue-names.ts --migrate` reads job data from old queues using raw Redis commands (single-key ops work on both standalone and cluster), re-adds them to new hash-tagged queues via BullMQ, then cleans up old keys.
+3. **Deploy** — Workers and producers use new hash-tagged names. In containerized deployments (ECS, Kubernetes), both deploy together naturally.
 
-For environments where zero-downtime is critical, a staged migration is possible:
-1. Deploy workers that listen on both old and new queue names
-2. Switch producers to write to new names
-3. Wait for old queues to drain
-4. Remove old queue listeners
+The migration script uses raw Redis reads (not BullMQ) to access old queues because BullMQ's Lua scripts fail with CROSSSLOT on un-tagged names in cluster mode. Single-key operations (`LRANGE`, `HGETALL`) work fine regardless.
+
+For environments that cannot tolerate any job loss:
+1. Run `--migrate` before deploying (moves waiting/delayed/active jobs to new queues)
+2. Deploy new code
+3. Verify with dry-run that no old keys remain
 
 ### Enforcement
 
@@ -85,9 +86,9 @@ Queue names now include braces in logs, metrics, and span attributes (`{collecto
 - Integration tests with real Redis Cluster provide confidence
 
 **Negative:**
-- Queue name rename orphans in-flight jobs under old names (mitigated by migration script)
+- Queue name rename orphans in-flight jobs under old names (mitigated by migration script's `--migrate` mode which moves jobs before cleanup)
 - Braces appear in all observability output (logs, metrics, traces)
-- Deployment requires coordination or draining (documented above)
+- Migration must be run before deployment to avoid job loss
 
 **Neutral:**
 - No performance impact — hash tag parsing is done by Redis, not application code
