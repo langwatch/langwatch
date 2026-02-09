@@ -13,8 +13,8 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
     properties: {
       metrics: {
         properties: {
-          cache_read_input_tokens: { type: "integer" },
-          cache_creation_input_tokens: { type: "integer" },
+          cache_read_input_tokens: { type: "long" },
+          cache_creation_input_tokens: { type: "long" },
         },
       },
       spans: {
@@ -22,8 +22,8 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
         properties: {
           metrics: {
             properties: {
-              cache_read_input_tokens: { type: "integer" },
-              cache_creation_input_tokens: { type: "integer" },
+              cache_read_input_tokens: { type: "long" },
+              cache_creation_input_tokens: { type: "long" },
             },
           },
         },
