@@ -16,8 +16,10 @@ import "../../event-sourcing/runtime/eventSourcing";
 
 const logger = createLogger("langwatch:workers:eventSourcingWorker");
 
-/** Queue name for the event sourcing maintenance worker — hash tag for Redis Cluster */
-export const EVENT_SOURCING_QUEUE_NAME = "{event_sourcing}";
+import { makeQueueName } from "../queues/makeQueueName";
+
+/** Queue name for the event sourcing maintenance worker */
+export const EVENT_SOURCING_QUEUE_NAME = makeQueueName("event_sourcing");
 
 // Define a simple job type for event sourcing maintenance tasks
 export type EventSourcingJob = {

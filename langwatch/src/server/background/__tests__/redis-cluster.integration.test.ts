@@ -28,6 +28,7 @@ import { EVENT_SOURCING_QUEUE_NAME } from "../workers/eventSourcingWorker";
 import { SCENARIO_QUEUE } from "../../scenarios/scenario.constants";
 import { traceProcessingPipelineDefinition } from "../../event-sourcing/pipelines/trace-processing/pipeline";
 import { evaluationProcessingPipelineDefinition } from "../../event-sourcing/pipelines/evaluation-processing/pipeline";
+import { makeQueueName } from "../queues/makeQueueName";
 
 /**
  * Validates that a queue name contains a hash tag for Redis Cluster compatibility.
@@ -42,6 +43,16 @@ function hasHashTag(queueName: string): boolean {
 // ---------------------------------------------------------------------------
 
 describe("BullMQ Redis Cluster Compatibility", () => {
+  describe("when using makeQueueName", () => {
+    it("wraps a name in hash tags", () => {
+      expect(makeQueueName("collector")).toBe("{collector}");
+    });
+
+    it("wraps a path-style name in hash tags", () => {
+      expect(makeQueueName("pipeline/handler/foo")).toBe("{pipeline/handler/foo}");
+    });
+  });
+
   describe("when checking background worker queue constants", () => {
     it.each([
       ["COLLECTOR_QUEUE", COLLECTOR_QUEUE.NAME],

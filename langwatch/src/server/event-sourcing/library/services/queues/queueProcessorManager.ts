@@ -1,3 +1,4 @@
+import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
@@ -375,11 +376,11 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
-   * Wraps a queue suffix in a Redis Cluster hash tag.
-   * Ensures all BullMQ keys for the queue land on the same Redis slot.
+   * Builds a hash-tagged queue name for a pipeline component.
+   * Delegates to the shared makeQueueName utility.
    */
-  private makeQueueName(suffix: string): string {
-    return `{${this.pipelineName}/${suffix}}`;
+  private makePipelineQueueName(suffix: string): string {
+    return makeQueueName(`${this.pipelineName}/${suffix}`);
   }
 
   /**
@@ -418,7 +419,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = this.makeQueueName(`handler/${handlerName}`);
+      const queueName = this.makePipelineQueueName(`handler/${handlerName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -472,7 +473,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = this.makeQueueName(`projection/${projectionName}`);
+      const queueName = this.makePipelineQueueName(`projection/${projectionName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -557,8 +558,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         );
       }
 
-      // Create queue name (uses this.pipelineName via makeQueueName)
-      const queueName = this.makeQueueName(`command/${commandName}`);
+      const queueName = this.makePipelineQueueName(`command/${commandName}`);
 
       // Use per-command lockTtlMs if provided, otherwise use default
       const effectiveLockTtlMs = options.lockTtlMs ?? this.commandLockTtlMs;
