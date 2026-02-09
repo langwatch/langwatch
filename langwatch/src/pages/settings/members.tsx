@@ -23,8 +23,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import type { MembersForm } from "../../components/AddMembersForm";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import { CopyInput } from "../../components/CopyInput";
-import { orgRoleOptions } from "../../components/settings/orgRoleOptions";
-import { RoleBadge } from "../../components/settings/RoleBadge";
+import { orgRoleOptions, RoleBadge } from "../../components/roles";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
@@ -43,6 +42,7 @@ import type {
 } from "../../server/api/routers/organization";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
+import { buildInviteUrl } from "../../utils/buildInviteUrl";
 
 function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -174,7 +174,7 @@ function MembersList({
 
           const description = hasEmailProvider
             ? "All invites have been sent."
-            : "All invites have been created. View invite link under actions menu.";
+            : "All invites have been created. View invite links in the Pending Invites table.";
 
           toaster.create({
             title: `${
@@ -455,7 +455,7 @@ function MembersList({
                         </Table.Cell>
                         <Table.Cell>
                           <CopyInput
-                            value={`${typeof window !== "undefined" ? window.location.origin : ""}/invite/accept?inviteCode=${invite.inviteCode}`}
+                            value={buildInviteUrl({ origin: typeof window !== "undefined" ? window.location.origin : "", inviteCode: invite.inviteCode })}
                             label="Invite Link"
                           />
                         </Table.Cell>
@@ -512,7 +512,7 @@ function MembersList({
                   >
                     <Text fontWeight="600">{invite.email}</Text>
                     <CopyInput
-                      value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
+                      value={buildInviteUrl({ origin: window.location.origin, inviteCode: invite.inviteCode })}
                       label="Invite Link"
                       marginTop={0}
                     />

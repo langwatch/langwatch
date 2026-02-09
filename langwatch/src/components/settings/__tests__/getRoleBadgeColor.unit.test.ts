@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "@prisma/client";
-import { getRoleBadgeColor } from "../RoleBadge";
+import { getRoleBadgeColor } from "../../roles/RoleBadge";
 
 describe("getRoleBadgeColor()", () => {
   describe("when role is ADMIN", () => {

@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { api } from "../../utils/api";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
-import { orgRoleOptions } from "./orgRoleOptions";
-import type { OrgRoleOption } from "./orgRoleOptions";
+import { orgRoleOptions } from "../roles/orgRoleOptions";
+import type { OrgRoleOption } from "../roles/orgRoleOptions";
 
 /**
  * OrganizationUserRoleField

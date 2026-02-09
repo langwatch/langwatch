@@ -6,6 +6,7 @@ import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
+import { buildInviteUrl } from "../../utils/buildInviteUrl";
 import { sendEmail } from "./emailSender";
 
 export const sendInviteEmail = async ({
@@ -17,7 +18,7 @@ export const sendInviteEmail = async ({
   organization: Organization;
   inviteCode: string;
 }) => {
-  const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
+  const acceptInviteUrl = buildInviteUrl({ origin: env.BASE_HOST, inviteCode });
 
   const emailHtml = await render(
     <Html lang="en" dir="ltr">
