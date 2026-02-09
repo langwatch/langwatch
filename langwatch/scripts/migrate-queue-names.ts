@@ -6,17 +6,20 @@
  * BullMQ creates new Redis keys. Jobs under old key names become orphaned
  * and will never be processed because workers now listen on new names.
  *
- * This script:
- *   1. Discovers old queues by scanning Redis for pre-hash-tag key patterns
- *   2. Reads job data from old queues using raw Redis commands
- *      (single-key ops work on both standalone and cluster)
- *   3. Re-adds jobs to the corresponding new hash-tagged queue via BullMQ
- *   4. Cleans up old keys after migration
+ * The migration is a safe two-step process:
+ *
+ *   Step 1: COPY jobs from old queues to new hash-tagged queues.
+ *           Old keys are left intact — nothing is deleted.
+ *           Safe to re-run (uses deterministic job IDs for idempotency).
+ *
+ *   Step 2: CLEANUP old keys once you've verified migration worked.
+ *           Run dry-run first to confirm new queues have the jobs,
+ *           then cleanup to remove old keys.
  *
  * Usage:
  *   npx tsx scripts/migrate-queue-names.ts              # Dry-run (report only)
- *   npx tsx scripts/migrate-queue-names.ts --migrate     # Move jobs → new queues, cleanup old
- *   npx tsx scripts/migrate-queue-names.ts --cleanup     # Delete old keys (no job move)
+ *   npx tsx scripts/migrate-queue-names.ts --migrate     # Copy jobs to new queues (no delete)
+ *   npx tsx scripts/migrate-queue-names.ts --cleanup     # Delete old keys (after verifying)
  *
  * Environment:
  *   REDIS_URL or REDIS_CLUSTER_ENDPOINTS must be set.
@@ -63,31 +66,6 @@ export const OLD_QUEUE_PATTERNS = [
   "bull:trace_processing/*",
   "bull:evaluation_processing/*",
 ];
-
-// ---------------------------------------------------------------------------
-// BullMQ key suffixes — used to identify queue names from raw Redis keys
-// ---------------------------------------------------------------------------
-
-const BULLMQ_KEY_SUFFIXES = [
-  "wait",
-  "active",
-  "completed",
-  "failed",
-  "delayed",
-  "paused",
-  "stalled",
-  "meta",
-  "id",
-  "events",
-  "priority",
-  "pc", // priority counter
-  "marker",
-] as const;
-
-const BULLMQ_SUFFIX_SET = new Set<string>(BULLMQ_KEY_SUFFIXES);
-
-/** Lists/sets that contain job IDs worth migrating. */
-const JOB_LISTS = ["wait", "delayed", "active"] as const;
 
 // ---------------------------------------------------------------------------
 // Core functions (exported for testing)
@@ -237,7 +215,11 @@ export async function readJobData(
   connection: IORedis | Cluster,
   oldQueueName: string,
   jobId: string,
-): Promise<{ name: string; data: unknown; opts: Record<string, unknown> } | null> {
+): Promise<{
+  name: string;
+  data: unknown;
+  opts: Record<string, unknown>;
+} | null> {
   const hash = await connection.hgetall(`bull:${oldQueueName}:${jobId}`);
 
   if (!hash || !hash.data) {
@@ -256,45 +238,72 @@ export async function readJobData(
 }
 
 /**
- * Moves jobs from an old queue to a new hash-tagged queue.
- *
- * Reads job data using raw Redis commands (works on cluster for single-key ops),
- * then re-adds via BullMQ Queue.add() (works on cluster because new names have hash tags).
- *
- * Returns the number of jobs moved.
+ * Generates a deterministic job ID for a migrated job.
+ * This makes migration idempotent — re-running won't create duplicates
+ * because BullMQ deduplicates by job ID.
  */
-export async function moveJobs(
+export function migrationJobId(oldQueueName: string, oldJobId: string): string {
+  return `migrated:${oldQueueName}:${oldJobId}`;
+}
+
+export interface MigrateResult {
+  copied: number;
+  skipped: number;
+  failed: Array<{ jobId: string; error: string }>;
+}
+
+/**
+ * Copies jobs from an old queue to a new hash-tagged queue.
+ *
+ * - Reads job data using raw Redis commands (works on cluster)
+ * - Re-adds via BullMQ Queue.add() with deterministic job IDs
+ * - Does NOT delete old keys — that's a separate step
+ * - Safe to re-run: deterministic IDs prevent duplicates
+ * - Continues on per-job errors, reports all failures at the end
+ */
+export async function copyJobs(
   connection: IORedis | Cluster,
   oldQueueName: string,
   newQueueName: string,
-): Promise<number> {
+): Promise<MigrateResult> {
+  const result: MigrateResult = { copied: 0, skipped: 0, failed: [] };
+
   const jobIds = await readJobIds(connection, oldQueueName);
-  if (jobIds.length === 0) return 0;
+  if (jobIds.length === 0) return result;
 
   const newQueue = new Queue(newQueueName, {
     connection: connection as any,
   });
 
-  let moved = 0;
   try {
     for (const jobId of jobIds) {
       const job = await readJobData(connection, oldQueueName, jobId);
-      if (!job) continue;
+      if (!job) {
+        result.skipped++;
+        continue;
+      }
 
-      await newQueue.add(job.name, job.data, {
-        // Preserve relevant options but let BullMQ assign a new job ID
-        delay: (job.opts.delay as number) ?? undefined,
-        priority: (job.opts.priority as number) ?? undefined,
-        attempts: (job.opts.attempts as number) ?? undefined,
-        backoff: job.opts.backoff as any,
-      });
-      moved++;
+      try {
+        await newQueue.add(job.name, job.data, {
+          jobId: migrationJobId(oldQueueName, jobId),
+          delay: (job.opts.delay as number) ?? undefined,
+          priority: (job.opts.priority as number) ?? undefined,
+          attempts: (job.opts.attempts as number) ?? undefined,
+          backoff: job.opts.backoff as any,
+        });
+        result.copied++;
+      } catch (err) {
+        result.failed.push({
+          jobId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   } finally {
     await newQueue.close();
   }
 
-  return moved;
+  return result;
 }
 
 /**
@@ -328,10 +337,11 @@ async function main() {
 
   if (migrate && cleanup) {
     console.error("Error: Use --migrate or --cleanup, not both.");
+    console.error("  --migrate first (copies jobs), then --cleanup (deletes old keys).");
     process.exit(1);
   }
 
-  const mode = migrate ? "MIGRATE" : cleanup ? "CLEANUP" : "DRY-RUN";
+  const mode = migrate ? "MIGRATE (copy jobs, keep old keys)" : cleanup ? "CLEANUP (delete old keys)" : "DRY-RUN";
   console.log(`Mode: ${mode}`);
   console.log("");
 
@@ -359,32 +369,56 @@ async function main() {
   console.log("");
   console.log(`Total: ${totalOrphaned} orphaned keys`);
 
-  // Phase 2: Migrate jobs (if --migrate)
+  // Phase 2: Copy jobs to new queues (if --migrate)
   if (migrate) {
     console.log("");
-    console.log("Moving jobs from old queues to new hash-tagged queues...");
+    console.log("Copying jobs from old queues to new hash-tagged queues...");
+    console.log("(Old keys are NOT deleted — run --cleanup separately after verifying.)");
+    console.log("");
 
     const mapping = await buildQueueMapping(connection);
-    let totalMoved = 0;
+    let totalCopied = 0;
+    let totalSkipped = 0;
+    const allFailures: Array<{ queue: string; jobId: string; error: string }> = [];
 
     for (const [oldName, newName] of Object.entries(mapping)) {
       const jobIds = await readJobIds(connection, oldName);
       if (jobIds.length === 0) continue;
 
       console.log(`  ${oldName} → ${newName}: ${jobIds.length} jobs`);
-      const moved = await moveJobs(connection, oldName, newName);
-      console.log(`    → moved ${moved} jobs`);
-      totalMoved += moved;
+      const result = await copyJobs(connection, oldName, newName);
+      console.log(`    → copied: ${result.copied}, skipped: ${result.skipped}, failed: ${result.failed.length}`);
+
+      totalCopied += result.copied;
+      totalSkipped += result.skipped;
+      for (const f of result.failed) {
+        allFailures.push({ queue: oldName, ...f });
+      }
     }
 
     console.log("");
-    console.log(`Total: ${totalMoved} jobs moved`);
+    console.log(`Summary: ${totalCopied} copied, ${totalSkipped} skipped, ${allFailures.length} failed`);
+
+    if (allFailures.length > 0) {
+      console.log("");
+      console.log("Failures:");
+      for (const f of allFailures) {
+        console.log(`  ${f.queue}:${f.jobId} — ${f.error}`);
+      }
+      console.log("");
+      console.log("Re-run --migrate to retry failed jobs (already-copied jobs will be skipped).");
+    } else {
+      console.log("");
+      console.log("All jobs copied successfully. Old keys are still in Redis.");
+      console.log("Verify new queues look correct, then run:");
+      console.log("  npx tsx scripts/migrate-queue-names.ts --cleanup");
+    }
   }
 
-  // Phase 3: Cleanup old keys (if --migrate or --cleanup)
-  if (migrate || cleanup) {
+  // Phase 3: Delete old keys (if --cleanup)
+  if (cleanup) {
     console.log("");
-    console.log("Cleaning up old keys...");
+    console.log("Deleting old keys...");
     await cleanupKeys(connection, allOldKeys);
     console.log(`  → deleted ${allOldKeys.length} keys`);
   }
@@ -392,10 +426,10 @@ async function main() {
   // Phase 4: Dry-run instructions
   if (!migrate && !cleanup) {
     console.log("");
-    console.log("To move jobs to new queues and clean up:");
+    console.log("Step 1 — Copy jobs to new queues (safe, no deletion):");
     console.log("  npx tsx scripts/migrate-queue-names.ts --migrate");
     console.log("");
-    console.log("To just delete old keys (jobs will be lost):");
+    console.log("Step 2 — After verifying, delete old keys:");
     console.log("  npx tsx scripts/migrate-queue-names.ts --cleanup");
   }
 

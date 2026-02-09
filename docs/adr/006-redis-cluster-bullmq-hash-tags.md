@@ -44,18 +44,19 @@ We use **per-queue hash tags** (each queue has its own tag) rather than a shared
 
 ### Deployment & Migration Strategy
 
-This is a queue name rename. The migration script (`scripts/migrate-queue-names.ts`) handles the transition:
+This is a queue name rename. The migration script (`scripts/migrate-queue-names.ts`) handles the transition as a safe two-step process:
 
 1. **Dry-run** — `npx tsx scripts/migrate-queue-names.ts` reports orphaned keys under old queue names.
-2. **Migrate** — `npx tsx scripts/migrate-queue-names.ts --migrate` reads job data from old queues using raw Redis commands (single-key ops work on both standalone and cluster), re-adds them to new hash-tagged queues via BullMQ, then cleans up old keys.
-3. **Deploy** — Workers and producers use new hash-tagged names. In containerized deployments (ECS, Kubernetes), both deploy together naturally.
+2. **Copy** — `npx tsx scripts/migrate-queue-names.ts --migrate` copies jobs from old queues to new hash-tagged queues. Old keys are left intact — nothing is deleted. Uses deterministic job IDs (`migrated:<oldQueue>:<oldJobId>`) so re-running is idempotent (no duplicates). Per-job errors are logged but do not stop the migration.
+3. **Verify** — Re-run dry-run or inspect new queues to confirm jobs were copied correctly.
+4. **Cleanup** — `npx tsx scripts/migrate-queue-names.ts --cleanup` deletes old keys once you're confident the migration is correct.
 
-The migration script uses raw Redis reads (not BullMQ) to access old queues because BullMQ's Lua scripts fail with CROSSSLOT on un-tagged names in cluster mode. Single-key operations (`LRANGE`, `HGETALL`) work fine regardless.
+The script reads job data using raw Redis commands (`LRANGE`, `HGETALL`) because BullMQ's Lua scripts fail with CROSSSLOT on un-tagged names in cluster mode. Single-key operations work fine. It writes to new queues via BullMQ `Queue.add()` which works because new names have hash tags.
 
-For environments that cannot tolerate any job loss:
-1. Run `--migrate` before deploying (moves waiting/delayed/active jobs to new queues)
-2. Deploy new code
-3. Verify with dry-run that no old keys remain
+Deployment order:
+1. Deploy new code (creates new queues, workers listen on new names)
+2. Run `--migrate` to copy any remaining jobs from old queues
+3. Verify, then run `--cleanup` to remove old keys
 
 ### Enforcement
 

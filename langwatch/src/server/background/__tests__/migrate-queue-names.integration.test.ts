@@ -2,7 +2,7 @@
  * Integration tests for the queue name migration script.
  *
  * Seeds Redis with BullMQ jobs under old (pre-hash-tag) queue names,
- * verifies the migration logic discovers them, moves them to new
+ * verifies the migration logic discovers them, copies them to new
  * hash-tagged queues, and cleans up old keys — without touching
  * new keys.
  *
@@ -27,7 +27,8 @@ import {
   cleanupKeys,
   readJobIds,
   readJobData,
-  moveJobs,
+  copyJobs,
+  migrationJobId,
   buildQueueMapping,
 } from "../../../../scripts/migrate-queue-names";
 
@@ -135,12 +136,11 @@ describe("Queue Name Migration Script", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Moving jobs
+  // Copying jobs (safe, no deletion)
   // -----------------------------------------------------------------------
 
-  describe("when moving jobs from old to new queue", () => {
-    it("moves all waiting jobs to the new hash-tagged queue", async () => {
-      // Seed 3 jobs into old "collector" queue
+  describe("when copying jobs from old to new queue", () => {
+    it("copies all waiting jobs to the new hash-tagged queue", async () => {
       const oldQueue = createTestQueue("collector", redis);
       queuesToClose.push(oldQueue);
 
@@ -148,9 +148,9 @@ describe("Queue Name Migration Script", () => {
       await oldQueue.add("trace", { traceId: "2" });
       await oldQueue.add("trace", { traceId: "3" });
 
-      // Move them
-      const moved = await moveJobs(redis, "collector", "{collector}");
-      expect(moved).toBe(3);
+      const result = await copyJobs(redis, "collector", "{collector}");
+      expect(result.copied).toBe(3);
+      expect(result.failed).toHaveLength(0);
 
       // Verify they exist in the new queue
       const newQueue = createTestQueue("{collector}", redis);
@@ -171,7 +171,7 @@ describe("Queue Name Migration Script", () => {
 
       await oldQueue.add("custom-evaluator", { check: true });
 
-      await moveJobs(redis, "evaluations", "{evaluations}");
+      await copyJobs(redis, "evaluations", "{evaluations}");
 
       const newQueue = createTestQueue("{evaluations}", redis);
       queuesToClose.push(newQueue);
@@ -187,8 +187,7 @@ describe("Queue Name Migration Script", () => {
 
       await oldQueue.add("maintenance", { action: "health_check" });
 
-      // Old name uses hyphen, new name uses underscore
-      await moveJobs(redis, "event-sourcing", "{event_sourcing}");
+      await copyJobs(redis, "event-sourcing", "{event_sourcing}");
 
       const newQueue = createTestQueue("{event_sourcing}", redis);
       queuesToClose.push(newQueue);
@@ -198,18 +197,72 @@ describe("Queue Name Migration Script", () => {
       expect(job!.data).toEqual({ action: "health_check" });
     });
 
+    it("leaves old queue keys intact after copying", async () => {
+      const oldQueue = createTestQueue("collector", redis);
+      queuesToClose.push(oldQueue);
+
+      await oldQueue.add("trace", { traceId: "keep-me" });
+
+      await copyJobs(redis, "collector", "{collector}");
+
+      // Old keys should still exist
+      const oldKeys = await scanKeys(redis, "bull:collector:*");
+      expect(oldKeys.length).toBeGreaterThan(0);
+
+      // Old job data should still be readable
+      const jobIds = await readJobIds(redis, "collector");
+      expect(jobIds).toHaveLength(1);
+    });
+
     it("returns 0 when old queue has no jobs", async () => {
-      const moved = await moveJobs(redis, "collector", "{collector}");
-      expect(moved).toBe(0);
+      const result = await copyJobs(redis, "collector", "{collector}");
+      expect(result.copied).toBe(0);
+      expect(result.failed).toHaveLength(0);
     });
   });
 
   // -----------------------------------------------------------------------
-  // End-to-end: migrate + cleanup
+  // Idempotency — re-running migration is safe
   // -----------------------------------------------------------------------
 
-  describe("when running full migration (move + cleanup)", () => {
-    it("moves jobs and cleans up old keys without touching new keys", async () => {
+  describe("when running migration twice (idempotency)", () => {
+    it("does not create duplicate jobs on re-run", async () => {
+      const oldQueue = createTestQueue("collector", redis);
+      queuesToClose.push(oldQueue);
+
+      await oldQueue.add("trace", { traceId: "1" });
+      await oldQueue.add("trace", { traceId: "2" });
+
+      // First run
+      const result1 = await copyJobs(redis, "collector", "{collector}");
+      expect(result1.copied).toBe(2);
+
+      // Second run — same jobs, deterministic IDs
+      const result2 = await copyJobs(redis, "collector", "{collector}");
+      // Jobs already exist, so they should be skipped (BullMQ returns
+      // the existing job when adding with a duplicate jobId)
+      // The total in the new queue should still be 2, not 4
+      const newQueue = createTestQueue("{collector}", redis);
+      queuesToClose.push(newQueue);
+
+      const waiting = await newQueue.getWaiting();
+      expect(waiting).toHaveLength(2);
+    });
+
+    it("generates deterministic job IDs from old queue name and job ID", () => {
+      const id1 = migrationJobId("collector", "42");
+      const id2 = migrationJobId("collector", "42");
+      expect(id1).toBe(id2);
+      expect(id1).toBe("migrated:collector:42");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // End-to-end: copy + verify + cleanup
+  // -----------------------------------------------------------------------
+
+  describe("when running full two-step migration", () => {
+    it("copies jobs, then cleanup removes old keys without touching new keys", async () => {
       // Seed jobs into two old queues
       const oldCollector = createTestQueue("collector", redis);
       const oldEval = createTestQueue("evaluations", redis);
@@ -223,14 +276,22 @@ describe("Queue Name Migration Script", () => {
       queuesToClose.push(existingNew);
       await existingNew.add("event", { id: "existing" });
 
-      // Step 1: Build mapping and move jobs
+      // Step 1: Copy jobs (no deletion)
       const mapping = await buildQueueMapping(redis);
-      expect(mapping).toHaveProperty("collector", "{collector}");
-      expect(mapping).toHaveProperty("evaluations", "{evaluations}");
-
       for (const [oldName, newName] of Object.entries(mapping)) {
-        await moveJobs(redis, oldName, newName);
+        await copyJobs(redis, oldName, newName);
       }
+
+      // Verify old keys still exist
+      const oldCollectorKeys = await scanKeys(redis, "bull:collector:*");
+      expect(oldCollectorKeys.length).toBeGreaterThan(0);
+
+      // Verify new queues have the copied jobs
+      const newCollector = createTestQueue("{collector}", redis);
+      queuesToClose.push(newCollector);
+      const collectorJobs = await newCollector.getWaiting();
+      expect(collectorJobs).toHaveLength(1);
+      expect(collectorJobs[0]!.data).toEqual({ id: "t1" });
 
       // Step 2: Cleanup old keys
       const allOldKeys: string[] = [];
@@ -239,18 +300,15 @@ describe("Queue Name Migration Script", () => {
       }
       await cleanupKeys(redis, allOldKeys);
 
-      // Verify: old queues are empty
-      const oldCollectorKeys = await scanKeys(redis, "bull:collector:*");
-      expect(oldCollectorKeys).toHaveLength(0);
+      // Old keys should be gone
+      const afterCleanup = await scanKeys(redis, "bull:collector:*");
+      expect(afterCleanup).toHaveLength(0);
 
-      // Verify: new queues have the migrated jobs
-      const newCollector = createTestQueue("{collector}", redis);
-      queuesToClose.push(newCollector);
-      const collectorJobs = await newCollector.getWaiting();
-      expect(collectorJobs).toHaveLength(1);
-      expect(collectorJobs[0]!.data).toEqual({ id: "t1" });
+      // New queues should still have the jobs
+      const stillThere = await newCollector.getWaiting();
+      expect(stillThere).toHaveLength(1);
 
-      // Verify: pre-existing new queue is untouched
+      // Pre-existing new queue is untouched
       const trackJobs = await existingNew.getWaiting();
       expect(trackJobs).toHaveLength(1);
       expect(trackJobs[0]!.data).toEqual({ id: "existing" });
@@ -258,7 +316,7 @@ describe("Queue Name Migration Script", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Cleanup only (no move)
+  // Cleanup only
   // -----------------------------------------------------------------------
 
   describe("when cleaning up without migration", () => {
