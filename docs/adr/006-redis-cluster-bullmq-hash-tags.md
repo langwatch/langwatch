@@ -46,12 +46,14 @@ We use **per-queue hash tags** (each queue has its own tag) rather than a shared
 
 This is a queue name rename. The migration script (`scripts/migrate-queue-names.ts`) handles the transition as a safe two-step process:
 
-1. **Dry-run** — `npx tsx scripts/migrate-queue-names.ts` reports orphaned keys under old queue names.
-2. **Copy** — `npx tsx scripts/migrate-queue-names.ts --migrate` copies jobs from old queues to new hash-tagged queues. Old keys are left intact — nothing is deleted. Uses deterministic job IDs (`migrated:<oldQueue>:<oldJobId>`) so re-running is idempotent (no duplicates). Per-job errors are logged but do not stop the migration.
-3. **Verify** — Re-run dry-run or inspect new queues to confirm jobs were copied correctly.
-4. **Cleanup** — `npx tsx scripts/migrate-queue-names.ts --cleanup` deletes old keys once you're confident the migration is correct.
+1. **Dry-run** — `npx tsx scripts/migrate-queue-names.ts` reports orphaned keys under old queue names and migration status (how many jobs already copied vs pending).
+2. **Copy** — `npx tsx scripts/migrate-queue-names.ts --migrate` copies jobs from old queues to new hash-tagged queues. Old keys are left intact — nothing is deleted. Uses a Redis SET (`migration:queue-names:copied`) to track what's been copied, so re-running is idempotent even after workers process and remove the copied jobs. Per-job errors are logged but do not stop the migration.
+3. **Verify** — Re-run dry-run to confirm "All jobs have been copied. Safe to run --cleanup."
+4. **Cleanup** — `npx tsx scripts/migrate-queue-names.ts --cleanup` deletes old keys and the migration tracker set.
 
-The script reads job data using raw Redis commands (`LRANGE`, `HGETALL`) because BullMQ's Lua scripts fail with CROSSSLOT on un-tagged names in cluster mode. Single-key operations work fine. It writes to new queues via BullMQ `Queue.add()` which works because new names have hash tags.
+The script reads job data using raw Redis commands (`LRANGE`, `ZRANGE`, `HGETALL`) because BullMQ's Lua scripts fail with CROSSSLOT on un-tagged names in cluster mode. Single-key operations work fine. It writes to new queues via BullMQ `Queue.add()` which works because new names have hash tags. It also discovers dynamic pipeline queues by scanning for `bull:<prefix>/*:meta` keys.
+
+**Note:** ioredis `Cluster` lazily discovers topology — `nodes("master")` returns `[]` until the first command. The script issues a `ping()` before scanning to ensure all master nodes are discovered.
 
 Deployment order:
 1. Deploy new code (creates new queues, workers listen on new names)
@@ -89,7 +91,7 @@ Queue names now include braces in logs, metrics, and span attributes (`{collecto
 **Negative:**
 - Queue name rename orphans in-flight jobs under old names (mitigated by migration script's `--migrate` mode which moves jobs before cleanup)
 - Braces appear in all observability output (logs, metrics, traces)
-- Migration must be run before deployment to avoid job loss
+- Migration must be run after deployment to move orphaned jobs to new queues
 
 **Neutral:**
 - No performance impact — hash tag parsing is done by Redis, not application code
