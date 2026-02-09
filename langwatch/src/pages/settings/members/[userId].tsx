@@ -11,11 +11,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  type CustomRole,
   OrganizationUserRole,
-  type Team,
   TeamUserRole,
-  type TeamUser,
 } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +23,6 @@ import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
 import {
   MISSING_CUSTOM_ROLE_VALUE,
-  teamRolesOptions,
   TeamUserRoleField,
 } from "../../../components/settings/TeamUserRoleField";
 import { Link } from "../../../components/ui/link";
@@ -36,199 +32,20 @@ import { checkCompoundLimits } from "../../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
-  getAutoCorrectedTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
-  type TeamRoleValue,
 } from "../../../utils/memberRoleConstraints";
+import {
+  type PendingTeamRoleMap,
+  applyOrganizationRoleToPendingTeamRoles,
+  arePendingTeamRolesEqual,
+  buildInitialPendingTeamRoles,
+  getLicenseLimitTypeForRoleChange,
+  getTeamRoleDisplayName,
+  getTeamRoleUpdates,
+  hasPendingRoleChanges,
+} from "../../../utils/memberRoleState";
 import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
 import { api } from "../../../utils/api";
-
-type PendingTeamRole = {
-  role: string;
-  customRoleId?: string;
-};
-
-type PendingTeamRoleMap = Record<string, PendingTeamRole>;
-
-type TeamRoleUpdatePayload = {
-  teamId: string;
-  userId: string;
-  role: string;
-  customRoleId?: string;
-};
-
-type TeamMembershipWithRole = TeamUser & {
-  assignedRole?: CustomRole | null;
-  team: Team;
-};
-
-function resolveTeamRoleValue(membership: TeamMembershipWithRole): string {
-  if (membership.role === TeamUserRole.CUSTOM) {
-    return membership.assignedRole
-      ? `custom:${membership.assignedRole.id}`
-      : MISSING_CUSTOM_ROLE_VALUE;
-  }
-  return membership.role;
-}
-
-function getTeamRoleDisplayName(membership: TeamMembershipWithRole): string {
-  if (membership.role === "CUSTOM") {
-    return membership.assignedRole?.name ?? "Custom";
-  }
-  const option = teamRolesOptions[membership.role as keyof typeof teamRolesOptions];
-  return option?.label ?? membership.role;
-}
-
-function buildInitialPendingTeamRoles(params: {
-  teamMemberships: TeamMembershipWithRole[];
-  organizationId?: string;
-}): PendingTeamRoleMap {
-  const { teamMemberships, organizationId } = params;
-  return Object.fromEntries(
-    teamMemberships
-      .filter((tm) => tm.team.organizationId === organizationId)
-      .map((tm) => [
-        tm.teamId,
-        {
-          role: resolveTeamRoleValue(tm),
-          customRoleId:
-            tm.role === TeamUserRole.CUSTOM ? tm.assignedRole?.id : undefined,
-        },
-      ]),
-  );
-}
-
-function getTeamRoleUpdates(params: {
-  teamMemberships: TeamMembershipWithRole[];
-  pendingTeamRoles: PendingTeamRoleMap;
-  userId: string;
-}): TeamRoleUpdatePayload[] {
-  const { teamMemberships, pendingTeamRoles, userId } = params;
-
-  return teamMemberships.flatMap((teamMembership) => {
-    const pending = pendingTeamRoles[teamMembership.teamId];
-    if (!pending) return [];
-
-    const currentRole = resolveTeamRoleValue(teamMembership);
-    const currentCustomRoleId =
-      teamMembership.role === TeamUserRole.CUSTOM
-        ? teamMembership.assignedRole?.id
-        : undefined;
-
-    if (
-      pending.role === currentRole &&
-      (pending.customRoleId ?? undefined) === currentCustomRoleId
-    ) {
-      return [];
-    }
-
-    return [
-      {
-        teamId: teamMembership.teamId,
-        userId,
-        role: pending.role,
-        customRoleId: pending.customRoleId,
-      },
-    ];
-  });
-}
-
-function hasPendingRoleChanges(params: {
-  teamMemberships: TeamMembershipWithRole[];
-  pendingTeamRoles: PendingTeamRoleMap;
-  pendingOrganizationRole: OrganizationUserRole | null;
-  currentOrganizationRole: OrganizationUserRole;
-}): boolean {
-  const {
-    teamMemberships,
-    pendingTeamRoles,
-    pendingOrganizationRole,
-    currentOrganizationRole,
-  } = params;
-
-  if (
-    pendingOrganizationRole !== null &&
-    pendingOrganizationRole !== currentOrganizationRole
-  ) {
-    return true;
-  }
-
-  return teamMemberships.some((teamMembership) => {
-    const pending = pendingTeamRoles[teamMembership.teamId];
-    if (!pending) return false;
-
-    const currentRole = resolveTeamRoleValue(teamMembership);
-
-    return (
-      pending.role !== currentRole ||
-      (pending.customRoleId ?? null) !== (teamMembership.assignedRole?.id ?? null)
-    );
-  });
-}
-
-function arePendingTeamRolesEqual(
-  left: PendingTeamRoleMap,
-  right: PendingTeamRoleMap,
-): boolean {
-  const leftEntries = Object.entries(left);
-  const rightEntries = Object.entries(right);
-  if (leftEntries.length !== rightEntries.length) return false;
-
-  return leftEntries.every(([teamId, leftRole]) => {
-    const rightRole = right[teamId];
-    if (!rightRole) return false;
-    return (
-      leftRole.role === rightRole.role &&
-      (leftRole.customRoleId ?? null) === (rightRole.customRoleId ?? null)
-    );
-  });
-}
-
-function getLicenseLimitTypeForRoleChange(params: {
-  previousRole: OrganizationUserRole;
-  nextRole: OrganizationUserRole;
-}): "members" | "membersLite" | null {
-  const { previousRole, nextRole } = params;
-
-  if (
-    previousRole === OrganizationUserRole.EXTERNAL &&
-    nextRole !== OrganizationUserRole.EXTERNAL
-  ) {
-    return "members";
-  }
-
-  if (
-    previousRole !== OrganizationUserRole.EXTERNAL &&
-    nextRole === OrganizationUserRole.EXTERNAL
-  ) {
-    return "membersLite";
-  }
-
-  return null;
-}
-
-function applyOrganizationRoleToPendingTeamRoles(params: {
-  organizationRole: OrganizationUserRole;
-  currentPendingTeamRoles: PendingTeamRoleMap;
-}): PendingTeamRoleMap {
-  const { organizationRole, currentPendingTeamRoles } = params;
-
-  return Object.fromEntries(
-    Object.entries(currentPendingTeamRoles).map(([teamId, teamRole]) => [
-      teamId,
-      {
-        role: getAutoCorrectedTeamRoleForOrganizationRole({
-          organizationRole,
-          currentTeamRole: teamRole.role as TeamRoleValue,
-        }),
-        customRoleId:
-          organizationRole === OrganizationUserRole.EXTERNAL
-            ? undefined
-            : teamRole.customRoleId,
-      },
-    ]),
-  );
-}
 
 export default function UserDetailsPage() {
   const router = useRouter();

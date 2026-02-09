@@ -17,7 +17,7 @@ import { Select } from "../ui/select";
 
 export type RoleOption = {
   label: string;
-  value: string;
+  value: TeamRoleValue;
   description: string;
   isCustom?: boolean;
   customRoleId?: string;
@@ -91,8 +91,8 @@ export const TeamUserRoleField = ({
   value?: string;
   onChange: (value: RoleOption) => void;
 }) => {
-  const selectedRoleValue =
-    value ??
+  const selectedRoleValue: TeamRoleValue =
+    (value as TeamRoleValue | undefined) ??
     (member.role === TeamUserRole.CUSTOM && customRole
       ? `custom:${customRole.id}`
       : member.role);
@@ -156,7 +156,7 @@ export const TeamRoleSelect = ({
     () => {
       const constrainedOptions = [
         ...Object.values(teamRolesOptions),
-        ...(customRoles.data ?? []).map((role) => ({
+        ...(customRoles.data ?? []).map((role): RoleOption => ({
           label: role.name,
           value: `custom:${role.id}`,
           description:
@@ -167,7 +167,7 @@ export const TeamRoleSelect = ({
       ].filter((option) =>
         isTeamRoleAllowedForOrganizationRole({
           organizationRole,
-          teamRole: option.value as TeamRoleValue,
+          teamRole: option.value,
         }),
       );
 
@@ -186,7 +186,7 @@ export const TeamRoleSelect = ({
   const correctedSelectedRole = useMemo(() => {
     const correctedValue = getAutoCorrectedTeamRoleForOrganizationRole({
       organizationRole,
-      currentTeamRole: value.value as TeamRoleValue,
+      currentTeamRole: value.value,
     });
     return allRoleOptions.find((option) => option.value === correctedValue);
   }, [allRoleOptions, organizationRole, value.value]);
@@ -201,7 +201,7 @@ export const TeamRoleSelect = ({
       collection={roleCollection}
       value={[correctedSelectedRole?.value ?? value.value]}
       onValueChange={(details) => {
-        const selectedValue = details.value[0];
+        const selectedValue = details.value[0] as TeamRoleValue | undefined;
         if (selectedValue) {
           const selectedOption = allRoleOptions.find(
             (o) => o.value === selectedValue,

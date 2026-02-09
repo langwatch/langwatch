@@ -1564,7 +1564,7 @@ export const organizationRouter = createTRPCRouter({
         const requestedTeamRoleUpdates = (input.teamRoleUpdates ?? []).reduce<
           Array<{
             teamId: string;
-            role: string;
+            role: TeamRoleValue;
             customRoleId?: string;
           }>
         >((acc, teamRoleUpdate) => {
@@ -1582,7 +1582,7 @@ export const organizationRouter = createTRPCRouter({
           }
           acc.push({
             teamId: teamRoleUpdate.teamId,
-            role: teamRoleUpdate.role,
+            role: teamRoleUpdate.role as TeamRoleValue,
             customRoleId: teamRoleUpdate.customRoleId,
           });
           return acc;
@@ -1630,7 +1630,7 @@ export const organizationRouter = createTRPCRouter({
 
           return [] as Array<{
             teamId: string;
-            role: string;
+            role: TeamRoleValue;
             customRoleId?: string;
           }>;
         })();
@@ -1651,8 +1651,10 @@ export const organizationRouter = createTRPCRouter({
           if (!desiredUpdate) continue;
 
           if (
-            input.role === OrganizationUserRole.EXTERNAL &&
-            desiredUpdate.role !== TeamUserRole.VIEWER
+            !isTeamRoleAllowedForOrganizationRole({
+              organizationRole: input.role,
+              teamRole: desiredUpdate.role,
+            })
           ) {
             throw new TRPCError({
               code: "BAD_REQUEST",
