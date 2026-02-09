@@ -1,5 +1,124 @@
 # Changelog
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.2...langwatch@v2.1.0) (2026-02-09)
+
+
+### Features
+
+* add ability to archive scenarios from UI ([#1376](https://github.com/langwatch/langwatch/issues/1376)) ([09f9566](https://github.com/langwatch/langwatch/commit/09f956629037ce203f3d7f7046822f5e29a405fb))
+* add ability to drill down on eval graphs ([#1172](https://github.com/langwatch/langwatch/issues/1172)) ([10ca94f](https://github.com/langwatch/langwatch/commit/10ca94f68f00a3bfbcb37e3c1ef1b9a400101a8e))
+* add agent and evaluation replication ([#1287](https://github.com/langwatch/langwatch/issues/1287)) ([034ef6c](https://github.com/langwatch/langwatch/commit/034ef6c5c7844acc480f62b10f4ebe9502b00a23))
+* add ClickHouse analytics backend with dual-database routing ([#1203](https://github.com/langwatch/langwatch/issues/1203)) ([0c49494](https://github.com/langwatch/langwatch/commit/0c49494e1e1e36ef47d2d7ed6dea7a116fa17bfa))
+* add CUPID reviewer alongside Uncle Bob for parallel code reviews ([#1236](https://github.com/langwatch/langwatch/issues/1236)) ([a9ff151](https://github.com/langwatch/langwatch/commit/a9ff15152a5217da7c020e32ac518333feb1f7f4)), closes [#1235](https://github.com/langwatch/langwatch/issues/1235)
+* add devils-advocate agent and /challenge skill ([#1369](https://github.com/langwatch/langwatch/issues/1369)) ([3de5efb](https://github.com/langwatch/langwatch/commit/3de5efb41075a369b91af0596eb1ce68ee1a772f))
+* add local/dev indicator ([#1408](https://github.com/langwatch/langwatch/issues/1408)) ([ac18176](https://github.com/langwatch/langwatch/commit/ac18176b9889dc5dba16e62a089ce2c6f5bbe947))
+* add observability and prompt MCP tools to @langwatch/mcp-server v0.4.0 ([#1410](https://github.com/langwatch/langwatch/issues/1410)) ([b770040](https://github.com/langwatch/langwatch/commit/b7700401dd87e7f1b76fefb213d67c906bcc1202))
+* add pii detection and redaction to event sourcing trace ingestion ([#1278](https://github.com/langwatch/langwatch/issues/1278)) ([71bcb49](https://github.com/langwatch/langwatch/commit/71bcb49c4c671209c612417615060ccc1cf1edf6))
+* add PII reviewer agent ([#1423](https://github.com/langwatch/langwatch/issues/1423)) ([ad1b56d](https://github.com/langwatch/langwatch/commit/ad1b56d2d77366e5c701485f659a950d330a16bc))
+* added topic clustering to trace processing event sourcing pipeline ([#1275](https://github.com/langwatch/langwatch/issues/1275)) ([3a0a094](https://github.com/langwatch/langwatch/commit/3a0a0946e80c1c55e6035a90cc2167d15514832d))
+* **agents:** add /test-review skill and integrate into orchestration ([#1297](https://github.com/langwatch/langwatch/issues/1297)) ([4328510](https://github.com/langwatch/langwatch/commit/43285101c0d816d6779521ff2d30c4423873b7d4)), closes [#1295](https://github.com/langwatch/langwatch/issues/1295)
+* **automations:** rename triggers to automations, add code mode for customizing automation, improve filters ([#1317](https://github.com/langwatch/langwatch/issues/1317)) ([8624850](https://github.com/langwatch/langwatch/commit/862485076dc927bc60ccb27ca2db22dd05837d45))
+* enable clickhouse trace ingestion as default for new projects ([#1368](https://github.com/langwatch/langwatch/issues/1368)) ([7c5f86e](https://github.com/langwatch/langwatch/commit/7c5f86ebf5bd8afc8ef4b0ba91a69e662aba8dbc))
+* enable reusable testcontainers for faster integration tests ([#1302](https://github.com/langwatch/langwatch/issues/1302)) ([d9b065c](https://github.com/langwatch/langwatch/commit/d9b065cef7ea10510eb76fcfb9384ed37bc32add))
+* **evaluations-v3:** evaluate your evaluator on workbench, workflow evaluators, and smashing several evaluations workbench bugs ([#1269](https://github.com/langwatch/langwatch/issues/1269)) ([476aed6](https://github.com/langwatch/langwatch/commit/476aed648627f46b6ed1b21dec9a895a1cb6017e))
+* expose feature flags to frontend via session ([#1218](https://github.com/langwatch/langwatch/issues/1218)) ([94beed1](https://github.com/langwatch/langwatch/commit/94beed1ab296d52aa989615ac44139230d479773))
+* full trace (AI-Readable) mapping source for online evaluations ([#1395](https://github.com/langwatch/langwatch/issues/1395)) ([9e6b5a1](https://github.com/langwatch/langwatch/commit/9e6b5a11d56138ad7c047f0905aa34656ea30baa))
+* **licensing:** add enterprise blockers for datasets, dashboards, graphs, and automations ([#1316](https://github.com/langwatch/langwatch/issues/1316)) ([a0c0ef3](https://github.com/langwatch/langwatch/commit/a0c0ef39005f8e29e77c41e053167ccfc2d2b7f7))
+* **licensing:** add experiment limits and improve member naming ([#1256](https://github.com/langwatch/langwatch/issues/1256)) ([cac6894](https://github.com/langwatch/langwatch/commit/cac68947d946d9cac43c5c15a9bd97ea3fa05cfe))
+* otel genai input output messages ([#1416](https://github.com/langwatch/langwatch/issues/1416)) ([6906b7f](https://github.com/langwatch/langwatch/commit/6906b7fb2bbb368c72fcf5421a8f9016d56656f3))
+* pass thread_id through execute_component to LangWatch tracing ([ac986cc](https://github.com/langwatch/langwatch/commit/ac986cc3ca0e5e37fa8e71ae304e2cad63cb6b14))
+* **python-sdk:** add prompts_path configuration to setup() ([#1271](https://github.com/langwatch/langwatch/issues/1271)) ([49cfa7c](https://github.com/langwatch/langwatch/commit/49cfa7c30335a6fd007fbaa156f272f2419af11a))
+* re-apply frontend feature flags ([#1257](https://github.com/langwatch/langwatch/issues/1257)) ([50076b7](https://github.com/langwatch/langwatch/commit/50076b7bfe8a5b2bd6e7688917993336935b1f82))
+* redesign trace details evaluations tab and fix thread mappings ([#1393](https://github.com/langwatch/langwatch/issues/1393)) ([a2ceaea](https://github.com/langwatch/langwatch/commit/a2ceaea3742ee9e611914d82a58f2e340e1879dc))
+* replace search bar with new command bar ([#1245](https://github.com/langwatch/langwatch/issues/1245)) ([15d9827](https://github.com/langwatch/langwatch/commit/15d982756e0d2830245c3db146da82aa7a164de7))
+* **scenarios:** create AI Create Modal for scenario generation ([#1268](https://github.com/langwatch/langwatch/issues/1268)) ([d9af4c5](https://github.com/langwatch/langwatch/commit/d9af4c58d885873e3032a1bbc6ec4508e9861638))
+* **scenarios:** display friendly name for internal scenario sets ([#1362](https://github.com/langwatch/langwatch/issues/1362)) ([5f2877f](https://github.com/langwatch/langwatch/commit/5f2877ff4b1971e9693feded1e52237cf326936c))
+* **scenarios:** isolated OTEL traces for server-side execution ([#1134](https://github.com/langwatch/langwatch/issues/1134)) ([bc46411](https://github.com/langwatch/langwatch/commit/bc46411c54f0b5d521102bc10ba73730f233620d))
+* **scenarios:** replace local-scenarios with internal namespace pattern ([#1347](https://github.com/langwatch/langwatch/issues/1347)) ([d4305ea](https://github.com/langwatch/langwatch/commit/d4305eac4150f90bc8bab5bad09840f8c180000b))
+* warn user when no model providers configured for AI scenario creation ([#1348](https://github.com/langwatch/langwatch/issues/1348)) ([49e6331](https://github.com/langwatch/langwatch/commit/49e6331d1421e16b5d23382e3ce753e58a45090e))
+
+
+### Bug Fixes
+
+* add bullmq metrics, and also stop sending old job format in event sourcing ([#1406](https://github.com/langwatch/langwatch/issues/1406)) ([2abbf29](https://github.com/langwatch/langwatch/commit/2abbf2912441a8c37b922ceb9d5e385a0e36dcb6))
+* add CI ([#788](https://github.com/langwatch/langwatch/issues/788)) ([71da835](https://github.com/langwatch/langwatch/commit/71da83545d475a90f388aefcaf1bd356b5d752f0))
+* **agents:** restore simplified test-reviewer.md ([#1305](https://github.com/langwatch/langwatch/issues/1305)) ([5d9ed6f](https://github.com/langwatch/langwatch/commit/5d9ed6f2c98e7fdf544cdce02f813d5df85f80fe))
+* allow back to start workers together with server, fix for docker compose, return back to single start script ([30d55cb](https://github.com/langwatch/langwatch/commit/30d55cb9d13de52eca403e3cfe78d813e4d93fc4))
+* change how context is propagated though jobs ([#1377](https://github.com/langwatch/langwatch/issues/1377)) ([73fc13e](https://github.com/langwatch/langwatch/commit/73fc13ee60f5f3d0b97af2c6c8486d7c509bff25))
+* **claude:** correct worktree skill paths for langwatch repo ([#1262](https://github.com/langwatch/langwatch/issues/1262)) ([c94b1a7](https://github.com/langwatch/langwatch/commit/c94b1a755a2ab28f1b088faefae2f3c81f90ee4a))
+* clean up event sourcing initialization  ([#1273](https://github.com/langwatch/langwatch/issues/1273)) ([f492b1a](https://github.com/langwatch/langwatch/commit/f492b1af08d94f61474c0490217f2df2a40a5775))
+* click propagation was causing dialogs to click parents ([#1364](https://github.com/langwatch/langwatch/issues/1364)) ([81bb778](https://github.com/langwatch/langwatch/commit/81bb7788fdb9fbe177afad886b1223772786af0f))
+* dev logging caused listener pollution, and improve logging more ([#1373](https://github.com/langwatch/langwatch/issues/1373)) ([9962b7c](https://github.com/langwatch/langwatch/commit/9962b7c38ccd8db1d98953fdc9c58654c689d02e))
+* **docker:** add shared pnpm store for faster Docker installs ([#1299](https://github.com/langwatch/langwatch/issues/1299)) ([ac7017d](https://github.com/langwatch/langwatch/commit/ac7017d3b34ba0fdb528120334617b203b95094b))
+* evaluation schema and logging ([#1394](https://github.com/langwatch/langwatch/issues/1394)) ([c7b8a94](https://github.com/langwatch/langwatch/commit/c7b8a9414abd48e7e18a7b4a1916bd9d2bc5242d))
+* evaluator-as-target batch eval header icon and update uv lock file for langwatch_nlp ([33cfa86](https://github.com/langwatch/langwatch/commit/33cfa86b64cdb743c88446ebb1eb8979196c5e4c))
+* event sourcing init across module boundaries ([#1277](https://github.com/langwatch/langwatch/issues/1277)) ([94fffcf](https://github.com/langwatch/langwatch/commit/94fffcf3e7e90d2dbd15a9b44703b2e84fc8b760))
+* event sourcing logging issues due to error instance checks not being possible ([#1307](https://github.com/langwatch/langwatch/issues/1307)) ([c0da41b](https://github.com/langwatch/langwatch/commit/c0da41b679bc5caaef71f9747dee502d26de40e1))
+* extract input/output text from json arrays of chat-message-like objects ([7fef464](https://github.com/langwatch/langwatch/commit/7fef464a7e5d6968cf808803ede1d71d3c8dec67))
+* fix cascadeArchive integration tests ([1138da2](https://github.com/langwatch/langwatch/commit/1138da2ed4cdb6a56e4f9673eaabf4407a80f307))
+* fix failing unit and integration tests ([#1281](https://github.com/langwatch/langwatch/issues/1281)) ([676ca66](https://github.com/langwatch/langwatch/commit/676ca668e047129482099610e4f7b5d85bded5d1))
+* guard against -Infinity in CustomGraph maxValue when data is empty ([8a86fc5](https://github.com/langwatch/langwatch/commit/8a86fc5061442a4b7d4a6fd59c47246da321a896))
+* improve evaluations empty state and update documentation links ([dca1c14](https://github.com/langwatch/langwatch/commit/dca1c145fb56e503bfeefaf9103d804e0d7d9ada))
+* improve rendering for high limits, render new license button for ourselves for IS_SAAS ([3187333](https://github.com/langwatch/langwatch/commit/31873338672f1058d61c054eb544597fd7e438ad))
+* **model-providers:** save API key when switching from env vars to custom ([#1191](https://github.com/langwatch/langwatch/issues/1191)) ([a1f9699](https://github.com/langwatch/langwatch/commit/a1f9699be01d1e1ced14bc38d000a4700fdf0b53)), closes [#1186](https://github.com/langwatch/langwatch/issues/1186)
+* moved pii detection check, and store in event/command ([#1293](https://github.com/langwatch/langwatch/issues/1293)) ([010eb6d](https://github.com/langwatch/langwatch/commit/010eb6dbab210ce367188c049adde26204d539aa))
+* node engine version to 24 ([#1367](https://github.com/langwatch/langwatch/issues/1367)) ([39e6beb](https://github.com/langwatch/langwatch/commit/39e6bebc6dc2fe616f10eb458731b07356d884e8))
+* prefer last user-role message when extracting input text from chat arrays ([9be5248](https://github.com/langwatch/langwatch/commit/9be524865b491b9094046fee0bb9a399657e1b74))
+* **projects:** create project in correct organization from dropdown ([#1265](https://github.com/langwatch/langwatch/issues/1265)) ([53b4c84](https://github.com/langwatch/langwatch/commit/53b4c84feb714846698b520a252d3f1eb86a403e))
+* **prompt-editor:** prevent race condition when switching targets ([#1358](https://github.com/langwatch/langwatch/issues/1358)) ([b6116a4](https://github.com/langwatch/langwatch/commit/b6116a4e68a4554d1b2fc05843844c917eb10b65))
+* **python-sdk:** resolve prompt path at sdk setup ([#1272](https://github.com/langwatch/langwatch/issues/1272)) ([4daf6d0](https://github.com/langwatch/langwatch/commit/4daf6d023a7ac5bd2b519c0e34173298d1569ea2))
+* rename scenario "Delete" to "Archive" in UI for honesty ([73ec200](https://github.com/langwatch/langwatch/commit/73ec2006c55469736ec421b2fc84ff3642fb8c62))
+* rename scenario Delete to Archive in UI ([#1405](https://github.com/langwatch/langwatch/issues/1405)) ([73ec200](https://github.com/langwatch/langwatch/commit/73ec2006c55469736ec421b2fc84ff3642fb8c62))
+* scenario worker fails immediately on worker death instead of retrying ([#1315](https://github.com/langwatch/langwatch/issues/1315)) ([e3353c1](https://github.com/langwatch/langwatch/commit/e3353c157e7a13e2eb3536cfc329d11b83ca9103))
+* **scenarios:** use __dirname for reliable child process path resolution ([#1306](https://github.com/langwatch/langwatch/issues/1306)) ([11f9264](https://github.com/langwatch/langwatch/commit/11f9264b284b7c4649ee0b86f4b246432316564d))
+* set `ensure_ascii` as false on all json.dumps inside NLP to support utf-8 encoding ([#1313](https://github.com/langwatch/langwatch/issues/1313)) ([e8db9a5](https://github.com/langwatch/langwatch/commit/e8db9a51e83e77c6be8e3e33cf6bc5c69c282bf6))
+* skip command bar on admin and onboarding ([3b653c8](https://github.com/langwatch/langwatch/commit/3b653c8bafe0055ca64ef902687929b7ceb55c5b))
+* skip keys that are not matching cold storage for batch evaluations ([59c9abb](https://github.com/langwatch/langwatch/commit/59c9abbf9999d37894f0c9143ddae3587420bcda))
+* support air-gapped Docker builds ([#1242](https://github.com/langwatch/langwatch/issues/1242)) ([0b04919](https://github.com/langwatch/langwatch/commit/0b049198e2c8e87851783c547ce264d9e323b1cd))
+* support air-gapped Docker builds with Prisma checksum skip ([0b04919](https://github.com/langwatch/langwatch/commit/0b049198e2c8e87851783c547ce264d9e323b1cd)), closes [#1241](https://github.com/langwatch/langwatch/issues/1241)
+* **test:** configure enterprise license for integration tests ([17eb3dd](https://github.com/langwatch/langwatch/commit/17eb3dd3b13815f66ed012fae52961fc27c53586))
+* tests, handle wildcard (*) in spans and metadata trace mappings and allow log_response() without explicit target context  ([#1291](https://github.com/langwatch/langwatch/issues/1291)) ([af5d77f](https://github.com/langwatch/langwatch/commit/af5d77fade37ea9ca157965e7d1ac8e4e73f2dcf))
+* **tests:** add  cleanup for integration tests ([#1290](https://github.com/langwatch/langwatch/issues/1290)) ([17eb3dd](https://github.com/langwatch/langwatch/commit/17eb3dd3b13815f66ed012fae52961fc27c53586))
+* **tests:** update license tests to match UI showing formatted numbers ([#1267](https://github.com/langwatch/langwatch/issues/1267)) ([4f62a04](https://github.com/langwatch/langwatch/commit/4f62a0411e7150bf19637028c3d41231318531e5))
+* **tests:** update tests for New Prompt naming and rename .integration.test.tsx files ([822c8bb](https://github.com/langwatch/langwatch/commit/822c8bbd75c8ef34b2169fe4a458f627a23db18c))
+* **tests:** update tests for New Prompt naming and rename .integration.test.tsx files ([417d961](https://github.com/langwatch/langwatch/commit/417d961fb96c7832a776a9f6a3c7702514d44e4b))
+* **traces:** check IS_SAAS before DB calls in checkLimit ([#1251](https://github.com/langwatch/langwatch/issues/1251)) ([55442fb](https://github.com/langwatch/langwatch/commit/55442fbe0d010998d5781a2813c035a167eb757d)), closes [#1249](https://github.com/langwatch/langwatch/issues/1249)
+* **traces:** enforce limits for self-hosted instances with licenses ([#1260](https://github.com/langwatch/langwatch/issues/1260)) ([3f65268](https://github.com/langwatch/langwatch/commit/3f652688ff71fb01b0dc588d04d2a2794c18a4b8))
+* tracing on trpc, and more fixes from reading logs ([#1381](https://github.com/langwatch/langwatch/issues/1381)) ([53db3ef](https://github.com/langwatch/langwatch/commit/53db3efd2dd707df1014c2e5d5c926f3f1d90743))
+* update BullMQ for Redis Cluster CROSSSLOT compatibility ([#1420](https://github.com/langwatch/langwatch/issues/1420)) ([b9f0840](https://github.com/langwatch/langwatch/commit/b9f0840e6fc4ed3b0eedc82fb7a63fb07967ab43))
+* use nested pnpm task because for some reasone that prevents force kills to leave the server hanging in the background for better development experience ([7dff46c](https://github.com/langwatch/langwatch/commit/7dff46c7c350d026f9d305f94c6ab1880e3812fb))
+
+
+### Miscellaneous
+
+* add logging and project id to nlp logging ([#1374](https://github.com/langwatch/langwatch/issues/1374)) ([ff42237](https://github.com/langwatch/langwatch/commit/ff42237f325e424b8f329bf0e9b5b00f3e4f71b7))
+* add more features to command bar, address comments from first pr ([#1255](https://github.com/langwatch/langwatch/issues/1255)) ([ae3819b](https://github.com/langwatch/langwatch/commit/ae3819b982cb87ceaa89697965c7b3e07a929cac))
+* address errors from logs, and cleanup some misguided error levels ([#1365](https://github.com/langwatch/langwatch/issues/1365)) ([d68e5fe](https://github.com/langwatch/langwatch/commit/d68e5fea6f72d50b9481544e71549d2182e41c26))
+* fully remove permission and use rbac ([#1263](https://github.com/langwatch/langwatch/issues/1263)) ([13bc6bf](https://github.com/langwatch/langwatch/commit/13bc6bf52226160dfb232e059ac0b169ab874dcf))
+* improve build times ([#1344](https://github.com/langwatch/langwatch/issues/1344)) ([5efd5d6](https://github.com/langwatch/langwatch/commit/5efd5d6128834f72425a15bb4daa132d7d78135a))
+* improve logging, telemetry, metrics across the entire platform ([#1253](https://github.com/langwatch/langwatch/issues/1253)) ([370ca90](https://github.com/langwatch/langwatch/commit/370ca90773c62d8c9ada085b2c88fd4dfe1eaf89))
+* **main:** release python-sdk 0.10.1 ([#1158](https://github.com/langwatch/langwatch/issues/1158)) ([254ddcc](https://github.com/langwatch/langwatch/commit/254ddcc8f50189d5ec3aebd7827ca0f3ec85ecb9))
+* **main:** release python-sdk 0.10.2 ([#1292](https://github.com/langwatch/langwatch/issues/1292)) ([47f463d](https://github.com/langwatch/langwatch/commit/47f463d7e428c21b91d25c35cc4e419261b39329))
+* new readme ([#1304](https://github.com/langwatch/langwatch/issues/1304)) ([d50f0f1](https://github.com/langwatch/langwatch/commit/d50f0f1d5a77187607479f6dc8fc9fc0bd7d3f63))
+* remove duplicate .claude directory from langwatch/ ([#1283](https://github.com/langwatch/langwatch/issues/1283)) ([bdfb432](https://github.com/langwatch/langwatch/commit/bdfb432fcf0f581b809d28bec430700392d1d7a1)), closes [#1282](https://github.com/langwatch/langwatch/issues/1282)
+* remove script since migration is done ([#1424](https://github.com/langwatch/langwatch/issues/1424)) ([3c4ee83](https://github.com/langwatch/langwatch/commit/3c4ee83fbcd7257bcf45d72a3ce36451312ef51f))
+* remove worktree command from repo ([#1355](https://github.com/langwatch/langwatch/issues/1355)) ([2793f48](https://github.com/langwatch/langwatch/commit/2793f487abb14a7e92537570dd6af939b7e383f3))
+* require user approval on feature file before implementation ([#1342](https://github.com/langwatch/langwatch/issues/1342)) ([90a2511](https://github.com/langwatch/langwatch/commit/90a2511be97697e00461ac83805373306001e5b7))
+* update to node 25 ([#1301](https://github.com/langwatch/langwatch/issues/1301)) ([94b5e5e](https://github.com/langwatch/langwatch/commit/94b5e5e7dd219cc0fe2b498b198c46ffda10dd3c))
+* use node 24-lts ([#1346](https://github.com/langwatch/langwatch/issues/1346)) ([9f607d2](https://github.com/langwatch/langwatch/commit/9f607d2cf702a6b85957b5d5965647c4f1c160c5))
+
+
+### Documentation
+
+* add generic "build on existing patterns" guidance ([6bad2f1](https://github.com/langwatch/langwatch/commit/6bad2f1a6635f55d9ad77d93b4a359e5568b66a1)), closes [#1213](https://github.com/langwatch/langwatch/issues/1213)
+* add search-before-building guidance to plan skill ([#1214](https://github.com/langwatch/langwatch/issues/1214)) ([6bad2f1](https://github.com/langwatch/langwatch/commit/6bad2f1a6635f55d9ad77d93b4a359e5568b66a1))
+
+
+### Code Refactoring
+
+* **licensing:** remove LICENSE_ENFORCEMENT_ENABLED env var from specs ([#1380](https://github.com/langwatch/langwatch/issues/1380)) ([7c1a483](https://github.com/langwatch/langwatch/commit/7c1a483b3626a6db64ff08ef4a6a9bc808ae3aac))
+* migrate python-sdk prompts to Pydantic + walk up directory tree for prompts.json ([#1392](https://github.com/langwatch/langwatch/issues/1392)) ([66cb286](https://github.com/langwatch/langwatch/commit/66cb286a853964be3d614a509d08a9f38126b42b))
+
 ## [2.0.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.1...langwatch@v2.0.2) (2026-01-28)
 
 
