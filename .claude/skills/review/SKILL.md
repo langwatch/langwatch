@@ -1,12 +1,12 @@
 ---
 name: review
-description: "Run parallel code reviews: uncle-bob-reviewer (SOLID/TDD), cupid-reviewer (CUPID properties), and test-reviewer (pyramid placement). Surfaces conflicts for orchestrator resolution."
+description: "Run parallel code reviews: uncle-bob-reviewer (SOLID/TDD), cupid-reviewer (CUPID properties), test-reviewer (pyramid placement), and pii-reviewer (security/secrets). Surfaces conflicts for orchestrator resolution."
 context: fork
 user-invocable: true
 argument-hint: "[focus-area or file-path]"
 ---
 
-Run all three reviewers in parallel on the recent changes.
+Run all four reviewers in parallel on the recent changes.
 
 ## Step 1: Parallel Reviews
 
@@ -15,6 +15,7 @@ Spawn ALL agents simultaneously using the Task tool in a single message:
 1. **uncle-bob-reviewer**: SOLID scan, TDD interrogation, clean code inspection
 2. **cupid-reviewer**: CUPID properties assessment (Composable, Unix, Predictable, Idiomatic, Domain-based)
 3. **test-reviewer**: Test pyramid placement, spec validation, naming conventions, flakiness vectors
+4. **pii-reviewer**: PII exposure, hardcoded secrets, sensitive data in tests/logs
 
 Focus area: $ARGUMENTS
 
@@ -33,6 +34,9 @@ After all complete, synthesize:
 
 ### Test Architect (Pyramid/Quality)
 [Key findings on test placement, naming, and quality]
+
+### Security (PII/Secrets)
+[Key findings on sensitive data exposure]
 
 ### Conflicts Requiring Decision
 [Any tensions between reviewers—these need user input]
