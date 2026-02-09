@@ -6,7 +6,6 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useMemo } from "react";
-import type { TeamMemberWithUser } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
@@ -72,14 +71,14 @@ export const TeamRoleSelectItemContent = ({
 );
 
 export const TeamUserRoleField = ({
-  member,
+  currentRole,
   organizationId,
   organizationRole,
   customRole,
   value,
   onChange,
 }: {
-  member: TeamMemberWithUser;
+  currentRole: TeamUserRole;
   organizationId: string;
   organizationRole: OrganizationUserRole;
   customRole?: {
@@ -93,9 +92,9 @@ export const TeamUserRoleField = ({
 }) => {
   const selectedRoleValue: TeamRoleValue =
     (value as TeamRoleValue | undefined) ??
-    (member.role === TeamUserRole.CUSTOM && customRole
+    (currentRole === TeamUserRole.CUSTOM && customRole
       ? `custom:${customRole.id}`
-      : member.role);
+      : currentRole);
 
   const selectedRole: RoleOption =
     selectedRoleValue === TeamUserRole.CUSTOM ||

@@ -15,7 +15,7 @@ import {
 } from "./memberRoleConstraints";
 
 export type PendingTeamRole = {
-  role: string;
+  role: TeamRoleValue;
   customRoleId?: string;
 };
 
@@ -24,7 +24,7 @@ export type PendingTeamRoleMap = Record<string, PendingTeamRole>;
 export type TeamRoleUpdatePayload = {
   teamId: string;
   userId: string;
-  role: string;
+  role: TeamRoleValue;
   customRoleId?: string;
 };
 
@@ -36,7 +36,7 @@ export type TeamMembershipWithRole = TeamUser & {
 /** Resolves the effective team role value for display/comparison, handling CUSTOM roles. */
 export function resolveTeamRoleValue(
   membership: TeamMembershipWithRole,
-): string {
+): TeamRoleValue {
   if (membership.role === TeamUserRole.CUSTOM) {
     return membership.assignedRole
       ? `custom:${membership.assignedRole.id}`
@@ -204,7 +204,7 @@ export function applyOrganizationRoleToPendingTeamRoles(params: {
       {
         role: getAutoCorrectedTeamRoleForOrganizationRole({
           organizationRole,
-          currentTeamRole: teamRole.role as TeamRoleValue, // PendingTeamRole.role is string but holds valid TeamRoleValues
+          currentTeamRole: teamRole.role,
         }),
         customRoleId:
           organizationRole === OrganizationUserRole.EXTERNAL

@@ -106,6 +106,9 @@ const teamRoleInputSchema = z.union([
   customTeamRoleInputSchema,
 ]);
 
+export const LITE_MEMBER_VIEWER_ONLY_ERROR =
+  "Lite Member users can only have Viewer team role";
+
 /**
  * Gets permissions for a custom role by its ID.
  */
@@ -158,6 +161,81 @@ async function getUserCustomRolePermissions(
   }
 
   return allPermissions.length > 0 ? allPermissions : undefined;
+}
+
+interface TeamRoleUpdate {
+  teamId: string;
+  role: TeamRoleValue;
+  customRoleId?: string;
+}
+
+interface CurrentTeamMembership {
+  teamId: string;
+  role: TeamUserRole;
+}
+
+/**
+ * Computes the effective set of team role updates to apply when changing a
+ * member's organization role.
+ *
+ * Cases:
+ * 1. Requested updates present + non-EXTERNAL org role: use requested updates as-is.
+ * 2. Requested updates present + EXTERNAL org role: use requested updates plus
+ *    fallback any uncovered existing memberships to VIEWER.
+ * 3. No requested updates + EXTERNAL org role: auto-correct all non-VIEWER
+ *    memberships to VIEWER.
+ * 4. No requested updates + MEMBER org role: auto-upgrade all VIEWER
+ *    memberships to MEMBER.
+ * 5. No requested updates + other org role (e.g. ADMIN): no changes needed.
+ */
+export function computeEffectiveTeamRoleUpdates(params: {
+  requestedTeamRoleUpdates: TeamRoleUpdate[];
+  currentMemberships: CurrentTeamMembership[];
+  newOrganizationRole: OrganizationUserRole;
+}): TeamRoleUpdate[] {
+  const { requestedTeamRoleUpdates, currentMemberships, newOrganizationRole } =
+    params;
+
+  if (requestedTeamRoleUpdates.length > 0) {
+    if (newOrganizationRole !== OrganizationUserRole.EXTERNAL) {
+      return requestedTeamRoleUpdates;
+    }
+
+    const requestedTeamIdSet = new Set(
+      requestedTeamRoleUpdates.map((update) => update.teamId),
+    );
+    const externalFallbackUpdates = currentMemberships
+      .filter((membership) => !requestedTeamIdSet.has(membership.teamId))
+      .map((membership) => ({
+        teamId: membership.teamId,
+        role: TeamUserRole.VIEWER,
+        customRoleId: undefined,
+      }));
+
+    return [...requestedTeamRoleUpdates, ...externalFallbackUpdates];
+  }
+
+  if (newOrganizationRole === OrganizationUserRole.EXTERNAL) {
+    return currentMemberships
+      .filter((membership) => membership.role !== TeamUserRole.VIEWER)
+      .map((membership) => ({
+        teamId: membership.teamId,
+        role: TeamUserRole.VIEWER,
+        customRoleId: undefined,
+      }));
+  }
+
+  if (newOrganizationRole === OrganizationUserRole.MEMBER) {
+    return currentMemberships
+      .filter((membership) => membership.role === TeamUserRole.VIEWER)
+      .map((membership) => ({
+        teamId: membership.teamId,
+        role: TeamUserRole.MEMBER,
+        customRoleId: undefined,
+      }));
+  }
+
+  return [];
 }
 
 export const organizationRouter = createTRPCRouter({
@@ -1166,7 +1244,7 @@ export const organizationRouter = createTRPCRouter({
           if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Lite Member users can only have Viewer team role",
+              message: LITE_MEMBER_VIEWER_ONLY_ERROR,
             });
           }
 
@@ -1286,7 +1364,7 @@ export const organizationRouter = createTRPCRouter({
             ) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
-                message: "Lite Member users can only have Viewer team role",
+                message: LITE_MEMBER_VIEWER_ONLY_ERROR,
               });
             }
 
@@ -1588,52 +1666,11 @@ export const organizationRouter = createTRPCRouter({
           return acc;
         }, []);
 
-        const effectiveTeamRoleUpdates = (() => {
-          if (requestedTeamRoleUpdates.length > 0) {
-            if (input.role !== OrganizationUserRole.EXTERNAL) {
-              return requestedTeamRoleUpdates;
-            }
-
-            const requestedTeamIdSet = new Set(
-              requestedTeamRoleUpdates.map((teamRoleUpdate) => teamRoleUpdate.teamId),
-            );
-            const externalFallbackUpdates = currentMemberships
-              .filter((membership) => !requestedTeamIdSet.has(membership.teamId))
-              .map((membership) => ({
-                teamId: membership.teamId,
-                role: TeamUserRole.VIEWER,
-                customRoleId: undefined,
-              }));
-
-            return [...requestedTeamRoleUpdates, ...externalFallbackUpdates];
-          }
-
-          if (input.role === OrganizationUserRole.EXTERNAL) {
-            return currentMemberships
-              .filter((membership) => membership.role !== TeamUserRole.VIEWER)
-              .map((membership) => ({
-                teamId: membership.teamId,
-                role: TeamUserRole.VIEWER,
-                customRoleId: undefined,
-              }));
-          }
-
-          if (input.role === OrganizationUserRole.MEMBER) {
-            return currentMemberships
-              .filter((membership) => membership.role === TeamUserRole.VIEWER)
-              .map((membership) => ({
-                teamId: membership.teamId,
-                role: TeamUserRole.MEMBER,
-                customRoleId: undefined,
-              }));
-          }
-
-          return [] as Array<{
-            teamId: string;
-            role: TeamRoleValue;
-            customRoleId?: string;
-          }>;
-        })();
+        const effectiveTeamRoleUpdates = computeEffectiveTeamRoleUpdates({
+          requestedTeamRoleUpdates,
+          currentMemberships,
+          newOrganizationRole: input.role,
+        });
 
         const dedupedTeamRoleUpdates = new Map(
           effectiveTeamRoleUpdates.map((teamRoleUpdate) => [
@@ -1658,7 +1695,7 @@ export const organizationRouter = createTRPCRouter({
           ) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Lite Member users can only have Viewer team role",
+              message: LITE_MEMBER_VIEWER_ONLY_ERROR,
             });
           }
         }

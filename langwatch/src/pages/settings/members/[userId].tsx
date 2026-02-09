@@ -150,6 +150,7 @@ export default function UserDetailsPage() {
     [member.data, filteredTeamMemberships, pendingTeamRoles, pendingOrganizationRole],
   );
 
+  // Do not overwrite user's unsaved edits when server data refreshes.
   useEffect(() => {
     if (!member.data) return;
     const nextPendingTeamRoles = buildInitialPendingTeamRoles({
@@ -192,7 +193,7 @@ export default function UserDetailsPage() {
     );
   };
 
-  const goBackOrMembersList = () => {
+  const navigateToMembersList = () => {
     void router.push("/settings/members");
   };
 
@@ -200,7 +201,7 @@ export default function UserDetailsPage() {
     router.back();
   };
 
-  const saveMemberChanges = async () => {
+  const persistMemberRoleUpdates = async () => {
     if (!member.data || !organization || pendingOrganizationRole === null) return;
     const nextOrganizationRole = pendingOrganizationRole;
     const teamRoleUpdates = getTeamRoleUpdates({
@@ -264,7 +265,7 @@ export default function UserDetailsPage() {
     const enforcements = limitType ? [enforcementByLimitType[limitType]] : [];
 
     checkCompoundLimits(enforcements, () => {
-      void saveMemberChanges();
+      void persistMemberRoleUpdates();
     });
   };
 
@@ -321,7 +322,7 @@ export default function UserDetailsPage() {
               </Button>
             </HStack>
           ) : (
-            <Button variant="outline" onClick={goBackOrMembersList}>
+            <Button variant="outline" onClick={navigateToMembersList}>
               Back
             </Button>
           )}
@@ -378,10 +379,7 @@ export default function UserDetailsPage() {
                         {canManageOrganization ? (
                           <Field.Root>
                             <TeamUserRoleField
-                              member={{
-                                ...tm,
-                                user: memberData.user,
-                              }}
+                              currentRole={tm.role}
                               organizationId={organization.id}
                               organizationRole={currentOrganizationRole}
                               value={pendingTeamRoles[tm.teamId]?.role}

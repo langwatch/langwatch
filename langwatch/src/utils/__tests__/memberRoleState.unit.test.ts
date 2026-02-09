@@ -351,8 +351,14 @@ describe("memberRoleState", () => {
   describe("arePendingTeamRolesEqual()", () => {
     describe("when maps are equal", () => {
       it("returns true", () => {
-        const left = { t1: { role: "ADMIN" }, t2: { role: "VIEWER" } };
-        const right = { t1: { role: "ADMIN" }, t2: { role: "VIEWER" } };
+        const left = {
+          t1: { role: TeamUserRole.ADMIN },
+          t2: { role: TeamUserRole.VIEWER },
+        };
+        const right = {
+          t1: { role: TeamUserRole.ADMIN },
+          t2: { role: TeamUserRole.VIEWER },
+        };
 
         expect(arePendingTeamRolesEqual(left, right)).toBe(true);
       });
@@ -360,8 +366,8 @@ describe("memberRoleState", () => {
 
     describe("when roles differ", () => {
       it("returns false", () => {
-        const left = { t1: { role: "ADMIN" } };
-        const right = { t1: { role: "VIEWER" } };
+        const left = { t1: { role: TeamUserRole.ADMIN } };
+        const right = { t1: { role: TeamUserRole.VIEWER } };
 
         expect(arePendingTeamRolesEqual(left, right)).toBe(false);
       });
@@ -369,8 +375,11 @@ describe("memberRoleState", () => {
 
     describe("when maps have different lengths", () => {
       it("returns false", () => {
-        const left = { t1: { role: "ADMIN" } };
-        const right = { t1: { role: "ADMIN" }, t2: { role: "VIEWER" } };
+        const left = { t1: { role: TeamUserRole.ADMIN } };
+        const right = {
+          t1: { role: TeamUserRole.ADMIN },
+          t2: { role: TeamUserRole.VIEWER },
+        };
 
         expect(arePendingTeamRolesEqual(left, right)).toBe(false);
       });
@@ -378,8 +387,12 @@ describe("memberRoleState", () => {
 
     describe("when customRoleId differs", () => {
       it("returns false", () => {
-        const left = { t1: { role: "custom:cr-1", customRoleId: "cr-1" } };
-        const right = { t1: { role: "custom:cr-1", customRoleId: "cr-2" } };
+        const left = {
+          t1: { role: "custom:cr-1" as const, customRoleId: "cr-1" },
+        };
+        const right = {
+          t1: { role: "custom:cr-1" as const, customRoleId: "cr-2" },
+        };
 
         expect(arePendingTeamRolesEqual(left, right)).toBe(false);
       });

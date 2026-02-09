@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OrganizationUserRole, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { organizationRouter } from "../organization";
+import { organizationRouter, LITE_MEMBER_VIEWER_ONLY_ERROR } from "../organization";
 import { createInnerTRPCContext } from "../../trpc";
 
 vi.mock("../../../auditLog", () => ({
@@ -138,7 +138,7 @@ describe("organizationRouter member role validation", () => {
           }),
         ).rejects.toMatchObject({
           code: "BAD_REQUEST",
-          message: "Lite Member users can only have Viewer team role",
+          message: LITE_MEMBER_VIEWER_ONLY_ERROR,
         });
       });
 
@@ -152,7 +152,7 @@ describe("organizationRouter member role validation", () => {
           }),
         ).rejects.toMatchObject({
           code: "BAD_REQUEST",
-          message: "Lite Member users can only have Viewer team role",
+          message: LITE_MEMBER_VIEWER_ONLY_ERROR,
         });
       });
     });
@@ -252,7 +252,27 @@ describe("organizationRouter member role validation", () => {
             }),
           ).rejects.toMatchObject({
             code: "BAD_REQUEST",
-            message: "Lite Member users can only have Viewer team role",
+            message: LITE_MEMBER_VIEWER_ONLY_ERROR,
+          });
+        });
+
+        it("rejects MEMBER team role via teamRoleUpdates", async () => {
+          await expect(
+            caller.updateMemberRole({
+              userId: "member-1",
+              organizationId: "org-1",
+              role: OrganizationUserRole.EXTERNAL,
+              teamRoleUpdates: [
+                {
+                  teamId: "team-1",
+                  userId: "member-1",
+                  role: TeamUserRole.MEMBER,
+                },
+              ],
+            }),
+          ).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+            message: LITE_MEMBER_VIEWER_ONLY_ERROR,
           });
         });
       });
