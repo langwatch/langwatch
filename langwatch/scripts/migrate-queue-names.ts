@@ -96,6 +96,17 @@ function createConnection(): IORedis | Cluster {
 }
 
 /**
+ * Ensures cluster topology is discovered before scanning.
+ * ioredis Cluster lazily discovers nodes; nodes("master") returns []
+ * until the first command forces topology resolution.
+ */
+async function ensureClusterReady(connection: IORedis | Cluster): Promise<void> {
+  if (connection instanceof Cluster) {
+    await connection.ping();
+  }
+}
+
+/**
  * Scans Redis for keys matching a glob pattern.
  * Supports both standalone Redis and Redis Cluster (scans each master node).
  */
@@ -106,6 +117,7 @@ export async function scanKeys(
   const keys: string[] = [];
 
   if (connection instanceof Cluster) {
+    await ensureClusterReady(connection);
     const masters = connection.nodes("master");
     for (const node of masters) {
       let cursor = "0";
