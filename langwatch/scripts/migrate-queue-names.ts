@@ -407,6 +407,36 @@ async function main() {
   console.log("");
   console.log(`Total: ${totalOrphaned} orphaned keys`);
 
+  // Phase 1b: Check migration status (how many jobs are already copied?)
+  const trackerSize = await connection.scard(MIGRATION_TRACKER_KEY);
+  const mapping = await buildQueueMapping(connection);
+
+  let totalPendingJobs = 0;
+  let totalTrackedJobs = 0;
+
+  for (const [oldName] of Object.entries(mapping)) {
+    const jobIds = await readJobIds(connection, oldName);
+    for (const jobId of jobIds) {
+      const tracked = await connection.sismember(
+        MIGRATION_TRACKER_KEY,
+        migrationTrackerId(oldName, jobId),
+      );
+      if (tracked) {
+        totalTrackedJobs++;
+      } else {
+        totalPendingJobs++;
+      }
+    }
+  }
+
+  if (trackerSize > 0) {
+    console.log("");
+    console.log(`Migration status: ${totalTrackedJobs} jobs already copied, ${totalPendingJobs} pending`);
+    if (totalPendingJobs === 0 && !migrate) {
+      console.log("  ✓ All jobs have been copied. Safe to run --cleanup.");
+    }
+  }
+
   // Phase 2: Copy jobs to new queues (if --migrate)
   if (migrate) {
     console.log("");
