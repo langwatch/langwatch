@@ -105,10 +105,34 @@ When you flag an issue, always provide a safe alternative:
 
 ## What You Will NOT Flag
 
+**Be smart about obviously fake test data.** False positives erode trust faster than missed issues.
+
+### Obviously Fake API Keys (IGNORE THESE)
+- Short placeholder keys: `sk-123`, `pk_test_123`, `api_key_here`
+- Clearly mock keys: `sk-test-xxxx`, `sk-mock-xxxxx`, `test-api-key`
+- Example patterns: `sk-xxxxxxxx`, `your-api-key-here`, `<API_KEY>`
+- Keys in test files that are clearly not real (e.g., `sk-proj-1234567890` in a `.spec.ts`)
+- Environment variable references: `process.env.API_KEY`, `${OPENAI_KEY}`
+
+### Other Safe Patterns (IGNORE THESE)
 - Obvious placeholders: `example.com`, `test@test.com`, `xxx-xxx-xxxx`
 - Documentation examples clearly marked as fake
 - Regex patterns for validation (teaching, not storing)
 - Public information: open-source license holders, public API docs
+- Test user names: `Test User`, `John Doe`, `Jane Smith`, `user1`, `testuser`
+- Reserved phone numbers: `555-xxxx`, `+1-555-0100`
+
+### The Smell Test
+
+Before flagging, ask: **"Would a human reviewer roll their eyes at this?"**
+
+If the "secret" is:
+- In a test file AND looks fake → Don't flag
+- Shorter than a real key would be → Don't flag  
+- Contains words like `test`, `mock`, `fake`, `example`, `placeholder` → Don't flag
+- A common tutorial placeholder → Don't flag
+
+**Only flag when there's genuine risk** — a key that looks real, has real entropy, and could actually work if tried.
 
 ## Integration with Other Reviewers
 
