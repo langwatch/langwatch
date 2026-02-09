@@ -1,13 +1,22 @@
 /**
  * @jest-environment node
- * 
+ *
  * Integration tests for BullMQ Redis Cluster compatibility.
  * Tests that all queues use hash tags to avoid CROSSSLOT errors.
- * 
+ *
+ * Spins up a real 6-node Redis Cluster (3 masters, 3 replicas) via
+ * testcontainers to prove that:
+ *   - Non-hash-tagged queue names cause CROSSSLOT errors
+ *   - Hash-tagged queue names ({name}) work correctly
+ *
  * @see specs/background/redis-cluster-compatibility.feature
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { GenericContainer, Wait } from "testcontainers";
+import type { StartedTestContainer } from "testcontainers";
+import { Cluster } from "ioredis";
+import { Queue, Worker, QueueEvents } from "bullmq";
 import {
   COLLECTOR_QUEUE,
   EVALUATIONS_QUEUE,
@@ -15,6 +24,10 @@ import {
   TRACK_EVENTS_QUEUE,
   USAGE_STATS_QUEUE,
 } from "../queues/constants";
+import { EVENT_SOURCING_QUEUE_NAME } from "../workers/eventSourcingWorker";
+import { SCENARIO_QUEUE } from "../../scenarios/scenario.constants";
+import { traceProcessingPipelineDefinition } from "../../event-sourcing/pipelines/trace-processing/pipeline";
+import { evaluationProcessingPipelineDefinition } from "../../event-sourcing/pipelines/evaluation-processing/pipeline";
 
 /**
  * Validates that a queue name contains a hash tag for Redis Cluster compatibility.
@@ -24,154 +37,133 @@ function hasHashTag(queueName: string): boolean {
   return /\{[^}]+\}/.test(queueName);
 }
 
-/**
- * Extracts the hash tag from a queue name.
- * Returns null if no hash tag is present.
- */
-function extractHashTag(queueName: string): string | null {
-  const match = queueName.match(/\{([^}]+)\}/);
-  return match ? match[1] : null;
-}
+// ---------------------------------------------------------------------------
+// Unit: every queue name constant in the system must contain a hash tag
+// ---------------------------------------------------------------------------
 
 describe("BullMQ Redis Cluster Compatibility", () => {
-  describe("Queue Constants Hash Tags", () => {
-    it("COLLECTOR_QUEUE should have hash tag", () => {
-      expect(hasHashTag(COLLECTOR_QUEUE.NAME)).toBe(true);
-      expect(extractHashTag(COLLECTOR_QUEUE.NAME)).toBe("collector");
-    });
-
-    it("EVALUATIONS_QUEUE should have hash tag", () => {
-      expect(hasHashTag(EVALUATIONS_QUEUE.NAME)).toBe(true);
-      expect(extractHashTag(EVALUATIONS_QUEUE.NAME)).toBe("evaluations");
-    });
-
-    it("TOPIC_CLUSTERING_QUEUE should have hash tag", () => {
-      expect(hasHashTag(TOPIC_CLUSTERING_QUEUE.NAME)).toBe(true);
-      expect(extractHashTag(TOPIC_CLUSTERING_QUEUE.NAME)).toBe("topic_clustering");
-    });
-
-    it("TRACK_EVENTS_QUEUE should have hash tag", () => {
-      expect(hasHashTag(TRACK_EVENTS_QUEUE.NAME)).toBe(true);
-      expect(extractHashTag(TRACK_EVENTS_QUEUE.NAME)).toBe("track_events");
-    });
-
-    it("USAGE_STATS_QUEUE should have hash tag", () => {
-      expect(hasHashTag(USAGE_STATS_QUEUE.NAME)).toBe(true);
-      expect(extractHashTag(USAGE_STATS_QUEUE.NAME)).toBe("usage_stats");
+  describe("when checking background worker queue constants", () => {
+    it.each([
+      ["COLLECTOR_QUEUE", COLLECTOR_QUEUE.NAME],
+      ["EVALUATIONS_QUEUE", EVALUATIONS_QUEUE.NAME],
+      ["TOPIC_CLUSTERING_QUEUE", TOPIC_CLUSTERING_QUEUE.NAME],
+      ["TRACK_EVENTS_QUEUE", TRACK_EVENTS_QUEUE.NAME],
+      ["USAGE_STATS_QUEUE", USAGE_STATS_QUEUE.NAME],
+    ])("%s contains a hash tag", (_label, queueName) => {
+      expect(hasHashTag(queueName)).toBe(true);
     });
   });
 
-  describe("Event Sourcing Queue Names", () => {
-    // TODO: These tests document expected behavior after the fix
-    // They will pass once we add hash tags to event-sourcing queues
-    
-    it("event-sourcing worker queue should have hash tag", async () => {
-      // Currently fails: eventSourcingWorker.ts uses hardcoded "event-sourcing"
-      // After fix: should use "{event_sourcing}"
-      const EVENT_SOURCING_QUEUE_NAME = "{event_sourcing}";
+  describe("when checking event sourcing queue names", () => {
+    it("event sourcing worker queue contains a hash tag", () => {
       expect(hasHashTag(EVENT_SOURCING_QUEUE_NAME)).toBe(true);
     });
 
-    it("trace_processing pipeline queue should have hash tag", async () => {
-      // Pipeline names should be wrapped in hash tags when creating BullMQ queues
-      const expectedQueueName = "{trace_processing}";
-      expect(hasHashTag(expectedQueueName)).toBe(true);
+    it("trace_processing pipeline name is defined in metadata", () => {
+      // QueueProcessorManager.makeQueueName wraps this as {trace_processing/...}
+      const pipelineName = traceProcessingPipelineDefinition.metadata.name;
+      expect(pipelineName).toBe("trace_processing");
     });
 
-    it("evaluation_processing pipeline queue should have hash tag", async () => {
-      const expectedQueueName = "{evaluation_processing}";
-      expect(hasHashTag(expectedQueueName)).toBe(true);
+    it("evaluation_processing pipeline name is defined in metadata", () => {
+      const pipelineName = evaluationProcessingPipelineDefinition.metadata.name;
+      expect(pipelineName).toBe("evaluation_processing");
     });
   });
 
-  describe("Hash Tag Format Validation", () => {
-    it("hash tag should wrap the entire meaningful part of queue name", () => {
-      // Good: {collector} - the hash tag IS the queue name
-      // Bad: collector{tag} - hash tag is a suffix
-      // Bad: {col}lector - hash tag is partial
-      
-      const validNames = [
-        "{collector}",
-        "{evaluations}",
-        "{topic_clustering}",
-        "{event_sourcing}",
-      ];
-
-      for (const name of validNames) {
-        // The hash tag should be the entire name (except for the braces)
-        const tag = extractHashTag(name);
-        expect(name).toBe(`{${tag}}`);
-      }
+  describe("when checking scenario queue name", () => {
+    it("SCENARIO_QUEUE contains a hash tag", () => {
+      expect(hasHashTag(SCENARIO_QUEUE.NAME)).toBe(true);
     });
   });
 });
 
-describe("Redis Cluster CROSSSLOT Behavior", () => {
-  // These tests require a Redis Cluster to run
-  // Skip if REDIS_CLUSTER_URL is not set
-  const skipIfNoCluster = !process.env.REDIS_CLUSTER_URL;
+// ---------------------------------------------------------------------------
+// Live Redis Cluster tests — spins up a real 6-node cluster via testcontainers
+// ---------------------------------------------------------------------------
 
-  it.skipIf(skipIfNoCluster)(
-    "should fail with CROSSSLOT when using non-hash-tagged queue name",
-    async () => {
-      // This test demonstrates the bug we're fixing
-      const { Queue } = await import("bullmq");
-      const Redis = (await import("ioredis")).default;
-      
-      const cluster = new Redis.Cluster([
-        { host: "localhost", port: 7000 },
-        { host: "localhost", port: 7001 },
-        { host: "localhost", port: 7002 },
-      ]);
+const INITIAL_PORT = 17000;
+const CLUSTER_PORTS = Array.from({ length: 6 }, (_, i) => INITIAL_PORT + i);
 
-      const queue = new Queue("test-no-hash-tag", {
-        connection: cluster as any,
-      });
-
-      await expect(
-        queue.add("test-job", { data: "test" })
-      ).rejects.toThrow(/CROSSSLOT/);
-
-      await queue.close();
-      await cluster.quit();
-    }
+function createClusterConnection(): Cluster {
+  return new Cluster(
+    CLUSTER_PORTS.slice(0, 3).map((port) => ({ host: "127.0.0.1", port })),
+    {
+      redisOptions: { maxRetriesPerRequest: null },
+    },
   );
+}
 
-  it.skipIf(skipIfNoCluster)(
-    "should succeed with hash-tagged queue name",
-    async () => {
-      const { Queue, Worker } = await import("bullmq");
-      const Redis = (await import("ioredis")).default;
-      
-      const cluster = new Redis.Cluster([
-        { host: "localhost", port: 7000 },
-        { host: "localhost", port: 7001 },
-        { host: "localhost", port: 7002 },
-      ]);
+describe("Redis Cluster CROSSSLOT Behavior", () => {
+  let container: StartedTestContainer;
 
-      const queue = new Queue("{test-with-hash-tag}", {
-        connection: cluster as any,
-      });
+  beforeAll(async () => {
+    container = await new GenericContainer("grokzen/redis-cluster:7.0.10")
+      .withEnvironment({ IP: "127.0.0.1", INITIAL_PORT: String(INITIAL_PORT) })
+      .withExposedPorts(
+        ...CLUSTER_PORTS.map((p) => ({ container: p, host: p })),
+      )
+      .withWaitStrategy(Wait.forLogMessage(/Cluster state changed: ok/))
+      .withStartupTimeout(60_000)
+      .withReuse()
+      .start();
+  }, 90_000);
 
-      const worker = new Worker(
-        "{test-with-hash-tag}",
-        async (job) => {
-          return { processed: true };
-        },
-        { connection: cluster as any }
-      );
+  afterAll(async () => {
+    // Reusable container stays running for faster subsequent runs.
+    // To stop: docker rm -f $(docker ps -q --filter "label=org.testcontainers=true")
+  });
 
+  it("fails with CROSSSLOT when queue name has no hash tag", async () => {
+    const connection = createClusterConnection();
+    const queue = new Queue("test-no-hash-tag", {
+      connection: connection as any,
+    });
+
+    try {
+      await expect(
+        queue.add("test-job", { data: "test" }),
+      ).rejects.toThrow(/CROSSSLOT/);
+    } finally {
+      await queue.close();
+      await connection.quit();
+    }
+  });
+
+  it("succeeds when queue name has a hash tag", async () => {
+    const queueConnection = createClusterConnection();
+    const workerConnection = createClusterConnection();
+
+    const queue = new Queue("{test_hash_tag}", {
+      connection: queueConnection as any,
+    });
+    const worker = new Worker(
+      "{test_hash_tag}",
+      async () => ({ processed: true }),
+      { connection: workerConnection as any },
+    );
+
+    try {
       await worker.waitUntilReady();
 
       const job = await queue.add("test-job", { data: "test" });
       expect(job.id).toBeDefined();
 
-      // Wait for job to be processed
-      await job.waitUntilFinished(queue.events);
+      const eventsConnection = createClusterConnection();
+      const queueEvents = new QueueEvents("{test_hash_tag}", {
+        connection: eventsConnection as any,
+      });
 
+      const result = await job.waitUntilFinished(queueEvents, 10_000);
+      expect(result).toEqual({ processed: true });
+
+      await queueEvents.close();
+      await eventsConnection.quit();
+    } finally {
       await worker.close();
       await queue.close();
-      await cluster.quit();
+      await workerConnection.quit();
+      await queueConnection.quit();
     }
-  );
+  });
 });

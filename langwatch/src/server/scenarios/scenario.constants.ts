@@ -7,7 +7,7 @@
 /** Queue configuration */
 export const SCENARIO_QUEUE = {
   /** Queue name for BullMQ - scoped under simulations domain */
-  NAME: "simulations/scenarios/executions",
+  NAME: "{simulations/scenarios/executions}",
   /** Job name for queue.add() */
   JOB: "scenario",
   /** How long to keep completed jobs (seconds) */

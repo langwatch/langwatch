@@ -375,6 +375,14 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
+   * Wraps a queue suffix in a Redis Cluster hash tag.
+   * Ensures all BullMQ keys for the queue land on the same Redis slot.
+   */
+  private makeQueueName(suffix: string): string {
+    return `{${this.pipelineName}/${suffix}}`;
+  }
+
+  /**
    * Creates a default deduplication ID for event processing.
    * Format: ${event.tenantId}:${event.aggregateType}:${event.aggregateId}
    */
@@ -410,7 +418,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.pipelineName}/handler/${handlerName}`;
+      const queueName = this.makeQueueName(`handler/${handlerName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -464,7 +472,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = `${this.pipelineName}/projection/${projectionName}`;
+      const queueName = this.makeQueueName(`projection/${projectionName}`);
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -550,7 +558,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       }
 
       // Create queue name
-      const queueName = `${pipelineName}/command/${commandName}`;
+      const queueName = `{${pipelineName}/command/${commandName}}`;
 
       // Use per-command lockTtlMs if provided, otherwise use default
       const effectiveLockTtlMs = options.lockTtlMs ?? this.commandLockTtlMs;

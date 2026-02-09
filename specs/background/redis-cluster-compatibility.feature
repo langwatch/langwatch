@@ -1,52 +1,54 @@
 Feature: BullMQ Redis Cluster Compatibility
-  As a LangWatch operator
-  I want BullMQ queues to work with Redis Cluster
-  So that I can deploy LangWatch with high-availability Redis
+  As a LangWatch operator deploying with Redis Cluster
+  I want all BullMQ queues to use Redis hash tags
+  So that queue operations do not fail with CROSSSLOT errors
 
-  Background:
-    Given Redis is running in Cluster mode
-    And BullMQ queues are configured
-
-  @integration
-  Scenario: Standard queue names fail with CROSSSLOT error
-    Given a BullMQ queue with name "test-queue" and no hash tag
-    When I add a job to the queue
-    Then the operation should fail with "CROSSSLOT" error
+  # Redis Cluster distributes keys across slots by hashing the key name.
+  # BullMQ uses multiple keys per queue (e.g., bull:<name>:wait, bull:<name>:active).
+  # Without hash tags, those keys may land on different slots, causing CROSSSLOT
+  # errors from Lua scripts that touch multiple keys atomically.
+  #
+  # Wrapping queue names in {braces} forces Redis to hash only the braced
+  # portion, guaranteeing all keys for a queue land on the same slot.
 
   @integration
-  Scenario: Hash-tagged queue names work with Redis Cluster
-    Given a BullMQ queue with name "{test-queue}" (hash-tagged)
-    When I add a job to the queue
-    Then the operation should succeed
-    And the job should be processed by the worker
+  Scenario: Adding a job to a queue without a hash tag fails on Redis Cluster
+    Given a Redis Cluster is running
+    And a BullMQ queue named "no-hash-tag"
+    When a job is added to the queue
+    Then the operation fails with a CROSSSLOT error
 
   @integration
-  Scenario: All production queues use hash tags
-    Given the following queues are configured:
-      | queue_name           | expected_pattern    |
-      | collector            | {collector}         |
-      | evaluations          | {evaluations}       |
-      | topic_clustering     | {topic_clustering}  |
-      | track_events         | {track_events}      |
-      | usage_stats          | {usage_stats}       |
-      | event-sourcing       | {event-sourcing}    |
-      | trace_processing     | {trace_processing}  |
-      | evaluation_processing| {evaluation_processing} |
-    Then all queue names should contain hash tags
+  Scenario: Adding and processing a job succeeds when the queue name has a hash tag
+    Given a Redis Cluster is running
+    And a BullMQ queue named "{with_hash_tag}"
+    And a worker is listening on the same queue
+    When a job is added to the queue
+    Then the job is processed successfully without errors
 
   @integration
-  Scenario: Workers use matching hash-tagged queue names
-    Given a queue with hash-tagged name "{test-queue}"
-    And a worker configured for the same queue "{test-queue}"
-    When I add and process multiple jobs
-    Then all jobs should be processed successfully
-    And no CROSSSLOT errors should occur
+  Scenario: Background worker queues operate on Redis Cluster
+    Given a Redis Cluster is running
+    And the background worker queue names are loaded from configuration
+    Then every background worker queue name contains a hash tag
+    And adding a job to each queue succeeds on the cluster
+
+  @integration
+  Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
+    Given a Redis Cluster is running
+    And the event sourcing maintenance worker queue name is loaded
+    Then the queue name contains a hash tag
+    And adding a job to the queue succeeds on the cluster
+
+  @integration
+  Scenario: Event sourcing pipeline queues operate on Redis Cluster
+    Given a Redis Cluster is running
+    And event sourcing pipeline queues are created for handlers, projections, and commands
+    Then every pipeline queue name contains a hash tag
+    And adding a job to each pipeline queue succeeds on the cluster
 
   @unit
-  Scenario: Queue constants define hash-tagged names
-    When I inspect the queue constants
-    Then COLLECTOR_QUEUE.NAME should equal "{collector}"
-    And EVALUATIONS_QUEUE.NAME should equal "{evaluations}"
-    And TOPIC_CLUSTERING_QUEUE.NAME should equal "{topic_clustering}"
-    And TRACK_EVENTS_QUEUE.NAME should equal "{track_events}"
-    And USAGE_STATS_QUEUE.NAME should equal "{usage_stats}"
+  Scenario: Every queue name produced by the system contains a hash tag
+    Given all queue name sources in the codebase
+    When each source produces its queue name
+    Then every produced name matches the pattern "{...}"
