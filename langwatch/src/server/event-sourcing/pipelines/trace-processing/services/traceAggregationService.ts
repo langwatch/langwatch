@@ -226,6 +226,23 @@ const LAST_TOKEN_EVENTS = new Set([
   "llm.last_token",
 ]);
 
+// Standard OTEL resource attributes for host/process/OS etc. are infrastructure
+// metadata that should not be stored as trace-level business metadata.
+const STANDARD_RESOURCE_PREFIXES = [
+  "host.",
+  "process.",
+  "telemetry.",
+  "service.",
+  "os.",
+  "container.",
+  "k8s.",
+  "cloud.",
+  "deployment.",
+  "device.",
+  "faas.",
+  "webengine.",
+] as const;
+
 /**
  * Extracts token timing from span events.
  */
@@ -321,6 +338,19 @@ const extractTraceAttributes = (
     }
     if (typeof serviceName === "string" && !attributes["service.name"]) {
       attributes["service.name"] = serviceName;
+    }
+
+    // Pass through custom resource attributes (user-defined, not standard OTEL infra).
+    for (const [key, value] of Object.entries(resourceAttrs)) {
+      if (STANDARD_RESOURCE_PREFIXES.some((prefix) => key.startsWith(prefix)))
+        continue;
+      if (attributes[key]) continue;
+
+      if (typeof value === "string") {
+        attributes[key] = value;
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        attributes[key] = String(value);
+      }
     }
 
     // Thread/User context from span attributes

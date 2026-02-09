@@ -120,6 +120,9 @@ export const ATTR_KEYS = {
 
   // OpenInference attributes
   OPENINFERENCE_SPAN_KIND: "openinference.span.kind",
+  OPENINFERENCE_USER_ID: "user.id",
+  OPENINFERENCE_SESSION_ID: "session.id",
+  OPENINFERENCE_TAG_TAGS: "tag.tags",
 
   // Haystack attributes
   RETRIEVAL_DOCUMENTS: "retrieval.documents",

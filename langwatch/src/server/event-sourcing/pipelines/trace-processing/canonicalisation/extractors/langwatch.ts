@@ -160,6 +160,34 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           );
           ctx.recordRule(`${this.id}:metadata.labels`);
         }
+
+        // Promote reserved metadata fields to canonical attributes.
+        // Python SDK embeds user_id/thread_id/customer_id inside the JSON
+        // blob rather than setting them as separate OTEL attributes.
+        // Uses setAttrIfAbsent so explicit attributes take precedence.
+        const metaUserId = parsedObj.user_id ?? parsedObj.userId;
+        if (typeof metaUserId === "string" && metaUserId.length > 0) {
+          ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, metaUserId);
+          ctx.recordRule(`${this.id}:metadata.user_id`);
+        }
+
+        const metaThreadId = parsedObj.thread_id ?? parsedObj.threadId;
+        if (typeof metaThreadId === "string" && metaThreadId.length > 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_CONVERSATION_ID,
+            metaThreadId,
+          );
+          ctx.recordRule(`${this.id}:metadata.thread_id`);
+        }
+
+        const metaCustomerId = parsedObj.customer_id ?? parsedObj.customerId;
+        if (typeof metaCustomerId === "string" && metaCustomerId.length > 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.LANGWATCH_CUSTOMER_ID,
+            metaCustomerId,
+          );
+          ctx.recordRule(`${this.id}:metadata.customer_id`);
+        }
       }
     }
 
