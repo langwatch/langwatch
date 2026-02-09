@@ -365,6 +365,50 @@ describe("Queue Name Migration Script", () => {
   // Cleanup only
   // -----------------------------------------------------------------------
 
+  // -----------------------------------------------------------------------
+  // Pipeline queue discovery
+  // -----------------------------------------------------------------------
+
+  describe("when discovering pipeline queues", () => {
+    it("includes dynamically-named pipeline queues in the mapping", async () => {
+      // Seed a pipeline queue meta key (BullMQ creates :meta for every queue)
+      await redis.set(
+        "bull:trace_processing/handler/ingestTrace:meta",
+        '{"opts":{}}',
+      );
+      await redis.set(
+        "bull:evaluation_processing/projection/evalState:meta",
+        '{"opts":{}}',
+      );
+
+      const mapping = await buildQueueMapping(redis);
+
+      // Static queues should be present
+      expect(mapping).toHaveProperty("collector", "{collector}");
+
+      // Dynamic pipeline queues should be discovered
+      expect(mapping).toHaveProperty(
+        "trace_processing/handler/ingestTrace",
+        "{trace_processing/handler/ingestTrace}",
+      );
+      expect(mapping).toHaveProperty(
+        "evaluation_processing/projection/evalState",
+        "{evaluation_processing/projection/evalState}",
+      );
+    });
+
+    it("returns only static queues when no pipeline meta keys exist", async () => {
+      const mapping = await buildQueueMapping(redis);
+      expect(Object.keys(mapping)).toEqual(
+        Object.keys(STATIC_QUEUE_MAPPING),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Cleanup
+  // -----------------------------------------------------------------------
+
   describe("when cleaning up without migration", () => {
     it("deletes all BullMQ key types for a queue", async () => {
       const suffixes = [
@@ -384,6 +428,36 @@ describe("Queue Name Migration Script", () => {
       for (const key of keys) {
         expect(await redis.exists(key)).toBe(0);
       }
+    });
+  });
+
+  describe("when cleaning up after migration", () => {
+    it("removes the migration tracker set along with old keys", async () => {
+      const oldQueue = createTestQueue("collector", redis);
+      queuesToClose.push(oldQueue);
+      await oldQueue.add("trace", { traceId: "1" });
+
+      // Copy jobs (populates tracker set)
+      await copyJobs(redis, "collector", "{collector}");
+      expect(await redis.scard(MIGRATION_TRACKER_KEY)).toBeGreaterThan(0);
+
+      // Cleanup old keys
+      const oldKeys = await scanKeys(redis, "bull:collector:*");
+      await cleanupKeys(redis, oldKeys);
+
+      // Remove tracker (as --cleanup does)
+      await redis.unlink(MIGRATION_TRACKER_KEY);
+
+      // Tracker set should be gone
+      expect(await redis.exists(MIGRATION_TRACKER_KEY)).toBe(0);
+
+      // Old keys should be gone
+      expect(await scanKeys(redis, "bull:collector:*")).toHaveLength(0);
+
+      // New queue should still have the job
+      const newQueue = createTestQueue("{collector}", redis);
+      queuesToClose.push(newQueue);
+      expect(await newQueue.getWaiting()).toHaveLength(1);
     });
   });
 });
