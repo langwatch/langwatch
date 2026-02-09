@@ -117,6 +117,12 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             {span.metrics?.reasoning_tokens != null &&
               span.metrics.reasoning_tokens > 0 &&
               ` (${span.metrics.reasoning_tokens} reasoning)`}
+            {span.metrics?.cache_read_input_tokens != null &&
+              span.metrics.cache_read_input_tokens > 0 &&
+              ` (${span.metrics.cache_read_input_tokens} cache read)`}
+            {span.metrics?.cache_creation_input_tokens != null &&
+              span.metrics.cache_creation_input_tokens > 0 &&
+              ` (${span.metrics.cache_creation_input_tokens} cache write)`}
             {span.metrics.completion_tokens &&
               span.metrics.completion_tokens > 0 &&
               (() => {

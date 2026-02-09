@@ -915,14 +915,12 @@ const addOpenTelemetrySpanAsSpan = (
         if (attributesMap.gen_ai?.usage) {
           if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
             metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
-            delete attributesMap.gen_ai.usage.prompt_tokens;
           }
           if (
             typeof attributesMap.gen_ai.usage.completion_tokens === "number"
           ) {
             metrics.completion_tokens =
               attributesMap.gen_ai.usage.completion_tokens;
-            delete attributesMap.gen_ai.usage.completion_tokens;
           }
           // Spring AI
           if (
@@ -932,7 +930,6 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.prompt_tokens = Number(
               attributesMap.gen_ai.usage.input_tokens,
             );
-            delete attributesMap.gen_ai.usage.input_tokens;
           }
           if (
             attributesMap.gen_ai.usage.output_tokens &&
@@ -941,7 +938,6 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.completion_tokens = Number(
               attributesMap.gen_ai.usage.output_tokens,
             );
-            delete attributesMap.gen_ai.usage.output_tokens;
           }
           // Reasoning tokens (Traceloop/OpenLLMetry convention: gen_ai.usage.reasoning_tokens)
           if (
@@ -951,7 +947,6 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.reasoning_tokens = Number(
               attributesMap.gen_ai.usage.reasoning_tokens,
             );
-            delete attributesMap.gen_ai.usage.reasoning_tokens;
           }
           // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
           if (
@@ -961,7 +956,6 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.cache_read_input_tokens = Number(
               attributesMap.gen_ai.usage.cache_read.input_tokens,
             );
-            delete attributesMap.gen_ai.usage.cache_read;
           }
           if (
             attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
@@ -970,10 +964,7 @@ const addOpenTelemetrySpanAsSpan = (
             metrics.cache_creation_input_tokens = Number(
               attributesMap.gen_ai.usage.cache_creation.input_tokens,
             );
-            delete attributesMap.gen_ai.usage.cache_creation;
           }
-          // total_tokens is redundant (sum of input + output), clean it from params
-          delete attributesMap.gen_ai.usage.total_tokens;
         }
 
         // Params

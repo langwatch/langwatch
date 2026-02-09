@@ -1562,6 +1562,11 @@ describe("opentelemetry traces receiver", () => {
                 start_time: "2025-05-25T10:37:11.068343+00:00",
                 end_time: "2025-05-25T10:37:12.014098+00:00",
               },
+              usage: {
+                prompt_tokens: 24,
+                completion_tokens: 10,
+                total_tokens: 34,
+              },
               agent: {
                 name: "Strands Agent",
               },
@@ -2628,6 +2633,11 @@ describe("opentelemetry traces receiver", () => {
               response: {
                 id: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
                 finish_reasons: ["STOP"],
+              },
+              usage: {
+                input_tokens: "11",
+                output_tokens: "13",
+                total_tokens: "24",
               },
               system: "openai",
               operation: {
