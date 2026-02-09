@@ -82,6 +82,13 @@ export const suiteRouter = createTRPCRouter({
       return result;
     }),
 
+  getQueueStatus: protectedProcedure
+    .input(projectSchema.extend({ suiteId: z.string() }))
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      return SuiteService.getQueueStatus({ suiteId: input.suiteId });
+    }),
+
   run: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))

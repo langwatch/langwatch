@@ -181,7 +181,7 @@ Feature: Suite Workflow — Create, Run, See Results
   Scenario: Edit suite via header button
     Given suite "Critical Path" exists with 3 scenarios and 1 target
     When I select "Critical Path" in the sidebar
-    And I click "Edit" in the main panel header
+    And I click "Edit" in the suite header
     Then the edit drawer opens with title "Edit Suite"
     And the name field contains "Critical Path"
     And 3 scenarios are pre-selected
@@ -230,13 +230,13 @@ Feature: Suite Workflow — Create, Run, See Results
     Given suite "Critical Path" exists with 2 scenarios and 1 target
     When I click "Run" next to "Critical Path" in the sidebar
     Then "Critical Path" is selected in the sidebar
-    And a new run appears in the main panel
+    And a new run appears in the run history
 
   @e2e
-  Scenario: Run suite from main panel header
+  Scenario: Run suite from header button
     Given suite "Critical Path" is selected
-    When I click the "Run" button in the main panel header
-    Then a new run appears in the main panel
+    When I click the "Run" button in the suite header
+    Then a new run appears in the run history
 
   @e2e
   Scenario: Save and run from drawer
@@ -244,7 +244,7 @@ Feature: Suite Workflow — Create, Run, See Results
     When I click "Run Now"
     Then the suite is saved
     And a run is triggered immediately
-    And I see the suite selected with results appearing
+    And I see the suite selected with the new run in the run history
 
   # ============================================================================
   # Run Suite — Job Scheduling
@@ -281,70 +281,122 @@ Feature: Suite Workflow — Create, Run, See Results
     Then the run fails with an error about invalid target references
 
   # ============================================================================
-  # View Results
+  # Run History — Queue Status Visibility
   # ============================================================================
+  #
+  # When a suite run is scheduled, jobs are queued in BullMQ (Redis).
+  # The RunHistoryList shows a status banner while jobs are pending/active.
+  #
+
+  @unit
+  Scenario: Queue status returns counts for pending and active jobs
+    Given a suite "Critical Path" has 3 pending and 1 active job in the queue
+    When I query the queue status for "Critical Path"
+    Then the status shows 3 waiting and 1 active
+
+  @unit
+  Scenario: Queue status returns zero counts when no jobs are queued
+    Given a suite "Critical Path" has no jobs in the queue
+    When I query the queue status for "Critical Path"
+    Then the status shows 0 waiting and 0 active
+
+  @integration
+  Scenario: Queue status banner appears when jobs are pending
+    Given a suite has 2 pending and 1 active job
+    When I view the run history
+    Then I see a status banner showing "2 pending, 1 running"
+    And the banner includes a spinner
+
+  @integration
+  Scenario: Queue status banner disappears when all jobs complete
+    Given a suite has 0 pending and 0 active jobs
+    When I view the run history
+    Then I do not see a queue status banner
+
+  # ============================================================================
+  # Run History List
+  # ============================================================================
+  #
+  # The main content area shows a run history list. Each row is a **run**
+  # (not an individual scenario×target pair). Runs are collapsible — expanding
+  # shows the scenario × target breakdown as a summary preview.
+  # Clicking a run navigates to the existing run detail page.
+  # Results are fetched from ElasticSearch filtered by the suite's setId.
+  #
 
   @e2e
-  Scenario: View results after suite run completes
+  Scenario: View run history after suite run completes
     Given suite "Critical Path" has a completed run with all passing
     When I select "Critical Path" in the sidebar
     Then the main panel shows the suite header with name and stats
-    And I see a run group with the timestamp and overall pass rate
-    And each scenario × target pair shows pass/fail status
+    And I see a run history list below the header
+    And the most recent run row shows the timestamp and overall pass rate
 
   @integration
-  Scenario: Results show scenario × target pairs
-    Given suite "Critical Path" ran 3 scenarios against "Prod Agent"
-    When I view the results
-    Then I see rows like "Angry refund × Prod Agent"
-    And each row shows the pass percentage, trial count, and duration
+  Scenario: Run row shows timestamp, pass rate, and trigger type
+    Given suite "Critical Path" has a run triggered manually 2 hours ago at 100% pass rate
+    When I view the run history
+    Then I see a run row with "2 hours ago", "100%", and "Manual"
 
   @integration
-  Scenario: Results show repeat trial counts
+  Scenario: Expand run to see scenario × target breakdown
+    Given suite "Critical Path" has a completed run
+    When I expand the run row
+    Then I see scenario × target pairs like "Angry refund × Prod Agent"
+    And each pair shows pass percentage, trial count, and duration
+
+  @integration
+  Scenario: Expanded run shows repeat trial counts
     Given suite "Critical Path" has repeat count 3
     And all trials passed for "Angry refund × Prod Agent"
-    When I view the results
+    When I expand the run row
     Then I see "100% (3/3)" for that pair
 
   @integration
-  Scenario: Expand and collapse run groups
+  Scenario: Most recent run is expanded by default
     Given suite "Critical Path" has 2 completed runs
-    When I view the results
+    When I view the run history
     Then the most recent run is expanded
     And the older run is collapsed
-    When I click the older run header
-    Then it expands to show its scenario × target results
 
   @integration
-  Scenario: Run trigger type shown in results
-    Given a run was triggered manually
-    When I view the results
-    Then the run group header shows "Manual" as the trigger type
+  Scenario: Collapse and expand run rows
+    Given suite "Critical Path" has 2 completed runs
+    When I click the expanded run header
+    Then it collapses
+    When I click the collapsed run header
+    Then it expands to show its scenario × target breakdown
+
+  @integration
+  Scenario: Click run row navigates to run detail page
+    Given suite "Critical Path" has a completed run
+    When I click on a scenario × target pair inside an expanded run
+    Then I am navigated to the existing run detail page for that run
 
   # ============================================================================
-  # Results — Filters
+  # Run History — Filters
   # ============================================================================
 
   @integration
-  Scenario: Filter results by scenario
+  Scenario: Filter run history by scenario
     Given suite "Critical Path" has results for 5 scenarios
     When I select a scenario from the "Scenario" filter dropdown
-    Then only results for that scenario are shown
+    Then only runs containing that scenario are shown
 
   @integration
-  Scenario: Filter results by target
+  Scenario: Filter run history by target
     Given suite "Critical Path" has results for 2 targets
     When I select a target from the "Target" filter dropdown
-    Then only results for that target are shown
+    Then only runs containing that target are shown
 
   @integration
-  Scenario: Filter results by pass/fail status
-    Given suite "Critical Path" has both passing and failing results
+  Scenario: Filter run history by pass/fail status
+    Given suite "Critical Path" has both passing and failing runs
     When I select "Fail" from the "Pass/Fail" filter
-    Then only failing scenario × target pairs are shown
+    Then only runs with failures are shown
 
   # ============================================================================
-  # Results — Summary Stats
+  # Run History — Summary Stats
   # ============================================================================
 
   @integration
@@ -360,9 +412,9 @@ Feature: Suite Workflow — Create, Run, See Results
     Then "Billing Edge" shows "9/12 passed" with a failure indicator
 
   @integration
-  Scenario: Results footer shows totals
+  Scenario: Run history footer shows totals
     Given suite "Critical Path" has 3 runs with 21 passed and 3 failed total
-    When I view the results
+    When I view the run history
     Then the footer shows "3 runs" and "21 passed" and "3 failed"
 
   # ============================================================================

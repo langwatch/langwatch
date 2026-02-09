@@ -13,10 +13,18 @@ import {
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import { FolderOpen, List, Play, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
+
+export type SuiteRunSummary = {
+  passedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number | null;
+};
 
 type SuiteSidebarProps = {
   suites: SimulationSuiteConfiguration[];
   selectedSuiteId: string | null;
+  runSummaries?: Map<string, SuiteRunSummary>;
   onSelectSuite: (id: string) => void;
   onNewSuite: () => void;
   onRunSuite: (id: string) => void;
@@ -26,6 +34,7 @@ type SuiteSidebarProps = {
 export function SuiteSidebar({
   suites,
   selectedSuiteId,
+  runSummaries,
   onSelectSuite,
   onNewSuite,
   onRunSuite,
@@ -106,6 +115,7 @@ export function SuiteSidebar({
             key={suite.id}
             suite={suite}
             isSelected={suite.id === selectedSuiteId}
+            runSummary={runSummaries?.get(suite.id)}
             onSelect={() => onSelectSuite(suite.id)}
             onRun={() => onRunSuite(suite.id)}
             onContextMenu={(e) => onContextMenu(e, suite.id)}
@@ -146,12 +156,14 @@ function SidebarButton({
 function SuiteListItem({
   suite,
   isSelected,
+  runSummary,
   onSelect,
   onRun,
   onContextMenu,
 }: {
   suite: SimulationSuiteConfiguration;
   isSelected: boolean;
+  runSummary?: SuiteRunSummary;
   onSelect: () => void;
   onRun: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
@@ -177,6 +189,14 @@ function SuiteListItem({
             {suite.name}
           </Text>
         </HStack>
+        {runSummary && runSummary.totalCount > 0 && (
+          <Text fontSize="xs" color="fg.muted" paddingLeft={5}>
+            {runSummary.passedCount}/{runSummary.totalCount} passed
+            {runSummary.lastRunTimestamp && (
+              <> · {formatTimeAgo(runSummary.lastRunTimestamp)}</>
+            )}
+          </Text>
+        )}
       </VStack>
       <Box
         as="button"

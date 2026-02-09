@@ -6,6 +6,8 @@ import {
   Badge,
   Box,
   Button,
+  Center,
+  EmptyState,
   HStack,
   Separator,
   Text,
@@ -14,13 +16,16 @@ import {
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import {
   FileText,
+  FolderOpen,
   Hash,
   Pencil,
   Play,
+  Plus,
   RefreshCw,
   Target,
 } from "lucide-react";
-import { parseSuiteTargets } from "~/server/api/routers/suites/schemas";
+import { parseSuiteTargets } from "~/server/suites/types";
+import { RunHistoryList } from "./RunHistoryList";
 
 type SuiteDetailPanelProps = {
   suite: SimulationSuiteConfiguration;
@@ -100,12 +105,8 @@ export function SuiteDetailPanel({
 
       <Separator />
 
-      {/* Results area - placeholder for now */}
-      <Box paddingX={6} paddingY={4} flex={1}>
-        <Text fontSize="sm" color="fg.muted">
-          Run this suite to see results here.
-        </Text>
-      </Box>
+      {/* Run history list */}
+      <RunHistoryList suite={suite} />
     </VStack>
   );
 }
@@ -143,16 +144,23 @@ function StatChip({
 }
 
 /** Empty state when no suite is selected */
-export function SuiteEmptyState() {
+export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
   return (
-    <VStack
-      height="100%"
-      justify="center"
-      align="center"
-      color="fg.muted"
-      gap={2}
-    >
-      <Text fontSize="md">Select a suite or create one</Text>
-    </VStack>
+    <Center flex={1} height="100%">
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <FolderOpen size={32} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>No suite selected</EmptyState.Title>
+          <EmptyState.Description>
+            Select a suite from the sidebar or create a new one
+          </EmptyState.Description>
+          <Button colorPalette="blue" onClick={onNewSuite}>
+            <Plus size={16} /> New Suite
+          </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    </Center>
   );
 }

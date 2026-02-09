@@ -28,7 +28,15 @@ Reference mockups for issue #1397. Based on design screenshots (Feb 2026).
 
 ---
 
-## 2. Suites Page — Suite Selected (Main View)
+## 2. Suites Page — Suite Selected
+
+When a suite is selected in the sidebar, the main area shows:
+1. Suite header (name, labels, description, Edit + Run buttons)
+2. Stats chips row
+3. Last activity timestamp
+4. Filter bar
+5. Run history list (collapsible rows — each row is a **run**)
+6. Footer totals
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -162,7 +170,7 @@ Opened via "+ New Suite" button. Slides in from right.
 ## 4. Edit Suite Drawer
 
 Same as New Suite but pre-populated. Title says "Edit Suite". Opened via:
-- Edit button in main panel header
+- Edit button in suite header
 - "Edit" in context menu
 
 ```
@@ -193,9 +201,22 @@ Same as New Suite but pre-populated. Title says "Edit Suite". Opened via:
 
 ---
 
-## 6. Run Results — Expanded Run Group
+## 6. Run History List
 
-Each run is collapsible. Shows scenario × target pairs.
+The main content area below the suite header and filter bar. Each row
+represents a **run** (not individual scenario×target pairs). Runs are
+collapsible — expanding shows the scenario × target breakdown as a
+summary preview. Clicking a run navigates to the existing run detail page.
+
+### Collapsed run
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ ▸ 1 day ago  ·  ✗ 88%                                   Webhook  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Expanded run (most recent is expanded by default)
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -207,13 +228,15 @@ Each run is collapsible. Shows scenario × target pairs.
 │ ✓ Edge: empty cart × Prod Agent           100% (3/3)   2.0s       │
 │ ✓ Billing dispute × Prod Agent            100% (3/3)   2.5s       │
 └────────────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────────────┐
-│ ▸ 1 day ago  ·  ✗ 88%                                   Webhook  │
-└────────────────────────────────────────────────────────────────────┘
 ```
 
-### Result row anatomy
+### Run row header anatomy
+
+```
+[chevron] [relative_time]  ·  [status_icon] [pass_rate]     [trigger_type]
+```
+
+### Scenario × target row anatomy (inside expanded run)
 
 ```
 [status_icon] [scenario_name] × [target_name]    [pass%] ([pass/total])  [duration]
@@ -224,12 +247,19 @@ Where:
 - `pass%`: percentage of repeat trials that passed
 - `(pass/total)`: e.g. (3/3) when repeatCount=3
 - `duration`: average execution time
+- `trigger_type`: Manual, Webhook, etc.
+
+### Footer
+
+```
+  3 runs                                         21 passed   3 failed
+```
 
 ---
 
-## 7. Stats Bar
+## 7. Stats Chips
 
-Horizontal row of stat chips shown in suite detail header.
+Horizontal row of stat chips shown in the suite header area.
 
 ```
 ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐

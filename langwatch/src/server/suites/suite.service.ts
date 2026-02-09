@@ -18,23 +18,27 @@ import { getSuiteSetId } from "./suite-set-id";
 import {
   generateBatchRunId,
   scheduleScenarioRun,
+  scenarioQueue,
 } from "../scenarios/scenario.queue";
-import {
-  parseSuiteTargets,
-  type SuiteTarget,
-} from "../api/routers/suites/schemas";
+import { parseSuiteTargets, type SuiteTarget } from "./types";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:suites:service");
 
 // Re-export for consumers that need the type
-export type { SuiteTarget } from "../api/routers/suites/schemas";
+export type { SuiteTarget } from "./types";
 
 /** Result of scheduling a suite run */
 export type SuiteRunResult = {
   batchRunId: string;
   setId: string;
   jobCount: number;
+};
+
+/** Queue status counts for a suite's pending/active jobs */
+export type QueueStatus = {
+  waiting: number;
+  active: number;
 };
 
 /** Dependencies for validating references before a run */
@@ -172,6 +176,36 @@ export class SuiteService {
     return params.scenarioCount * params.targetCount * params.repeatCount;
   }
 
+  /**
+   * Query the BullMQ queue for pending/active jobs belonging to a suite.
+   *
+   * Fetches waiting and active jobs from the scenario queue, then filters
+   * by the suite's setId to return only jobs for this suite.
+   */
+  static async getQueueStatus(params: {
+    suiteId: string;
+  }): Promise<QueueStatus> {
+    const setId = getSuiteSetId(params.suiteId);
+
+    const jobs = await scenarioQueue.getJobs(["waiting", "active"]);
+
+    let waiting = 0;
+    let active = 0;
+
+    for (const job of jobs) {
+      if (job.data?.setId !== setId) continue;
+
+      const state = await job.getState();
+      if (state === "waiting") {
+        waiting++;
+      } else if (state === "active") {
+        active++;
+      }
+    }
+
+    return { waiting, active };
+  }
+
   private async validateReferences(params: {
     suite: SimulationSuiteConfiguration;
     projectId: string;
@@ -222,23 +256,64 @@ export class SuiteService {
     batchRunId: string;
   }): Promise<number> {
     const { suite, targets, projectId, setId, batchRunId } = params;
-    let jobCount = 0;
 
+    const jobPromises: Promise<{ id?: string | null }>[] = [];
     for (const scenarioId of suite.scenarioIds) {
       for (const target of targets) {
         for (let repeat = 0; repeat < suite.repeatCount; repeat++) {
-          await scheduleScenarioRun({
-            projectId,
-            scenarioId,
-            target: { type: target.type, referenceId: target.referenceId },
-            setId,
-            batchRunId,
-          });
-          jobCount++;
+          jobPromises.push(
+            scheduleScenarioRun({
+              projectId,
+              scenarioId,
+              target: { type: target.type, referenceId: target.referenceId },
+              setId,
+              batchRunId,
+              trialIndex: repeat,
+            }),
+          );
         }
       }
     }
 
-    return jobCount;
+    const results = await Promise.allSettled(jobPromises);
+
+    const fulfilled = results.filter(
+      (r): r is PromiseSettledResult<{ id?: string | null }> & { status: "fulfilled" } =>
+        r.status === "fulfilled",
+    );
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+
+    if (rejected.length > 0) {
+      logger.error(
+        {
+          suiteId: suite.id,
+          batchRunId,
+          totalJobs: results.length,
+          failedCount: rejected.length,
+          succeededCount: fulfilled.length,
+          errors: rejected.map((r) => String(r.reason)),
+        },
+        "Suite run scheduling partially failed, rolling back enqueued jobs",
+      );
+
+      // Roll back: remove all successfully enqueued jobs
+      await Promise.allSettled(
+        fulfilled.map(async (r) => {
+          const jobId = r.value.id;
+          if (jobId) {
+            const job = await scenarioQueue.getJob(jobId);
+            await job?.remove();
+          }
+        }),
+      );
+
+      throw new Error(
+        `Failed to schedule suite run: ${rejected.length} of ${results.length} jobs failed to enqueue`,
+      );
+    }
+
+    return fulfilled.length;
   }
 }

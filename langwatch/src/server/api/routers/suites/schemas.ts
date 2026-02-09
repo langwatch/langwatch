@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { suiteTargetSchema } from "~/server/suites/types";
+
+// Re-export domain types so existing API-layer consumers don't break
+export { suiteTargetSchema, parseSuiteTargets } from "~/server/suites/types";
+export type { SuiteTarget } from "~/server/suites/types";
 
 /**
  * Shared schemas for suite routers.
@@ -6,19 +11,6 @@ import { z } from "zod";
 export const projectSchema = z.object({
   projectId: z.string(),
 });
-
-/** Target reference in a suite configuration */
-export const suiteTargetSchema = z.object({
-  type: z.enum(["prompt", "http"]),
-  referenceId: z.string(),
-});
-
-export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
-
-/** Parse and validate suite targets from Prisma's Json field */
-export function parseSuiteTargets(raw: unknown): SuiteTarget[] {
-  return z.array(suiteTargetSchema).parse(raw);
-}
 
 export const createSuiteSchema = projectSchema.extend({
   name: z.string().min(1, "Name is required"),

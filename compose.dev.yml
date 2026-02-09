@@ -156,6 +156,7 @@ services:
       NEXTAUTH_URL: http://localhost:${APP_PORT:-5560}
       # Enable scenarios UI in dev
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
+      RELEASE_UI_SUITES_ENABLED: "1"
     env_file:
       - langwatch/.env
     depends_on:
@@ -184,7 +185,7 @@ services:
     volumes:
       - ./langwatch:/app
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && while true; do pnpm tsx --watch --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+    command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
       NODE_ENV: development

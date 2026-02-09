@@ -2,12 +2,48 @@
 
 Separate data access (Repository) from business logic (Service).
 
+> "The Repository doesn't care which component is invoking it; it blindly does what it is asked. The Service layer doesn't care how it gets accessed, it just does its work, using a Repository where required."
+> — [Tom Collings](https://tom-collings.medium.com/controller-service-repository-16e29a4684e5)
+
+## The Three Layers
+
+Code is organized into three layers. The **domain layer** (Service + Repository) is the core — it contains the business logic and knows how our product works. The other two layers are adapters that pass information between clients and the domain.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  API Layer (Router/Controller)                              │
+│  server/api/routers/suites/                                 │
+│  Translates HTTP/tRPC requests → domain calls.              │
+│  Handles auth, request validation, error mapping.           │
+├─────────────────────────────────────────────────────────────┤
+│  Domain Layer (Service + Repository)                        │
+│  server/suites/                                             │
+│  The core. Business rules, orchestration, data access.      │
+│  Imports from nobody — both API and UI import from here.    │
+├─────────────────────────────────────────────────────────────┤
+│  UI Layer (Components)                                      │
+│  components/suites/                                         │
+│  Translates domain data → things users see and click.       │
+│  Fetches data via tRPC hooks (API layer).                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key rule:** Dependencies flow inward. The domain layer never imports from the API or UI layers. If a type (like `SuiteTarget`) or utility (like `parseSuiteTargets`) is needed by both the API router and the domain service, it belongs in the domain layer (`server/suites/types.ts`), and the router re-exports or imports from there.
+
+## Why This Pattern
+
+1. **Separation of concerns** - Each layer has one job
+2. **Testability** - Integration tests use real DB; unit tests cover pure logic only
+3. **Clarity** - Obvious where new code should go
+4. **Flexibility** - Swap implementations without affecting other layers
+
 ## When to Use
 
 | Layer | Responsibility | Examples |
 |-------|----------------|----------|
-| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `ProjectRepository` |
-| Service | Business logic, orchestration, validation | `DatasetService`, `PromptService` |
+| Router | Request/response handling, auth, error mapping | `suite.router.ts`, `dataset.router.ts` |
+| Service | Business logic, orchestration, validation | `DatasetService`, `SuiteService` |
+| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `SuiteRepository` |
 
 ## Repository Layer
 
@@ -105,8 +141,34 @@ src/server/datasets/
   dataset-record.repository.ts
   dataset.service.ts        # Business logic
   errors.ts                 # Domain errors
-  types.ts                  # Shared types
+  types.ts                  # Domain types (Zod schemas, inferred types, parsers)
 ```
+
+## Where Types Belong
+
+Domain types live in the domain layer (`server/<feature>/types.ts`), not in the API layer.
+
+```typescript
+// GOOD: Domain type in domain layer
+// server/suites/types.ts
+export const suiteTargetSchema = z.object({
+  type: z.enum(["prompt", "http"]),
+  referenceId: z.string(),
+});
+export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
+
+// Router re-exports from domain
+// server/api/routers/suites/schemas.ts
+export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
+```
+
+```typescript
+// BAD: Domain type defined in API layer, imported by service
+// server/api/routers/suites/schemas.ts   <-- defined here
+// server/suites/suite.service.ts         <-- imports from API layer (wrong direction)
+```
+
+**Rule of thumb:** If a type represents a business concept (not just a request shape), it belongs in the domain layer. Request-specific schemas (like `createSuiteSchema` with its validation messages) can stay in the router schemas file since they're API concerns.
 
 ## Decision Checklist
 

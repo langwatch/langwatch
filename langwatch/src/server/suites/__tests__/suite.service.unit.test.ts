@@ -7,12 +7,24 @@ import {
 import type { SuiteRepository } from "../suite.repository";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 
+type MockJob = {
+  data: { setId: string };
+  getState: () => Promise<string>;
+};
+
 // Mock the scenario queue module
+const { mockRemove, mockGetJob, mockGetJobs } = vi.hoisted(() => ({
+  mockRemove: vi.fn(() => Promise.resolve()),
+  mockGetJob: vi.fn(() => Promise.resolve({ remove: vi.fn(() => Promise.resolve()) })),
+  mockGetJobs: vi.fn((): Promise<MockJob[]> => Promise.resolve([])),
+}));
+
 vi.mock("../../scenarios/scenario.queue", () => ({
   generateBatchRunId: vi.fn(() => "batch_test_123"),
   scheduleScenarioRun: vi.fn(() =>
     Promise.resolve({ id: "job_1", data: {} }),
   ),
+  scenarioQueue: { getJob: mockGetJob, getJobs: mockGetJobs },
 }));
 
 import {
@@ -191,6 +203,42 @@ describe("SuiteService", () => {
       });
     });
 
+    describe("given some jobs fail to enqueue", () => {
+      describe("when the suite run is triggered", () => {
+        it("rolls back all enqueued jobs and throws", async () => {
+          let callCount = 0;
+          mockScheduleScenarioRun.mockImplementation(() => {
+            callCount++;
+            if (callCount === 2) {
+              return Promise.reject(new Error("Redis connection lost"));
+            }
+            return Promise.resolve({ id: `job_${callCount}`, data: {} } as never);
+          });
+
+          mockGetJob.mockImplementation(() =>
+            Promise.resolve({ remove: mockRemove }),
+          );
+
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+            ] as SuiteTarget[],
+            repeatCount: 3,
+          });
+          const deps = makeDeps();
+
+          await expect(
+            service.run({ suite, projectId: "proj_1", deps }),
+          ).rejects.toThrow("Failed to schedule suite run: 1 of 3 jobs failed to enqueue");
+
+          // Verify rollback: remove called for each of the 2 successfully enqueued jobs
+          expect(mockGetJob).toHaveBeenCalledTimes(2);
+          expect(mockRemove).toHaveBeenCalledTimes(2);
+        });
+      });
+    });
+
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
         it("fails with an error about invalid scenario references", async () => {
@@ -229,6 +277,70 @@ describe("SuiteService", () => {
             service.run({ suite, projectId: "proj_1", deps }),
           ).rejects.toThrow("Invalid target references: removed-target");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
+
+  describe("getQueueStatus()", () => {
+    describe("given a suite has 3 waiting and 1 active job in the queue", () => {
+      describe("when the queue status is queried", () => {
+        it("returns 3 waiting and 1 active", async () => {
+          const suiteId = "suite_abc123";
+          const setId = "__suite__suite_abc123";
+
+          mockGetJobs.mockResolvedValue([
+            { data: { setId }, getState: () => Promise.resolve("waiting") },
+            { data: { setId }, getState: () => Promise.resolve("waiting") },
+            { data: { setId }, getState: () => Promise.resolve("waiting") },
+            { data: { setId }, getState: () => Promise.resolve("active") },
+            { data: { setId: "other_set" }, getState: () => Promise.resolve("waiting") },
+          ]);
+
+          const result = await SuiteService.getQueueStatus({ suiteId });
+
+          expect(result).toEqual({
+            waiting: 3,
+            active: 1,
+          });
+        });
+      });
+    });
+
+    describe("given a suite has no jobs in the queue", () => {
+      describe("when the queue status is queried", () => {
+        it("returns 0 waiting and 0 active", async () => {
+          mockGetJobs.mockResolvedValue([]);
+
+          const result = await SuiteService.getQueueStatus({ suiteId: "suite_empty" });
+
+          expect(result).toEqual({
+            waiting: 0,
+            active: 0,
+          });
+        });
+      });
+    });
+
+    describe("given the queue has jobs for multiple suites", () => {
+      describe("when the queue status is queried for one suite", () => {
+        it("only counts jobs matching the suite setId", async () => {
+          const targetSetId = "__suite__suite_target";
+          const otherSetId = "__suite__suite_other";
+
+          mockGetJobs.mockResolvedValue([
+            { data: { setId: targetSetId }, getState: () => Promise.resolve("waiting") },
+            { data: { setId: otherSetId }, getState: () => Promise.resolve("waiting") },
+            { data: { setId: targetSetId }, getState: () => Promise.resolve("active") },
+            { data: { setId: otherSetId }, getState: () => Promise.resolve("active") },
+          ]);
+
+          const result = await SuiteService.getQueueStatus({ suiteId: "suite_target" });
+
+          expect(result).toEqual({
+            waiting: 1,
+            active: 1,
+          });
         });
       });
     });

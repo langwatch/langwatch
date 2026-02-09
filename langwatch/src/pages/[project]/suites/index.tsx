@@ -6,7 +6,7 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -15,22 +15,29 @@ import {
   SuiteDetailPanel,
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
-import { SuiteFormDrawer } from "~/components/suites/SuiteFormDrawer";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
+import {
+  DialogRoot,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+  DialogCloseTrigger,
+} from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer, setFlowCallbacks } = useDrawer();
   const utils = api.useContext();
 
   // State
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingSuite, setEditingSuite] =
-    useState<SimulationSuiteConfiguration | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -113,20 +120,34 @@ function SuitesPageContent() {
   });
 
   // Handlers
-  const handleNewSuite = useCallback(() => {
-    setEditingSuite(null);
-    setDrawerOpen(true);
+  const handleSuiteSaved = useCallback(
+    (suite: SimulationSuiteConfiguration) => {
+      setSelectedSuiteId(suite.id);
+    },
+    [],
+  );
+
+  const handleSuiteRan = useCallback((suiteId: string) => {
+    setSelectedSuiteId(suiteId);
   }, []);
+
+  const handleNewSuite = useCallback(() => {
+    setFlowCallbacks("suiteEditor", {
+      onSaved: handleSuiteSaved,
+      onRan: handleSuiteRan,
+    });
+    openDrawer("suiteEditor");
+  }, [openDrawer, setFlowCallbacks, handleSuiteSaved, handleSuiteRan]);
 
   const handleEditSuite = useCallback(
     (suiteId: string) => {
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) {
-        setEditingSuite(suite);
-        setDrawerOpen(true);
-      }
+      setFlowCallbacks("suiteEditor", {
+        onSaved: handleSuiteSaved,
+        onRan: handleSuiteRan,
+      });
+      openDrawer("suiteEditor", { urlParams: { suiteId } });
     },
-    [suites],
+    [openDrawer, setFlowCallbacks, handleSuiteSaved, handleSuiteRan],
   );
 
   const handleRunSuite = useCallback(
@@ -149,14 +170,15 @@ function SuitesPageContent() {
   const handleDeleteSuite = useCallback(
     (suiteId: string) => {
       if (!project) return;
-      // Simple confirmation via window.confirm for now
-      if (window.confirm("Are you sure you want to delete this suite?")) {
-        setDeleteConfirmId(suiteId);
-        deleteMutation.mutate({ projectId: project.id, id: suiteId });
-      }
+      setDeleteConfirmId(suiteId);
     },
-    [project, deleteMutation],
+    [project],
   );
+
+  const confirmDelete = useCallback(() => {
+    if (!project || !deleteConfirmId) return;
+    deleteMutation.mutate({ projectId: project.id, id: deleteConfirmId });
+  }, [project, deleteConfirmId, deleteMutation]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, suiteId: string) => {
@@ -166,20 +188,9 @@ function SuitesPageContent() {
     [],
   );
 
-  const handleSuiteSaved = useCallback(
-    (suite: SimulationSuiteConfiguration) => {
-      setSelectedSuiteId(suite.id);
-    },
-    [],
-  );
-
-  const handleSuiteRan = useCallback((suiteId: string) => {
-    setSelectedSuiteId(suiteId);
-  }, []);
-
   return (
     <DashboardLayout>
-      <HStack height="calc(100vh - 60px)" align="stretch" gap={0}>
+      <HStack w="full" h="full" alignItems="stretch" gap={0}>
         {/* Sidebar */}
         {isLoading ? (
           <VStack width="280px" minWidth="280px" justify="center" align="center">
@@ -207,7 +218,7 @@ function SuitesPageContent() {
             </VStack>
           )}
 
-          {!error && !selectedSuite && <SuiteEmptyState />}
+          {!error && !selectedSuite && <SuiteEmptyState onNewSuite={handleNewSuite} />}
 
           {selectedSuite && (
             <SuiteDetailPanel
@@ -231,14 +242,41 @@ function SuitesPageContent() {
         />
       )}
 
-      {/* Form drawer */}
-      <SuiteFormDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        suite={editingSuite}
-        onSaved={handleSuiteSaved}
-        onRan={handleSuiteRan}
-      />
+      {/* Delete confirmation dialog */}
+      <DialogRoot
+        open={!!deleteConfirmId}
+        onOpenChange={(e) => {
+          if (!e.open) setDeleteConfirmId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Suite</DialogTitle>
+            <DialogCloseTrigger />
+          </DialogHeader>
+          <DialogBody>
+            <Text>
+              Are you sure you want to delete this suite? This action cannot be
+              undone.
+            </Text>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              onClick={confirmDelete}
+              loading={deleteMutation.isPending}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
     </DashboardLayout>
   );
 }
