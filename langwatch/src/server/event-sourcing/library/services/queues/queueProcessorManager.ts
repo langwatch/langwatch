@@ -557,8 +557,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         );
       }
 
-      // Create queue name
-      const queueName = `{${pipelineName}/command/${commandName}}`;
+      // Create queue name (uses this.pipelineName via makeQueueName)
+      const queueName = this.makeQueueName(`command/${commandName}`);
 
       // Use per-command lockTtlMs if provided, otherwise use default
       const effectiveLockTtlMs = options.lockTtlMs ?? this.commandLockTtlMs;
