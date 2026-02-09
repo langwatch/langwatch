@@ -26,7 +26,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
 
   const selectedIndex = themeOptions.findIndex((o) => o.value === theme);
   const safeIndex = selectedIndex === -1 ? 0 : selectedIndex;
-  const currentOption = themeOptions[safeIndex]!;
+  const currentOption = themeOptions[safeIndex];
   const pillShadow = useColorModeValue(
     "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
     "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
@@ -36,7 +36,9 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
 
   const cycleTheme = () => {
     const nextIndex = (safeIndex + 1) % themeOptions.length;
-    setTheme(themeOptions[nextIndex]!.value);
+    const nextOption = themeOptions[nextIndex];
+    if (!nextOption) return;
+    setTheme(nextOption.value);
   };
 
   // Collapsed mode: single icon that cycles through themes on click
@@ -55,7 +57,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
           color="fg.subtle"
           cursor="pointer"
           transition="all 0.15s ease-in-out"
-          _hover={{ color: "fg.muted", bg: "nav.bgHover" }}
+          _hover={{ color: "fg.muted", backgroundColor: "nav.bgHover" }}
           onClick={cycleTheme}
           aria-label={`Current theme: ${currentOption.value}. Click to change.`}
         >
