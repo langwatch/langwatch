@@ -238,17 +238,34 @@ export async function readJobData(
 }
 
 /**
- * Generates a deterministic job ID for a migrated job.
- * This makes migration idempotent — re-running won't create duplicates
- * because BullMQ deduplicates by job ID.
+ * Redis key for tracking which jobs have been copied.
+ * This is the source of truth for idempotency — NOT BullMQ's job IDs,
+ * because BullMQ removes job IDs when jobs complete (removeOnComplete).
+ *
+ * If we relied on BullMQ job IDs alone:
+ *   1. --migrate copies job with jobId "migrated:collector:42"
+ *   2. Worker processes it, job completes and gets removed
+ *   3. Re-run --migrate → jobId is gone → BullMQ creates a DUPLICATE
+ *
+ * By tracking in a separate Redis set, we know what was already copied
+ * regardless of whether workers have processed the jobs.
  */
-export function migrationJobId(oldQueueName: string, oldJobId: string): string {
-  return `migrated:${oldQueueName}:${oldJobId}`;
+export const MIGRATION_TRACKER_KEY = "migration:queue-names:copied";
+
+/**
+ * Returns the tracker member string for a given old queue + job ID.
+ */
+export function migrationTrackerId(
+  oldQueueName: string,
+  oldJobId: string,
+): string {
+  return `${oldQueueName}:${oldJobId}`;
 }
 
 export interface MigrateResult {
   copied: number;
   skipped: number;
+  alreadyCopied: number;
   failed: Array<{ jobId: string; error: string }>;
 }
 
@@ -256,9 +273,12 @@ export interface MigrateResult {
  * Copies jobs from an old queue to a new hash-tagged queue.
  *
  * - Reads job data using raw Redis commands (works on cluster)
- * - Re-adds via BullMQ Queue.add() with deterministic job IDs
+ * - Checks a Redis SET to skip already-copied jobs (survives job completion)
+ * - Re-adds via BullMQ Queue.add()
+ * - Records each copied job in the tracker set
  * - Does NOT delete old keys — that's a separate step
- * - Safe to re-run: deterministic IDs prevent duplicates
+ * - Safe to re-run: tracker set prevents duplicates even after workers
+ *   process and remove the copied jobs
  * - Continues on per-job errors, reports all failures at the end
  */
 export async function copyJobs(
@@ -266,7 +286,12 @@ export async function copyJobs(
   oldQueueName: string,
   newQueueName: string,
 ): Promise<MigrateResult> {
-  const result: MigrateResult = { copied: 0, skipped: 0, failed: [] };
+  const result: MigrateResult = {
+    copied: 0,
+    skipped: 0,
+    alreadyCopied: 0,
+    failed: [],
+  };
 
   const jobIds = await readJobIds(connection, oldQueueName);
   if (jobIds.length === 0) return result;
@@ -277,6 +302,17 @@ export async function copyJobs(
 
   try {
     for (const jobId of jobIds) {
+      // Check if we already copied this job (idempotency)
+      const trackerId = migrationTrackerId(oldQueueName, jobId);
+      const alreadyDone = await connection.sismember(
+        MIGRATION_TRACKER_KEY,
+        trackerId,
+      );
+      if (alreadyDone) {
+        result.alreadyCopied++;
+        continue;
+      }
+
       const job = await readJobData(connection, oldQueueName, jobId);
       if (!job) {
         result.skipped++;
@@ -285,12 +321,14 @@ export async function copyJobs(
 
       try {
         await newQueue.add(job.name, job.data, {
-          jobId: migrationJobId(oldQueueName, jobId),
           delay: (job.opts.delay as number) ?? undefined,
           priority: (job.opts.priority as number) ?? undefined,
           attempts: (job.opts.attempts as number) ?? undefined,
           backoff: job.opts.backoff as any,
         });
+
+        // Record that we copied this job
+        await connection.sadd(MIGRATION_TRACKER_KEY, trackerId);
         result.copied++;
       } catch (err) {
         result.failed.push({
@@ -379,6 +417,7 @@ async function main() {
     const mapping = await buildQueueMapping(connection);
     let totalCopied = 0;
     let totalSkipped = 0;
+    let totalAlreadyCopied = 0;
     const allFailures: Array<{ queue: string; jobId: string; error: string }> = [];
 
     for (const [oldName, newName] of Object.entries(mapping)) {
@@ -387,17 +426,18 @@ async function main() {
 
       console.log(`  ${oldName} → ${newName}: ${jobIds.length} jobs`);
       const result = await copyJobs(connection, oldName, newName);
-      console.log(`    → copied: ${result.copied}, skipped: ${result.skipped}, failed: ${result.failed.length}`);
+      console.log(`    → copied: ${result.copied}, already done: ${result.alreadyCopied}, skipped: ${result.skipped}, failed: ${result.failed.length}`);
 
       totalCopied += result.copied;
       totalSkipped += result.skipped;
+      totalAlreadyCopied += result.alreadyCopied;
       for (const f of result.failed) {
         allFailures.push({ queue: oldName, ...f });
       }
     }
 
     console.log("");
-    console.log(`Summary: ${totalCopied} copied, ${totalSkipped} skipped, ${allFailures.length} failed`);
+    console.log(`Summary: ${totalCopied} copied, ${totalAlreadyCopied} already done, ${totalSkipped} skipped, ${allFailures.length} failed`);
 
     if (allFailures.length > 0) {
       console.log("");
@@ -415,12 +455,16 @@ async function main() {
     }
   }
 
-  // Phase 3: Delete old keys (if --cleanup)
+  // Phase 3: Delete old keys and migration tracker (if --cleanup)
   if (cleanup) {
     console.log("");
     console.log("Deleting old keys...");
     await cleanupKeys(connection, allOldKeys);
     console.log(`  → deleted ${allOldKeys.length} keys`);
+
+    // Remove the migration tracker set
+    await connection.unlink(MIGRATION_TRACKER_KEY);
+    console.log("  → removed migration tracker");
   }
 
   // Phase 4: Dry-run instructions

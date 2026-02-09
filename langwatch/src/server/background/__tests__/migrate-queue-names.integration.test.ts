@@ -23,12 +23,13 @@ import {
 import {
   OLD_QUEUE_PATTERNS,
   STATIC_QUEUE_MAPPING,
+  MIGRATION_TRACKER_KEY,
   scanKeys,
   cleanupKeys,
   readJobIds,
   readJobData,
   copyJobs,
-  migrationJobId,
+  migrationTrackerId,
   buildQueueMapping,
 } from "../../../../scripts/migrate-queue-names";
 
@@ -226,22 +227,24 @@ describe("Queue Name Migration Script", () => {
   // -----------------------------------------------------------------------
 
   describe("when running migration twice (idempotency)", () => {
-    it("does not create duplicate jobs on re-run", async () => {
+    it("skips already-copied jobs on re-run", async () => {
       const oldQueue = createTestQueue("collector", redis);
       queuesToClose.push(oldQueue);
 
       await oldQueue.add("trace", { traceId: "1" });
       await oldQueue.add("trace", { traceId: "2" });
 
-      // First run
+      // First run — copies both jobs
       const result1 = await copyJobs(redis, "collector", "{collector}");
       expect(result1.copied).toBe(2);
+      expect(result1.alreadyCopied).toBe(0);
 
-      // Second run — same jobs, deterministic IDs
+      // Second run — tracker set recognizes them as already copied
       const result2 = await copyJobs(redis, "collector", "{collector}");
-      // Jobs already exist, so they should be skipped (BullMQ returns
-      // the existing job when adding with a duplicate jobId)
-      // The total in the new queue should still be 2, not 4
+      expect(result2.copied).toBe(0);
+      expect(result2.alreadyCopied).toBe(2);
+
+      // New queue should still have exactly 2 jobs, not 4
       const newQueue = createTestQueue("{collector}", redis);
       queuesToClose.push(newQueue);
 
@@ -249,11 +252,54 @@ describe("Queue Name Migration Script", () => {
       expect(waiting).toHaveLength(2);
     });
 
-    it("generates deterministic job IDs from old queue name and job ID", () => {
-      const id1 = migrationJobId("collector", "42");
-      const id2 = migrationJobId("collector", "42");
+    it("survives job completion — no duplicates even after workers process the jobs", async () => {
+      const oldQueue = createTestQueue("collector", redis);
+      queuesToClose.push(oldQueue);
+
+      await oldQueue.add("trace", { traceId: "1" });
+
+      // First run — copies the job
+      const result1 = await copyJobs(redis, "collector", "{collector}");
+      expect(result1.copied).toBe(1);
+
+      // Simulate worker completing and removing the job from the new queue
+      const newQueue = createTestQueue("{collector}", redis);
+      queuesToClose.push(newQueue);
+      const [job] = await newQueue.getWaiting();
+      await job!.remove();
+
+      // Verify the job is actually gone from the new queue
+      const waitingAfterRemove = await newQueue.getWaiting();
+      expect(waitingAfterRemove).toHaveLength(0);
+
+      // Re-run migration — tracker set prevents re-copying
+      const result2 = await copyJobs(redis, "collector", "{collector}");
+      expect(result2.copied).toBe(0);
+      expect(result2.alreadyCopied).toBe(1);
+
+      // Still 0 in queue — NOT re-created
+      const waitingAfterRerun = await newQueue.getWaiting();
+      expect(waitingAfterRerun).toHaveLength(0);
+    });
+
+    it("generates deterministic tracker IDs", () => {
+      const id1 = migrationTrackerId("collector", "42");
+      const id2 = migrationTrackerId("collector", "42");
       expect(id1).toBe(id2);
-      expect(id1).toBe("migrated:collector:42");
+      expect(id1).toBe("collector:42");
+    });
+
+    it("records copied jobs in the tracker set", async () => {
+      const oldQueue = createTestQueue("collector", redis);
+      queuesToClose.push(oldQueue);
+
+      await oldQueue.add("trace", { traceId: "1" });
+
+      await copyJobs(redis, "collector", "{collector}");
+
+      // Verify the tracker set has the entry
+      const members = await redis.smembers(MIGRATION_TRACKER_KEY);
+      expect(members.length).toBeGreaterThan(0);
     });
   });
 
