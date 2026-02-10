@@ -11,22 +11,24 @@ import {
   Box,
   Button,
   Card,
+  createListCollection,
   Flex,
   Heading,
   HStack,
   Input,
-  NativeSelect,
+  SimpleGrid,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { Check, ExternalLink, Users } from "lucide-react";
+import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import SettingsLayout from "~/components/SettingsLayout";
+import { Select } from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "~/utils/api";
 
 /**
@@ -54,366 +56,318 @@ interface EditableUser extends SubscriptionUser {
   isNew?: boolean;
 }
 
-/**
- * Plan feature definition for display
- */
-interface PlanFeature {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}
+const memberTypeOptions = [
+  { label: "Full Member", value: "core" as const },
+  { label: "Lite Member", value: "lite" as const },
+];
+
+const memberTypeCollection = createListCollection({ items: memberTypeOptions });
+
+type Currency = "EUR" | "USD";
+
+const SEAT_PRICE: Record<Currency, number> = { EUR: 29, USD: 32 };
+const ANNUAL_DISCOUNT = 0.08;
+
+const currencySymbol: Record<Currency, string> = { EUR: "€", USD: "$" };
+
+const currencyOptions = [
+  { label: "€ EUR", value: "EUR" as const },
+  { label: "$ USD", value: "USD" as const },
+];
+const currencyCollection = createListCollection({ items: currencyOptions });
 
 /**
- * Developer plan features for display
+ * Developer plan features for current plan block
  */
-const DEVELOPER_PLAN_FEATURES: PlanFeature[] = [
-  { label: "Logs per month", value: "50,000 logs/month" },
-  { label: "Data retention", value: "14 days data retention" },
-  { label: "Users", value: "2 users", highlight: true },
-  { label: "Scenarios", value: "3 scenarios/simulations/custom evals" },
-  { label: "Support", value: "Community (GitHub & Discord)" },
+const DEVELOPER_FEATURES = [
+  "Up to 2 core members",
+  "Limited platform features",
+  "Community support",
 ];
 
 /**
- * Growth plan features for display
+ * Growth plan features for upgrade block
  */
-const GROWTH_PLAN_FEATURES: PlanFeature[] = [
-  { label: "Events", value: "200,000 events + €1 per 100k extra" },
-  { label: "Retention", value: "30 days retention + custom (€3/GB)" },
-  { label: "Core users", value: "Up to 20 core users (after volume discount)" },
-  { label: "Lite users", value: "Unlimited lite users" },
-  { label: "Evals", value: "Unlimited evals/simulations" },
-  { label: "Support", value: "Private Slack / Teams" },
+const GROWTH_FEATURES = [
+  "Up to 20 core users",
+  "200,000 events/month (Included)",
+  "Unlimited lite users",
+  "30 days retention",
+  "Unlimited evals",
+  "Private Slack support",
 ];
 
 /**
- * Validates an email address format
+ * Current Plan Block - displays the active subscription
  */
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-/**
- * Plan Block component for displaying a subscription plan
- */
-function PlanBlock({
+function CurrentPlanBlock({
   planName,
-  price,
+  description,
   features,
-  isCurrent,
-  buttonText,
-  buttonVariant = "solid",
-  onButtonClick,
   userCount,
+  upgradeRequired,
   onUserCountClick,
-  testId,
 }: {
   planName: string;
-  price: string;
-  features: PlanFeature[];
-  isCurrent: boolean;
-  buttonText: string;
-  buttonVariant?: "solid" | "outline";
-  onButtonClick?: () => void;
-  userCount?: number;
+  description?: string;
+  features?: string[];
+  userCount: number;
+  upgradeRequired?: boolean;
   onUserCountClick?: () => void;
-  testId: string;
 }) {
   return (
     <Card.Root
-      data-testid={testId}
-      flex={1}
-      minWidth="300px"
-      borderWidth={isCurrent ? 2 : 1}
-      borderColor={isCurrent ? "orange.500" : "gray.200"}
+      data-testid="current-plan-block"
+      borderWidth={1}
+      borderColor="gray.200"
     >
-      <Card.Header>
-        <HStack justifyContent="space-between">
-          <VStack align="start" gap={1}>
-            <Heading size="lg">{planName}</Heading>
-            <Text fontSize="xl" fontWeight="bold" color="orange.500">
-              {price}
-            </Text>
-          </VStack>
-          {isCurrent && (
-            <Badge colorPalette="orange" size="lg">
-              Current
-            </Badge>
-          )}
-        </HStack>
-      </Card.Header>
-      <Card.Body>
-        <VStack align="start" gap={3}>
-          {features.map((feature, index) => (
-            <HStack key={index} gap={2}>
-              <Check size={16} color="green" />
-              {feature.highlight && userCount !== undefined ? (
-                <Box
-                  as="button"
-                  data-testid="user-count-link"
-                  onClick={onUserCountClick}
-                  _hover={{ textDecoration: "underline", cursor: "pointer" }}
-                  color="blue.500"
+      <Card.Body paddingY={5} paddingX={6}>
+        <VStack align="stretch" gap={5}>
+          <Flex justifyContent="space-between" alignItems="flex-start">
+            <VStack align="start" gap={1}>
+              <HStack gap={3}>
+                <Text fontWeight="semibold" fontSize="lg">
+                  {planName}
+                </Text>
+                <Badge
+                  colorPalette="blue"
+                  variant="outline"
+                  borderRadius="md"
+                  paddingX={2}
+                  paddingY={0.5}
+                  fontSize="xs"
                 >
-                  <Text>{userCount} users</Text>
-                </Box>
-              ) : (
-                <Text>{feature.value}</Text>
+                  Current
+                </Badge>
+                {upgradeRequired && (
+                  <Badge
+                    colorPalette="orange"
+                    variant="subtle"
+                    borderRadius="md"
+                    paddingX={2}
+                    paddingY={0.5}
+                    fontSize="xs"
+                  >
+                    Upgrade required
+                  </Badge>
+                )}
+              </HStack>
+              {description && (
+                <Text color="gray.500" fontSize="sm">
+                  {description}
+                </Text>
               )}
-            </HStack>
-          ))}
+            </VStack>
+            <VStack align="end" gap={0}>
+              <Text color="gray.500" fontSize="sm">
+                Users
+              </Text>
+              <Box
+                as="button"
+                onClick={onUserCountClick}
+                textDecoration="underline"
+                _hover={{ color: "blue.600", cursor: "pointer" }}
+                color="gray.900"
+              >
+                <Text
+                  fontWeight="semibold"
+                  fontSize="lg"
+                  data-testid="user-count-link"
+                >
+                  {userCount}
+                </Text>
+              </Box>
+            </VStack>
+          </Flex>
+          {features && (
+            <SimpleGrid columns={3} gap={3}>
+              {features.map((feature, index) => (
+                <HStack key={index} gap={2}>
+                  <Check size={16} color="var(--chakra-colors-blue-500)" />
+                  <Text fontSize="sm" color="gray.600">
+                    {feature}
+                  </Text>
+                </HStack>
+              ))}
+            </SimpleGrid>
+          )}
         </VStack>
       </Card.Body>
-      <Card.Footer>
-        <Button
-          width="full"
-          colorPalette="orange"
-          variant={buttonVariant}
-          onClick={onButtonClick}
-        >
-          {buttonText}
-        </Button>
-      </Card.Footer>
     </Card.Root>
   );
 }
 
 /**
- * User row in the management drawer
+ * Upgrade Plan Block - displays upgrade CTA with features and dynamic pricing
  */
-function UserRow({
-  user,
-  isAdmin,
-  onMemberTypeChange,
+function UpgradePlanBlock({
+  planName,
+  pricePerSeat,
+  totalPrice,
+  coreMembers,
+  features,
+  onUpgrade,
+  isLoading,
 }: {
-  user: EditableUser;
-  isAdmin: boolean;
-  onMemberTypeChange: (userId: string, memberType: MemberType) => void;
+  planName: React.ReactNode;
+  pricePerSeat: React.ReactNode;
+  totalPrice: string;
+  coreMembers: number;
+  features: string[];
+  onUpgrade?: () => void;
+  isLoading?: boolean;
 }) {
-  const isDisabled = isAdmin || user.role === "ADMIN";
-
   return (
-    <HStack
-      data-testid={`user-row-${user.id}`}
-      width="full"
-      justifyContent="space-between"
-      padding={3}
+    <Card.Root
+      data-testid="upgrade-plan-block"
       borderWidth={1}
-      borderRadius="md"
       borderColor="gray.200"
     >
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Text fontWeight="medium">{user.name || user.email}</Text>
-          {user.status === "pending" && (
-            <Badge colorPalette="yellow" size="sm">
-              pending
-            </Badge>
-          )}
-        </HStack>
-        <Text fontSize="sm" color="gray.500">
-          {user.email}
-        </Text>
-      </VStack>
-      <HStack gap={2}>
-        <NativeSelect.Root
-          size="sm"
-          width="140px"
-          disabled={isDisabled}
-        >
-          <NativeSelect.Field
-            data-testid="member-type-selector"
-            value={user.memberType}
-            onChange={(e) => {
-              if (!isDisabled) {
-                onMemberTypeChange(user.id, e.target.value as MemberType);
-              }
-            }}
-          >
-            <option value="core">Core User</option>
-            <option value="lite">Lite User</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </HStack>
-    </HStack>
+      <Card.Body paddingY={5} paddingX={6}>
+        <VStack align="stretch" gap={5}>
+          <Flex justifyContent="space-between" alignItems="center">
+            <VStack align="start" gap={1}>
+              <Text fontWeight="semibold" fontSize="lg">
+                Upgrade to {planName}
+              </Text>
+
+              <Text
+                data-testid="upgrade-total"
+                fontSize="sm"
+                paddingY={4}
+                fontWeight="medium"
+                color="gray.700"
+              >
+                {totalPrice} per {coreMembers} core member
+                {coreMembers !== 1 ? "s" : ""}
+              </Text>
+            </VStack>
+            <Button
+              colorPalette="blue"
+              size="md"
+              onClick={onUpgrade}
+              loading={isLoading}
+              disabled={isLoading}
+            >
+              Upgrade now
+            </Button>
+          </Flex>
+          <SimpleGrid columns={3} gap={2}>
+            {features.map((feature, index) => (
+              <HStack key={index} gap={2}>
+                <Check size={16} color="var(--chakra-colors-blue-500)" />
+                <Text fontSize="sm" color="gray.600">
+                  {feature}
+                </Text>
+              </HStack>
+            ))}
+          </SimpleGrid>
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
 /**
- * Add user form component
+ * Recent Invoices Block - displays invoice history
  */
-function AddUserForm({
-  onAdd,
-  onCancel,
-}: {
-  onAdd: (email: string, memberType: MemberType) => void;
-  onCancel: () => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [memberType, setMemberType] = useState<MemberType>("lite");
-  const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState(false);
-
-  const handleSubmit = () => {
-    if (!isValidEmail(email)) {
-      setError("Invalid email address");
-      return;
-    }
-    onAdd(email, memberType);
-    setEmail("");
-    setMemberType("lite");
-    setError(null);
-    setTouched(false);
-  };
-
-  const handleBlur = () => {
-    setTouched(true);
-    if (email && !isValidEmail(email)) {
-      setError("Invalid email address");
-    } else {
-      setError(null);
-    }
-  };
-
-  const isAddDisabled = !email || (touched && !isValidEmail(email));
-
+function RecentInvoicesBlock() {
   return (
-    <VStack align="start" width="full" gap={3} padding={3} borderWidth={1} borderRadius="md">
-      <HStack width="full" gap={3}>
-        <Input
-          placeholder="Enter email address"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (error) setError(null);
-          }}
-          onBlur={handleBlur}
-          flex={1}
-        />
-        <NativeSelect.Root size="md" width="140px">
-          <NativeSelect.Field
-            data-testid="new-user-member-type"
-            value={memberType}
-            onChange={(e) => setMemberType(e.target.value as MemberType)}
-          >
-            <option value="core">Core User</option>
-            <option value="lite">Lite User</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </HStack>
-      {error && (
-        <Text color="red.500" fontSize="sm">
-          {error}
-        </Text>
-      )}
-      <HStack gap={2}>
-        <Button size="sm" onClick={handleSubmit} disabled={isAddDisabled}>
-          Add
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </HStack>
+    <VStack align="stretch" gap={4} width="full">
+      <Text fontWeight="semibold" fontSize="lg">
+        Recent invoices
+      </Text>
+      <Card.Root
+        data-testid="invoices-block"
+        borderWidth={1}
+        borderColor="gray.200"
+      >
+        <Card.Body paddingY={5} paddingX={6}>
+          <Text color="gray.500">No invoices yet</Text>
+        </Card.Body>
+      </Card.Root>
     </VStack>
   );
 }
 
 /**
+ * Planned user for upgrade (ephemeral, not saved to DB)
+ */
+interface PlannedUser {
+  id: string;
+  email: string;
+  memberType: MemberType;
+}
+
+/**
  * User management drawer component
+ * Manages ephemeral state for planning upgrades - does NOT save to DB
  */
 function UserManagementDrawer({
   open,
   onClose,
   users,
+  plannedUsers,
   isLoading,
   onSave,
-  isSaving,
-  maxMembers,
-  currentPlanType,
 }: {
   open: boolean;
   onClose: () => void;
   users: SubscriptionUser[];
+  plannedUsers: PlannedUser[];
   isLoading: boolean;
-  onSave: (users: EditableUser[]) => Promise<{ hasPendingUsers: boolean }>;
-  isSaving: boolean;
-  maxMembers: number;
-  currentPlanType: string;
+  onSave: (plannedUsers: PlannedUser[]) => void;
 }) {
   const [editableUsers, setEditableUsers] = useState<EditableUser[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localPlannedUsers, setLocalPlannedUsers] = useState<PlannedUser[]>([]);
 
-  // Initialize editable users when drawer opens or users change
+  // Initialize state when drawer opens
   useEffect(() => {
-    if (open && users.length > 0) {
+    if (open) {
       setEditableUsers(users.map((u) => ({ ...u, isNew: false })));
-      setShowAddForm(false);
-      setError(null);
+      setLocalPlannedUsers(plannedUsers);
     }
-  }, [open, users]);
+  }, [open, users, plannedUsers]);
 
-  // Reset state when closing
+  // Reset state when closing without saving
   const handleClose = useCallback(() => {
     setEditableUsers([]);
-    setShowAddForm(false);
-    setError(null);
+    setLocalPlannedUsers([]);
     onClose();
   }, [onClose]);
 
-  // Detect unsaved changes
-  const hasChanges = useMemo(() => {
-    if (editableUsers.length !== users.length) return true;
-    return editableUsers.some((eu) => {
-      const original = users.find((u) => u.id === eu.id);
-      if (!original) return true;
-      return eu.memberType !== original.memberType;
-    });
-  }, [editableUsers, users]);
+  const handleAddSeat = () => {
+    const newPlannedUser: PlannedUser = {
+      id: `planned-${Date.now()}-${localPlannedUsers.length}`,
+      email: "",
+      memberType: "core",
+    };
+    setLocalPlannedUsers((prev) => [...prev, newPlannedUser]);
+  };
 
-  // Check if adding more users requires upgrade
-  const exceedsLimit = useMemo(() => {
-    const coreUserCount = editableUsers.filter((u) => u.memberType === "core").length;
-    return coreUserCount > maxMembers;
-  }, [editableUsers, maxMembers]);
+  const handleRemovePlannedUser = (id: string) => {
+    setLocalPlannedUsers((prev) => prev.filter((u) => u.id !== id));
+  };
 
-  const handleMemberTypeChange = (userId: string, memberType: MemberType) => {
-    setEditableUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, memberType } : u))
+  const handleUpdatePlannedUserEmail = (id: string, email: string) => {
+    setLocalPlannedUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, email } : u)),
     );
   };
 
-  const handleAddUser = (email: string, memberType: MemberType) => {
-    const newUser: EditableUser = {
-      id: `new-${Date.now()}`,
-      userId: `new-${Date.now()}`,
-      name: "",
-      email,
-      role: "MEMBER",
-      memberType,
-      status: "pending",
-      isNew: true,
-    };
-    setEditableUsers((prev) => [...prev, newUser]);
-    setShowAddForm(false);
+  const handleUpdatePlannedUserMemberType = (
+    id: string,
+    memberType: MemberType,
+  ) => {
+    setLocalPlannedUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, memberType } : u)),
+    );
   };
 
-  const handleSave = async () => {
-    try {
-      setError(null);
-      await onSave(editableUsers);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    }
+  const handleSave = () => {
+    onSave(localPlannedUsers);
+    onClose();
   };
-
-  // Check if there's only one admin (can't change to lite)
-  const hasOnlyOneAdmin = useMemo(() => {
-    return editableUsers.filter((u) => u.role === "ADMIN").length === 1;
-  }, [editableUsers]);
 
   return (
     <Drawer.Root
@@ -428,7 +382,7 @@ function UserManagementDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Heading size="md">Manage Users</Heading>
+          <Heading size="md">Manage Seats</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
 
@@ -438,107 +392,120 @@ function UserManagementDrawer({
               <Spinner />
             </Flex>
           ) : (
-            <VStack align="start" gap={4} width="full">
-              {hasOnlyOneAdmin && (
-                <Box
-                  padding={3}
-                  borderRadius="md"
-                  backgroundColor="blue.50"
-                  borderWidth={1}
-                  borderColor="blue.200"
-                  width="full"
-                >
-                  <Text fontSize="sm" color="blue.700">
-                    Admin users requires core user status and cannot be changed to lite.
-                  </Text>
-                </Box>
-              )}
+            <VStack align="start" gap={6} width="full">
+              {/* Current Members section */}
+              <VStack align="start" gap={3} width="full">
+                <Text fontWeight="semibold" fontSize="sm" color="gray.500">
+                  Current Members
+                </Text>
+                {editableUsers.map((user) => (
+                  <HStack
+                    key={user.id}
+                    width="full"
+                    justifyContent="space-between"
+                    padding={3}
+                    borderWidth={1}
+                    borderRadius="md"
+                    borderColor="gray.200"
+                  >
+                    <VStack align="start" gap={1}>
+                      <Text fontWeight="medium">{user.name || user.email}</Text>
+                      <Text fontSize="sm" color="gray.500">
+                        {user.email}
+                      </Text>
+                    </VStack>
+                    <Badge
+                      colorPalette={
+                        user.memberType === "core" ? "blue" : "gray"
+                      }
+                    >
+                      {user.memberType === "core" ? "Core User" : "Lite User"}
+                    </Badge>
+                  </HStack>
+                ))}
+              </VStack>
 
-              {exceedsLimit && (
-                <Box
-                  padding={3}
-                  borderRadius="md"
-                  backgroundColor="orange.50"
-                  borderWidth={1}
-                  borderColor="orange.200"
-                  width="full"
-                >
-                  <Text fontSize="sm" color="orange.700">
-                    You have exceeded the {maxMembers} user limit for the Developer plan.
-                    Upgrade to Growth plan to add more users.
-                  </Text>
-                </Box>
-              )}
-
-              {error && (
-                <Box
-                  padding={3}
-                  borderRadius="md"
-                  backgroundColor="red.50"
-                  borderWidth={1}
-                  borderColor="red.200"
-                  width="full"
-                >
-                  <Text fontSize="sm" color="red.700">
-                    Error: {error}
-                  </Text>
-                </Box>
-              )}
-
-              {editableUsers.map((user) => (
-                <UserRow
-                  key={user.id}
-                  user={user}
-                  isAdmin={user.role === "ADMIN"}
-                  onMemberTypeChange={handleMemberTypeChange}
-                />
-              ))}
-
-              {showAddForm ? (
-                <AddUserForm
-                  onAdd={handleAddUser}
-                  onCancel={() => setShowAddForm(false)}
-                />
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddForm(true)}
-                >
-                  <Users size={16} />
-                  Add User
+              {/* Pending Seats section */}
+              <VStack align="start" gap={3} width="full">
+                <Text fontWeight="semibold" fontSize="sm" color="gray.500">
+                  Pending Seats
+                </Text>
+                {localPlannedUsers.map((user, index) => (
+                  <HStack
+                    key={user.id}
+                    data-testid={`pending-seat-${index}`}
+                    width="full"
+                    gap={2}
+                    padding={3}
+                    borderWidth={1}
+                    borderRadius="md"
+                    borderColor="gray.200"
+                  >
+                    <Input
+                      data-testid={`seat-email-${index}`}
+                      placeholder="Enter email address"
+                      size="sm"
+                      flex={1}
+                      value={user.email}
+                      onChange={(e) =>
+                        handleUpdatePlannedUserEmail(user.id, e.target.value)
+                      }
+                    />
+                    <Select.Root
+                      data-testid={`seat-member-type-${index}`}
+                      collection={memberTypeCollection}
+                      size="sm"
+                      width="160px"
+                      value={[user.memberType]}
+                      onValueChange={(details) => {
+                        const selectedValue = details.value[0];
+                        if (selectedValue) {
+                          handleUpdatePlannedUserMemberType(
+                            user.id,
+                            selectedValue as MemberType,
+                          );
+                        }
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.ValueText placeholder="Select type" />
+                      </Select.Trigger>
+                      <Select.Content paddingY={2} zIndex="popover">
+                        {memberTypeOptions.map((option) => (
+                          <Select.Item key={option.value} item={option}>
+                            {option.label}
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Root>
+                    <Button
+                      data-testid={`remove-seat-${index}`}
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="red"
+                      onClick={() => handleRemovePlannedUser(user.id)}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </HStack>
+                ))}
+                <Button variant="outline" size="sm" onClick={handleAddSeat}>
+                  <Plus size={16} />
+                  Add Seat
                 </Button>
-              )}
+              </VStack>
             </VStack>
           )}
         </Drawer.Body>
 
         <Drawer.Footer>
-          <HStack width="full" justifyContent="space-between">
-            <HStack>
-              {hasChanges && (
-                <Badge
-                  data-testid="unsaved-changes-indicator"
-                  colorPalette="yellow"
-                >
-                  Unsaved changes
-                </Badge>
-              )}
-            </HStack>
-            <HStack>
-              <Button variant="ghost" onClick={handleClose} disabled={isSaving}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                onClick={handleSave}
-                disabled={!hasChanges}
-                loading={isSaving}
-                data-loading={isSaving}
-              >
-                Save
-              </Button>
-            </HStack>
+          <HStack width="full" justifyContent="flex-end">
+            <Button variant="ghost" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button colorPalette="blue" onClick={handleSave}>
+              Done
+            </Button>
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
@@ -552,20 +519,30 @@ function UserManagementDrawer({
 export function SubscriptionPage() {
   const { organization } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [showPendingBanner, setShowPendingBanner] = useState(false);
+  const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
+  const [currency, setCurrency] = useState<Currency>("EUR");
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
+    "monthly",
+  );
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("success")) {
+      setShowSuccess(true);
+    }
+  }, []);
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
 
-  // Fetch organization users - using organization members API
-  // In the Cloud version, this would be replaced with a dedicated subscription API
+  // Fetch organization users
   const organizationWithMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       { organizationId: organization?.id ?? "" },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
 
   // Map organization members to subscription users format
@@ -577,38 +554,54 @@ export function SubscriptionPage() {
       name: member.user.name ?? "",
       email: member.user.email ?? "",
       role: member.role,
-      // For now, treat ADMIN/MEMBER as core, EXTERNAL as lite
-      memberType: member.role === "EXTERNAL" ? "lite" as const : "core" as const,
+      memberType:
+        member.role === "EXTERNAL" ? ("lite" as const) : ("core" as const),
     }));
   }, [organizationWithMembers.data]);
 
-  // Track local edits and saving state
-  const [isSaving, setIsSaving] = useState(false);
-
   const plan = activePlan.data;
-
-  // Determine if current plan is Developer (free) or Growth
   const isDeveloperPlan = plan?.free ?? true;
-  const isGrowthPlan = !isDeveloperPlan && plan?.type === "GROWTH";
+  const totalUserCount = users.length + plannedUsers.length;
 
-  const handleSaveUsers = async (editableUsers: EditableUser[]): Promise<{ hasPendingUsers: boolean }> => {
-    setIsSaving(true);
-    try {
-      // For now, this is a placeholder for the actual API call
-      // In the Cloud version, this would call a subscription API endpoint
-      // For demonstration, we simulate success with pending users
-      const hasPendingUsers = editableUsers.some((u) => u.isNew);
+  // Pricing calculations
+  const sym = currencySymbol[currency];
+  const basePrice = SEAT_PRICE[currency];
+  const annualSeatPrice = Math.round(basePrice * (1 - ANNUAL_DISCOUNT));
+  const seatPrice = billingPeriod === "annually" ? annualSeatPrice : basePrice;
 
-      if (hasPendingUsers) {
-        setShowPendingBanner(true);
-      }
+  const existingCoreMembers = users.filter(
+    (u) => u.memberType === "core",
+  ).length;
+  const plannedCoreMembers = plannedUsers.filter(
+    (u) => u.memberType === "core",
+  ).length;
+  const totalCoreMembers = existingCoreMembers + plannedCoreMembers;
+  const plannedLiteMembers = plannedUsers.filter(
+    (u) => u.memberType === "lite",
+  ).length;
+  const totalPrice = totalCoreMembers * seatPrice;
 
-      setIsDrawerOpen(false);
-      await organizationWithMembers.refetch();
+  const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
+    setPlannedUsers(newPlannedUsers);
+  };
 
-      return { hasPendingUsers };
-    } finally {
-      setIsSaving(false);
+  // Subscription router is injected via SaaS dependency injection (not in OSS types)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionApi = (api as any).subscription;
+  const createSubscription = subscriptionApi.create.useMutation();
+
+  const handleUpgrade = async () => {
+    if (!organization) return;
+
+    const result = await createSubscription.mutateAsync({
+      organizationId: organization.id,
+      baseUrl: window.location.origin,
+      plan: "GROWTH_SEAT_USAGE",
+      membersToAdd: totalCoreMembers,
+    });
+
+    if (result.url) {
+      window.location.href = result.url;
     }
   };
 
@@ -622,72 +615,155 @@ export function SubscriptionPage() {
     );
   }
 
+  const currentPlanName = isDeveloperPlan ? "Free plan" : "Growth plan";
+  const currentPlanDescription = isDeveloperPlan
+    ? undefined
+    : `${sym}${seatPrice} per user/mo`;
+  const currentPlanFeatures = isDeveloperPlan
+    ? DEVELOPER_FEATURES
+    : GROWTH_FEATURES;
+
+  const pricePerSeat = `${sym}${seatPrice} per seat/mo`;
+  const totalPriceFormatted = `${sym}${totalPrice}/mo`;
+
   return (
     <SettingsLayout>
-      <VStack gap={6} width="full" align="start">
-        <Heading>Subscription</Heading>
-
-        {showPendingBanner && (
-          <Box
-            data-testid="pending-users-banner"
-            padding={4}
-            borderRadius="md"
-            backgroundColor="orange.50"
-            borderWidth={1}
-            borderColor="orange.300"
-            width="full"
-          >
-            <Text fontWeight="medium" color="orange.800">
-              Complete upgrade to activate pending users
+      <VStack
+        gap={6}
+        width="full"
+        align="stretch"
+        maxWidth="900px"
+        marginX="auto"
+      >
+        {/* Header */}
+        <Flex justifyContent="space-between" alignItems="flex-start">
+          <VStack align="start" gap={1}>
+            <Heading size="xl">Billing</Heading>
+            <Text color="gray.500">
+              For questions about billing,{" "}
+              <Link
+                href="mailto:sales@langwatch.ai"
+                fontWeight="semibold"
+                color="gray.700"
+                _hover={{ color: "gray.900" }}
+              >
+                contact us
+              </Link>
             </Text>
+          </VStack>
+          <HStack gap={4} alignItems="center">
+            <HStack gap={3} data-testid="billing-period-toggle">
+              <Text
+                fontWeight={billingPeriod === "monthly" ? "bold" : "normal"}
+              >
+                Monthly
+              </Text>
+              <Switch
+                colorPalette="blue"
+                checked={billingPeriod === "annually"}
+                onCheckedChange={(e) =>
+                  setBillingPeriod(e.checked ? "annually" : "monthly")
+                }
+              />
+              <Text
+                fontWeight={billingPeriod === "annually" ? "bold" : "normal"}
+              >
+                Annually
+              </Text>
+            </HStack>
+            <Select.Root
+              data-testid="currency-selector"
+              collection={currencyCollection}
+              size="xs"
+              width="100px"
+              value={[currency]}
+              onValueChange={(details) => {
+                const selected = details.value[0];
+                if (selected) {
+                  setCurrency(selected as Currency);
+                }
+              }}
+            >
+              <Select.Trigger>
+                <Select.ValueText />
+              </Select.Trigger>
+              <Select.Content paddingY={2} zIndex="popover">
+                {currencyOptions.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    {option.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            <Link href="/settings/plans">
+              <Button variant="ghost" size="sm" color="gray.600">
+                All plans <ArrowRight size={14} />
+              </Button>
+            </Link>
+          </HStack>
+        </Flex>
+
+        {showSuccess && (
+          <Box
+            data-testid="subscription-success"
+            backgroundColor="green.50"
+            borderWidth={1}
+            borderColor="green.200"
+            borderRadius="md"
+            padding={4}
+          >
+            <HStack gap={2}>
+              <Check size={16} color="green" />
+              <Text fontWeight="semibold" color="green.800">
+                Subscription activated successfully!
+              </Text>
+            </HStack>
           </Box>
         )}
 
-        <Flex gap={6} width="full" wrap="wrap">
-          <PlanBlock
-            testId="plan-block-developer"
-            planName="Developer"
-            price="Free"
-            features={DEVELOPER_PLAN_FEATURES}
-            isCurrent={isDeveloperPlan}
-            buttonText="Get Started"
-            buttonVariant={isDeveloperPlan ? "outline" : "solid"}
-            userCount={users.length || plan.maxMembers}
-            onUserCountClick={() => setIsDrawerOpen(true)}
-          />
+        {/* Current Plan Block */}
+        <CurrentPlanBlock
+          planName={currentPlanName}
+          description={currentPlanDescription}
+          features={currentPlanFeatures}
+          userCount={totalUserCount}
+          upgradeRequired={plannedUsers.length > 0}
+          onUserCountClick={() => setIsDrawerOpen(true)}
+        />
 
-          <PlanBlock
-            testId="plan-block-growth"
-            planName="Growth"
-            price="€29/seat/month"
-            features={GROWTH_PLAN_FEATURES}
-            isCurrent={isGrowthPlan}
-            buttonText="Try for Free"
-            buttonVariant={isGrowthPlan ? "outline" : "solid"}
+        {/* Upgrade Block - only show if on free plan */}
+        {isDeveloperPlan && (
+          <UpgradePlanBlock
+            planName={
+              <>
+                Growth Plan{" "}
+                {billingPeriod === "annually" && (
+                  <Badge colorPalette="green" variant="subtle" fontSize="xs">
+                    Save {Math.round(ANNUAL_DISCOUNT * 100)}%
+                  </Badge>
+                )}
+              </>
+            }
+            pricePerSeat={pricePerSeat}
+            totalPrice={totalPriceFormatted}
+            coreMembers={totalCoreMembers}
+            features={GROWTH_FEATURES}
+            onUpgrade={handleUpgrade}
+            isLoading={createSubscription.isPending}
           />
-        </Flex>
+        )}
 
-        <Link
-          href="mailto:sales@langwatch.ai"
-          color="blue.500"
-          display="flex"
-          alignItems="center"
-          gap={2}
-        >
-          <ExternalLink size={16} />
-          Need more? Contact sales
-        </Link>
+        {/* Recent Invoices */}
+        <RecentInvoicesBlock />
       </VStack>
 
       <UserManagementDrawer
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         users={users}
+        plannedUsers={plannedUsers}
         isLoading={organizationWithMembers.isLoading}
-        onSave={handleSaveUsers}
-        isSaving={isSaving}
-        maxMembers={plan.maxMembers}
-        currentPlanType={plan.type}
+        onSave={handleSavePlannedUsers}
       />
     </SettingsLayout>
   );

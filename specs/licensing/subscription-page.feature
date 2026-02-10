@@ -65,15 +65,22 @@ Feature: Subscription Page Plan Management
     And the Growth plan shows "Try for Free" button
 
   # ============================================================================
-  # User Management Drawer
+  # Seat Management Drawer
   # ============================================================================
 
   @integration
-  Scenario: Opens user management drawer when clicking on user count
+  Scenario: Opens seat management drawer when clicking on user count
     Given the organization has no active paid subscription
     When I click on the user count in the plan block
-    Then a drawer opens showing "Manage Users"
-    And I see a list of organization users
+    Then a drawer opens showing "Manage Seats"
+    And I see a "Current Members" section with organization users
+    And I see a "Pending Seats" section
+
+  @integration
+  Scenario: Drawer does not display alert banners
+    When I open the seat management drawer
+    Then I do not see an admin-requires-core-user info banner
+    And I do not see a core-user-limit-exceeded warning banner
 
   @integration
   Scenario: User list shows member type for each user
@@ -81,62 +88,118 @@ Feature: Subscription Page Plan Management
       | name       | type        |
       | Admin User | Core User   |
       | Jane Doe   | Lite User   |
-    When I open the user management drawer
+    When I open the seat management drawer
     Then each user shows their member type badge
     And "Admin User" shows "Core User"
     And "Jane Doe" shows "Lite User"
 
   @integration
-  Scenario: Cannot change admin user member type
-    Given the organization has an admin user
-    When I open the user management drawer
-    Then the admin user's member type selector is disabled
-    And the admin user remains as "Core User"
+  Scenario: Add Seat button uses plus icon
+    When I open the seat management drawer
+    Then I see a button labeled "Add Seat"
+    And the button displays a plus icon
 
   @integration
-  Scenario: Can change non-admin user from core to lite
-    Given the organization has a non-admin core user "Jane Doe"
-    When I open the user management drawer
-    And I change "Jane Doe" from "Core User" to "Lite User"
-    Then "Jane Doe" shows "Lite User" in the drawer
-    And the changes are not yet saved to the server
+  Scenario: Clicking Add Seat adds a pending seat immediately
+    When I open the seat management drawer
+    And I click "Add Seat"
+    Then a new pending seat row appears with an email input and member type selector
+    And the member type defaults to "Full Member"
+    And the pending seat count increases by 1
 
   @integration
-  Scenario: Can add new users in pending state
-    Given I have the user management drawer open
-    When I click "Add User"
-    And I enter email "newuser@example.com"
-    And I select member type "Lite User"
-    Then a new user row appears with "newuser@example.com"
-    And the new user shows as "pending"
-    And the changes are not yet saved to the server
+  Scenario: Can enter email for a pending seat
+    When I open the seat management drawer
+    And I click "Add Seat"
+    And I enter "newuser@example.com" in the seat email field
+    Then the pending seat row shows the entered email
 
   @integration
-  Scenario: Pending user changes show save button enabled
-    Given I have made changes to users in the drawer
-    When I view the drawer footer
-    Then the "Save" button is enabled
-    And I see an indicator showing unsaved changes
+  Scenario: Can change pending seat member type to Lite Member
+    When I open the seat management drawer
+    And I click "Add Seat"
+    And I change the seat member type to "Lite Member"
+    Then the pending seat shows "Lite Member" selected
 
   @integration
-  Scenario: Discarding changes resets drawer state
-    Given I have made changes to users in the drawer
-    When I click "Cancel" or close the drawer
-    Then the drawer closes
-    And reopening the drawer shows the original user state
+  Scenario: Clicking Add Seat multiple times in a row adds multiple seats
+    When I open the seat management drawer
+    And I click "Add Seat" 3 times in a row
+    Then 3 new pending seat rows appear in the drawer
+
+  @integration
+  Scenario: Each batch-added seat can be removed individually
+    When I open the seat management drawer
+    And I click "Add Seat" 3 times in a row
+    And I remove the second pending seat
+    Then 2 pending seat rows remain in the drawer
+
+  @integration
+  Scenario: Batch-added seats reflect in the total user count
+    When I open the seat management drawer
+    And I click "Add Seat" 3 times in a row
+    And I close the drawer by clicking Done
+    Then the subscription page shows a total of 5 users
+
+  @integration
+  Scenario: Cancelling the drawer discards all batch-added seats
+    When I open the seat management drawer
+    And I click "Add Seat" 2 times in a row
+    And I click "Cancel"
+    And I reopen the seat management drawer
+    Then no pending seat rows are shown
+
+  @integration
+  Scenario: Closing the drawer with Done preserves batch-added seats
+    When I open the seat management drawer
+    And I click "Add Seat" 2 times in a row
+    And I close the drawer by clicking Done
+    And I reopen the seat management drawer
+    Then 2 pending seat rows are shown
+
+  # ============================================================================
+  # Billing Toggles and Dynamic Pricing
+  # ============================================================================
+
+  @integration
+  Scenario: Page shows currency selector and billing period toggle
+    When the subscription page loads
+    Then I see a currency selector defaulting to EUR
+    And I see a billing period toggle with Monthly and Annually options
+
+  @integration
+  Scenario: Switching to annual billing shows 25% discount badge
+    When I select "Annually" billing
+    Then a "SAVE 25%" badge appears
+
+  @integration
+  Scenario: Upgrade block shows dynamic total based on core members
+    Given the organization has 2 existing core members
+    And I have added 1 core member seat in the drawer
+    Then the upgrade block shows total for 3 core members
+
+  @integration
+  Scenario: Upgrade block total updates when switching currency or billing period
+    Given the organization has 3 core members
+    When I switch the currency to USD or toggle billing period
+    Then the upgrade block total recalculates accordingly
+
+  @integration
+  Scenario: Clicking Upgrade now shows alert with totals
+    Given the organization has pending seats
+    When I click "Upgrade now"
+    Then an alert shows the seat breakdown and total price
 
   # ============================================================================
   # Saving User Changes - Pending State Flow
   # ============================================================================
 
   @integration
-  Scenario: Saving users beyond plan limit creates pending state
+  Scenario: Adding seats beyond plan limit shows upgrade required
     Given the organization is on the Developer plan with 2 users
-    And I have added a third user in the user management drawer
-    When I click "Save"
-    Then the drawer closes
-    And the new user is saved with "pending" status
-    And a banner appears showing "Complete upgrade to activate pending users"
+    And I have added a third seat in the seat management drawer
+    When I click "Done"
+    Then the "Upgrade required" badge appears on the current plan block
 
   @e2e
   Scenario: Completing upgrade activates pending users
@@ -154,67 +217,12 @@ Feature: Subscription Page Plan Management
     And the Growth plan shows the organization's current usage
 
   # ============================================================================
-  # Error Handling
-  # ============================================================================
-
-  @integration
-  Scenario: Shows error when save fails
-    Given I have made changes to users in the drawer
-    And the server will return an error
-    When I click "Save"
-    Then an error message appears
-    And the drawer remains open with my changes preserved
-    And I can retry the save operation
-
-  @integration
-  Scenario: Validates email format when adding users
-    Given I have the user management drawer open
-    When I click "Add User"
-    And I enter an invalid email "not-an-email"
-    Then I see a validation error for the email field
-    And the "Add" button is disabled
-
-  # ============================================================================
   # Loading States
   # ============================================================================
 
   @integration
   Scenario: Shows loading state while fetching user data
-    Given the user management drawer is opening
+    Given the seat management drawer is opening
     When the user data is being fetched
     Then a loading spinner is displayed
     And the user list area shows skeleton placeholders
-
-  @integration
-  Scenario: Shows saving state during save operation
-    Given I have made changes and clicked save
-    When the save operation is in progress
-    Then the "Save" button shows a loading state
-    And the drawer cannot be closed
-    And the user list is disabled
-
-  # ============================================================================
-  # Edge Cases
-  # ============================================================================
-
-  @integration
-  Scenario: Handles organization with single admin user
-    Given the organization has only one user who is admin
-    When I open the user management drawer
-    Then I cannot change the admin to lite user
-    And I see a message explaining admin requires core user status
-
-  @integration
-  Scenario: Prevents removing all core users
-    Given the organization has one core user (admin) and one lite user
-    When I try to convert the admin to lite user
-    Then the action is blocked
-    And I see a message that at least one core user is required
-
-  @integration
-  Scenario: Adding users beyond Developer plan limit shows upgrade prompt
-    Given the Developer plan allows maximum 2 users
-    And the organization already has 2 users
-    When I add another user in the drawer
-    Then I see a message that this will require upgrading to Growth plan
-    And the user is added as pending
