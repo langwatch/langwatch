@@ -37,8 +37,6 @@ export interface AICreateModalProps {
   onGenerate: (description: string) => Promise<void> | undefined;
   /** Called when Skip is clicked */
   onSkip: () => void;
-  /** Max character length (default: 500) */
-  maxLength?: number;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
   /** Whether model providers are configured (default: true) */
@@ -51,7 +49,6 @@ type ModalState = "idle" | "generating" | "error";
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_MAX_LENGTH = 500;
 const DEFAULT_PLACEHOLDER =
   "Describe your scenario. What does your agent do? What situation do you want to test?";
 const DEFAULT_GENERATING_TEXT = "Generating...";
@@ -69,7 +66,6 @@ export function AICreateModal({
   exampleTemplates,
   onGenerate,
   onSkip,
-  maxLength = DEFAULT_MAX_LENGTH,
   generatingText = DEFAULT_GENERATING_TEXT,
   hasModelProviders = true,
 }: AICreateModalProps) {
@@ -98,16 +94,14 @@ export function AICreateModal({
 
   const handleDescriptionChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const value = e.target.value;
-      // Truncate to maxLength if needed
-      setDescription(value.slice(0, maxLength));
+      setDescription(e.target.value);
     },
-    [maxLength]
+    []
   );
 
   const handleExampleClick = useCallback((templateText: string) => {
-    setDescription(templateText.slice(0, maxLength));
-  }, [maxLength]);
+    setDescription(templateText);
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!description.trim()) return;
@@ -160,7 +154,6 @@ export function AICreateModal({
     [modalState, onClose]
   );
 
-  const characterCount = description.length;
   const showCloseButton = modalState !== "generating";
 
   return (
@@ -179,8 +172,6 @@ export function AICreateModal({
             <IdleState
               description={description}
               placeholder={placeholder}
-              maxLength={maxLength}
-              characterCount={characterCount}
               exampleTemplates={exampleTemplates}
               onDescriptionChange={handleDescriptionChange}
               onExampleClick={handleExampleClick}
@@ -222,8 +213,6 @@ export function AICreateModal({
 interface IdleStateProps {
   description: string;
   placeholder: string;
-  maxLength: number;
-  characterCount: number;
   exampleTemplates: ExampleTemplate[];
   onDescriptionChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onExampleClick: (text: string) => void;
@@ -232,8 +221,6 @@ interface IdleStateProps {
 function IdleState({
   description,
   placeholder,
-  maxLength,
-  characterCount,
   exampleTemplates,
   onDescriptionChange,
   onExampleClick,
@@ -246,11 +233,8 @@ function IdleState({
           value={description}
           onChange={onDescriptionChange}
           rows={5}
-          resize="none"
+          resize="vertical"
         />
-        <Text fontSize="xs" color="fg.muted" textAlign="right" mt={1}>
-          {characterCount} / {maxLength}
-        </Text>
       </Box>
 
       <Box>
