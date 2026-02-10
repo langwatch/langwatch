@@ -314,7 +314,7 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when clicking on the user count in the plan block", () => {
-    it("opens a drawer showing 'Manage Users'", async () => {
+    it("opens a drawer showing 'Manage Seats'", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
@@ -325,7 +325,19 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByText("Manage Users")).toBeInTheDocument();
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Current Members and Pending Seats sections", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Current Members")).toBeInTheDocument();
+        expect(screen.getByText("Pending Seats")).toBeInTheDocument();
       });
     });
 
@@ -342,7 +354,7 @@ describe("<SubscriptionPage/>", () => {
     });
   });
 
-  describe("when viewing the user management drawer", () => {
+  describe("when viewing the seat management drawer", () => {
     it("shows member type badge for each user", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
@@ -350,184 +362,183 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        // Both users are Core Users
+        // Both users are Core Users (ADMIN and MEMBER roles map to core)
         const coreUserBadges = screen.getAllByText("Core User");
         expect(coreUserBadges.length).toBeGreaterThanOrEqual(2);
       });
     });
 
-    it("shows admin user with disabled member type selector", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        const adminRow = screen.getByTestId("user-row-user-1");
-        const selector = within(adminRow).getByTestId("member-type-selector");
-        expect(selector).toBeDisabled();
-      });
-    });
-
-    it("shows non-admin user with enabled member type selector", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        const memberRow = screen.getByTestId("user-row-user-2");
-        const selector = within(memberRow).getByTestId("member-type-selector");
-        expect(selector).not.toBeDisabled();
-      });
-    });
-  });
-
-  describe("when changing a non-admin user from core to lite", () => {
-    it("updates the user display to show 'Lite User'", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector") as HTMLSelectElement;
-
-      // Use native select change
-      await user.selectOptions(selector, "lite");
-
-      await waitFor(() => {
-        expect(selector.value).toBe("lite");
-      });
-    });
-
-    it("shows unsaved changes indicator", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector");
-      await user.selectOptions(selector, "lite");
-
-      await waitFor(() => {
-        expect(screen.getByTestId("unsaved-changes-indicator")).toBeInTheDocument();
-      });
-    });
-
-    it("enables the Save button", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector");
-      await user.selectOptions(selector, "lite");
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Save/i })).not.toBeDisabled();
-      });
-    });
   });
 
   // ============================================================================
-  // Adding Users
+  // Adding Seats
   // ============================================================================
 
-  describe("when clicking 'Add User' in the drawer", () => {
-    it("shows a form to enter email and select member type", async () => {
+  describe("when clicking 'Add Seat' in the drawer", () => {
+    it("adds a pending seat row with email input immediately", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add User/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
-        expect(screen.getByTestId("new-user-member-type")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("seat-email-0")).toBeInTheDocument();
       });
     });
-  });
 
-  describe("when entering a valid email and clicking Add", () => {
-    it("adds a new user row with pending status", async () => {
+    it("allows entering an email for a pending seat", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add User/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
-      const emailInput = screen.getByPlaceholderText(/email/i);
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
       await user.type(emailInput, "newuser@example.com");
 
-      await user.click(screen.getByRole("button", { name: /^Add$/i }));
+      expect(emailInput.value).toBe("newuser@example.com");
+    });
+
+    it("defaults member type to Full Member", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
       await waitFor(() => {
-        // Look for user rows with the new email - there should be one user row with it
-        const userRows = screen.getAllByTestId(/^user-row-/);
-        const newUserRow = userRows.find((row) => row.textContent?.includes("newuser@example.com"));
-        expect(newUserRow).toBeDefined();
-        expect(screen.getByText("pending")).toBeInTheDocument();
+        const selectRoot = screen.getByTestId("seat-member-type-0");
+        // The Chakra Select renders a value text span showing the selected label
+        const valueText = within(selectRoot).getByText("Full Member", { selector: "span" });
+        expect(valueText).toBeInTheDocument();
+      });
+    });
+
+    it("renders both Full Member and Lite Member options", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // The Chakra Select renders a hidden native <select> with both options
+      const selectRoot = screen.getByTestId("seat-member-type-0");
+      const nativeSelect = selectRoot.querySelector("select") as HTMLSelectElement;
+      expect(nativeSelect).toBeInTheDocument();
+
+      const options = Array.from(nativeSelect.options).map((o) => o.textContent);
+      expect(options).toContain("Full Member");
+      expect(options).toContain("Lite Member");
+    });
+
+    it("adds multiple seats when clicked multiple times", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-2")).toBeInTheDocument();
+      });
+    });
+
+    it("allows removing individual pending seats", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-2")).toBeInTheDocument();
+      });
+
+      // Remove the second pending seat using its data-testid
+      await user.click(screen.getByTestId("remove-seat-1"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+        expect(screen.queryByTestId("pending-seat-2")).not.toBeInTheDocument();
       });
     });
   });
 
-  describe("when entering an invalid email", () => {
-    it("shows a validation error", async () => {
+  describe("when closing the drawer with Done after adding seats", () => {
+    it("reflects batch-added seats in total user count", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
-
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, "not-an-email");
-
-      // Try to submit
-      await user.click(screen.getByRole("button", { name: /^Add$/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/invalid email/i)).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Done to save
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        // 2 existing users + 3 new seats = 5
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("5");
       });
     });
 
-    it("keeps the Add button disabled", async () => {
+    it("preserves batch-added seats when reopening drawer", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
-
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, "not-an-email");
-      await user.tab(); // Blur to trigger validation
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /^Add$/i })).toBeDisabled();
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Done to save
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Reopen drawer
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
       });
     });
   });
@@ -536,57 +547,130 @@ describe("<SubscriptionPage/>", () => {
   // Discarding Changes
   // ============================================================================
 
-  describe("when clicking Cancel or closing the drawer with unsaved changes", () => {
-    it("closes the drawer", async () => {
+  describe("when clicking Cancel after adding seats", () => {
+    it("closes the drawer and discards batch-added seats", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByText("Manage Users")).toBeInTheDocument();
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
       });
 
-      // Make a change
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector");
-      await user.selectOptions(selector, "lite");
+      // Add some seats
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
       // Click Cancel
       await user.click(screen.getByRole("button", { name: /Cancel/i }));
 
       await waitFor(() => {
-        expect(screen.queryByText("Manage Users")).not.toBeInTheDocument();
+        expect(screen.queryByText("Manage Seats")).not.toBeInTheDocument();
+      });
+
+      // Reopen - pending seats should be gone
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("pending-seat-0")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Billing Toggles and Dynamic Pricing
+  // ============================================================================
+
+  describe("when viewing billing toggles", () => {
+    it("shows currency selector defaulting to EUR", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currencySelector = screen.getByTestId("currency-selector");
+        expect(currencySelector).toBeInTheDocument();
       });
     });
 
-    it("resets changes when reopening the drawer", async () => {
+    it("shows billing period toggle defaulting to Monthly", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("billing-period-toggle")).toBeInTheDocument();
+        expect(screen.getByText("Monthly")).toBeInTheDocument();
+        expect(screen.getByText("Annually")).toBeInTheDocument();
+      });
+    });
+
+    it("shows SAVE 25% badge when switching to annually", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
-      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByText("Annually"));
 
       await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
+        expect(screen.getByText("SAVE 25%")).toBeInTheDocument();
       });
+    });
+  });
 
-      // Make a change
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector") as HTMLSelectElement;
-      await user.selectOptions(selector, "lite");
+  describe("when upgrade block shows dynamic pricing", () => {
+    it("displays total based on core members count", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
 
-      // Close drawer
-      await user.click(screen.getByRole("button", { name: /Cancel/i }));
-
-      // Reopen
+      // Add 1 seat via drawer (2 existing core + 1 = 3 total)
       await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
 
       await waitFor(() => {
-        // User should be back to Core User
-        const memberRowAgain = screen.getByTestId("user-row-user-2");
-        const selectorAgain = within(memberRowAgain).getByTestId("member-type-selector") as HTMLSelectElement;
-        expect(selectorAgain.value).toBe("core");
+        // 3 core members × €29 = €87/mo
+        const total = screen.getByTestId("upgrade-total");
+        expect(total).toHaveTextContent("€87/mo");
+        expect(total).toHaveTextContent("3 core members");
       });
+    });
+
+    it("updates price when switching to annually", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Switch to annual
+      await user.click(screen.getByText("Annually"));
+
+      await waitFor(() => {
+        // 3 × €22 (29 * 0.75 rounded) = €66/mo
+        const total = screen.getByTestId("upgrade-total");
+        expect(total).toHaveTextContent("€66/mo");
+      });
+    });
+
+    it("shows alert with totals when clicking Upgrade now", async () => {
+      const user = userEvent.setup();
+      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+      renderSubscriptionPage();
+
+      // Add 1 seat
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Core members: 3")
+      );
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.stringContaining("€87/mo")
+      );
+
+      alertSpy.mockRestore();
     });
   });
 
@@ -594,7 +678,7 @@ describe("<SubscriptionPage/>", () => {
   // Saving - Pending State Flow
   // ============================================================================
 
-  describe("when saving users beyond the plan limit", () => {
+  describe("when adding seats beyond the plan limit", () => {
     beforeEach(() => {
       mockGetActivePlan.mockReturnValue({
         data: createMockPlan({ maxMembers: 2 }),
@@ -602,105 +686,24 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("shows a banner about completing upgrade to activate pending users", async () => {
+    it("shows upgrade required badge after adding seats and clicking Done", async () => {
       const user = userEvent.setup();
-      const mockMutateAsync = vi.fn().mockResolvedValue({ hasPendingUsers: true });
-      mockUpdateUsers.mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: mockMutateAsync,
-        isLoading: false,
-      });
-
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
-      // Add a third user (exceeds limit of 2)
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, "newuser@example.com");
-      await user.click(screen.getByRole("button", { name: /^Add$/i }));
+      // Add a third seat (exceeds limit of 2)
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
-      // Save
-      await user.click(screen.getByRole("button", { name: /Save/i }));
+      // Click Done
+      await user.click(screen.getByRole("button", { name: /Done/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Complete upgrade to activate pending users/i)).toBeInTheDocument();
+        expect(screen.getByText(/Upgrade required/i)).toBeInTheDocument();
       });
     });
   });
 
-  // ============================================================================
-  // Error Handling
-  // ============================================================================
-
-  describe("when save fails", () => {
-    // Note: Error handling tests are skipped because the current implementation
-    // uses a placeholder save function. When the Cloud subscription API is
-    // implemented, these tests should be updated to properly mock the API.
-    it.skip("shows an error message", async () => {
-      const user = userEvent.setup();
-      const mockMutateAsync = vi.fn().mockRejectedValue(new Error("Server error"));
-      mockUpdateUsers.mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: mockMutateAsync,
-        isLoading: false,
-      });
-
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      // Make a change
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector");
-      await user.selectOptions(selector, "lite");
-
-      // Save
-      await user.click(screen.getByRole("button", { name: /Save/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/error/i)).toBeInTheDocument();
-      });
-    });
-
-    it.skip("keeps the drawer open with changes preserved", async () => {
-      const user = userEvent.setup();
-      const mockMutateAsync = vi.fn().mockRejectedValue(new Error("Server error"));
-      mockUpdateUsers.mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: mockMutateAsync,
-        isLoading: false,
-      });
-
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      // Make a change
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector") as HTMLSelectElement;
-      await user.selectOptions(selector, "lite");
-
-      // Save
-      await user.click(screen.getByRole("button", { name: /Save/i }));
-
-      await waitFor(() => {
-        // Drawer should still be open
-        expect(screen.getByText("Manage Users")).toBeInTheDocument();
-        // Change should be preserved
-        expect(selector.value).toBe("lite");
-      });
-    });
-  });
 
   // ============================================================================
   // Loading States
@@ -726,160 +729,34 @@ describe("<SubscriptionPage/>", () => {
     });
   });
 
-  describe("when save operation is in progress", () => {
-    it("shows loading state on Save button", async () => {
+  // ============================================================================
+  // Drawer does not display alert banners
+  // ============================================================================
+
+  describe("when opening the seat management drawer", () => {
+    it("does not display alert banners", async () => {
       const user = userEvent.setup();
 
-      // Start with normal mutation
-      mockUpdateUsers.mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: vi.fn().mockResolvedValue({ hasPendingUsers: false }),
-        isLoading: false,
-      });
-
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("user-row-user-2")).toBeInTheDocument();
-      });
-
-      // Make a change
-      const memberRow = screen.getByTestId("user-row-user-2");
-      const selector = within(memberRow).getByTestId("member-type-selector");
-      await user.selectOptions(selector, "lite");
-
-      // Now mock the loading state
-      mockUpdateUsers.mockReturnValue({
-        mutate: vi.fn(),
-        mutateAsync: vi.fn().mockResolvedValue({ hasPendingUsers: false }),
-        isLoading: true,
-      });
-
-      // The button should show loading state when isLoading is true
-      // Re-render would pick up the new mock
-      await waitFor(() => {
-        // Since we can't easily re-render, we'll check the data attribute is set correctly
-        // The test verifies the loading prop works when isLoading=true
-        expect(screen.getByRole("button", { name: /Save/i })).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ============================================================================
-  // Edge Cases
-  // ============================================================================
-
-  describe("when organization has only one admin user", () => {
-    beforeEach(() => {
+      // Set up org with single admin to previously trigger the alert
       const adminMember = mockOrganizationMembers.members[0]!;
       mockGetOrganizationWithMembers.mockReturnValue({
-        data: { ...mockOrganizationMembers, members: [adminMember] }, // Only admin
+        data: { ...mockOrganizationMembers, members: [adminMember] },
         isLoading: false,
         refetch: vi.fn(),
       });
-    });
 
-    it("shows message explaining admin requires core user status", async () => {
-      const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByText(/admin.*requires.*core/i)).toBeInTheDocument();
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
       });
-    });
-  });
 
-  describe("when organization has one core user (admin) and one lite user", () => {
-    beforeEach(() => {
-      // Set up organization with one admin (core) and one EXTERNAL user (lite)
-      mockGetOrganizationWithMembers.mockReturnValue({
-        data: {
-          ...mockOrganizationMembers,
-          members: [
-            {
-              userId: "user-1",
-              role: "ADMIN",
-              user: {
-                id: "user-1",
-                name: "Admin User",
-                email: "admin@example.com",
-                teamMemberships: [],
-              },
-            },
-            {
-              userId: "user-2",
-              role: "EXTERNAL",
-              user: {
-                id: "user-2",
-                name: "Lite User",
-                email: "lite@example.com",
-                teamMemberships: [],
-              },
-            },
-          ],
-        },
-        isLoading: false,
-        refetch: vi.fn(),
-      });
-    });
-
-    it("blocks changing admin to lite user", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        // Admin user's selector should be disabled
-        const adminRow = screen.getByTestId("user-row-user-1");
-        const selector = within(adminRow).getByTestId("member-type-selector");
-        expect(selector).toBeDisabled();
-      });
-    });
-
-    it("shows message that at least one core user is required", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-
-      await waitFor(() => {
-        expect(screen.getByText(/admin.*requires.*core/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("when adding users beyond Developer plan limit", () => {
-    beforeEach(() => {
-      mockGetActivePlan.mockReturnValue({
-        data: createMockPlan({ maxMembers: 2 }),
-        isLoading: false,
-      });
-    });
-
-    it("shows upgrade message when adding third core user", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-      await user.click(screen.getByRole("button", { name: /Add User/i }));
-
-      const emailInput = screen.getByPlaceholderText(/email/i);
-      await user.type(emailInput, "newuser@example.com");
-
-      // Select Core User (not Lite User, which is the default)
-      const memberTypeSelect = screen.getByTestId("new-user-member-type") as HTMLSelectElement;
-      await user.selectOptions(memberTypeSelect, "core");
-
-      await user.click(screen.getByRole("button", { name: /^Add$/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/exceeded.*user limit/i)).toBeInTheDocument();
-      });
+      // No admin-requires-core-user info banner
+      expect(screen.queryByText(/admin.*requires.*core/i)).not.toBeInTheDocument();
+      // No exceeded-limit warning banner
+      expect(screen.queryByText(/exceeded.*user limit/i)).not.toBeInTheDocument();
     });
   });
 });
