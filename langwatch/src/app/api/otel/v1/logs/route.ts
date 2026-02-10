@@ -24,7 +24,7 @@ const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "1mb",
+      sizeLimit: "10mb",
     },
   },
 };

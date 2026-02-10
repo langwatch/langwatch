@@ -34,7 +34,7 @@ const logger = createLogger("langwatch.collector");
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "1mb",
+      sizeLimit: "10mb",
     },
   },
 };
