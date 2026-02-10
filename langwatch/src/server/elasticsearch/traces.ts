@@ -251,3 +251,114 @@ export const getTracesGroupedByThreadId = async ({
 
   return traces;
 };
+
+/**
+ * Get distinct span names and metadata keys for a project within a date range.
+ *
+ * - Metadata keys: efficient terms aggregation on the `metadata.all_keys` keyword field
+ * - Span names: nested terms aggregation on `spans.model` (keyword) combined with
+ *   a lightweight search for span `name` fields from a sample of traces.
+ *   This is needed because `spans.name` is a text field (not aggregatable).
+ */
+export async function getDistinctFieldNames({
+  connConfig,
+  startDate,
+  endDate,
+}: {
+  connConfig: ProjectConnectionConfig;
+  startDate: number;
+  endDate: number;
+}): Promise<{
+  spanNames: Array<{ key: string; label: string }>;
+  metadataKeys: Array<{ key: string; label: string }>;
+}> {
+  const client = await esClient(connConfig);
+
+  const dateFilter = {
+    range: {
+      "timestamps.started_at": {
+        gte: startDate,
+        lte: endDate,
+        format: "epoch_millis",
+      },
+    },
+  };
+
+  const projectFilter = { term: { project_id: connConfig.projectId } };
+
+  // Run two queries in parallel:
+  // 1. Aggregation for metadata keys (keyword field, very efficient)
+  //    + span models (keyword, nested)
+  // 2. Lightweight search for span names (text field, need to sample documents)
+  const [aggsResult, spansResult] = await Promise.all([
+    client.search({
+      index: TRACE_INDEX.alias,
+      size: 0,
+      query: { bool: { filter: [projectFilter, dateFilter] } },
+      aggs: {
+        metadata_keys: {
+          terms: {
+            field: "metadata.all_keys",
+            size: 10_000,
+            order: { _key: "asc" },
+          },
+        },
+        span_models: {
+          nested: { path: "spans" },
+          aggs: {
+            models: {
+              terms: {
+                field: "spans.model",
+                size: 10_000,
+                order: { _key: "asc" },
+              },
+            },
+          },
+        },
+      },
+    }),
+    // Fetch 200 traces but only span name/model/type fields (very lightweight)
+    client.search<{ spans?: Array<{ name?: string; model?: string; type?: string }> }>({
+      index: TRACE_INDEX.alias,
+      size: 200,
+      _source: {
+        includes: ["spans.name", "spans.model", "spans.type"],
+      },
+      query: { bool: { filter: [projectFilter, dateFilter] } },
+      sort: [{ "timestamps.started_at": { order: "desc" } }],
+    }),
+  ]);
+
+  // Extract metadata keys from aggregation
+  const metadataKeyBuckets =
+    (aggsResult.aggregations?.metadata_keys as any)?.buckets ?? [];
+  const metadataKeys = metadataKeyBuckets.map((bucket: any) => ({
+    key: bucket.key as string,
+    label: bucket.key as string,
+  }));
+
+  // Extract span models from aggregation
+  const spanModelBuckets =
+    (aggsResult.aggregations?.span_models as any)?.models?.buckets ?? [];
+  const modelNames = new Set<string>(
+    spanModelBuckets.map((bucket: any) => bucket.key as string),
+  );
+
+  // Extract span names from the lightweight search results
+  const spanNameSet = new Set<string>(modelNames);
+  for (const hit of spansResult.hits.hits) {
+    const spans = hit._source?.spans ?? [];
+    for (const span of spans) {
+      const name = span.name ?? (span.type === "llm" ? span.model : undefined);
+      if (name) {
+        spanNameSet.add(name);
+      }
+    }
+  }
+
+  const spanNames = Array.from(spanNameSet)
+    .sort()
+    .map((name) => ({ key: name, label: name }));
+
+  return { spanNames, metadataKeys };
+}

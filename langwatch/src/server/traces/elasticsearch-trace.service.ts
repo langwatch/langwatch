@@ -10,6 +10,7 @@ import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import type { Protections } from "~/server/elasticsearch/protections";
 import {
   aggregateTraces,
+  getDistinctFieldNames as esGetDistinctFieldNames,
   getTraceById as esGetTraceById,
   getTracesGroupedByThreadId as esGetTracesGroupedByThreadId,
   searchTraces,
@@ -24,6 +25,7 @@ import type {
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
   PromptStudioSpanResult,
   TopicCountsResult,
@@ -756,5 +758,25 @@ export class ElasticsearchTraceService {
     }
 
     return groups;
+  }
+
+  /**
+   * Get distinct span names and metadata keys for a project.
+   *
+   * @param projectId - The project ID
+   * @param startDate - Start of date range (epoch millis)
+   * @param endDate - End of date range (epoch millis)
+   * @returns DistinctFieldNamesResult with span names and metadata keys
+   */
+  async getDistinctFieldNames(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<DistinctFieldNamesResult> {
+    return esGetDistinctFieldNames({
+      connConfig: { projectId },
+      startDate,
+      endDate,
+    });
   }
 }

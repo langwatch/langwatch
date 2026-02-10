@@ -59,6 +59,15 @@ export interface CustomersAndLabelsResult {
 }
 
 /**
+ * Result structure for getDistinctFieldNames.
+ * Returns unique span names and metadata keys for a project.
+ */
+export interface DistinctFieldNamesResult {
+  spanNames: Array<{ key: string; label: string }>;
+  metadataKeys: Array<{ key: string; label: string }>;
+}
+
+/**
  * Result structure for getSpanForPromptStudio.
  * Contains all the data needed to populate the prompt studio UI.
  */

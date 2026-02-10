@@ -21,6 +21,7 @@ import {
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
   PromptStudioSpanResult,
   TopicCountsResult,
@@ -976,6 +977,96 @@ export class ClickHouseTraceService {
             }
           : null,
     };
+  }
+
+  /**
+   * Get distinct span names and metadata keys for a project.
+   *
+   * Returns null if ClickHouse is not enabled for the project.
+   */
+  async getDistinctFieldNames(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<DistinctFieldNamesResult | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getDistinctFieldNames",
+      { attributes: { "tenant.id": projectId } },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        try {
+          // Get distinct span names from stored_spans
+          const spanResult = await this.clickHouseClient.query({
+            query: `
+              SELECT DISTINCT SpanName
+              FROM stored_spans FINAL
+              WHERE TenantId = {tenantId:String}
+                AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
+                AND SpanName != ''
+              ORDER BY SpanName ASC
+            `,
+            query_params: {
+              tenantId: projectId,
+              startDate,
+              endDate,
+            },
+            format: "JSONEachRow",
+          });
+
+          const spanRows = (await spanResult.json()) as Array<{
+            SpanName: string;
+          }>;
+
+          const spanNames = spanRows.map((row) => ({
+            key: row.SpanName,
+            label: row.SpanName,
+          }));
+
+          // Get distinct metadata keys from trace_summaries Attributes
+          const metaResult = await this.clickHouseClient.query({
+            query: `
+              SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
+              FROM trace_summaries FINAL
+              WHERE TenantId = {tenantId:String}
+                AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+              ORDER BY key ASC
+            `,
+            query_params: {
+              tenantId: projectId,
+              startDate,
+              endDate,
+            },
+            format: "JSONEachRow",
+          });
+
+          const metaRows = (await metaResult.json()) as Array<{
+            key: string;
+          }>;
+
+          const metadataKeys = metaRows.map((row) => ({
+            key: row.key,
+            label: row.key,
+          }));
+
+          return { spanNames, metadataKeys };
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch distinct field names from ClickHouse",
+          );
+          throw new Error("Failed to fetch distinct field names");
+        }
+      },
+    );
   }
 
   /**

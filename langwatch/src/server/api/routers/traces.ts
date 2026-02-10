@@ -298,6 +298,24 @@ export const tracesRouter = createTRPCRouter({
       );
     }),
 
+  getFieldNames: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        startDate: z.number(),
+        endDate: z.number(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ ctx, input }) => {
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getDistinctFieldNames(
+        input.projectId,
+        input.startDate,
+        input.endDate,
+      );
+    }),
+
   getSampleTraces: protectedProcedure
     .input(
       tracesFilterInput.extend({
