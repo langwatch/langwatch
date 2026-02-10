@@ -57,17 +57,10 @@ Feature: AI Create Modal for Scenarios
   # ============================================================================
 
   @integration
-  Scenario: Modal displays character counter
+  Scenario: Textarea allows unlimited text input
     When I click the "New Scenario" button
-    And I enter "Test description" in the textarea
-    Then I see the character counter showing "16 / 500"
-
-  @integration
-  Scenario: Character counter enforces 500 character limit
-    When I click the "New Scenario" button
-    And I enter a 500 character description
-    Then the character counter shows "500 / 500"
-    And I cannot enter more characters
+    And I enter a very long description (1000+ characters)
+    Then the full text is accepted without truncation
 
   @integration
   Scenario: Close modal with close button in default state
