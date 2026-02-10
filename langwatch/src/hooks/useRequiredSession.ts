@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import { signIn, useSession } from "next-auth/react";
 
-export const publicRoutes = ["/share/[id]"];
+export const publicRoutes = ["/share/[id]", "/auth/signin", "/auth/signup", "/auth/error"];
 
 export const useRequiredSession = (
   { required = true }: { required?: boolean } = { required: true },
