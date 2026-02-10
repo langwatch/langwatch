@@ -38,8 +38,10 @@ spec:
         {{- toYaml .Values.workers.pod.labels | nindent 8 }}
         {{- end }}
       annotations:
-        {{- if .Values.workers.podAnnotations }}
-        {{- toYaml .Values.workers.podAnnotations | nindent 8 }}
+        {{- if .Values.workers.pod.annotations }}
+        {{- toYaml .Values.workers.pod.annotations | nindent 8 }}
+        {{- else if .Values.global.podAnnotations }}
+        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
         {{- end }}
     spec:
       {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
@@ -263,6 +265,18 @@ spec:
             # Telemetry
             - name: DISABLE_USAGE_STATS
               value: {{ (not (.Values.app.telemetry.usage.enabled | default true)) | quote }}
+            {{- if .Values.app.telemetry.metrics.enabled }}
+            {{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
+            - name: METRICS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.key }}
+            {{- else if .Values.app.telemetry.metrics.apiKey.value }}
+            - name: METRICS_API_KEY
+              value: {{ .Values.app.telemetry.metrics.apiKey.value | quote }}
+            {{- end }}
+            {{- end }}
 
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}
