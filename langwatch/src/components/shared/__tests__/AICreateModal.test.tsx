@@ -105,41 +105,6 @@ describe("<AICreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays character counter at 0 / 500", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(within(dialog).getByText("0 / 500")).toBeInTheDocument();
-    });
-
-    it("displays character counter with custom maxLength", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          maxLength={300}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      expect(within(dialog).getByText("0 / 300")).toBeInTheDocument();
-    });
-
     it("displays example pills", () => {
       render(
         <AICreateModal
@@ -218,7 +183,7 @@ describe("<AICreateModal/>", () => {
   });
 
   describe("when user types in textarea", () => {
-    it("updates character counter", () => {
+    it("allows unlimited text input", () => {
       render(
         <AICreateModal
           open={true}
@@ -233,31 +198,10 @@ describe("<AICreateModal/>", () => {
 
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test description" } });
+      const longText = "A".repeat(1000);
+      fireEvent.change(textarea, { target: { value: longText } });
 
-      expect(within(dialog).getByText("16 / 500")).toBeInTheDocument();
-    });
-
-    it("truncates text at maxLength", () => {
-      render(
-        <AICreateModal
-          open={true}
-          onClose={vi.fn()}
-          title="Create new scenario"
-          exampleTemplates={defaultExampleTemplates}
-          onGenerate={vi.fn()}
-          onSkip={vi.fn()}
-          maxLength={10}
-        />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "This is a very long description" } });
-
-      expect(textarea).toHaveValue("This is a ");
-      expect(within(dialog).getByText("10 / 10")).toBeInTheDocument();
+      expect(textarea).toHaveValue(longText);
     });
   });
 
