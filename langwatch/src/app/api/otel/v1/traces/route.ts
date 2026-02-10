@@ -28,7 +28,7 @@ const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "1mb",
+      sizeLimit: "10mb",
     },
   },
 };

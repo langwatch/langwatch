@@ -24,7 +24,7 @@ const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "1mb",
+      sizeLimit: "10mb",
     },
   },
 };
