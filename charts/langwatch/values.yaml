@@ -556,9 +556,9 @@ app:
 ## @section Workers
 workers:
   # Enable separate worker deployment
-  # When false (default), workers run inside the main app pod
-  ## @param workers.enabled [default: false] Deploy workers as a separate pod.
-  enabled: false
+  # When false, workers run inside the main app pod
+  ## @param workers.enabled [default: true] Deploy workers as a separate pod.
+  enabled: true
 
   # Number of worker replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
