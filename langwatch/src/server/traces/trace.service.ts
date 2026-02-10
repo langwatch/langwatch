@@ -9,6 +9,7 @@ import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
   PromptStudioSpanResult,
   TopicCountsResult,
@@ -393,6 +394,54 @@ export class TraceService {
         }
 
         return this.elasticsearchService.getCustomersAndLabels(input);
+      },
+    );
+  }
+
+  /**
+   * Get distinct span names and metadata keys for a project within a date range.
+   *
+   * @param projectId - The project ID
+   * @param startDate - Start of date range (epoch millis)
+   * @param endDate - End of date range (epoch millis)
+   * @returns DistinctFieldNamesResult with span names and metadata keys
+   */
+  async getDistinctFieldNames(
+    projectId: string,
+    startDate: number,
+    endDate: number,
+  ): Promise<DistinctFieldNamesResult> {
+    return this.tracer.withActiveSpan(
+      "TraceService.getDistinctFieldNames",
+      { attributes: { "tenant.id": projectId } },
+      async (span) => {
+        const useClickHouse = await this.isClickHouseEnabled(projectId);
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
+
+        if (useClickHouse) {
+          const result =
+            await this.clickHouseService.getDistinctFieldNames(
+              projectId,
+              startDate,
+              endDate,
+            );
+          if (result !== null) {
+            return result;
+          }
+          this.logger.warn(
+            { projectId },
+            "ClickHouse enabled but returned null for getDistinctFieldNames, falling back to Elasticsearch",
+          );
+        }
+
+        return this.elasticsearchService.getDistinctFieldNames(
+          projectId,
+          startDate,
+          endDate,
+        );
       },
     );
   }
