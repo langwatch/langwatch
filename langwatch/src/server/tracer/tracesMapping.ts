@@ -685,7 +685,7 @@ export type ThreadMappingState = {
   mapping: Record<
     string,
     {
-      source: keyof typeof THREAD_MAPPINGS | "";
+      source: AllThreadMappingSources | "";
       selectedFields?: string[];
     }
   >;
@@ -758,7 +758,7 @@ export const mapTraceToDatasetEntry = (
   mapping: Record<
     string,
     {
-      source: keyof typeof TRACE_MAPPINGS | "";
+      source: string;
       key?: string;
       subkey?: string;
       selectedFields?: string[];
@@ -784,7 +784,7 @@ export const mapTraceToDatasetEntry = (
         ([column, { source, key, subkey, selectedFields }]) => {
           const source_ =
             source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source]
+              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
               : undefined;
 
           let value = source_?.mapping(trace, key!, subkey!, {
@@ -920,7 +920,7 @@ const THREAD_TRACES_CHILDREN = [
  * Human-readable labels for trace mapping sources.
  * Keys not listed here will use their key name as the label.
  */
-const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
+export const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
   formatted_trace: "Full Trace (AI-Readable)",
 };
 
@@ -928,7 +928,7 @@ const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
  * Human-readable labels for thread mapping sources.
  * Keys not listed here will use their key name as the label.
  */
-const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
+export const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
   formatted_traces: "Full Thread (AI-Readable)",
 };
 
