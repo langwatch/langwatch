@@ -1,0 +1,286 @@
+{{- if .Values.workers.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-workers
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-workers
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: workers
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.workers.labels }}
+    {{- toYaml .Values.workers.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.workers.deployment.annotations }}
+    {{- toYaml .Values.workers.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.workers.replicaCount }}
+  {{- if .Values.workers.deployment.strategy }}
+  strategy:
+    {{- toYaml .Values.workers.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if .Values.workers.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.workers.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-workers
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-workers
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: workers
+        {{- if .Values.workers.pod.labels }}
+        {{- toYaml .Values.workers.pod.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.workers.podAnnotations }}
+        {{- toYaml .Values.workers.podAnnotations | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.workers.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.opensearch.chartManaged }}
+        - name: wait-for-opensearch
+          image: curlimages/curl:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              url="http://{{ .Release.Name }}-opensearch:9200/_cluster/health"
+              echo "Waiting for OpenSearch service at $url..."
+              until curl -s -f $url | grep -q '"status":"green"\|"status":"yellow"'; do
+                echo "OpenSearch not ready yet, waiting..."
+                sleep 5
+              done
+              echo "OpenSearch is ready!"
+        {{- end }}
+      containers:
+        {{- with .Values.workers.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-workers
+          securityContext:
+            {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          command: ['pnpm']
+          args: ['run', 'start:workers']
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
+
+            - name: BASE_HOST
+              value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
+
+            - name: SKIP_ENV_VALIDATION
+              value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
+            - name: DISABLE_PII_REDACTION
+              value: {{ .Values.app.features.disablePiiRedaction | default false | quote }}
+
+            - name: LANGWATCH_NLP_SERVICE
+              value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
+            - name: LANGEVALS_ENDPOINT
+              value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+
+            # PostgreSQL connection string
+            {{- if .Values.postgresql.chartManaged }}
+            - name: PGUSER
+              value: {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.postgresql.auth.existingSecret }}{{ .Values.postgresql.auth.existingSecret }}{{ else }}{{ .Release.Name }}-postgresql{{ end }}
+                  key: {{ if .Values.postgresql.auth.existingSecret }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}{{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}{{ else }}{{ .Values.postgresql.auth.secretKeys.passwordKey | default "password" }}{{ end }}{{ else }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}postgres-password{{ else }}password{{ end }}{{ end }}
+            - name: PGHOST
+              value: "{{ .Release.Name }}-postgresql"
+            - name: PGDATABASE
+              value: {{ .Values.postgresql.auth.database | quote }}
+            - name: DATABASE_URL
+              value: "postgresql://$(PGUSER):$(PGPASSWORD)@$(PGHOST):5432/$(PGDATABASE)"
+            {{- else }}
+            - name: DATABASE_URL
+              {{- if .Values.postgresql.external.connectionString.value }}
+              value: {{ .Values.postgresql.external.connectionString.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.external.connectionString.secretKeyRef.name }}
+                  key: {{ .Values.postgresql.external.connectionString.secretKeyRef.key }}
+              {{- end }}
+            {{- end }}
+
+            # Redis connection string
+            {{- if .Values.redis.chartManaged }}
+            {{- if .Values.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.existingSecret }}{{ else }}{{ .Release.Name }}-redis{{ end }}
+                  key: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.secretKeys.passwordKey | default "password" }}{{ else }}redis-password{{ end }}
+            - name: REDIS_HOST
+              value: "{{ .Release.Name }}-redis-master"
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):6379"
+            {{- else }}
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis-master:6379"
+            {{- end }}
+            {{- else }}
+            {{- if eq .Values.redis.external.architecture "standalone" }}
+            - name: REDIS_URL
+            {{- else}}
+            - name: REDIS_CLUSTER_ENDPOINTS
+            {{- end }}
+            {{- if .Values.redis.external.connectionString.value }}
+              value: {{ .Values.redis.external.connectionString.value | quote }}
+            {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.external.connectionString.secretKeyRef.name }}
+                  key: {{ .Values.redis.external.connectionString.secretKeyRef.key }}
+            {{- end }}
+            {{- end }}
+
+            # ElasticSearch/OpenSearch/Quickwit connection string
+            {{- if .Values.opensearch.chartManaged }}
+            - name: ELASTICSEARCH_NODE_URL
+              value: "http://{{ .Release.Name }}-opensearch:9200"
+            - name: IS_OPENSEARCH
+              value: "true"
+            {{- else}}
+            - name: ELASTICSEARCH_NODE_URL
+              {{- if .Values.opensearch.external.nodeUrl.value }}
+              value: {{ .Values.opensearch.external.nodeUrl.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
+                  key: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
+              {{- end }}
+            - name: ELASTICSEARCH_API_KEY
+              {{- if .Values.opensearch.external.apiKey.value }}
+              value: {{ .Values.opensearch.external.apiKey.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opensearch.external.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.opensearch.external.apiKey.secretKeyRef.key }}
+              {{- end }}
+            {{- if eq .Values.opensearch.external.engine "opensearch" }}
+            - name: IS_OPENSEARCH
+              value: "true"
+            {{- else if eq .Values.opensearch.external.engine "quickwit" }}
+            - name: IS_QUICKWIT
+              value: "true"
+            {{- end }}
+            {{- end }}
+
+            # Credentials encryption key
+            {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
+            - name: CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
+                  key: {{ .Values.app.credentialsEncryptionKey.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.credentialsEncryptionKey | default "credentialsEncryptionKey" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: credentialsEncryptionKey
+            {{- end }}
+
+            # Evaluators - Azure OpenAI Integration
+            {{- if .Values.app.evaluators.azureOpenAI.enabled }}
+            {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.azureOpenAI.endpoint.value }}
+            - name: AZURE_OPENAI_ENDPOINT
+              value: {{ .Values.app.evaluators.azureOpenAI.endpoint.value | quote }}
+            {{- end }}
+            {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
+            - name: AZURE_OPENAI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.azureOpenAI.apiKey.value }}
+            - name: AZURE_OPENAI_KEY
+              value: {{ .Values.app.evaluators.azureOpenAI.apiKey.value | quote }}
+            {{- end }}
+            {{- end }}
+
+            # Evaluators - Google AI Integration
+            {{- if .Values.app.evaluators.google.enabled }}
+            {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.evaluators.google.credentials.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.google.credentials.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.google.credentials.value }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: {{ .Values.app.evaluators.google.credentials.value | quote }}
+            {{- end }}
+            {{- end }}
+
+            # Telemetry
+            - name: DISABLE_USAGE_STATS
+              value: {{ (not (.Values.app.telemetry.usage.enabled | default true)) | quote }}
+
+            {{- with .Values.workers.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          resources:
+            {{- toYaml .Values.workers.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.workers.extraVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+
+      volumes:
+        {{- with .Values.workers.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}

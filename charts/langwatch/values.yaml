@@ -547,6 +547,93 @@ app:
   extraAppVolumeMounts: []
 
 # =============================================================================
+# LangWatch Workers Configuration
+# =============================================================================
+# Configuration for running BullMQ background workers in a separate pod.
+# When enabled, workers are deployed as their own Deployment and the main app
+# pod no longer starts in-process workers (START_WORKERS=false).
+# Uses the same container image as the app but runs `pnpm start:workers`.
+## @section Workers
+workers:
+  # Enable separate worker deployment
+  # When false (default), workers run inside the main app pod
+  ## @param workers.enabled [default: false] Deploy workers as a separate pod.
+  enabled: false
+
+  # Number of worker replicas
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
+  ## @param workers.replicaCount [default: 1] Number of worker replicas.
+  replicaCount: 1
+
+  # Resource requirements for worker pods
+  # Workers are CPU/memory intensive for processing evaluations and trace collection
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
+  ## @extra workers.resources Resource requests and limits for workers.
+  ## @param workers.resources.requests.cpu [string, default: 250m] Requested CPU.
+  ## @param workers.resources.requests.memory [string, default: 2Gi] Requested memory.
+  ## @param workers.resources.limits.cpu [string, default: 1000m] CPU limit.
+  ## @param workers.resources.limits.memory [string, default: 4Gi] Memory limit.
+  resources:
+    requests: { cpu: 250m, memory: 2Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
+
+  # =============================================================================
+  # Kubernetes Pass-Through Configuration
+  # =============================================================================
+
+  # Pod security context
+  # See: https://kubespec.dev/v1/Pod#spec.securityContext
+  ## @param workers.podSecurityContext [object] Pod security context overrides.
+  podSecurityContext: {}
+  # Container security context
+  # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
+  ## @param workers.containerSecurityContext [object] Container security context overrides.
+  containerSecurityContext: {}
+  # PodDisruptionBudget pass-through
+  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
+  ## @param workers.podDisruptionBudget [object] PodDisruptionBudget spec overrides.
+  podDisruptionBudget: {}
+  # Node selector
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
+  ## @param workers.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  # Tolerations
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
+  ## @param workers.tolerations [array] Tolerations overrides.
+  tolerations: []
+  # Affinity
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
+  ## @param workers.affinity [object] Affinity overrides.
+  affinity: {}
+  # Pod-level configurations
+  ## @extra workers.pod Pod-level metadata.
+  pod:
+    ## @param workers.pod.annotations [object] Additional pod annotations.
+    annotations: {}
+    ## @param workers.pod.labels [object] Additional pod labels.
+    labels: {}
+  # Deployment-level configurations
+  ## @extra workers.deployment Deployment-level metadata and strategy.
+  deployment:
+    ## @param workers.deployment.annotations [object] Additional deployment annotations.
+    annotations: {}
+    ## @param workers.deployment.labels [object] Additional deployment labels.
+    labels: {}
+    ## @param workers.deployment.strategy [object] Deployment strategy overrides.
+    strategy: {}
+  # Additional Kubernetes resources
+  ## @param workers.extraEnvs [array] Additional environment variables.
+  extraEnvs: []
+  ## @param workers.extraContainers [array] Additional sidecar containers.
+  extraContainers: []
+  ## @param workers.extraVolumes [array] Additional pod volumes.
+  extraVolumes: []
+  ## @param workers.extraInitContainers [array] Additional init containers.
+  extraInitContainers: []
+  ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
+  extraVolumeMounts: []
+
+# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the Natural Language Processing service

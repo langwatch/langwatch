@@ -119,6 +119,10 @@ spec:
             - name: NODE_ENV
               value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
 
+            # When workers are deployed separately, disable in-process workers
+            - name: START_WORKERS
+              value: {{ if .Values.workers.enabled }}"false"{{ else }}"true"{{ end }}
+
             - name: BASE_HOST
               value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
             - name: NEXTAUTH_URL
