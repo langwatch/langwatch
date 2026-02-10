@@ -317,10 +317,10 @@ export async function getDistinctFieldNames({
         },
       },
     }),
-    // Fetch 200 traces but only span name/model/type fields (very lightweight)
+    // Fetch 10k traces but only span name/model/type fields (very lightweight)
     client.search<{ spans?: Array<{ name?: string; model?: string; type?: string }> }>({
       index: TRACE_INDEX.alias,
-      size: 200,
+      size: 10000,
       _source: {
         includes: ["spans.name", "spans.model", "spans.type"],
       },
