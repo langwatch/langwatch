@@ -88,15 +88,15 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: latest
-    pullPolicy: Always
+    tag: 2.2.0 # x-release-please-version
+    pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository.
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: latest
-    pullPolicy: Always
+    tag: 2.2.0 # x-release-please-version
+    pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
@@ -439,16 +439,6 @@ app:
       apiKey:
         value: ""
         ## @param app.telemetry.metrics.apiKey.secretKeyRef [object] Secret ref for metrics API key.
-        secretKeyRef: { name: "", key: "" }
-    # Sentry error reporting integration
-    ## @extra app.telemetry.sentry Sentry error reporting.
-    ## @param app.telemetry.sentry.enabled [default: false] Enable Sentry error reporting.
-    ## @param app.telemetry.sentry.dsn.value [string] Sentry DSN.
-    sentry:
-      enabled: false
-      dsn:
-        value: ""
-        ## @param app.telemetry.sentry.dsn.secretKeyRef [object] Secret ref for Sentry DSN.
         secretKeyRef: { name: "", key: "" }
 
   # =============================================================================

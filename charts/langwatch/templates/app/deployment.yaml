@@ -618,19 +618,6 @@ spec:
               value: {{ .Values.app.telemetry.metrics.apiKey.value | quote }}
             {{- end }}
             {{- end }}
-            # Telemetry - Sentry error reporting integration
-            {{- if .Values.app.telemetry.sentry.enabled }}
-            {{- if .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
-            - name: SENTRY_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
-                  key: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.key }}
-            {{- else if .Values.app.telemetry.sentry.dsn.value }}
-            - name: SENTRY_DSN
-              value: {{ .Values.app.telemetry.sentry.dsn.value | quote }}
-            {{- end }}
-            {{- end }}
 
             {{- with .Values.app.extraEnvs}}
             {{- toYaml . | nindent 12 }}
