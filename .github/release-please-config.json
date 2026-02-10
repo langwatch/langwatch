@@ -87,7 +87,6 @@
         "typescript-sdk",
         "sdk-go",
         "mcp-server",
-        "charts",
         ".github",
         ".cursor",
         "assets"
@@ -104,7 +103,9 @@
           "type": "toml",
           "path": "pyproject.toml",
           "jsonpath": "$.project.version"
-        }
+        },
+        "charts/langwatch/Chart.yaml",
+        "charts/langwatch/values.yaml"
       ]
     }
   },

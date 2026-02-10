@@ -119,6 +119,10 @@ spec:
             - name: NODE_ENV
               value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
 
+            # When workers are deployed separately, disable in-process workers
+            - name: START_WORKERS
+              value: {{ if .Values.workers.enabled }}"false"{{ else }}"true"{{ end }}
+
             - name: BASE_HOST
               value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
             - name: NEXTAUTH_URL
@@ -612,19 +616,6 @@ spec:
             {{- else if .Values.app.telemetry.metrics.apiKey.value }}
             - name: METRICS_API_KEY
               value: {{ .Values.app.telemetry.metrics.apiKey.value | quote }}
-            {{- end }}
-            {{- end }}
-            # Telemetry - Sentry error reporting integration
-            {{- if .Values.app.telemetry.sentry.enabled }}
-            {{- if .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
-            - name: SENTRY_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
-                  key: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.key }}
-            {{- else if .Values.app.telemetry.sentry.dsn.value }}
-            - name: SENTRY_DSN
-              value: {{ .Values.app.telemetry.sentry.dsn.value | quote }}
             {{- end }}
             {{- end }}
 

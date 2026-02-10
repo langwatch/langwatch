@@ -195,16 +195,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{- if .Values.app.telemetry.sentry.enabled }}
-  {{- if .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
-    {{- if empty .Values.app.telemetry.sentry.dsn.secretKeyRef.key }}
-      {{- $errors = append $errors "app.telemetry.sentry.dsn.secretKeyRef.name is set but key is empty" }}
-    {{- end }}
-  {{- else if empty .Values.app.telemetry.sentry.dsn.value }}
-    {{- $errors = append $errors "app.telemetry.sentry.enabled is true but dsn is not configured" }}
-  {{- end }}
-{{- end }}
-
 {{/* Validate external service secrets */}}
 {{- if not .Values.opensearch.chartManaged }}
   {{- if .Values.opensearch.external.nodeUrl.secretKeyRef.name }}

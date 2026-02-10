@@ -1,0 +1,19 @@
+{{- if and .Values.workers.enabled .Values.workers.podDisruptionBudget }}
+{{- with .Values.workers.podDisruptionBudget }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-workers-pdb
+  labels:
+    app.kubernetes.io/name: {{ $.Release.Name }}-workers
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: workers
+    {{- include "langwatch.labels" $ | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $.Release.Name }}-workers
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
