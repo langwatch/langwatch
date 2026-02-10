@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.1.0...langwatch@v2.2.0) (2026-02-10)
+
+
+### Features
+
+* increase OTEL collector body size limit from 1MB to 10MB ([3774f89](https://github.com/langwatch/langwatch/commit/3774f89a7b79f26407f079d82ee4016009ac4da0))
+* increase OTEL collector body size limit to 10MB ([#1432](https://github.com/langwatch/langwatch/issues/1432)) ([3774f89](https://github.com/langwatch/langwatch/commit/3774f89a7b79f26407f079d82ee4016009ac4da0))
+* map gen_ai.conversation.id to thread_id in OTEL traces ([#1428](https://github.com/langwatch/langwatch/issues/1428)) ([3b58d8e](https://github.com/langwatch/langwatch/commit/3b58d8ee8e02122c7ba63815713e6973a52537cd))
+
+
+### Bug Fixes
+
+* add auth pages to publicRoutes to prevent infinite redirect loop ([#1433](https://github.com/langwatch/langwatch/issues/1433)) ([3357334](https://github.com/langwatch/langwatch/commit/335733456e05e8513c7aace00ad47533f8a5c2d8))
+* remove character limits on AI scenario generation ([#1430](https://github.com/langwatch/langwatch/issues/1430)) ([39d9ce1](https://github.com/langwatch/langwatch/commit/39d9ce1c6eb69a2205a27094cde4f14d23ba826e))
+* theme toggle cut-off in collapsed sidebar ([#1382](https://github.com/langwatch/langwatch/issues/1382)) ([eeca00e](https://github.com/langwatch/langwatch/commit/eeca00ed70ad1941a0393f2604855bfafdab178f))
+
+
+### Miscellaneous
+
+* remove orphaned migration test file ([#1431](https://github.com/langwatch/langwatch/issues/1431)) ([a2358dc](https://github.com/langwatch/langwatch/commit/a2358dc847e85c8c41b025b4fa77ce6a30ae105a))
+* sync model registry ([f937adb](https://github.com/langwatch/langwatch/commit/f937adb8a89c2581c9e6cbf1308a58c1c949a93b))
+* sync model registry (332 models) ([#1417](https://github.com/langwatch/langwatch/issues/1417)) ([f937adb](https://github.com/langwatch/langwatch/commit/f937adb8a89c2581c9e6cbf1308a58c1c949a93b))
+
 ## [2.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.0.2...langwatch@v2.1.0) (2026-02-09)
 
 
