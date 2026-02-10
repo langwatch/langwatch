@@ -16,9 +16,12 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
+  type AllTraceMappingSources,
   type MappingState,
   mapTraceToDatasetEntry,
+  SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
+  TRACE_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
@@ -151,7 +154,7 @@ export const TracesMapping = ({
     mapping: Record<
       string,
       {
-        source: keyof typeof TRACE_MAPPINGS | "";
+        source: AllTraceMappingSources | "";
         key?: string;
         subkey?: string;
         selectedFields?: string[];
@@ -181,13 +184,36 @@ export const TracesMapping = ({
   );
   const mapping = traceMappingState.mapping;
 
+  // Check if any column uses a server-only source (e.g. formatted_trace)
+  const needsFormattedDigest = useMemo(
+    () =>
+      Object.values(mapping).some(
+        (m) =>
+          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source),
+      ),
+    [mapping],
+  );
+
+  // Fetch formatted span digests from server when needed
+  const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceIds: traces.map((t) => t.trace_id),
+    },
+    {
+      enabled: !!project?.id && needsFormattedDigest && traces.length > 0,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    },
+  );
+
   const availableExpansions = useMemo(() => {
     const result = new Set(
       Object.values(mapping)
         .map((mapping) => {
           const source =
             mapping.source && mapping.source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[mapping.source]
+              ? TRACE_MAPPINGS[mapping.source as keyof typeof TRACE_MAPPINGS]
               : undefined;
           if (source && "expandable_by" in source && source.expandable_by) {
             return source.expandable_by;
@@ -330,6 +356,13 @@ export const TracesMapping = ({
     let index = 0;
     const entries: DatasetRecordEntry[] = [];
 
+    // Identify columns mapped to server-only sources
+    const serverOnlyColumns = Object.entries(mapping)
+      .filter(([, m]) =>
+        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source),
+      )
+      .map(([col, m]) => ({ col, source: m.source }));
+
     for (const trace of traces_) {
       const mappedEntries = mapTraceToDatasetEntry(
         trace,
@@ -341,6 +374,13 @@ export const TracesMapping = ({
 
       // Add each expanded entry to the final results
       for (const entry of mappedEntries) {
+        // Override server-only source columns with data from server
+        for (const { col, source } of serverOnlyColumns) {
+          if (source === "formatted_trace" && formattedDigests.data) {
+            entry[col] = formattedDigests.data[trace.trace_id] ?? "";
+          }
+        }
+
         entries.push({
           id: `${now}-${index}`,
           selected: true,
@@ -358,6 +398,7 @@ export const TracesMapping = ({
     setDatasetEntries,
     traces_,
     allThreadTraces.data,
+    formattedDigests.data,
     project?.id,
     now,
   ]);
@@ -386,7 +427,7 @@ export const TracesMapping = ({
         ([targetField, { source, key, subkey }], index) => {
           const traceMappingDefinition =
             source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source]
+              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
               : undefined;
 
           // Get subkeys for the selected key
@@ -513,7 +554,7 @@ export const TracesMapping = ({
                                   ...prev.mapping,
                                   [targetField]: {
                                     source: e.target.value as
-                                      | keyof typeof TRACE_MAPPINGS
+                                      | AllTraceMappingSources
                                       | "",
                                     key: undefined,
                                     subkey: undefined,
@@ -527,9 +568,12 @@ export const TracesMapping = ({
                           value={source}
                         >
                           <option value=""></option>
-                          {Object.keys(TRACE_MAPPINGS).map((key) => (
+                          {[
+                            ...SERVER_ONLY_TRACE_SOURCES,
+                            ...Object.keys(TRACE_MAPPINGS),
+                          ].map((key) => (
                             <option key={key} value={key}>
-                              {key}
+                              {TRACE_MAPPING_LABELS[key] ?? key}
                             </option>
                           ))}
                         </NativeSelect.Field>
