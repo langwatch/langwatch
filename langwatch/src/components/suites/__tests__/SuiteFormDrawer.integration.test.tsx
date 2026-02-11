@@ -201,6 +201,32 @@ describe("<SuiteFormDrawer/>", () => {
   });
 
   describe("given the drawer is open in create mode", () => {
+    it("displays the 'New Suite' title", () => {
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+      expect(screen.getByText("New Suite")).toBeInTheDocument();
+    });
+
+    it("renders fields for Name, Description, Scenarios, and Targets", () => {
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByPlaceholderText("e.g., Critical Path Suite"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Core journeys that must pass before deploy"),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/^Scenarios/)).toBeInTheDocument();
+      expect(screen.getByText(/^Target\(s\)/)).toBeInTheDocument();
+    });
+
+    it("renders Save and Run Now buttons", () => {
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+      expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
+    });
+
     describe("when Save is clicked with an empty name", () => {
       it("shows a name validation error", async () => {
         const user = userEvent.setup();

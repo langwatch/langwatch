@@ -4,6 +4,10 @@ import {
   type SuiteRunDependencies,
   type SuiteTarget,
 } from "../suite.service";
+import {
+  InvalidScenarioReferencesError,
+  InvalidTargetReferencesError,
+} from "../errors";
 import type { SuiteRepository } from "../suite.repository";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 
@@ -241,7 +245,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
-        it("fails with an error about invalid scenario references", async () => {
+        it("throws InvalidScenarioReferencesError with the invalid IDs", async () => {
           const suite = makeSuite({
             scenarioIds: ["scen_1", "deleted-scenario"],
           });
@@ -253,6 +257,9 @@ describe("SuiteService", () => {
 
           await expect(
             service.run({ suite, projectId: "proj_1", deps }),
+          ).rejects.toThrow(InvalidScenarioReferencesError);
+          await expect(
+            service.run({ suite, projectId: "proj_1", deps }),
           ).rejects.toThrow("Invalid scenario references: deleted-scenario");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });
@@ -261,7 +268,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a removed target", () => {
       describe("when the suite run is triggered", () => {
-        it("fails with an error about invalid target references", async () => {
+        it("throws InvalidTargetReferencesError with the invalid IDs", async () => {
           const suite = makeSuite({
             targets: [
               { type: "http", referenceId: "removed-target" },
@@ -275,8 +282,180 @@ describe("SuiteService", () => {
 
           await expect(
             service.run({ suite, projectId: "proj_1", deps }),
+          ).rejects.toThrow(InvalidTargetReferencesError);
+          await expect(
+            service.run({ suite, projectId: "proj_1", deps }),
           ).rejects.toThrow("Invalid target references: removed-target");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
+
+  describe("duplicate()", () => {
+    let service: SuiteService;
+    let mockRepository: {
+      create: ReturnType<typeof vi.fn>;
+      findById: ReturnType<typeof vi.fn>;
+      findAll: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      archive: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockRepository = {
+        create: vi.fn(),
+        findById: vi.fn(),
+        findAll: vi.fn(),
+        update: vi.fn(),
+        archive: vi.fn(),
+      };
+      service = new SuiteService(mockRepository as unknown as SuiteRepository);
+    });
+
+    describe("given an existing suite", () => {
+      describe("when duplicate is called", () => {
+        it("creates a new suite with '(copy)' appended to the name", async () => {
+          const original = makeSuite({ id: "suite_1", name: "Critical Path" });
+          mockRepository.findById.mockResolvedValue(original);
+          mockRepository.create.mockResolvedValue(
+            makeSuite({ id: "suite_2", name: "Critical Path (copy)" }),
+          );
+
+          const result = await service.duplicate({
+            id: "suite_1",
+            projectId: "proj_1",
+          });
+
+          expect(result.name).toBe("Critical Path (copy)");
+          expect(mockRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({ name: "Critical Path (copy)" }),
+          );
+        });
+
+        it("copies scenarioIds from the original", async () => {
+          const original = makeSuite({
+            id: "suite_1",
+            scenarioIds: ["scen_1", "scen_2", "scen_3"],
+          });
+          mockRepository.findById.mockResolvedValue(original);
+          mockRepository.create.mockResolvedValue(makeSuite());
+
+          await service.duplicate({ id: "suite_1", projectId: "proj_1" });
+
+          const createArg = mockRepository.create.mock.calls[0]![0];
+          expect(createArg.scenarioIds).toEqual(["scen_1", "scen_2", "scen_3"]);
+        });
+
+        it("copies targets from the original", async () => {
+          const original = makeSuite({
+            id: "suite_1",
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "prompt", referenceId: "prompt_1" },
+            ] as SuiteTarget[],
+          });
+          mockRepository.findById.mockResolvedValue(original);
+          mockRepository.create.mockResolvedValue(makeSuite());
+
+          await service.duplicate({ id: "suite_1", projectId: "proj_1" });
+
+          const createArg = mockRepository.create.mock.calls[0]![0];
+          expect(createArg.targets).toEqual([
+            { type: "http", referenceId: "agent_1" },
+            { type: "prompt", referenceId: "prompt_1" },
+          ]);
+        });
+
+        it("copies repeatCount from the original", async () => {
+          const original = makeSuite({ id: "suite_1", repeatCount: 5 });
+          mockRepository.findById.mockResolvedValue(original);
+          mockRepository.create.mockResolvedValue(makeSuite());
+
+          await service.duplicate({ id: "suite_1", projectId: "proj_1" });
+
+          const createArg = mockRepository.create.mock.calls[0]![0];
+          expect(createArg.repeatCount).toBe(5);
+        });
+
+        it("copies labels from the original", async () => {
+          const original = makeSuite({ id: "suite_1", labels: ["regression", "smoke"] });
+          mockRepository.findById.mockResolvedValue(original);
+          mockRepository.create.mockResolvedValue(makeSuite());
+
+          await service.duplicate({ id: "suite_1", projectId: "proj_1" });
+
+          const createArg = mockRepository.create.mock.calls[0]![0];
+          expect(createArg.labels).toEqual(["regression", "smoke"]);
+        });
+      });
+    });
+
+    describe("given a non-existent suite", () => {
+      describe("when duplicate is called", () => {
+        it("throws an error", async () => {
+          mockRepository.findById.mockResolvedValue(null);
+
+          await expect(
+            service.duplicate({ id: "suite_missing", projectId: "proj_1" }),
+          ).rejects.toThrow("Suite not found");
+        });
+      });
+    });
+  });
+
+  describe("delete()", () => {
+    let service: SuiteService;
+    let mockRepository: {
+      create: ReturnType<typeof vi.fn>;
+      findById: ReturnType<typeof vi.fn>;
+      findAll: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      archive: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockRepository = {
+        create: vi.fn(),
+        findById: vi.fn(),
+        findAll: vi.fn(),
+        update: vi.fn(),
+        archive: vi.fn(),
+      };
+      service = new SuiteService(mockRepository as unknown as SuiteRepository);
+    });
+
+    describe("given an existing suite", () => {
+      describe("when delete is called", () => {
+        it("archives the suite via the repository", async () => {
+          const archived = makeSuite({ archivedAt: new Date() });
+          mockRepository.archive.mockResolvedValue(archived);
+
+          const result = await service.delete({
+            id: "suite_1",
+            projectId: "proj_1",
+          });
+
+          expect(result).toBe(archived);
+          expect(mockRepository.archive).toHaveBeenCalledWith({
+            id: "suite_1",
+            projectId: "proj_1",
+          });
+        });
+      });
+    });
+
+    describe("given a non-existent suite", () => {
+      describe("when delete is called", () => {
+        it("returns null", async () => {
+          mockRepository.archive.mockResolvedValue(null);
+
+          const result = await service.delete({
+            id: "suite_missing",
+            projectId: "proj_1",
+          });
+
+          expect(result).toBeNull();
         });
       });
     });

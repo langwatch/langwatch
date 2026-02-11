@@ -222,4 +222,92 @@ describe("<SuiteSidebar/>", () => {
       expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });
+
+  describe("given suites with run summaries", () => {
+    const suites = [
+      makeSuite({ id: "suite_1", name: "Critical Path" }),
+      makeSuite({ id: "suite_2", name: "Billing Edge" }),
+    ];
+
+    describe("when a suite has all passing results", () => {
+      it("displays pass count and total", () => {
+        const runSummaries = new Map([
+          [
+            "suite_1",
+            {
+              passedCount: 8,
+              totalCount: 8,
+              lastRunTimestamp: Date.now() - 2 * 60 * 60 * 1000,
+            },
+          ],
+        ]);
+
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            suites={suites}
+            runSummaries={runSummaries}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
+      });
+    });
+
+    describe("when a suite has some failures", () => {
+      it("displays pass count and total showing the gap", () => {
+        const runSummaries = new Map([
+          [
+            "suite_2",
+            {
+              passedCount: 9,
+              totalCount: 12,
+              lastRunTimestamp: Date.now() - 60 * 1000,
+            },
+          ],
+        ]);
+
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            suites={suites}
+            runSummaries={runSummaries}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText(/9\/12 passed/)).toBeInTheDocument();
+      });
+    });
+
+    describe("when a suite has no run data", () => {
+      it("does not display a run summary line", () => {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            suites={suites}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when All Runs is clicked", () => {
+    it("calls onSelectSuite with 'all-runs'", async () => {
+      const user = userEvent.setup();
+      const onSelectSuite = vi.fn();
+
+      render(
+        <SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByText("All Runs"));
+      expect(onSelectSuite).toHaveBeenCalledWith("all-runs");
+    });
+  });
 });
