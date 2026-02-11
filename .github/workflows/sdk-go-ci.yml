@@ -58,7 +58,7 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
         working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
