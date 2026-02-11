@@ -95,7 +95,7 @@ examples = [
     "pytest>=7.4.2,<8.0.0",
     "python-dotenv==1.2.1",
     "streamlit>=1.37.1,<2.0.0",
-    "uvicorn>=0.38.0,<0.40.0",
+    "uvicorn>=0.38.0,<0.41.0",
     "json-repair>=0.42.0",
     "openinference-instrumentation-openai>=0.1.30",
     "opentelemetry-instrumentation-langchain>=0.40.4",
