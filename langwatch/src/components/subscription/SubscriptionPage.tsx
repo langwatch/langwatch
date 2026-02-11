@@ -21,13 +21,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
+import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -107,6 +108,8 @@ function CurrentPlanBlock({
   userCount,
   upgradeRequired,
   onUserCountClick,
+  onManageSubscription,
+  isManageLoading,
 }: {
   planName: string;
   description?: string;
@@ -114,6 +117,8 @@ function CurrentPlanBlock({
   userCount: number;
   upgradeRequired?: boolean;
   onUserCountClick?: () => void;
+  onManageSubscription?: () => void;
+  isManageLoading?: boolean;
 }) {
   return (
     <Card.Root
@@ -191,7 +196,65 @@ function CurrentPlanBlock({
               ))}
             </SimpleGrid>
           )}
+          {onManageSubscription && (
+            <Button
+              data-testid="manage-subscription-button"
+              variant="outline"
+              size="sm"
+              onClick={onManageSubscription}
+              loading={isManageLoading}
+              disabled={isManageLoading}
+            >
+              Manage Subscription
+            </Button>
+          )}
         </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+/**
+ * Update Seats Block - allows Growth plan users to finalize seat changes
+ */
+function UpdateSeatsBlock({
+  totalCoreMembers,
+  totalPrice,
+  onUpdate,
+  isLoading,
+}: {
+  totalCoreMembers: number;
+  totalPrice: string;
+  onUpdate: () => void;
+  isLoading?: boolean;
+}) {
+  return (
+    <Card.Root
+      data-testid="update-seats-block"
+      borderWidth={1}
+      borderColor="gray.200"
+    >
+      <Card.Body paddingY={5} paddingX={6}>
+        <Flex justifyContent="space-between" alignItems="center">
+          <VStack align="start" gap={1}>
+            <Text fontWeight="semibold" fontSize="lg">
+              Update Seats
+            </Text>
+            <Text fontSize="sm" color="gray.700">
+              {totalPrice} for {totalCoreMembers} core member
+              {totalCoreMembers !== 1 ? "s" : ""}
+            </Text>
+          </VStack>
+          <Button
+            colorPalette="blue"
+            size="md"
+            onClick={onUpdate}
+            loading={isLoading}
+            disabled={isLoading}
+          >
+            Update subscription
+          </Button>
+        </Flex>
       </Card.Body>
     </Card.Root>
   );
@@ -521,16 +584,32 @@ export function SubscriptionPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
   const [currency, setCurrency] = useState<Currency>("EUR");
+  const [currencyInitialized, setCurrencyInitialized] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
     "monthly",
   );
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Detect currency from IP geolocation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currencyApi = (api as any).currency;
+  const detectedCurrency = currencyApi?.detectCurrency?.useQuery(undefined, {
+    enabled: !currencyInitialized,
+  });
+
+  useEffect(() => {
+    if (detectedCurrency?.data?.currency && !currencyInitialized) {
+      setCurrency(detectedCurrency.data.currency);
+      setCurrencyInitialized(true);
+    }
+  }, [detectedCurrency?.data, currencyInitialized]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("success")) {
       setShowSuccess(true);
     }
   }, []);
+
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
@@ -589,6 +668,9 @@ export function SubscriptionPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionApi = (api as any).subscription;
   const createSubscription = subscriptionApi.create.useMutation();
+  const addTeamMemberOrEvents =
+    subscriptionApi.addTeamMemberOrEvents.useMutation();
+  const manageSubscription = subscriptionApi.manage.useMutation();
 
   const handleUpgrade = async () => {
     if (!organization) return;
@@ -600,6 +682,39 @@ export function SubscriptionPage() {
       membersToAdd: totalCoreMembers,
       currency,
       billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
+    });
+
+    if (result.url) {
+      window.location.href = result.url;
+    }
+  };
+
+  const handleUpdateSeats = async () => {
+    if (!organization) return;
+
+    await addTeamMemberOrEvents.mutateAsync({
+      organizationId: organization.id,
+      plan: "GROWTH_SEAT_USAGE",
+      upgradeMembers: true,
+      upgradeTraces: false,
+      totalMembers: totalCoreMembers,
+      totalTraces: 0,
+    });
+
+    setPlannedUsers([]);
+    toaster.create({
+      title: "Seats updated successfully",
+      type: "success",
+    });
+    void organizationWithMembers.refetch();
+  };
+
+  const handleManageSubscription = async () => {
+    if (!organization) return;
+
+    const result = await manageSubscription.mutateAsync({
+      organizationId: organization.id,
+      baseUrl: window.location.origin,
     });
 
     if (result.url) {
@@ -723,18 +838,50 @@ export function SubscriptionPage() {
           </Box>
         )}
 
+        {/* TIERED pricing model alert */}
+        {organization.pricingModel === "TIERED" && (
+          <Box
+            data-testid="tiered-pricing-alert"
+            backgroundColor="blue.50"
+            borderWidth={1}
+            borderColor="blue.200"
+            borderRadius="md"
+            padding={4}
+          >
+            <HStack gap={2}>
+              <Info size={16} color="var(--chakra-colors-blue-500)" />
+              <Text fontSize="sm" color="blue.800">
+                We've updated our pricing model. Visit the new{" "}
+                <Link
+                  href="/settings/plans"
+                  fontWeight="semibold"
+                  color="blue.600"
+                  _hover={{ color: "blue.800" }}
+                >
+                  plans page
+                </Link>{" "}
+                to see available options.
+              </Text>
+            </HStack>
+          </Box>
+        )}
+
         {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
           description={currentPlanDescription}
           features={currentPlanFeatures}
           userCount={totalUserCount}
-          upgradeRequired={plannedUsers.length > 0}
+          upgradeRequired={isDeveloperPlan && plannedUsers.length > 0}
           onUserCountClick={() => setIsDrawerOpen(true)}
+          onManageSubscription={
+            !isDeveloperPlan ? handleManageSubscription : undefined
+          }
+          isManageLoading={manageSubscription.isPending}
         />
 
-        {/* Upgrade Block - only show if on free plan */}
-        {isDeveloperPlan && (
+        {/* Upgrade Block - only show if on free plan and not TIERED pricing */}
+        {isDeveloperPlan && organization.pricingModel !== "TIERED" && (
           <UpgradePlanBlock
             planName={
               <>
@@ -752,6 +899,16 @@ export function SubscriptionPage() {
             features={GROWTH_FEATURES}
             onUpgrade={handleUpgrade}
             isLoading={createSubscription.isPending}
+          />
+        )}
+
+        {/* Update Seats Block - show for Growth plan when seats have been added, not for TIERED */}
+        {!isDeveloperPlan && plannedUsers.length > 0 && organization.pricingModel !== "TIERED" && (
+          <UpdateSeatsBlock
+            totalCoreMembers={totalCoreMembers}
+            totalPrice={totalPriceFormatted}
+            onUpdate={handleUpdateSeats}
+            isLoading={addTeamMemberOrEvents.isPending}
           />
         )}
 
