@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from langwatch_nlp.topic_clustering.build_response import build_response
 from langwatch_nlp.topic_clustering.topic_naming import (
@@ -146,5 +146,8 @@ def setup_endpoints(app: FastAPI):
                 "traces": traces_to_assign,
                 "cost": cost,
             }
+        except Exception as e:
+            logger.error("Batch clustering failed", error=str(e), error_type=type(e).__name__)
+            raise HTTPException(status_code=500, detail=str(e))
         finally:
             clear_log_context()

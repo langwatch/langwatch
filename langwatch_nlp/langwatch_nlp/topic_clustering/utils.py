@@ -1,4 +1,5 @@
 from typing import Optional
+import contextvars
 import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -51,7 +52,7 @@ def _generate_single_embedding(
             target_dim=dimensions,
         )
     except Exception as e:
-        logger.error("Error generating single embedding", error=str(e), text_preview=text[:100])
+        logger.warning("Error generating single embedding", error=str(e), text_preview=text[:100])
         raise e  # Re-raise the exception to be handled by the caller
 
 
@@ -80,9 +81,10 @@ def generate_embeddings_threaded(
         futures = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
+            # Submit all tasks, propagating log context to threads
+            ctx = contextvars.copy_context()
             for text in chunk:
-                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions))
+                futures.append(executor.submit(ctx.run, _generate_single_embedding, text, params_copy, dimensions))
 
             # Process results as they complete
             for future in futures:
@@ -140,7 +142,11 @@ def generate_embeddings(
             ]
         except Exception as e:
             if batch_size > 1:
-                # Instead of falling back to batch_size=1, use threaded implementation
+                # Don't fallback for auth errors — same key will fail for every individual request
+                if isinstance(e, litellm.exceptions.AuthenticationError):
+                    logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                    raise
+                # For other errors, fall back to threaded implementation
                 logger.info("Batch embedding failed, falling back to threaded implementation")
                 return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
