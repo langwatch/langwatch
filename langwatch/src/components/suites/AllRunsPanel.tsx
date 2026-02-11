@@ -6,7 +6,6 @@
  */
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { useCallback, useMemo, useState } from "react";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -27,8 +26,6 @@ const SUITE_PREFIX = "__suite__";
 
 export function AllRunsPanel() {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
-
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<RunHistoryFilterValues>({
     scenarioId: "",
@@ -138,11 +135,12 @@ export function AllRunsPanel() {
   // Navigate to run detail
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
-      void router.push(
-        `/${project?.slug}/scenarios/${scenarioRun.scenarioId}/runs/${scenarioRun.scenarioRunId}`,
-      );
+      if (!project) return;
+      const setId = runDataResult?.scenarioSetIds[scenarioRun.batchRunId] ?? "";
+      const url = `/${project.slug}/simulations/${encodeURIComponent(setId)}/${encodeURIComponent(scenarioRun.batchRunId)}/${encodeURIComponent(scenarioRun.scenarioRunId)}`;
+      window.open(url, "_blank");
     },
-    [project, router],
+    [project, runDataResult?.scenarioSetIds],
   );
 
   // Load more pagination

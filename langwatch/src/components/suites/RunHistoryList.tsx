@@ -9,7 +9,6 @@
 
 import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
-import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -43,7 +42,6 @@ type RunHistoryListProps = {
 
 export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
   const setId = getSuiteSetId(suite.id);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -227,9 +225,9 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
     (scenarioRun: ScenarioRunData) => {
       if (!project) return;
       const url = `/${project.slug}/simulations/${encodeURIComponent(setId)}/${encodeURIComponent(scenarioRun.batchRunId)}/${encodeURIComponent(scenarioRun.scenarioRunId)}`;
-      void router.push(url);
+      window.open(url, "_blank");
     },
-    [project, router, setId],
+    [project, setId],
   );
 
   if (isLoading) {
