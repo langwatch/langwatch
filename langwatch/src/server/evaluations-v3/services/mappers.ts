@@ -4,6 +4,7 @@
  * canonical camelCase service types.
  */
 
+import { parse } from "date-fns";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationTarget,
@@ -102,14 +103,20 @@ export interface ClickHouseCostSummaryRow {
  * @param record - The ClickHouse row
  * @param workflowVersion - Optional workflow version metadata from Prisma
  * @param evaluatorBreakdown - Optional per-evaluator aggregation rows for this run
+ * @param costSummary - Optional per-run cost/duration summary
  * @returns The canonical ExperimentRun
  */
-export function mapClickHouseRunToExperimentRun(
-  record: ClickHouseExperimentRunRow,
-  workflowVersion?: ExperimentRunWorkflowVersion | null,
-  evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[],
-  costSummary?: ClickHouseCostSummaryRow,
-): ExperimentRun {
+export function mapClickHouseRunToExperimentRun({
+  record,
+  workflowVersion,
+  evaluatorBreakdown,
+  costSummary,
+}: {
+  record: ClickHouseExperimentRunRow;
+  workflowVersion?: ExperimentRunWorkflowVersion | null;
+  evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[];
+  costSummary?: ClickHouseCostSummaryRow;
+}): ExperimentRun {
   const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
 
   if (evaluatorBreakdown) {
@@ -441,7 +448,9 @@ export function mapEsTargetsToTargets(
  * Parses a ClickHouse DateTime64(3) string into a Unix timestamp in milliseconds.
  * ClickHouse returns DateTime64(3) as strings like "2024-01-15 10:30:00.000".
  */
+const CLICKHOUSE_DATETIME64_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSX";
+
 function parseClickHouseDateTime(value: string): number {
-  const ms = Date.parse(value);
+  const ms = parse(`${value}Z`, CLICKHOUSE_DATETIME64_FORMAT, new Date(0)).getTime();
   return isNaN(ms) ? 0 : ms;
 }

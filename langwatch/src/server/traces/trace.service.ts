@@ -38,10 +38,12 @@ export class TraceService {
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
+  private readonly evaluationService: EvaluationService;
 
   constructor(readonly prisma: PrismaClient) {
     this.clickHouseService = ClickHouseTraceService.create(prisma);
     this.elasticsearchService = ElasticsearchTraceService.create(prisma);
+    this.evaluationService = EvaluationService.create(prisma);
   }
 
   /**
@@ -262,14 +264,14 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async (span) => {
-        const evalService = EvaluationService.create(this.prisma);
-        const useClickHouse = await evalService.isClickHouseEnabled(projectId);
+        const useClickHouse =
+          await this.evaluationService.isClickHouseEnabled(projectId);
         span.setAttribute(
           "backend",
           useClickHouse ? "clickhouse" : "elasticsearch",
         );
 
-        const result = await evalService.getEvaluationsMultiple({
+        const result = await this.evaluationService.getEvaluationsMultiple({
           projectId,
           traceIds,
           protections,

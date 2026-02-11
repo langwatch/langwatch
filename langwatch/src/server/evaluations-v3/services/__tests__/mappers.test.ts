@@ -72,7 +72,7 @@ const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
 
 describe("mapClickHouseRunToExperimentRun", () => {
   it("maps PascalCase fields to camelCase", () => {
-    const result = mapClickHouseRunToExperimentRun(baseClickHouseRun);
+    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
 
     expect(result.experimentId).toBe("exp-1");
     expect(result.runId).toBe("run-1");
@@ -80,47 +80,47 @@ describe("mapClickHouseRunToExperimentRun", () => {
     expect(result.total).toBe(10);
   });
 
-  it("parses ClickHouse DateTime64 strings to Unix milliseconds", () => {
-    const result = mapClickHouseRunToExperimentRun(baseClickHouseRun);
+  it("parses ClickHouse DateTime64 strings to UTC Unix milliseconds", () => {
+    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
 
     expect(result.timestamps.createdAt).toBe(
-      Date.parse("2024-01-15 10:30:00.000"),
+      Date.parse("2024-01-15T10:30:00.000Z"),
     );
     expect(result.timestamps.updatedAt).toBe(
-      Date.parse("2024-01-15 10:35:00.000"),
+      Date.parse("2024-01-15T10:35:00.000Z"),
     );
     expect(result.timestamps.finishedAt).toBe(
-      Date.parse("2024-01-15 10:40:00.000"),
+      Date.parse("2024-01-15T10:40:00.000Z"),
     );
   });
 
   it("sets finishedAt and stoppedAt to null when absent", () => {
     const row = { ...baseClickHouseRun, FinishedAt: null, StoppedAt: null };
-    const result = mapClickHouseRunToExperimentRun(row);
+    const result = mapClickHouseRunToExperimentRun({ record: row });
 
     expect(result.timestamps.finishedAt).toBeNull();
     expect(result.timestamps.stoppedAt).toBeNull();
   });
 
   it("attaches workflow version when provided", () => {
-    const result = mapClickHouseRunToExperimentRun(
-      baseClickHouseRun,
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
       workflowVersion,
-    );
+    });
     expect(result.workflowVersion).toEqual(workflowVersion);
   });
 
   it("sets workflowVersion to null when not provided", () => {
-    const result = mapClickHouseRunToExperimentRun(baseClickHouseRun);
+    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
     expect(result.workflowVersion).toBeNull();
   });
 
   it("aggregates evaluator breakdown into summary evaluations", () => {
-    const result = mapClickHouseRunToExperimentRun(
-      baseClickHouseRun,
-      null,
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+      workflowVersion: null,
       evaluatorBreakdown,
-    );
+    });
 
     expect(result.summary.evaluations["eval-1"]).toEqual({
       name: "Accuracy",
@@ -130,21 +130,21 @@ describe("mapClickHouseRunToExperimentRun", () => {
   });
 
   it("uses EvaluatorId as name fallback when EvaluatorName is null", () => {
-    const result = mapClickHouseRunToExperimentRun(
-      baseClickHouseRun,
-      null,
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+      workflowVersion: null,
       evaluatorBreakdown,
-    );
+    });
 
     expect(result.summary.evaluations["eval-2"]!.name).toBe("eval-2");
   });
 
   it("omits averagePassed when hasPassedCount is 0", () => {
-    const result = mapClickHouseRunToExperimentRun(
-      baseClickHouseRun,
-      null,
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+      workflowVersion: null,
       evaluatorBreakdown,
-    );
+    });
 
     expect(
       result.summary.evaluations["eval-2"]!.averagePassed,
@@ -152,7 +152,7 @@ describe("mapClickHouseRunToExperimentRun", () => {
   });
 
   it("returns empty evaluations when no breakdown provided", () => {
-    const result = mapClickHouseRunToExperimentRun(baseClickHouseRun);
+    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
     expect(result.summary.evaluations).toEqual({});
   });
 });

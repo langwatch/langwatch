@@ -219,12 +219,12 @@ export class ClickHouseExperimentRunService {
               ? (versionsMap[row.WorkflowVersionId] ?? null)
               : null;
 
-            const run = mapClickHouseRunToExperimentRun(
-              row,
+            const run = mapClickHouseRunToExperimentRun({
+              record: row,
               workflowVersion,
-              breakdownByRunId.get(row.RunId),
-              costByRunId.get(row.RunId),
-            );
+              evaluatorBreakdown: breakdownByRunId.get(row.RunId),
+              costSummary: costByRunId.get(row.RunId),
+            });
 
             if (!(run.experimentId in result)) {
               result[run.experimentId] = [];
