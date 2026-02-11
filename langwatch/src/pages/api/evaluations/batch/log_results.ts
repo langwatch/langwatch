@@ -10,6 +10,7 @@ import {
   esClient,
 } from "../../../../server/elasticsearch";
 import { ExperimentRunDispatcher } from "../../../../server/evaluations-v3/dispatch";
+import { mapEsTargetsToTargets } from "../../../../server/evaluations-v3/services/mappers";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -392,17 +393,7 @@ const dispatchToClickHouse = async (
 
     const { run_id: runId } = batchEvaluation;
 
-    // Map targets from snake_case (ES) to camelCase (event-sourcing)
-    const targets = (batchEvaluation.targets ?? []).map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      promptId: t.prompt_id ?? undefined,
-      promptVersion: t.prompt_version ?? undefined,
-      agentId: t.agent_id ?? undefined,
-      model: t.model ?? undefined,
-      metadata: t.metadata ?? undefined,
-    }));
+    const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
     await dispatcher.startRun({
       tenantId: project.id,

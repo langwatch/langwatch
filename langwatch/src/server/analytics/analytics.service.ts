@@ -89,11 +89,11 @@ export class AnalyticsService {
 
       return project?.featureClickHouseDataSourceTraces === true;
     } catch (error) {
-      this.logger.error(
+      this.logger.warn(
         { projectId, error: error instanceof Error ? error.message : error },
-        "Failed to check ClickHouse feature flag",
+        "Failed to check ClickHouse feature flag, defaulting to ES",
       );
-      throw error;
+      return false;
     }
   }
 

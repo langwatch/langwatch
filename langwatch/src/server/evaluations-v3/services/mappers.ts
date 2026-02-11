@@ -4,13 +4,17 @@
  * canonical camelCase service types.
  */
 
-import type { ESBatchEvaluation } from "~/server/experiments/types";
+import type {
+  ESBatchEvaluation,
+  ESBatchEvaluationTarget,
+} from "~/server/experiments/types";
 import type {
   ExperimentRun,
   ExperimentRunDatasetEntry,
   ExperimentRunEvaluation,
   ExperimentRunEvaluationSummary,
   ExperimentRunSummary,
+  ExperimentRunTarget,
   ExperimentRunWithItems,
   ExperimentRunWorkflowVersion,
 } from "./types";
@@ -367,17 +371,9 @@ export function mapEsBatchEvaluationToRunWithItems(
     }),
   );
 
-  const targets = source.targets?.map((t) => ({
-    id: t.id,
-    name: t.name,
-    type: t.type,
-    promptId: t.prompt_id,
-    promptVersion: t.prompt_version,
-    agentId: t.agent_id,
-    evaluatorId: t.evaluator_id,
-    model: t.model,
-    metadata: t.metadata,
-  }));
+  const targets = source.targets
+    ? mapEsTargetsToTargets(source.targets)
+    : undefined;
 
   return {
     experimentId: source.experiment_id,
@@ -396,6 +392,29 @@ export function mapEsBatchEvaluationToRunWithItems(
       stoppedAt: source.timestamps.stopped_at,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Shared ES target mapper
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps Elasticsearch snake_case targets to the canonical camelCase shape.
+ */
+export function mapEsTargetsToTargets(
+  targets: ESBatchEvaluationTarget[],
+): ExperimentRunTarget[] {
+  return targets.map((t) => ({
+    id: t.id,
+    name: t.name,
+    type: t.type,
+    promptId: t.prompt_id,
+    promptVersion: t.prompt_version,
+    agentId: t.agent_id,
+    evaluatorId: t.evaluator_id,
+    model: t.model,
+    metadata: t.metadata,
+  }));
 }
 
 // ---------------------------------------------------------------------------

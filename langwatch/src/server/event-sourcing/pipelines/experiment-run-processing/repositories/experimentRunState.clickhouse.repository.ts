@@ -54,7 +54,7 @@ function timestampToDateTime64(timestampMs: number | null): string | null {
 
 function dateTime64ToTimestamp(dateTime64: string | null): number | null {
   if (dateTime64 === null) return null;
-  return parseInt(dateTime64, 10);
+  return new Date(dateTime64).getTime();
 }
 
 export class ExperimentRunStateRepositoryClickHouse<
@@ -145,7 +145,7 @@ export class ExperimentRunStateRepositoryClickHouse<
             LastProcessedEventId
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
-          ORDER BY Version DESC
+          ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, runId },
