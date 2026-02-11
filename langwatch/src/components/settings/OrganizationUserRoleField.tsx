@@ -4,30 +4,8 @@ import { useMemo, useState } from "react";
 import { api } from "../../utils/api";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
-
-export type OrgRoleOption = {
-  label: string;
-  value: OrganizationUserRole;
-  description: string;
-};
-
-export const orgRoleOptions: OrgRoleOption[] = [
-  {
-    label: "Admin",
-    value: OrganizationUserRole.ADMIN,
-    description: "Can manage organization and add or remove members",
-  },
-  {
-    label: "Member",
-    value: OrganizationUserRole.MEMBER,
-    description: "Can manage their own projects and view other projects",
-  },
-  {
-    label: "Lite Member",
-    value: OrganizationUserRole.EXTERNAL,
-    description: "Can only view projects they are invited to, cannot see costs",
-  },
-];
+import { orgRoleOptions } from "../roles/orgRoleOptions";
+import type { OrgRoleOption } from "../roles/orgRoleOptions";
 
 /**
  * OrganizationUserRoleField
