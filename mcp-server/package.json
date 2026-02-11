@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^2.0.15",
-    "@anthropic-ai/claude-code": "^1.0.111",
+    "@anthropic-ai/claude-code": "^2.1.7",
     "@eslint/js": "^9.4.0",
     "@langwatch/scenario": "^0.3.0",
     "@types/debug": "^4.1.12",
@@ -40,7 +40,7 @@
     "@typescript/native-preview": "7.0.0-dev.20250911.1",
     "ai": "^5.0.40",
     "dotenv": "^17.2.2",
-    "esbuild": "^0.21.5",
+    "esbuild": "^0.25.0",
     "eslint": "^8.57.0",
     "tsup": "^8.1.0",
     "tsx": "^4.20.5",
