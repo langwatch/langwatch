@@ -18,13 +18,13 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/python-sdk"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/langwatch_nlp"
     schedule:
       interval: "weekly"
