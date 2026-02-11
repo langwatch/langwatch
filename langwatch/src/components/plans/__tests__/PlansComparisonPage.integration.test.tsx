@@ -1,0 +1,169 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it } from "vitest";
+import { PlansComparisonPage } from "../PlansComparisonPage";
+
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("<PlansComparisonPage/>", () => {
+  describe("when a member opens the plans comparison page", () => {
+    it("shows the plans comparison layout with three plan columns", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByRole("heading", { name: "Plans" })).toBeInTheDocument();
+      expect(screen.getByTestId("plan-column-free")).toBeInTheDocument();
+      expect(screen.getByTestId("plan-column-growth")).toBeInTheDocument();
+      expect(screen.getByTestId("plan-column-enterprise")).toBeInTheDocument();
+      expect(screen.getByText("Usage")).toBeInTheDocument();
+      expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when organization is on the Free plan", () => {
+    it("marks the Free column as current", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const freeColumn = screen.getByTestId("plan-column-free");
+      expect(within(freeColumn).getByText("Current")).toBeInTheDocument();
+    });
+
+    it("shows the free plan usage details", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const eventsRow = screen.getByTestId("comparison-row-events-included");
+      expect(within(eventsRow).getByText("50,000")).toBeInTheDocument();
+
+      const retentionRow = screen.getByTestId("comparison-row-data-retention");
+      expect(within(retentionRow).getByText("14 days")).toBeInTheDocument();
+
+      const scenariosRow = screen.getByTestId("comparison-row-scenarios");
+      expect(within(scenariosRow).getByText("3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when organization is on the Growth plan", () => {
+    it("marks the Growth column as current", () => {
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "GROWTH_SEAT_USAGE", free: false }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const growthColumn = screen.getByTestId("plan-column-growth");
+      expect(within(growthColumn).getByText("Current")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-free")).queryByText("Current"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-enterprise")).queryByText(
+          "Current",
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows seat and usage pricing details", () => {
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "GROWTH_SEAT_USAGE", free: false }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("$29 per seat/month")).toBeInTheDocument();
+      const growthColumn = screen.getByTestId("plan-column-growth");
+      expect(
+        within(growthColumn).getByRole("link", { name: "Add Members" }),
+      ).toBeInTheDocument();
+      expect(
+        within(growthColumn).getByRole("link", { name: "Add Events" }),
+      ).toBeInTheDocument();
+
+      const extraEventsRow = screen.getByTestId(
+        "comparison-row-extra-event-pricing",
+      );
+      expect(
+        within(extraEventsRow).getByText("$1 per additional 100,000 events"),
+      ).toBeInTheDocument();
+
+      const liteUsersRow = screen.getByTestId("comparison-row-lite-users");
+      const liteUsersCells = within(liteUsersRow).getAllByRole("cell");
+      expect(liteUsersCells[2]).toHaveTextContent("Unlimited");
+    });
+  });
+
+  describe("when organization is on the Enterprise plan", () => {
+    it("marks the Enterprise column as current", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "ENTERPRISE", free: false }} />,
+        { wrapper: Wrapper },
+      );
+
+      const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
+      expect(within(enterpriseColumn).getByText("Current")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-free")).queryByText("Current"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-growth")).queryByText("Current"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when organization is on a legacy tier plan", () => {
+    it("shows no current plan badge in comparison columns", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "LAUNCH", free: false }} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        within(screen.getByTestId("plan-column-free")).queryByText("Current"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-growth")).queryByText("Current"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("plan-column-enterprise")).queryByText(
+          "Current",
+        ),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when comparing enterprise plan options", () => {
+    it("shows enterprise commercial highlights and sales action", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
+      expect(within(enterpriseColumn).getByText("Custom pricing")).toBeInTheDocument();
+      expect(
+        within(enterpriseColumn).getByRole("link", { name: "Talk to Sales" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Custom SSO / RBAC")).toBeInTheDocument();
+      expect(screen.getByText("Uptime & Support SLA")).toBeInTheDocument();
+    });
+  });
+});
