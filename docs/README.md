@@ -9,13 +9,13 @@ Cross-cutting principles that apply everywhere:
 
 ## Language & Framework Specific
 
-- **best_practices/** - TypeScript, React, Git conventions
+- **best_practices/** - TypeScript, React, Git, logging, repository-service conventions
 - **design/** - UI design system
 - **TESTING.md** - Test hierarchy, workflow, E2E patterns
 
 ## Architecture
 
-- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging)
+- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging, feature flags, Redis)
 
 ## Also See
 

@@ -84,12 +84,15 @@ docs/
 ├── adr/                   # Architecture Decision Records
 │   ├── 001-rbac.md        # Org → Team → Project hierarchy
 │   ├── 002-event-sourcing.md  # Traces/evaluations storage
-│   ├── 003-logging.md     # Structured logging
-│   └── 004-docker-dev-environment.md  # Make targets
+│   ├── 003-logging.md     # Logging and tracing infrastructure
+│   ├── 004-docker-dev-environment.md  # Make targets
+│   ├── 005-feature-flags.md  # Feature flags via tRPC/PostHog
+│   └── 006-redis-cluster-bullmq-hash-tags.md  # Redis cluster hash tags
 ├── best_practices/        # Language/framework conventions
 │   ├── typescript.md
 │   ├── react.md
 │   ├── git.md
+│   ├── logging-and-tracing.md
 │   └── repository-service.md
 └── design/                # UI design system
 ```

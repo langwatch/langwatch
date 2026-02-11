@@ -2,16 +2,6 @@
 
 Separate data access (Repository) from business logic (Service).
 
-> "The Repository doesn't care which component is invoking it; it blindly does what it is asked. The Service layer doesn't care how it gets accessed, it just does its work, using a Repository where required."
-> — [Tom Collings](https://tom-collings.medium.com/controller-service-repository-16e29a4684e5)
-
-## Why This Pattern
-
-1. **Separation of concerns** - Each layer has one job
-2. **Testability** - Integration tests use real DB; unit tests cover pure logic only
-3. **Clarity** - Obvious where new code should go
-4. **Flexibility** - Swap implementations without affecting other layers
-
 ## When to Use
 
 | Layer | Responsibility | Examples |
@@ -81,28 +71,6 @@ export class DatasetService {
 - Apply business rules, validation, default resolution
 - Throw domain-specific errors (see below)
 
-## Factory Pattern
-
-Services use a static `create()` factory method:
-
-```typescript
-// In service class
-static create(prisma: PrismaClient): DatasetService {
-  return new DatasetService(
-    prisma,
-    new DatasetRepository(prisma),
-    new DatasetRecordRepository(prisma),
-    new ExperimentRepository(prisma),
-  );
-}
-
-// Usage in router/controller
-const service = DatasetService.create(ctx.prisma);
-const result = await service.upsertDataset(params);
-```
-
-This encapsulates dependency wiring and allows easy testing with mocks.
-
 ## Domain Errors
 
 Services throw framework-agnostic errors that routers map to HTTP/tRPC errors:
@@ -115,13 +83,6 @@ export class DatasetNotFoundError extends Error {
     this.name = "DatasetNotFoundError";
   }
 }
-
-export class DatasetConflictError extends Error {
-  constructor(message = "A dataset with this name already exists") {
-    super(message);
-    this.name = "DatasetConflictError";
-  }
-}
 ```
 
 ```typescript
@@ -131,9 +92,6 @@ try {
 } catch (error) {
   if (error instanceof DatasetNotFoundError) {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-  }
-  if (error instanceof DatasetConflictError) {
-    throw new TRPCError({ code: "CONFLICT", message: error.message });
   }
   throw error;
 }
@@ -171,24 +129,4 @@ Follow the [Testing Philosophy](../TESTING_PHILOSOPHY.md):
 | **Integration** | Service + Repository together | Real (testcontainers) |
 | **Unit** | Pure logic only (e.g., `resolveDefaults`) | None needed |
 
-```typescript
-// Integration test - real database via testcontainers
-it("creates dataset with generated slug", async () => {
-  const service = DatasetService.create(prisma);
-  const result = await service.upsertDataset({ projectId, name: "My Dataset" });
-  expect(result.slug).toBe("my-dataset");
-});
-
-// Unit test - pure logic only, no database
-it("resolves null model to default", () => {
-  const config = resolveDefaults({ ...project, defaultModel: null });
-  expect(config.defaultModel).toBe(DEFAULT_MODEL);
-});
-```
-
 **Avoid mocking repositories** - it tests implementation details. If the service works with a real database, it works.
-
-## References
-
-- [Controller-Service-Repository](https://tom-collings.medium.com/controller-service-repository-16e29a4684e5) - Tom Collings
-- [Should Controllers Reference Repositories or Services](https://ardalis.com/should-controllers-reference-repositories-services/) - Steve Smith
