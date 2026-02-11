@@ -1,5 +1,5 @@
 from typing import Any, Optional, TypeVar
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 import numpy as np
 from pydantic import BaseModel
@@ -307,5 +307,8 @@ def setup_endpoints(app: FastAPI):
                 "traces": traces_to_assign + traces_from_new_topics_to_assign,
                 "cost": cost,
             }
+        except Exception as e:
+            logger.error("Incremental clustering failed", error=str(e), error_type=type(e).__name__)
+            raise HTTPException(status_code=500, detail="Incremental clustering failed") from e
         finally:
             clear_log_context()

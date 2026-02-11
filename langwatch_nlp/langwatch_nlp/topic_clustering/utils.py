@@ -1,4 +1,5 @@
 from typing import Optional
+import contextvars
 import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -51,7 +52,7 @@ def _generate_single_embedding(
             target_dim=dimensions,
         )
     except Exception as e:
-        logger.error("Error generating single embedding", error=str(e), text_preview=text[:100])
+        logger.warning("Error generating single embedding", error=str(e), text_preview=text[:100])
         raise e  # Re-raise the exception to be handled by the caller
 
 
@@ -80,9 +81,10 @@ def generate_embeddings_threaded(
         futures = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
+            # Submit all tasks, propagating log context to threads
             for text in chunk:
-                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions))
+                ctx = contextvars.copy_context()
+                futures.append(executor.submit(ctx.run, _generate_single_embedding, text, params_copy, dimensions))
 
             # Process results as they complete
             for future in futures:
@@ -118,9 +120,10 @@ def generate_embeddings(
     total_batches = len(batches)
 
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
-    if "dimensions" in embeddings_litellm_params:
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
-        del embeddings_litellm_params["dimensions"]
+        del params_copy["dimensions"]
 
     logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
@@ -128,7 +131,7 @@ def generate_embeddings(
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
         try:
             response = litellm.embedding(
-                **embeddings_litellm_params,  # type: ignore
+                **params_copy,  # type: ignore
                 input=batch if batch_size > 1 else batch[0],
             )
             embeddings += [
@@ -140,7 +143,11 @@ def generate_embeddings(
             ]
         except Exception as e:
             if batch_size > 1:
-                # Instead of falling back to batch_size=1, use threaded implementation
+                # Don't fallback for auth errors — same key will fail for every individual request
+                if isinstance(e, litellm.exceptions.AuthenticationError):
+                    logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                    raise
+                # For other errors, fall back to threaded implementation
                 logger.info("Batch embedding failed, falling back to threaded implementation")
                 return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
