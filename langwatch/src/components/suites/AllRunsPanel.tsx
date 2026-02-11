@@ -16,13 +16,12 @@ import {
 } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
+import { SUITE_SET_PREFIX } from "~/server/suites/suite-set-id";
 import {
   computeBatchRunSummary,
   computeRunHistoryTotals,
-  groupRunsByBatchIdWithSetIds,
+  groupRunsByBatchId,
 } from "./run-history-transforms";
-
-const SUITE_PREFIX = "__suite__";
 
 export function AllRunsPanel() {
   const { project } = useOrganizationTeamProject();
@@ -100,7 +99,7 @@ export function AllRunsPanel() {
       );
     }
 
-    return groupRunsByBatchIdWithSetIds({
+    return groupRunsByBatchId({
       runs,
       scenarioSetIds: runDataResult.scenarioSetIds,
     });
@@ -203,8 +202,8 @@ export function AllRunsPanel() {
               const isExpanded = expandedIds.has(batchRun.batchRunId);
 
               // Extract suite name from scenarioSetId
-              const suiteId = batchRun.scenarioSetId?.startsWith(SUITE_PREFIX)
-                ? batchRun.scenarioSetId.slice(SUITE_PREFIX.length)
+              const suiteId = batchRun.scenarioSetId?.startsWith(SUITE_SET_PREFIX)
+                ? batchRun.scenarioSetId.slice(SUITE_SET_PREFIX.length)
                 : null;
               const suiteName = suiteId ? suiteNameMap.get(suiteId) ?? null : null;
 

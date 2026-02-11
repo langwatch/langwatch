@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   groupRunsByBatchId,
-  groupRunsByBatchIdWithSetIds,
   computeBatchRunSummary,
   computeRunHistoryTotals,
   type BatchRun,
@@ -68,10 +67,10 @@ describe("groupRunsByBatchId()", () => {
   });
 });
 
-describe("groupRunsByBatchIdWithSetIds()", () => {
+describe("groupRunsByBatchId() with scenarioSetIds", () => {
   describe("when given an empty array", () => {
     it("returns an empty array", () => {
-      const result = groupRunsByBatchIdWithSetIds({
+      const result = groupRunsByBatchId({
         runs: [],
         scenarioSetIds: {},
       });
@@ -104,7 +103,7 @@ describe("groupRunsByBatchIdWithSetIds()", () => {
         batch_2: "__suite__suite_xyz",
       };
 
-      const result = groupRunsByBatchIdWithSetIds({ runs, scenarioSetIds });
+      const result = groupRunsByBatchId({ runs, scenarioSetIds });
       expect(result).toHaveLength(2);
       expect(result[0]!.scenarioSetId).toBe("__suite__suite_abc");
       expect(result[1]!.scenarioSetId).toBe("__suite__suite_xyz");
@@ -120,7 +119,7 @@ describe("groupRunsByBatchIdWithSetIds()", () => {
         }),
       ];
 
-      const result = groupRunsByBatchIdWithSetIds({
+      const result = groupRunsByBatchId({
         runs,
         scenarioSetIds: {},
       });
@@ -150,7 +149,7 @@ describe("groupRunsByBatchIdWithSetIds()", () => {
         batch_new: "__suite__suite_2",
       };
 
-      const result = groupRunsByBatchIdWithSetIds({ runs, scenarioSetIds });
+      const result = groupRunsByBatchId({ runs, scenarioSetIds });
       expect(result).toHaveLength(2);
       expect(result[0]!.batchRunId).toBe("batch_new");
       expect(result[1]!.batchRunId).toBe("batch_old");

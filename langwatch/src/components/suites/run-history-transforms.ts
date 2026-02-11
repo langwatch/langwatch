@@ -45,11 +45,14 @@ const SUCCESS_STATUSES = new Set<string>([ScenarioRunStatus.SUCCESS]);
  *
  * Returns batch runs sorted by timestamp descending (most recent first).
  * Each batch uses the maximum timestamp from its scenario runs.
+ * When scenarioSetIds is provided, each batch run includes its scenarioSetId.
  */
 export function groupRunsByBatchId({
   runs,
+  scenarioSetIds,
 }: {
   runs: ScenarioRunData[];
+  scenarioSetIds?: Record<string, string>;
 }): BatchRun[] {
   const batchMap = new Map<string, ScenarioRunData[]>();
 
@@ -68,7 +71,8 @@ export function groupRunsByBatchId({
       (max, r) => Math.max(max, r.timestamp),
       0,
     );
-    batchRuns.push({ batchRunId, timestamp, scenarioRuns });
+    const scenarioSetId = scenarioSetIds?.[batchRunId];
+    batchRuns.push({ batchRunId, timestamp, scenarioRuns, scenarioSetId });
   }
 
   batchRuns.sort((a, b) => b.timestamp - a.timestamp);
@@ -110,44 +114,6 @@ export function computeBatchRunSummary({
     totalCount: batchRun.scenarioRuns.length,
     inProgressCount,
   };
-}
-
-/**
- * Groups a flat list of scenario runs by their batchRunId with scenario set IDs.
- *
- * Returns batch runs sorted by timestamp descending (most recent first).
- * Each batch uses the maximum timestamp from its scenario runs and includes its scenarioSetId.
- */
-export function groupRunsByBatchIdWithSetIds({
-  runs,
-  scenarioSetIds,
-}: {
-  runs: ScenarioRunData[];
-  scenarioSetIds: Record<string, string>;
-}): BatchRun[] {
-  const batchMap = new Map<string, ScenarioRunData[]>();
-
-  for (const run of runs) {
-    const existing = batchMap.get(run.batchRunId);
-    if (existing) {
-      existing.push(run);
-    } else {
-      batchMap.set(run.batchRunId, [run]);
-    }
-  }
-
-  const batchRuns: BatchRun[] = [];
-  for (const [batchRunId, scenarioRuns] of batchMap) {
-    const timestamp = scenarioRuns.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
-    const scenarioSetId = scenarioSetIds[batchRunId];
-    batchRuns.push({ batchRunId, timestamp, scenarioRuns, scenarioSetId });
-  }
-
-  batchRuns.sort((a, b) => b.timestamp - a.timestamp);
-  return batchRuns;
 }
 
 /**
