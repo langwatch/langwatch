@@ -19,6 +19,9 @@ import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
 from openai import OpenAI
+from langwatch_nlp.logger import get_logger
+
+logger = get_logger("main")
 
 from langwatch_nlp.studio.app import app as studio_app, lifespan as studio_lifespan
 
@@ -65,7 +68,7 @@ async def health_check():
 
 
 async def proxy_startup():
-    print("=== proxy_startup called ===", flush=True)
+    logger.info("Proxy startup called")
     original_get_available_deployment = Router.async_get_available_deployment
 
     # Patch to be able to replace api_key and api_base on the fly from the parameters comming from langwatch according to user settings
@@ -91,9 +94,7 @@ async def proxy_startup():
         )
         deployment = deployment.copy()
 
-        print(f"deployment: {deployment}")
-
-        print(f"model: {model}")
+        logger.debug("LiteLLM deployment resolved", deployment_model=deployment.get("litellm_params", {}).get("model"), model=model)
 
         if "litellm_params" not in deployment:
             deployment["litellm_params"] = {}
