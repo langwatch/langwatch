@@ -81,7 +81,7 @@
         "eslint": "^9.32.0",
         "fets": "^0.8.5",
         "fishery": "^2.3.1",
-        "langchain": ">=0.3.0 <1.0.0",
+        "langchain": ">=0.3.0 <2.0.0",
         "msw": "^2.10.4",
         "nock": "^14.0.8",
         "openapi-msw": "^1.2.0",
@@ -127,7 +127,7 @@
         "@opentelemetry/context-zone": ">=1.19.0 <3.0.0",
         "@opentelemetry/sdk-node": ">=0.200.0 <1.0.0",
         "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
-        "langchain": ">=0.3.0 <1.0.0"
+        "langchain": ">=0.3.0 <2.0.0"
     },
     "pnpm": {
         "overrides": {
