@@ -1,6 +1,7 @@
 import {
   INVITE_STATUS,
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
@@ -110,7 +111,7 @@ export interface ILicenseEnforcementRepository {
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Counts active (non-archived) workflows for license enforcement.
@@ -182,8 +183,8 @@ export class LicenseEnforcementRepository
    * Counts full members in organization:
    * - Users with ADMIN or MEMBER org role
    * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
-   * - Pending invites (not expired) with ADMIN or MEMBER role
-   * - Pending invites (not expired) with custom role that has non-view permissions
+   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with ADMIN or MEMBER role
+   * - PENDING and WAITING_APPROVAL invites with custom role that has non-view permissions
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -193,7 +194,7 @@ export class LicenseEnforcementRepository
   /**
    * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - Pending invites (not expired) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -222,8 +223,8 @@ export class LicenseEnforcementRepository
     const pendingInvites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: INVITE_STATUS.PENDING,
-        expiration: { gt: new Date() },
+        status: { in: [INVITE_STATUS.PENDING, INVITE_STATUS.WAITING_APPROVAL] },
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
       select: { role: true, teamAssignments: true },
     });
