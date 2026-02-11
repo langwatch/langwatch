@@ -5,6 +5,7 @@ import type { Protections } from "~/server/elasticsearch/protections";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-state.mappers";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import type {
@@ -34,6 +35,7 @@ import type {
  */
 export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
+  private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
   private readonly elasticsearchService: ElasticsearchTraceService;
 
