@@ -8,6 +8,24 @@ Feature: Subscription Page Plan Management
     And I navigate to the subscription page
 
   # ============================================================================
+  # Pricing Model Routing
+  # ============================================================================
+
+  @integration
+  Scenario: SEAT_USAGE organization is redirected to billing page
+    Given the organization uses the SEAT_USAGE pricing model
+    When I navigate to the subscription page
+    Then I am redirected to the billing page without seeing the subscription page
+
+  @integration
+  Scenario: TIERED organization sees upgrade alert on subscription page
+    Given the organization uses the TIERED pricing model
+    When I navigate to the subscription page
+    Then I see an alert suggesting to upgrade to the new pricing model
+    And the alert contains a link to the plans page
+    And I cannot upgrade my plan from this page
+
+  # ============================================================================
   # Page Layout
   # ============================================================================
 
@@ -226,3 +244,39 @@ Feature: Subscription Page Plan Management
     When the user data is being fetched
     Then a loading spinner is displayed
     And the user list area shows skeleton placeholders
+
+  # ============================================================================
+  # Growth Plan Seat Updates
+  # ============================================================================
+
+  @integration
+  Scenario: Growth plan user can add seats and update subscription
+    Given the organization has an active Growth subscription
+    When I open the seat management drawer
+    And I click "Add Seat"
+    And I close the drawer by clicking Done
+    Then I see an "Update Seats" block with seat count and price
+    And I can click "Update subscription" to finalize the changes
+
+  @integration
+  Scenario: Growth plan user sees Manage Subscription button
+    Given the organization has an active Growth subscription
+    When the subscription page loads
+    Then I see a "Manage Subscription" button on the current plan block
+
+  @integration
+  Scenario: Free plan user does not see Manage Subscription button
+    Given the organization has no active paid subscription
+    When the subscription page loads
+    Then I do not see a "Manage Subscription" button on the current plan block
+
+  # ============================================================================
+  # Usage Page Seat Limit Accuracy
+  # ============================================================================
+
+  @integration
+  Scenario: Usage page reflects purchased seat count as team member limit
+    Given the organization has an active Growth Seat Usage subscription with 4 seats
+    And the organization has 2 current core members
+    When I navigate to the usage page
+    Then the "Team Members" resource shows "2 / 4"
