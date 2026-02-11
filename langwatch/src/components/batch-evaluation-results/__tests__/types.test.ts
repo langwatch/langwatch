@@ -52,7 +52,7 @@ describe("transformBatchEvaluationData", () => {
       expect(result.total).toBe(10);
     });
 
-    it("handles stopped evaluation with stopped_at timestamp", () => {
+    it("handles stopped evaluation with stoppedAt timestamp", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
         runId: "run-1",
@@ -1061,7 +1061,7 @@ describe("transformBatchEvaluationData", () => {
       ).toBe(0.8);
     });
 
-    it("correctly builds evaluatorNames map for targets with target_id", () => {
+    it("correctly builds evaluatorNames map for targets with targetId", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
         runId: "run-1",
@@ -1084,7 +1084,7 @@ describe("transformBatchEvaluationData", () => {
       const result = transformBatchEvaluationData(data);
 
       // The evaluatorNames map should include the human-readable name
-      // Key format when target_id exists: "targetId:evaluatorId"
+      // Key format when targetId exists: "targetId:evaluatorId"
       expect(result.evaluatorNames).toBeDefined();
       // Should have at least one entry
       expect(Object.keys(result.evaluatorNames).length).toBeGreaterThan(0);

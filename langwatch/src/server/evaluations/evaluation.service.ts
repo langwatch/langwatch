@@ -34,7 +34,7 @@ export class EvaluationService {
     "langwatch.evaluations.service",
   );
 
-  constructor(readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: PrismaClient) {
     this.clickHouseService = ClickHouseEvaluationService.create(prisma);
     this.elasticsearchService =
       ElasticsearchEvaluationService.create(prisma);
