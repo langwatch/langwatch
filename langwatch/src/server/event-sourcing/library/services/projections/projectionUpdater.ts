@@ -491,24 +491,25 @@ export class ProjectionUpdater<
           return; // Skip projection processing
         }
 
-        // Fetch events up to and including the current event for processing
-        // This ensures we don't include events that haven't been processed yet
-        const eventsUpToCurrent = await this.eventStore.getEventsUpTo(
+        // Fetch ALL events for the aggregate, not just up to current event.
+        // Using getEventsUpTo() misses concurrent events that share the same
+        // timestamp but have a higher EventId than the trigger event, which
+        // causes incomplete projections (e.g. trace summaries with fewer spans).
+        const allEvents = await this.eventStore.getEvents(
           String(event.aggregateId),
           context,
           this.aggregateType,
-          event,
         );
 
         // Validate event processing prerequisites (sequence number, idempotency, ordering)
-        // Pass eventsUpToCurrent for sequence number computation
+        // Pass allEvents for sequence number computation
         const sequenceNumber = await this.validator.validateEventProcessing(
           projectionName,
           "projection",
           event,
           context,
           {
-            events: eventsUpToCurrent,
+            events: allEvents,
           },
         );
 
@@ -543,14 +544,12 @@ export class ProjectionUpdater<
             sequenceNumber,
           );
 
-          // Rebuild projection from events up to and including the current event
-          // This returns both the projection and all events that were processed in the batch
-          // Pass eventsUpToCurrent to avoid duplicate query and ensure we only process up to this event
+          // Rebuild projection from all events for the aggregate
           await this.updateProjectionByName(
             projectionName,
             String(event.aggregateId),
             context,
-            { events: eventsUpToCurrent },
+            { events: allEvents },
           );
 
           // Checkpoint the event we just processed

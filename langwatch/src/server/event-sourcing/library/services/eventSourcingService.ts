@@ -378,20 +378,23 @@ export class EventSourcingService<
     );
 
     try {
-      // Fetch events up to and including the current event for projection rebuild
-      const eventsUpToCurrent = await this.eventStore.getEventsUpTo(
+      // Fetch ALL events for the aggregate, not just up to current event.
+      // Using getEventsUpTo() misses concurrent events that share the same
+      // timestamp but have a higher EventId than the trigger event, which
+      // causes incomplete projections (e.g. trace summaries with fewer spans).
+      // This matches BatchEventProcessor's approach (see its getEvents() call).
+      const allEvents = await this.eventStore.getEvents(
         String(event.aggregateId),
         context,
         this.aggregateType,
-        event,
       );
 
-      // Update the projection with events up to current
+      // Update the projection with all events
       await this.projectionUpdater.updateProjectionByName(
         projectionName,
         String(event.aggregateId),
         context,
-        { events: eventsUpToCurrent },
+        { events: allEvents },
       );
 
       // Save processed checkpoint on success

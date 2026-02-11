@@ -1,5 +1,5 @@
 import type { NextRequest, NextResponse } from "next/server";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 import {
   createContextFromNextRequest,
   runWithContext,

@@ -362,7 +362,7 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
 
           return params as LiteLLMParams;
         } catch (error) {
-          console.error("Failed to prepare LiteLLM params:", error);
+          logger.error({ error }, "failed to prepare LiteLLM params");
           return null;
         }
       },

@@ -708,7 +708,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       await service.storeEvents(events, context);
 
-      expect(eventStore.getEventsUpTo).toHaveBeenCalledTimes(2);
+      expect(eventStore.getEvents).toHaveBeenCalledTimes(2);
       expect(projectionHandler.handle).toHaveBeenCalledTimes(2);
     });
   });

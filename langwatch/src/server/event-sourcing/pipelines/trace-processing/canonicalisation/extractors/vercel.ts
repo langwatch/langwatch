@@ -69,7 +69,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // Detection Check
     // Only proceed if Vercel AI SDK signals are present
     // ─────────────────────────────────────────────────────────────────────────
-    if (ctx.span.instrumentationScope.name === "ai") return;
+    if (ctx.span.instrumentationScope.name !== "ai") return;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Span Type

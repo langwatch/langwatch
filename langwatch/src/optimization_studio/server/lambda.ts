@@ -408,12 +408,9 @@ export const invokeLambda = async (
             }
 
             if (statusCode === 422) {
-              console.error(
+              logger.error(
+                { event, errorMessage },
                 "Optimization Studio validation failed, please contact support",
-                "\n\n",
-                JSON.stringify(event, null, 2),
-                "\n\nValidation error:\n",
-                errorMessage,
               );
               const error = new Error(
                 `Optimization Studio validation failed, please contact support`,
@@ -427,7 +424,7 @@ export const invokeLambda = async (
           }
           controller.close();
         } catch (error) {
-          console.log("error", error);
+          logger.error({ error }, "failed to run workflow stream");
           controller.error(error);
         }
       },

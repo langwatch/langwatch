@@ -1,8 +1,11 @@
 import type { Project, Trigger } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "~/server/db";
+import { createLogger } from "~/utils/logger/server";
 import { processCustomGraphTrigger } from "./customGraphTrigger";
 import { processTraceBasedTrigger } from "./traceBasedTrigger";
+
+const logger = createLogger("langwatch:cron:triggers");
 
 export default async function handler(
   req: NextApiRequest,
@@ -55,9 +58,9 @@ export default async function handler(
         const result = await processCustomGraphTrigger(trigger, projects);
         results.push(result);
       } catch (error) {
-        console.error(
-          `Error processing custom graph trigger ${trigger.id}:`,
-          error instanceof Error ? error.message : error,
+        logger.error(
+          { triggerId: trigger.id, error },
+          "error processing custom graph trigger",
         );
         results.push({
           triggerId: trigger.id,
@@ -72,9 +75,9 @@ export default async function handler(
         const result = await processTraceBasedTrigger(trigger, projects);
         results.push(result);
       } catch (error) {
-        console.error(
-          `Error processing trace-based trigger ${trigger.id}:`,
-          error instanceof Error ? error.message : error,
+        logger.error(
+          { triggerId: trigger.id, error },
+          "error processing trace-based trigger",
         );
         results.push({
           triggerId: trigger.id,
