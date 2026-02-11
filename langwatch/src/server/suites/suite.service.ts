@@ -5,10 +5,12 @@
  * Handles CRUD, duplication, and run scheduling.
  */
 
+import { SpanKind } from "@opentelemetry/api";
 import type {
   PrismaClient,
   SimulationSuiteConfiguration,
 } from "@prisma/client";
+import { getLangWatchTracer } from "langwatch";
 import {
   SuiteRepository,
   type CreateSuiteInput,
@@ -21,8 +23,13 @@ import {
   scenarioQueue,
 } from "../scenarios/scenario.queue";
 import { parseSuiteTargets, type SuiteTarget } from "./types";
+import {
+  InvalidScenarioReferencesError,
+  InvalidTargetReferencesError,
+} from "./errors";
 import { createLogger } from "~/utils/logger/server";
 
+const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
 
 // Re-export for consumers that need the type
@@ -64,20 +71,66 @@ export class SuiteService {
   async create(
     input: CreateSuiteInput,
   ): Promise<SimulationSuiteConfiguration> {
-    return this.repository.create(input);
+    return tracer.withActiveSpan(
+      "SuiteService.create",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": input.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId: input.projectId }, "Creating suite");
+        const result = await this.repository.create(input);
+        span.setAttribute("suite.id", result.id);
+        return result;
+      },
+    );
   }
 
   async getAll(params: {
     projectId: string;
   }): Promise<SimulationSuiteConfiguration[]> {
-    return this.repository.findAll(params);
+    return tracer.withActiveSpan(
+      "SuiteService.getAll",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId: params.projectId }, "Fetching all suites");
+        const result = await this.repository.findAll(params);
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
   }
 
   async getById(params: {
     id: string;
     projectId: string;
   }): Promise<SimulationSuiteConfiguration | null> {
-    return this.repository.findById(params);
+    return tracer.withActiveSpan(
+      "SuiteService.getById",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Fetching suite by id",
+        );
+        const result = await this.repository.findById(params);
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
   }
 
   async update(params: {
@@ -85,33 +138,85 @@ export class SuiteService {
     projectId: string;
     data: UpdateSuiteInput;
   }): Promise<SimulationSuiteConfiguration> {
-    return this.repository.update(params);
+    return tracer.withActiveSpan(
+      "SuiteService.update",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async () => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Updating suite",
+        );
+        return await this.repository.update(params);
+      },
+    );
   }
 
   async duplicate(params: {
     id: string;
     projectId: string;
   }): Promise<SimulationSuiteConfiguration> {
-    const original = await this.repository.findById(params);
-    if (!original) {
-      throw new Error("Suite not found");
-    }
-    return this.repository.create({
-      projectId: original.projectId,
-      name: `${original.name} (copy)`,
-      description: original.description,
-      scenarioIds: original.scenarioIds,
-      targets: parseSuiteTargets(original.targets),
-      repeatCount: original.repeatCount,
-      labels: original.labels,
-    });
+    return tracer.withActiveSpan(
+      "SuiteService.duplicate",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Duplicating suite",
+        );
+        const original = await this.repository.findById(params);
+        if (!original) {
+          throw new Error("Suite not found");
+        }
+        const result = await this.repository.create({
+          projectId: original.projectId,
+          name: `${original.name} (copy)`,
+          description: original.description,
+          scenarioIds: original.scenarioIds,
+          targets: parseSuiteTargets(original.targets),
+          repeatCount: original.repeatCount,
+          labels: original.labels,
+        });
+        span.setAttribute("suite.duplicated_id", result.id);
+        return result;
+      },
+    );
   }
 
   async delete(params: {
     id: string;
     projectId: string;
   }): Promise<SimulationSuiteConfiguration | null> {
-    return this.repository.archive(params);
+    return tracer.withActiveSpan(
+      "SuiteService.delete",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Deleting suite",
+        );
+        const result = await this.repository.archive(params);
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
   }
 
   /**
@@ -121,47 +226,66 @@ export class SuiteService {
    * N scenarios x M targets x repeatCount jobs.
    *
    * @returns The batch run ID and job count
-   * @throws Error if any scenario or target references are invalid
+   * @throws {InvalidScenarioReferencesError} if any scenario references are invalid
+   * @throws {InvalidTargetReferencesError} if any target references are invalid
    */
   async run(params: {
     suite: SimulationSuiteConfiguration;
     projectId: string;
     deps: SuiteRunDependencies;
   }): Promise<SuiteRunResult> {
-    const { suite, projectId, deps } = params;
-    const targets = parseSuiteTargets(suite.targets);
-
-    await this.validateReferences({ suite, projectId, targets, deps });
-
-    const batchRunId = generateBatchRunId();
-    const setId = getSuiteSetId(suite.id);
-
-    logger.info(
+    return tracer.withActiveSpan(
+      "SuiteService.run",
       {
-        suiteId: suite.id,
-        projectId,
-        batchRunId,
-        scenarioCount: suite.scenarioIds.length,
-        targetCount: targets.length,
-        repeatCount: suite.repeatCount,
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.suite.id,
+          "suite.scenario_count": params.suite.scenarioIds.length,
+          "suite.repeat_count": params.suite.repeatCount,
+        },
       },
-      "Scheduling suite run",
+      async (span) => {
+        const { suite, projectId, deps } = params;
+        const targets = parseSuiteTargets(suite.targets);
+        span.setAttribute("suite.target_count", targets.length);
+
+        await this.validateReferences({ suite, projectId, targets, deps });
+
+        const batchRunId = generateBatchRunId();
+        const setId = getSuiteSetId(suite.id);
+        span.setAttribute("suite.batch_run_id", batchRunId);
+
+        logger.info(
+          {
+            suiteId: suite.id,
+            projectId,
+            batchRunId,
+            scenarioCount: suite.scenarioIds.length,
+            targetCount: targets.length,
+            repeatCount: suite.repeatCount,
+          },
+          "Scheduling suite run",
+        );
+
+        const jobCount = await this.scheduleJobs({
+          suite,
+          targets,
+          projectId,
+          setId,
+          batchRunId,
+        });
+
+        span.setAttribute("suite.job_count", jobCount);
+
+        logger.info(
+          { suiteId: suite.id, batchRunId, jobCount },
+          "Suite run scheduled",
+        );
+
+        return { batchRunId, setId, jobCount };
+      },
     );
-
-    const jobCount = await this.scheduleJobs({
-      suite,
-      targets,
-      projectId,
-      setId,
-      batchRunId,
-    });
-
-    logger.info(
-      { suiteId: suite.id, batchRunId, jobCount },
-      "Suite run scheduled",
-    );
-
-    return { batchRunId, setId, jobCount };
   }
 
   /**
@@ -225,9 +349,9 @@ export class SuiteService {
       }
     }
     if (invalidScenarios.length > 0) {
-      throw new Error(
-        `Invalid scenario references: ${invalidScenarios.join(", ")}`,
-      );
+      throw new InvalidScenarioReferencesError({
+        invalidIds: invalidScenarios,
+      });
     }
 
     const invalidTargets: string[] = [];
@@ -242,9 +366,9 @@ export class SuiteService {
       }
     }
     if (invalidTargets.length > 0) {
-      throw new Error(
-        `Invalid target references: ${invalidTargets.join(", ")}`,
-      );
+      throw new InvalidTargetReferencesError({
+        invalidIds: invalidTargets,
+      });
     }
   }
 
