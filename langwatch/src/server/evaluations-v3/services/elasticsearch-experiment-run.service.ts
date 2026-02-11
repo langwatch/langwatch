@@ -193,11 +193,11 @@ export class ElasticsearchExperimentRunService {
           .map((hit) => hit._source?.workflow_version_id)
           .filter((id): id is string => Boolean(id));
 
-        const versionsMap = await getVersionMap(
-          this.prisma,
+        const versionsMap = await getVersionMap({
+          prisma: this.prisma,
           projectId,
           versionIds,
-        );
+        });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const aggBuckets = (batchEvaluationRuns.aggregations?.runs as any)

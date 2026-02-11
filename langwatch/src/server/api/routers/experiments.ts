@@ -649,7 +649,7 @@ export const experimentsRouter = createTRPCRouter({
         .map((hit) => hit._source?.workflow_version_id)
         .filter((id): id is string => Boolean(id));
 
-      const versionsMap = await getVersionMap(prisma, input.projectId, versionIds);
+      const versionsMap = await getVersionMap({ prisma, projectId: input.projectId, versionIds });
 
       const result: DSPyRunsSummary[] = (
         dspySteps.aggregations?.runs as any

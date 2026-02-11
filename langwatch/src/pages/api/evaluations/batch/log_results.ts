@@ -403,41 +403,41 @@ const dispatchToClickHouse = async (
       targets,
     });
 
-    // Dispatch target results for each dataset entry
-    for (const entry of batchEvaluation.dataset) {
-      await dispatcher.recordTargetResult({
-        tenantId: project.id,
-        runId,
-        experimentId,
-        index: entry.index,
-        targetId: entry.target_id ?? "default",
-        entry: entry.entry,
-        predicted: entry.predicted ?? undefined,
-        cost: entry.cost ?? undefined,
-        duration: entry.duration ?? undefined,
-        error: entry.error ?? undefined,
-        traceId: entry.trace_id ?? undefined,
-      });
-    }
-
-    // Dispatch evaluator results for each evaluation entry
-    for (const evaluation of batchEvaluation.evaluations) {
-      await dispatcher.recordEvaluatorResult({
-        tenantId: project.id,
-        runId,
-        experimentId,
-        index: evaluation.index,
-        targetId: evaluation.target_id ?? "default",
-        evaluatorId: evaluation.evaluator,
-        evaluatorName: evaluation.name ?? undefined,
-        status: evaluation.status,
-        score: evaluation.score ?? undefined,
-        label: evaluation.label ?? undefined,
-        passed: evaluation.passed ?? undefined,
-        details: evaluation.details ?? undefined,
-        cost: evaluation.cost ?? undefined,
-      });
-    }
+    // Dispatch target and evaluator results in parallel
+    await Promise.all([
+      ...batchEvaluation.dataset.map((entry) =>
+        dispatcher.recordTargetResult({
+          tenantId: project.id,
+          runId,
+          experimentId,
+          index: entry.index,
+          targetId: entry.target_id ?? "default",
+          entry: entry.entry,
+          predicted: entry.predicted ?? undefined,
+          cost: entry.cost ?? undefined,
+          duration: entry.duration ?? undefined,
+          error: entry.error ?? undefined,
+          traceId: entry.trace_id ?? undefined,
+        }),
+      ),
+      ...batchEvaluation.evaluations.map((evaluation) =>
+        dispatcher.recordEvaluatorResult({
+          tenantId: project.id,
+          runId,
+          experimentId,
+          index: evaluation.index,
+          targetId: evaluation.target_id ?? "default",
+          evaluatorId: evaluation.evaluator,
+          evaluatorName: evaluation.name ?? undefined,
+          status: evaluation.status,
+          score: evaluation.score ?? undefined,
+          label: evaluation.label ?? undefined,
+          passed: evaluation.passed ?? undefined,
+          details: evaluation.details ?? undefined,
+          cost: evaluation.cost ?? undefined,
+        }),
+      ),
+    ]);
 
     // Dispatch completion if finished or stopped
     if (

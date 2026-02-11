@@ -118,11 +118,18 @@ export class ExperimentRunResultStorageHandler
     );
   }
 
-  private mapTargetResultToRecord(event: TargetResultEvent): ClickHouseExperimentRunResultRecord {
-    const id = IdUtils.generateDeterministicResultId(
-      event.tenantId, event.data.runId, event.data.index, event.data.targetId,
-      "target", null, event.timestamp,
-    );
+  private mapTargetResultToRecord(
+    event: TargetResultEvent,
+  ): ClickHouseExperimentRunResultRecord {
+    const id = IdUtils.generateDeterministicResultId({
+      tenantId: event.tenantId,
+      runId: event.data.runId,
+      index: event.data.index,
+      targetId: event.data.targetId,
+      resultType: "target",
+      evaluatorId: null,
+      timestampMs: event.timestamp,
+    });
     return {
       Id: id,
       TenantId: event.tenantId,
@@ -145,15 +152,22 @@ export class ExperimentRunResultStorageHandler
       Passed: null,
       EvaluationDetails: null,
       EvaluationCost: null,
-      CreatedAt: event.timestamp.toString(),
+      CreatedAt: new Date(event.timestamp).toISOString(),
     };
   }
 
-  private mapEvaluatorResultToRecord(event: EvaluatorResultEvent): ClickHouseExperimentRunResultRecord {
-    const id = IdUtils.generateDeterministicResultId(
-      event.tenantId, event.data.runId, event.data.index, event.data.targetId,
-      "evaluator", event.data.evaluatorId, event.timestamp,
-    );
+  private mapEvaluatorResultToRecord(
+    event: EvaluatorResultEvent,
+  ): ClickHouseExperimentRunResultRecord {
+    const id = IdUtils.generateDeterministicResultId({
+      tenantId: event.tenantId,
+      runId: event.data.runId,
+      index: event.data.index,
+      targetId: event.data.targetId,
+      resultType: "evaluator",
+      evaluatorId: event.data.evaluatorId,
+      timestampMs: event.timestamp,
+    });
     return {
       Id: id,
       TenantId: event.tenantId,
@@ -173,10 +187,15 @@ export class ExperimentRunResultStorageHandler
       EvaluationStatus: event.data.status,
       Score: event.data.score ?? null,
       Label: event.data.label ?? null,
-      Passed: event.data.passed === undefined || event.data.passed === null ? null : event.data.passed ? 1 : 0,
+      Passed:
+        event.data.passed === undefined || event.data.passed === null
+          ? null
+          : event.data.passed
+            ? 1
+            : 0,
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
-      CreatedAt: event.timestamp.toString(),
+      CreatedAt: new Date(event.timestamp).toISOString(),
     };
   }
 

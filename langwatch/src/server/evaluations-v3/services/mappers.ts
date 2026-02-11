@@ -82,6 +82,16 @@ export interface ClickHouseEvaluatorBreakdownRow {
   hasPassedCount: number;
 }
 
+/** Per-run cost/duration summary from ClickHouse aggregate query. */
+export interface ClickHouseCostSummaryRow {
+  RunId: string;
+  datasetCost: number | null;
+  evaluationsCost: number | null;
+  datasetAverageCost: number | null;
+  datasetAverageDuration: number | null;
+  evaluationsAverageCost: number | null;
+}
+
 // ---------------------------------------------------------------------------
 // ClickHouse mappers
 // ---------------------------------------------------------------------------
@@ -98,6 +108,7 @@ export function mapClickHouseRunToExperimentRun(
   record: ClickHouseExperimentRunRow,
   workflowVersion?: ExperimentRunWorkflowVersion | null,
   evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[],
+  costSummary?: ClickHouseCostSummaryRow,
 ): ExperimentRun {
   const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
 
@@ -115,6 +126,11 @@ export function mapClickHouseRunToExperimentRun(
   }
 
   const summary: ExperimentRunSummary = {
+    datasetCost: costSummary?.datasetCost ?? undefined,
+    evaluationsCost: costSummary?.evaluationsCost ?? undefined,
+    datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
+    datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
+    evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
     evaluations,
   };
 

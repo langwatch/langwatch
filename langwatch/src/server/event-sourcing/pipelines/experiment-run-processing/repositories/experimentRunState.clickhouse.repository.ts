@@ -49,7 +49,7 @@ interface ClickHouseExperimentRunRecord {
 
 function timestampToDateTime64(timestampMs: number | null): string | null {
   if (timestampMs === null) return null;
-  return timestampMs.toString();
+  return new Date(timestampMs).toISOString();
 }
 
 function dateTime64ToTimestamp(dateTime64: string | null): number | null {

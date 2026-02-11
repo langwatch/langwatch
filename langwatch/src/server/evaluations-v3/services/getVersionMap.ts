@@ -12,11 +12,15 @@ import type { ExperimentRunWorkflowVersion } from "./types";
  * @param versionIds - Array of workflow version IDs to look up
  * @returns Map of version ID to workflow version metadata
  */
-export async function getVersionMap(
-  prisma: PrismaClient,
-  projectId: string,
-  versionIds: string[],
-): Promise<Record<string, ExperimentRunWorkflowVersion>> {
+export async function getVersionMap({
+  prisma,
+  projectId,
+  versionIds,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  versionIds: string[];
+}): Promise<Record<string, ExperimentRunWorkflowVersion>> {
   if (versionIds.length === 0) {
     return {};
   }

@@ -3,152 +3,108 @@ import { IdUtils } from "../id.utils";
 
 describe("IdUtils", () => {
   describe("generateDeterministicResultId", () => {
+    const baseParams = {
+      tenantId: "tenant-1",
+      runId: "run-123",
+      index: 0,
+      targetId: "target-1",
+      resultType: "target" as const,
+      evaluatorId: null,
+      timestampMs: 1000000,
+    };
+
     it("generates deterministic IDs (same input = same output)", () => {
-      const id1 = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
-      const id2 = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const id1 = IdUtils.generateDeterministicResultId(baseParams);
+      const id2 = IdUtils.generateDeterministicResultId(baseParams);
 
       expect(id1).toBe(id2);
     });
 
     it("generates different IDs for different inputs", () => {
-      const baseArgs = [
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "target" as const,
-        null,
-        1000000,
-      ] as const;
-
-      const baseId = IdUtils.generateDeterministicResultId(...baseArgs);
+      const baseId = IdUtils.generateDeterministicResultId(baseParams);
 
       // Different tenant
-      const differentTenant = IdUtils.generateDeterministicResultId(
-        "tenant-2",
-        "run-123",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const differentTenant = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        tenantId: "tenant-2",
+      });
       expect(differentTenant).not.toBe(baseId);
 
       // Different run
-      const differentRun = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-456",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const differentRun = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        runId: "run-456",
+      });
       expect(differentRun).not.toBe(baseId);
 
       // Different index
-      const differentIndex = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        1,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const differentIndex = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        index: 1,
+      });
       expect(differentIndex).not.toBe(baseId);
 
       // Different target
-      const differentTarget = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-2",
-        "target",
-        null,
-        1000000,
-      );
+      const differentTarget = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        targetId: "target-2",
+      });
       expect(differentTarget).not.toBe(baseId);
     });
 
     it("generates different IDs for target vs evaluator results", () => {
-      const targetId = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const targetId = IdUtils.generateDeterministicResultId(baseParams);
 
-      const evaluatorId = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "evaluator",
-        "eval-1",
-        1000000,
-      );
+      const evaluatorId = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        resultType: "evaluator",
+        evaluatorId: "eval-1",
+      });
 
       expect(targetId).not.toBe(evaluatorId);
     });
 
     it("generates different IDs for different evaluators", () => {
-      const eval1Id = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "evaluator",
-        "eval-1",
-        1000000,
-      );
+      const eval1Id = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        resultType: "evaluator",
+        evaluatorId: "eval-1",
+      });
 
-      const eval2Id = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "evaluator",
-        "eval-2",
-        1000000,
-      );
+      const eval2Id = IdUtils.generateDeterministicResultId({
+        ...baseParams,
+        resultType: "evaluator",
+        evaluatorId: "eval-2",
+      });
 
       expect(eval1Id).not.toBe(eval2Id);
     });
 
     it("returns a string ID", () => {
-      const id = IdUtils.generateDeterministicResultId(
-        "tenant-1",
-        "run-123",
-        0,
-        "target-1",
-        "target",
-        null,
-        1000000,
-      );
+      const id = IdUtils.generateDeterministicResultId(baseParams);
 
       expect(typeof id).toBe("string");
       expect(id.length).toBeGreaterThan(0);
+    });
+
+    it("throws when evaluator result has no evaluatorId", () => {
+      expect(() =>
+        IdUtils.generateDeterministicResultId({
+          ...baseParams,
+          resultType: "evaluator",
+          evaluatorId: null,
+        }),
+      ).toThrow("evaluatorId is required for evaluator results");
+    });
+
+    it("throws when target result has an evaluatorId", () => {
+      expect(() =>
+        IdUtils.generateDeterministicResultId({
+          ...baseParams,
+          resultType: "target",
+          evaluatorId: "eval-1",
+        }),
+      ).toThrow("evaluatorId must be null for target results");
     });
   });
 });

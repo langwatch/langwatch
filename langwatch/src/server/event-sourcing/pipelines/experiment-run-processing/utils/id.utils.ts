@@ -2,15 +2,30 @@ import { createHash } from "crypto";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
-function generateDeterministicResultId(
-  tenantId: string,
-  runId: string,
-  index: number,
-  targetId: string,
-  resultType: "target" | "evaluator",
-  evaluatorId: string | null,
-  timestampMs: number,
-): string {
+function generateDeterministicResultId({
+  tenantId,
+  runId,
+  index,
+  targetId,
+  resultType,
+  evaluatorId,
+  timestampMs,
+}: {
+  tenantId: string;
+  runId: string;
+  index: number;
+  targetId: string;
+  resultType: "target" | "evaluator";
+  evaluatorId: string | null;
+  timestampMs: number;
+}): string {
+  if (resultType === "evaluator" && !evaluatorId) {
+    throw new Error("evaluatorId is required for evaluator results");
+  }
+  if (resultType === "target" && evaluatorId != null) {
+    throw new Error("evaluatorId must be null for target results");
+  }
+
   const hashInput = evaluatorId
     ? `${tenantId}:${runId}:${index}:${targetId}:${evaluatorId}:${resultType}`
     : `${tenantId}:${runId}:${index}:${targetId}:${resultType}`;

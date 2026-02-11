@@ -7,6 +7,7 @@ import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
 import { isClickHouseReadEnabled } from "./isClickHouseReadEnabled";
 import type {
+  ClickHouseCostSummaryRow,
   ClickHouseEvaluatorBreakdownRow,
   ClickHouseExperimentRunItemRow,
   ClickHouseExperimentRunRow,
@@ -139,7 +140,7 @@ export class ClickHouseExperimentRunService {
                 EvaluatorId,
                 any(EvaluatorName) AS EvaluatorName,
                 avg(Score) AS avgScore,
-                countIf(Passed = 1) / countIf(Passed IS NOT NULL) AS passRate,
+                if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
                 countIf(Passed IS NOT NULL) AS hasPassedCount
               FROM experiment_run_items FINAL
               WHERE TenantId = {tenantId:String}
@@ -169,16 +170,46 @@ export class ClickHouseExperimentRunService {
             breakdownByRunId.set(row.RunId, existing);
           }
 
+          // Fetch cost/duration summary per run
+          const costResult = await this.clickHouseClient.query({
+            query: `
+              SELECT
+                RunId,
+                sumIf(TargetCost, ResultType = 'target') AS datasetCost,
+                sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
+                avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
+                avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
+                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost
+              FROM experiment_run_items FINAL
+              WHERE TenantId = {tenantId:String}
+                AND RunId IN ({runIds:Array(String)})
+              GROUP BY RunId
+            `,
+            query_params: {
+              tenantId: projectId,
+              runIds,
+            },
+            format: "JSONEachRow",
+          });
+
+          const costRows =
+            (await costResult.json()) as ClickHouseCostSummaryRow[];
+
+          const costByRunId = new Map<string, ClickHouseCostSummaryRow>();
+          for (const row of costRows) {
+            costByRunId.set(row.RunId, row);
+          }
+
           // Fetch workflow version metadata from Prisma
           const versionIds = runRows
             .map((r) => r.WorkflowVersionId)
             .filter((id): id is string => id !== null);
 
-          const versionsMap = await getVersionMap(
-            this.prisma,
+          const versionsMap = await getVersionMap({
+            prisma: this.prisma,
             projectId,
             versionIds,
-          );
+          });
 
           // Map to canonical types and group by experiment ID
           const result: Record<string, ExperimentRun[]> = {};
@@ -192,6 +223,7 @@ export class ClickHouseExperimentRunService {
               row,
               workflowVersion,
               breakdownByRunId.get(row.RunId),
+              costByRunId.get(row.RunId),
             );
 
             if (!(run.experimentId in result)) {
@@ -231,6 +263,7 @@ export class ClickHouseExperimentRunService {
    */
   async getRun({
     projectId,
+    experimentId,
     runId,
   }: {
     projectId: string;
@@ -260,11 +293,13 @@ export class ClickHouseExperimentRunService {
               SELECT *
               FROM experiment_runs FINAL
               WHERE TenantId = {tenantId:String}
+                AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
               LIMIT 1
             `,
             query_params: {
               tenantId: projectId,
+              experimentId,
               runId,
             },
             format: "JSONEachRow",

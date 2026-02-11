@@ -525,7 +525,15 @@ export async function* runOrchestrator(
 
   // Check if ClickHouse dual-write is enabled for this project
   const dispatcher = ExperimentRunDispatcher.create();
-  const clickHouseEnabled = await dispatcher.isClickHouseEnabled(projectId);
+  let clickHouseEnabled = false;
+  try {
+    clickHouseEnabled = await dispatcher.isClickHouseEnabled(projectId);
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "Failed to check ClickHouse enabled status, proceeding without dual-write",
+    );
+  }
 
   // Get repository and initialize storage if enabled
   const repository =
@@ -665,7 +673,10 @@ export async function* runOrchestrator(
           index: event.rowIndex,
           targetId: event.targetId,
           entry: datasetEntry,
-          predicted: event.output != null ? { output: event.output } : null,
+          predicted:
+            event.output === null || event.output === undefined
+              ? null
+              : { output: event.output },
           cost: event.cost ?? null,
           duration: event.duration ?? null,
           error: event.error ?? null,
