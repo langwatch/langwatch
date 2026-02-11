@@ -108,24 +108,24 @@ export function useModelProviderForm(
     }
 
     return {
-      defaultModel: resolveModelForProvider(
-        defaultModel,
-        provider.provider,
-        provider.models,
-        "chat",
-      ),
-      topicClusteringModel: resolveModelForProvider(
-        topicClusteringModel,
-        provider.provider,
-        provider.models,
-        "chat",
-      ),
-      embeddingsModel: resolveModelForProvider(
-        embeddingsModel,
-        provider.provider,
-        provider.embeddingsModels,
-        "embedding",
-      ),
+      defaultModel: resolveModelForProvider({
+        current: defaultModel,
+        providerKey: provider.provider,
+        storedModels: provider.models,
+        mode: "chat",
+      }),
+      topicClusteringModel: resolveModelForProvider({
+        current: topicClusteringModel,
+        providerKey: provider.provider,
+        storedModels: provider.models,
+        mode: "chat",
+      }),
+      embeddingsModel: resolveModelForProvider({
+        current: embeddingsModel,
+        providerKey: provider.provider,
+        storedModels: provider.embeddingsModels,
+        mode: "embedding",
+      }),
     };
   }, [
     effectiveDefaults,
@@ -210,11 +210,11 @@ export function useModelProviderForm(
   // Also auto-enable when this is the only enabled provider (first provider setup)
   const [useAsDefaultProvider, setUseAsDefaultProvider] = useState<boolean>(
     () =>
-      shouldAutoEnableAsDefault(
-        provider.provider,
+      shouldAutoEnableAsDefault({
+        providerKey: provider.provider,
         project,
         enabledProvidersCount,
-      ),
+      }),
   );
   const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
     initialProjectDefaultModel,
@@ -281,11 +281,11 @@ export function useModelProviderForm(
     // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
     // Also auto-enable when this is the only enabled provider (first provider setup)
     setUseAsDefaultProvider(
-      shouldAutoEnableAsDefault(
-        provider.provider,
+      shouldAutoEnableAsDefault({
+        providerKey: provider.provider,
         project,
         enabledProvidersCount,
-      ),
+      }),
     );
 
     setProjectDefaultModel(initialProjectDefaultModel);

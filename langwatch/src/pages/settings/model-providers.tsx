@@ -37,9 +37,9 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
 import {
-  isProviderDefaultModel,
   isProviderEffectiveDefault,
   isProviderUsedForDefaultModels,
+  shouldAutoEnableAsDefault,
 } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
@@ -85,10 +85,11 @@ export default function ModelsPage() {
   // Check if provider is used for the Default Model only (badge display)
   // When there's only one enabled provider, it is the default by definition
   const isDefaultProvider = (providerKey: string) => {
-    return (
-      isProviderDefaultModel(providerKey, project) ||
-      enabledProviders.length === 1
-    );
+    return shouldAutoEnableAsDefault({
+      providerKey,
+      project,
+      enabledProvidersCount: enabledProviders.length,
+    });
   };
 
   // Check if provider is used for any default models (for delete prevention)
