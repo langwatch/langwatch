@@ -83,7 +83,7 @@ jobs:
 
       - name: Create pull request with fixes
         if: success()
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "fix(python-sdk): auto-fix failing tests via Codex"
           branch: codex/auto-fix-python-${{ github.run_id }}
