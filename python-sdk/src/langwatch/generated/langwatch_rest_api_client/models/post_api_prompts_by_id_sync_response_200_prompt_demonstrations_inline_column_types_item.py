@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, Literal, TypeVar, Union, cast
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -14,47 +16,47 @@ class PostApiPromptsByIdSyncResponse200PromptDemonstrationsInlineColumnTypesItem
     """
     Attributes:
         name (str):
-        type_ (Union[Literal['annotations'], Literal['boolean'], Literal['chat_messages'], Literal['date'],
-            Literal['evaluations'], Literal['image'], Literal['json'], Literal['list'], Literal['number'],
-            Literal['rag_contexts'], Literal['spans'], Literal['string']]):
-        id (Union[Unset, str]):
+        type_ (Literal['annotations'] | Literal['boolean'] | Literal['chat_messages'] | Literal['date'] |
+            Literal['evaluations'] | Literal['image'] | Literal['json'] | Literal['list'] | Literal['number'] |
+            Literal['rag_contexts'] | Literal['spans'] | Literal['string']):
+        id (str | Unset):
     """
 
     name: str
-    type_: Union[
-        Literal["annotations"],
-        Literal["boolean"],
-        Literal["chat_messages"],
-        Literal["date"],
-        Literal["evaluations"],
-        Literal["image"],
-        Literal["json"],
-        Literal["list"],
-        Literal["number"],
-        Literal["rag_contexts"],
-        Literal["spans"],
-        Literal["string"],
-    ]
-    id: Union[Unset, str] = UNSET
+    type_: (
+        Literal["annotations"]
+        | Literal["boolean"]
+        | Literal["chat_messages"]
+        | Literal["date"]
+        | Literal["evaluations"]
+        | Literal["image"]
+        | Literal["json"]
+        | Literal["list"]
+        | Literal["number"]
+        | Literal["rag_contexts"]
+        | Literal["spans"]
+        | Literal["string"]
+    )
+    id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
-        type_: Union[
-            Literal["annotations"],
-            Literal["boolean"],
-            Literal["chat_messages"],
-            Literal["date"],
-            Literal["evaluations"],
-            Literal["image"],
-            Literal["json"],
-            Literal["list"],
-            Literal["number"],
-            Literal["rag_contexts"],
-            Literal["spans"],
-            Literal["string"],
-        ]
+        type_: (
+            Literal["annotations"]
+            | Literal["boolean"]
+            | Literal["chat_messages"]
+            | Literal["date"]
+            | Literal["evaluations"]
+            | Literal["image"]
+            | Literal["json"]
+            | Literal["list"]
+            | Literal["number"]
+            | Literal["rag_contexts"]
+            | Literal["spans"]
+            | Literal["string"]
+        )
         type_ = self.type_
 
         id = self.id
@@ -79,20 +81,20 @@ class PostApiPromptsByIdSyncResponse200PromptDemonstrationsInlineColumnTypesItem
 
         def _parse_type_(
             data: object,
-        ) -> Union[
-            Literal["annotations"],
-            Literal["boolean"],
-            Literal["chat_messages"],
-            Literal["date"],
-            Literal["evaluations"],
-            Literal["image"],
-            Literal["json"],
-            Literal["list"],
-            Literal["number"],
-            Literal["rag_contexts"],
-            Literal["spans"],
-            Literal["string"],
-        ]:
+        ) -> (
+            Literal["annotations"]
+            | Literal["boolean"]
+            | Literal["chat_messages"]
+            | Literal["date"]
+            | Literal["evaluations"]
+            | Literal["image"]
+            | Literal["json"]
+            | Literal["list"]
+            | Literal["number"]
+            | Literal["rag_contexts"]
+            | Literal["spans"]
+            | Literal["string"]
+        ):
             type_type_0 = cast(Literal["string"], data)
             if type_type_0 != "string":
                 raise ValueError(f"type_type_0 must match const 'string', got '{type_type_0}'")

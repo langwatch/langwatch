@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -20,12 +22,12 @@ class PostApiPromptsBodyOutputsItem:
     Attributes:
         identifier (str):
         type_ (PostApiPromptsBodyOutputsItemType):
-        json_schema (Union[Unset, PostApiPromptsBodyOutputsItemJsonSchema]):
+        json_schema (PostApiPromptsBodyOutputsItemJsonSchema | Unset):
     """
 
     identifier: str
     type_: PostApiPromptsBodyOutputsItemType
-    json_schema: Union[Unset, "PostApiPromptsBodyOutputsItemJsonSchema"] = UNSET
+    json_schema: PostApiPromptsBodyOutputsItemJsonSchema | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -33,7 +35,7 @@ class PostApiPromptsBodyOutputsItem:
 
         type_ = self.type_.value
 
-        json_schema: Union[Unset, dict[str, Any]] = UNSET
+        json_schema: dict[str, Any] | Unset = UNSET
         if not isinstance(self.json_schema, Unset):
             json_schema = self.json_schema.to_dict()
 
@@ -60,7 +62,7 @@ class PostApiPromptsBodyOutputsItem:
         type_ = PostApiPromptsBodyOutputsItemType(d.pop("type"))
 
         _json_schema = d.pop("json_schema", UNSET)
-        json_schema: Union[Unset, PostApiPromptsBodyOutputsItemJsonSchema]
+        json_schema: PostApiPromptsBodyOutputsItemJsonSchema | Unset
         if isinstance(_json_schema, Unset):
             json_schema = UNSET
         else:

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -14,17 +16,17 @@ class PostApiScenarioEventsResponse201:
     """
     Attributes:
         success (bool):
-        url (Union[None, Unset, str]):
+        url (None | str | Unset):
     """
 
     success: bool
-    url: Union[None, Unset, str] = UNSET
+    url: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         success = self.success
 
-        url: Union[None, Unset, str]
+        url: None | str | Unset
         if isinstance(self.url, Unset):
             url = UNSET
         else:
@@ -47,12 +49,12 @@ class PostApiScenarioEventsResponse201:
         d = dict(src_dict)
         success = d.pop("success")
 
-        def _parse_url(data: object) -> Union[None, Unset, str]:
+        def _parse_url(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         url = _parse_url(d.pop("url", UNSET))
 

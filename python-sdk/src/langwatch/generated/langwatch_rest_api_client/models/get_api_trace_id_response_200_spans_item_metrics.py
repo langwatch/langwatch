@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -13,14 +15,14 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200SpansItemMetrics")
 class GetApiTraceIdResponse200SpansItemMetrics:
     """
     Attributes:
-        tokens_estimated (Union[Unset, bool]):  Example: True.
-        completion_tokens (Union[Unset, int]):  Example: 7.
-        prompt_tokens (Union[Unset, int]):  Example: 20.
+        tokens_estimated (bool | Unset):  Example: True.
+        completion_tokens (int | Unset):  Example: 7.
+        prompt_tokens (int | Unset):  Example: 20.
     """
 
-    tokens_estimated: Union[Unset, bool] = UNSET
-    completion_tokens: Union[Unset, int] = UNSET
-    prompt_tokens: Union[Unset, int] = UNSET
+    tokens_estimated: bool | Unset = UNSET
+    completion_tokens: int | Unset = UNSET
+    prompt_tokens: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

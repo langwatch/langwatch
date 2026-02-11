@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,28 +19,28 @@ T = TypeVar("T", bound="Evaluation")
 class Evaluation:
     """
     Attributes:
-        evaluation_id (Union[Unset, str]):
-        score (Union[Unset, float]):
-        timestamps (Union[Unset, EvaluationTimestamps]):
-        evaluator_id (Union[Unset, str]):
-        name (Union[Unset, str]):
-        details (Union[Unset, str]):
-        passed (Union[Unset, bool]):
-        label (Union[None, Unset, str]):
-        type_ (Union[Unset, str]):
-        status (Union[Unset, str]):
+        evaluation_id (str | Unset):
+        score (float | Unset):
+        timestamps (EvaluationTimestamps | Unset):
+        evaluator_id (str | Unset):
+        name (str | Unset):
+        details (str | Unset):
+        passed (bool | Unset):
+        label (None | str | Unset):
+        type_ (str | Unset):
+        status (str | Unset):
     """
 
-    evaluation_id: Union[Unset, str] = UNSET
-    score: Union[Unset, float] = UNSET
-    timestamps: Union[Unset, "EvaluationTimestamps"] = UNSET
-    evaluator_id: Union[Unset, str] = UNSET
-    name: Union[Unset, str] = UNSET
-    details: Union[Unset, str] = UNSET
-    passed: Union[Unset, bool] = UNSET
-    label: Union[None, Unset, str] = UNSET
-    type_: Union[Unset, str] = UNSET
-    status: Union[Unset, str] = UNSET
+    evaluation_id: str | Unset = UNSET
+    score: float | Unset = UNSET
+    timestamps: EvaluationTimestamps | Unset = UNSET
+    evaluator_id: str | Unset = UNSET
+    name: str | Unset = UNSET
+    details: str | Unset = UNSET
+    passed: bool | Unset = UNSET
+    label: None | str | Unset = UNSET
+    type_: str | Unset = UNSET
+    status: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -46,7 +48,7 @@ class Evaluation:
 
         score = self.score
 
-        timestamps: Union[Unset, dict[str, Any]] = UNSET
+        timestamps: dict[str, Any] | Unset = UNSET
         if not isinstance(self.timestamps, Unset):
             timestamps = self.timestamps.to_dict()
 
@@ -58,7 +60,7 @@ class Evaluation:
 
         passed = self.passed
 
-        label: Union[None, Unset, str]
+        label: None | str | Unset
         if isinstance(self.label, Unset):
             label = UNSET
         else:
@@ -104,7 +106,7 @@ class Evaluation:
         score = d.pop("score", UNSET)
 
         _timestamps = d.pop("timestamps", UNSET)
-        timestamps: Union[Unset, EvaluationTimestamps]
+        timestamps: EvaluationTimestamps | Unset
         if isinstance(_timestamps, Unset):
             timestamps = UNSET
         else:
@@ -118,12 +120,12 @@ class Evaluation:
 
         passed = d.pop("passed", UNSET)
 
-        def _parse_label(data: object) -> Union[None, Unset, str]:
+        def _parse_label(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         label = _parse_label(d.pop("label", UNSET))
 

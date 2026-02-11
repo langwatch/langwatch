@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,9 +26,9 @@ class PostApiScenarioEventsBodyType1:
         scenario_id (str):
         scenario_run_id (str):
         status (PostApiScenarioEventsBodyType1Status):
-        raw_event (Union[Unset, Any]):
-        scenario_set_id (Union[Unset, str]):  Default: 'default'.
-        results (Union['PostApiScenarioEventsBodyType1ResultsType0', None, Unset]):
+        raw_event (Any | Unset):
+        scenario_set_id (str | Unset):  Default: 'default'.
+        results (None | PostApiScenarioEventsBodyType1ResultsType0 | Unset):
     """
 
     type_: Literal["SCENARIO_RUN_FINISHED"]
@@ -35,9 +37,9 @@ class PostApiScenarioEventsBodyType1:
     scenario_id: str
     scenario_run_id: str
     status: PostApiScenarioEventsBodyType1Status
-    raw_event: Union[Unset, Any] = UNSET
-    scenario_set_id: Union[Unset, str] = "default"
-    results: Union["PostApiScenarioEventsBodyType1ResultsType0", None, Unset] = UNSET
+    raw_event: Any | Unset = UNSET
+    scenario_set_id: str | Unset = "default"
+    results: None | PostApiScenarioEventsBodyType1ResultsType0 | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,7 +63,7 @@ class PostApiScenarioEventsBodyType1:
 
         scenario_set_id = self.scenario_set_id
 
-        results: Union[None, Unset, dict[str, Any]]
+        results: dict[str, Any] | None | Unset
         if isinstance(self.results, Unset):
             results = UNSET
         elif isinstance(self.results, PostApiScenarioEventsBodyType1ResultsType0):
@@ -115,7 +117,7 @@ class PostApiScenarioEventsBodyType1:
 
         scenario_set_id = d.pop("scenarioSetId", UNSET)
 
-        def _parse_results(data: object) -> Union["PostApiScenarioEventsBodyType1ResultsType0", None, Unset]:
+        def _parse_results(data: object) -> None | PostApiScenarioEventsBodyType1ResultsType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -126,9 +128,9 @@ class PostApiScenarioEventsBodyType1:
                 results_type_0 = PostApiScenarioEventsBodyType1ResultsType0.from_dict(data)
 
                 return results_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union["PostApiScenarioEventsBodyType1ResultsType0", None, Unset], data)
+            return cast(None | PostApiScenarioEventsBodyType1ResultsType0 | Unset, data)
 
         results = _parse_results(d.pop("results", UNSET))
 

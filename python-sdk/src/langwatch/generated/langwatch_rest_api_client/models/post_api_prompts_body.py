@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 
@@ -21,36 +23,36 @@ class PostApiPromptsBody:
     """
     Attributes:
         handle (str):
-        scope (Union[Unset, PostApiPromptsBodyScope]):  Default: PostApiPromptsBodyScope.PROJECT.
-        model (Union[Unset, str]):
-        temperature (Union[Unset, float]):
-        max_tokens (Union[Unset, float]):
-        commit_message (Union[Unset, str]):
-        author_id (Union[Unset, str]):
-        prompt (Union[Unset, str]):
-        messages (Union[Unset, list['PostApiPromptsBodyMessagesItem']]):
-        inputs (Union[Unset, list['PostApiPromptsBodyInputsItem']]):
-        outputs (Union[Unset, list['PostApiPromptsBodyOutputsItem']]):
-        schema_version (Union[Unset, PostApiPromptsBodySchemaVersion]):
+        scope (PostApiPromptsBodyScope | Unset):  Default: PostApiPromptsBodyScope.PROJECT.
+        model (str | Unset):
+        temperature (float | Unset):
+        max_tokens (float | Unset):
+        commit_message (str | Unset):
+        author_id (str | Unset):
+        prompt (str | Unset):
+        messages (list[PostApiPromptsBodyMessagesItem] | Unset):
+        inputs (list[PostApiPromptsBodyInputsItem] | Unset):
+        outputs (list[PostApiPromptsBodyOutputsItem] | Unset):
+        schema_version (PostApiPromptsBodySchemaVersion | Unset):
     """
 
     handle: str
-    scope: Union[Unset, PostApiPromptsBodyScope] = PostApiPromptsBodyScope.PROJECT
-    model: Union[Unset, str] = UNSET
-    temperature: Union[Unset, float] = UNSET
-    max_tokens: Union[Unset, float] = UNSET
-    commit_message: Union[Unset, str] = UNSET
-    author_id: Union[Unset, str] = UNSET
-    prompt: Union[Unset, str] = UNSET
-    messages: Union[Unset, list["PostApiPromptsBodyMessagesItem"]] = UNSET
-    inputs: Union[Unset, list["PostApiPromptsBodyInputsItem"]] = UNSET
-    outputs: Union[Unset, list["PostApiPromptsBodyOutputsItem"]] = UNSET
-    schema_version: Union[Unset, PostApiPromptsBodySchemaVersion] = UNSET
+    scope: PostApiPromptsBodyScope | Unset = PostApiPromptsBodyScope.PROJECT
+    model: str | Unset = UNSET
+    temperature: float | Unset = UNSET
+    max_tokens: float | Unset = UNSET
+    commit_message: str | Unset = UNSET
+    author_id: str | Unset = UNSET
+    prompt: str | Unset = UNSET
+    messages: list[PostApiPromptsBodyMessagesItem] | Unset = UNSET
+    inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET
+    outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET
+    schema_version: PostApiPromptsBodySchemaVersion | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
 
-        scope: Union[Unset, str] = UNSET
+        scope: str | Unset = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
 
@@ -66,32 +68,33 @@ class PostApiPromptsBody:
 
         prompt = self.prompt
 
-        messages: Union[Unset, list[dict[str, Any]]] = UNSET
+        messages: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.messages, Unset):
             messages = []
             for messages_item_data in self.messages:
                 messages_item = messages_item_data.to_dict()
                 messages.append(messages_item)
 
-        inputs: Union[Unset, list[dict[str, Any]]] = UNSET
+        inputs: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.inputs, Unset):
             inputs = []
             for inputs_item_data in self.inputs:
                 inputs_item = inputs_item_data.to_dict()
                 inputs.append(inputs_item)
 
-        outputs: Union[Unset, list[dict[str, Any]]] = UNSET
+        outputs: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.outputs, Unset):
             outputs = []
             for outputs_item_data in self.outputs:
                 outputs_item = outputs_item_data.to_dict()
                 outputs.append(outputs_item)
 
-        schema_version: Union[Unset, str] = UNSET
+        schema_version: str | Unset = UNSET
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "handle": handle,
@@ -132,7 +135,7 @@ class PostApiPromptsBody:
         handle = d.pop("handle")
 
         _scope = d.pop("scope", UNSET)
-        scope: Union[Unset, PostApiPromptsBodyScope]
+        scope: PostApiPromptsBodyScope | Unset
         if isinstance(_scope, Unset):
             scope = UNSET
         else:
@@ -150,29 +153,35 @@ class PostApiPromptsBody:
 
         prompt = d.pop("prompt", UNSET)
 
-        messages = []
         _messages = d.pop("messages", UNSET)
-        for messages_item_data in _messages or []:
-            messages_item = PostApiPromptsBodyMessagesItem.from_dict(messages_item_data)
+        messages: list[PostApiPromptsBodyMessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = PostApiPromptsBodyMessagesItem.from_dict(messages_item_data)
 
-            messages.append(messages_item)
+                messages.append(messages_item)
 
-        inputs = []
         _inputs = d.pop("inputs", UNSET)
-        for inputs_item_data in _inputs or []:
-            inputs_item = PostApiPromptsBodyInputsItem.from_dict(inputs_item_data)
+        inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = PostApiPromptsBodyInputsItem.from_dict(inputs_item_data)
 
-            inputs.append(inputs_item)
+                inputs.append(inputs_item)
 
-        outputs = []
         _outputs = d.pop("outputs", UNSET)
-        for outputs_item_data in _outputs or []:
-            outputs_item = PostApiPromptsBodyOutputsItem.from_dict(outputs_item_data)
+        outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET
+        if _outputs is not UNSET:
+            outputs = []
+            for outputs_item_data in _outputs:
+                outputs_item = PostApiPromptsBodyOutputsItem.from_dict(outputs_item_data)
 
-            outputs.append(outputs_item)
+                outputs.append(outputs_item)
 
         _schema_version = d.pop("schemaVersion", UNSET)
-        schema_version: Union[Unset, PostApiPromptsBodySchemaVersion]
+        schema_version: PostApiPromptsBodySchemaVersion | Unset
         if isinstance(_schema_version, Unset):
             schema_version = UNSET
         else:

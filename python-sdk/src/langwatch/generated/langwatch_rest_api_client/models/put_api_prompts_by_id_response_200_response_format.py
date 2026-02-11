@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -22,11 +24,11 @@ class PutApiPromptsByIdResponse200ResponseFormat:
     """
     Attributes:
         type_ (PutApiPromptsByIdResponse200ResponseFormatType):
-        json_schema (Union['PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0', None]):
+        json_schema (None | PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0):
     """
 
     type_: PutApiPromptsByIdResponse200ResponseFormatType
-    json_schema: Union["PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0", None]
+    json_schema: None | PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +38,7 @@ class PutApiPromptsByIdResponse200ResponseFormat:
 
         type_ = self.type_.value
 
-        json_schema: Union[None, dict[str, Any]]
+        json_schema: dict[str, Any] | None
         if isinstance(self.json_schema, PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0):
             json_schema = self.json_schema.to_dict()
         else:
@@ -62,9 +64,7 @@ class PutApiPromptsByIdResponse200ResponseFormat:
         d = dict(src_dict)
         type_ = PutApiPromptsByIdResponse200ResponseFormatType(d.pop("type"))
 
-        def _parse_json_schema(
-            data: object,
-        ) -> Union["PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0", None]:
+        def _parse_json_schema(data: object) -> None | PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0:
             if data is None:
                 return data
             try:
@@ -73,9 +73,9 @@ class PutApiPromptsByIdResponse200ResponseFormat:
                 json_schema_type_0 = PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0.from_dict(data)
 
                 return json_schema_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union["PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0", None], data)
+            return cast(None | PutApiPromptsByIdResponse200ResponseFormatJsonSchemaType0, data)
 
         json_schema = _parse_json_schema(d.pop("json_schema"))
 
