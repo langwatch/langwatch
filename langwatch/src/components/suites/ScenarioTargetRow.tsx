@@ -30,7 +30,7 @@ function StatusIcon({ status }: { status: string }) {
   ) {
     return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
   }
-  return <Loader size={14} color="var(--chakra-colors-orange-500)" />;
+  return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
 }
 
 export function ScenarioTargetRow({

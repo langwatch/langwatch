@@ -3,7 +3,6 @@
  */
 
 import {
-  Badge,
   Box,
   Button,
   Center,
@@ -59,9 +58,16 @@ export function SuiteDetailPanel({
                 {suite.name}
               </Text>
               {suite.labels.map((label) => (
-                <Badge key={label} size="sm" variant="outline">
-                  {label}
-                </Badge>
+                <Text
+                  key={label}
+                  fontSize="xs"
+                  bg="bg.muted"
+                  px={2}
+                  py={0.5}
+                  borderRadius="md"
+                >
+                  #{label}
+                </Text>
               ))}
             </HStack>
             {suite.description && (

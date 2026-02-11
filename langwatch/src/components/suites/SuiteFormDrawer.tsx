@@ -12,7 +12,6 @@
  */
 
 import {
-  Badge,
   Box,
   Button,
   Collapsible,
@@ -35,6 +34,7 @@ import { api } from "~/utils/api";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm } from "./useSuiteForm";
+import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
 import { ScenarioCheckboxList } from "./ScenarioCheckboxList";
 import { TargetCheckboxList } from "./TargetCheckboxList";
 
@@ -249,30 +249,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               <Text fontSize="sm" fontWeight="medium">
                 Labels
               </Text>
-              <HStack gap={1} flexWrap="wrap">
-                {form.labels.map((label) => (
-                  <Badge
-                    key={label}
-                    size="sm"
-                    variant="outline"
-                    cursor="pointer"
-                    onClick={() => form.removeLabel(label)}
-                  >
-                    {label} x
-                  </Badge>
-                ))}
-                <Input
-                  size="sm"
-                  placeholder="+ add"
-                  width="80px"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      form.addLabel(e.currentTarget.value.trim());
-                      e.currentTarget.value = "";
-                    }
-                  }}
-                />
-              </HStack>
+              <InlineTagsInput
+                value={form.labels}
+                onChange={form.setLabels}
+                placeholder="Add label..."
+              />
             </VStack>
 
             {/* Scenarios */}

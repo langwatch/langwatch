@@ -84,7 +84,7 @@ After walking through all scenarios, report a summary:
 
 - Read `HOW_TO.md` in this skill directory before your first run — it has critical gotchas about auth, port mismatches, Chakra UI, and dev mode slowness
 - Use `browser_snapshot` (accessibility tree) for interactions, not screenshots — it's faster and gives you element refs
-- Use `browser_take_screenshot` only to capture evidence of failures
+- Use `browser_take_screenshot` only to capture evidence of failures. Always save to `.browser-test-screenshots/` directory (e.g. `filename: ".browser-test-screenshots/my-screenshot.png"`). This directory is gitignored.
 - Don't create any test files — this is interactive verification only
 - If the app isn't running, tell the user and stop
 - If a page requires auth/login, walk through login first and ask the user for credentials if needed

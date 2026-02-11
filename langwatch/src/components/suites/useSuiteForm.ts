@@ -238,6 +238,7 @@ export function useSuiteForm({
     description,
     setDescription,
     labels,
+    setLabels,
     addLabel,
     removeLabel,
     repeatCountStr,

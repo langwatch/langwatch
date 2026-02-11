@@ -132,9 +132,16 @@ export function ScenarioCheckboxList({
                   {scenario.name}
                 </Text>
                 {scenario.labels.map((l) => (
-                  <Badge key={l} size="sm" variant="outline">
+                  <Text
+                    key={l}
+                    fontSize="xs"
+                    bg="bg.muted"
+                    px={2}
+                    py={0.5}
+                    borderRadius="md"
+                  >
                     #{l}
-                  </Badge>
+                  </Text>
                 ))}
               </HStack>
             </Checkbox>
