@@ -304,6 +304,15 @@ export const navigationCommands: Command[] = [
     path: "/settings/subscription",
   },
   {
+    id: "nav-settings-plans",
+    label: "Plans",
+    description: "Settings → Plans",
+    icon: CreditCard,
+    category: "navigation",
+    keywords: ["plans", "pricing", "compare", "billing"],
+    path: "/settings/plans",
+  },
+  {
     id: "nav-settings-authentication",
     label: "Authentication",
     description: "Settings → Authentication",

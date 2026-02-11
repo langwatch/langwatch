@@ -598,6 +598,8 @@ export function SubscriptionPage() {
       baseUrl: window.location.origin,
       plan: "GROWTH_SEAT_USAGE",
       membersToAdd: totalCoreMembers,
+      currency,
+      billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
     });
 
     if (result.url) {

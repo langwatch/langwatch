@@ -108,6 +108,12 @@ const mockUpdateUsers = vi.fn(() => ({
   isLoading: false,
 }));
 
+const mockCreateSubscription = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn().mockResolvedValue({ url: null }),
+  isLoading: false,
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     plan: {
@@ -123,6 +129,9 @@ vi.mock("~/utils/api", () => ({
     subscription: {
       updateUsers: {
         useMutation: () => mockUpdateUsers(),
+      },
+      create: {
+        useMutation: () => mockCreateSubscription(),
       },
     },
     useContext: vi.fn(() => ({
@@ -165,20 +174,20 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when the subscription page loads", () => {
-    it("displays two plan blocks: Developer (Free) and Growth", async () => {
+    it("displays current plan block and upgrade plan block", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        expect(screen.getByTestId("plan-block-developer")).toBeInTheDocument();
-        expect(screen.getByTestId("plan-block-growth")).toBeInTheDocument();
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
     });
 
-    it("displays 'Need more? Contact sales' link below the plan blocks", async () => {
+    it("displays a contact link for billing questions", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        expect(screen.getByText(/Need more\? Contact sales/i)).toBeInTheDocument();
+        expect(screen.getByText(/contact us/i)).toBeInTheDocument();
       });
     });
   });
@@ -188,40 +197,37 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when organization has no active paid subscription", () => {
-    it("shows 'Current' indicator on Developer plan block", async () => {
+    it("shows 'Current' badge on the current plan block", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const developerBlock = screen.getByTestId("plan-block-developer");
-        expect(within(developerBlock).getByText("Current")).toBeInTheDocument();
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Current")).toBeInTheDocument();
       });
     });
 
-    it("shows correct Developer plan characteristics", async () => {
+    it("shows the Free plan label and developer features", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const developerBlock = screen.getByTestId("plan-block-developer");
+        const currentBlock = screen.getByTestId("current-plan-block");
 
-        // Title and price
-        expect(within(developerBlock).getByText("Developer")).toBeInTheDocument();
-        expect(within(developerBlock).getByText("Free")).toBeInTheDocument();
+        // Title
+        expect(within(currentBlock).getByText("Free plan")).toBeInTheDocument();
 
         // Features
-        expect(within(developerBlock).getByText(/50,000.*logs\/month/i)).toBeInTheDocument();
-        expect(within(developerBlock).getByText(/14 days.*data retention/i)).toBeInTheDocument();
-        expect(within(developerBlock).getByText(/2 users/i)).toBeInTheDocument();
-        expect(within(developerBlock).getByText(/3.*scenarios/i)).toBeInTheDocument();
-        expect(within(developerBlock).getByText(/Community/i)).toBeInTheDocument();
+        expect(within(currentBlock).getByText(/2 core members/i)).toBeInTheDocument();
+        expect(within(currentBlock).getByText(/Community support/i)).toBeInTheDocument();
       });
     });
 
-    it("shows 'Get Started' button on Developer plan", async () => {
+    it("shows the upgrade block with Growth features", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const developerBlock = screen.getByTestId("plan-block-developer");
-        expect(within(developerBlock).getByRole("button", { name: /Get Started/i })).toBeInTheDocument();
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(within(upgradeBlock).getByText(/Growth Plan/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
       });
     });
 
@@ -231,7 +237,7 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         const userCountLink = screen.getByTestId("user-count-link");
         expect(userCountLink).toBeInTheDocument();
-        expect(userCountLink).toHaveTextContent("2 users");
+        expect(userCountLink).toHaveTextContent("2");
       });
     });
   });
@@ -240,33 +246,29 @@ describe("<SubscriptionPage/>", () => {
   // Plan Display - Growth Tier
   // ============================================================================
 
-  describe("when viewing the Growth plan block", () => {
-    it("shows correct Growth plan characteristics", async () => {
+  describe("when viewing the upgrade plan block", () => {
+    it("shows correct Growth plan features", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const growthBlock = screen.getByTestId("plan-block-growth");
-
-        // Title and price
-        expect(within(growthBlock).getByText("Growth")).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/€29\/seat\/month/i)).toBeInTheDocument();
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
 
         // Features
-        expect(within(growthBlock).getByText(/200,000.*events/i)).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/30 days.*retention/i)).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/20.*core users/i)).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/Unlimited.*lite users/i)).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/Unlimited.*evals/i)).toBeInTheDocument();
-        expect(within(growthBlock).getByText(/Private Slack/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/200,000.*events/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/30 days.*retention/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/20.*core users/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Unlimited.*lite users/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Unlimited.*evals/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Private Slack/i)).toBeInTheDocument();
       });
     });
 
-    it("shows 'Try for Free' button on Growth plan", async () => {
+    it("shows 'Upgrade now' button on upgrade block", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const growthBlock = screen.getByTestId("plan-block-growth");
-        expect(within(growthBlock).getByRole("button", { name: /Try for Free/i })).toBeInTheDocument();
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
       });
     });
   });
@@ -290,22 +292,24 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("shows 'Current' indicator on Growth plan block", async () => {
+    it("shows 'Current' badge on the Growth plan block", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const growthBlock = screen.getByTestId("plan-block-growth");
-        expect(within(growthBlock).getByText("Current")).toBeInTheDocument();
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Current")).toBeInTheDocument();
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
       });
     });
 
-    it("does not show 'Current' indicator on Developer plan", async () => {
+    it("does not show the upgrade block", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const developerBlock = screen.getByTestId("plan-block-developer");
-        expect(within(developerBlock).queryByText("Current")).not.toBeInTheDocument();
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
+
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
     });
   });
 
@@ -602,14 +606,16 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("shows SAVE 25% badge when switching to annually", async () => {
+    it("shows Save badge when switching to annually", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
-      await user.click(screen.getByText("Annually"));
+      const toggle = screen.getByTestId("billing-period-toggle");
+      const switchInput = within(toggle).getByRole("checkbox");
+      await user.click(switchInput);
 
       await waitFor(() => {
-        expect(screen.getByText("SAVE 25%")).toBeInTheDocument();
+        expect(screen.getByText(/Save 8%/i)).toBeInTheDocument();
       });
     });
   });
@@ -642,18 +648,25 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByRole("button", { name: /Done/i }));
 
       // Switch to annual
-      await user.click(screen.getByText("Annually"));
+      const toggle = screen.getByTestId("billing-period-toggle");
+      const switchInput = within(toggle).getByRole("checkbox");
+      await user.click(switchInput);
 
       await waitFor(() => {
-        // 3 × €22 (29 * 0.75 rounded) = €66/mo
+        // 3 x €27 (Math.round(29 * 0.92)) = €81/mo
         const total = screen.getByTestId("upgrade-total");
-        expect(total).toHaveTextContent("€66/mo");
+        expect(total).toHaveTextContent("€81/mo");
       });
     });
 
-    it("shows alert with totals when clicking Upgrade now", async () => {
+    it("calls create subscription API when clicking Upgrade now", async () => {
       const user = userEvent.setup();
-      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+      const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockMutateAsync,
+        isLoading: false,
+      });
       renderSubscriptionPage();
 
       // Add 1 seat
@@ -663,14 +676,15 @@ describe("<SubscriptionPage/>", () => {
 
       await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
 
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Core members: 3")
-      );
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining("€87/mo")
-      );
-
-      alertSpy.mockRestore();
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            plan: "GROWTH_SEAT_USAGE",
+            membersToAdd: 3,
+          })
+        );
+      });
     });
   });
 
