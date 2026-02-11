@@ -41,6 +41,13 @@ Feature: Settings Plans Comparison Page
     Then no plan column is shown as current
 
   @integration
+  Scenario: TIERED organizations see a discontinued plan migration notice
+    Given my organization uses the TIERED pricing model
+    When I view /settings/plans
+    Then I see a notice that my current pricing model has been discontinued
+    And the notice contains a link to /settings/subscription to update my plan
+
+  @integration
   Scenario: Free plan column shows default limits
     Given I am on /settings/plans
     Then the "Free" plan shows:

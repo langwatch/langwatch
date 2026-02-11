@@ -58,6 +58,19 @@ describe("<PlansComparisonPage/>", () => {
       const scenariosRow = screen.getByTestId("comparison-row-scenarios");
       expect(within(scenariosRow).getByText("3")).toBeInTheDocument();
     });
+
+    it("routes growth upgrade action to subscription page", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const growthColumn = screen.getByTestId("plan-column-growth");
+      const upgradeLink = within(growthColumn).getByRole("link", {
+        name: "Upgrade Now",
+      });
+      expect(upgradeLink).toHaveAttribute("href", "/settings/subscription");
+    });
   });
 
   describe("when organization is on the Growth plan", () => {
@@ -146,6 +159,37 @@ describe("<PlansComparisonPage/>", () => {
         within(screen.getByTestId("plan-column-enterprise")).queryByText(
           "Current",
         ),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows discontinued pricing notice for TIERED organizations", () => {
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "LAUNCH", free: false }}
+          pricingModel="TIERED"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const notice = screen.getByTestId("tiered-discontinued-notice");
+      expect(notice).toBeInTheDocument();
+      expect(notice).toHaveTextContent(/pricing model has been discontinued/i);
+
+      const link = within(notice).getByRole("link", { name: /update your plan/i });
+      expect(link).toHaveAttribute("href", "/settings/subscription");
+    });
+
+    it("does not show discontinued pricing notice for SEAT_USAGE organizations", () => {
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "GROWTH_SEAT_USAGE", free: false }}
+          pricingModel="SEAT_USAGE"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.queryByTestId("tiered-discontinued-notice"),
       ).not.toBeInTheDocument();
     });
   });

@@ -28,7 +28,10 @@ function PlansPage() {
 
   return (
     <SettingsLayout>
-      <PlansComparisonPage activePlan={activePlan.data} />
+      <PlansComparisonPage
+        activePlan={activePlan.data}
+        pricingModel={organization?.pricingModel}
+      />
     </SettingsLayout>
   );
 }

@@ -21,7 +21,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
@@ -97,6 +97,18 @@ const GROWTH_FEATURES = [
   "Unlimited evals",
   "Private Slack support",
 ];
+
+function formatPlanTypeLabel(planType?: string | null) {
+  if (!planType) {
+    return "Current plan";
+  }
+
+  return planType
+    .toLowerCase()
+    .split("_")
+    .map((word) => word[0]?.toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 /**
  * Current Plan Block - displays the active subscription
@@ -593,7 +605,7 @@ export function SubscriptionPage() {
   // Detect currency from IP geolocation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currencyApi = (api as any).currency;
-  const detectedCurrency = currencyApi?.detectCurrency?.useQuery(undefined, {
+  const detectedCurrency = currencyApi?.detectCurrency?.useQuery({}, {
     enabled: !currencyInitialized,
   });
 
@@ -640,6 +652,8 @@ export function SubscriptionPage() {
 
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
+  const isTieredPricingModel = organization?.pricingModel === "TIERED";
+  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan;
   const totalUserCount = users.length + plannedUsers.length;
 
   // Pricing calculations
@@ -732,13 +746,21 @@ export function SubscriptionPage() {
     );
   }
 
-  const currentPlanName = isDeveloperPlan ? "Free plan" : "Growth plan";
-  const currentPlanDescription = isDeveloperPlan
+  const currentPlanName = isTieredPricingModel
+    ? (plan.name ?? formatPlanTypeLabel(plan.type))
+    : isDeveloperPlan
+      ? "Free plan"
+      : "Growth plan";
+  const currentPlanDescription = isTieredPricingModel
     ? undefined
-    : `${sym}${seatPrice} per user/mo`;
-  const currentPlanFeatures = isDeveloperPlan
-    ? DEVELOPER_FEATURES
-    : GROWTH_FEATURES;
+    : isDeveloperPlan
+      ? undefined
+      : `${sym}${seatPrice} per user/mo`;
+  const currentPlanFeatures = isTieredLegacyPaidPlan
+    ? undefined
+    : isDeveloperPlan
+      ? DEVELOPER_FEATURES
+      : GROWTH_FEATURES;
 
   const pricePerSeat = `${sym}${seatPrice} per seat/mo`;
   const totalPriceFormatted = `${sym}${totalPrice}/mo`;
@@ -838,34 +860,6 @@ export function SubscriptionPage() {
           </Box>
         )}
 
-        {/* TIERED pricing model alert */}
-        {organization.pricingModel === "TIERED" && (
-          <Box
-            data-testid="tiered-pricing-alert"
-            backgroundColor="blue.50"
-            borderWidth={1}
-            borderColor="blue.200"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack gap={2}>
-              <Info size={16} color="var(--chakra-colors-blue-500)" />
-              <Text fontSize="sm" color="blue.800">
-                We've updated our pricing model. Visit the new{" "}
-                <Link
-                  href="/settings/plans"
-                  fontWeight="semibold"
-                  color="blue.600"
-                  _hover={{ color: "blue.800" }}
-                >
-                  plans page
-                </Link>{" "}
-                to see available options.
-              </Text>
-            </HStack>
-          </Box>
-        )}
-
         {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
@@ -880,8 +874,8 @@ export function SubscriptionPage() {
           isManageLoading={manageSubscription.isPending}
         />
 
-        {/* Upgrade Block - only show if on free plan and not TIERED pricing */}
-        {isDeveloperPlan && organization.pricingModel !== "TIERED" && (
+        {/* Upgrade Block - show for free plan on both pricing models */}
+        {isDeveloperPlan && (
           <UpgradePlanBlock
             planName={
               <>
@@ -902,8 +896,8 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Update Seats Block - show for Growth plan when seats have been added, not for TIERED */}
-        {!isDeveloperPlan && plannedUsers.length > 0 && organization.pricingModel !== "TIERED" && (
+        {/* Update Seats Block - show for Growth seat+usage plan when seats have been added */}
+        {!isDeveloperPlan && plannedUsers.length > 0 && !isTieredPricingModel && (
           <UpdateSeatsBlock
             totalCoreMembers={totalCoreMembers}
             totalPrice={totalPriceFormatted}
