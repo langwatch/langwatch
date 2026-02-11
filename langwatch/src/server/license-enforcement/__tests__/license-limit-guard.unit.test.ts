@@ -99,19 +99,22 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(5); // 5 members, limit is 5
       const limits = createLimits(5);
 
-      await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
-          organizationId,
-          mockRepo,
-          limits
-        )
-      ).rejects.toThrow(
-        expect.objectContaining({
-          code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
-        })
-      );
+      const error = await assertMemberTypeLimitNotExceeded(
+        "lite-to-full",
+        organizationId,
+        mockRepo,
+        limits
+      ).catch((e) => e);
+
+      expect(error).toMatchObject({
+        code: "FORBIDDEN",
+        message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+        cause: {
+          limitType: "members",
+          current: 5,
+          max: 5,
+        },
+      });
     });
 
     it("throws when over limit", async () => {
@@ -150,19 +153,22 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(0, 10); // 10 lite members, limit is 10
       const limits = createLimits(5, 10);
 
-      await expect(
-        assertMemberTypeLimitNotExceeded(
-          "full-to-lite",
-          organizationId,
-          mockRepo,
-          limits
-        )
-      ).rejects.toThrow(
-        expect.objectContaining({
-          code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
-        })
-      );
+      const error = await assertMemberTypeLimitNotExceeded(
+        "full-to-lite",
+        organizationId,
+        mockRepo,
+        limits
+      ).catch((e) => e);
+
+      expect(error).toMatchObject({
+        code: "FORBIDDEN",
+        message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
+        cause: {
+          limitType: "membersLite",
+          current: 10,
+          max: 10,
+        },
+      });
     });
 
     it("throws when over limit", async () => {

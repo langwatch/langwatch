@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import {
@@ -224,6 +224,7 @@ export const TeamForm = ({
                           canManageOrganization ? (
                             <TeamRoleSelect
                               organizationId={organizationId}
+                              organizationRole={OrganizationUserRole.ADMIN}
                               value={field.value}
                               onChange={field.onChange}
                             />

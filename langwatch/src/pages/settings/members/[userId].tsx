@@ -5,31 +5,52 @@ import {
   Heading,
   HStack,
   Icon,
+  Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  OrganizationUserRole,
+  TeamUserRole,
+} from "@prisma/client";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, MoreVertical } from "lucide-react";
 import { LuTrash } from "react-icons/lu";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
-import { TeamUserRoleField } from "../../../components/settings/TeamUserRoleField";
+import {
+  MISSING_CUSTOM_ROLE_VALUE,
+  TeamUserRoleField,
+} from "../../../components/settings/TeamUserRoleField";
 import { Link } from "../../../components/ui/link";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
+import { checkCompoundLimits } from "../../../hooks/useCompoundLicenseCheck";
+import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import {
+  getOrganizationRoleLabel,
+} from "../../../utils/memberRoleConstraints";
+import {
+  type PendingTeamRoleMap,
+  applyOrganizationRoleToPendingTeamRoles,
+  arePendingTeamRolesEqual,
+  buildInitialPendingTeamRoles,
+  getLicenseLimitTypeForRoleChange,
+  getTeamRoleDisplayName,
+  getTeamRoleUpdates,
+  hasPendingRoleChanges,
+} from "../../../utils/memberRoleState";
+import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
 import { api } from "../../../utils/api";
-/**
- * UserDetailsPage
- * Single Responsibility: Display a user's details, allow changing org role, and list team memberships
- */
+
 export default function UserDetailsPage() {
   const router = useRouter();
   const { userId } = router.query as { userId?: string };
-  const { organization, hasOrgPermission, hasPermission } =
+  const { organization, hasOrgPermission } =
     useOrganizationTeamProject();
 
   const canManageOrganization = hasOrgPermission("organization:manage");
@@ -48,11 +69,15 @@ export default function UserDetailsPage() {
   );
 
   const removeMemberFromTeam = api.team.removeMember.useMutation();
+  const updateMemberRole = api.organization.updateMemberRole.useMutation();
+  const membersEnforcement = useLicenseEnforcement("members");
+  const membersLiteEnforcement = useLicenseEnforcement("membersLite");
+  const [pendingOrganizationRole, setPendingOrganizationRole] =
+    useState<OrganizationUserRole | null>(null);
+  const [pendingTeamRoles, setPendingTeamRoles] = useState<PendingTeamRoleMap>(
+    {},
+  );
 
-  /**
-   * Remove user from team
-   * Single Responsibility: Handle the removal of a user from a specific team
-   */
   const handleRemoveFromTeam = async (
     teamMembership: NonNullable<
       typeof member.data
@@ -102,27 +127,155 @@ export default function UserDetailsPage() {
     [member.data?.user.teamMemberships, organization?.id],
   );
 
+  const hasMissingCustomRoleAssignments = useMemo(
+    () =>
+      Object.values(pendingTeamRoles).some(
+        (pendingTeamRole) =>
+          pendingTeamRole.role === TeamUserRole.CUSTOM ||
+          pendingTeamRole.role === MISSING_CUSTOM_ROLE_VALUE,
+      ),
+    [pendingTeamRoles],
+  );
+
+  const hasPendingChanges = useMemo(
+    () =>
+      member.data
+        ? hasPendingRoleChanges({
+            teamMemberships: filteredTeamMemberships,
+            pendingTeamRoles,
+            pendingOrganizationRole,
+            currentOrganizationRole: member.data.role,
+          })
+        : false,
+    [member.data, filteredTeamMemberships, pendingTeamRoles, pendingOrganizationRole],
+  );
+
+  // Do not overwrite user's unsaved edits when server data refreshes.
+  useEffect(() => {
+    if (!member.data) return;
+    const nextPendingTeamRoles = buildInitialPendingTeamRoles({
+      teamMemberships: member.data.user.teamMemberships,
+      organizationId: organization?.id,
+    });
+    const isSyncedWithServer =
+      pendingOrganizationRole === member.data.role &&
+      arePendingTeamRolesEqual(pendingTeamRoles, nextPendingTeamRoles);
+    if (isSyncedWithServer) return;
+
+    if (
+      hasPendingRoleChanges({
+        teamMemberships: filteredTeamMemberships,
+        pendingTeamRoles,
+        pendingOrganizationRole,
+        currentOrganizationRole: member.data.role,
+      })
+    ) {
+      return;
+    }
+
+    setPendingOrganizationRole(member.data.role);
+    setPendingTeamRoles(nextPendingTeamRoles);
+  }, [
+    member.data,
+    organization?.id,
+    filteredTeamMemberships,
+    pendingTeamRoles,
+    pendingOrganizationRole,
+  ]);
+
+  const handleOrganizationRoleChange = (nextRole: OrganizationUserRole) => {
+    setPendingOrganizationRole(nextRole);
+    setPendingTeamRoles((current) =>
+      applyOrganizationRoleToPendingTeamRoles({
+        organizationRole: nextRole,
+        currentPendingTeamRoles: current,
+      }),
+    );
+  };
+
+  const navigateToMembersList = () => {
+    void router.push("/settings/members");
+  };
+
+  const goBack = () => {
+    router.back();
+  };
+
+  const persistMemberRoleUpdates = async () => {
+    if (!member.data || !organization || pendingOrganizationRole === null) return;
+    const nextOrganizationRole = pendingOrganizationRole;
+    const teamRoleUpdates = getTeamRoleUpdates({
+      teamMemberships: filteredTeamMemberships,
+      pendingTeamRoles,
+      userId: member.data.userId,
+    });
+    const organizationRoleChanged = nextOrganizationRole !== member.data.role;
+
+    try {
+      if (!canManageOrganization || (!organizationRoleChanged && teamRoleUpdates.length === 0)) {
+        return;
+      }
+
+      await updateMemberRole.mutateAsync({
+        organizationId: organization.id,
+        userId: member.data.userId,
+        role: nextOrganizationRole,
+        teamRoleUpdates,
+      });
+
+      toaster.create({
+        title: "Member updated",
+        type: "success",
+        duration: 2500,
+      });
+      await apiContext.organization.getMemberById.invalidate();
+      await apiContext.organization.getAll.invalidate();
+    } catch (error) {
+      if (isHandledByGlobalLicenseHandler(error)) return;
+      toaster.create({
+        title: "Failed to update member",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        type: "error",
+      });
+    }
+  };
+
+  const handleSave = () => {
+    if (!member.data || pendingOrganizationRole === null) return;
+    if (hasMissingCustomRoleAssignments) {
+      toaster.create({
+        title: "Cannot save member",
+        description: "Resolve missing custom roles before saving changes.",
+        type: "error",
+      });
+      return;
+    }
+
+    const limitType = getLicenseLimitTypeForRoleChange({
+      previousRole: member.data.role,
+      nextRole: pendingOrganizationRole,
+    });
+
+    const enforcementByLimitType = {
+      members: membersEnforcement,
+      membersLite: membersLiteEnforcement,
+    } as const;
+
+    const enforcements = limitType ? [enforcementByLimitType[limitType]] : [];
+
+    checkCompoundLimits(enforcements, () => {
+      void persistMemberRoleUpdates();
+    });
+  };
+
   if (!organization || !member.data) {
     return <SettingsLayout />;
   }
 
   const memberData = member.data;
-
-  if (!memberData) {
-    return (
-      <SettingsLayout>
-        <VStack paddingX={4} paddingY={6} gap={6} align="start">
-          <Heading size="lg" as="h1">
-            User not found
-          </Heading>
-          <Link href="/settings/members">
-            <Button variant="outline">Back to Members</Button>
-          </Link>
-        </VStack>
-      </SettingsLayout>
-    );
-  }
-
+  const currentOrganizationRole: OrganizationUserRole =
+    pendingOrganizationRole ?? memberData.role;
   return (
     <SettingsLayout>
       <VStack
@@ -145,6 +298,34 @@ export default function UserDetailsPage() {
           <Heading size="lg" as="h1">
             Member
           </Heading>
+          {canManageOrganization ? (
+            <HStack>
+              <Button variant="outline" onClick={goBack}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void handleSave()}
+                disabled={
+                  !hasPendingChanges ||
+                  hasMissingCustomRoleAssignments ||
+                  updateMemberRole.isLoading
+                }
+              >
+                {updateMemberRole.isLoading ? (
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text>Saving...</Text>
+                  </HStack>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </HStack>
+          ) : (
+            <Button variant="outline" onClick={navigateToMembersList}>
+              Back
+            </Button>
+          )}
         </HStack>
 
         <Card.Root width="full">
@@ -159,19 +340,12 @@ export default function UserDetailsPage() {
               {canManageOrganization ? (
                 <Field.Root>
                   <OrganizationUserRoleField
-                    organizationId={organization.id}
-                    userId={memberData.userId}
-                    defaultRole={memberData.role}
+                    value={currentOrganizationRole}
+                    onChange={handleOrganizationRoleChange}
                   />
                 </Field.Root>
               ) : (
-                <Text>
-                  {memberData.role === "ADMIN"
-                    ? "Organization Admin"
-                    : memberData.role === "MEMBER"
-                      ? "Organization Member"
-                      : memberData.role}
-                </Text>
+                <Text>{getOrganizationRoleLabel(memberData.role)}</Text>
               )}
             </HorizontalFormControl>
           </Card.Body>
@@ -189,76 +363,70 @@ export default function UserDetailsPage() {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {filteredTeamMemberships.map((tm) => (
-                  <Table.Row key={tm.team.id}>
-                    <Table.Cell paddingLeft={6}>
-                      <Link href={`/settings/teams/${tm.team.slug}`}>
-                        {tm.team.name}
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {hasPermission("team:manage") ? (
-                        <Field.Root>
-                          <TeamUserRoleField
-                            member={{
-                              ...tm,
-                              user: memberData.user,
-                            }}
-                            organizationId={organization.id}
-                            customRole={(() => {
-                              // Check if this team membership has an assigned custom role
-                              const assignedRole = tm.assignedRole;
-                              return assignedRole
-                                ? {
-                                    ...assignedRole,
-                                    permissions:
-                                      assignedRole.permissions as string[],
-                                  }
-                                : undefined;
-                            })()}
-                          />
-                        </Field.Root>
-                      ) : (
-                        <Text>
-                          {tm.role === "CUSTOM" && tm.assignedRole
-                            ? tm.assignedRole.name
-                            : tm.role === "CUSTOM"
-                              ? "Custom"
-                              : tm.role === "ADMIN"
-                                ? "Admin"
-                                : tm.role === "MEMBER"
-                                  ? "Member"
-                                  : tm.role === "VIEWER"
-                                    ? "Viewer"
-                                    : tm.role}
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell paddingRight={6}>
-                      {hasPermission("team:manage") && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical size={16} />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="remove"
-                              color="red.500"
-                              onClick={() => {
-                                void handleRemoveFromTeam(tm);
+                {filteredTeamMemberships.map((tm) => {
+                  const customRoleForTeam = tm.assignedRole
+                    ? { ...tm.assignedRole, permissions: tm.assignedRole.permissions as string[] }
+                    : undefined;
+
+                  return (
+                    <Table.Row key={tm.team.id}>
+                      <Table.Cell paddingLeft={6}>
+                        <Link href={`/settings/teams/${tm.team.slug}`}>
+                          {tm.team.name}
+                        </Link>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {canManageOrganization ? (
+                          <Field.Root>
+                            <TeamUserRoleField
+                              currentRole={tm.role}
+                              organizationId={organization.id}
+                              organizationRole={currentOrganizationRole}
+                              value={pendingTeamRoles[tm.teamId]?.role}
+                              onChange={(nextRole) => {
+                                setPendingTeamRoles((current) => ({
+                                  ...current,
+                                  [tm.teamId]: {
+                                    role: nextRole.value,
+                                    customRoleId: nextRole.customRoleId,
+                                  },
+                                }));
                               }}
-                            >
-                              <LuTrash size={16} />
-                              Remove from team
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
+                              customRole={customRoleForTeam}
+                            />
+                          </Field.Root>
+                        ) : (
+                          <Text>
+                            {getTeamRoleDisplayName(tm)}
+                          </Text>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell paddingRight={6}>
+                        {canManageOrganization && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical size={16} />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="remove"
+                                color="red.500"
+                                onClick={() => {
+                                  void handleRemoveFromTeam(tm);
+                                }}
+                              >
+                                <LuTrash size={16} />
+                                Remove from team
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
               </Table.Body>
             </Table.Root>
           </Card.Body>

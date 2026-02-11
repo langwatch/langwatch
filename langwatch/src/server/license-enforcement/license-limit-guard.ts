@@ -43,6 +43,11 @@ export async function assertMemberTypeLimitNotExceeded(
       throw new TRPCError({
         code: "FORBIDDEN",
         message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+        cause: {
+          limitType: "members",
+          current: memberCount,
+          max: limits.maxMembers,
+        },
       });
     }
   }
@@ -53,6 +58,11 @@ export async function assertMemberTypeLimitNotExceeded(
       throw new TRPCError({
         code: "FORBIDDEN",
         message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
+        cause: {
+          limitType: "membersLite",
+          current: liteCount,
+          max: limits.maxMembersLite,
+        },
       });
     }
   }
