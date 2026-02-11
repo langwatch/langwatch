@@ -52,7 +52,7 @@ export function useInviteActions({
         onSuccess: (data) => {
           const newInvites = data.reduce(
             (acc, invite) => {
-              if (invite?.invite && invite.noEmailProvider) {
+              if (invite?.invite && invite.emailNotSent) {
                 acc.push({
                   inviteCode: invite.invite.inviteCode,
                   email: invite.invite.email,
@@ -65,13 +65,14 @@ export function useInviteActions({
 
           onInviteCreated(newInvites);
 
+          const totalInvites = data.filter(Boolean).length;
           const description = hasEmailProvider
             ? "All invites have been sent."
             : "All invites have been created. View invite link under actions menu.";
 
           toaster.create({
             title: `${
-              newInvites.length > 1 ? "Invites" : "Invite"
+              totalInvites > 1 ? "Invites" : "Invite"
             } created successfully`,
             description,
             type: "success",
@@ -81,10 +82,10 @@ export function useInviteActions({
           onClose();
           refetchInvites();
         },
-        onError: () => {
+        onError: (error) => {
           toaster.create({
             title: "Sorry, something went wrong",
-            description: "Please try that again",
+            description: error.message ?? "Please try that again",
             type: "error",
             duration: 5000,
             meta: { closable: true },
@@ -224,6 +225,15 @@ export function useInviteActions({
             meta: { closable: true },
           });
           refetchInvites();
+        },
+        onError: (error) => {
+          toaster.create({
+            title: "Sorry, something went wrong",
+            description: error.message ?? "Please try that again",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
         },
       },
     );

@@ -32,8 +32,17 @@ import { decrypt, encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
-import { sendInviteEmail } from "../../mailer/inviteEmail";
-import { InviteService } from "../../invites/invite.service";
+import {
+  INVITE_EXPIRATION_MS,
+  InviteService,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../../invites/invite.service";
+import {
+  DuplicateInviteError,
+  InviteNotFoundError,
+  LicenseLimitError,
+  OrganizationNotFoundError,
+} from "../../invites/errors";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
@@ -674,77 +683,30 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      const subscriptionLimits =
-        await dependencies.subscriptionHandler.getActivePlan(
-          input.organizationId,
-          ctx.session.user,
-        );
+      const inviteService = InviteService.create(prisma);
 
-      // Get current counts using the centralized repository (includes pending invites)
-      const licenseRepo = new LicenseEnforcementRepository(prisma);
-      const currentFullMembers = await licenseRepo.getMemberCount(
-        input.organizationId
-      );
-      const currentMembersLite = await licenseRepo.getMembersLiteCount(
-        input.organizationId
-      );
-
-      // Get custom roles for checking new invites
-      const customRoles = await prisma.customRole.findMany({
-        where: { organizationId: input.organizationId },
-        select: { id: true, permissions: true },
-      });
-      const customRoleMap = new Map(
-        customRoles.map((r) => [r.id, r.permissions as string[]])
-      );
-
-      // Count new invites by type (check custom roles for EXTERNAL members)
-      let newFullMembers = 0;
-      let newLiteMembers = 0;
-
-      for (const invite of input.invites) {
-        if (
-          invite.role === OrganizationUserRole.ADMIN ||
-          invite.role === OrganizationUserRole.MEMBER
-        ) {
-          newFullMembers++;
-        } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-          // Check if any team assignment has non-view custom role
-          const hasNonViewRole = invite.teams?.some((t) => {
-            if (!t.customRoleId) return false;
-            const permissions = customRoleMap.get(t.customRoleId);
-            return permissions && !isViewOnlyCustomRole(permissions);
-          });
-          if (hasNonViewRole) {
-            newFullMembers++;
-          } else {
-            newLiteMembers++;
-          }
-        }
-      }
-
-      // Check limits separately for full members and lite members
-      if (!subscriptionLimits.overrideAddingLimitations) {
-        if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      // Check license limits using the service
+      try {
+        await inviteService.checkLicenseLimits({
+          organizationId: input.organizationId,
+          newInvites: input.invites.map((invite) => ({
+            role: invite.role,
+            teams: invite.teams,
+          })),
+          user: ctx.session.user,
+        });
+      } catch (error) {
+        if (error instanceof LicenseLimitError) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
+            message: error.message,
           });
         }
-        if (
-          currentMembersLite + newLiteMembers >
-          subscriptionLimits.maxMembersLite
-        ) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
-          });
-        }
+        throw error;
       }
-
-      const invites = await Promise.all(
+      // Prepare invite data (read-only validation) outside transaction
+      const preparedAdminInvites = await Promise.all(
         input.invites.map(async (invite) => {
-          // Support both new teams array and legacy teamIds string
           let teamAssignments: Array<{
             teamId: string;
             role: TeamUserRole;
@@ -753,10 +715,8 @@ export const organizationRouter = createTRPCRouter({
           let teamIdsString = "";
 
           if (invite.teams && invite.teams.length > 0) {
-            // New format: teams array with roles
             const teamIds = invite.teams.map((t) => t.teamId);
 
-            // Filter out team IDs that do not belong to the organization
             const validTeams = await prisma.team.findMany({
               where: {
                 id: { in: teamIds },
@@ -767,12 +727,10 @@ export const organizationRouter = createTRPCRouter({
 
             const validTeamIds = validTeams.map((team) => team.id);
 
-            // If no valid team IDs are found, skip this invite
             if (validTeamIds.length === 0) {
               return null;
             }
 
-            // Build teamAssignments with only valid teams
             teamAssignments = invite.teams
               .filter((t) => validTeamIds.includes(t.teamId))
               .map((t) => {
@@ -788,7 +746,6 @@ export const organizationRouter = createTRPCRouter({
                 };
               })
               .filter((t) => {
-                // Validate custom roles have customRoleId
                 if (t.role === TeamUserRole.CUSTOM && !t.customRoleId) {
                   return false;
                 }
@@ -797,13 +754,11 @@ export const organizationRouter = createTRPCRouter({
 
             teamIdsString = validTeamIds.join(",");
           } else if (invite.teamIds?.trim()) {
-            // Legacy format: comma-separated teamIds string
             const teamIdArray = invite.teamIds
               .split(",")
               .map((s) => s.trim())
               .filter(Boolean);
 
-            // Filter out team IDs that do not belong to the organization
             const validTeams = await prisma.team.findMany({
               where: {
                 id: { in: teamIdArray },
@@ -814,28 +769,17 @@ export const organizationRouter = createTRPCRouter({
 
             const validTeamIds = validTeams.map((team) => team.id);
 
-            // If no valid team IDs are found, skip this invite
             if (validTeamIds.length === 0) {
               return null;
             }
 
-            // For legacy format, use organization role mapping (backward compatibility)
-            const organizationToTeamRoleMap: {
-              [K in OrganizationUserRole]: TeamUserRole;
-            } = {
-              [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-              [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-              [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
-            };
-
             teamAssignments = validTeamIds.map((teamId) => ({
               teamId,
-              role: organizationToTeamRoleMap[invite.role],
+              role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
             }));
 
             teamIdsString = validTeamIds.join(",");
           } else {
-            // No teams provided
             return null;
           }
 
@@ -843,48 +787,56 @@ export const organizationRouter = createTRPCRouter({
             return null;
           }
 
-          // Checks that a valid pending invite does not already exist for this email and organization
-          const inviteService = new InviteService(prisma);
-          const existingInvite = await inviteService.checkDuplicateInvite({
-            email: invite.email,
-            organizationId: input.organizationId,
-          });
-
-          if (existingInvite) {
-            return null;
-          }
-
-          const inviteCode = nanoid();
-          const savedInvite = await prisma.organizationInvite.create({
-            data: {
-              email: invite.email,
-              inviteCode: inviteCode,
-              expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-              organizationId: input.organizationId,
-              teamIds: teamIdsString,
-              teamAssignments:
-                teamAssignments.length > 0 ? teamAssignments : undefined,
-              role: invite.role,
-            },
-          });
-
-          if (env.SENDGRID_API_KEY) {
-            await sendInviteEmail({
-              email: invite.email,
-              organization,
-              inviteCode,
-            });
-          }
-
           return {
-            invite: savedInvite,
-            noEmailProvider: !env.SENDGRID_API_KEY,
+            email: invite.email,
+            role: invite.role,
+            organizationId: input.organizationId,
+            teamIds: teamIdsString,
+            teamAssignments:
+              teamAssignments.length > 0 ? teamAssignments : undefined,
           };
         }),
       );
 
-      // Filter out any null values (skipped invites)
-      return invites.filter(Boolean);
+      const validInvites = preparedAdminInvites.filter(
+        (inv): inv is NonNullable<typeof inv> => inv !== null,
+      );
+
+      // Phase 1: DB operations in transaction (no side-effects)
+      const inviteRecords = await prisma.$transaction(async (tx) => {
+        const txInviteService = InviteService.create(tx);
+        return Promise.all(
+          validInvites.map(async (invite) => {
+            const existingInvite = await txInviteService.checkDuplicateInvite({
+              email: invite.email,
+              organizationId: invite.organizationId,
+            });
+
+            if (existingInvite) {
+              return null;
+            }
+
+            return await txInviteService.createAdminInviteRecord(invite);
+          }),
+        );
+      });
+
+      // Phase 2: Send emails outside transaction
+      const createdRecords = inviteRecords.filter(
+        (r): r is NonNullable<typeof r> => r !== null,
+      );
+      const invites = await Promise.all(
+        createdRecords.map(async (record) => {
+          const { emailNotSent } = await inviteService.trySendInviteEmail({
+            email: record.invite.email,
+            organization: record.organization,
+            inviteCode: record.invite.inviteCode,
+          });
+          return { invite: record.invite, emailNotSent };
+        }),
+      );
+
+      return invites;
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
@@ -953,127 +905,150 @@ export const organizationRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      const inviteService = new InviteService(prisma);
+      const inviteService = InviteService.create(prisma);
 
-      // Check license limits for all invites at once
-      await inviteService.checkLicenseLimits({
-        organizationId: input.organizationId,
-        newInvites: input.invites.map((invite) => ({
-          role: invite.role as OrganizationUserRole,
-          teams: invite.teams,
-        })),
-        user: ctx.session.user,
-      });
-
-      const results = await Promise.all(
-        input.invites.map(async (invite) => {
-          // Check for duplicate invites across PENDING and WAITING_APPROVAL
-          const existingInvite = await inviteService.checkDuplicateInvite({
-            email: invite.email,
-            organizationId: input.organizationId,
-          });
-
-          if (existingInvite) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `An invitation for ${invite.email} already exists`,
-            });
-          }
-
-          // Validate team IDs
-          let teamIdsString = "";
-          let teamAssignments: Array<{
-            teamId: string;
-            role: TeamUserRole;
-            customRoleId?: string;
-          }> = [];
-
-          if (invite.teams && invite.teams.length > 0) {
-            const teamIds = invite.teams.map((t) => t.teamId);
-            const validTeamIds = await inviteService.validateTeamIds({
-              teamIds,
-              organizationId: input.organizationId,
-            });
-
-            if (validTeamIds.length === 0) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "No valid teams provided",
-              });
-            }
-
-            teamAssignments = invite.teams
-              .filter((t) => validTeamIds.includes(t.teamId))
-              .map((t) => {
-                const isCustomRole =
-                  typeof t.role === "string" && t.role.startsWith("custom:");
-                return {
-                  teamId: t.teamId,
-                  role: isCustomRole
-                    ? ("CUSTOM" as TeamUserRole)
-                    : (t.role as TeamUserRole),
-                  customRoleId:
-                    isCustomRole && t.customRoleId
-                      ? t.customRoleId
-                      : undefined,
-                };
-              });
-
-            teamIdsString = validTeamIds.join(",");
-          } else if (invite.teamIds?.trim()) {
-            const teamIdArray = invite.teamIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-
-            const validTeamIds = await inviteService.validateTeamIds({
-              teamIds: teamIdArray,
-              organizationId: input.organizationId,
-            });
-
-            if (validTeamIds.length === 0) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "No valid teams provided",
-              });
-            }
-
-            const organizationToTeamRoleMap: {
-              [K in OrganizationUserRole]: TeamUserRole;
-            } = {
-              [OrganizationUserRole.ADMIN]: "ADMIN" as TeamUserRole,
-              [OrganizationUserRole.MEMBER]: "MEMBER" as TeamUserRole,
-              [OrganizationUserRole.EXTERNAL]: "VIEWER" as TeamUserRole,
-            };
-
-            teamAssignments = validTeamIds.map((teamId) => ({
-              teamId,
-              role: organizationToTeamRoleMap[
-                invite.role as OrganizationUserRole
-              ],
-            }));
-
-            teamIdsString = validTeamIds.join(",");
-          } else {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "At least one team must be provided",
-            });
-          }
-
-          return inviteService.createMemberInviteRequest({
-            email: invite.email,
+      try {
+        // Check license limits for all invites at once
+        await inviteService.checkLicenseLimits({
+          organizationId: input.organizationId,
+          newInvites: input.invites.map((invite) => ({
             role: invite.role as OrganizationUserRole,
-            organizationId: input.organizationId,
-            teamIds: teamIdsString,
-            teamAssignments:
-              teamAssignments.length > 0 ? teamAssignments : undefined,
-            requestedBy: ctx.session.user.id,
-          });
-        }),
-      );
+            teams: invite.teams,
+          })),
+          user: ctx.session.user,
+        });
 
-      return results;
+        const normalizedPayloadEmails = input.invites.map((invite) =>
+          invite.email.trim().toLowerCase(),
+        );
+        const duplicatePayloadEmails = normalizedPayloadEmails.filter(
+          (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
+        );
+
+        if (duplicatePayloadEmails.length > 0) {
+          const uniqueDuplicatePayloadEmails = [
+            ...new Set(duplicatePayloadEmails),
+          ];
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
+          });
+        }
+
+        const preparedInvites = await Promise.all(
+          input.invites.map(async (invite) => {
+            const normalizedEmail = invite.email.trim().toLowerCase();
+
+            // Validate team IDs
+            let teamIdsString = "";
+            let teamAssignments: Array<{
+              teamId: string;
+              role: TeamUserRole;
+              customRoleId?: string;
+            }> = [];
+
+            if (invite.teams && invite.teams.length > 0) {
+              const teamIds = invite.teams.map((t) => t.teamId);
+              const validTeamIds = await inviteService.validateTeamIds({
+                teamIds,
+                organizationId: input.organizationId,
+              });
+
+              if (validTeamIds.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "No valid teams provided",
+                });
+              }
+
+              teamAssignments = invite.teams
+                .filter((t) => validTeamIds.includes(t.teamId))
+                .map((t) => {
+                  const isCustomRole =
+                    typeof t.role === "string" && t.role.startsWith("custom:");
+                  return {
+                    teamId: t.teamId,
+                    role: isCustomRole
+                      ? ("CUSTOM" as TeamUserRole)
+                      : (t.role as TeamUserRole),
+                    customRoleId:
+                      isCustomRole && t.customRoleId
+                        ? t.customRoleId
+                        : undefined,
+                  };
+                });
+
+              teamIdsString = validTeamIds.join(",");
+            } else if (invite.teamIds?.trim()) {
+              const teamIdArray = invite.teamIds
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+              const validTeamIds = await inviteService.validateTeamIds({
+                teamIds: teamIdArray,
+                organizationId: input.organizationId,
+              });
+
+              if (validTeamIds.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "No valid teams provided",
+                });
+              }
+
+              teamAssignments = validTeamIds.map((teamId) => ({
+                teamId,
+                role: ORGANIZATION_TO_TEAM_ROLE_MAP[
+                  invite.role as OrganizationUserRole
+                ],
+              }));
+
+              teamIdsString = validTeamIds.join(",");
+            } else {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "At least one team must be provided",
+              });
+            }
+
+            return {
+              email: normalizedEmail,
+              role: invite.role as OrganizationUserRole,
+              organizationId: input.organizationId,
+              teamIds: teamIdsString,
+              teamAssignments:
+                teamAssignments.length > 0 ? teamAssignments : undefined,
+              requestedBy: ctx.session.user.id,
+            };
+          }),
+        );
+
+        const results = await prisma.$transaction(async (tx) => {
+          const transactionalInviteService = InviteService.create(tx);
+          return Promise.all(
+            preparedInvites.map((invite) =>
+              transactionalInviteService.createMemberInviteRequest(invite),
+            ),
+          );
+        });
+
+        return results;
+      } catch (error) {
+        if (error instanceof LicenseLimitError) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+          });
+        }
+        if (error instanceof DuplicateInviteError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
   approveInvite: protectedProcedure
     .input(
@@ -1085,12 +1060,52 @@ export const organizationRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      const inviteService = new InviteService(prisma);
+      const inviteService = InviteService.create(prisma);
 
-      return inviteService.approveInvite({
-        inviteId: input.inviteId,
-        organizationId: input.organizationId,
-      });
+      try {
+        // Re-validate license limits before approving (org may have reached cap since request)
+        const invite = await prisma.organizationInvite.findFirst({
+          where: {
+            id: input.inviteId,
+            organizationId: input.organizationId,
+            status: "WAITING_APPROVAL",
+          },
+        });
+
+        if (!invite) {
+          throw new InviteNotFoundError();
+        }
+
+        const teamAssignments =
+          (invite.teamAssignments as Array<{ customRoleId?: string }>) ?? [];
+        await inviteService.checkLicenseLimits({
+          organizationId: input.organizationId,
+          newInvites: [{ role: invite.role, teams: teamAssignments }],
+          user: ctx.session.user,
+        });
+
+        return await inviteService.approveInvite({
+          inviteId: input.inviteId,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        if (
+          error instanceof InviteNotFoundError ||
+          error instanceof OrganizationNotFoundError
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        if (error instanceof LicenseLimitError) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
   acceptInvite: protectedProcedure
     .input(
@@ -1174,14 +1189,6 @@ export const organizationRouter = createTRPCRouter({
           }));
         } else {
           // Legacy format: use organization role mapping
-          const organizationToTeamRoleMap: {
-            [K in OrganizationUserRole]: TeamUserRole;
-          } = {
-            [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-            [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-            [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
-          };
-
           const dedupedTeamIds = Array.from(
             new Set(
               invite.teamIds
@@ -1194,7 +1201,7 @@ export const organizationRouter = createTRPCRouter({
           teamMembershipData = dedupedTeamIds.map((teamId) => ({
             userId: session.user.id,
             teamId,
-            role: organizationToTeamRoleMap[invite.role],
+            role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
           }));
         }
 

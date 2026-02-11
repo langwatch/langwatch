@@ -243,12 +243,6 @@ function MembersList({
         <HStack width="full">
           <Heading>Organization Members</Heading>
           <Spacer />
-          {activePlan.overrideAddingLimitations && (
-            <PageLayout.HeaderButton onClick={() => onAddMembersOpen()}>
-              <Plus size={20} />
-              (Admin Override) Add members
-            </PageLayout.HeaderButton>
-          )}
           <PageLayout.HeaderButton onClick={onAddMembersOpen}>
             <Plus size={20} />
             Add members

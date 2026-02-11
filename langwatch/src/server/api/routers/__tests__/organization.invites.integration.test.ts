@@ -20,6 +20,7 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { INVITE_EXPIRATION_MS } from "../../../invites/invite.service";
 
 // vi.hoisted runs before vi.mock hoisting, so these are available in mock factories
 const { mockSendInviteEmail, mockGetActivePlan } = vi.hoisted(() => ({
@@ -317,6 +318,31 @@ describe("Organization Invites Integration", () => {
         expect(results[2]!.invite.email).toBe("multi-c@example.com");
         expect(results[2]!.invite.status).toBe("WAITING_APPROVAL");
       });
+
+      it("rejects duplicate emails in a single payload and creates no invites", async () => {
+        await expect(
+          memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "dupe@example.com", role: "MEMBER", teamIds: teamId },
+              { email: "dupe@example.com", role: "EXTERNAL", teamIds: teamId },
+            ],
+          }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining(
+            "Duplicate emails in request payload",
+          ),
+        });
+
+        const persistedInvites = await prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: "dupe@example.com",
+          },
+        });
+        expect(persistedInvites).toHaveLength(0);
+      });
     });
 
     describe("when duplicate invitation exists with WAITING_APPROVAL status", () => {
@@ -390,8 +416,8 @@ describe("Organization Invites Integration", () => {
         });
 
         const expiration = result.invite.expiration!;
-        const expectedMin = beforeApproval + 2 * 24 * 60 * 60 * 1000 - 5000; // 48h - 5s tolerance
-        const expectedMax = Date.now() + 2 * 24 * 60 * 60 * 1000 + 5000; // 48h + 5s tolerance
+        const expectedMin = beforeApproval + INVITE_EXPIRATION_MS - 5000; // 48h - 5s tolerance
+        const expectedMax = Date.now() + INVITE_EXPIRATION_MS + 5000; // 48h + 5s tolerance
 
         expect(expiration.getTime()).toBeGreaterThanOrEqual(expectedMin);
         expect(expiration.getTime()).toBeLessThanOrEqual(expectedMax);
@@ -445,6 +471,47 @@ describe("Organization Invites Integration", () => {
         });
       });
     });
+
+    describe("when license limit is reached after invite was created", () => {
+      it("rejects approval with FORBIDDEN error", async () => {
+        // Create WAITING_APPROVAL invite while limits are generous
+        mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
+
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              {
+                email: "late-limit@example.com",
+                role: "MEMBER",
+                teamIds: teamId,
+              },
+            ],
+          });
+
+        const inviteId = results[0]!.invite.id;
+
+        // Simulate plan downgrade: org has 2 members + 1 WAITING_APPROVAL = 3 counted,
+        // setting maxMembers to 2 makes re-validation during approval fail
+        mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 2 }));
+
+        await expect(
+          adminCaller.organization.approveInvite({
+            inviteId,
+            organizationId,
+          })
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+
+        // Verify the invite remains in WAITING_APPROVAL status (not transitioned)
+        const unchangedInvite =
+          await prisma.organizationInvite.findFirst({
+            where: { id: inviteId, organizationId },
+          });
+        expect(unchangedInvite?.status).toBe("WAITING_APPROVAL");
+      });
+    });
   });
 
   // ============================================================================
@@ -494,7 +561,7 @@ describe("Organization Invites Integration", () => {
           data: {
             email: "pending@example.com",
             inviteCode: nanoid(),
-            expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+            expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
             organizationId,
             teamIds: teamId,
             role: OrganizationUserRole.MEMBER,
@@ -555,10 +622,188 @@ describe("Organization Invites Integration", () => {
   });
 
   // ============================================================================
+  // Two-phase email: records created atomically, emails sent after commit
+  // ============================================================================
+
+  describe("createInvites (admin batch)", () => {
+    describe("when admin invites multiple users in a single batch", () => {
+      it("creates all invite records before sending any emails", async () => {
+        const callOrder: string[] = [];
+
+        // Track when emails are sent relative to DB operations
+        mockSendInviteEmail.mockImplementation(async () => {
+          callOrder.push("email-sent");
+        });
+
+        const results = await adminCaller.organization.createInvites({
+          organizationId,
+          invites: [
+            { email: "batch-a@example.com", role: "MEMBER", teamIds: teamId },
+            { email: "batch-b@example.com", role: "MEMBER", teamIds: teamId },
+          ],
+        });
+
+        // All records exist in DB (transaction committed)
+        expect(results).toHaveLength(2);
+
+        const dbInvites = await prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: { in: ["batch-a@example.com", "batch-b@example.com"] },
+          },
+        });
+        expect(dbInvites).toHaveLength(2);
+
+        // Emails were sent (outside transaction)
+        expect(mockSendInviteEmail).toHaveBeenCalledTimes(2);
+      });
+
+      it("persists records even if email sending fails for one invite", async () => {
+        mockSendInviteEmail
+          .mockResolvedValueOnce(undefined) // first email succeeds
+          .mockRejectedValueOnce(new Error("SMTP failure")); // second email fails
+
+        const results = await adminCaller.organization.createInvites({
+          organizationId,
+          invites: [
+            { email: "ok-email@example.com", role: "MEMBER", teamIds: teamId },
+            {
+              email: "fail-email@example.com",
+              role: "MEMBER",
+              teamIds: teamId,
+            },
+          ],
+        });
+
+        // Both invites exist in DB despite email failure
+        expect(results).toHaveLength(2);
+
+        const dbInvites = await prisma.organizationInvite.findMany({
+          where: {
+            organizationId,
+            email: {
+              in: ["ok-email@example.com", "fail-email@example.com"],
+            },
+          },
+        });
+        expect(dbInvites).toHaveLength(2);
+
+        // The failed one has emailNotSent = true
+        const failedResult = results.find(
+          (r) => r.invite.email === "fail-email@example.com"
+        );
+        expect(failedResult?.emailNotSent).toBe(true);
+
+        // The successful one has emailNotSent = false
+        const okResult = results.find(
+          (r) => r.invite.email === "ok-email@example.com"
+        );
+        expect(okResult?.emailNotSent).toBe(false);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Email failure during approval does not revert the approval
+  // ============================================================================
+
+  describe("approveInvite (email failure)", () => {
+    describe("when email service is unavailable during approval", () => {
+      it("still approves the invitation", async () => {
+        // Create WAITING_APPROVAL invite
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          });
+
+        // Make email sending fail
+        mockSendInviteEmail.mockRejectedValue(
+          new Error("Email service unavailable")
+        );
+
+        const result = await adminCaller.organization.approveInvite({
+          inviteId: results[0]!.invite.id,
+          organizationId,
+        });
+
+        // Approval succeeded despite email failure
+        expect(result.invite.status).toBe("PENDING");
+
+        // Verify in DB too
+        const dbInvite = await prisma.organizationInvite.findFirst({
+          where: { id: results[0]!.invite.id, organizationId },
+        });
+        expect(dbInvite?.status).toBe("PENDING");
+      });
+
+      it("returns emailNotSent as fallback indicator", async () => {
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              { email: "user@example.com", role: "MEMBER", teamIds: teamId },
+            ],
+          });
+
+        mockSendInviteEmail.mockRejectedValue(
+          new Error("Email service unavailable")
+        );
+
+        const result = await adminCaller.organization.approveInvite({
+          inviteId: results[0]!.invite.id,
+          organizationId,
+        });
+
+        expect(result.emailNotSent).toBe(true);
+      });
+    });
+  });
+
+  // ============================================================================
   // License limit enforcement with WAITING_APPROVAL
   // ============================================================================
 
   describe("license limits", () => {
+    describe("when license limit is reached between invite creation and approval", () => {
+      it("rejects approval with FORBIDDEN error", async () => {
+        // Step 1: Create WAITING_APPROVAL invite while limits are generous
+        mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
+
+        const results =
+          await memberCaller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              {
+                email: "approval-limit@example.com",
+                role: "MEMBER",
+                teamIds: teamId,
+              },
+            ],
+          });
+
+        const inviteId = results[0]!.invite.id;
+
+        // Step 2: Simulate capacity being reached after invite was created
+        // (e.g., plan downgrade or other members joined)
+        // Org has 2 real members (admin + member) + 1 WAITING_APPROVAL invite = 3 counted.
+        // Set maxMembers to 2 so the re-validation during approval fails.
+        mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 2 }));
+
+        // Step 3: Admin attempts to approve the invite
+        await expect(
+          adminCaller.organization.approveInvite({
+            inviteId,
+            organizationId,
+          })
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+      });
+    });
+
     describe("when WAITING_APPROVAL invites count toward member limits", () => {
       it("rejects new invite when limit is reached", async () => {
         // Override the subscription handler to set a low limit

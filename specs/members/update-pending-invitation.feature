@@ -56,22 +56,22 @@ Feature: Invitation Approval Workflow
   Scenario: Member request sets requestedBy to the requesting user
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "MEMBER"
-    Then the invitation is created with status "WAITING_APPROVAL"
-    And the invitation has the requesting user's ID as requestedBy
+    Then the invitation is queued for admin approval
+    And the invitation records who requested it
 
   @integration
   Scenario: Invitation request has no expiration while awaiting approval
     Given I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "user@example.com" with role "MEMBER"
-    Then the invitation is created with a null expiration
+    Then the invitation does not expire while waiting for admin approval
 
   @integration
   Scenario: Approving an invitation sets expiration and status
     Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
     And I am authenticated as an "ADMIN" of the organization
     When I approve the invitation for "user@example.com"
-    Then the invitation status changes to "PENDING"
-    And the invitation receives a 48-hour expiration
+    Then the invitation becomes ready for the invited user to accept
+    And the invitation expires after a 48-hour invite window
 
   @integration
   Scenario: No email is sent when a member creates an invitation request
@@ -88,12 +88,10 @@ Feature: Invitation Approval Workflow
 
   @integration
   Scenario: WAITING_APPROVAL invites count toward license member limits
-    Given the organization has 4 accepted members
-    And the organization has 1 invitation with status "WAITING_APPROVAL"
-    And the organization has a license with maxMembers 5
+    Given the organization has reached its member limit
+    And there is a pending approval invitation
     When I invite user "new@example.com" to the organization
-    Then the request fails with FORBIDDEN
-    And the error message contains "Over the limit of invites allowed"
+    Then the invitation request is rejected because the member limit was reached
 
   @integration
   Scenario: Duplicate detection across PENDING and WAITING_APPROVAL statuses
@@ -101,6 +99,22 @@ Feature: Invitation Approval Workflow
     And I am authenticated as a "MEMBER" of the organization
     When I request an invitation for "existing@example.com" with role "MEMBER"
     Then the request fails with a duplicate invitation error
+
+  @integration
+  Scenario: Admin batch invite creates all records before sending any emails
+    Given I am authenticated as an "ADMIN" of the organization
+    When I invite multiple users in a single batch
+    Then all invite records are created atomically
+    And emails are sent only after all records are persisted
+
+  @integration
+  Scenario: Email failure during approval does not revert the approval
+    Given there is a "WAITING_APPROVAL" invitation for "user@example.com"
+    And I am authenticated as an "ADMIN" of the organization
+    And the email service is unavailable
+    When I approve the invitation for "user@example.com"
+    Then the invitation is still approved
+    And the invite link is shown as fallback
 
   @integration
   Scenario: Deleting a WAITING_APPROVAL invitation works the same as PENDING

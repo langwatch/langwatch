@@ -8,6 +8,27 @@
  */
 import { Page, expect } from "@playwright/test";
 
+/**
+ * Typed shape of a tRPC response from organization.getAll.
+ * tRPC wraps results in a nested `result.data` structure,
+ * with the actual payload under `result.data.json`.
+ */
+interface TrpcOrganizationResponse {
+  result?: {
+    data?:
+      | {
+          json?: Array<{
+            id: string;
+            teams?: Array<{ id: string }>;
+          }>;
+        }
+      | Array<{
+          id: string;
+          teams?: Array<{ id: string }>;
+        }>;
+  };
+}
+
 // =============================================================================
 // Navigation Steps
 // =============================================================================
@@ -60,6 +81,15 @@ export async function whenIFillEmailWith(page: Page, email: string) {
 }
 
 /**
+ * Select an organization role from the role dropdown in the Add Members dialog.
+ */
+export async function whenISelectOrgRole(page: Page, role: string) {
+  const dialog = page.locator('[role="dialog"]').last();
+  await dialog.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: role, exact: true }).click();
+}
+
+/**
  * Click the submit button in the Add Members dialog.
  * Button reads "Create invites" when no email provider is configured.
  */
@@ -78,9 +108,13 @@ export async function whenICloseInviteLinkDialog(page: Page) {
   const inviteLinkHeading = page.getByRole("heading", {
     name: "Invite Link",
   });
-  const isVisible = await inviteLinkHeading
-    .isVisible({ timeout: 3000 })
-    .catch(() => false);
+  let isVisible = false;
+  try {
+    await expect(inviteLinkHeading).toBeVisible({ timeout: 3000 });
+    isVisible = true;
+  } catch {
+    isVisible = false;
+  }
 
   if (isVisible) {
     // Close the dialog
@@ -196,11 +230,14 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   // Use the settings API to get org data
   const orgData = await page.evaluate(async () => {
     const response = await fetch("/api/trpc/organization.getAll");
-    const json = await response.json();
-    // tRPC wraps the result
-    const orgs = (json as any)?.result?.data?.json ?? (json as any)?.result?.data ?? [];
-    if (orgs.length === 0) throw new Error("No organizations found");
-    const org = orgs[0];
+    const json = (await response.json()) as TrpcOrganizationResponse;
+    // tRPC wraps the result; data may be {json: [...]} or directly [...]
+    const data = json.result?.data;
+    const orgs = (data && !Array.isArray(data) ? data.json : data) ?? [];
+    if (!Array.isArray(orgs) || orgs.length === 0) {
+      throw new Error("No organizations found");
+    }
+    const org = orgs[0]!;
     return {
       organizationId: org.id,
       teamId: org.teams?.[0]?.id ?? "",
@@ -219,12 +256,17 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
 /**
  * Create a WAITING_APPROVAL invitation via tRPC API.
  */
-export async function seedWaitingApprovalInvite(
-  page: Page,
-  email: string,
-  organizationId: string,
-  teamId: string
-) {
+export async function seedWaitingApprovalInvite({
+  page,
+  email,
+  organizationId,
+  teamId,
+}: {
+  page: Page;
+  email: string;
+  organizationId: string;
+  teamId: string;
+}) {
   const response = await page.request.post(
     "/api/trpc/organization.createInviteRequest",
     {

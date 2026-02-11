@@ -1,22 +1,55 @@
 import {
+  type Organization,
   type OrganizationInvite,
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
 } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+import {
+  DuplicateInviteError,
+  InviteNotFoundError,
+  LicenseLimitError,
+  OrganizationNotFoundError,
+} from "./errors";
 import { nanoid } from "nanoid";
 import type { JsonArray } from "@prisma/client/runtime/library";
+
+/** Duration in milliseconds before an invite expires (48 hours). */
+export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** Mapping from organization roles to default team roles. */
+export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
+  OrganizationUserRole,
+  TeamUserRole
+> = {
+  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+  [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+} as const;
 
 import { env } from "~/env.mjs";
 import {
   isViewOnlyCustomRole,
+  type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
 import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { dependencies } from "../../injection/dependencies.server";
-import type { TeamUserRole } from "@prisma/client";
+import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
+import type { PlanInfo } from "../subscriptionHandler";
+
+/**
+ * Interface for subscription plan retrieval.
+ * Enables dependency injection and testing.
+ */
+export interface ISubscriptionHandler {
+  getActivePlan(
+    organizationId: string,
+    user?: Session["user"]
+  ): Promise<PlanInfo>;
+}
 
 /**
  * Team assignment input for invite creation.
@@ -25,6 +58,47 @@ interface TeamAssignmentInput {
   teamId: string;
   role: TeamUserRole;
   customRoleId?: string;
+}
+
+/**
+ * Pure function that classifies invites by member type (full vs lite).
+ * Testable in isolation without database or dependencies.
+ *
+ * @param invites - Array of invites with role and optional team assignments
+ * @param customRoleMap - Map of custom role ID to permissions array
+ * @returns Count of full members and lite members
+ */
+export function classifyInvitesByMemberType(
+  invites: Array<{
+    role: OrganizationUserRole;
+    teams?: Array<{ customRoleId?: string }>;
+  }>,
+  customRoleMap: Map<string, string[]>
+): { fullMembers: number; liteMembers: number } {
+  let fullMembers = 0;
+  let liteMembers = 0;
+
+  for (const invite of invites) {
+    if (
+      invite.role === OrganizationUserRole.ADMIN ||
+      invite.role === OrganizationUserRole.MEMBER
+    ) {
+      fullMembers++;
+    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
+      const hasNonViewRole = invite.teams?.some((t) => {
+        if (!t.customRoleId) return false;
+        const permissions = customRoleMap.get(t.customRoleId);
+        return permissions && !isViewOnlyCustomRole(permissions);
+      });
+      if (hasNonViewRole) {
+        fullMembers++;
+      } else {
+        liteMembers++;
+      }
+    }
+  }
+
+  return { fullMembers, liteMembers };
 }
 
 /**
@@ -61,9 +135,29 @@ interface ApproveInviteInput {
 /**
  * Service that encapsulates invite creation, validation, and approval logic.
  * Extracted from the organization router to enable both admin and member invite flows.
+ *
+ * Dependencies are injected to follow DIP and enable testability.
  */
 export class InviteService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+    private readonly licenseRepo: ILicenseEnforcementRepository,
+    private readonly subscriptionHandler: ISubscriptionHandler
+  ) {}
+
+  /**
+   * Factory method for creating InviteService with default dependencies.
+   * Use this in production code for convenience.
+   */
+  static create(prisma: PrismaClient | Prisma.TransactionClient): InviteService {
+    const licenseRepo = new LicenseEnforcementRepository(prisma);
+    const subscriptionHandler = {
+      getActivePlan: dependencies.subscriptionHandler.getActivePlan.bind(
+        dependencies.subscriptionHandler
+      ),
+    };
+    return new InviteService(prisma, licenseRepo, subscriptionHandler);
+  }
 
   /**
    * Validates that an invite can be created:
@@ -124,77 +218,54 @@ export class InviteService {
     }>;
     user: Session["user"];
   }): Promise<void> {
-    const subscriptionLimits =
-      await dependencies.subscriptionHandler.getActivePlan(
-        organizationId,
-        user
-      );
+    const subscriptionLimits = await this.subscriptionHandler.getActivePlan(
+      organizationId,
+      user
+    );
 
-    const licenseRepo = new LicenseEnforcementRepository(this.prisma);
-    const currentFullMembers = await licenseRepo.getMemberCount(organizationId);
-    const currentMembersLite =
-      await licenseRepo.getMembersLiteCount(organizationId);
+    const currentFullMembers = await this.licenseRepo.getMemberCount(
+      organizationId
+    );
+    const currentMembersLite = await this.licenseRepo.getMembersLiteCount(
+      organizationId
+    );
 
     const customRoles = await this.prisma.customRole.findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
     const customRoleMap = new Map(
-      customRoles.map((r) => [r.id, r.permissions as string[]])
+      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []])
     );
 
-    let newFullMembers = 0;
-    let newLiteMembers = 0;
-
-    for (const invite of newInvites) {
-      if (
-        invite.role === OrganizationUserRole.ADMIN ||
-        invite.role === OrganizationUserRole.MEMBER
-      ) {
-        newFullMembers++;
-      } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-        const hasNonViewRole = invite.teams?.some((t) => {
-          if (!t.customRoleId) return false;
-          const permissions = customRoleMap.get(t.customRoleId);
-          return permissions && !isViewOnlyCustomRole(permissions);
-        });
-        if (hasNonViewRole) {
-          newFullMembers++;
-        } else {
-          newLiteMembers++;
-        }
-      }
-    }
+    const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
+      classifyInvitesByMemberType(newInvites, customRoleMap);
 
     if (!subscriptionLimits.overrideAddingLimitations) {
       if (
         currentFullMembers + newFullMembers >
         subscriptionLimits.maxMembers
       ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT,
-        });
+        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT);
       }
       if (
         currentMembersLite + newLiteMembers >
         subscriptionLimits.maxMembersLite
       ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
-        });
+        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT);
       }
     }
   }
 
   /**
-   * Creates a direct invite with PENDING status (admin flow).
-   * Sets 48-hour expiration and sends invitation email.
+   * Creates an invite record with PENDING status (DB-only, no email).
+   * Use this inside transactions to avoid sending emails before commit.
+   *
+   * @returns The created invite and its organization (for email sending later)
    */
-  async createAdminInvite(
+  async createAdminInviteRecord(
     input: CreateAdminInviteInput
-  ): Promise<{ invite: OrganizationInvite; noEmailProvider: boolean }> {
+  ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
     const inviteCode = nanoid();
 
     const organization = await this.prisma.organization.findFirst({
@@ -202,17 +273,14 @@ export class InviteService {
     });
 
     if (!organization) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Organization not found",
-      });
+      throw new OrganizationNotFoundError();
     }
 
     const savedInvite = await this.prisma.organizationInvite.create({
       data: {
         email: input.email,
         inviteCode,
-        expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 48 hours
+        expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
         organizationId: input.organizationId,
         teamIds: input.teamIds,
         teamAssignments:
@@ -224,18 +292,28 @@ export class InviteService {
       },
     });
 
-    if (env.SENDGRID_API_KEY) {
-      await sendInviteEmail({
-        email: input.email,
-        organization,
-        inviteCode,
-      });
-    }
+    return { invite: savedInvite, organization };
+  }
 
-    return {
-      invite: savedInvite,
-      noEmailProvider: !env.SENDGRID_API_KEY,
-    };
+  /**
+   * Attempts to send an invite email, catching failures gracefully.
+   * Returns whether the email was not sent (due to missing provider or error).
+   */
+  async trySendInviteEmail({ email, organization, inviteCode }: {
+    email: string;
+    organization: Organization;
+    inviteCode: string;
+  }): Promise<{ emailNotSent: boolean }> {
+    if (!env.SENDGRID_API_KEY) {
+      return { emailNotSent: true };
+    }
+    try {
+      await sendInviteEmail({ email, organization, inviteCode });
+      return { emailNotSent: false };
+    } catch (error) {
+      console.error("Failed to send invite email:", error);
+      return { emailNotSent: true };
+    }
   }
 
   /**
@@ -246,6 +324,15 @@ export class InviteService {
   async createMemberInviteRequest(
     input: CreateMemberInviteRequestInput
   ): Promise<{ invite: OrganizationInvite }> {
+    const existingInvite = await this.checkDuplicateInvite({
+      email: input.email,
+      organizationId: input.organizationId,
+    });
+
+    if (existingInvite) {
+      throw new DuplicateInviteError(input.email);
+    }
+
     const inviteCode = nanoid();
 
     const savedInvite = await this.prisma.organizationInvite.create({
@@ -272,53 +359,42 @@ export class InviteService {
    * Approves a WAITING_APPROVAL invite:
    * - Transitions status to PENDING
    * - Sets 48-hour expiration
-   * - Sends invitation email
+   * - Attempts to send invitation email (failure does not revert approval)
    */
   async approveInvite(
     input: ApproveInviteInput
-  ): Promise<{ invite: OrganizationInvite }> {
+  ): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
     const invite = await this.prisma.organizationInvite.findFirst({
       where: {
         id: input.inviteId,
         organizationId: input.organizationId,
         status: "WAITING_APPROVAL",
       },
+      include: { organization: true },
     });
 
     if (!invite) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Invitation not found or is not waiting for approval",
-      });
+      throw new InviteNotFoundError();
     }
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: input.organizationId },
-    });
-
-    if (!organization) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Organization not found",
-      });
+    if (!invite.organization) {
+      throw new OrganizationNotFoundError();
     }
 
     const updatedInvite = await this.prisma.organizationInvite.update({
       where: { id: invite.id, organizationId: input.organizationId },
       data: {
         status: "PENDING",
-        expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 48 hours
+        expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
       },
     });
 
-    if (env.SENDGRID_API_KEY) {
-      await sendInviteEmail({
-        email: invite.email,
-        organization,
-        inviteCode: invite.inviteCode,
-      });
-    }
+    const { emailNotSent } = await this.trySendInviteEmail({
+      email: invite.email,
+      organization: invite.organization,
+      inviteCode: invite.inviteCode,
+    });
 
-    return { invite: updatedInvite };
+    return { invite: updatedInvite, emailNotSent };
   }
 }

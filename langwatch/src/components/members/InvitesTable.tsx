@@ -4,6 +4,7 @@ import {
   Card,
   Heading,
   HStack,
+  IconButton,
   Table,
   Text,
   VStack,
@@ -123,8 +124,14 @@ export function InvitesTable({
                           />
                         ) : (
                           <Menu.Root>
-                            <Menu.Trigger>
-                              <MoreVertical size={16} />
+                            <Menu.Trigger asChild>
+                              <IconButton
+                                aria-label="Invite actions"
+                                variant="ghost"
+                                size="sm"
+                              >
+                                <MoreVertical size={16} />
+                              </IconButton>
                             </Menu.Trigger>
                             <Menu.Content>
                               <Menu.Item

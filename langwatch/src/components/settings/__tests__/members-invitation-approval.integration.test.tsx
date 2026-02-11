@@ -1,58 +1,23 @@
 /**
  * @vitest-environment jsdom
  *
- * Unit tests for invitation approval workflow on the members page.
+ * Integration tests for invitation approval workflow on the members page.
  *
- * Covers the @unit scenarios from specs/members/update-pending-invitation.feature:
- * - Non-admin user sees restricted role options in invite form
- * - Admin user sees all role options in invite form
+ * Covers the @integration scenarios from specs/members/update-pending-invitation.feature:
  * - Non-admin sees no action buttons for pending requests
  * - Admin sees approve and reject buttons for pending requests
+ *
+ * Note: Unit tests for getOrgRoleOptionsForUser are in
+ * src/components/members/__tests__/getOrgRoleOptionsForUser.unit.test.ts
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { orgRoleOptions } from "../OrganizationUserRoleField";
-import { getOrgRoleOptionsForUser } from "../../members/getOrgRoleOptionsForUser";
-import {
-  WaitingApprovalActions,
-} from "../../members/WaitingApprovalActions";
+import { WaitingApprovalActions } from "../../members/WaitingApprovalActions";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
-
-describe("getOrgRoleOptionsForUser()", () => {
-  describe("when user is a non-admin", () => {
-    it("returns only Member and Lite Member options", () => {
-      const options = getOrgRoleOptionsForUser({ isAdmin: false });
-
-      const labels = options.map((o) => o.label);
-      expect(labels).toContain("Member");
-      expect(labels).toContain("Lite Member");
-      expect(labels).toHaveLength(2);
-    });
-
-    it("does not include Admin as a role option", () => {
-      const options = getOrgRoleOptionsForUser({ isAdmin: false });
-
-      const labels = options.map((o) => o.label);
-      expect(labels).not.toContain("Admin");
-    });
-  });
-
-  describe("when user is an admin", () => {
-    it("returns Admin, Member, and Lite Member options", () => {
-      const options = getOrgRoleOptionsForUser({ isAdmin: true });
-
-      const labels = options.map((o) => o.label);
-      expect(labels).toContain("Admin");
-      expect(labels).toContain("Member");
-      expect(labels).toContain("Lite Member");
-      expect(labels).toHaveLength(3);
-    });
-  });
-});
 
 describe("<WaitingApprovalActions/>", () => {
   afterEach(() => {
