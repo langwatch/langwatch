@@ -128,12 +128,19 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
 
           // Cache checkpoint immediately after ClickHouse insert for fast reads
           if (this.cache) {
-            await this.cache.set(checkpointKey, {
+            const cachedData = {
               sequenceNumber,
               status,
               eventId: event.id,
               timestamp: event.timestamp,
-            });
+              processorType,
+            };
+            await this.cache.set(checkpointKey, cachedData);
+            await this.cache.setByCheckpointKey(checkpointKey, cachedData);
+
+            if (status === "failed") {
+              await this.cache.setFailureStatus(checkpointKey, true);
+            }
           }
 
           this.logger.debug(
@@ -182,7 +189,30 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
       },
       async () => {
         try {
-          // Get record from repository
+          // Check Redis cache first for fast reads
+          if (this.cache) {
+            const cached =
+              await this.cache.getByCheckpointKey(checkpointKey);
+            if (cached) {
+              const parsedKey = parseCheckpointKey(checkpointKey);
+              return {
+                processorName: parsedKey.processorName,
+                processorType: cached.processorType ?? "handler",
+                eventId: cached.eventId,
+                status: cached.status,
+                eventTimestamp: cached.timestamp,
+                sequenceNumber: cached.sequenceNumber,
+                processedAt: void 0,
+                failedAt: void 0,
+                errorMessage: void 0,
+                tenantId: parsedKey.tenantId,
+                aggregateType: parsedKey.aggregateType as AggregateType,
+                aggregateId: parsedKey.aggregateId,
+              };
+            }
+          }
+
+          // Fallback to ClickHouse
           const record =
             await this.repository.getCheckpointRecord(checkpointKey);
 
@@ -456,10 +486,24 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
             aggregateId,
           );
 
-          // Delegate to repository
-          return await this.repository.hasFailedCheckpointRecords(
-            checkpointKey,
-          );
+          // Check Redis cache first for fast reads
+          if (this.cache) {
+            const cached = await this.cache.getFailureStatus(checkpointKey);
+            if (cached !== null) {
+              return cached;
+            }
+          }
+
+          // Fallback to ClickHouse
+          const hasFailed =
+            await this.repository.hasFailedCheckpointRecords(checkpointKey);
+
+          // Cache the result for future lookups
+          if (this.cache) {
+            await this.cache.setFailureStatus(checkpointKey, hasFailed);
+          }
+
+          return hasFailed;
         } catch (error) {
           this.logger.error(
             {
@@ -574,6 +618,12 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
         try {
           // Delegate to repository
           await this.repository.deleteCheckpointRecord(checkpointKey);
+
+          // Clear all cache entries for this checkpoint key
+          if (this.cache) {
+            await this.cache.deleteByCheckpointKey(checkpointKey);
+            await this.cache.deleteFailureStatus(checkpointKey);
+          }
 
           this.logger.debug(
             {
