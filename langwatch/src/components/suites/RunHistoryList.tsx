@@ -30,11 +30,18 @@ import {
   groupRunsByBatchId,
 } from "./run-history-transforms";
 
-type RunHistoryListProps = {
-  suite: SimulationSuiteConfiguration;
+export type RunHistoryStats = {
+  runCount: number;
+  passRate: number;
+  lastActivityTimestamp: number | null;
 };
 
-export function RunHistoryList({ suite }: RunHistoryListProps) {
+type RunHistoryListProps = {
+  suite: SimulationSuiteConfiguration;
+  onStatsReady?: (stats: RunHistoryStats) => void;
+};
+
+export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const setId = getSuiteSetId(suite.id);
@@ -185,6 +192,24 @@ export function RunHistoryList({ suite }: RunHistoryListProps) {
   );
 
   const lastActivityTimestamp = batchRuns[0]?.timestamp ?? null;
+
+  // Notify parent when stats are ready
+  useEffect(() => {
+    if (onStatsReady && batchRuns.length > 0) {
+      const totalRunCount = batchRuns.reduce(
+        (sum, batch) => sum + batch.scenarioRuns.length,
+        0,
+      );
+      const finishedCount = totals.passedCount + totals.failedCount;
+      const passRate = finishedCount > 0 ? (totals.passedCount / finishedCount) * 100 : 0;
+
+      onStatsReady({
+        runCount: totalRunCount,
+        passRate,
+        lastActivityTimestamp,
+      });
+    }
+  }, [batchRuns, totals, lastActivityTimestamp, onStatsReady]);
 
   const handleToggle = useCallback((batchRunId: string) => {
     setExpandedIds((prev) => {

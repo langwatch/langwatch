@@ -183,7 +183,16 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     } else {
       createMutation.mutate(data, { onSuccess });
     }
-  }, [form, project, isEditMode, suite, createMutation, updateMutation, runMutation, onRan]);
+  }, [
+    form,
+    project,
+    isEditMode,
+    suite,
+    createMutation,
+    updateMutation,
+    runMutation,
+    onRan,
+  ]);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -196,7 +205,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       placement="end"
       size="lg"
     >
-      <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.Title>{title}</Drawer.Title>

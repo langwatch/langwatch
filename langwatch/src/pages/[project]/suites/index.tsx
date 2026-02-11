@@ -10,6 +10,7 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
@@ -37,7 +38,7 @@ function SuitesPageContent() {
   const utils = api.useContext();
 
   // State
-  const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
+  const [selectedSuiteId, setSelectedSuiteId] = useState<string | "all-runs" | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -55,7 +56,9 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
-  const selectedSuite = suites?.find((s) => s.id === selectedSuiteId) ?? null;
+  const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"
+    ? suites?.find((s) => s.id === selectedSuiteId) ?? null
+    : null;
 
   // Mutations
   const deleteMutation = api.suites.delete.useMutation({
@@ -218,7 +221,9 @@ function SuitesPageContent() {
             </VStack>
           )}
 
-          {!error && !selectedSuite && <SuiteEmptyState onNewSuite={handleNewSuite} />}
+          {!error && selectedSuiteId === "all-runs" && <AllRunsPanel />}
+
+          {!error && !selectedSuiteId && <SuiteEmptyState onNewSuite={handleNewSuite} />}
 
           {selectedSuite && (
             <SuiteDetailPanel

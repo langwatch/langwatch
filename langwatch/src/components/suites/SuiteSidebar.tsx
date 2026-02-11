@@ -2,14 +2,7 @@
  * Suite sidebar with search, new suite button, all runs link, and suite list.
  */
 
-import {
-  Box,
-  HStack,
-  Input,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Input, Separator, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import { FolderOpen, List, Play, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -23,9 +16,9 @@ export type SuiteRunSummary = {
 
 type SuiteSidebarProps = {
   suites: SimulationSuiteConfiguration[];
-  selectedSuiteId: string | null;
+  selectedSuiteId: string | "all-runs" | null;
   runSummaries?: Map<string, SuiteRunSummary>;
-  onSelectSuite: (id: string) => void;
+  onSelectSuite: (id: string | "all-runs") => void;
   onNewSuite: () => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
@@ -57,10 +50,14 @@ export function SuiteSidebar({
       borderColor="border"
       align="stretch"
       gap={0}
-      bg="bg.page"
     >
       <Box paddingX={3} paddingTop={3} paddingBottom={2}>
-        <Text fontSize="xs" fontWeight="semibold" textTransform="uppercase" color="fg.muted">
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          textTransform="uppercase"
+          color="fg.muted"
+        >
           Suites
         </Text>
       </Box>
@@ -77,7 +74,7 @@ export function SuiteSidebar({
       <Box paddingX={2}>
         <SidebarButton
           icon={<Plus size={14} />}
-          label="+ New Suite"
+          label="New Suite"
           onClick={onNewSuite}
         />
       </Box>
@@ -86,7 +83,8 @@ export function SuiteSidebar({
         <SidebarButton
           icon={<List size={14} />}
           label="All Runs"
-          onClick={() => {}}
+          isSelected={selectedSuiteId === "all-runs"}
+          onClick={() => onSelectSuite("all-runs")}
         />
       </Box>
 
@@ -101,12 +99,24 @@ export function SuiteSidebar({
         align="stretch"
       >
         {filteredSuites.length === 0 && suites.length === 0 && (
-          <Text fontSize="sm" color="fg.muted" paddingX={2} paddingY={4} textAlign="center">
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            paddingX={2}
+            paddingY={4}
+            textAlign="center"
+          >
             No suites yet
           </Text>
         )}
         {filteredSuites.length === 0 && suites.length > 0 && (
-          <Text fontSize="sm" color="fg.muted" paddingX={2} paddingY={4} textAlign="center">
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            paddingX={2}
+            paddingY={4}
+            textAlign="center"
+          >
             No matching suites
           </Text>
         )}
@@ -129,10 +139,12 @@ export function SuiteSidebar({
 function SidebarButton({
   icon,
   label,
+  isSelected = false,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  isSelected?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -143,7 +155,8 @@ function SidebarButton({
       paddingY={1.5}
       borderRadius="md"
       cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
+      bg={isSelected ? "bg.emphasized" : "transparent"}
+      _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
       onClick={onClick}
       gap={2}
     >

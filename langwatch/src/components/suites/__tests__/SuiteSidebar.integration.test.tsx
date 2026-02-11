@@ -67,7 +67,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("+ New Suite")).toBeInTheDocument();
+      expect(screen.getByText("New Suite")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -218,7 +218,7 @@ describe("<SuiteSidebar/>", () => {
         { wrapper: Wrapper },
       );
 
-      await user.click(screen.getByText("+ New Suite"));
+      await user.click(screen.getByText("New Suite"));
       expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });

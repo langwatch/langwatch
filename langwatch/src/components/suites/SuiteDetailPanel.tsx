@@ -15,6 +15,8 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuiteConfiguration } from "@prisma/client";
 import {
+  Activity,
+  CheckCircle,
   FileText,
   FolderOpen,
   Hash,
@@ -24,8 +26,10 @@ import {
   RefreshCw,
   Target,
 } from "lucide-react";
+import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
-import { RunHistoryList } from "./RunHistoryList";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { RunHistoryList, type RunHistoryStats } from "./RunHistoryList";
 
 type SuiteDetailPanelProps = {
   suite: SimulationSuiteConfiguration;
@@ -41,6 +45,8 @@ export function SuiteDetailPanel({
   const targets = parseSuiteTargets(suite.targets);
   const jobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
+
+  const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
 
   return (
     <VStack align="stretch" gap={0} height="100%" overflow="auto">
@@ -100,13 +106,34 @@ export function SuiteDetailPanel({
             value={jobCount}
             label="executions"
           />
+          {liveStats && (
+            <>
+              <StatChip
+                icon={<Play size={14} />}
+                value={liveStats.runCount}
+                label="runs"
+              />
+              <StatChip
+                icon={<CheckCircle size={14} />}
+                value={`${Math.round(liveStats.passRate)}%`}
+                label="pass rate"
+              />
+              {liveStats.lastActivityTimestamp && (
+                <StatChip
+                  icon={<Activity size={14} />}
+                  value={formatTimeAgo(liveStats.lastActivityTimestamp) ?? ""}
+                  label="last run"
+                />
+              )}
+            </>
+          )}
         </HStack>
       </Box>
 
       <Separator />
 
       {/* Run history list */}
-      <RunHistoryList suite={suite} />
+      <RunHistoryList suite={suite} onStatsReady={setLiveStats} />
     </VStack>
   );
 }

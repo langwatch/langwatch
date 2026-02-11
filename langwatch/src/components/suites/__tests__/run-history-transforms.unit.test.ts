@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   groupRunsByBatchId,
+  groupRunsByBatchIdWithSetIds,
   computeBatchRunSummary,
   computeRunHistoryTotals,
   type BatchRun,
@@ -60,6 +61,96 @@ describe("groupRunsByBatchId()", () => {
       ];
 
       const result = groupRunsByBatchId({ runs });
+      expect(result).toHaveLength(2);
+      expect(result[0]!.batchRunId).toBe("batch_new");
+      expect(result[1]!.batchRunId).toBe("batch_old");
+    });
+  });
+});
+
+describe("groupRunsByBatchIdWithSetIds()", () => {
+  describe("when given an empty array", () => {
+    it("returns an empty array", () => {
+      const result = groupRunsByBatchIdWithSetIds({
+        runs: [],
+        scenarioSetIds: {},
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when given runs with scenario set IDs", () => {
+    it("groups runs and includes scenarioSetId for each batch", () => {
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_1",
+          scenarioId: "scen_1",
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_2",
+          scenarioId: "scen_2",
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_2",
+          scenarioRunId: "run_3",
+          scenarioId: "scen_3",
+        }),
+      ];
+
+      const scenarioSetIds = {
+        batch_1: "__suite__suite_abc",
+        batch_2: "__suite__suite_xyz",
+      };
+
+      const result = groupRunsByBatchIdWithSetIds({ runs, scenarioSetIds });
+      expect(result).toHaveLength(2);
+      expect(result[0]!.scenarioSetId).toBe("__suite__suite_abc");
+      expect(result[1]!.scenarioSetId).toBe("__suite__suite_xyz");
+    });
+  });
+
+  describe("when scenarioSetId is missing for a batch", () => {
+    it("sets scenarioSetId to undefined", () => {
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_orphan",
+          scenarioRunId: "run_1",
+        }),
+      ];
+
+      const result = groupRunsByBatchIdWithSetIds({
+        runs,
+        scenarioSetIds: {},
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]!.scenarioSetId).toBeUndefined();
+    });
+  });
+
+  describe("when given runs from multiple batches", () => {
+    it("sorts batches by timestamp descending", () => {
+      const now = Date.now();
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_old",
+          scenarioRunId: "run_1",
+          timestamp: now - 10000,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_new",
+          scenarioRunId: "run_2",
+          timestamp: now,
+        }),
+      ];
+
+      const scenarioSetIds = {
+        batch_old: "__suite__suite_1",
+        batch_new: "__suite__suite_2",
+      };
+
+      const result = groupRunsByBatchIdWithSetIds({ runs, scenarioSetIds });
       expect(result).toHaveLength(2);
       expect(result[0]!.batchRunId).toBe("batch_new");
       expect(result[1]!.batchRunId).toBe("batch_old");

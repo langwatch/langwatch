@@ -644,6 +644,163 @@ export class ScenarioEventRepository {
     };
   }
 
+  async getBatchRunIdsForAllSuites({
+    projectId,
+    limit,
+    cursor,
+  }: {
+    projectId: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    batchRunIds: string[];
+    scenarioSetIds: Record<string, string>;
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    // Validate and clamp the limit to prevent ES result window issues
+    const actualLimit = Math.min(limit, 20);
+
+    // Parse cursor to get search_after values
+    let searchAfter: any[] | undefined;
+    if (cursor) {
+      try {
+        // Try to decode base64 cursor first (new stable format)
+        const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
+        const cursorData = JSON.parse(decodedCursor);
+
+        // Validate cursor shape - expected: sort values from search results
+        // These come from Elasticsearch's sort values for the documents
+        if (Array.isArray(cursorData) && cursorData.length > 0) {
+          searchAfter = cursorData;
+        }
+      } catch (e) {
+        captureException({
+          message: "Malformed cursor",
+          cursor,
+          error: e,
+        });
+        throw new Error(`Malformed cursor: ${cursor}`);
+      }
+    }
+
+    // Request more items to account for potential deduplication
+    // We need to ensure we get enough unique batch runs after deduplication
+    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
+
+    // Use prefix query to match all suite scenario sets (__suite__*)
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { prefix: { [ES_FIELDS.scenarioSetId]: "__suite__" } },
+              { exists: { field: ES_FIELDS.batchRunId } },
+            ],
+          },
+        },
+        sort: [
+          { timestamp: { order: "desc" } },
+          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
+        ],
+        size: requestSize,
+        ...(searchAfter && { search_after: searchAfter }),
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+
+    // Manual deduplication by batch run ID, keeping the latest timestamp for each
+    // Also track which scenario_set_id each batch_run_id belongs to
+    const batchRunMap = new Map<
+      string,
+      { timestamp: number; sort: any[]; hit: any; scenarioSetId: string }
+    >();
+
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const batchRunId = source?.batch_run_id as string;
+      const timestamp = source?.timestamp as number;
+      const scenarioSetId = source?.scenario_set_id as string;
+
+      if (batchRunId && timestamp !== undefined && scenarioSetId) {
+        const existing = batchRunMap.get(batchRunId);
+        if (!existing || timestamp > existing.timestamp) {
+          // Ensure we have valid sort values for pagination
+          const sortValues = hit.sort;
+          if (Array.isArray(sortValues) && sortValues.length > 0) {
+            batchRunMap.set(batchRunId, {
+              timestamp,
+              sort: sortValues,
+              hit: hit,
+              scenarioSetId,
+            });
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by timestamp descending, then by batch run ID
+    const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
+      ([keyA, a], [keyB, b]) => {
+        if (b.timestamp !== a.timestamp) {
+          return b.timestamp - a.timestamp;
+        }
+        return String(keyA) < String(keyB)
+          ? -1
+          : String(keyA) > String(keyB)
+            ? 1
+            : 0;
+      },
+    );
+
+    // Determine if there are more results
+    const hasMore =
+      hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
+
+    let nextCursor: string | undefined;
+
+    if (hasMore && sortedBatchRuns.length > actualLimit) {
+      // Get the sort values from the extra item in the deduplicated results
+      const extraItem = sortedBatchRuns[actualLimit];
+      if (extraItem) {
+        // Use the sort values from the hit for search_after pagination
+        const searchAfterValues = extraItem[1].sort;
+
+        if (
+          Array.isArray(searchAfterValues) &&
+          searchAfterValues.length > 0 &&
+          searchAfterValues.every((val: any) => val !== undefined)
+        ) {
+          // Encode cursor as base64 for stability and compactness
+          nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
+            "base64",
+          );
+        }
+      }
+    }
+
+    // Slice to actualLimit before returning and build scenarioSetIds map
+    const limitedBatchRuns = sortedBatchRuns.slice(0, actualLimit);
+    const batchRunIds = limitedBatchRuns.map((item: any) => item[0]); // item[0] is the batchRunId key
+    const scenarioSetIds: Record<string, string> = {};
+    for (const [batchRunId, data] of limitedBatchRuns) {
+      scenarioSetIds[batchRunId] = data.scenarioSetId;
+    }
+
+    return {
+      batchRunIds,
+      scenarioSetIds,
+      nextCursor,
+      hasMore,
+    };
+  }
+
   /**
    * Gets the total count of batch runs for a scenario set.
    * Used for pagination calculations.

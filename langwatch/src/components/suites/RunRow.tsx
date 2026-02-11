@@ -20,6 +20,7 @@ type RunRowProps = {
   targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   expectedJobCount?: number;
+  suiteName?: string; // displayed in All Runs view
 };
 
 function OverallStatusIcon({ summary }: { summary: BatchRunSummary }) {
@@ -40,6 +41,7 @@ export function RunRow({
   targetName,
   onScenarioRunClick,
   expectedJobCount,
+  suiteName,
 }: RunRowProps) {
   const timeAgo = formatTimeAgo(batchRun.timestamp);
 
@@ -68,6 +70,16 @@ export function RunRow({
           <ChevronDown size={14} />
         ) : (
           <ChevronRight size={14} />
+        )}
+        {suiteName && (
+          <>
+            <Text fontSize="sm" fontWeight="medium" color="fg.default">
+              {suiteName}
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              &middot;
+            </Text>
+          </>
         )}
         <Text fontSize="sm" color="fg.muted">
           {timeAgo}
@@ -112,6 +124,26 @@ export function RunRow({
           )}
         </VStack>
       )}
+
+      {/* Per-batch footer stats */}
+      <HStack
+        paddingX={4}
+        paddingY={2}
+        borderTop="1px solid"
+        borderColor="border"
+        bg="bg.subtle"
+        fontSize="xs"
+        color="fg.muted"
+        justifyContent="space-between"
+      >
+        <Text>
+          {summary.totalCount} {summary.totalCount === 1 ? "run" : "runs"}
+        </Text>
+        <HStack gap={3}>
+          <Text color="green.600">{summary.passedCount} passed</Text>
+          <Text color="red.600">{summary.failedCount} failed</Text>
+        </HStack>
+      </HStack>
     </Box>
   );
 }
