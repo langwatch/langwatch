@@ -48,7 +48,7 @@ vi.mock("../../components/ui/toaster", () => ({
 // Import the hook after mocking
 import { useModelProviderForm } from "../useModelProviderForm";
 
-describe("useModelProviderForm", () => {
+describe("useModelProviderForm()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -569,8 +569,8 @@ describe("useModelProviderForm", () => {
     });
   });
 
-  describe("enabledProvidersCount behavior", () => {
-    it("auto-enables useAsDefaultProvider when enabledProvidersCount is 1", () => {
+  describe("when enabledProvidersCount is 1", () => {
+    it("auto-enables useAsDefaultProvider", () => {
       const provider = createOpenAIProvider({ enabled: false });
       // Project default model is anthropic, NOT openai -- yet toggle should auto-enable
       const project = { defaultModel: "anthropic/claude-sonnet-4" };
@@ -587,24 +587,7 @@ describe("useModelProviderForm", () => {
       expect(result.current[0].useAsDefaultProvider).toBe(true);
     });
 
-    it("does not auto-enable useAsDefaultProvider when enabledProvidersCount is greater than 1", () => {
-      const provider = createOpenAIProvider({ enabled: false });
-      // Project default model is anthropic, NOT openai
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
-
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project,
-          enabledProvidersCount: 2,
-        }),
-      );
-
-      expect(result.current[0].useAsDefaultProvider).toBe(false);
-    });
-
-    it("resolves projectDefaultModel to provider model when enabledProvidersCount is 1", () => {
+    it("resolves projectDefaultModel to provider model", () => {
       const provider: MaybeStoredModelProvider = {
         provider: "azure",
         enabled: false,
@@ -657,8 +640,27 @@ describe("useModelProviderForm", () => {
       // Should keep the existing azure model, not override with first stored model
       expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4-turbo");
     });
+  });
 
-    it("does not resolve models when enabledProvidersCount is greater than 1", () => {
+  describe("when enabledProvidersCount is greater than 1", () => {
+    it("does not auto-enable useAsDefaultProvider", () => {
+      const provider = createOpenAIProvider({ enabled: false });
+      // Project default model is anthropic, NOT openai
+      const project = { defaultModel: "anthropic/claude-sonnet-4" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 2,
+        }),
+      );
+
+      expect(result.current[0].useAsDefaultProvider).toBe(false);
+    });
+
+    it("does not resolve models to provider", () => {
       const provider: MaybeStoredModelProvider = {
         provider: "azure",
         enabled: false,

@@ -239,18 +239,23 @@ export function filterMaskedApiKeys(
  * If the current model already belongs to the provider, returns it unchanged.
  * Otherwise, picks the first available model from stored models or registry.
  *
- * @param current - The current model string (e.g., "openai/gpt-4o")
- * @param providerKey - The provider key (e.g., "openai")
- * @param storedModels - Provider's stored models (custom or persisted)
- * @param mode - Whether to look up "chat" or "embedding" models
+ * @param params.current - The current model string (e.g., "openai/gpt-4o")
+ * @param params.providerKey - The provider key (e.g., "openai")
+ * @param params.storedModels - Provider's stored models (custom or persisted)
+ * @param params.mode - Whether to look up "chat" or "embedding" models
  * @returns A model string prefixed with the provider key
  */
-export function resolveModelForProvider(
-  current: string,
-  providerKey: string,
-  storedModels: string[] | null | undefined,
-  mode: "chat" | "embedding",
-): string {
+export function resolveModelForProvider({
+  current,
+  providerKey,
+  storedModels,
+  mode,
+}: {
+  current: string;
+  providerKey: string;
+  storedModels: string[] | null | undefined;
+  mode: "chat" | "embedding";
+}): string {
   if (current.startsWith(`${providerKey}/`)) return current;
   if (storedModels?.length)
     return `${providerKey}/${storedModels[0]}`;
@@ -265,20 +270,24 @@ export function resolveModelForProvider(
  * Returns true when the provider is already the project's default model provider,
  * or when this is the only enabled provider (first-provider setup).
  *
- * @param providerKey - The provider key (e.g., "openai")
- * @param project - The project object containing default model info
- * @param enabledProvidersCount - Number of currently enabled providers
+ * @param params.providerKey - The provider key (e.g., "openai")
+ * @param params.project - The project object containing default model info
+ * @param params.enabledProvidersCount - Number of currently enabled providers
  */
-export function shouldAutoEnableAsDefault(
-  providerKey: string,
+export function shouldAutoEnableAsDefault({
+  providerKey,
+  project,
+  enabledProvidersCount,
+}: {
+  providerKey: string;
   project:
     | { defaultModel?: string | null }
     | null
-    | undefined,
-  enabledProvidersCount: number,
-): boolean {
+    | undefined;
+  enabledProvidersCount: number;
+}): boolean {
   return (
     isProviderDefaultModel(providerKey, project) ||
-    enabledProvidersCount === 1
+    enabledProvidersCount <= 1
   );
 }
