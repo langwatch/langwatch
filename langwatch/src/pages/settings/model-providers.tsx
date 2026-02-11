@@ -59,26 +59,10 @@ export default function ModelsPage() {
     name: string;
   } | null>(null);
 
-  // Check if provider is used for the Default Model only (badge display)
-  const isDefaultProvider = (providerKey: string) => {
-    return isProviderDefaultModel(providerKey, project);
-  };
-
-  // Check if provider is used for any default models (for delete prevention)
-  const isProviderUsedForAnyDefault = (providerKey: string) => {
-    return isProviderEffectiveDefault(providerKey, project);
-  };
-
-  const utils = api.useContext();
-
-  useEffect(() => {
-    if (!isProviderDrawerOpen) {
-      // Refetch both providers and organization data when drawer closes
-      void refetch();
-      void utils.organization.getAll.invalidate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isProviderDrawerOpen]);
+  const enabledProviders = useMemo(() => {
+    if (!providers) return [];
+    return Object.values(providers).filter((provider) => provider.enabled);
+  }, [providers]);
 
   const notEnabledProviders = useMemo(() => {
     return Object.keys(modelProvidersRegistry)
@@ -98,10 +82,30 @@ export default function ModelsPage() {
       }));
   }, [providers]);
 
-  const enabledProviders = useMemo(() => {
-    if (!providers) return [];
-    return Object.values(providers).filter((provider) => provider.enabled);
-  }, [providers]);
+  // Check if provider is used for the Default Model only (badge display)
+  // When there's only one enabled provider, it is the default by definition
+  const isDefaultProvider = (providerKey: string) => {
+    return (
+      isProviderDefaultModel(providerKey, project) ||
+      enabledProviders.length === 1
+    );
+  };
+
+  // Check if provider is used for any default models (for delete prevention)
+  const isProviderUsedForAnyDefault = (providerKey: string) => {
+    return isProviderEffectiveDefault(providerKey, project);
+  };
+
+  const utils = api.useContext();
+
+  useEffect(() => {
+    if (!isProviderDrawerOpen) {
+      // Refetch both providers and organization data when drawer closes
+      void refetch();
+      void utils.organization.getAll.invalidate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProviderDrawerOpen]);
 
   return (
     <SettingsLayout>
