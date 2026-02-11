@@ -80,7 +80,7 @@ export class ExperimentRunStateProjectionHandler
 
     const scores: number[] = [];
     let passedCount = 0;
-    let evaluatorResultCount = 0;
+    let passFailCount = 0;
 
     for (const event of events) {
       if (isExperimentRunStartedEvent(event)) {
@@ -101,11 +101,11 @@ export class ExperimentRunStateProjectionHandler
           completedCells.add(cellKey);
           failedCells.delete(cellKey);
         }
-        if (event.data.cost !== undefined && event.data.cost !== null) {
+        if (event.data.cost != null) {
           totalCost += event.data.cost;
           hasCostData = true;
         }
-        if (event.data.duration !== undefined && event.data.duration !== null) {
+        if (event.data.duration != null) {
           totalDurationMs += event.data.duration;
           hasDurationData = true;
         }
@@ -113,14 +113,16 @@ export class ExperimentRunStateProjectionHandler
         logger.debug({ runId: event.data.runId, index: event.data.index, targetId: event.data.targetId },
           "Processing TargetResultEvent");
       } else if (isEvaluatorResultEvent(event)) {
-        evaluatorResultCount++;
-        if (event.data.status === "processed" && event.data.score !== undefined && event.data.score !== null) {
-          scores.push(event.data.score);
+        if (event.data.status === "processed") {
+          if (event.data.score != null) {
+            scores.push(event.data.score);
+          }
+          if (event.data.passed != null) {
+            passFailCount++;
+            if (event.data.passed) passedCount++;
+          }
         }
-        if (event.data.status === "processed" && event.data.passed !== undefined && event.data.passed !== null) {
-          if (event.data.passed) passedCount++;
-        }
-        if (event.data.cost !== undefined && event.data.cost !== null) {
+        if (event.data.cost != null) {
           totalCost += event.data.cost;
           hasCostData = true;
         }
@@ -139,7 +141,7 @@ export class ExperimentRunStateProjectionHandler
     const completedCount = completedCells.size;
     const failedCount = failedCells.size;
     const avgScore = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : null;
-    const passRate = evaluatorResultCount > 0 ? passedCount / evaluatorResultCount : null;
+    const passRate = passFailCount > 0 ? passedCount / passFailCount : null;
 
     const projectionId = `experiment_run_state:${tenantId}:${runId}`;
 

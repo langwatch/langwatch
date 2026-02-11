@@ -230,6 +230,57 @@ describe("ExperimentRunStateProjectionHandler", () => {
     expect(projection.data.StoppedAt).toBe(5000);
   });
 
+  it("excludes skipped and error evaluator results from pass rate", () => {
+    const events: ExperimentRunProcessingEvent[] = [
+      createStartedEvent(),
+      createTargetResultEvent(),
+      createEvaluatorResultEvent({ passed: true }),
+      createEvaluatorResultEvent(
+        { passed: false, evaluatorId: "eval-2" },
+        { id: "event-3b", timestamp: 3100 },
+      ),
+      createEvaluatorResultEvent(
+        { status: "skipped", evaluatorId: "eval-3", score: undefined, passed: undefined },
+        { id: "event-3c", timestamp: 3200 },
+      ),
+      createEvaluatorResultEvent(
+        { status: "error", evaluatorId: "eval-4", score: undefined, passed: undefined },
+        { id: "event-3d", timestamp: 3300 },
+      ),
+    ];
+    const stream = new EventStream("run-123", TEST_TENANT_ID, events);
+
+    const projection = handler.handle(stream);
+
+    // Only 2 processed evaluators (1 passed, 1 failed), skipped/error excluded
+    expect(projection.data.PassRate).toBeCloseTo(1 / 2, 5);
+  });
+
+  it("excludes score-only evaluators from pass rate denominator", () => {
+    const events: ExperimentRunProcessingEvent[] = [
+      createStartedEvent(),
+      createTargetResultEvent(),
+      createEvaluatorResultEvent({ passed: true }),
+      createEvaluatorResultEvent(
+        { passed: false, evaluatorId: "eval-2" },
+        { id: "event-3b", timestamp: 3100 },
+      ),
+      // Score-only evaluator with no passed value
+      createEvaluatorResultEvent(
+        { score: 0.9, passed: undefined, evaluatorId: "eval-3" },
+        { id: "event-3c", timestamp: 3200 },
+      ),
+    ];
+    const stream = new EventStream("run-123", TEST_TENANT_ID, events);
+
+    const projection = handler.handle(stream);
+
+    // pass rate: 1/2 (score-only eval excluded from denominator)
+    expect(projection.data.PassRate).toBeCloseTo(1 / 2, 5);
+    // avg score still includes all 3
+    expect(projection.data.AvgScore).toBeCloseTo((0.8 + 0.8 + 0.9) / 3, 5);
+  });
+
   it("accumulates costs from target and evaluator results", () => {
     const events: ExperimentRunProcessingEvent[] = [
       createStartedEvent(),
