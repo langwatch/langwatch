@@ -82,8 +82,8 @@ def generate_embeddings_threaded(
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks, propagating log context to threads
-            ctx = contextvars.copy_context()
             for text in chunk:
+                ctx = contextvars.copy_context()
                 futures.append(executor.submit(ctx.run, _generate_single_embedding, text, params_copy, dimensions))
 
             # Process results as they complete
@@ -120,9 +120,10 @@ def generate_embeddings(
     total_batches = len(batches)
 
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
-    if "dimensions" in embeddings_litellm_params:
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
-        del embeddings_litellm_params["dimensions"]
+        del params_copy["dimensions"]
 
     logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
 
@@ -130,7 +131,7 @@ def generate_embeddings(
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
         try:
             response = litellm.embedding(
-                **embeddings_litellm_params,  # type: ignore
+                **params_copy,  # type: ignore
                 input=batch if batch_size > 1 else batch[0],
             )
             embeddings += [

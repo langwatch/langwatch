@@ -148,6 +148,6 @@ def setup_endpoints(app: FastAPI):
             }
         except Exception as e:
             logger.error("Batch clustering failed", error=str(e), error_type=type(e).__name__)
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Batch clustering failed") from e
         finally:
             clear_log_context()
