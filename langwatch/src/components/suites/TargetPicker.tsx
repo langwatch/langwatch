@@ -1,5 +1,5 @@
 /**
- * Checkbox list for selecting targets (agents and prompts) in a suite form.
+ * Picker component for selecting targets (agents and prompts) in a suite form.
  *
  * Renders: search input, scrollable checkbox list with type indicators,
  * "Add New Agent" and "Add New Prompt" action rows, and a count footer.
@@ -16,7 +16,7 @@ interface AvailableTarget {
   referenceId: string;
 }
 
-export interface TargetCheckboxListProps {
+export interface TargetPickerProps {
   /** Filtered list of targets to display. */
   targets: AvailableTarget[];
   /** Currently selected targets. */
@@ -39,7 +39,7 @@ export interface TargetCheckboxListProps {
   hasError?: boolean;
 }
 
-export function TargetCheckboxList({
+export function TargetPicker({
   targets,
   selectedTargets,
   totalCount,
@@ -50,7 +50,7 @@ export function TargetCheckboxList({
   onCreateAgent,
   onCreatePrompt,
   hasError,
-}: TargetCheckboxListProps) {
+}: TargetPickerProps) {
   return (
     <Box
       border="1px solid"

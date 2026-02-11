@@ -7,8 +7,8 @@
  *
  * This is a thin orchestrator that composes:
  * - `useSuiteForm` for all form state and logic
- * - `ScenarioCheckboxList` for scenario selection UI
- * - `TargetCheckboxList` for target selection UI
+ * - `ScenarioPicker` for scenario selection UI
+ * - `TargetPicker` for target selection UI
  */
 
 import {
@@ -35,8 +35,8 @@ import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm } from "./useSuiteForm";
 import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
-import { ScenarioCheckboxList } from "./ScenarioCheckboxList";
-import { TargetCheckboxList } from "./TargetCheckboxList";
+import { ScenarioPicker } from "./ScenarioPicker";
+import { TargetPicker } from "./TargetPicker";
 
 /** Callbacks passed via flowCallbacks from the parent page. */
 export type SuiteFormDrawerProps = {
@@ -261,7 +261,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               <Text fontSize="sm" fontWeight="medium">
                 Scenarios *
               </Text>
-              <ScenarioCheckboxList
+              <ScenarioPicker
                 scenarios={form.filteredScenarios}
                 selectedIds={form.selectedScenarioIds}
                 totalCount={form.totalScenarioCount}
@@ -288,7 +288,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               <Text fontSize="sm" fontWeight="medium">
                 Target(s) *
               </Text>
-              <TargetCheckboxList
+              <TargetPicker
                 targets={form.filteredTargets}
                 selectedTargets={form.selectedTargets}
                 totalCount={form.availableTargets.length}

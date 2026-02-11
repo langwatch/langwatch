@@ -1,5 +1,5 @@
 /**
- * Checkbox list for selecting scenarios in a suite form.
+ * Picker component for selecting scenarios in a suite form.
  *
  * Renders: search input, label filter chips, scrollable checkbox list,
  * "Create New Scenario" button, and a footer with count + select all/clear.
@@ -23,7 +23,7 @@ interface Scenario {
   labels: string[];
 }
 
-export interface ScenarioCheckboxListProps {
+export interface ScenarioPickerProps {
   /** Filtered list of scenarios to display. */
   scenarios: Scenario[];
   /** Currently selected scenario IDs. */
@@ -52,7 +52,7 @@ export interface ScenarioCheckboxListProps {
   hasError?: boolean;
 }
 
-export function ScenarioCheckboxList({
+export function ScenarioPicker({
   scenarios,
   selectedIds,
   totalCount,
@@ -66,7 +66,7 @@ export function ScenarioCheckboxList({
   onLabelFilterChange,
   onCreateNew,
   hasError,
-}: ScenarioCheckboxListProps) {
+}: ScenarioPickerProps) {
   return (
     <Box
       border="1px solid"
