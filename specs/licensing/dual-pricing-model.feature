@@ -70,7 +70,8 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     When I call subscription.create with plan "GROWTH_SEAT_USAGE" and 3 members
     Then a PENDING subscription is created with plan "GROWTH_SEAT_USAGE"
     And a Stripe checkout session is created with seat-based line items
-    And the checkout success URL points to "/settings/billing"
+    And the checkout success URL points to "/settings/subscription"
+    And the checkout cancel URL points to "/settings/subscription"
     And the organization's pricingModel is set to "SEAT_USAGE"
 
   @integration
@@ -86,7 +87,7 @@ Feature: Dual Pricing Model — Seat+Usage Billing
   Scenario: Managing billing portal returns correct URL for SEAT_USAGE
     Given the organization has pricingModel "SEAT_USAGE"
     When I call subscription.manage
-    Then the billing portal return URL points to "/settings/billing"
+    Then the billing portal return URL points to "/settings/subscription"
 
   @integration
   Scenario: Managing billing portal returns correct URL for TIERED

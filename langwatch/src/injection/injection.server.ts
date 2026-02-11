@@ -61,7 +61,6 @@ export interface Dependencies {
     organizationId: string;
     newTotalSeats: number;
   }) => Promise<boolean>;
-  afterOrganizationCreate?: (organizationId: string) => Promise<void>;
 }
 
 const dependencies: Dependencies = {
