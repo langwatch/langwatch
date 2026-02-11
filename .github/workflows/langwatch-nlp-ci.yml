@@ -9,19 +9,31 @@ on:
       - "langwatch_nlp/**"
       - "python-sdk/**"
       - ".github/workflows/langwatch-nlp-ci.yml"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - "langwatch_nlp/**"
+      - "python-sdk/**"
+      - ".github/workflows/langwatch-nlp-ci.yml"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   lint:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
         uses: astral-sh/setup-uv@v5
@@ -39,11 +51,17 @@ jobs:
       #   run: make lint
 
   test:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
         uses: astral-sh/setup-uv@v5
@@ -60,11 +78,17 @@ jobs:
         run: make test
 
   test-integration:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
         uses: astral-sh/setup-uv@v5
@@ -77,6 +101,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run integration tests
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         working-directory: langwatch_nlp
         env:
           OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
@@ -85,11 +110,17 @@ jobs:
         run: make test-integration
 
   docker-build:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

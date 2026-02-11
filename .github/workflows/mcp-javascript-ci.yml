@@ -8,14 +8,29 @@ on:
     paths:
       - "mcp-server/**"
       - ".github/.release-please-manifest.json"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - "mcp-server/**"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typecheck:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v2
         with:
@@ -37,10 +52,16 @@ jobs:
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
   build_and_test:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v2
         with:
@@ -62,6 +83,7 @@ jobs:
         run: pnpm run build
 
       - name: Run tests
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         working-directory: mcp-server
         env:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}

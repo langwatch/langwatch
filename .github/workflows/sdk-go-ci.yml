@@ -8,13 +8,29 @@ on:
     paths:
       - 'sdk-go/**'
       - ".github/.release-please-manifest.json"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - 'sdk-go/**'
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -42,6 +58,7 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
@@ -49,14 +66,24 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.GO_SDK_OPENAI_API_KEY }}
 
   typecheck:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - run: echo "no typechecking is needed for go"
 
   build:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
