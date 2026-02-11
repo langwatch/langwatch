@@ -60,6 +60,7 @@ export default function SettingsLayout({
           </MenuLink>
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
+          {isSaaS && <MenuLink href="/settings/plans">Plans</MenuLink>}
           {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
           {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
         </VStack>

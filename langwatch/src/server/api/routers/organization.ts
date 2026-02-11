@@ -294,6 +294,8 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
+          await dependencies.afterOrganizationCreate?.(organization.id);
+
           // 2. Assign the user to the organization
           await prisma.organizationUser.create({
             data: {
@@ -934,6 +936,17 @@ export const organizationRouter = createTRPCRouter({
       await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
+
+      if (dependencies.onSeatsChanged) {
+        const licenseRepo = new LicenseEnforcementRepository(prisma);
+        const currentFullMembers = await licenseRepo.getMemberCount(
+          input.organizationId
+        );
+        await dependencies.onSeatsChanged({
+          organizationId: input.organizationId,
+          newTotalSeats: currentFullMembers,
+        });
+      }
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(
