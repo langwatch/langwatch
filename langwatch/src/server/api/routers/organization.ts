@@ -294,8 +294,6 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          await dependencies.afterOrganizationCreate?.(organization.id);
-
           // 2. Assign the user to the organization
           await prisma.organizationUser.create({
             data: {

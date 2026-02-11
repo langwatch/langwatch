@@ -11,17 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { SubscriptionPage } from "../SubscriptionPage";
 
-// Mock dependencies
-const mockRouterReplace = vi.fn();
-vi.mock("next/router", () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: mockRouterReplace,
-    query: {},
-    asPath: "/settings/subscription",
-  }),
-}));
-
 let mockOrganization: { id: string; name: string; pricingModel?: string } = {
   id: "test-org-id",
   name: "Test Org",
@@ -190,7 +179,6 @@ describe("<SubscriptionPage/>", () => {
       id: "test-org-id",
       name: "Test Org",
     };
-    mockRouterReplace.mockReset();
     mockGetActivePlan.mockReturnValue({
       data: createMockPlan(),
       isLoading: false,
@@ -968,7 +956,7 @@ describe("<SubscriptionPage/>", () => {
   });
 
   // ============================================================================
-  // Pricing Model Routing
+  // Pricing Model Behavior
   // ============================================================================
 
   describe("when organization has specific pricing model", () => {
@@ -981,11 +969,13 @@ describe("<SubscriptionPage/>", () => {
         };
       });
 
-      it("redirects to the billing page", async () => {
+      it("renders billing page content on subscription route", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          expect(mockRouterReplace).toHaveBeenCalledWith("/settings/billing");
+          expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+          expect(screen.getByTestId("invoices-block")).toBeInTheDocument();
         });
       });
     });
@@ -999,40 +989,54 @@ describe("<SubscriptionPage/>", () => {
         };
       });
 
-      it("shows an alert suggesting to upgrade to the new pricing model", async () => {
-        renderSubscriptionPage();
-
-        await waitFor(() => {
-          const alert = screen.getByTestId("tiered-pricing-alert");
-          expect(alert).toBeInTheDocument();
-          expect(alert).toHaveTextContent(/updated our pricing model/i);
-        });
-
-        const link = screen.getByRole("link", { name: /plans page/i });
-        expect(link).toHaveAttribute("href", "/settings/plans");
-      });
-
-      it("hides the upgrade plan block on free plan", async () => {
+      it("does not show the old tiered alert on subscription page", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block")
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      it("hides the update seats block on growth plan with planned users", async () => {
+      it("shows upgrade plan block on free plan", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+      });
+
+      it("shows legacy paid plan name as current plan title", async () => {
         mockGetActivePlan.mockReturnValue({
           data: createMockPlan({
-            type: "GROWTH",
-            name: "Growth",
+            type: "ACCELERATE",
+            name: "Accelerate",
             free: false,
-            maxMembers: 20,
-            maxMembersLite: 1000,
-            maxMessagesPerMonth: 200000,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
+          }),
+          isLoading: false,
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          const currentBlock = screen.getByTestId("current-plan-block");
+          expect(within(currentBlock).getByText("Accelerate")).toBeInTheDocument();
+        });
+      });
+
+      it("hides the update seats block on legacy paid plan with planned users", async () => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "ACCELERATE",
+            name: "Accelerate",
+            free: false,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
           }),
           isLoading: false,
         });
@@ -1048,9 +1052,7 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("update-seats-block")
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
     });
   });

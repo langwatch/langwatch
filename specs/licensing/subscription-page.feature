@@ -8,22 +8,32 @@ Feature: Subscription Page Plan Management
     And I navigate to the subscription page
 
   # ============================================================================
-  # Pricing Model Routing
+  # Pricing Model Behavior
   # ============================================================================
 
   @integration
-  Scenario: SEAT_USAGE organization is redirected to billing page
+  Scenario: SEAT_USAGE organization sees billing page on subscription route
     Given the organization uses the SEAT_USAGE pricing model
     When I navigate to the subscription page
-    Then I am redirected to the billing page without seeing the subscription page
+    Then I see the billing page content
+    And I see the current plan block
+    And I see recent invoices
 
   @integration
-  Scenario: TIERED organization sees upgrade alert on subscription page
+  Scenario: TIERED organization can view billing page and migrate
     Given the organization uses the TIERED pricing model
     When I navigate to the subscription page
-    Then I see an alert suggesting to upgrade to the new pricing model
-    And the alert contains a link to the plans page
-    And I cannot upgrade my plan from this page
+    Then I see the billing page content
+    And I see the current plan block
+    And I see an upgrade block below the current plan block
+
+  @integration
+  Scenario: TIERED organization current block shows legacy plan from subscription data
+    Given the organization uses the TIERED pricing model
+    And the organization has an active ACCELERATE subscription
+    When I view the subscription page
+    Then the current plan block title is "Accelerate"
+    And the current plan block shows the organization user count
 
   # ============================================================================
   # Page Layout

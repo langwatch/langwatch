@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   Card,
   Flex,
@@ -10,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import {
   type ComparisonPlanId,
@@ -155,6 +156,7 @@ type PlansComparisonPageProps = {
     type?: string | null;
     free?: boolean | null;
   };
+  pricingModel?: string | null;
 };
 
 function PlanCardActions({
@@ -199,7 +201,7 @@ function PlanCardActions({
         colorPalette="orange"
         variant="solid"
       >
-        <Link href="/settings/billing">Upgrade Now</Link>
+        <Link href="/settings/subscription">Upgrade Now</Link>
       </Button>
     );
   }
@@ -285,8 +287,12 @@ function PlanCard({
   );
 }
 
-export function PlansComparisonPage({ activePlan }: PlansComparisonPageProps) {
+export function PlansComparisonPage({
+  activePlan,
+  pricingModel,
+}: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
+  const showTieredNotice = pricingModel === "TIERED";
 
   return (
     <VStack
@@ -306,6 +312,33 @@ export function PlansComparisonPage({ activePlan }: PlansComparisonPageProps) {
           </Text>
         </VStack>
       </Flex>
+
+      {showTieredNotice && (
+        <Box
+          data-testid="tiered-discontinued-notice"
+          backgroundColor="orange.50"
+          borderWidth={1}
+          borderColor="orange.200"
+          borderRadius="md"
+          padding={4}
+        >
+          <HStack gap={2} alignItems="start">
+            <Info size={16} color="var(--chakra-colors-orange-500)" />
+            <Text fontSize="sm" color="orange.900">
+              Your current pricing model has been discontinued.{" "}
+              <Link
+                href="/settings/subscription"
+                fontWeight="semibold"
+                color="orange.700"
+                _hover={{ color: "orange.900" }}
+              >
+                Update your plan
+              </Link>{" "}
+              to move to seat and usage billing.
+            </Text>
+          </HStack>
+        </Box>
+      )}
 
       <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
         {PLAN_COLUMNS.map((plan) => (
