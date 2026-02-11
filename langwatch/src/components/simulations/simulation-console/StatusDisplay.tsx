@@ -6,7 +6,7 @@ import {
 import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
 
 interface StatusDisplayProps {
-  status?: string;
+  status?: ScenarioRunStatus;
   verdict?: Verdict;
 }
 
@@ -23,6 +23,8 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
       return CONSOLE_COLORS.pendingColor;
     if (status === ScenarioRunStatus.SUCCESS)
       return CONSOLE_COLORS.successColor;
+    if (status === ScenarioRunStatus.STALLED)
+      return CONSOLE_COLORS.warningColor;
 
     return CONSOLE_COLORS.failureColor;
   };
@@ -35,9 +37,10 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
           ? "FAILED"
           : "INCONCLUSIVE";
     }
-    return STATUS_DISPLAY_TEXT_MAP[
-      status as keyof typeof STATUS_DISPLAY_TEXT_MAP
-    ];
+    if (status !== undefined) {
+      return STATUS_DISPLAY_TEXT_MAP[status];
+    }
+    return undefined;
   };
 
   return (

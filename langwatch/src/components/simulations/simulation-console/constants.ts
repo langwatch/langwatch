@@ -30,6 +30,7 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.IN_PROGRESS]: "IN PROGRESS",
   [ScenarioRunStatus.PENDING]: "PENDING",
   [ScenarioRunStatus.FAILED]: "FAILED",
+  [ScenarioRunStatus.STALLED]: "STALLED",
 };
 
 /**

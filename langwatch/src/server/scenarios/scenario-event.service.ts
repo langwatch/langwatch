@@ -4,6 +4,7 @@ import { createLogger } from "~/utils/logger/server";
 import { ScenarioRunStatus } from "./scenario-event.enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./scenario-event.types";
+import { resolveRunStatus } from "./stall-detection";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
@@ -117,11 +118,21 @@ export class ScenarioEventService {
         span.setAttribute("result.found", true);
         span.setAttribute("scenario.id", runStartedEvent.scenarioId);
 
+        // Determine the most recent event timestamp across all event types
+        const lastEventTimestamp = Math.max(
+          runStartedEvent.timestamp,
+          latestMessageEvent?.timestamp ?? 0,
+          latestRunFinishedEvent?.timestamp ?? 0,
+        );
+
         return {
           scenarioId: runStartedEvent.scenarioId,
           batchRunId: runStartedEvent.batchRunId,
           scenarioRunId: runStartedEvent.scenarioRunId,
-          status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
+          status: resolveRunStatus({
+            finishedStatus: latestRunFinishedEvent?.status,
+            lastEventTimestamp,
+          }),
           results: latestRunFinishedEvent?.results ?? null,
           messages: latestMessageEvent?.messages ?? [],
           timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
@@ -559,11 +570,21 @@ export class ScenarioEventService {
             continue;
           }
 
+          // Determine the most recent event timestamp across all event types
+          const lastEventTimestamp = Math.max(
+            runStartedEvent.timestamp,
+            messageEvent?.timestamp ?? 0,
+            runFinishedEvent?.timestamp ?? 0,
+          );
+
           runs.push({
             scenarioId: runStartedEvent.scenarioId,
             batchRunId: runStartedEvent.batchRunId,
             scenarioRunId: runStartedEvent.scenarioRunId,
-            status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
+            status: resolveRunStatus({
+              finishedStatus: runFinishedEvent?.status,
+              lastEventTimestamp,
+            }),
             results: runFinishedEvent?.results ?? null,
             messages: messageEvent?.messages ?? [],
             timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,

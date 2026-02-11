@@ -19,7 +19,7 @@ import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-function getStatusBadgeProps(status: string): {
+export function getStatusBadgeProps(status: ScenarioRunStatus): {
   colorPalette: string;
   label: string;
 } {
@@ -31,10 +31,15 @@ function getStatusBadgeProps(status: string): {
       return { colorPalette: "red", label: "failed" };
     case ScenarioRunStatus.CANCELLED:
       return { colorPalette: "gray", label: "cancelled" };
+    case ScenarioRunStatus.STALLED:
+      return { colorPalette: "yellow", label: "stalled" };
     case ScenarioRunStatus.IN_PROGRESS:
     case ScenarioRunStatus.PENDING:
-    default:
       return { colorPalette: "orange", label: "running" };
+    default: {
+      const _exhaustive: never = status;
+      throw new Error(`Unhandled ScenarioRunStatus: ${_exhaustive}`);
+    }
   }
 }
 

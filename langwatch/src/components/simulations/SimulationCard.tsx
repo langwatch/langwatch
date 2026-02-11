@@ -13,6 +13,37 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
+interface CardStatusConfig {
+  isComplete: boolean;
+  colorPalette: string;
+}
+
+/**
+ * Returns visual configuration for a scenario run status in the card header.
+ * Uses an exhaustive switch to ensure compile-time errors when new statuses are added.
+ */
+function getCardStatusConfig(status: ScenarioRunStatus): CardStatusConfig {
+  switch (status) {
+    case ScenarioRunStatus.SUCCESS:
+      return { isComplete: true, colorPalette: "green" };
+    case ScenarioRunStatus.FAILED:
+    case ScenarioRunStatus.ERROR:
+      return { isComplete: true, colorPalette: "red" };
+    case ScenarioRunStatus.CANCELLED:
+      return { isComplete: true, colorPalette: "gray" };
+    case ScenarioRunStatus.STALLED:
+      return { isComplete: true, colorPalette: "yellow" };
+    case ScenarioRunStatus.IN_PROGRESS:
+      return { isComplete: false, colorPalette: "blue" };
+    case ScenarioRunStatus.PENDING:
+      return { isComplete: false, colorPalette: "gray" };
+    default: {
+      const _exhaustive: never = status;
+      throw new Error(`Unhandled ScenarioRunStatus: ${_exhaustive}`);
+    }
+  }
+}
+
 function SimulationCardHeader({
   title,
   status,
@@ -20,20 +51,9 @@ function SimulationCardHeader({
   title: string;
   status?: ScenarioRunStatus;
 }) {
-  const isComplete =
-    status === ScenarioRunStatus.SUCCESS ||
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED;
-
-  const colorPalette = {
-    [ScenarioRunStatus.SUCCESS]: "green",
-    [ScenarioRunStatus.IN_PROGRESS]: "blue",
-    [ScenarioRunStatus.ERROR]: "red",
-    [ScenarioRunStatus.CANCELLED]: "gray",
-    [ScenarioRunStatus.PENDING]: "gray",
-    [ScenarioRunStatus.FAILED]: "red",
-  }[status ?? ScenarioRunStatus.IN_PROGRESS];
+  const { isComplete, colorPalette } = getCardStatusConfig(
+    status ?? ScenarioRunStatus.IN_PROGRESS,
+  );
 
   return (
     <Box py={3} px={4} w="100%" position="relative" zIndex={25}>

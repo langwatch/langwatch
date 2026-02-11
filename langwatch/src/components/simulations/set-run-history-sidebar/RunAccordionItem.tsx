@@ -39,7 +39,7 @@ export const RunAccordionItem = ({
       ) {
         acc.failedCount++;
       } else {
-        // do nothing for other statuses like IN_PROGRESS, PENDING, CANCELLED
+        // do nothing for other statuses like IN_PROGRESS, PENDING, CANCELLED, STALLED
       }
       return acc;
     },

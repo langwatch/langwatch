@@ -24,7 +24,9 @@ export function SimulationConsole({
   status?: ScenarioRunStatus;
   durationInMs?: number;
 }) {
-  const isPending = status === ScenarioRunStatus.IN_PROGRESS;
+  const isPending =
+    status === ScenarioRunStatus.IN_PROGRESS ||
+    status === ScenarioRunStatus.PENDING;
 
   return (
     <Box
