@@ -93,7 +93,7 @@ examples = [
     "openai>=1.68.2",
     "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.1",
     "streamlit>=1.37.1,<2.0.0",
     "uvicorn>=0.38.0,<0.40.0",
     "json-repair>=0.42.0",
@@ -107,5 +107,5 @@ examples = [
 tests = [
     "factory-boy>=3.3.3",
     "pytest-asyncio>=0.21.2",
-    "python-dotenv==1.0.1"
+    "python-dotenv==1.2.1"
 ]
