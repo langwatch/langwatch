@@ -140,6 +140,8 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
 
             if (status === "failed") {
               await this.cache.setFailureStatus(checkpointKey, true);
+            } else if (status === "processed") {
+              await this.cache.setFailureStatus(checkpointKey, false);
             }
           }
 
@@ -213,8 +215,11 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
           }
 
           // Fallback to ClickHouse
-          const record =
-            await this.repository.getCheckpointRecord(checkpointKey);
+          const parsedKeyForQuery = parseCheckpointKey(checkpointKey);
+          const record = await this.repository.getCheckpointRecord(
+            checkpointKey,
+            parsedKeyForQuery.tenantId,
+          );
 
           if (!record) {
             return null;
@@ -278,6 +283,7 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
           const record =
             await this.repository.getLastProcessedCheckpointRecord(
               checkpointKey,
+              tenantId,
             );
 
           if (!record) {
@@ -421,6 +427,7 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
             await this.repository.getCheckpointRecordBySequenceNumber(
               checkpointKey,
               sequenceNumber,
+              tenantId,
             );
 
           if (!record) {
@@ -496,7 +503,10 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
 
           // Fallback to ClickHouse
           const hasFailed =
-            await this.repository.hasFailedCheckpointRecords(checkpointKey);
+            await this.repository.hasFailedCheckpointRecords(
+              checkpointKey,
+              tenantId,
+            );
 
           // Cache the result for future lookups
           if (this.cache) {
@@ -562,7 +572,10 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
 
           // Get records from repository
           const records =
-            await this.repository.getFailedCheckpointRecords(checkpointKey);
+            await this.repository.getFailedCheckpointRecords(
+              checkpointKey,
+              tenantId,
+            );
 
           // Transform to checkpoints
           return records.map((record) => this.recordToCheckpoint(record));
@@ -617,11 +630,14 @@ export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointSt
       async () => {
         try {
           // Delegate to repository
-          await this.repository.deleteCheckpointRecord(checkpointKey);
+          await this.repository.deleteCheckpointRecord(
+            checkpointKey,
+            tenantId,
+          );
 
           // Clear all cache entries for this checkpoint key
           if (this.cache) {
-            await this.cache.deleteByCheckpointKey(checkpointKey);
+            await this.cache.delete(checkpointKey);
             await this.cache.deleteFailureStatus(checkpointKey);
           }
 

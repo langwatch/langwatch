@@ -1,3 +1,5 @@
+import type { TenantId } from "../../../library/domain/tenantId";
+
 /**
  * Checkpoint record format used by repositories for data storage.
  * This is the raw format stored in the database/memory.
@@ -30,40 +32,54 @@ export interface CheckpointRepository {
   /**
    * Gets a checkpoint record by checkpoint key.
    * Returns raw record without validation or transformation.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
-  getCheckpointRecord(checkpointKey: string): Promise<CheckpointRecord | null>;
+  getCheckpointRecord(
+    checkpointKey: string,
+    tenantId: TenantId,
+  ): Promise<CheckpointRecord | null>;
 
   /**
    * Gets the last processed checkpoint record for a checkpoint key.
    * Returns raw record without validation or transformation.
    * Only returns records with Status = 'processed'.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
   getLastProcessedCheckpointRecord(
     checkpointKey: string,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord | null>;
 
   /**
    * Gets a checkpoint record by sequence number for a checkpoint key.
    * Returns raw record without validation or transformation.
    * Only returns records where SequenceNumber >= sequenceNumber and Status != 'failed'.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
   getCheckpointRecordBySequenceNumber(
     checkpointKey: string,
     sequenceNumber: number,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord | null>;
 
   /**
    * Checks if any failed checkpoint records exist for a checkpoint key.
    * Returns raw boolean without validation.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
-  hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean>;
+  hasFailedCheckpointRecords(
+    checkpointKey: string,
+    tenantId: TenantId,
+  ): Promise<boolean>;
 
   /**
    * Gets all failed checkpoint records for a checkpoint key.
    * Returns raw records without validation or transformation.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
   getFailedCheckpointRecords(
     checkpointKey: string,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord[]>;
 
   /**
@@ -75,6 +91,10 @@ export interface CheckpointRepository {
   /**
    * Deletes a checkpoint record from storage.
    * Does not validate.
+   * @param tenantId - Tenant ID for primary index optimization (first column in ORDER BY)
    */
-  deleteCheckpointRecord(checkpointKey: string): Promise<void>;
+  deleteCheckpointRecord(
+    checkpointKey: string,
+    tenantId: TenantId,
+  ): Promise<void>;
 }

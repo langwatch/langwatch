@@ -111,7 +111,11 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
     checkpointKey: string,
   ): Promise<ProcessorCheckpoint | null> {
     // Get record from repository
-    const record = await this.repository.getCheckpointRecord(checkpointKey);
+    const parsedKey = parseCheckpointKey(checkpointKey);
+    const record = await this.repository.getCheckpointRecord(
+      checkpointKey,
+      parsedKey.tenantId,
+    );
 
     if (!record) {
       return null;
@@ -145,7 +149,10 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
 
     // Get record from repository
     const record =
-      await this.repository.getLastProcessedCheckpointRecord(checkpointKey);
+      await this.repository.getLastProcessedCheckpointRecord(
+        checkpointKey,
+        tenantId,
+      );
 
     if (!record) {
       return null;
@@ -196,6 +203,7 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
     const record = await this.repository.getCheckpointRecordBySequenceNumber(
       checkpointKey,
       sequenceNumber,
+      tenantId,
     );
 
     if (!record) {
@@ -229,7 +237,10 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
     );
 
     // Delegate to repository
-    return await this.repository.hasFailedCheckpointRecords(checkpointKey);
+    return await this.repository.hasFailedCheckpointRecords(
+      checkpointKey,
+      tenantId,
+    );
   }
 
   async getFailedEvents(
@@ -256,7 +267,10 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
 
     // Get records from repository
     const records =
-      await this.repository.getFailedCheckpointRecords(checkpointKey);
+      await this.repository.getFailedCheckpointRecords(
+        checkpointKey,
+        tenantId,
+      );
 
     // Transform to checkpoints
     return records.map((record) => this.recordToCheckpoint(record));
@@ -283,7 +297,7 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
     }
 
     // Delegate to repository
-    await this.repository.deleteCheckpointRecord(checkpointKey);
+    await this.repository.deleteCheckpointRecord(checkpointKey, tenantId);
   }
 
   /**

@@ -273,6 +273,25 @@ export class CheckpointCacheRedis {
   }
 
   /**
+   * Deletes the entire checkpoint hash key, removing all fields
+   * (sequenceNumber, status, eventId, timestamp, latest).
+   */
+  async delete(checkpointKey: string): Promise<void> {
+    try {
+      const key = this.buildRedisKey(checkpointKey);
+      await this.redis.del(key);
+    } catch (error) {
+      this.logger.error(
+        {
+          checkpointKey,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to delete checkpoint hash from Redis cache",
+      );
+    }
+  }
+
+  /**
    * Builds the Redis key for a checkpoint.
    * Format: event-sourcing:processor-checkpoint:{checkpointKey}
    */
