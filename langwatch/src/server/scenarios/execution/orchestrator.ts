@@ -44,18 +44,18 @@ export class ScenarioExecutionOrchestrator {
         return this.failure("Project default model is not configured");
       }
 
-      const modelParams = await this.prepareModelParams(
+      const modelParamsResult = await this.prepareModelParams(
         context.projectId,
         project.defaultModel,
       );
-      if (!modelParams) {
-        return this.failure(`Failed to prepare model params`);
+      if (!modelParamsResult.success) {
+        return this.failure(modelParamsResult.message);
       }
 
       const adapterResult = await this.createAdapter(
         context.projectId,
         target,
-        modelParams,
+        modelParamsResult.params,
       );
       if (!adapterResult.success) {
         return this.failure(adapterResult.error);
@@ -66,7 +66,7 @@ export class ScenarioExecutionOrchestrator {
       return await this.runScenario(
         scenario,
         adapterResult.adapter,
-        modelParams,
+        modelParamsResult.params,
         context.batchRunId,
         { endpoint: this.deps.telemetryEndpoint, apiKey: project.apiKey },
       );
@@ -95,9 +95,7 @@ export class ScenarioExecutionOrchestrator {
   private async createAdapter(
     projectId: string,
     target: ExecutionInput["target"],
-    modelParams: NonNullable<
-      Awaited<ReturnType<typeof this.prepareModelParams>>
-    >,
+    modelParams: LiteLLMParams,
   ) {
     return this.deps.adapterFactory.create({
       projectId,

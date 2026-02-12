@@ -419,6 +419,14 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
     modelParamsProvider: {
       prepare: async (projectId, model): Promise<ModelParamsResult> => {
         try {
+          if (!model.includes("/")) {
+            return {
+              success: false,
+              reason: "invalid_model_format",
+              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+            };
+          }
+
           const providerKey = model.split("/")[0];
           if (!providerKey) {
             return {
