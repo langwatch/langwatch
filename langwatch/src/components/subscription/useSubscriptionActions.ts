@@ -1,4 +1,5 @@
 import { toaster } from "~/components/ui/toaster";
+import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
 import type { Currency } from "./billing-plans";
 
@@ -34,6 +35,8 @@ export function useSubscriptionActions({
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
 }) {
+  const openSeats = useUpgradeModalStore((s) => s.openSeats);
+
   // Subscription router is injected via SaaS dependency injection (not in OSS types)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionApi = (api as any).subscription;
@@ -91,7 +94,7 @@ export function useSubscriptionActions({
     }
   };
 
-  const handleUpdateSeats = async () => {
+  const handleUpdateSeats = () => {
     if (!organizationId) return;
 
     const invitesWithEmail = plannedUsers
@@ -102,22 +105,28 @@ export function useSubscriptionActions({
     const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "core").length;
     const updateTotalMembers = (currentMaxMembers ?? totalCoreMembers) + plannedCoreCount;
 
-    await addTeamMemberOrEvents.mutateAsync({
+    openSeats({
       organizationId,
-      plan: "GROWTH_SEAT_USAGE",
-      upgradeMembers: true,
-      upgradeTraces: false,
-      totalMembers: updateTotalMembers,
-      totalTraces: 0,
-      ...(invitesWithEmail.length > 0 ? { invites: invitesWithEmail } : {}),
+      currentSeats: currentMaxMembers ?? totalCoreMembers,
+      newSeats: updateTotalMembers,
+      onConfirm: async () => {
+        await addTeamMemberOrEvents.mutateAsync({
+          organizationId,
+          plan: "GROWTH_SEAT_USAGE",
+          upgradeMembers: true,
+          upgradeTraces: false,
+          totalMembers: updateTotalMembers,
+          totalTraces: 0,
+          ...(invitesWithEmail.length > 0 ? { invites: invitesWithEmail } : {}),
+        });
+        onSeatsUpdated();
+        toaster.create({
+          title: "Seats updated successfully",
+          type: "success",
+        });
+        void organizationWithMembers.refetch();
+      },
     });
-
-    onSeatsUpdated();
-    toaster.create({
-      title: "Seats updated successfully",
-      type: "success",
-    });
-    void organizationWithMembers.refetch();
   };
 
   const handleManageSubscription = async () => {

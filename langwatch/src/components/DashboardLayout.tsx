@@ -23,7 +23,6 @@ import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
-import type { LimitType } from "../server/license-enforcement";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -655,17 +654,7 @@ export const DashboardLayout = ({
 };
 
 function GlobalUpgradeModal() {
-  const { isOpen, limitType, current, max, close } = useUpgradeModalStore();
-
-  if (!limitType) return null;
-
-  return (
-    <UpgradeModal
-      open={isOpen}
-      onClose={close}
-      limitType={limitType as LimitType}
-      current={current ?? undefined}
-      max={max ?? undefined}
-    />
-  );
+  const { isOpen, variant, close } = useUpgradeModalStore();
+  if (!variant) return null;
+  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
 }
