@@ -232,6 +232,10 @@ function SuitesPageContent() {
               onRun={() => handleRunSuite(selectedSuite.id)}
             />
           )}
+
+          {!error && selectedSuiteId && selectedSuiteId !== "all-runs" && !selectedSuite && !isLoading && (
+            <SuiteEmptyState onNewSuite={handleNewSuite} />
+          )}
         </Box>
       </HStack>
 

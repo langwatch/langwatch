@@ -183,6 +183,7 @@ function SuiteListItem({
 }) {
   return (
     <HStack
+      as="button"
       paddingX={2}
       paddingY={2}
       borderRadius="md"
@@ -192,8 +193,8 @@ function SuiteListItem({
       onClick={onSelect}
       onContextMenu={onContextMenu}
       justify="space-between"
-      role="button"
-      tabIndex={0}
+      textAlign="left"
+      width="full"
     >
       <VStack align="start" gap={0} flex={1} overflow="hidden">
         <HStack gap={1.5}>

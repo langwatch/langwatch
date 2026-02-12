@@ -9,7 +9,7 @@ Separate data access (Repository) from business logic (Service).
 
 Code is organized into three layers. The **domain layer** (Service + Repository) is the core — it contains the business logic and knows how our product works. The other two layers are adapters that pass information between clients and the domain.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  API Layer (Router/Controller)                              │
 │  server/api/routers/suites/                                 │
@@ -135,7 +135,7 @@ try {
 
 ## File Structure
 
-```
+```text
 src/server/datasets/
   dataset.repository.ts     # Data access
   dataset-record.repository.ts

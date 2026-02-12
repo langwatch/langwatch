@@ -61,11 +61,14 @@ export const suiteRouter = createTRPCRouter({
       const service = SuiteService.fromPrisma(ctx.prisma);
       try {
         return await service.duplicate(input);
-      } catch {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        throw error;
       }
     }),
 

@@ -150,7 +150,7 @@ export class SuiteRepository {
           "Updating suite",
         );
         return this.prisma.simulationSuiteConfiguration.update({
-          where: { id: params.id, projectId: params.projectId },
+          where: { id: params.id, projectId: params.projectId, archivedAt: null },
           data: params.data,
         });
       },

@@ -343,6 +343,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                       size="sm"
                       width="80px"
                       min={1}
+                      max={100}
                       value={form.repeatCountStr}
                       onChange={(e) => form.setRepeatCountStr(e.target.value)}
                     />

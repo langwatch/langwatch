@@ -138,7 +138,7 @@ export function useSuiteForm({
       setSelectedTargets(parseSuiteTargets(suite.targets));
       setRepeatCountStr(String(suite.repeatCount));
       setErrors({});
-    } else if (!suiteId && isOpen) {
+    } else if (isOpen) {
       setName("");
       setDescription("");
       setLabels([]);
@@ -182,7 +182,10 @@ export function useSuiteForm({
 
   const selectAllScenarios = () => {
     if (filteredScenarios) {
-      setSelectedScenarioIds(filteredScenarios.map((s) => s.id));
+      setSelectedScenarioIds((prev) => {
+        const merged = new Set([...prev, ...filteredScenarios.map((s) => s.id)]);
+        return Array.from(merged);
+      });
     }
   };
 

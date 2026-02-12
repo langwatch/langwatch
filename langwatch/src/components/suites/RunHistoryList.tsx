@@ -16,6 +16,7 @@ import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { buildRoutePath } from "~/utils/routes";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -193,7 +194,7 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
 
   // Notify parent when stats are ready
   useEffect(() => {
-    if (onStatsReady && batchRuns.length > 0) {
+    if (onStatsReady) {
       const totalRunCount = batchRuns.reduce(
         (sum, batch) => sum + batch.scenarioRuns.length,
         0,
@@ -224,7 +225,12 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
       if (!project) return;
-      const url = `/${project.slug}/simulations/${encodeURIComponent(setId)}/${encodeURIComponent(scenarioRun.batchRunId)}/${encodeURIComponent(scenarioRun.scenarioRunId)}`;
+      const url = buildRoutePath("simulations_run", {
+        project: project.slug,
+        scenarioSetId: setId,
+        batchRunId: scenarioRun.batchRunId,
+        scenarioRunId: scenarioRun.scenarioRunId,
+      });
       window.open(url, "_blank");
     },
     [project, setId],

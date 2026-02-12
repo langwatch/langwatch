@@ -6,10 +6,11 @@
  */
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { buildRoutePath } from "~/utils/routes";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -32,6 +33,16 @@ export function AllRunsPanel() {
   });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
 
+  // Accumulate pages for true "Load More" behavior
+  type PageData = {
+    runs: ScenarioRunData[];
+    scenarioSetIds: Record<string, string>;
+    hasMore: boolean;
+    nextCursor?: string;
+  };
+  const [pages, setPages] = useState<PageData[]>([]);
+  const prevCursorRef = useRef<string | undefined>(undefined);
+
   // Fetch all suites to build suite name map
   const { data: suites } = api.suites.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -49,7 +60,7 @@ export function AllRunsPanel() {
     return map;
   }, [suites]);
 
-  // Fetch cross-suite run data
+  // Fetch cross-suite run data for current cursor
   const {
     data: runDataResult,
     isLoading,
@@ -62,9 +73,38 @@ export function AllRunsPanel() {
     },
     {
       enabled: !!project,
-      refetchInterval: 5000,
+      refetchInterval: cursor === undefined ? 5000 : undefined, // Only auto-refresh first page
     },
   );
+
+  // Accumulate pages as data arrives
+  useEffect(() => {
+    if (!runDataResult) return;
+
+    if (cursor === undefined) {
+      // First page — replace all accumulated data
+      setPages([runDataResult]);
+    } else if (cursor !== prevCursorRef.current) {
+      // New cursor — append page
+      setPages((prev) => [...prev, runDataResult]);
+    }
+    prevCursorRef.current = cursor;
+  }, [runDataResult, cursor]);
+
+  // Flatten accumulated pages into a single dataset
+  const allRuns = useMemo(() => {
+    return pages.flatMap((p) => p.runs);
+  }, [pages]);
+
+  const allScenarioSetIds = useMemo(() => {
+    const merged: Record<string, string> = {};
+    for (const page of pages) {
+      Object.assign(merged, page.scenarioSetIds);
+    }
+    return merged;
+  }, [pages]);
+
+  const hasMore = pages.length > 0 ? (pages[pages.length - 1]?.hasMore ?? false) : false;
 
   // Fetch all scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -81,9 +121,9 @@ export function AllRunsPanel() {
 
   // Group runs by batch and apply filters
   const batchRuns = useMemo(() => {
-    if (!runDataResult) return [];
+    if (allRuns.length === 0) return [];
 
-    let runs = runDataResult.runs;
+    let runs = allRuns;
 
     // Filter by scenario
     if (filters.scenarioId) {
@@ -101,9 +141,9 @@ export function AllRunsPanel() {
 
     return groupRunsByBatchId({
       runs,
-      scenarioSetIds: runDataResult.scenarioSetIds,
+      scenarioSetIds: allScenarioSetIds,
     });
-  }, [runDataResult, filters]);
+  }, [allRuns, allScenarioSetIds, filters]);
 
   // Compute totals
   const totals = useMemo(() => {
@@ -135,19 +175,25 @@ export function AllRunsPanel() {
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
       if (!project) return;
-      const setId = runDataResult?.scenarioSetIds[scenarioRun.batchRunId] ?? "";
-      const url = `/${project.slug}/simulations/${encodeURIComponent(setId)}/${encodeURIComponent(scenarioRun.batchRunId)}/${encodeURIComponent(scenarioRun.scenarioRunId)}`;
+      const setId = allScenarioSetIds[scenarioRun.batchRunId] ?? "";
+      const url = buildRoutePath("simulations_run", {
+        project: project.slug,
+        scenarioSetId: setId,
+        batchRunId: scenarioRun.batchRunId,
+        scenarioRunId: scenarioRun.scenarioRunId,
+      });
       window.open(url, "_blank");
     },
-    [project, runDataResult?.scenarioSetIds],
+    [project, allScenarioSetIds],
   );
 
-  // Load more pagination
+  // Load more pagination — advance cursor to fetch next page
   const handleLoadMore = useCallback(() => {
-    if (runDataResult?.nextCursor) {
-      setCursor(runDataResult.nextCursor);
+    const lastPage = pages[pages.length - 1];
+    if (lastPage?.nextCursor) {
+      setCursor(lastPage.nextCursor);
     }
-  }, [runDataResult]);
+  }, [pages]);
 
   if (error) {
     return (
@@ -157,7 +203,7 @@ export function AllRunsPanel() {
     );
   }
 
-  if (isLoading && !runDataResult) {
+  if (isLoading && pages.length === 0) {
     return (
       <Box padding={6} display="flex" justifyContent="center">
         <Spinner size="lg" />
@@ -227,7 +273,7 @@ export function AllRunsPanel() {
           </VStack>
 
           {/* Load More button */}
-          {runDataResult?.hasMore && (
+          {hasMore && (
             <Box paddingTop={4} display="flex" justifyContent="center">
               <Button variant="outline" onClick={handleLoadMore}>
                 Load More...

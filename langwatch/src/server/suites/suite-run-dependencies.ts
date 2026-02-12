@@ -30,7 +30,7 @@ export function createSuiteRunDependencies({
     validateTargetExists: async ({ referenceId, type, projectId }) => {
       if (type === "prompt") {
         const prompt = await prisma.llmPromptConfig.findFirst({
-          where: { id: referenceId, projectId },
+          where: { id: referenceId, projectId, deletedAt: null },
         });
         return prompt !== null;
       }

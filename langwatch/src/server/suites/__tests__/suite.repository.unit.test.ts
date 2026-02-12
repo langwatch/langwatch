@@ -181,7 +181,7 @@ describe("SuiteRepository", () => {
 
         expect(result).toBe(updated);
         expect(prisma.simulationSuiteConfiguration.update).toHaveBeenCalledWith({
-          where: { id: "suite_abc123", projectId: "proj_1" },
+          where: { id: "suite_abc123", projectId: "proj_1", archivedAt: null },
           data: { name: "Updated Name" },
         });
       });

@@ -26,6 +26,7 @@ import { parseSuiteTargets, type SuiteTarget } from "./types";
 import {
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  SuiteDomainError,
 } from "./errors";
 import { createLogger } from "~/utils/logger/server";
 
@@ -177,7 +178,7 @@ export class SuiteService {
         );
         const original = await this.repository.findById(params);
         if (!original) {
-          throw new Error("Suite not found");
+          throw new SuiteDomainError("Suite not found");
         }
         const result = await this.repository.create({
           projectId: original.projectId,

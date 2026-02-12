@@ -19,7 +19,7 @@ export const createSuiteSchema = projectSchema.extend({
   targets: z
     .array(suiteTargetSchema)
     .min(1, "At least one target is required"),
-  repeatCount: z.number().int().min(1).default(1),
+  repeatCount: z.number().int().min(1).max(100).default(1),
   labels: z.array(z.string()).default([]),
 });
 
@@ -29,6 +29,6 @@ export const updateSuiteSchema = projectSchema.extend({
   description: z.string().optional().nullable(),
   scenarioIds: z.array(z.string()).min(1).optional(),
   targets: z.array(suiteTargetSchema).min(1).optional(),
-  repeatCount: z.number().int().min(1).optional(),
+  repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
 });
