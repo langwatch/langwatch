@@ -1134,6 +1134,13 @@ const addOpenTelemetrySpanAsSpan = (
               attributesMap.langwatch.customer.id;
             (attributesMap as any).langwatch.customer.id = void 0;
           }
+          if (Array.isArray(attributesMap.langwatch.labels)) {
+            metadata = {
+              ...metadata,
+              labels: attributesMap.langwatch.labels,
+            };
+            (attributesMap as any).langwatch.labels = void 0;
+          }
 
           if (attributesMap.langwatch.input) {
             if (
