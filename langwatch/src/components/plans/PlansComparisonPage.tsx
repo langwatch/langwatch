@@ -1,28 +1,31 @@
+import { useState } from "react";
 import {
   Badge,
   Box,
   Button,
   Card,
-  Flex,
   Heading,
   HStack,
   SimpleGrid,
-  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, Info } from "lucide-react";
+import { Check, CircleDollarSign, DollarSign, Euro, Info } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
-import { SEAT_PRICE } from "../subscription/billing-plans";
+import {
+  type Currency,
+  SEAT_PRICE,
+  ANNUAL_DISCOUNT,
+  currencySymbol,
+} from "../subscription/billing-plans";
 
 type PlanColumn = {
   id: ComparisonPlanId;
   name: string;
-  price: string;
   subtitle: string;
   actionLabel: string;
   actionHref: string;
@@ -30,19 +33,10 @@ type PlanColumn = {
   features: string[];
 };
 
-type ComparisonRow = {
-  id: string;
-  label: string;
-  free: string;
-  growth: string;
-  enterprise: string;
-};
-
 const PLAN_COLUMNS: PlanColumn[] = [
   {
     id: "free",
     name: "Free",
-    price: "$0 per user/month",
     subtitle: "For teams getting started",
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
@@ -58,7 +52,6 @@ const PLAN_COLUMNS: PlanColumn[] = [
   {
     id: "growth",
     name: "Growth",
-    price: `$${SEAT_PRICE.USD} per seat/month`,
     subtitle: "Seat and usage pricing for growing teams",
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
@@ -76,7 +69,6 @@ const PLAN_COLUMNS: PlanColumn[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    price: "Custom pricing",
     subtitle: "Regulated and high-volume deployments",
     actionLabel: "Talk to Sales",
     actionHref: "mailto:sales@langwatch.ai",
@@ -93,65 +85,6 @@ const PLAN_COLUMNS: PlanColumn[] = [
   },
 ];
 
-const USAGE_ROWS: ComparisonRow[] = [
-  {
-    id: "events-included",
-    label: "Events included",
-    free: "50,000",
-    growth: "200,000",
-    enterprise: "Custom",
-  },
-  {
-    id: "extra-event-pricing",
-    label: "Extra event pricing",
-    free: "-",
-    growth: "$1 per additional 100,000 events",
-    enterprise: "Custom",
-  },
-  {
-    id: "data-retention",
-    label: "Data retention",
-    free: "14 days",
-    growth: "30 days (+ custom at $3/GB)",
-    enterprise: "Custom",
-  },
-  {
-    id: "users",
-    label: "Users",
-    free: "2 users",
-    growth: "Up to 20 core users",
-    enterprise: "Custom",
-  },
-  {
-    id: "lite-users",
-    label: "Lite users",
-    free: "-",
-    growth: "Unlimited",
-    enterprise: "Unlimited",
-  },
-  {
-    id: "scenarios",
-    label: "Scenarios",
-    free: "3",
-    growth: "Unlimited",
-    enterprise: "Unlimited",
-  },
-  {
-    id: "simulation-runs",
-    label: "Simulation runs",
-    free: "3",
-    growth: "Unlimited",
-    enterprise: "Unlimited",
-  },
-  {
-    id: "custom-evaluations",
-    label: "Custom evaluations",
-    free: "3",
-    growth: "Unlimited",
-    enterprise: "Unlimited",
-  },
-];
-
 type PlansComparisonPageProps = {
   activePlan?: {
     type?: string | null;
@@ -159,6 +92,23 @@ type PlansComparisonPageProps = {
   };
   pricingModel?: string | null;
 };
+
+function getPlanPrice(
+  planId: ComparisonPlanId,
+  currency: Currency,
+  billingPeriod: "monthly" | "annually",
+): string {
+  if (planId === "free") return `${currencySymbol[currency]}0 per user/month`;
+  if (planId === "growth") {
+    const base = SEAT_PRICE[currency];
+    const price =
+      billingPeriod === "annually"
+        ? Math.round(base * (1 - ANNUAL_DISCOUNT))
+        : base;
+    return `${currencySymbol[currency]}${price} per seat/month`;
+  }
+  return "Custom pricing";
+}
 
 function PlanCardActions({
   plan,
@@ -175,20 +125,10 @@ function PlanCardActions({
     if (currentPlan === "growth") {
       return (
         <VStack width="full" gap={2}>
-          <Button
-            asChild
-            width="full"
-            colorPalette="orange"
-            variant="solid"
-          >
+          <Button asChild width="full" colorPalette="orange" variant="solid">
             <Link href="/settings/members">Add Members</Link>
           </Button>
-          <Button
-            asChild
-            width="full"
-            colorPalette="orange"
-            variant="outline"
-          >
+          <Button asChild width="full" colorPalette="orange" variant="outline">
             <Link href="/settings/subscription">Add Events</Link>
           </Button>
         </VStack>
@@ -196,25 +136,17 @@ function PlanCardActions({
     }
 
     return (
-      <Button
-        asChild
-        width="full"
-        colorPalette="orange"
-        variant="solid"
-      >
-        <Link href="/settings/subscription">Upgrade Now</Link>
+      <Button asChild width="full" colorPalette="orange" variant="solid">
+        <Link color="emphasized" href="/settings/subscription">
+          Upgrade Now
+        </Link>
       </Button>
     );
   }
 
   if (plan.id === "enterprise" && currentPlan !== "enterprise") {
     return (
-      <Button
-        asChild
-        width="full"
-        colorPalette="blue"
-        variant="outline"
-      >
+      <Button asChild width="full" colorPalette="muted" variant="outline">
         <Link href="mailto:sales@langwatch.ai" isExternal>
           Talk to Sales
         </Link>
@@ -229,10 +161,14 @@ function PlanCard({
   plan,
   isCurrent,
   currentPlan,
+  currency,
+  billingPeriod,
 }: {
   plan: PlanColumn;
   isCurrent: boolean;
   currentPlan: ComparisonPlanId | null;
+  currency: Currency;
+  billingPeriod: "monthly" | "annually";
 }) {
   return (
     <Card.Root
@@ -242,6 +178,11 @@ function PlanCard({
       bg="bg.panel"
       borderRadius="2xl"
       height="full"
+      transition="all 0.2s ease-in-out"
+      _hover={{
+        transform: "scale(1.02)",
+        boxShadow: "lg",
+      }}
     >
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5} height="full">
@@ -251,13 +192,13 @@ function PlanCard({
                 {plan.name}
               </Heading>
               {isCurrent && (
-                <Badge colorPalette="blue" variant="subtle">
+                <Badge colorPalette="green" variant="surface" size={"lg"}>
                   Current
                 </Badge>
               )}
             </HStack>
             <Text color="fg" fontSize="md" fontWeight="medium">
-              {plan.price}
+              {getPlanPrice(plan.id, currency, billingPeriod)}
             </Text>
             <Text color="fg.muted" fontSize="sm">
               {plan.subtitle}
@@ -295,6 +236,11 @@ export function PlansComparisonPage({
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
   const showTieredNotice = pricingModel === "TIERED";
 
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
+    "monthly",
+  );
+
   return (
     <VStack
       gap={6}
@@ -303,16 +249,71 @@ export function PlansComparisonPage({
       maxWidth="900px"
       marginX="auto"
     >
-      <Flex justifyContent="space-between" alignItems="flex-start">
-        <VStack align="start" gap={1}>
-          <Heading size="xl" as="h2">
-            Plans
-          </Heading>
-          <Text color="fg.muted">
-            Compare plans and choose the right tier for your organization.
-          </Text>
-        </VStack>
-      </Flex>
+      <VStack align="center" gap={1}>
+        <Heading size="xl" as="h2">
+          Plans
+        </Heading>
+        <Text color="fg.muted">
+          Compare plans and choose the right tier for your organization.
+        </Text>
+      </VStack>
+
+      <HStack
+        width="full"
+        justifyContent={{ base: "center", md: "center" }}
+        flexWrap="wrap"
+        gap={3}
+      >
+        <Box flex={{ md: 1 }} />
+        <HStack
+          gap={0}
+          bg="bg.muted"
+          borderRadius="full"
+          padding="1"
+          data-testid="billing-period-toggle"
+        >
+          {[
+            { label: "Monthly", value: "monthly" as const },
+            { label: "Annually", value: "annually" as const },
+          ].map((opt) => (
+            <Box
+              key={opt.value}
+              as="button"
+              onClick={() => setBillingPeriod(opt.value)}
+              paddingX={4}
+              paddingY={1.5}
+              borderRadius="full"
+              fontSize="sm"
+              fontWeight={billingPeriod === opt.value ? "semibold" : "normal"}
+              color={billingPeriod === opt.value ? "orange.500" : "fg.muted"}
+              bg={billingPeriod === opt.value ? "bg.panel" : "transparent"}
+              boxShadow={billingPeriod === opt.value ? "xs" : "none"}
+              transition="all 0.15s ease-in-out"
+              cursor="pointer"
+              _hover={{
+                color: billingPeriod === opt.value ? "orange.500" : "fg",
+              }}
+            >
+              {opt.label}
+            </Box>
+          ))}
+        </HStack>
+        <Box flex={{ md: 1 }} display="flex" justifyContent="flex-end">
+          <Button
+            data-testid="currency-toggle"
+            variant="subtle"
+            size="sm"
+            _hover={{
+              bgColor: "orange.400",
+              color: "bg.muted",
+            }}
+            onClick={() => setCurrency(currency === "EUR" ? "USD" : "EUR")}
+          >
+            {currency === "EUR" ? <Euro size={14} /> : <DollarSign size={14} />}
+            {currency}
+          </Button>
+        </Box>
+      </HStack>
 
       {showTieredNotice && (
         <Box
@@ -348,60 +349,11 @@ export function PlansComparisonPage({
             plan={plan}
             isCurrent={currentPlan === plan.id}
             currentPlan={currentPlan}
+            currency={currency}
+            billingPeriod={billingPeriod}
           />
         ))}
       </SimpleGrid>
-
-      <VStack align="stretch" gap={3} width="full">
-        <Heading as="h2" size="xl">
-          Usage
-        </Heading>
-        <Table.ScrollArea
-          width="full"
-          borderRadius="2xl"
-          bg="bg.panel"
-          overflow="hidden"
-        >
-          <Table.Root variant="line" width="full" tableLayout="fixed">
-            <Table.ColumnGroup>
-              <Table.Column width="30%" />
-              <Table.Column width="20%" />
-              <Table.Column width="30%" />
-              <Table.Column width="20%" />
-            </Table.ColumnGroup>
-            <Table.Header>
-              <Table.Row borderBottomWidth={0}>
-                <Table.ColumnHeader bg="transparent" color="fg.subtle" borderBottomWidth={0}>
-                  Capability
-                </Table.ColumnHeader>
-                <Table.ColumnHeader bg="transparent" color="fg.subtle" borderBottomWidth={0}>
-                  Free
-                </Table.ColumnHeader>
-                <Table.ColumnHeader bg="transparent" color="fg.subtle" borderBottomWidth={0}>
-                  Growth
-                </Table.ColumnHeader>
-                <Table.ColumnHeader bg="transparent" color="fg.subtle" borderBottomWidth={0}>
-                  Enterprise
-                </Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {USAGE_ROWS.map((row) => (
-                <Table.Row
-                  key={row.id}
-                  data-testid={`comparison-row-${row.id}`}
-                  borderBottomWidth={0}
-                >
-                  <Table.Cell color="fg" borderBottomWidth={0}>{row.label}</Table.Cell>
-                  <Table.Cell color="fg" borderBottomWidth={0}>{row.free}</Table.Cell>
-                  <Table.Cell color="fg" borderBottomWidth={0}>{row.growth}</Table.Cell>
-                  <Table.Cell color="fg" borderBottomWidth={0}>{row.enterprise}</Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Table.ScrollArea>
-      </VStack>
     </VStack>
   );
 }

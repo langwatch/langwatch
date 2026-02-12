@@ -27,7 +27,7 @@ import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
-import { Switch } from "~/components/ui/switch";
+import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -97,6 +97,7 @@ function CurrentPlanBlock({
   description,
   features,
   userCount,
+  maxSeats,
   upgradeRequired,
   onUserCountClick,
   onManageSubscription,
@@ -106,6 +107,7 @@ function CurrentPlanBlock({
   description?: string;
   features?: string[];
   userCount: number;
+  maxSeats?: number;
   upgradeRequired?: boolean;
   onUserCountClick?: () => void;
   onManageSubscription?: () => void;
@@ -170,7 +172,7 @@ function CurrentPlanBlock({
                   fontSize="lg"
                   data-testid="user-count-link"
                 >
-                  {userCount}
+                  {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
                 </Text>
               </Box>
             </VStack>
@@ -617,6 +619,12 @@ export function SubscriptionPage() {
       { enabled: !!organization },
     );
 
+  // Fetch pending invites for seat counting
+  const pendingInvites = api.organization.getOrganizationPendingInvites.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
   // Map organization members to subscription users format
   const users: SubscriptionUser[] = useMemo(() => {
     if (!organizationWithMembers.data) return [];
@@ -635,15 +643,34 @@ export function SubscriptionPage() {
   const isDeveloperPlan = plan?.free ?? true;
   const isTieredPricingModel = organization?.pricingModel === "TIERED";
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan;
+
+  // N = core members + core PENDING invites, M = plan.maxMembers
+  const pendingCoreInviteCount = useMemo(() => {
+    if (!pendingInvites.data) return 0;
+    return pendingInvites.data.filter(
+      (i) => i.role !== "EXTERNAL" && i.status === "PENDING"
+    ).length;
+  }, [pendingInvites.data]);
+
+  const existingCoreMembers = users.filter((u) => u.memberType === "core").length;
+  const plannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "core").length;
+  const seatUsageN = existingCoreMembers + pendingCoreInviteCount + plannedCoreSeatCount;
+  const seatUsageM = plan?.maxMembers;
+
   const totalUserCount = users.length + plannedUsers.length;
 
   const {
     sym,
     seatPrice,
     totalCoreMembers,
+    plannedCoreMembers,
     pricePerSeat,
     totalPriceFormatted,
   } = useBillingPricing({ currency, billingPeriod, users, plannedUsers });
+
+  // For update-seats flow: base on plan.maxMembers (what's already paid for), not recount of users
+  const updateTotalCoreMembers = (seatUsageM ?? totalCoreMembers) + plannedCoreSeatCount;
+  const updateTotalPriceFormatted = `${sym}${updateTotalCoreMembers * seatPrice}/mo`;
 
   const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
     setPlannedUsers(newPlannedUsers);
@@ -661,7 +688,12 @@ export function SubscriptionPage() {
     currency,
     billingPeriod,
     totalCoreMembers,
-    onSeatsUpdated: () => setPlannedUsers([]),
+    currentMaxMembers: seatUsageM ?? undefined,
+    plannedUsers,
+    onSeatsUpdated: () => {
+      setPlannedUsers([]);
+      void pendingInvites.refetch();
+    },
     organizationWithMembers,
   });
 
@@ -717,25 +749,13 @@ export function SubscriptionPage() {
             </Text>
           </VStack>
           <HStack gap={4} alignItems="center">
-            <HStack gap={3} data-testid="billing-period-toggle">
-              <Text
-                fontWeight={billingPeriod === "monthly" ? "bold" : "normal"}
-              >
-                Monthly
-              </Text>
-              <Switch
-                colorPalette="blue"
-                checked={billingPeriod === "annually"}
-                onCheckedChange={(e) =>
-                  setBillingPeriod(e.checked ? "annually" : "monthly")
-                }
-              />
-              <Text
-                fontWeight={billingPeriod === "annually" ? "bold" : "normal"}
-              >
-                Annually
-              </Text>
-            </HStack>
+            <LabeledSwitch
+              data-testid="billing-period-toggle"
+              left={{ label: "Monthly", value: "monthly" }}
+              right={{ label: "Annually", value: "annually" }}
+              value={billingPeriod}
+              onChange={setBillingPeriod}
+            />
             <Select.Root
               data-testid="currency-selector"
               collection={currencyCollection}
@@ -791,7 +811,8 @@ export function SubscriptionPage() {
           planName={currentPlanName}
           description={currentPlanDescription}
           features={currentPlanFeatures}
-          userCount={totalUserCount}
+          userCount={seatUsageN}
+          maxSeats={seatUsageM}
           upgradeRequired={isDeveloperPlan && plannedUsers.length > 0}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
@@ -825,8 +846,8 @@ export function SubscriptionPage() {
         {/* Update Seats Block - show for Growth seat+usage plan when seats have been added */}
         {!isDeveloperPlan && plannedUsers.length > 0 && !isTieredPricingModel && (
           <UpdateSeatsBlock
-            totalCoreMembers={totalCoreMembers}
-            totalPrice={totalPriceFormatted}
+            totalCoreMembers={updateTotalCoreMembers}
+            totalPrice={updateTotalPriceFormatted}
             onUpdate={handleUpdateSeats}
             isLoading={isUpdateSeatsLoading}
           />
