@@ -262,7 +262,7 @@ const addOpenTelemetrySpanAsSpan = (
         let input: LLMSpan["input"] = null;
         let output: LLMSpan["output"] = null;
         let params: Span["params"] = {};
-        let metadata = {};
+        let metadata: Record<string, unknown> = {};
         let started_at: Span["timestamps"]["started_at"] | undefined =
           parseTimestamp(incomingSpan.startTimeUnixNano);
         let finished_at: Span["timestamps"]["finished_at"] | undefined =
@@ -959,7 +959,9 @@ const addOpenTelemetrySpanAsSpan = (
           }
           if (
             attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
-            !isNaN(Number(attributesMap.gen_ai.usage.cache_creation.input_tokens))
+            !isNaN(
+              Number(attributesMap.gen_ai.usage.cache_creation.input_tokens),
+            )
           ) {
             metrics.cache_creation_input_tokens = Number(
               attributesMap.gen_ai.usage.cache_creation.input_tokens,
@@ -1133,6 +1135,24 @@ const addOpenTelemetrySpanAsSpan = (
             trace.reservedTraceMetadata.customer_id =
               attributesMap.langwatch.customer.id;
             (attributesMap as any).langwatch.customer.id = void 0;
+          }
+          if (Array.isArray(attributesMap.langwatch.labels)) {
+            metadata = {
+              ...metadata,
+              labels: attributesMap.langwatch.labels,
+            };
+            (attributesMap as any).langwatch.labels = void 0;
+          }
+          // Backward compatibility for legacy "langwatch.tags" attribute
+          if (
+            !metadata.labels &&
+            Array.isArray((attributesMap as any).langwatch.tags)
+          ) {
+            metadata = {
+              ...metadata,
+              labels: (attributesMap as any).langwatch.tags,
+            };
+            (attributesMap as any).langwatch.tags = void 0;
           }
 
           if (attributesMap.langwatch.input) {

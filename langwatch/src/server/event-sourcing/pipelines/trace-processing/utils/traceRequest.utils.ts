@@ -57,7 +57,9 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     v.arrayValue &&
     Array.isArray(v.arrayValue?.values)
   ) {
-    return JSON.stringify(v.arrayValue.values);
+    return JSON.stringify(
+      v.arrayValue.values.map((item) => scalar(item) ?? item),
+    );
   }
   if ("bytesValue" in v && v.bytesValue) {
     if (typeof v.bytesValue === "string") {
