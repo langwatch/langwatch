@@ -11,7 +11,7 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
-import { nanoid } from "nanoid";
+import { randomBytes } from "crypto";
 import type { CodeAgentData } from "../types";
 
 /** Timeout for NLP service requests (2 minutes) */
@@ -77,7 +77,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     return {
       api_key: this.apiKey,
       workflow_id: `scenario-code-${this.config.agentId}`,
-      spec_version: "1.3",
+      spec_version: "1.4",
       name: "Scenario Code Execution",
       icon: "🔧",
       description: "Minimal workflow for scenario code agent execution",
@@ -99,7 +99,11 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             train_size: 1,
             test_size: 1,
             seed: 42,
-            dataset: "",
+            dataset: {
+              id: "scenario-input",
+              name: "Scenario Input",
+              inline: null,
+            },
           },
         },
         {
@@ -170,11 +174,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     const event = {
       type: "execute_flow" as const,
       payload: {
-        trace_id: `trace_${nanoid()}`,
+        trace_id: randomBytes(16).toString("hex"),
         workflow,
         inputs: [inputRecord],
         manual_execution_mode: false,
         do_not_trace: true,
+        run_evaluations: false,
       },
     };
 
@@ -196,9 +201,15 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       );
 
       if (!response.ok) {
-        const body = await response.text().catch(() => "");
+        let errorMessage = "";
+        try {
+          const errorBody = (await response.json()) as { detail?: string };
+          errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+        } catch {
+          errorMessage = await response.text().catch(() => "");
+        }
         throw new Error(
-          `Code execution failed: HTTP ${response.status}${body ? ` - ${body}` : ""}`,
+          `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
         );
       }
 

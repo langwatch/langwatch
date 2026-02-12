@@ -108,17 +108,33 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   describe("when the code execution fails", () => {
-    it("throws an error with a descriptive message", async () => {
+    it("extracts error detail from JSON response", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
-        text: vi.fn().mockResolvedValue("Internal Server Error"),
+        json: vi.fn().mockResolvedValue({ detail: "Python runtime error" }),
+        text: vi.fn().mockResolvedValue('{"detail": "Python runtime error"}'),
       });
 
       const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
 
       await expect(adapter.call(defaultInput)).rejects.toThrow(
-        "Code execution failed: HTTP 500 - Internal Server Error",
+        "Code execution failed: HTTP 500 - Python runtime error",
+      );
+    });
+
+    it("falls back to text when JSON parsing fails", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: vi.fn().mockRejectedValue(new Error("not json")),
+        text: vi.fn().mockResolvedValue("Bad Gateway"),
+      });
+
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+
+      await expect(adapter.call(defaultInput)).rejects.toThrow(
+        "Code execution failed: HTTP 502 - Bad Gateway",
       );
     });
   });
@@ -207,6 +223,74 @@ describe("SerializedCodeAgentAdapter", () => {
       );
       expect(codeNode.data.inputs[0].value).toBe("Hello");
       expect(codeNode.data.inputs[1].value).toBe("");
+    });
+  });
+
+  describe("when sending the request to the NLP service", () => {
+    it("passes an abort signal for timeout protection", async () => {
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("sets run_evaluations to false and do_not_trace to true", async () => {
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      expect(callBody.payload.run_evaluations).toBe(false);
+      expect(callBody.payload.do_not_trace).toBe(true);
+    });
+
+    it("generates a valid 32-char hex trace_id", async () => {
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      expect(callBody.payload.trace_id).toMatch(/^[0-9a-f]{32}$/);
+    });
+  });
+
+  describe("when building the workflow", () => {
+    it("includes a valid dataset on the entry node", async () => {
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const entryNode = callBody.payload.workflow.nodes.find(
+        (n: { id: string }) => n.id === "entry",
+      );
+      expect(entryNode.data.dataset).toEqual({
+        id: "scenario-input",
+        name: "Scenario Input",
+        inline: null,
+      });
+    });
+
+    it("connects entry -> code_agent -> end with correct edge handles", async () => {
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const edges = callBody.payload.workflow.edges;
+
+      // entry -> code_agent edge
+      const entryToCode = edges.find(
+        (e: { source: string; target: string }) =>
+          e.source === "entry" && e.target === "code_agent",
+      );
+      expect(entryToCode.sourceHandle).toBe("entry.outputs.input");
+      expect(entryToCode.targetHandle).toBe("code_agent.inputs.input");
+
+      // code_agent -> end edge
+      const codeToEnd = edges.find(
+        (e: { source: string; target: string }) =>
+          e.source === "code_agent" && e.target === "end",
+      );
+      expect(codeToEnd.sourceHandle).toBe("code_agent.outputs.output");
+      expect(codeToEnd.targetHandle).toBe("end.inputs.output");
     });
   });
 });
