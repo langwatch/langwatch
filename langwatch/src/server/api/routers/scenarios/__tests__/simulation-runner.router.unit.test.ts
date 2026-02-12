@@ -94,25 +94,11 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called", () => {
-      it("throws TRPCError with BAD_REQUEST code", async () => {
-        await expect(caller.run(defaultInput)).rejects.toThrow(TRPCError);
-
-        try {
-          await caller.run(defaultInput);
-        } catch (error) {
-          expect(error).toBeInstanceOf(TRPCError);
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-        }
-      });
-
-      it("returns error message about missing model", async () => {
-        try {
-          await caller.run(defaultInput);
-        } catch (error) {
-          expect((error as TRPCError).message).toBe(
-            "Project default model is not configured",
-          );
-        }
+      it("throws TRPCError with BAD_REQUEST code and missing model message", async () => {
+        await expect(caller.run(defaultInput)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: "Project default model is not configured",
+        });
       });
 
       it("does not schedule the job", async () => {
@@ -145,12 +131,12 @@ describe("simulationRunnerRouter.run", () => {
       });
 
       it("returns error message containing not found", async () => {
-        try {
-          await caller.run({ ...defaultInput, scenarioId: "nonexistent" });
-        } catch (error) {
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-          expect((error as TRPCError).message).toContain("not found");
-        }
+        await expect(
+          caller.run({ ...defaultInput, scenarioId: "nonexistent" }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining("not found"),
+        });
       });
 
       it("does not schedule the job", async () => {
@@ -183,12 +169,46 @@ describe("simulationRunnerRouter.run", () => {
       });
 
       it("returns error message containing not found", async () => {
+        await expect(caller.run(input)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringContaining("not found"),
+        });
+      });
+
+      it("does not schedule the job", async () => {
         try {
           await caller.run(input);
-        } catch (error) {
-          expect((error as TRPCError).code).toBe("BAD_REQUEST");
-          expect((error as TRPCError).message).toContain("not found");
+        } catch {
+          // Expected to throw
         }
+        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given code agent does not exist", () => {
+    beforeEach(() => {
+      mockPrefetchScenarioData.mockResolvedValue({
+        success: false,
+        error: "Code agent nonexistent not found",
+      });
+    });
+
+    describe("when run is called with code agent target", () => {
+      const input = {
+        ...defaultInput,
+        target: { type: "code" as const, referenceId: "nonexistent" },
+      };
+
+      it("throws TRPCError with BAD_REQUEST code", async () => {
+        await expect(caller.run(input)).rejects.toThrow(TRPCError);
+      });
+
+      it("returns error message containing Code agent and not found", async () => {
+        await expect(caller.run(input)).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: expect.stringMatching(/Code agent.*not found/),
+        });
       });
 
       it("does not schedule the job", async () => {

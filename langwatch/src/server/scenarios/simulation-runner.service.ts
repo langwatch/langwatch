@@ -174,6 +174,10 @@ export class SimulationRunnerService {
           projectId,
           prisma: this.prisma,
         });
+      case "code":
+        throw new Error(
+          "Code agent targets are only supported via the child process execution path",
+        );
       default: {
         const _exhaustive: never = target.type;
         throw new Error(`Unknown target type: ${_exhaustive}`);

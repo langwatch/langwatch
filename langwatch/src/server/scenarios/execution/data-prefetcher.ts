@@ -27,6 +27,7 @@ import { ScenarioService } from "../scenario.service";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
+  type CodeAgentData,
   type ExecutionContext,
   type HttpAgentData,
   type LiteLLMParams,
@@ -145,9 +146,10 @@ export async function prefetchScenarioData(
       { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
       "Target adapter not found",
     );
+    const targetLabel = target.type === "prompt" ? "Prompt" : target.type === "code" ? "Code agent" : "HTTP agent";
     return {
       success: false,
-      error: `${target.type === "prompt" ? "Prompt" : "HTTP agent"} ${target.referenceId} not found`,
+      error: `${targetLabel} ${target.referenceId} not found`,
     };
   }
 
@@ -239,6 +241,9 @@ async function fetchAgentData(
   if (target.type === "prompt") {
     return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
   }
+  if (target.type === "code") {
+    return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
+  }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
 }
 
@@ -303,6 +308,56 @@ async function fetchHttpAgentData(
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+  };
+}
+
+/**
+ * Zod schema for code agent config validation.
+ * Code agents have a parameters array with a "code" entry, plus inputs/outputs.
+ */
+const RawCodeAgentConfigSchema = z.object({
+  parameters: z.array(z.object({
+    identifier: z.string(),
+    type: z.string(),
+    value: z.string().optional(),
+  })),
+  inputs: z.array(z.object({
+    identifier: z.string(),
+    type: z.string(),
+  })).optional(),
+  outputs: z.array(z.object({
+    identifier: z.string(),
+    type: z.string(),
+  })).optional(),
+});
+
+async function fetchCodeAgentData(
+  projectId: string,
+  agentId: string,
+  fetcher: AgentFetcher,
+): Promise<CodeAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (!agent || agent.type !== "code") return null;
+
+  const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) {
+    return null;
+  }
+  const config = parseResult.data;
+
+  const codeParam = config.parameters.find(
+    (p) => p.identifier === "code" && p.type === "code",
+  );
+  if (!codeParam?.value) {
+    return null;
+  }
+
+  return {
+    type: "code",
+    agentId: agent.id,
+    code: codeParam.value,
+    inputs: config.inputs ?? [],
+    outputs: config.outputs ?? [],
   };
 }
 

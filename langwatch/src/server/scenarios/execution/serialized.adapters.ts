@@ -6,6 +6,7 @@
  */
 
 export {
+  SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
 } from "./serialized-adapters";

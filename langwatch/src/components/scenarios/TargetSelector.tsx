@@ -1,13 +1,17 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Globe, Plus } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
+import {
+  isAgentTarget,
+  useFilteredAgents,
+} from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http";
+  type: "prompt" | "http" | "code";
   id: string;
 } | null;
 
@@ -21,7 +25,8 @@ interface TargetSelectorProps {
 
 /**
  * Unified target selector for scenarios.
- * Shows prompts and HTTP agents in grouped sections with search.
+ * Shows all agents (HTTP and code) in a single "Agents" section and prompts
+ * in a separate "Prompts" section, with search across both.
  * Includes actions to create new prompts/agents.
  */
 export function TargetSelector({
@@ -57,14 +62,7 @@ export function TargetSelector({
     );
   }, [prompts, searchValue]);
 
-  // Filter HTTP agents (already sorted by updatedAt desc from backend)
-  const filteredAgents = useMemo(() => {
-    const httpAgents = agents?.filter((a) => a.type === "http") ?? [];
-    if (!searchValue) return httpAgents;
-    return httpAgents.filter((a) =>
-      a.name.toLowerCase().includes(searchValue.toLowerCase()),
-    );
-  }, [agents, searchValue]);
+  const filteredAgents = useFilteredAgents(agents, searchValue);
 
   // Get the selected item's label for display
   const selectedLabel = useMemo(() => {
@@ -73,6 +71,7 @@ export function TargetSelector({
       const prompt = prompts?.find((p) => p.id === value.id);
       return prompt ? (prompt.handle ?? prompt.id) : null;
     }
+    // Both "http" and "code" agents come from the agents list
     const agent = agents?.find((a) => a.id === value.id);
     return agent?.name ?? null;
   }, [value, prompts, agents]);
@@ -122,6 +121,7 @@ export function TargetSelector({
           <HStack gap={2}>
             {value?.type === "prompt" && <BookText size={14} />}
             {value?.type === "http" && <Globe size={14} />}
+            {value?.type === "code" && <Code size={14} />}
             <Text>{selectedLabel ?? placeholder}</Text>
           </HStack>
           <ChevronDown size={14} />
@@ -137,7 +137,7 @@ export function TargetSelector({
             borderColor="border"
             position="sticky"
             top={0}
-            bg="white"
+            bg="bg"
             zIndex={10}
           >
             <Input
@@ -151,7 +151,7 @@ export function TargetSelector({
 
           {/* Scrollable Content */}
           <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
-            {/* Agents Section - First (typically fewer items) */}
+            {/* Agents Section - All agents (HTTP + code) */}
             <Box>
               <Text
                 fontSize="xs"
@@ -165,7 +165,7 @@ export function TargetSelector({
                 top={0}
                 zIndex={5}
               >
-                HTTP Agents
+                Agents
               </Text>
               {filteredAgents.length === 0 ? (
                 <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
@@ -179,18 +179,27 @@ export function TargetSelector({
                     paddingY={2}
                     cursor="pointer"
                     bg={
-                      value?.type === "http" && value.id === agent.id
+                      isAgentTarget(value) && value.id === agent.id
                         ? "blue.50"
                         : "transparent"
                     }
                     _hover={{ bg: "gray.100" }}
-                    onClick={() => handleSelect({ type: "http", id: agent.id })}
+                    onClick={() =>
+                      handleSelect({
+                        type: agent.type,
+                        id: agent.id,
+                      })
+                    }
                   >
-                    <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                    {agent.type === "code" ? (
+                      <Code size={14} color="var(--chakra-colors-gray-500)" />
+                    ) : (
+                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                    )}
                     <Text fontSize="sm" flex={1}>
                       {agent.name}
                     </Text>
-                    {value?.type === "http" && value.id === agent.id && (
+                    {isAgentTarget(value) && value.id === agent.id && (
                       <Text color="blue.500" fontSize="sm">
                         ✓
                       </Text>

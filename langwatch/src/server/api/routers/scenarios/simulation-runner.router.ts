@@ -25,7 +25,7 @@ const logger = createLogger("SimulationRunnerRouter");
  * Extensible: add new types as needed (llm, workflow, etc.)
  */
 export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http"]),
+  type: z.enum(["prompt", "http", "code"]),
   referenceId: z.string(),
 });
 

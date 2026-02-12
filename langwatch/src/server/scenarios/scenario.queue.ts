@@ -27,7 +27,7 @@ export const scenarioJobSchema = z.object({
   projectId: z.string(),
   scenarioId: z.string(),
   target: z.object({
-    type: z.enum(["prompt", "http"]),
+    type: z.enum(["prompt", "http", "code"]),
     referenceId: z.string(),
   }),
   setId: z.string(),
