@@ -8,10 +8,15 @@ on:
     paths:
       - "typescript-sdk/**"
       - ".github/.release-please-manifest.json"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - "typescript-sdk/**"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -20,6 +25,10 @@ env:
 
 jobs:
   ci:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
@@ -28,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -54,6 +65,7 @@ jobs:
         run: pnpm run build
 
       - name: Run tests
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         env:
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
@@ -61,6 +73,10 @@ jobs:
         run: pnpm test
 
   e2e:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
 
     env:
@@ -120,6 +136,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -177,6 +195,7 @@ jobs:
         run: pnpm run build
 
       - name: Run e2e tests
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           E2E_TIMEOUT: 120000
