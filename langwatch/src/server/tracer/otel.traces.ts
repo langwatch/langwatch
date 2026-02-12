@@ -1141,6 +1141,14 @@ const addOpenTelemetrySpanAsSpan = (
             };
             (attributesMap as any).langwatch.labels = void 0;
           }
+          // Backward compatibility for legacy "langwatch.tags" attribute
+          if (!metadata.labels && Array.isArray((attributesMap as any).langwatch.tags)) {
+            metadata = {
+              ...metadata,
+              labels: (attributesMap as any).langwatch.tags,
+            };
+            (attributesMap as any).langwatch.tags = void 0;
+          }
 
           if (attributesMap.langwatch.input) {
             if (
