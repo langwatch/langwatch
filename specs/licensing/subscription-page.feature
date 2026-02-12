@@ -196,9 +196,9 @@ Feature: Subscription Page Plan Management
     And I see a billing period toggle with Monthly and Annually options
 
   @integration
-  Scenario: Switching to annual billing shows 25% discount badge
+  Scenario: Switching to annual billing shows 8% discount badge
     When I select "Annually" billing
-    Then a "SAVE 25%" badge appears
+    Then a "Save 8%" badge appears
 
   @integration
   Scenario: Upgrade block shows dynamic total based on core members
@@ -213,10 +213,11 @@ Feature: Subscription Page Plan Management
     Then the upgrade block total recalculates accordingly
 
   @integration
-  Scenario: Clicking Upgrade now shows alert with totals
+  Scenario: Clicking Upgrade now redirects to Stripe checkout
     Given the organization has pending seats
     When I click "Upgrade now"
-    Then an alert shows the seat breakdown and total price
+    Then a Stripe checkout session is created with the seat breakdown
+    And the user is redirected to the Stripe checkout URL
 
   # ============================================================================
   # Saving User Changes - Pending State Flow

@@ -102,7 +102,7 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("$29 per seat/month")).toBeInTheDocument();
+      expect(screen.getByText("$32 per seat/month")).toBeInTheDocument();
       const growthColumn = screen.getByTestId("plan-column-growth");
       expect(
         within(growthColumn).getByRole("link", { name: "Add Members" }),

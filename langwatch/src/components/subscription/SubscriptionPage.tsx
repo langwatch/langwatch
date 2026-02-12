@@ -28,9 +28,16 @@ import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
-import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import {
+  type Currency,
+  ANNUAL_DISCOUNT,
+  DEVELOPER_FEATURES,
+  GROWTH_FEATURES,
+} from "./billing-plans";
+import { useBillingPricing } from "./useBillingPricing";
+import { useSubscriptionActions } from "./useSubscriptionActions";
 
 /**
  * Member type for users in the organization
@@ -64,39 +71,11 @@ const memberTypeOptions = [
 
 const memberTypeCollection = createListCollection({ items: memberTypeOptions });
 
-type Currency = "EUR" | "USD";
-
-const SEAT_PRICE: Record<Currency, number> = { EUR: 29, USD: 32 };
-const ANNUAL_DISCOUNT = 0.08;
-
-const currencySymbol: Record<Currency, string> = { EUR: "€", USD: "$" };
-
 const currencyOptions = [
   { label: "€ EUR", value: "EUR" as const },
   { label: "$ USD", value: "USD" as const },
 ];
 const currencyCollection = createListCollection({ items: currencyOptions });
-
-/**
- * Developer plan features for current plan block
- */
-const DEVELOPER_FEATURES = [
-  "Up to 2 core members",
-  "Limited platform features",
-  "Community support",
-];
-
-/**
- * Growth plan features for upgrade block
- */
-const GROWTH_FEATURES = [
-  "Up to 20 core users",
-  "200,000 events/month (Included)",
-  "Unlimited lite users",
-  "30 days retention",
-  "Unlimited evals",
-  "Private Slack support",
-];
 
 function formatPlanTypeLabel(planType?: string | null) {
   if (!planType) {
@@ -604,7 +583,9 @@ export function SubscriptionPage() {
 
   // Detect currency from IP geolocation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currencyApi = (api as any).currency;
+  const currencyApi = (api as any).currency as
+    | { detectCurrency: { useQuery: (input: Record<string, never>, opts: { enabled: boolean }) => { data?: { currency: Currency } } } }
+    | undefined;
   const detectedCurrency = currencyApi?.detectCurrency?.useQuery({}, {
     enabled: !currencyInitialized,
   });
@@ -617,7 +598,7 @@ export function SubscriptionPage() {
   }, [detectedCurrency?.data, currencyInitialized]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("success")) {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("success")) {
       setShowSuccess(true);
     }
   }, []);
@@ -656,85 +637,33 @@ export function SubscriptionPage() {
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan;
   const totalUserCount = users.length + plannedUsers.length;
 
-  // Pricing calculations
-  const sym = currencySymbol[currency];
-  const basePrice = SEAT_PRICE[currency];
-  const annualSeatPrice = Math.round(basePrice * (1 - ANNUAL_DISCOUNT));
-  const seatPrice = billingPeriod === "annually" ? annualSeatPrice : basePrice;
-
-  const existingCoreMembers = users.filter(
-    (u) => u.memberType === "core",
-  ).length;
-  const plannedCoreMembers = plannedUsers.filter(
-    (u) => u.memberType === "core",
-  ).length;
-  const totalCoreMembers = existingCoreMembers + plannedCoreMembers;
-  const plannedLiteMembers = plannedUsers.filter(
-    (u) => u.memberType === "lite",
-  ).length;
-  const totalPrice = totalCoreMembers * seatPrice;
+  const {
+    sym,
+    seatPrice,
+    totalCoreMembers,
+    pricePerSeat,
+    totalPriceFormatted,
+  } = useBillingPricing({ currency, billingPeriod, users, plannedUsers });
 
   const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
     setPlannedUsers(newPlannedUsers);
   };
 
-  // Subscription router is injected via SaaS dependency injection (not in OSS types)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subscriptionApi = (api as any).subscription;
-  const createSubscription = subscriptionApi.create.useMutation();
-  const addTeamMemberOrEvents =
-    subscriptionApi.addTeamMemberOrEvents.useMutation();
-  const manageSubscription = subscriptionApi.manage.useMutation();
-
-  const handleUpgrade = async () => {
-    if (!organization) return;
-
-    const result = await createSubscription.mutateAsync({
-      organizationId: organization.id,
-      baseUrl: window.location.origin,
-      plan: "GROWTH_SEAT_USAGE",
-      membersToAdd: totalCoreMembers,
-      currency,
-      billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
-    });
-
-    if (result.url) {
-      window.location.href = result.url;
-    }
-  };
-
-  const handleUpdateSeats = async () => {
-    if (!organization) return;
-
-    await addTeamMemberOrEvents.mutateAsync({
-      organizationId: organization.id,
-      plan: "GROWTH_SEAT_USAGE",
-      upgradeMembers: true,
-      upgradeTraces: false,
-      totalMembers: totalCoreMembers,
-      totalTraces: 0,
-    });
-
-    setPlannedUsers([]);
-    toaster.create({
-      title: "Seats updated successfully",
-      type: "success",
-    });
-    void organizationWithMembers.refetch();
-  };
-
-  const handleManageSubscription = async () => {
-    if (!organization) return;
-
-    const result = await manageSubscription.mutateAsync({
-      organizationId: organization.id,
-      baseUrl: window.location.origin,
-    });
-
-    if (result.url) {
-      window.location.href = result.url;
-    }
-  };
+  const {
+    handleUpgrade,
+    handleUpdateSeats,
+    handleManageSubscription,
+    isUpgradeLoading,
+    isUpdateSeatsLoading,
+    isManageLoading,
+  } = useSubscriptionActions({
+    organizationId: organization?.id,
+    currency,
+    billingPeriod,
+    totalCoreMembers,
+    onSeatsUpdated: () => setPlannedUsers([]),
+    organizationWithMembers,
+  });
 
   if (!organization || !plan) {
     return (
@@ -761,9 +690,6 @@ export function SubscriptionPage() {
     : isDeveloperPlan
       ? DEVELOPER_FEATURES
       : GROWTH_FEATURES;
-
-  const pricePerSeat = `${sym}${seatPrice} per seat/mo`;
-  const totalPriceFormatted = `${sym}${totalPrice}/mo`;
 
   return (
     <SettingsLayout>
@@ -871,7 +797,7 @@ export function SubscriptionPage() {
           onManageSubscription={
             !isDeveloperPlan ? handleManageSubscription : undefined
           }
-          isManageLoading={manageSubscription.isPending}
+          isManageLoading={isManageLoading}
         />
 
         {/* Upgrade Block - show for free plan on both pricing models */}
@@ -892,7 +818,7 @@ export function SubscriptionPage() {
             coreMembers={totalCoreMembers}
             features={GROWTH_FEATURES}
             onUpgrade={handleUpgrade}
-            isLoading={createSubscription.isPending}
+            isLoading={isUpgradeLoading}
           />
         )}
 
@@ -902,7 +828,7 @@ export function SubscriptionPage() {
             totalCoreMembers={totalCoreMembers}
             totalPrice={totalPriceFormatted}
             onUpdate={handleUpdateSeats}
-            isLoading={addTeamMemberOrEvents.isPending}
+            isLoading={isUpdateSeatsLoading}
           />
         )}
 
