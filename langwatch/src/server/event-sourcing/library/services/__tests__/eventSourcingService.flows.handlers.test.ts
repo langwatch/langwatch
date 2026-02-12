@@ -157,6 +157,71 @@ describe("EventSourcingService - Handler Flows", () => {
     });
   });
 
+  describe("when handler is non-sequential", () => {
+    it("calls handler.handle(event) directly without BatchEventProcessor", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler, {
+            sequential: false,
+          }),
+        },
+        processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
+
+      await service.storeEvents([event], context);
+
+      expect(handler.handle).toHaveBeenCalledWith(event);
+      // No checkpoints should be saved for non-sequential handlers
+      expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
+    });
+
+    it("does not check for failed events before dispatching", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
+
+      const service = new EventSourcingService({
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler, {
+            sequential: false,
+          }),
+        },
+        processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
+
+      await service.storeEvents([event], context);
+
+      // hasFailedEvents should not be called for non-sequential handlers
+      expect(checkpointStore.hasFailedEvents).not.toHaveBeenCalled();
+      // Handler should still be called despite "failures"
+      expect(handler.handle).toHaveBeenCalledWith(event);
+    });
+  });
+
   describe("failure handling and checkpointing", () => {
     it("stops processing when a previous event failed for the same aggregate", async () => {
       const eventStore = createMockEventStore<Event>();

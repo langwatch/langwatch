@@ -55,6 +55,20 @@ export interface EventHandlerOptions<
    * When the feature flag is true, the handler is disabled.
    */
   killSwitch?: KillSwitchOptions;
+
+  /**
+   * Whether this handler requires sequential, ordered processing with checkpointing.
+   * Defaults to `true`.
+   *
+   * When `true`: Events are processed through BatchEventProcessor with distributed
+   * locking, sequence numbers, ordering validation, and per-event checkpoints.
+   *
+   * When `false`: Events are processed directly from the queue payload without
+   * locking, checkpoints, or ordering. Each queue job calls handler.handle(event)
+   * independently. Use for handlers where idempotency is guaranteed externally
+   * (e.g., ClickHouse primary key deduplication) and event ordering doesn't matter.
+   */
+  sequential?: boolean;
 }
 
 /**

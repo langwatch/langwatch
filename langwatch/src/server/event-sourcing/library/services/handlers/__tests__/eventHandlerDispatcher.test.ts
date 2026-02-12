@@ -204,6 +204,55 @@ describe("EventHandlerDispatcher", () => {
       expect(handler.handle).toHaveBeenCalledWith(event1);
     });
 
+    it("skips hasFailedEvents check for non-sequential handlers (queue mode)", async () => {
+      const handler = createMockEventReactionHandler<Event>();
+      const eventHandlers = new Map([
+        [
+          "handler1",
+          createMockEventHandlerDefinition("handler1", handler, {
+            sequential: false,
+          }),
+        ],
+      ]);
+
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueManager = new QueueProcessorManager({
+        aggregateType,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+      (queueManager as any).handlerQueueProcessors.set(
+        "handler1",
+        mockQueueProcessor,
+      );
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
+
+      const dispatcher = createDispatcher({
+        eventHandlers,
+        processorCheckpointStore: checkpointStore,
+        queueManager,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await dispatcher.dispatchEventsToHandlers([event], context);
+
+      // hasFailedEvents should NOT be called for non-sequential handlers
+      expect(checkpointStore.hasFailedEvents).not.toHaveBeenCalled();
+      // Event should still be dispatched to the queue
+      expect(mockQueueProcessor.send).toHaveBeenCalledWith(event);
+    });
+
     it("skips dispatch when previous events have failed (queue mode)", async () => {
       const handler = createMockEventReactionHandler<Event>();
       const eventHandlers = new Map([

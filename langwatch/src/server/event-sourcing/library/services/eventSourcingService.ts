@@ -213,8 +213,22 @@ export class EventSourcingService<
       this.queueManager.initializeHandlerQueues(
         eventHandlers,
         async (handlerName, triggerEvent, _context) => {
-          // Use batch processor to handle all unprocessed events for this aggregate
-          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
+          const handlerDef = this.eventHandlers?.get(handlerName);
+          if (!handlerDef) {
+            throw new ConfigurationError(
+              "EventSourcingService",
+              `Handler "${handlerName}" not found`,
+              { handlerName },
+            );
+          }
+
+          // Non-sequential: process directly, no lock/checkpoint overhead
+          if (handlerDef.options.sequential === false) {
+            await handlerDef.handler.handle(triggerEvent);
+            return;
+          }
+
+          // Sequential: use batch processor or fallback to single-event processing
           if (this.handlerBatchProcessor) {
             await this.handlerBatchProcessor.processUnprocessedEvents(
               triggerEvent,
@@ -230,15 +244,6 @@ export class EventSourcingService<
               },
             );
           } else {
-            // Fallback to single-event processing if no batch processor
-            const handlerDef = this.eventHandlers?.get(handlerName);
-            if (!handlerDef) {
-              throw new ConfigurationError(
-                "EventSourcingService",
-                `Handler "${handlerName}" not found`,
-                { handlerName },
-              );
-            }
             await this.handlerDispatcher.handleEvent(
               handlerName,
               handlerDef,

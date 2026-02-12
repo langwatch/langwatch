@@ -213,8 +213,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         // Dispatch events to queues in registration order (actual processing order maintained by queue workers)
         for (const event of events) {
           for (const handlerName of sortedHandlers) {
-            // Check if processing should continue (no failed events for this aggregate)
-            if (this.processorCheckpointStore) {
+            const handlerDef = this.eventHandlers?.get(handlerName);
+            if (!handlerDef) {
+              continue;
+            }
+
+            // Skip checkpoint failure check for non-sequential handlers
+            // (they don't save checkpoints, so the query is wasted)
+            if (
+              handlerDef.options.sequential !== false &&
+              this.processorCheckpointStore
+            ) {
               const hasFailures =
                 await this.processorCheckpointStore.hasFailedEvents(
                   this.checkpointManager.getPipelineName(),
@@ -239,10 +248,6 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 );
                 continue;
               }
-            }
-            const handlerDef = this.eventHandlers?.get(handlerName);
-            if (!handlerDef) {
-              continue;
             }
 
             // Check kill switch - if enabled, skip event handler processing
@@ -370,7 +375,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 "event.id": event.id,
                 "event.aggregate_id": String(event.aggregateId),
               });
-              await this.handleEvent(handlerName, handlerDef, event, context);
+
+              // Non-sequential: process directly, no lock/checkpoint overhead
+              if (handlerDef.options.sequential === false) {
+                await handlerDef.handler.handle(event);
+              } else {
+                await this.handleEvent(handlerName, handlerDef, event, context);
+              }
+
               span.addEvent("handler.handle.complete", {
                 "handler.name": handlerName,
               });

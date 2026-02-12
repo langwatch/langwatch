@@ -30,6 +30,7 @@ export const traceProcessingPipelineDefinition =
     })
     .withEventHandler("spanStorage", SpanStorageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      sequential: false,
     })
     // .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
     //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
