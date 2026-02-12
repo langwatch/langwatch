@@ -2,22 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event, ProcessorCheckpoint } from "../../../domain/types";
 import type { ProcessorCheckpointStore } from "../../../stores/eventHandlerCheckpointStore.types";
 import type { EventStore } from "../../../stores/eventStore.types";
-import type { DistributedLock } from "../../../utils/distributedLock";
 import {
-  createMockDistributedLock,
   createMockEventStore,
   createMockProcessorCheckpointStore,
   createTestContext,
   createTestEvent,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { LockError } from "../../errorHandling";
 import { BatchEventProcessor } from "../batchEventProcessor";
 
 describe("BatchEventProcessor", () => {
   let eventStore: EventStore<Event>;
   let checkpointStore: ProcessorCheckpointStore;
-  let distributedLock: DistributedLock;
   let batchProcessor: BatchEventProcessor<Event>;
 
   const { aggregateType, tenantId } = createTestContext();
@@ -29,42 +25,16 @@ describe("BatchEventProcessor", () => {
     vi.clearAllMocks();
     eventStore = createMockEventStore<Event>();
     checkpointStore = createMockProcessorCheckpointStore();
-    distributedLock = createMockDistributedLock();
 
     batchProcessor = new BatchEventProcessor(
       eventStore,
       checkpointStore,
-      distributedLock,
       pipelineName,
       aggregateType,
     );
   });
 
   describe("processUnprocessedEvents", () => {
-    describe("when lock cannot be acquired", () => {
-      it("throws LockError", async () => {
-        vi.mocked(distributedLock.acquire).mockResolvedValue(null);
-
-        const triggerEvent = createTestEvent(
-          aggregateId,
-          aggregateType,
-          tenantId,
-        );
-        const processEvent = vi.fn();
-
-        await expect(
-          batchProcessor.processUnprocessedEvents(
-            triggerEvent,
-            processorName,
-            "handler",
-            processEvent,
-          ),
-        ).rejects.toThrow(LockError);
-
-        expect(processEvent).not.toHaveBeenCalled();
-      });
-    });
-
     describe("when aggregate has failed events", () => {
       it("skips processing and returns failure result", async () => {
         vi.mocked(checkpointStore.hasFailedEvents).mockResolvedValue(true);
@@ -486,7 +456,6 @@ describe("BatchEventProcessor", () => {
         const batchProcessorNoCheckpoint = new BatchEventProcessor(
           eventStore,
           void 0, // No checkpoint store
-          distributedLock,
           pipelineName,
           aggregateType,
         );
@@ -525,74 +494,6 @@ describe("BatchEventProcessor", () => {
         expect(result.success).toBe(true);
         expect(result.processedCount).toBe(2);
         expect(processEvent).toHaveBeenCalledTimes(2);
-      });
-    });
-
-    describe("lock management", () => {
-      it("releases lock after successful processing", async () => {
-        // Trigger event is the only event (already processed)
-        const triggerEvent = createTestEvent(
-          aggregateId,
-          aggregateType,
-          tenantId,
-          void 0,
-          1000,
-        );
-
-        vi.mocked(eventStore.getEvents).mockResolvedValue([triggerEvent]);
-        vi.mocked(checkpointStore.getLastProcessedEvent).mockResolvedValue({
-          processorName,
-          processorType: "handler",
-          eventId: triggerEvent.id,
-          status: "processed",
-          eventTimestamp: triggerEvent.timestamp,
-          sequenceNumber: 1,
-          tenantId,
-          aggregateType,
-          aggregateId,
-        } as ProcessorCheckpoint);
-
-        const processEvent = vi.fn();
-
-        await batchProcessor.processUnprocessedEvents(
-          triggerEvent,
-          processorName,
-          "handler",
-          processEvent,
-        );
-
-        expect(distributedLock.release).toHaveBeenCalledTimes(1);
-      });
-
-      it("releases lock after failed processing", async () => {
-        // Trigger event is the only event
-        const triggerEvent = createTestEvent(
-          aggregateId,
-          aggregateType,
-          tenantId,
-          void 0,
-          1000,
-        );
-
-        vi.mocked(eventStore.getEvents).mockResolvedValue([triggerEvent]);
-        vi.mocked(checkpointStore.getLastProcessedEvent).mockResolvedValue(
-          null,
-        );
-
-        const processEvent = vi
-          .fn()
-          .mockRejectedValue(new Error("Processing failed"));
-
-        await expect(
-          batchProcessor.processUnprocessedEvents(
-            triggerEvent,
-            processorName,
-            "handler",
-            processEvent,
-          ),
-        ).rejects.toThrow("Processing failed");
-
-        expect(distributedLock.release).toHaveBeenCalledTimes(1);
       });
     });
 

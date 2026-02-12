@@ -9,8 +9,6 @@ import type {
   EventStore,
   EventStoreReadContext,
 } from "../../stores/eventStore.types";
-import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
-import { LockError } from "../errorHandling";
 
 /**
  * Result of batch event processing.
@@ -60,8 +58,6 @@ export type SingleEventProcessor<EventType extends Event = Event> = (
  * Options for batch event processing.
  */
 export interface BatchProcessingOptions {
-  /** Lock TTL in milliseconds */
-  lockTtlMs?: number;
   /** Whether to skip failure detection (useful for recovery scenarios) */
   skipFailureDetection?: boolean;
 }
@@ -85,7 +81,6 @@ export interface BatchProcessingOptions {
  * const batchProcessor = new BatchEventProcessor({
  *   eventStore,
  *   processorCheckpointStore,
- *   distributedLock,
  *   pipelineName: "trace-processing",
  *   aggregateType: "trace",
  * });
@@ -116,7 +111,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     private readonly processorCheckpointStore:
       | ProcessorCheckpointStore
       | undefined,
-    private readonly distributedLock: DistributedLock,
     private readonly pipelineName: string,
     private readonly aggregateType: AggregateType,
   ) {}
@@ -133,7 +127,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
    * @param processEvent - Callback to process a single event
    * @param options - Optional processing options
    * @returns Result of batch processing
-   * @throws {LockError} If lock cannot be acquired
    * @throws {Error} If processing fails (after partial success, will have checkpointed progress)
    */
   async processUnprocessedEvents(
@@ -169,30 +162,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
         },
       },
       async (span) => {
-        // Acquire distributed lock for the entire batch
-        const lockKey = this.buildLockKey(processorName, context);
-        const lockTtlMs = options?.lockTtlMs ?? 60000; // Default 60s for batch
-
-        const lockHandle = await this.distributedLock.acquire(
-          lockKey,
-          lockTtlMs,
-        );
-
-        if (!lockHandle) {
-          throw new LockError(
-            lockKey,
-            "processUnprocessedEvents",
-            `Cannot acquire lock for batch processing: ${lockKey}. Another process is handling this aggregate.`,
-            {
-              processorName,
-              processorType,
-              aggregateId: context.aggregateId,
-              tenantId: String(context.tenantId),
-            },
-          );
-        }
-
-        try {
           const eventStoreContext: EventStoreReadContext<EventType> = {
             tenantId: context.tenantId,
           };
@@ -419,9 +388,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
             success: true,
             lastProcessedSequence: currentSequence,
           };
-        } finally {
-          await this.releaseLock(lockHandle, processorName, context);
-        }
       },
     );
   }
@@ -471,37 +437,4 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     });
   }
 
-  /**
-   * Builds the lock key for batch processing.
-   */
-  private buildLockKey(
-    processorName: string,
-    context: BatchProcessingContext<EventType>,
-  ): string {
-    return `batch:${String(context.tenantId)}:${context.aggregateType}:${context.aggregateId}:${processorName}`;
-  }
-
-  /**
-   * Releases the distributed lock with error handling.
-   */
-  private async releaseLock(
-    lockHandle: LockHandle,
-    processorName: string,
-    context: BatchProcessingContext<EventType>,
-  ): Promise<void> {
-    try {
-      await this.distributedLock.release(lockHandle);
-    } catch (error) {
-      // Lock release failure is non-critical - processing already completed
-      this.logger.error(
-        {
-          processorName,
-          aggregateId: context.aggregateId,
-          tenantId: String(context.tenantId),
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to release distributed lock after batch processing",
-      );
-    }
-  }
 }

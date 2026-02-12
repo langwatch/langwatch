@@ -8,16 +8,17 @@ import type { Event } from "../../domain/types";
 import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
   createMockEventStore,
   createMockProcessorCheckpointStore,
   createMockProjectionDefinition,
+  createMockProjectionStore,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
+  createTestProjection,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "./testHelpers";
@@ -41,7 +42,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is required in all contexts", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -66,7 +66,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is validated before operations", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -91,7 +90,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("events are filtered by tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -130,7 +128,6 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -159,14 +156,70 @@ describe("EventSourcingService - Security Flows", () => {
       );
     });
 
-    it("checkpoints are scoped to tenantId", async () => {
+    it("projection checkpoints are scoped to tenantId", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler();
+      const projectionStore = createMockProjectionStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const context1 = createTestEventStoreReadContext(tenantId1);
+
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId1,
+        ),
+      ];
+
+      // Mock getEvents to return the stored events so projection processing can proceed
+      vi.mocked(eventStore.getEvents).mockResolvedValue(events);
+
+      const service = new EventSourcingService({
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      await service.storeEvents(events, context1);
+
+      // Projection checkpoint is saved with tenantId
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalled();
+      const saveCheckpointMock = checkpointStore.saveCheckpoint as ReturnType<
+        typeof vi.fn
+      >;
+      expect(saveCheckpointMock.mock.calls[0]?.[0]).toBe(tenantId1);
+      expect(saveCheckpointMock.mock.calls[0]?.[1]).toBe(
+        buildCheckpointKey(
+          tenantId1,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
+      );
+      expect(saveCheckpointMock.mock.calls[0]?.[2]).toBe("projection");
+      expect(saveCheckpointMock.mock.calls[0]?.[3]).toMatchObject({
+        tenantId: tenantId1,
+        aggregateType: aggregateType,
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      });
+    });
+
+    it("handlers do not create checkpoints (no checkpoint scoping needed)", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
       const checkpointStore = createMockProcessorCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -185,28 +238,13 @@ describe("EventSourcingService - Security Flows", () => {
       ];
       await service.storeEvents(events, context1);
 
-      // Checkpoint is saved with new signature: tenantId, checkpointKey, processorType, event, status, sequenceNumber, errorMessage
-      // Note: saveCheckpoint is called twice (pending, then processed), so we just verify it was called
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalled();
-      const saveCheckpointMock = checkpointStore.saveCheckpoint as ReturnType<
-        typeof vi.fn
-      >;
-      expect(saveCheckpointMock.mock.calls[0]?.[0]).toBe(tenantId1);
-      expect(saveCheckpointMock.mock.calls[0]?.[1]).toBe(
-        buildCheckpointKey(
-          tenantId1,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "handler",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.AGGREGATE_ID,
-        ),
+      // Handlers no longer save checkpoints
+      expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
+
+      // But handler was still called with the event
+      expect(handler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: tenantId1 }),
       );
-      expect(saveCheckpointMock.mock.calls[0]?.[2]).toBe("handler");
-      expect(saveCheckpointMock.mock.calls[0]?.[3]).toMatchObject({
-        tenantId: tenantId1,
-        aggregateType: aggregateType,
-        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-      });
     });
   });
 
@@ -214,7 +252,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("missing tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -236,7 +273,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("invalid tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -275,7 +311,6 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -306,7 +341,6 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const customAggregateType = "trace" as const;
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: customAggregateType,
         eventStore,
@@ -336,14 +370,12 @@ describe("EventSourcingService - Security Flows", () => {
       const aggregateType2 = "test_aggregate" as const as AggregateType;
 
       const service1 = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType1,
         eventStore,
       });
 
       const service2 = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType2,
         eventStore,
@@ -378,7 +410,6 @@ describe("EventSourcingService - Security Flows", () => {
     it("stores enforce tenant isolation", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -423,7 +454,6 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -457,7 +487,6 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -499,7 +528,6 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -543,21 +571,25 @@ describe("EventSourcingService - Security Flows", () => {
   });
 
   describe("security edge cases for recovery operations", () => {
-    it("getFailedEvents enforces tenant isolation", async () => {
+    it("getFailedEvents enforces tenant isolation for projections", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const projectionHandler = createMockEventHandler();
+      const projectionStore = createMockProjectionStore();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
         },
         processorCheckpointStore: checkpointStore,
       });
@@ -578,8 +610,10 @@ describe("EventSourcingService - Security Flows", () => {
         tenantId2,
       );
 
-      // Make handler fail for both events
-      handler.handle = vi.fn().mockRejectedValue(new Error("Handler failed"));
+      // Make projection handler fail for both events
+      projectionHandler.handle = vi
+        .fn()
+        .mockRejectedValue(new Error("Projection failed"));
 
       // Process events for both tenants
       await service.storeEvents([event1], context1);
@@ -588,8 +622,8 @@ describe("EventSourcingService - Security Flows", () => {
       // Get failed events for tenant1 - should only return tenant1's events
       const failedEvents1 = await checkpointStore.getFailedEvents(
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        "handler",
+        "projection",
+        "projection",
         tenantId1,
         aggregateType,
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -598,8 +632,8 @@ describe("EventSourcingService - Security Flows", () => {
       // Get failed events for tenant2 - should only return tenant2's events
       const failedEvents2 = await checkpointStore.getFailedEvents(
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        "handler",
+        "projection",
+        "projection",
         tenantId2,
         aggregateType,
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -612,21 +646,25 @@ describe("EventSourcingService - Security Flows", () => {
       expect(failedEvents2[0]?.tenantId).toBe(tenantId2);
     });
 
-    it("clearCheckpoint enforces tenant isolation", async () => {
+    it("clearCheckpoint enforces tenant isolation for projections", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const projectionHandler = createMockEventHandler();
+      const projectionStore = createMockProjectionStore();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
         },
         processorCheckpointStore: checkpointStore,
       });
@@ -647,18 +685,20 @@ describe("EventSourcingService - Security Flows", () => {
         tenantId2,
       );
 
-      // Make handler fail for both events
-      handler.handle = vi.fn().mockRejectedValue(new Error("Handler failed"));
+      // Make projection handler fail for both events
+      projectionHandler.handle = vi
+        .fn()
+        .mockRejectedValue(new Error("Projection failed"));
 
       // Process events for both tenants
       await service.storeEvents([event1], context1);
       await service.storeEvents([event2], context2);
 
-      // Clear checkpoint for tenant1's event (using new per-aggregate key format)
+      // Clear checkpoint for tenant1's projection (using per-aggregate key format)
       const checkpointKey1ToClear = buildCheckpointKey(
         tenantId1,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
@@ -668,7 +708,7 @@ describe("EventSourcingService - Security Flows", () => {
       const checkpointKey1 = buildCheckpointKey(
         tenantId1,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
@@ -679,7 +719,7 @@ describe("EventSourcingService - Security Flows", () => {
       const checkpointKey2 = buildCheckpointKey(
         tenantId2,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
@@ -712,7 +752,6 @@ describe("EventSourcingService - Security Flows", () => {
       const handler = createMockEventReactionHandler<Event>();
       const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -759,7 +798,6 @@ describe("EventSourcingService - Security Flows", () => {
       const handler = createMockEventReactionHandler<Event>();
       const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
-        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,

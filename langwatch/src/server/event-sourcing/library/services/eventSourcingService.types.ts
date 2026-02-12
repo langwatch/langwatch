@@ -11,14 +11,6 @@ import type { EventPublisher } from "../publishing/eventPublisher.types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
-import type { DistributedLock } from "../utils/distributedLock";
-
-/**
- * Default time-to-live for distributed locks used during projection updates.
- * Prevents locks from being held indefinitely if a process crashes.
- */
-export const DEFAULT_UPDATE_LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
 /**
  * Options for configuring event sourcing behavior.
  */
@@ -47,17 +39,16 @@ export interface UpdateProjectionOptions<EventType extends Event = Event> {
 }
 
 /**
- * Options for replaying events (time travel).
- * Currently not implemented - throws "Not implemented" error.
+ * Options for replaying events up to a specific timestamp (time travel).
  */
-export interface ReplayEventsOptions<_EventType extends Event = Event> {
+export interface ReplayEventsOptions<EventType extends Event = Event> {
   /**
-   * Replay events up to (and including) this timestamp.
-   * If not provided, replays all events.
+   * The timestamp to replay events up to.
+   * Events with timestamp <= upToTimestamp will be included.
    */
   upToTimestamp?: number;
   /**
-   * Optional projection store context. If not provided, defaults to eventStoreContext.
+   * Optional projection store context for replayed projections.
    */
   projectionStoreContext?: ProjectionStoreReadContext;
 }
@@ -114,42 +105,6 @@ export interface EventSourcingServiceOptions<
    */
   logger?: ReturnType<typeof createLogger>;
 
-  /**
-   * Required distributed lock for preventing concurrent updates of the same aggregate projection.
-   *
-   * **Concurrency:** The distributed lock ensures only one thread processes events for the same
-   * aggregate at a time, preventing race conditions and ensuring correct failure handling.
-   * Without a distributed lock, concurrent processing can cause events to be processed out of order
-   * or fail to block on previous failures.
-   *
-   * **Lock Scope:** The lock is per-aggregate, allowing parallel processing across different aggregates.
-   * This provides both safety and performance.
-   *
-   * **Failure Mode:** If lock acquisition fails, updateProjectionByName throws an error.
-   * The caller should retry via queue processing.
-   *
-   * **Required:** This is now a required parameter. All deployments must provide a DistributedLock
-   * implementation (e.g., Redis-based lock).
-   */
-  distributedLock: DistributedLock;
-  /**
-   * Time-to-live for update locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 5 minutes
-   */
-  updateLockTtlMs?: number;
-  /**
-   * Time-to-live for handler locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  handlerLockTtlMs?: number;
-  /**
-   * Time-to-live for command locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  commandLockTtlMs?: number;
   /**
    * Optional queue processor factory for creating queues for event handlers.
    *

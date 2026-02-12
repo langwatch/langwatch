@@ -11,7 +11,6 @@ import {
 } from "../../../__tests__/integration/testHelpers";
 import type { AggregateType } from "../../../library";
 import { createTenantId } from "../../../library";
-import { RedisDistributedLock } from "../../../library/utils/distributedLock";
 import { EventSourcing } from "../../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../../runtime/eventSourcingRuntime";
 import type { PipelineWithCommandHandlers } from "../../../runtime/pipeline/types";
@@ -188,9 +187,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     redisConnection,
   );
 
-  // Create distributed lock
-  const distributedLock = new RedisDistributedLock(redisConnection);
-
   // Create EventSourcingRuntime with test stores
   const runtime = EventSourcingRuntime.createWithStores(
     {
@@ -206,7 +202,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
       eventStore,
       checkpointStore: processorCheckpointStore,
       queueProcessorFactory,
-      distributedLock,
     },
   );
 

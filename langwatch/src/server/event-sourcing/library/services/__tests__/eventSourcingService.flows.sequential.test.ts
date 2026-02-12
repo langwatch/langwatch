@@ -9,7 +9,6 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
@@ -34,8 +33,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     cleanupTestEnvironment();
   });
 
-  describe("sequential ordering enforcement for handlers", () => {
-    it("event N+1 waits for event N to be processed", async () => {
+  describe("when handlers process events independently (no sequential ordering)", () => {
+    it("processes events regardless of order - no sequence enforcement", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -51,10 +50,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
-      // Create events with timestamps that will result in sequence numbers 1, 2, 3
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -70,60 +67,24 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
       );
 
-      // Store event1 first (but don't process it yet - simulate it being stored but not processed)
+      // Store event1 first (but don't process it via service yet)
       await eventStore.storeEvents([event1], context, aggregateType);
 
-      // Try to process event2 (sequence 2) before event1 (sequence 1) is processed
-      // This should fail because event1 hasn't been processed yet
-      await expect(service.storeEvents([event2], context)).rejects.toThrow(
-        "Previous event (sequence 1) has not been processed yet",
-      );
-
-      // Verify event2 handler was not called
-      expect(handler.handle).not.toHaveBeenCalled();
-
-      // Now process event1 (sequence 1) - should succeed
-      await service.storeEvents([event1], context);
-
-      // Verify event1 was processed
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
-
-      // Verify checkpoint for aggregate was saved as processed (checkpoint is per aggregate, not per event)
-      const checkpointKey1 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.status).toBe("processed");
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-
-      // Now process event2 (sequence 2) - should succeed because event1 is processed
+      // Process event2 before event1 - handlers no longer enforce ordering
       await service.storeEvents([event2], context);
 
-      // Verify event2 was processed
-      expect(handler.handle).toHaveBeenCalledTimes(2);
+      // Handler processes event2 independently
+      expect(handler.handle).toHaveBeenCalledTimes(1);
       expect(handler.handle).toHaveBeenCalledWith(event2);
 
-      // Verify checkpoint for aggregate was updated (same key, updated sequence number)
-      const checkpointKey2 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey2);
-      expect(checkpoint2).not.toBeNull();
-      expect(checkpoint2?.status).toBe("processed");
-      expect(checkpoint2?.sequenceNumber).toBe(2);
+      // Process event1 - also succeeds
+      await service.storeEvents([event1], context);
+
+      expect(handler.handle).toHaveBeenCalledTimes(2);
+      expect(handler.handle).toHaveBeenCalledWith(event1);
     });
 
-    it("events arriving out of order are processed in correct sequence", async () => {
+    it("processes events out of order without blocking", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -139,10 +100,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
-      // Create events with different timestamps
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -172,34 +131,21 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process events out of order: event3, then event1, then event2
-      // event3 should fail (waiting for event2, which is the immediate predecessor)
-      await expect(service.storeEvents([event3], context)).rejects.toThrow(
-        /Previous event \(sequence \d+\) has not been processed yet/,
-      );
-
-      // event2 should fail (waiting for event1)
-      await expect(service.storeEvents([event2], context)).rejects.toThrow(
-        "Previous event (sequence 1) has not been processed yet",
-      );
-
-      // event1 should succeed (first event, no previous)
-      await service.storeEvents([event1], context);
+      // Process events out of order: event3, event1, event2 - all succeed
+      await service.storeEvents([event3], context);
       expect(handler.handle).toHaveBeenCalledTimes(1);
+      expect(handler.handle).toHaveBeenCalledWith(event3);
+
+      await service.storeEvents([event1], context);
+      expect(handler.handle).toHaveBeenCalledTimes(2);
       expect(handler.handle).toHaveBeenCalledWith(event1);
 
-      // Now event2 should succeed
       await service.storeEvents([event2], context);
-      expect(handler.handle).toHaveBeenCalledTimes(2);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
-
-      // Now event3 should succeed
-      await service.storeEvents([event3], context);
       expect(handler.handle).toHaveBeenCalledTimes(3);
-      expect(handler.handle).toHaveBeenCalledWith(event3);
+      expect(handler.handle).toHaveBeenCalledWith(event2);
     });
 
-    it("first event (sequence 1) doesn't check for previous event", async () => {
+    it("processes first event without any prerequisite checks", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -215,7 +161,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -229,14 +174,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Store event
       await eventStore.storeEvents([event1], context, aggregateType);
 
-      // Process first event - should succeed without checking for previous
+      // Process first event - succeeds without checking for previous
       await service.storeEvents([event1], context);
 
       // Verify handler was called
       expect(handler.handle).toHaveBeenCalledTimes(1);
       expect(handler.handle).toHaveBeenCalledWith(event1);
 
-      // Verify checkpoint was saved
+      // Handlers no longer create checkpoints
       const checkpointKey1 = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -245,12 +190,10 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.AGGREGATE_ID,
       );
       const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.status).toBe("processed");
-      expect(checkpoint1?.sequenceNumber).toBe(1);
+      expect(checkpoint1).toBeNull();
     });
 
-    it("sequence number computation with real event data", async () => {
+    it("does not create handler checkpoints when processing events", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -266,10 +209,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
-      // Create multiple events with different timestamps
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -299,7 +240,15 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process events in order and verify sequence numbers after each
+      // Process events in order
+      await service.storeEvents([event1], context);
+      await service.storeEvents([event2], context);
+      await service.storeEvents([event3], context);
+
+      // Verify handler was called for all events
+      expect(handler.handle).toHaveBeenCalledTimes(3);
+
+      // Verify no handler checkpoint was created
       const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -307,30 +256,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-
-      // Process event1 and verify sequence number is 1
-      await service.storeEvents([event1], context);
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-      expect(checkpoint1?.status).toBe("processed");
-
-      // Process event2 and verify sequence number is 2
-      await service.storeEvents([event2], context);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint2).not.toBeNull();
-      expect(checkpoint2?.sequenceNumber).toBe(2);
-      expect(checkpoint2?.status).toBe("processed");
-
-      // Process event3 and verify sequence number is 3
-      await service.storeEvents([event3], context);
-      const checkpoint3 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint3).not.toBeNull();
-      expect(checkpoint3?.sequenceNumber).toBe(3);
-      expect(checkpoint3?.status).toBe("processed");
+      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
+      expect(checkpoint).toBeNull();
     });
 
-    it("concurrent events with same timestamp get correct sequence numbers", async () => {
+    it("handles concurrent events with same timestamp independently", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -346,10 +276,9 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
-      // Create events with same timestamp but different IDs (sorted by ID)
+      // Create events with same timestamp but different IDs
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -389,7 +318,17 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process events in order and verify sequence numbers after each
+      // Process all events - handlers process independently, no checkpoints
+      await service.storeEvents([event1], context);
+      await service.storeEvents([event2], context);
+      await service.storeEvents([event3], context);
+
+      expect(handler.handle).toHaveBeenCalledTimes(3);
+      expect(handler.handle).toHaveBeenCalledWith(event1);
+      expect(handler.handle).toHaveBeenCalledWith(event2);
+      expect(handler.handle).toHaveBeenCalledWith(event3);
+
+      // Verify no handler checkpoint was created
       const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -397,27 +336,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-
-      // Process event1 and verify sequence number is 1 (id ending in :a)
-      await service.storeEvents([event1], context);
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-      expect(checkpoint1?.status).toBe("processed");
-
-      // Process event2 and verify sequence number is 2 (id ending in :b)
-      await service.storeEvents([event2], context);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint2).not.toBeNull();
-      expect(checkpoint2?.sequenceNumber).toBe(2);
-      expect(checkpoint2?.status).toBe("processed");
-
-      // Process event3 and verify sequence number is 3 (id ending in :c)
-      await service.storeEvents([event3], context);
-      const checkpoint3 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint3).not.toBeNull();
-      expect(checkpoint3?.sequenceNumber).toBe(3);
-      expect(checkpoint3?.status).toBe("processed");
+      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
+      expect(checkpoint).toBeNull();
     });
   });
 
@@ -443,7 +363,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -535,7 +454,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -578,11 +496,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
   });
 
   describe("sequence number edge cases", () => {
-    it("events with identical timestamps get sequential numbers based on ID", async () => {
+    it("events with identical timestamps get sequential numbers based on ID for projections", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -590,11 +509,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
@@ -637,11 +559,18 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process events and verify sequence numbers after each
+      // Mock projection handler
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
+
+      // Process events and verify projection sequence numbers after each
       const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
@@ -668,11 +597,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(checkpointC?.status).toBe("processed");
     });
 
-    it("sequence numbers are deterministic (same events = same sequence numbers)", async () => {
+    it("sequence numbers are deterministic for projections (same events = same sequence numbers)", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -680,12 +610,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
+
+      // Mock projection handler
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
 
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -706,26 +646,20 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await eventStore.storeEvents([event1, event2], context, aggregateType);
 
       // Process events and capture sequence numbers
-      await service.storeEvents([event1], context);
-      const checkpointKey1 = buildCheckpointKey(
+      const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
+
+      await service.storeEvents([event1], context);
+      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
       const seq1 = checkpoint1?.sequenceNumber;
 
       await service.storeEvents([event2], context);
-      const checkpointKey2 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey2);
+      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
       const seq2 = checkpoint2?.sequenceNumber;
 
       // Verify sequence numbers are as expected
@@ -735,33 +669,38 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Create a new service instance and process same events
       const eventStore2 = new EventStoreMemory<Event>();
       const checkpointStore2 = new ProcessorCheckpointStoreMemory();
+      const projectionHandler2 = createMockEventHandler<Event, any>();
+      projectionHandler2.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
       const service2 = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore: eventStore2,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler2,
+            createMockProjectionStore(),
+          ),
         },
         processorCheckpointStore: checkpointStore2,
-        distributedLock: createMockDistributedLock(),
       });
 
       // Store same events
       await eventStore2.storeEvents([event1, event2], context, aggregateType);
 
       // Process events and check sequence numbers after each
-      // Reuse checkpointKey2 from above since it's the same key
-
-      // Process event1 and check sequence number
       await service2.storeEvents([event1], context);
       const checkpoint1_2 =
-        await checkpointStore2.loadCheckpoint(checkpointKey2);
+        await checkpointStore2.loadCheckpoint(checkpointKey);
       const seq1_2 = checkpoint1_2?.sequenceNumber;
 
-      // Process event2 and check sequence number
       await service2.storeEvents([event2], context);
       const checkpoint2_2 =
-        await checkpointStore2.loadCheckpoint(checkpointKey2);
+        await checkpointStore2.loadCheckpoint(checkpointKey);
       const seq2_2 = checkpoint2_2?.sequenceNumber;
 
       // Verify sequence numbers are the same
@@ -790,7 +729,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -854,11 +792,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(seq2_2).toBe(seq2);
     });
 
-    it("multiple events with same timestamp processed correctly", async () => {
+    it("multiple events with same timestamp processed correctly for projections", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -866,12 +805,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
+
+      // Mock projection handler
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
       const event1 = createTestEvent(
@@ -912,11 +861,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process events in order and verify sequence numbers after each
+      // Process events in order and verify projection sequence numbers after each
       const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
+        "projection",
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
@@ -942,8 +891,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(checkpoint3?.sequenceNumber).toBe(3);
       expect(checkpoint3?.status).toBe("processed");
 
-      // Verify handler was called for all events
-      expect(handler.handle).toHaveBeenCalledTimes(3);
+      // Verify projection handler was called for all events
+      expect(projectionHandler.handle).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -964,7 +913,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -990,8 +938,9 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
-      // Verify handler was only called once (idempotency check)
-      expect(handler.handle).toHaveBeenCalledTimes(1);
+      // Handlers no longer use checkpoints - they process each event independently
+      // Event is dispatched twice (once per storeEvents call), so handler is called twice
+      expect(handler.handle).toHaveBeenCalledTimes(2);
     });
 
     it("prevents duplicate when event stored directly then via service", async () => {
@@ -1010,7 +959,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1024,7 +972,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Store event1 directly in event store
       await eventStore.storeEvents([event1], context, aggregateType);
 
-      // Store event1 again via service (should not create duplicate)
+      // Store event1 again via service (should not create duplicate in store)
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once
@@ -1036,7 +984,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
-      // Verify sequence number is correct (should be 1, not affected by duplicate attempt)
+      // Handler is called once (from the service.storeEvents call)
+      expect(handler.handle).toHaveBeenCalledTimes(1);
+      expect(handler.handle).toHaveBeenCalledWith(event1);
+
+      // Handlers no longer create checkpoints
       const checkpointKey1 = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -1045,9 +997,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.AGGREGATE_ID,
       );
       const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-      expect(checkpoint1?.status).toBe("processed");
+      expect(checkpoint1).toBeNull();
     });
 
     it("handles batch storage with duplicates correctly", async () => {
@@ -1066,7 +1016,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1097,23 +1046,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
 
-      // Verify handler was called for each unique event
-      expect(handler.handle).toHaveBeenCalledTimes(2);
+      // Verify handler was called for each event in the batch (including duplicate)
+      // Handlers no longer use checkpoints for idempotency - they process each event independently
+      expect(handler.handle).toHaveBeenCalledTimes(3);
       expect(handler.handle).toHaveBeenCalledWith(event1);
       expect(handler.handle).toHaveBeenCalledWith(event2);
-
-      // Verify final checkpoint has correct sequence number (2, since there are 2 unique events)
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint).not.toBeNull();
-      expect(checkpoint?.sequenceNumber).toBe(2);
-      expect(checkpoint?.status).toBe("processed");
     });
 
     it("prevents duplicates with multiple handlers correctly", async () => {
@@ -1134,7 +1071,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler2: createMockEventHandlerDefinition("handler2", handler2),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1160,35 +1096,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
-      // Verify both handlers were only called once each (idempotency)
-      expect(handler1.handle).toHaveBeenCalledTimes(1);
-      expect(handler2.handle).toHaveBeenCalledTimes(1);
+      // Handlers no longer use checkpoints - they process each event independently
+      // Event is dispatched twice (once per storeEvents call), so each handler is called twice
+      expect(handler1.handle).toHaveBeenCalledTimes(2);
+      expect(handler2.handle).toHaveBeenCalledTimes(2);
       expect(handler1.handle).toHaveBeenCalledWith(event1);
       expect(handler2.handle).toHaveBeenCalledWith(event1);
-
-      // Verify checkpoints exist for both handlers
-      const checkpoint1_handler1 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(
-          tenantId,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "handler1",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.AGGREGATE_ID,
-        ),
-      );
-      const checkpoint1_handler2 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(
-          tenantId,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "handler2",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.AGGREGATE_ID,
-        ),
-      );
-      expect(checkpoint1_handler1).not.toBeNull();
-      expect(checkpoint1_handler2).not.toBeNull();
-      expect(checkpoint1_handler1?.status).toBe("processed");
-      expect(checkpoint1_handler2?.status).toBe("processed");
     });
 
     it("stores events in different aggregates separately (partition isolation)", async () => {
@@ -1207,7 +1120,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const aggregateId1 = "aggregate-1";
@@ -1260,7 +1172,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(handler.handle).toHaveBeenCalledWith(event1_agg1);
       expect(handler.handle).toHaveBeenCalledWith(event1_agg2);
 
-      // Verify checkpoints exist for both events (different event IDs)
+      // Handlers no longer create checkpoints - verify they're absent
       const checkpoint1 = await checkpointStore.loadCheckpoint(
         buildCheckpointKey(
           tenantId,
@@ -1279,11 +1191,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           aggregateId2,
         ),
       );
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint2).not.toBeNull();
+      expect(checkpoint1).toBeNull();
+      expect(checkpoint2).toBeNull();
     });
 
-    it("handles batch with mixed duplicates correctly - only processes new events", async () => {
+    it("handles batch with mixed duplicates correctly - dispatches all events to handlers", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
@@ -1299,7 +1211,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1342,14 +1253,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event3.id)).toBeDefined();
 
-      // Verify handler was called for event2 and event3 only (event1 already processed)
-      // Total calls: 1 (initial event1) + 2 (event2, event3) = 3
-      expect(handler.handle).toHaveBeenCalledTimes(3);
+      // Handlers process all dispatched events independently - no checkpoint-based idempotency
+      // Total calls: 1 (initial event1) + 3 (event1 duplicate + event2 + event3) = 4
+      expect(handler.handle).toHaveBeenCalledTimes(4);
       expect(handler.handle).toHaveBeenCalledWith(event1);
       expect(handler.handle).toHaveBeenCalledWith(event2);
       expect(handler.handle).toHaveBeenCalledWith(event3);
 
-      // Verify final checkpoint has correct sequence number (3, since there are 3 unique events)
+      // Handlers no longer create checkpoints
       const checkpointKey = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -1358,9 +1269,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         TEST_CONSTANTS.AGGREGATE_ID,
       );
       const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint).not.toBeNull();
-      expect(checkpoint?.status).toBe("processed");
-      expect(checkpoint?.sequenceNumber).toBe(3);
+      expect(checkpoint).toBeNull();
     });
   });
 });

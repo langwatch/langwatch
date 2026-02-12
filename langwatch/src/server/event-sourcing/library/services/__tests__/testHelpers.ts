@@ -23,7 +23,6 @@ import type {
   ProjectionStore,
   ProjectionStoreReadContext,
 } from "../../stores/projectionStore.types";
-import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
 
 /**
  * Creates a mock EventStore with default implementations.
@@ -144,19 +143,6 @@ export function createMockProjectionDefinition<
     handler: handler ?? createMockEventHandler<TEvent, TProjection>(),
     store: store ?? createMockProjectionStore<TProjection>(),
     options,
-  };
-}
-
-/**
- * Creates a mock DistributedLock with default implementations.
- */
-export function createMockDistributedLock(): DistributedLock {
-  return {
-    acquire: vi.fn().mockResolvedValue({
-      key: "test-key",
-      value: "test-value",
-    } as LockHandle),
-    release: vi.fn().mockResolvedValue(void 0),
   };
 }
 
