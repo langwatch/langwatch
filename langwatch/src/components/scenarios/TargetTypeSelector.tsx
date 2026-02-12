@@ -9,7 +9,7 @@ import { useMemo, useRef, useState } from "react";
 import { Listbox } from "../ui/listbox";
 import { Popover } from "../ui/popover";
 
-export type TargetType = "prompt" | "http";
+export type TargetType = "prompt" | "http" | "code";
 
 interface TargetTypeSelectorProps {
   value: TargetType;
@@ -19,6 +19,7 @@ interface TargetTypeSelectorProps {
 const TARGET_TYPE_OPTIONS = [
   { label: "Prompt", value: "prompt" as const },
   { label: "HTTP Agent", value: "http" as const },
+  { label: "Code Agent", value: "code" as const },
 ];
 
 /**

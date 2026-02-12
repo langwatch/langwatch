@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Globe, Plus } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -7,7 +7,7 @@ import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 
 export type TargetValue = {
-  type: "prompt" | "http";
+  type: "prompt" | "http" | "code";
   id: string;
 } | null;
 
@@ -66,6 +66,15 @@ export function TargetSelector({
     );
   }, [agents, searchValue]);
 
+  // Filter code agents (already sorted by updatedAt desc from backend)
+  const filteredCodeAgents = useMemo(() => {
+    const codeAgents = agents?.filter((a) => a.type === "code") ?? [];
+    if (!searchValue) return codeAgents;
+    return codeAgents.filter((a) =>
+      a.name.toLowerCase().includes(searchValue.toLowerCase()),
+    );
+  }, [agents, searchValue]);
+
   // Get the selected item's label for display
   const selectedLabel = useMemo(() => {
     if (!value) return null;
@@ -73,6 +82,7 @@ export function TargetSelector({
       const prompt = prompts?.find((p) => p.id === value.id);
       return prompt ? (prompt.handle ?? prompt.id) : null;
     }
+    // Both "http" and "code" agents come from the agents list
     const agent = agents?.find((a) => a.id === value.id);
     return agent?.name ?? null;
   }, [value, prompts, agents]);
@@ -122,6 +132,7 @@ export function TargetSelector({
           <HStack gap={2}>
             {value?.type === "prompt" && <BookText size={14} />}
             {value?.type === "http" && <Globe size={14} />}
+            {value?.type === "code" && <Code size={14} />}
             <Text>{selectedLabel ?? placeholder}</Text>
           </HStack>
           <ChevronDown size={14} />
@@ -212,6 +223,55 @@ export function TargetSelector({
                 <Plus size={14} />
                 <Text fontSize="sm">Add New Agent</Text>
               </HStack>
+            </Box>
+
+            {/* Code Agents Section */}
+            <Box borderTopWidth="1px" borderColor="border">
+              <Text
+                fontSize="xs"
+                fontWeight="bold"
+                textTransform="uppercase"
+                color="fg.muted"
+                paddingX={3}
+                paddingY={2}
+                bg="bg.subtle"
+                position="sticky"
+                top={0}
+                zIndex={5}
+              >
+                Code Agents
+              </Text>
+              {filteredCodeAgents.length === 0 ? (
+                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
+                  {searchValue ? "No code agents found" : "No code agents available"}
+                </Text>
+              ) : (
+                filteredCodeAgents.map((agent) => (
+                  <HStack
+                    key={agent.id}
+                    paddingX={3}
+                    paddingY={2}
+                    cursor="pointer"
+                    bg={
+                      value?.type === "code" && value.id === agent.id
+                        ? "blue.50"
+                        : "transparent"
+                    }
+                    _hover={{ bg: "gray.100" }}
+                    onClick={() => handleSelect({ type: "code", id: agent.id })}
+                  >
+                    <Code size={14} color="var(--chakra-colors-gray-500)" />
+                    <Text fontSize="sm" flex={1}>
+                      {agent.name}
+                    </Text>
+                    {value?.type === "code" && value.id === agent.id && (
+                      <Text color="blue.500" fontSize="sm">
+                        ✓
+                      </Text>
+                    )}
+                  </HStack>
+                ))
+              )}
             </Box>
 
             {/* Prompts Section */}

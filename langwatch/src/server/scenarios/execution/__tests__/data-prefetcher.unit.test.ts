@@ -283,6 +283,64 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given code agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with code agent not found error", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Code agent");
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
+    });
+
+    describe("given code agent has wrong type", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure when agent type mismatch", async () => {
+          const httpAgent = {
+            id: "agent_456",
+            type: "http" as const,
+            name: "HTTP Agent",
+            projectId: "proj_123",
+            config: {
+              url: "https://api.example.com",
+              method: "POST",
+              headers: [],
+            },
+            workflowId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            archivedAt: null,
+          };
+
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(httpAgent),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Code agent");
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
+    });
+
     describe("given model params preparation fails", () => {
       const promptWithModel = {
         id: "prompt_123",
@@ -309,6 +367,74 @@ describe("prefetchScenarioData", () => {
           if (!result.success) {
             expect(result.error).toBe("Failed to prepare model params");
           }
+        });
+      });
+    });
+  });
+
+  describe("code agent prefetch", () => {
+    describe("given a code agent exists with Python code and inputs/outputs", () => {
+      const codeAgent = {
+        id: "agent_456",
+        type: "code" as const,
+        name: "Classifier",
+        projectId: "proj_123",
+        config: {
+          parameters: [
+            { identifier: "code", type: "code", value: 'def execute(input):\n    return "classified"' },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+        workflowId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+
+      describe("when prefetching scenario data", () => {
+        it("fetches the agent and serializes code, inputs, and outputs", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(codeAgent),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.adapterData).toMatchObject({
+              type: "code",
+              agentId: "agent_456",
+              code: 'def execute(input):\n    return "classified"',
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            });
+          }
+        });
+
+        it("uses project defaultModel (code agents have no model)", async () => {
+          const mockModelParamsProvider: ModelParamsProvider = {
+            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+          };
+
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(codeAgent),
+            },
+            modelParamsProvider: mockModelParamsProvider,
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "anthropic/claude-3-sonnet",
+          );
         });
       });
     });
