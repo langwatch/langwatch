@@ -22,7 +22,7 @@
 #
 # Resource limits:
 #   minimal (dev):     ~6.3GB (postgres 256 + redis 64 + app 6144)
-#   scenarios:         ~7.6GB (+ workers 512 + scenario 512 + nlp 256 + bullboard 128 + ai-server 128)
+#   scenarios:         ~9.3GB (+ workers 1536 + nlp 1024 + bullboard 128 + ai-server 128)
 #   full:              ~8.6GB (+ opensearch 512 + langevals 256)
 #
 # Stop everything:
@@ -135,6 +135,7 @@ services:
 
   app:
     image: node:24
+    restart: unless-stopped
     working_dir: /app
     volumes:
       - ./langwatch:/app
@@ -196,7 +197,7 @@ services:
       BASE_HOST: http://app:5560
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # Uncomment to enable verbose scenario SDK logging
-      # SCENARIO_VERBOSE: "true"
+      SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
     depends_on:
@@ -205,7 +206,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 1536m
           cpus: "0.5"
 
   # =============================================================================
@@ -223,7 +224,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 1024m
           cpus: "0.5"
 
   langevals:

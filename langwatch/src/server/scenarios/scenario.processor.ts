@@ -173,6 +173,8 @@ export function buildChildProcessEnv(
     // Node.js vars
     NODE_ENV: process.env.NODE_ENV,
     NODE_OPTIONS: process.env.NODE_OPTIONS,
+    // Corepack vars (required for pnpm exec tsx in child processes)
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
     // Scenario-specific vars (passed in)
     ...scenarioVars,
   };

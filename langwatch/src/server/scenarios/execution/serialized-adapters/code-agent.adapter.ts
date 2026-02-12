@@ -139,21 +139,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       ],
       edges: [
         // entry -> code_agent edges (one per input)
+        // Handle format is "outputs.field" / "inputs.field" (no node ID prefix)
         ...inputs.map((inp) => ({
           id: `${entryNodeId}-${codeNodeId}-${inp.identifier}`,
           source: entryNodeId,
-          sourceHandle: `${entryNodeId}.outputs.${inp.identifier}`,
+          sourceHandle: `outputs.${inp.identifier}`,
           target: codeNodeId,
-          targetHandle: `${codeNodeId}.inputs.${inp.identifier}`,
+          targetHandle: `inputs.${inp.identifier}`,
           type: "default",
         })),
         // code_agent -> end edges (one per output)
         ...outputs.map((out) => ({
           id: `${codeNodeId}-${endNodeId}-${out.identifier}`,
           source: codeNodeId,
-          sourceHandle: `${codeNodeId}.outputs.${out.identifier}`,
+          sourceHandle: `outputs.${out.identifier}`,
           target: endNodeId,
-          targetHandle: `${endNodeId}.inputs.${out.identifier}`,
+          targetHandle: `inputs.${out.identifier}`,
           type: "default",
         })),
       ],
@@ -190,15 +191,25 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     );
 
     try {
-      const response = await fetch(
-        `${this.nlpServiceUrl}/studio/execute_sync`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        },
-      );
+      let response: Response;
+      try {
+        response = await fetch(
+          `${this.nlpServiceUrl}/studio/execute_sync`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+            signal: controller.signal,
+          },
+        );
+      } catch (fetchError) {
+        const cause = fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
+          : "";
+        throw new Error(
+          `Code execution failed: fetch to ${this.nlpServiceUrl}/studio/execute_sync failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
+        );
+      }
 
       if (!response.ok) {
         let errorMessage = "";

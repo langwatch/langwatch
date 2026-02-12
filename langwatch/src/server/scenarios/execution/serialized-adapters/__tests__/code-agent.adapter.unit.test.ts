@@ -281,16 +281,16 @@ describe("SerializedCodeAgentAdapter", () => {
         (e: { source: string; target: string }) =>
           e.source === "entry" && e.target === "code_agent",
       );
-      expect(entryToCode.sourceHandle).toBe("entry.outputs.input");
-      expect(entryToCode.targetHandle).toBe("code_agent.inputs.input");
+      expect(entryToCode.sourceHandle).toBe("outputs.input");
+      expect(entryToCode.targetHandle).toBe("inputs.input");
 
       // code_agent -> end edge
       const codeToEnd = edges.find(
         (e: { source: string; target: string }) =>
           e.source === "code_agent" && e.target === "end",
       );
-      expect(codeToEnd.sourceHandle).toBe("code_agent.outputs.output");
-      expect(codeToEnd.targetHandle).toBe("end.inputs.output");
+      expect(codeToEnd.sourceHandle).toBe("outputs.output");
+      expect(codeToEnd.targetHandle).toBe("inputs.output");
     });
   });
 });
