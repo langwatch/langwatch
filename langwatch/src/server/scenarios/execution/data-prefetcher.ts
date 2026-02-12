@@ -315,7 +315,7 @@ async function fetchHttpAgentData(
  * Zod schema for code agent config validation.
  * Code agents have a parameters array with a "code" entry, plus inputs/outputs.
  */
-const CodeAgentConfigSchema = z.object({
+const RawCodeAgentConfigSchema = z.object({
   parameters: z.array(z.object({
     identifier: z.string(),
     type: z.string(),
@@ -339,7 +339,7 @@ async function fetchCodeAgentData(
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "code") return null;
 
-  const parseResult = CodeAgentConfigSchema.safeParse(agent.config);
+  const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) {
     return null;
   }

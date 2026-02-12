@@ -23,7 +23,7 @@
 # Resource limits:
 #   minimal (dev):     ~6.3GB (postgres 256 + redis 64 + app 6144)
 #   scenarios:         ~9.3GB (+ workers 1536 + nlp 1024 + bullboard 128 + ai-server 128)
-#   full:              ~8.6GB (+ opensearch 512 + langevals 256)
+#   full:              ~10.0GB (+ opensearch 512 + langevals 256)
 #
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
@@ -196,8 +196,7 @@ services:
       # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
-      # Uncomment to enable verbose scenario SDK logging
-      SCENARIO_VERBOSE: "true"
+      # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
     depends_on:

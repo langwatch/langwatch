@@ -24,6 +24,10 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
 export class SerializedCodeAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
+  private static readonly ENTRY_NODE_ID = "entry";
+  private static readonly CODE_NODE_ID = "code_agent";
+  private static readonly END_NODE_ID = "end";
+
   constructor(
     private readonly config: CodeAgentData,
     private readonly nlpServiceUrl: string,
@@ -53,9 +57,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * an end node to capture the code node's outputs.
    */
   private buildWorkflow(inputValue: string) {
-    const entryNodeId = "entry";
-    const codeNodeId = "code_agent";
-    const endNodeId = "end";
+    const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
+      SerializedCodeAgentAdapter;
 
     // Build input fields - only the first input receives the scenario message,
     // remaining inputs get empty strings (code agents with multiple inputs
@@ -85,80 +88,100 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       template_adapter: "default" as const,
       default_llm: null,
       nodes: [
-        {
-          id: entryNodeId,
-          type: "entry",
-          position: { x: 0, y: 0 },
-          data: {
-            name: "Entry",
-            outputs: inputs.map((inp) => ({
-              identifier: inp.identifier,
-              type: inp.type,
-            })),
-            entry_selection: "first",
-            train_size: 1,
-            test_size: 1,
-            seed: 42,
-            dataset: {
-              id: "scenario-input",
-              name: "Scenario Input",
-              inline: null,
-            },
-          },
-        },
-        {
-          id: codeNodeId,
-          type: "code",
-          position: { x: 200, y: 0 },
-          data: {
-            name: "CodeAgent",
-            inputs,
-            outputs,
-            parameters: [
-              {
-                identifier: "code",
-                type: "code",
-                value: this.config.code,
-              },
-            ],
-            cls: "Code",
-          },
-        },
-        {
-          id: endNodeId,
-          type: "end",
-          position: { x: 400, y: 0 },
-          data: {
-            name: "End",
-            inputs: outputs.map((out) => ({
-              identifier: out.identifier,
-              type: out.type,
-            })),
-          },
-        },
+        this.buildEntryNode(inputs),
+        this.buildCodeNode(inputs, outputs),
+        this.buildEndNode(outputs),
       ],
       edges: [
         // entry -> code_agent edges (one per input)
         // Handle format is "outputs.field" / "inputs.field" (no node ID prefix)
         ...inputs.map((inp) => ({
-          id: `${entryNodeId}-${codeNodeId}-${inp.identifier}`,
-          source: entryNodeId,
+          id: `${ENTRY_NODE_ID}-${CODE_NODE_ID}-${inp.identifier}`,
+          source: ENTRY_NODE_ID,
           sourceHandle: `outputs.${inp.identifier}`,
-          target: codeNodeId,
+          target: CODE_NODE_ID,
           targetHandle: `inputs.${inp.identifier}`,
           type: "default",
         })),
         // code_agent -> end edges (one per output)
         ...outputs.map((out) => ({
-          id: `${codeNodeId}-${endNodeId}-${out.identifier}`,
-          source: codeNodeId,
+          id: `${CODE_NODE_ID}-${END_NODE_ID}-${out.identifier}`,
+          source: CODE_NODE_ID,
           sourceHandle: `outputs.${out.identifier}`,
-          target: endNodeId,
+          target: END_NODE_ID,
           targetHandle: `inputs.${out.identifier}`,
           type: "default",
         })),
       ],
       state: { execution: { status: "idle" } },
+    };
+  }
+
+  /** Build the entry node that provides input fields to the workflow. */
+  private buildEntryNode(
+    inputs: { identifier: string; type: string; value: string }[],
+  ) {
+    return {
+      id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
+      type: "entry",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Entry",
+        outputs: inputs.map((inp) => ({
+          identifier: inp.identifier,
+          type: inp.type,
+        })),
+        entry_selection: "first",
+        train_size: 1,
+        test_size: 1,
+        seed: 42,
+        dataset: {
+          id: "scenario-input",
+          name: "Scenario Input",
+          inline: null,
+        },
+      },
+    };
+  }
+
+  /** Build the code node that executes the agent's Python code. */
+  private buildCodeNode(
+    inputs: { identifier: string; type: string; value: string }[],
+    outputs: { identifier: string; type: string }[],
+  ) {
+    return {
+      id: SerializedCodeAgentAdapter.CODE_NODE_ID,
+      type: "code",
+      position: { x: 200, y: 0 },
+      data: {
+        name: "CodeAgent",
+        inputs,
+        outputs,
+        parameters: [
+          {
+            identifier: "code",
+            type: "code",
+            value: this.config.code,
+          },
+        ],
+        cls: "Code",
+      },
+    };
+  }
+
+  /** Build the end node that captures code node outputs for the response. */
+  private buildEndNode(outputs: { identifier: string; type: string }[]) {
+    return {
+      id: SerializedCodeAgentAdapter.END_NODE_ID,
+      type: "end",
+      position: { x: 400, y: 0 },
+      data: {
+        name: "End",
+        inputs: outputs.map((out) => ({
+          identifier: out.identifier,
+          type: out.type,
+        })),
+      },
     };
   }
 
