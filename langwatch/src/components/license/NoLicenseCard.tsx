@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { formatFileSize } from "./licenseStatusUtils";
 
@@ -216,16 +217,27 @@ export function NoLicenseCard({
             </Field.Root>
           )}
 
-          <Button
-            colorPalette="blue"
-            variant="solid"
-            size="sm"
-            onClick={handleActivate}
-            loading={isActivating}
-            disabled={isActivateDisabled}
-          >
-            Activate License
-          </Button>
+          <HStack gap={3}>
+            <Button
+              colorPalette="blue"
+              variant="solid"
+              size="sm"
+              onClick={handleActivate}
+              loading={isActivating}
+              disabled={isActivateDisabled}
+            >
+              Activate License
+            </Button>
+            <Link
+              href="mailto:sales@langwatch.ai"
+              isExternal
+              color="blue.fg"
+              fontSize="sm"
+              _hover={{ textDecoration: "underline" }}
+            >
+              Contact sales
+            </Link>
+          </HStack>
         </VStack>
       </VStack>
     </Box>
