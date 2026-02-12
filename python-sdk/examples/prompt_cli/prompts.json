@@ -1,0 +1,5 @@
+{
+  "prompts": {
+    "agent/performance": "file:prompts/agent/performance.prompt.yaml"
+  }
+}
