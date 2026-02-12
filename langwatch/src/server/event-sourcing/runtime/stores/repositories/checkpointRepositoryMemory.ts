@@ -1,4 +1,5 @@
 import type { createLogger } from "~/utils/logger/server";
+import type { TenantId } from "../../../library/domain/tenantId";
 import type {
   CheckpointRecord,
   CheckpointRepository,
@@ -22,6 +23,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
 
   async getCheckpointRecord(
     checkpointKey: string,
+    _tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     const record = this.checkpoints.get(checkpointKey);
     if (!record) {
@@ -33,6 +35,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
 
   async getLastProcessedCheckpointRecord(
     checkpointKey: string,
+    _tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     const record = this.checkpoints.get(checkpointKey);
     if (!record || record.Status !== "processed") {
@@ -46,6 +49,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
   async getCheckpointRecordBySequenceNumber(
     checkpointKey: string,
     sequenceNumber: number,
+    _tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     const record = this.checkpoints.get(checkpointKey);
 
@@ -106,13 +110,17 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
     return null;
   }
 
-  async hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean> {
+  async hasFailedCheckpointRecords(
+    checkpointKey: string,
+    _tenantId: TenantId,
+  ): Promise<boolean> {
     const record = this.checkpoints.get(checkpointKey);
     return record?.Status === "failed";
   }
 
   async getFailedCheckpointRecords(
     checkpointKey: string,
+    _tenantId: TenantId,
   ): Promise<CheckpointRecord[]> {
     const record = this.checkpoints.get(checkpointKey);
     if (!record || record.Status !== "failed") {
@@ -141,7 +149,10 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
     );
   }
 
-  async deleteCheckpointRecord(checkpointKey: string): Promise<void> {
+  async deleteCheckpointRecord(
+    checkpointKey: string,
+    _tenantId: TenantId,
+  ): Promise<void> {
     this.checkpoints.delete(checkpointKey);
   }
 }

@@ -478,14 +478,15 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
 
       await store.clearCheckpoint(tenantId, checkpointKey);
 
-      // Verify ALTER DELETE command was executed
+      // Verify ALTER DELETE command was executed with TenantId for primary index optimization
       expect(mockClickHouseClient.command).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.stringMatching(
-            /ALTER TABLE processor_checkpoints.*DELETE WHERE CheckpointKey/s,
+            /ALTER TABLE processor_checkpoints.*DELETE WHERE TenantId.*AND CheckpointKey/s,
           ),
           query_params: expect.objectContaining({
             checkpointKey,
+            tenantId: tenantId.toString(),
           }),
         }),
       );

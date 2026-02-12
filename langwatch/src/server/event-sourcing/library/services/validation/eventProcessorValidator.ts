@@ -116,12 +116,15 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     processorType: "handler" | "projection",
     event: EventType,
     context: EventStoreReadContext<EventType>,
-    options?: { events?: readonly EventType[] },
+    options?: { events?: readonly EventType[]; sequenceNumber?: number },
   ): Promise<number | null> {
     // Compute sequence number for this event
     let sequenceNumber: number;
     try {
-      if (options?.events) {
+      if (options?.sequenceNumber !== undefined) {
+        // Use pre-computed sequence number (avoids duplicate ClickHouse query)
+        sequenceNumber = options.sequenceNumber;
+      } else if (options?.events) {
         // Use pre-loaded events array to compute sequence number
         sequenceNumber = this.computeSequenceNumberFromEvents(
           event,

@@ -712,12 +712,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
 
         try {
           // Validate event processing prerequisites (idempotency, failures, ordering)
+          // Pass pre-computed sequenceNumber to avoid a duplicate ClickHouse query
           const validatedSequenceNumber =
             await this.validator.validateEventProcessing(
               handlerName,
               "handler",
               event,
               context,
+              { sequenceNumber },
             );
 
           // If validation returned null, processing should be skipped (already processed or has failures)

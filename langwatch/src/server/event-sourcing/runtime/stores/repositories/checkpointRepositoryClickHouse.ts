@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "../../../../../utils/logger/server";
+import type { TenantId } from "../../../library/domain/tenantId";
 import type {
   CheckpointRecord,
   CheckpointRepository,
@@ -20,6 +21,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
 
   async getCheckpointRecord(
     checkpointKey: string,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     try {
       // Use FINAL to get the latest version from ReplacingMergeTree
@@ -27,6 +29,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
       // be returned by this method which loads "current state"
       // With ORDER BY (TenantId, CheckpointKey, Status), we need to explicitly
       // filter by Status to avoid non-deterministic results
+      // TenantId filter enables primary index skip (first column in ORDER BY)
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
@@ -44,13 +47,15 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateType,
             AggregateId
           FROM processor_checkpoints FINAL
-          WHERE CheckpointKey = {checkpointKey:String}
+          WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
             AND Status != 'failed'
           ORDER BY SequenceNumber DESC
           LIMIT 1
         `,
         query_params: {
           checkpointKey,
+          tenantId,
         },
         format: "JSONEachRow",
       });
@@ -78,6 +83,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
 
   async getLastProcessedCheckpointRecord(
     checkpointKey: string,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     try {
       const result = await this.clickHouseClient.query({
@@ -97,12 +103,14 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateType,
             AggregateId
           FROM processor_checkpoints FINAL
-          WHERE CheckpointKey = {checkpointKey:String}
+          WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
             AND Status = 'processed'
           LIMIT 1
         `,
         query_params: {
           checkpointKey,
+          tenantId,
         },
         format: "JSONEachRow",
       });
@@ -131,6 +139,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
   async getCheckpointRecordBySequenceNumber(
     checkpointKey: string,
     sequenceNumber: number,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord | null> {
     try {
       // Query for checkpoints that prove the requested sequence was processed.
@@ -166,7 +175,8 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateType,
             AggregateId
           FROM processor_checkpoints FINAL
-          WHERE CheckpointKey = {checkpointKey:String}
+          WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
             AND Status != 'failed'
             AND SequenceNumber >= {sequenceNumber:UInt64}
             AND (
@@ -179,6 +189,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
         query_params: {
           checkpointKey,
           sequenceNumber,
+          tenantId,
         },
         format: "JSONEachRow",
       });
@@ -216,18 +227,23 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     }
   }
 
-  async hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean> {
+  async hasFailedCheckpointRecords(
+    checkpointKey: string,
+    tenantId: TenantId,
+  ): Promise<boolean> {
     try {
       const result = await this.clickHouseClient.query({
         query: `
           SELECT COUNT(*) as count
           FROM processor_checkpoints FINAL
-          WHERE CheckpointKey = {checkpointKey:String}
+          WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
             AND Status = 'failed'
           LIMIT 1
         `,
         query_params: {
           checkpointKey,
+          tenantId,
         },
         format: "JSONEachRow",
       });
@@ -251,6 +267,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
 
   async getFailedCheckpointRecords(
     checkpointKey: string,
+    tenantId: TenantId,
   ): Promise<CheckpointRecord[]> {
     try {
       // With ORDER BY (TenantId, CheckpointKey, Status), failed checkpoints are in
@@ -273,12 +290,14 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateType,
             AggregateId
           FROM processor_checkpoints FINAL
-          WHERE CheckpointKey = {checkpointKey:String}
+          WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
             AND Status = 'failed'
           ORDER BY SequenceNumber ASC
         `,
         query_params: {
           checkpointKey,
+          tenantId,
         },
         format: "JSONEachRow",
       });
@@ -338,16 +357,22 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     }
   }
 
-  async deleteCheckpointRecord(checkpointKey: string): Promise<void> {
+  async deleteCheckpointRecord(
+    checkpointKey: string,
+    tenantId: TenantId,
+  ): Promise<void> {
     try {
       // Delete checkpoint using ALTER DELETE
+      // TenantId filter enables primary index skip (first column in ORDER BY)
       await this.clickHouseClient.command({
         query: `
           ALTER TABLE processor_checkpoints
-          DELETE WHERE CheckpointKey = {checkpointKey:String}
+          DELETE WHERE TenantId = {tenantId:String}
+            AND CheckpointKey = {checkpointKey:String}
         `,
         query_params: {
           checkpointKey,
+          tenantId,
         },
       });
 
