@@ -11,7 +11,9 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
   const { isEnterprise } = useActivePlan();
