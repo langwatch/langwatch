@@ -10,6 +10,7 @@ from langwatch.domain import (
     RAGChunk,
 )
 import json
+import math
 from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
 import pydantic
@@ -53,15 +54,47 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
 
 
 class SerializableWithStringFallback(SerializableAndPydanticEncoder):
-    def default(self, o):
+    """JSON encoder that handles non-serializable objects by falling back to str().
+
+    Also converts NaN and Infinity float values to None, since these are not
+    valid JSON (Python's json module outputs bare NaN/Infinity tokens which
+    break RFC 8259-compliant parsers). This commonly occurs with pandas
+    DataFrames where missing values are represented as float('nan').
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        kwargs["allow_nan"] = False
+        super().__init__(*args, **kwargs)
+
+    def default(self, o: Any) -> Any:
         try:
             if hasattr(o, "model_dump"):
-                return o.model_dump(exclude_unset=True)
-            if isinstance(o, set):
-                return list(o)
-            return super().default(o)
-        except:
+                result = o.model_dump(exclude_unset=True)
+            elif isinstance(o, set):
+                result = list(o)
+            else:
+                result = super().default(o)
+            return _sanitize_nan(result)
+        except Exception:
             return str(o)
+
+    def encode(self, o: Any) -> str:
+        return super().encode(_sanitize_nan(o))
+
+    def iterencode(self, o: Any, _one_shot: bool = False) -> Any:
+        return super().iterencode(_sanitize_nan(o), _one_shot)
+
+
+def _sanitize_nan(obj: Any) -> Any:
+    """Recursively replace NaN and Infinity float values with None."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        # JSON has no tuple type; coerce to list
+        return [_sanitize_nan(v) for v in obj]
+    return obj
 
 
 def validate_safe(
