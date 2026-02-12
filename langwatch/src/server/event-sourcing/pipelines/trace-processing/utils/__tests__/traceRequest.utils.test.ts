@@ -289,6 +289,52 @@ describe("traceRequest.utils", () => {
       });
     });
 
+    describe("when attributes use OTEL arrayValue with AnyValue elements", () => {
+      it("unwraps stringValue wrappers inside arrayValue", () => {
+        const attributes = [
+          {
+            key: "langwatch.labels",
+            value: {
+              arrayValue: {
+                values: [
+                  { stringValue: "label1" },
+                  { stringValue: "label2" },
+                ],
+              },
+            },
+          },
+        ];
+
+        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+
+        expect(result["langwatch.labels"]).toBe('["label1","label2"]');
+        const parsed = JSON.parse(result["langwatch.labels"] as string);
+        expect(parsed).toEqual(["label1", "label2"]);
+      });
+
+      it("unwraps mixed scalar types inside arrayValue", () => {
+        const attributes = [
+          {
+            key: "mixed.values",
+            value: {
+              arrayValue: {
+                values: [
+                  { stringValue: "hello" },
+                  { intValue: 42 },
+                  { boolValue: true },
+                ],
+              },
+            },
+          },
+        ];
+
+        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+
+        const parsed = JSON.parse(result["mixed.values"] as string);
+        expect(parsed).toEqual(["hello", 42, true]);
+      });
+    });
+
     describe("edge cases", () => {
       it("handles multiple separate arrays in same input", () => {
         const attributes = [
