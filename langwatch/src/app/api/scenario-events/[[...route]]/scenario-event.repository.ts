@@ -481,13 +481,6 @@ export class ScenarioEventRepository {
   /**
    * Retrieves batch run IDs associated with a scenario set with cursor-based pagination.
    * Results are sorted by latest timestamp in descending order (most recent first).
-   *
-   * @param projectId - The project identifier
-   * @param scenarioSetId - The scenario set identifier
-   * @param limit - Maximum number of batch run IDs to return
-   * @param cursor - Cursor for pagination (search_after value)
-   * @returns Object containing batch run IDs and pagination info
-   * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
    */
   async getBatchRunIdsForScenarioSet({
     projectId,
@@ -504,146 +497,21 @@ export class ScenarioEventRepository {
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
-    const client = await this.getClient();
 
-    // Validate and clamp the limit to prevent ES result window issues
-    const actualLimit = Math.min(limit, 20);
-
-    // Parse cursor to get search_after values
-    let searchAfter: any[] | undefined;
-    if (cursor) {
-      try {
-        // Try to decode base64 cursor first (new stable format)
-        const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
-        const cursorData = JSON.parse(decodedCursor);
-
-        // Validate cursor shape - expected: sort values from search results
-        // These come from Elasticsearch's sort values for the documents
-        if (Array.isArray(cursorData) && cursorData.length > 0) {
-          searchAfter = cursorData;
-        }
-      } catch (e) {
-        captureException({
-          message: "Malformed cursor",
-          cursor,
-          error: e,
-        });
-        throw new Error(`Malformed cursor: ${cursor}`);
-      }
-    }
-
-    // Request more items to account for potential deduplication
-    // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
-
-    // Use search_after with manual deduplication for reliable pagination
-    // This approach is more reliable than collapse with search_after
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
-              { exists: { field: ES_FIELDS.batchRunId } },
-            ],
-          },
-        },
-        sort: [
-          { timestamp: { order: "desc" } },
-          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
-        ],
-        size: requestSize,
-        ...(searchAfter && { search_after: searchAfter }),
-      },
+    return this.queryBatchRunIds({
+      projectId,
+      limit,
+      cursor,
+      setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
     });
-
-    const hits = response.hits?.hits ?? [];
-
-    // Manual deduplication by batch run ID, keeping the latest timestamp for each
-    const batchRunMap = new Map<
-      string,
-      { timestamp: number; sort: any[]; hit: any }
-    >();
-
-    for (const hit of hits) {
-      const source = hit._source as Record<string, any>;
-      const batchRunId = source?.batch_run_id as string;
-      const timestamp = source?.timestamp as number;
-
-      if (batchRunId && timestamp !== undefined) {
-        const existing = batchRunMap.get(batchRunId);
-        if (!existing || timestamp > existing.timestamp) {
-          // Ensure we have valid sort values for pagination
-          const sortValues = hit.sort;
-          if (Array.isArray(sortValues) && sortValues.length > 0) {
-            batchRunMap.set(batchRunId, {
-              timestamp,
-              sort: sortValues,
-              hit: hit,
-            });
-          }
-        }
-      }
-    }
-
-    // Convert to array and sort by timestamp descending, then by batch run ID
-    const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
-      ([keyA, a], [keyB, b]) => {
-        if (b.timestamp !== a.timestamp) {
-          return b.timestamp - a.timestamp;
-        }
-        return String(keyA) < String(keyB)
-          ? -1
-          : String(keyA) > String(keyB)
-            ? 1
-            : 0;
-      },
-    );
-
-    // Determine if there are more results
-    // We have more if we got the full requested size from the aggregation
-    // OR if we have more unique batch runs than requested
-    const hasMore =
-      hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
-
-    let nextCursor: string | undefined;
-
-    if (hasMore && sortedBatchRuns.length > actualLimit) {
-      // Get the sort values from the extra item in the deduplicated results
-      const extraItem = sortedBatchRuns[actualLimit];
-      if (extraItem) {
-        // Use the sort values from the hit for search_after pagination
-        const searchAfterValues = extraItem[1].sort;
-
-        if (
-          Array.isArray(searchAfterValues) &&
-          searchAfterValues.length > 0 &&
-          searchAfterValues.every((val: any) => val !== undefined)
-        ) {
-          // Encode cursor as base64 for stability and compactness
-          nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
-            "base64",
-          );
-        }
-      }
-    }
-
-    // Slice to actualLimit before returning
-    const batchRunIds = sortedBatchRuns
-      .slice(0, actualLimit)
-      .map((item: any) => item[0]); // item[0] is the batchRunId key from the Map entry
-
-    return {
-      batchRunIds,
-      nextCursor,
-      hasMore,
-    };
   }
 
+  /**
+   * Retrieves batch run IDs across all suites with cursor-based pagination.
+   * Uses a wildcard query on scenario_set_id to match all suite sets.
+   * Returns scenarioSetIds map (batchRunId → scenarioSetId) for suite name resolution.
+   */
   async getBatchRunIdsForAllSuites({
     projectId,
     limit,
@@ -658,40 +526,52 @@ export class ScenarioEventRepository {
     nextCursor?: string;
     hasMore: boolean;
   }> {
+    const result = await this.queryBatchRunIds({
+      projectId,
+      limit,
+      cursor,
+      setFilter: { wildcard: { [ES_FIELDS.scenarioSetId]: "__internal__*__suite" } },
+      trackScenarioSetIds: true,
+    });
+
+    return result;
+  }
+
+  /**
+   * Shared implementation for paginated batch run ID queries.
+   * Handles cursor parsing, ES search, deduplication, sorting, and pagination.
+   */
+  private async queryBatchRunIds({
+    projectId,
+    limit,
+    cursor,
+    setFilter,
+    trackScenarioSetIds = false,
+  }: {
+    projectId: string;
+    limit: number;
+    cursor?: string;
+    setFilter: Record<string, any>;
+    trackScenarioSetIds?: boolean;
+  }): Promise<{
+    batchRunIds: string[];
+    scenarioSetIds: Record<string, string>;
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const client = await this.getClient();
 
-    // Validate and clamp the limit to prevent ES result window issues
-    const actualLimit = Math.min(limit, 20);
+    const maxLimit = 20;
+    const actualLimit = Math.min(limit, maxLimit);
 
-    // Parse cursor to get search_after values
-    let searchAfter: any[] | undefined;
-    if (cursor) {
-      try {
-        // Try to decode base64 cursor first (new stable format)
-        const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
-        const cursorData = JSON.parse(decodedCursor);
+    const searchAfter = cursor ? this.decodeCursor(cursor) : undefined;
 
-        // Validate cursor shape - expected: sort values from search results
-        // These come from Elasticsearch's sort values for the documents
-        if (Array.isArray(cursorData) && cursorData.length > 0) {
-          searchAfter = cursorData;
-        }
-      } catch (e) {
-        captureException({
-          message: "Malformed cursor",
-          cursor,
-          error: e,
-        });
-        throw new Error(`Malformed cursor: ${cursor}`);
-      }
-    }
+    // Request 5x the limit (min 1000) to account for deduplication
+    const oversampleFactor = 5;
+    const minRequestSize = 1000;
+    const requestSize = Math.max(actualLimit * oversampleFactor, minRequestSize);
 
-    // Request more items to account for potential deduplication
-    // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
-
-    // Use wildcard query to match all suite scenario sets (__internal__*__suite)
     const response = await client.search({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: {
@@ -699,14 +579,14 @@ export class ScenarioEventRepository {
           bool: {
             filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { wildcard: { [ES_FIELDS.scenarioSetId]: "__internal__*__suite" } },
+              setFilter,
               { exists: { field: ES_FIELDS.batchRunId } },
             ],
           },
         },
         sort: [
           { timestamp: { order: "desc" } },
-          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
+          { [ES_FIELDS.batchRunId]: { order: "asc" } },
         ],
         size: requestSize,
         ...(searchAfter && { search_after: searchAfter }),
@@ -715,29 +595,30 @@ export class ScenarioEventRepository {
 
     const hits = response.hits?.hits ?? [];
 
-    // Manual deduplication by batch run ID, keeping the latest timestamp for each
-    // Also track which scenario_set_id each batch_run_id belongs to
+    // Deduplicate by batch run ID, keeping the latest timestamp for each
     const batchRunMap = new Map<
       string,
-      { timestamp: number; sort: any[]; hit: any; scenarioSetId: string }
+      { timestamp: number; sort: any[]; scenarioSetId: string }
     >();
 
     for (const hit of hits) {
       const source = hit._source as Record<string, any>;
       const batchRunId = source?.batch_run_id as string;
       const timestamp = source?.timestamp as number;
-      const scenarioSetId = source?.scenario_set_id as string;
+      const scenarioSetId = trackScenarioSetIds
+        ? (source?.scenario_set_id as string)
+        : "";
 
-      if (batchRunId && timestamp !== undefined && scenarioSetId) {
+      if (batchRunId && timestamp !== undefined) {
+        if (trackScenarioSetIds && !scenarioSetId) continue;
+
         const existing = batchRunMap.get(batchRunId);
         if (!existing || timestamp > existing.timestamp) {
-          // Ensure we have valid sort values for pagination
           const sortValues = hit.sort;
           if (Array.isArray(sortValues) && sortValues.length > 0) {
             batchRunMap.set(batchRunId, {
               timestamp,
               sort: sortValues,
-              hit: hit,
               scenarioSetId,
             });
           }
@@ -745,60 +626,60 @@ export class ScenarioEventRepository {
       }
     }
 
-    // Convert to array and sort by timestamp descending, then by batch run ID
+    // Sort by timestamp descending, then by batch run ID for stability
     const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
       ([keyA, a], [keyB, b]) => {
-        if (b.timestamp !== a.timestamp) {
-          return b.timestamp - a.timestamp;
-        }
-        return String(keyA) < String(keyB)
-          ? -1
-          : String(keyA) > String(keyB)
-            ? 1
-            : 0;
+        if (b.timestamp !== a.timestamp) return b.timestamp - a.timestamp;
+        return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
       },
     );
 
-    // Determine if there are more results
     const hasMore =
       hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
 
-    let nextCursor: string | undefined;
+    const nextCursor =
+      hasMore && sortedBatchRuns.length > actualLimit
+        ? this.encodeCursor(sortedBatchRuns[actualLimit]?.[1].sort)
+        : undefined;
 
-    if (hasMore && sortedBatchRuns.length > actualLimit) {
-      // Get the sort values from the extra item in the deduplicated results
-      const extraItem = sortedBatchRuns[actualLimit];
-      if (extraItem) {
-        // Use the sort values from the hit for search_after pagination
-        const searchAfterValues = extraItem[1].sort;
+    const limitedBatchRuns = sortedBatchRuns.slice(0, actualLimit);
+    const batchRunIds = limitedBatchRuns.map(([id]) => id);
 
-        if (
-          Array.isArray(searchAfterValues) &&
-          searchAfterValues.length > 0 &&
-          searchAfterValues.every((val: any) => val !== undefined)
-        ) {
-          // Encode cursor as base64 for stability and compactness
-          nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
-            "base64",
-          );
-        }
+    const scenarioSetIds: Record<string, string> = {};
+    if (trackScenarioSetIds) {
+      for (const [batchRunId, data] of limitedBatchRuns) {
+        scenarioSetIds[batchRunId] = data.scenarioSetId;
       }
     }
 
-    // Slice to actualLimit before returning and build scenarioSetIds map
-    const limitedBatchRuns = sortedBatchRuns.slice(0, actualLimit);
-    const batchRunIds = limitedBatchRuns.map((item: any) => item[0]); // item[0] is the batchRunId key
-    const scenarioSetIds: Record<string, string> = {};
-    for (const [batchRunId, data] of limitedBatchRuns) {
-      scenarioSetIds[batchRunId] = data.scenarioSetId;
-    }
+    return { batchRunIds, scenarioSetIds, nextCursor, hasMore };
+  }
 
-    return {
-      batchRunIds,
-      scenarioSetIds,
-      nextCursor,
-      hasMore,
-    };
+  /** Decodes a base64-encoded cursor into search_after values. */
+  private decodeCursor(cursor: string): any[] {
+    try {
+      const decoded = Buffer.from(cursor, "base64").toString("utf-8");
+      const parsed = JSON.parse(decoded);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      throw new Error("Cursor must be a non-empty array");
+    } catch (e) {
+      captureException({ message: "Malformed cursor", cursor, error: e });
+      throw new Error(`Malformed cursor: ${cursor}`);
+    }
+  }
+
+  /** Encodes search_after sort values into a base64 cursor string. */
+  private encodeCursor(sortValues: any[] | undefined): string | undefined {
+    if (
+      !Array.isArray(sortValues) ||
+      sortValues.length === 0 ||
+      sortValues.some((val) => val === undefined)
+    ) {
+      return undefined;
+    }
+    return Buffer.from(JSON.stringify(sortValues)).toString("base64");
   }
 
   /**
