@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.14.0...typescript-sdk@v0.15.0) (2026-02-12)
+
+
+### Features
+
+* **cli:** add separate prompt pull and prompt push commands ([#1543](https://github.com/langwatch/langwatch/issues/1543)) ([76c4881](https://github.com/langwatch/langwatch/commit/76c48817d284b300b33a37bbc52c4047bff8e36e))
+
 ## [0.14.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.13.0...typescript-sdk@v0.14.0) (2026-02-12)
 
 
