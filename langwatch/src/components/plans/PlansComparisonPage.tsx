@@ -17,6 +17,7 @@ import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
+import { SEAT_PRICE } from "../subscription/billing-plans";
 
 type PlanColumn = {
   id: ComparisonPlanId;
@@ -57,7 +58,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
   {
     id: "growth",
     name: "Growth",
-    price: "$29 per seat/month",
+    price: `$${SEAT_PRICE.USD} per seat/month`,
     subtitle: "Seat and usage pricing for growing teams",
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
