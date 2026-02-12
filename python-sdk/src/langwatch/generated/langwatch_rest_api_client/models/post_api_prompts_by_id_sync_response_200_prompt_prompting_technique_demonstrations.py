@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,14 +21,14 @@ T = TypeVar("T", bound="PostApiPromptsByIdSyncResponse200PromptPromptingTechniqu
 class PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrations:
     """
     Attributes:
-        id (Union[Unset, str]):
-        name (Union[Unset, str]):
-        inline (Union[Unset, PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline]):
+        id (str | Unset):
+        name (str | Unset):
+        inline (PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline | Unset):
     """
 
-    id: Union[Unset, str] = UNSET
-    name: Union[Unset, str] = UNSET
-    inline: Union[Unset, "PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline"] = UNSET
+    id: str | Unset = UNSET
+    name: str | Unset = UNSET
+    inline: PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,7 +36,7 @@ class PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrations:
 
         name = self.name
 
-        inline: Union[Unset, dict[str, Any]] = UNSET
+        inline: dict[str, Any] | Unset = UNSET
         if not isinstance(self.inline, Unset):
             inline = self.inline.to_dict()
 
@@ -62,7 +64,7 @@ class PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrations:
         name = d.pop("name", UNSET)
 
         _inline = d.pop("inline", UNSET)
-        inline: Union[Unset, PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline]
+        inline: PostApiPromptsByIdSyncResponse200PromptPromptingTechniqueDemonstrationsInline | Unset
         if isinstance(_inline, Unset):
             inline = UNSET
         else:

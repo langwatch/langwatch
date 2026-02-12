@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -13,20 +15,20 @@ T = TypeVar("T", bound="Metrics")
 class Metrics:
     """
     Attributes:
-        tokens_estimated (Union[Unset, bool]):
-        completion_tokens (Union[Unset, int]):
-        prompt_tokens (Union[Unset, int]):
-        total_cost (Union[Unset, float]):
-        total_time_ms (Union[Unset, int]):
-        first_token_ms (Union[None, Unset, int]):
+        tokens_estimated (bool | Unset):
+        completion_tokens (int | Unset):
+        prompt_tokens (int | Unset):
+        total_cost (float | Unset):
+        total_time_ms (int | Unset):
+        first_token_ms (int | None | Unset):
     """
 
-    tokens_estimated: Union[Unset, bool] = UNSET
-    completion_tokens: Union[Unset, int] = UNSET
-    prompt_tokens: Union[Unset, int] = UNSET
-    total_cost: Union[Unset, float] = UNSET
-    total_time_ms: Union[Unset, int] = UNSET
-    first_token_ms: Union[None, Unset, int] = UNSET
+    tokens_estimated: bool | Unset = UNSET
+    completion_tokens: int | Unset = UNSET
+    prompt_tokens: int | Unset = UNSET
+    total_cost: float | Unset = UNSET
+    total_time_ms: int | Unset = UNSET
+    first_token_ms: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,7 +42,7 @@ class Metrics:
 
         total_time_ms = self.total_time_ms
 
-        first_token_ms: Union[None, Unset, int]
+        first_token_ms: int | None | Unset
         if isinstance(self.first_token_ms, Unset):
             first_token_ms = UNSET
         else:
@@ -77,12 +79,12 @@ class Metrics:
 
         total_time_ms = d.pop("total_time_ms", UNSET)
 
-        def _parse_first_token_ms(data: object) -> Union[None, Unset, int]:
+        def _parse_first_token_ms(data: object) -> int | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, int], data)
+            return cast(int | None | Unset, data)
 
         first_token_ms = _parse_first_token_ms(d.pop("first_token_ms", UNSET))
 

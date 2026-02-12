@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -18,23 +20,23 @@ T = TypeVar("T", bound="SearchResponse")
 class SearchResponse:
     """
     Attributes:
-        traces (Union[Unset, list['Trace']]):
-        pagination (Union[Unset, Pagination]):
+        traces (list[Trace] | Unset):
+        pagination (Pagination | Unset):
     """
 
-    traces: Union[Unset, list["Trace"]] = UNSET
-    pagination: Union[Unset, "Pagination"] = UNSET
+    traces: list[Trace] | Unset = UNSET
+    pagination: Pagination | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        traces: Union[Unset, list[dict[str, Any]]] = UNSET
+        traces: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.traces, Unset):
             traces = []
             for traces_item_data in self.traces:
                 traces_item = traces_item_data.to_dict()
                 traces.append(traces_item)
 
-        pagination: Union[Unset, dict[str, Any]] = UNSET
+        pagination: dict[str, Any] | Unset = UNSET
         if not isinstance(self.pagination, Unset):
             pagination = self.pagination.to_dict()
 
@@ -54,15 +56,17 @@ class SearchResponse:
         from ..models.trace import Trace
 
         d = dict(src_dict)
-        traces = []
         _traces = d.pop("traces", UNSET)
-        for traces_item_data in _traces or []:
-            traces_item = Trace.from_dict(traces_item_data)
+        traces: list[Trace] | Unset = UNSET
+        if _traces is not UNSET:
+            traces = []
+            for traces_item_data in _traces:
+                traces_item = Trace.from_dict(traces_item_data)
 
-            traces.append(traces_item)
+                traces.append(traces_item)
 
         _pagination = d.pop("pagination", UNSET)
-        pagination: Union[Unset, Pagination]
+        pagination: Pagination | Unset
         if isinstance(_pagination, Unset):
             pagination = UNSET
         else:

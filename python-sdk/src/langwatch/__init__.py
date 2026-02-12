@@ -23,10 +23,12 @@ if TYPE_CHECKING:
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
     from .prompts.prompt_facade import PromptsFacade
+    from .evaluators.evaluator_api_service import EvaluatorApiService
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
     prompts: PromptsFacade
+    evaluators: EvaluatorApiService
 
 
 @module_property
@@ -69,6 +71,12 @@ def __getattr__(name: str):
         from .prompts.prompt_facade import PromptsFacade
 
         svc = PromptsFacade.from_global()
+        globals()[name] = svc  # Cache for subsequent access
+        return svc
+    elif name == "evaluators":
+        from .evaluators.evaluator_api_service import EvaluatorApiService
+
+        svc = EvaluatorApiService.from_global()
         globals()[name] = svc  # Cache for subsequent access
         return svc
 

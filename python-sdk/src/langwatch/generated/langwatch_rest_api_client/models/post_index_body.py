@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,27 +23,27 @@ class PostIndexBody:
     """
     Attributes:
         handle (str):
-        scope (Union[Unset, PostIndexBodyScope]):  Default: PostIndexBodyScope.PROJECT.
-        author_id (Union[Unset, str]):
-        prompt (Union[Unset, str]):
-        messages (Union[Unset, list['PostIndexBodyMessagesItem']]):
-        inputs (Union[Unset, list['PostIndexBodyInputsItem']]):
-        outputs (Union[Unset, list['PostIndexBodyOutputsItem']]):
+        scope (PostIndexBodyScope | Unset):  Default: PostIndexBodyScope.PROJECT.
+        author_id (str | Unset):
+        prompt (str | Unset):
+        messages (list[PostIndexBodyMessagesItem] | Unset):
+        inputs (list[PostIndexBodyInputsItem] | Unset):
+        outputs (list[PostIndexBodyOutputsItem] | Unset):
     """
 
     handle: str
-    scope: Union[Unset, PostIndexBodyScope] = PostIndexBodyScope.PROJECT
-    author_id: Union[Unset, str] = UNSET
-    prompt: Union[Unset, str] = UNSET
-    messages: Union[Unset, list["PostIndexBodyMessagesItem"]] = UNSET
-    inputs: Union[Unset, list["PostIndexBodyInputsItem"]] = UNSET
-    outputs: Union[Unset, list["PostIndexBodyOutputsItem"]] = UNSET
+    scope: PostIndexBodyScope | Unset = PostIndexBodyScope.PROJECT
+    author_id: str | Unset = UNSET
+    prompt: str | Unset = UNSET
+    messages: list[PostIndexBodyMessagesItem] | Unset = UNSET
+    inputs: list[PostIndexBodyInputsItem] | Unset = UNSET
+    outputs: list[PostIndexBodyOutputsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
 
-        scope: Union[Unset, str] = UNSET
+        scope: str | Unset = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
 
@@ -49,21 +51,21 @@ class PostIndexBody:
 
         prompt = self.prompt
 
-        messages: Union[Unset, list[dict[str, Any]]] = UNSET
+        messages: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.messages, Unset):
             messages = []
             for messages_item_data in self.messages:
                 messages_item = messages_item_data.to_dict()
                 messages.append(messages_item)
 
-        inputs: Union[Unset, list[dict[str, Any]]] = UNSET
+        inputs: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.inputs, Unset):
             inputs = []
             for inputs_item_data in self.inputs:
                 inputs_item = inputs_item_data.to_dict()
                 inputs.append(inputs_item)
 
-        outputs: Union[Unset, list[dict[str, Any]]] = UNSET
+        outputs: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.outputs, Unset):
             outputs = []
             for outputs_item_data in self.outputs:
@@ -102,7 +104,7 @@ class PostIndexBody:
         handle = d.pop("handle")
 
         _scope = d.pop("scope", UNSET)
-        scope: Union[Unset, PostIndexBodyScope]
+        scope: PostIndexBodyScope | Unset
         if isinstance(_scope, Unset):
             scope = UNSET
         else:
@@ -112,26 +114,32 @@ class PostIndexBody:
 
         prompt = d.pop("prompt", UNSET)
 
-        messages = []
         _messages = d.pop("messages", UNSET)
-        for messages_item_data in _messages or []:
-            messages_item = PostIndexBodyMessagesItem.from_dict(messages_item_data)
+        messages: list[PostIndexBodyMessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = PostIndexBodyMessagesItem.from_dict(messages_item_data)
 
-            messages.append(messages_item)
+                messages.append(messages_item)
 
-        inputs = []
         _inputs = d.pop("inputs", UNSET)
-        for inputs_item_data in _inputs or []:
-            inputs_item = PostIndexBodyInputsItem.from_dict(inputs_item_data)
+        inputs: list[PostIndexBodyInputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = PostIndexBodyInputsItem.from_dict(inputs_item_data)
 
-            inputs.append(inputs_item)
+                inputs.append(inputs_item)
 
-        outputs = []
         _outputs = d.pop("outputs", UNSET)
-        for outputs_item_data in _outputs or []:
-            outputs_item = PostIndexBodyOutputsItem.from_dict(outputs_item_data)
+        outputs: list[PostIndexBodyOutputsItem] | Unset = UNSET
+        if _outputs is not UNSET:
+            outputs = []
+            for outputs_item_data in _outputs:
+                outputs_item = PostIndexBodyOutputsItem.from_dict(outputs_item_data)
 
-            outputs.append(outputs_item)
+                outputs.append(outputs_item)
 
         post_index_body = cls(
             handle=handle,

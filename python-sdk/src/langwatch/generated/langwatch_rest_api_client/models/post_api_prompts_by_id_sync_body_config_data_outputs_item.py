@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,12 +26,12 @@ class PostApiPromptsByIdSyncBodyConfigDataOutputsItem:
     Attributes:
         identifier (str):
         type_ (PostApiPromptsByIdSyncBodyConfigDataOutputsItemType):
-        json_schema (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema]):
+        json_schema (PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema | Unset):
     """
 
     identifier: str
     type_: PostApiPromptsByIdSyncBodyConfigDataOutputsItemType
-    json_schema: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema"] = UNSET
+    json_schema: PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,7 +39,7 @@ class PostApiPromptsByIdSyncBodyConfigDataOutputsItem:
 
         type_ = self.type_.value
 
-        json_schema: Union[Unset, dict[str, Any]] = UNSET
+        json_schema: dict[str, Any] | Unset = UNSET
         if not isinstance(self.json_schema, Unset):
             json_schema = self.json_schema.to_dict()
 
@@ -66,7 +68,7 @@ class PostApiPromptsByIdSyncBodyConfigDataOutputsItem:
         type_ = PostApiPromptsByIdSyncBodyConfigDataOutputsItemType(d.pop("type"))
 
         _json_schema = d.pop("json_schema", UNSET)
-        json_schema: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema]
+        json_schema: PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema | Unset
         if isinstance(_json_schema, Unset):
             json_schema = UNSET
         else:

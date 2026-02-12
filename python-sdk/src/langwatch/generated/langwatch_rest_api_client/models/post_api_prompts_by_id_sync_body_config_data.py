@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -35,36 +37,55 @@ class PostApiPromptsByIdSyncBodyConfigData:
     """
     Attributes:
         prompt (str):
-        inputs (list['PostApiPromptsByIdSyncBodyConfigDataInputsItem']):
-        outputs (list['PostApiPromptsByIdSyncBodyConfigDataOutputsItem']):
+        outputs (list[PostApiPromptsByIdSyncBodyConfigDataOutputsItem]):
         model (str):
-        messages (Union[Unset, list['PostApiPromptsByIdSyncBodyConfigDataMessagesItem']]):
-        temperature (Union[Unset, float]):
-        max_tokens (Union[Unset, float]):
-        demonstrations (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataDemonstrations]):
-        prompting_technique (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique]):
-        response_format (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]):
+        messages (list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset):
+        inputs (list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset):
+        temperature (float | Unset):
+        max_tokens (float | Unset):
+        top_p (float | Unset):
+        frequency_penalty (float | Unset):
+        presence_penalty (float | Unset):
+        seed (float | Unset):
+        top_k (float | Unset):
+        min_p (float | Unset):
+        repetition_penalty (float | Unset):
+        reasoning (str | Unset):
+        reasoning_effort (str | Unset):
+        thinking_level (str | Unset):
+        effort (str | Unset):
+        verbosity (str | Unset):
+        demonstrations (PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset):
+        prompting_technique (PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset):
+        response_format (PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset):
     """
 
     prompt: str
-    inputs: list["PostApiPromptsByIdSyncBodyConfigDataInputsItem"]
-    outputs: list["PostApiPromptsByIdSyncBodyConfigDataOutputsItem"]
+    outputs: list[PostApiPromptsByIdSyncBodyConfigDataOutputsItem]
     model: str
-    messages: Union[Unset, list["PostApiPromptsByIdSyncBodyConfigDataMessagesItem"]] = UNSET
-    temperature: Union[Unset, float] = UNSET
-    max_tokens: Union[Unset, float] = UNSET
-    demonstrations: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataDemonstrations"] = UNSET
-    prompting_technique: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique"] = UNSET
-    response_format: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataResponseFormat"] = UNSET
+    messages: list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset = UNSET
+    inputs: list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset = UNSET
+    temperature: float | Unset = UNSET
+    max_tokens: float | Unset = UNSET
+    top_p: float | Unset = UNSET
+    frequency_penalty: float | Unset = UNSET
+    presence_penalty: float | Unset = UNSET
+    seed: float | Unset = UNSET
+    top_k: float | Unset = UNSET
+    min_p: float | Unset = UNSET
+    repetition_penalty: float | Unset = UNSET
+    reasoning: str | Unset = UNSET
+    reasoning_effort: str | Unset = UNSET
+    thinking_level: str | Unset = UNSET
+    effort: str | Unset = UNSET
+    verbosity: str | Unset = UNSET
+    demonstrations: PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset = UNSET
+    prompting_technique: PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset = UNSET
+    response_format: PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         prompt = self.prompt
-
-        inputs = []
-        for inputs_item_data in self.inputs:
-            inputs_item = inputs_item_data.to_dict()
-            inputs.append(inputs_item)
 
         outputs = []
         for outputs_item_data in self.outputs:
@@ -73,26 +94,57 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         model = self.model
 
-        messages: Union[Unset, list[dict[str, Any]]] = UNSET
+        messages: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.messages, Unset):
             messages = []
             for messages_item_data in self.messages:
                 messages_item = messages_item_data.to_dict()
                 messages.append(messages_item)
 
+        inputs: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.inputs, Unset):
+            inputs = []
+            for inputs_item_data in self.inputs:
+                inputs_item = inputs_item_data.to_dict()
+                inputs.append(inputs_item)
+
         temperature = self.temperature
 
         max_tokens = self.max_tokens
 
-        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        top_p = self.top_p
+
+        frequency_penalty = self.frequency_penalty
+
+        presence_penalty = self.presence_penalty
+
+        seed = self.seed
+
+        top_k = self.top_k
+
+        min_p = self.min_p
+
+        repetition_penalty = self.repetition_penalty
+
+        reasoning = self.reasoning
+
+        reasoning_effort = self.reasoning_effort
+
+        thinking_level = self.thinking_level
+
+        effort = self.effort
+
+        verbosity = self.verbosity
+
+        demonstrations: dict[str, Any] | Unset = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        prompting_technique: dict[str, Any] | Unset = UNSET
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
-        response_format: Union[Unset, dict[str, Any]] = UNSET
+        response_format: dict[str, Any] | Unset = UNSET
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
@@ -101,17 +153,42 @@ class PostApiPromptsByIdSyncBodyConfigData:
         field_dict.update(
             {
                 "prompt": prompt,
-                "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
             }
         )
         if messages is not UNSET:
             field_dict["messages"] = messages
+        if inputs is not UNSET:
+            field_dict["inputs"] = inputs
         if temperature is not UNSET:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
             field_dict["max_tokens"] = max_tokens
+        if top_p is not UNSET:
+            field_dict["top_p"] = top_p
+        if frequency_penalty is not UNSET:
+            field_dict["frequency_penalty"] = frequency_penalty
+        if presence_penalty is not UNSET:
+            field_dict["presence_penalty"] = presence_penalty
+        if seed is not UNSET:
+            field_dict["seed"] = seed
+        if top_k is not UNSET:
+            field_dict["top_k"] = top_k
+        if min_p is not UNSET:
+            field_dict["min_p"] = min_p
+        if repetition_penalty is not UNSET:
+            field_dict["repetition_penalty"] = repetition_penalty
+        if reasoning is not UNSET:
+            field_dict["reasoning"] = reasoning
+        if reasoning_effort is not UNSET:
+            field_dict["reasoning_effort"] = reasoning_effort
+        if thinking_level is not UNSET:
+            field_dict["thinkingLevel"] = thinking_level
+        if effort is not UNSET:
+            field_dict["effort"] = effort
+        if verbosity is not UNSET:
+            field_dict["verbosity"] = verbosity
         if demonstrations is not UNSET:
             field_dict["demonstrations"] = demonstrations
         if prompting_technique is not UNSET:
@@ -145,13 +222,6 @@ class PostApiPromptsByIdSyncBodyConfigData:
         d = dict(src_dict)
         prompt = d.pop("prompt")
 
-        inputs = []
-        _inputs = d.pop("inputs")
-        for inputs_item_data in _inputs:
-            inputs_item = PostApiPromptsByIdSyncBodyConfigDataInputsItem.from_dict(inputs_item_data)
-
-            inputs.append(inputs_item)
-
         outputs = []
         _outputs = d.pop("outputs")
         for outputs_item_data in _outputs:
@@ -161,33 +231,68 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         model = d.pop("model")
 
-        messages = []
         _messages = d.pop("messages", UNSET)
-        for messages_item_data in _messages or []:
-            messages_item = PostApiPromptsByIdSyncBodyConfigDataMessagesItem.from_dict(messages_item_data)
+        messages: list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = PostApiPromptsByIdSyncBodyConfigDataMessagesItem.from_dict(messages_item_data)
 
-            messages.append(messages_item)
+                messages.append(messages_item)
+
+        _inputs = d.pop("inputs", UNSET)
+        inputs: list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = PostApiPromptsByIdSyncBodyConfigDataInputsItem.from_dict(inputs_item_data)
+
+                inputs.append(inputs_item)
 
         temperature = d.pop("temperature", UNSET)
 
         max_tokens = d.pop("max_tokens", UNSET)
 
+        top_p = d.pop("top_p", UNSET)
+
+        frequency_penalty = d.pop("frequency_penalty", UNSET)
+
+        presence_penalty = d.pop("presence_penalty", UNSET)
+
+        seed = d.pop("seed", UNSET)
+
+        top_k = d.pop("top_k", UNSET)
+
+        min_p = d.pop("min_p", UNSET)
+
+        repetition_penalty = d.pop("repetition_penalty", UNSET)
+
+        reasoning = d.pop("reasoning", UNSET)
+
+        reasoning_effort = d.pop("reasoning_effort", UNSET)
+
+        thinking_level = d.pop("thinkingLevel", UNSET)
+
+        effort = d.pop("effort", UNSET)
+
+        verbosity = d.pop("verbosity", UNSET)
+
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataDemonstrations]
+        demonstrations: PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
             demonstrations = PostApiPromptsByIdSyncBodyConfigDataDemonstrations.from_dict(_demonstrations)
 
         _prompting_technique = d.pop("prompting_technique", UNSET)
-        prompting_technique: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique]
+        prompting_technique: PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset
         if isinstance(_prompting_technique, Unset):
             prompting_technique = UNSET
         else:
             prompting_technique = PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique.from_dict(_prompting_technique)
 
         _response_format = d.pop("response_format", UNSET)
-        response_format: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]
+        response_format: PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:
@@ -195,12 +300,24 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         post_api_prompts_by_id_sync_body_config_data = cls(
             prompt=prompt,
-            inputs=inputs,
             outputs=outputs,
             model=model,
             messages=messages,
+            inputs=inputs,
             temperature=temperature,
             max_tokens=max_tokens,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            seed=seed,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
+            thinking_level=thinking_level,
+            effort=effort,
+            verbosity=verbosity,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
             response_format=response_format,
