@@ -1,4 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
+import { CodeAgentSelector } from "./CodeAgentSelector";
 import { HttpAgentSelector } from "./HttpAgentSelector";
 import { PromptSelector } from "./PromptSelector";
 import { type TargetType, TargetTypeSelector } from "./TargetTypeSelector";
@@ -12,7 +13,7 @@ interface QuickTestBarProps {
 
 /**
  * Quick Test section in the scenario editor footer.
- * Allows selecting a target type (prompt or HTTP agent) and the specific target.
+ * Allows selecting a target type (prompt, HTTP agent, or code agent) and the specific target.
  */
 export function QuickTestBar({
   targetType,
@@ -34,6 +35,11 @@ export function QuickTestBar({
         <TargetTypeSelector value={targetType} onChange={onTargetTypeChange} />
         {targetType === "prompt" ? (
           <PromptSelector
+            value={selectedTargetId}
+            onChange={onTargetIdChange}
+          />
+        ) : targetType === "code" ? (
+          <CodeAgentSelector
             value={selectedTargetId}
             onChange={onTargetIdChange}
           />

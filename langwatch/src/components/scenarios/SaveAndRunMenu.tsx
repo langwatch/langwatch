@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Globe, Play, Plus, Save } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -64,6 +64,15 @@ export function SaveAndRunMenu({
     );
   }, [agents, searchValue]);
 
+  // Filter code agents (already sorted by updatedAt desc from backend)
+  const filteredCodeAgents = useMemo(() => {
+    const codeAgents = agents?.filter((a) => a.type === "code") ?? [];
+    if (!searchValue) return codeAgents;
+    return codeAgents.filter((a) =>
+      a.name.toLowerCase().includes(searchValue.toLowerCase()),
+    );
+  }, [agents, searchValue]);
+
   const handleSelectAndRun = (target: TargetValue) => {
     onTargetChange(target);
     setOpen(false);
@@ -121,7 +130,7 @@ export function SaveAndRunMenu({
             borderColor="border"
             position="sticky"
             top={0}
-            bg="white"
+            bg="bg"
             zIndex={10}
           >
             <Input
@@ -195,6 +204,54 @@ export function SaveAndRunMenu({
                 <Plus size={14} />
                 <Text fontSize="sm">Add New Agent</Text>
               </HStack>
+            </Box>
+
+            {/* Code Agents Section */}
+            <Box borderTopWidth="1px" borderColor="border">
+              <Text
+                fontSize="xs"
+                fontWeight="bold"
+                textTransform="uppercase"
+                color="fg.muted"
+                paddingX={3}
+                paddingY={2}
+                bg="bg.subtle"
+                position="sticky"
+                top={0}
+                zIndex={5}
+              >
+                Run against Code Agent
+              </Text>
+              {filteredCodeAgents.length === 0 ? (
+                <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
+                  {searchValue ? "No code agents found" : "No code agents available"}
+                </Text>
+              ) : (
+                filteredCodeAgents.map((agent) => (
+                  <HStack
+                    key={agent.id}
+                    paddingX={3}
+                    paddingY={2}
+                    cursor="pointer"
+                    bg={
+                      selectedTarget?.type === "code" &&
+                      selectedTarget.id === agent.id
+                        ? "blue.50"
+                        : "transparent"
+                    }
+                    _hover={{ bg: "gray.100" }}
+                    onClick={() =>
+                      handleSelectAndRun({ type: "code", id: agent.id })
+                    }
+                  >
+                    <Code size={14} color="var(--chakra-colors-gray-500)" />
+                    <Text fontSize="sm" flex={1}>
+                      {agent.name}
+                    </Text>
+                    <Play size={12} color="var(--chakra-colors-blue-500)" />
+                  </HStack>
+                ))
+              )}
             </Box>
 
             {/* Prompts Section */}
