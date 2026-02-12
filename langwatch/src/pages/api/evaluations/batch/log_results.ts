@@ -68,6 +68,10 @@ export default async function handler(
     req.headers["content-type"] !== "application/json" ||
     typeof req.body !== "object"
   ) {
+    logger.warn(
+      { contentType: req.headers["content-type"], bodyType: typeof req.body },
+      "log_results request body is not json",
+    );
     return res.status(400).json({ message: "Invalid body, expecting json" });
   }
 
@@ -101,6 +105,10 @@ export default async function handler(
   }
 
   if (!params.experiment_id && !params.experiment_slug) {
+    logger.warn(
+      { runId: params.run_id },
+      "log_results missing experiment_id and experiment_slug",
+    );
     return res.status(400).json({
       error: "Either experiment_id or experiment_slug is required",
     });
