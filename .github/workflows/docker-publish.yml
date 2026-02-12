@@ -64,7 +64,7 @@ jobs:
             langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-amd64
 
   build-and-push-arm64:
-    runs-on: arm64-runner-16gb
+    runs-on: arm64-runner-32gb
     needs: extract-version
 
     steps:
