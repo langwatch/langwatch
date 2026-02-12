@@ -83,7 +83,7 @@ export interface StaticPipelineDefinition<
     string,
     {
       handlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType, any>;
+      options?: EventHandlerOptions<EventType>;
     }
   >;
 

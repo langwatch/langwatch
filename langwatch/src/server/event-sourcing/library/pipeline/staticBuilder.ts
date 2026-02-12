@@ -85,7 +85,7 @@ export class StaticPipelineBuilderWithNameAndType<
     string,
     {
       handlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType, string>;
+      options?: EventHandlerOptions<EventType>;
     }
   >();
   private commands: Array<{
@@ -188,7 +188,7 @@ export class StaticPipelineBuilderWithNameAndType<
   >(
     name: HandlerName,
     handlerClass: handlerClass,
-    options?: EventHandlerOptions<EventType, string>,
+    options?: EventHandlerOptions<EventType>,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,

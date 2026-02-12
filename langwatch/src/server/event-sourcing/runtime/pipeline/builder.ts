@@ -167,7 +167,7 @@ export class PipelineBuilderWithNameAndType<
   private eventPublisher?: EventPublisher<EventType>;
   private eventHandlers = new Map<
     string,
-    EventHandlerDefinition<EventType, RegisteredHandlerNames>
+    EventHandlerDefinition<EventType>
   >();
   private commandHandlers: Array<CommandHandlerRegistration<EventType>> = [];
   private parentLinks: Array<ParentLink<EventType>> = [];
@@ -338,7 +338,7 @@ export class PipelineBuilderWithNameAndType<
   >(
     name: HandlerName,
     handlerClass: handlerClass,
-    options?: EventHandlerOptions<EventType, RegisteredHandlerNames>,
+    options?: EventHandlerOptions<EventType>,
   ): PipelineBuilderWithNameAndType<
     EventType,
     RegisteredHandlerNames | HandlerName,
@@ -357,19 +357,13 @@ export class PipelineBuilderWithNameAndType<
     const handler = new handlerClass();
 
     // Merge event types from static method and options (options take precedence)
-    const mergedOptions: EventHandlerOptions<
-      EventType,
-      RegisteredHandlerNames
-    > = {
+    const mergedOptions: EventHandlerOptions<EventType> = {
       ...options,
       eventTypes:
         options?.eventTypes ?? handlerClass.getEventTypes?.() ?? void 0,
     };
 
-    const handlerDef: EventHandlerDefinition<
-      EventType,
-      RegisteredHandlerNames
-    > = {
+    const handlerDef: EventHandlerDefinition<EventType> = {
       name,
       handler,
       options: mergedOptions,

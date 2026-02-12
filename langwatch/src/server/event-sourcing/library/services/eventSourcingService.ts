@@ -19,7 +19,6 @@ import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-  ReplayEventsOptions,
   UpdateProjectionOptions,
 } from "./eventSourcingService.types";
 import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
@@ -537,32 +536,6 @@ export class EventSourcingService<
    */
   getProjectionNames(): string[] {
     return this.projectionUpdater.getProjectionNames();
-  }
-
-  async replayEvents<ProjectionName extends keyof ProjectionTypes & string>(
-    _projectionName: ProjectionName,
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _options?: ReplayEventsOptions<EventType>,
-  ): Promise<ProjectionTypes[ProjectionName]> {
-    throw new ConfigurationError(
-      "EventSourcingService",
-      "Method not implemented",
-    );
-  }
-
-  async replayEventsForHandler(
-    _handlerName: string,
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _options?: {
-      fromEventId?: string;
-    },
-  ): Promise<void> {
-    throw new ConfigurationError(
-      "EventSourcingService",
-      "Method not implemented",
-    );
   }
 
   /**

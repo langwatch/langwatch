@@ -98,7 +98,6 @@ export type {
 export { EventSourcingService } from "./services/eventSourcingService";
 export type {
   EventSourcingOptions,
-  ReplayEventsOptions,
   UpdateProjectionOptions,
 } from "./services/eventSourcingService.types";
 export type { ProcessorCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
@@ -116,16 +115,5 @@ export type {
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
 export type { EventStreamMetadata } from "./streams/eventStream";
 export { EventStream, EventStreamMetadataSchema } from "./streams/eventStream";
-export type {
-  DistributedLock,
-  LockHandle,
-  RedisClient,
-} from "./utils/distributedLock";
-export {
-  DistributedLockUtils,
-  InMemoryDistributedLock,
-  LockHandleSchema,
-  RedisDistributedLock,
-} from "./utils/distributedLock";
 export type { CreateEventOptions } from "./utils/event.utils";
 export { EventUtils } from "./utils/event.utils";

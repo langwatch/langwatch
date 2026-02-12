@@ -39,21 +39,6 @@ export interface UpdateProjectionOptions<EventType extends Event = Event> {
 }
 
 /**
- * Options for replaying events up to a specific timestamp (time travel).
- */
-export interface ReplayEventsOptions<EventType extends Event = Event> {
-  /**
-   * The timestamp to replay events up to.
-   * Events with timestamp <= upToTimestamp will be included.
-   */
-  upToTimestamp?: number;
-  /**
-   * Optional projection store context for replayed projections.
-   */
-  projectionStoreContext?: ProjectionStoreReadContext;
-}
-
-/**
  * Configuration options for EventSourcingService.
  */
 export interface EventSourcingServiceOptions<
