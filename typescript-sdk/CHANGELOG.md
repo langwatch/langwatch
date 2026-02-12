@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.13.0...typescript-sdk@v0.14.0) (2026-02-12)
+
+
+### Features
+
+* add public REST API for evaluators ([#1540](https://github.com/langwatch/langwatch/issues/1540)) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* add public REST API for evaluators (/api/evaluators) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* **evaluations-v3:** major table performance improvements, prompts to experiment button and other bugfixes ([#1181](https://github.com/langwatch/langwatch/issues/1181)) ([2cbf430](https://github.com/langwatch/langwatch/commit/2cbf4303f670edcd65a81f3af4d7a00a85b13010))
+
+
+### Miscellaneous
+
+* **deps:** bump liquidjs from 10.21.1 to 10.24.0 in /typescript-sdk ([#1466](https://github.com/langwatch/langwatch/issues/1466)) ([dd3ee8b](https://github.com/langwatch/langwatch/commit/dd3ee8b979b7659bbd346b06c7781e865880bd11))
+
 ## [0.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.12.0...typescript-sdk@v0.13.0) (2026-01-21)
 
 
