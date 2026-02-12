@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { flexibleDateSchema } from "~/app/api/shared/schemas";
 
 const evaluatorFieldSchema = z.object({
   identifier: z.string(),
@@ -16,8 +15,8 @@ export const apiResponseEvaluatorSchema = z.object({
   config: z.record(z.any()).nullable(),
   workflowId: z.string().nullable(),
   copiedFromEvaluatorId: z.string().nullable(),
-  createdAt: flexibleDateSchema,
-  updatedAt: flexibleDateSchema,
+  createdAt: z.date(),
+  updatedAt: z.date(),
   fields: z.array(evaluatorFieldSchema),
   outputFields: z.array(evaluatorFieldSchema),
   workflowName: z.string().optional(),
