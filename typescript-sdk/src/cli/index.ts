@@ -40,6 +40,16 @@ const syncCommand = async (): Promise<void> => {
   return syncCommandImpl();
 };
 
+const pullCommand = async (): Promise<void> => {
+  const { pullCommand: pullCommandImpl } = await import("./commands/pull.js");
+  return pullCommandImpl();
+};
+
+const pushCommand = async (): Promise<void> => {
+  const { pushCommand: pushCommandImpl } = await import("./commands/push.js");
+  return pushCommandImpl();
+};
+
 const createCommand = async (name: string, options: Record<string, unknown>): Promise<void> => {
   const { createCommand: createCommandImpl } = await import("./commands/create.js");
   return createCommandImpl(name, options);
@@ -146,6 +156,30 @@ promptCmd
   .action(async () => {
     try {
       await syncCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("pull")
+  .description("Pull remote prompts and materialize locally")
+  .action(async () => {
+    try {
+      await pullCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("push")
+  .description("Push local prompts to the server")
+  .action(async () => {
+    try {
+      await pushCommand();
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
