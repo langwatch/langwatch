@@ -100,7 +100,7 @@ export const ATTR_LANGWATCH_LABELS = "langwatch.labels";
  * LangWatch tags attribute key
  * Used to store tags for a span or event
  *
- * @depercated: Please use `ATTR_LANGWATCH_LABELS`.
+ * @deprecated: Please use `ATTR_LANGWATCH_LABELS`.
  */
 export const ATTR_LANGWATCH_TAGS = "langwatch.labels";
 
