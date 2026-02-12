@@ -177,10 +177,10 @@ describe("SuiteService", () => {
             deps,
           });
 
-          expect(result.setId).toBe("__suite__suite_abc123");
+          expect(result.setId).toBe("__internal__suite_abc123__suite");
           // Verify all scheduled jobs use the same setId
           for (const call of mockScheduleScenarioRun.mock.calls) {
-            expect(call[0]?.setId).toBe("__suite__suite_abc123");
+            expect(call[0]?.setId).toBe("__internal__suite_abc123__suite");
           }
         });
       });
@@ -466,7 +466,7 @@ describe("SuiteService", () => {
       describe("when the queue status is queried", () => {
         it("returns 3 waiting and 1 active", async () => {
           const suiteId = "suite_abc123";
-          const setId = "__suite__suite_abc123";
+          const setId = "__internal__suite_abc123__suite";
 
           mockGetJobs.mockResolvedValue([
             { data: { setId }, getState: () => Promise.resolve("waiting") },
@@ -504,8 +504,8 @@ describe("SuiteService", () => {
     describe("given the queue has jobs for multiple suites", () => {
       describe("when the queue status is queried for one suite", () => {
         it("only counts jobs matching the suite setId", async () => {
-          const targetSetId = "__suite__suite_target";
-          const otherSetId = "__suite__suite_other";
+          const targetSetId = "__internal__suite_target__suite";
+          const otherSetId = "__internal__suite_other__suite";
 
           mockGetJobs.mockResolvedValue([
             { data: { setId: targetSetId }, getState: () => Promise.resolve("waiting") },

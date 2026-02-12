@@ -4,7 +4,7 @@
  * Fetches run data from ElasticSearch via the existing scenarioEvents tRPC endpoint,
  * groups results by batch run, and renders collapsible run rows with filters and footer.
  *
- * Uses the suite's setId (__suite__<suiteId>) to query the scenario events.
+ * Uses the suite's setId (__internal__<suiteId>__suite) to query the scenario events.
  */
 
 import { Box, Spinner, Text, VStack } from "@chakra-ui/react";

@@ -99,14 +99,14 @@ describe("groupRunsByBatchId() with scenarioSetIds", () => {
       ];
 
       const scenarioSetIds = {
-        batch_1: "__suite__suite_abc",
-        batch_2: "__suite__suite_xyz",
+        batch_1: "__internal__suite_abc__suite",
+        batch_2: "__internal__suite_xyz__suite",
       };
 
       const result = groupRunsByBatchId({ runs, scenarioSetIds });
       expect(result).toHaveLength(2);
-      expect(result[0]!.scenarioSetId).toBe("__suite__suite_abc");
-      expect(result[1]!.scenarioSetId).toBe("__suite__suite_xyz");
+      expect(result[0]!.scenarioSetId).toBe("__internal__suite_abc__suite");
+      expect(result[1]!.scenarioSetId).toBe("__internal__suite_xyz__suite");
     });
   });
 
@@ -145,8 +145,8 @@ describe("groupRunsByBatchId() with scenarioSetIds", () => {
       ];
 
       const scenarioSetIds = {
-        batch_old: "__suite__suite_1",
-        batch_new: "__suite__suite_2",
+        batch_old: "__internal__suite_1__suite",
+        batch_new: "__internal__suite_2__suite",
       };
 
       const result = groupRunsByBatchId({ runs, scenarioSetIds });

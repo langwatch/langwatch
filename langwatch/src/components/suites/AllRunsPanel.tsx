@@ -16,7 +16,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
-import { SUITE_SET_PREFIX } from "~/server/suites/suite-set-id";
+import { extractSuiteId } from "~/server/suites/suite-set-id";
 import {
   computeBatchRunSummary,
   computeRunHistoryTotals,
@@ -202,8 +202,8 @@ export function AllRunsPanel() {
               const isExpanded = expandedIds.has(batchRun.batchRunId);
 
               // Extract suite name from scenarioSetId
-              const suiteId = batchRun.scenarioSetId?.startsWith(SUITE_SET_PREFIX)
-                ? batchRun.scenarioSetId.slice(SUITE_SET_PREFIX.length)
+              const suiteId = batchRun.scenarioSetId
+                ? extractSuiteId(batchRun.scenarioSetId)
                 : null;
               const suiteName = suiteId ? suiteNameMap.get(suiteId) ?? null : null;
 

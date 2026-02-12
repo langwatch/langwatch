@@ -130,7 +130,7 @@ describe("<AllRunsPanel/>", () => {
       mockRunDataQuery.mockReturnValue({
         data: {
           runs,
-          scenarioSetIds: { batch_1: "__suite__suite_1" },
+          scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
           hasMore: false,
         },
         isLoading: false,

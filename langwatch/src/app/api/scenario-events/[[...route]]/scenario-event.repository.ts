@@ -691,7 +691,7 @@ export class ScenarioEventRepository {
     // We need to ensure we get enough unique batch runs after deduplication
     const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
 
-    // Use prefix query to match all suite scenario sets (__suite__*)
+    // Use wildcard query to match all suite scenario sets (__internal__*__suite)
     const response = await client.search({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: {
@@ -699,7 +699,7 @@ export class ScenarioEventRepository {
           bool: {
             filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { prefix: { [ES_FIELDS.scenarioSetId]: "__suite__" } },
+              { wildcard: { [ES_FIELDS.scenarioSetId]: "__internal__*__suite" } },
               { exists: { field: ES_FIELDS.batchRunId } },
             ],
           },
