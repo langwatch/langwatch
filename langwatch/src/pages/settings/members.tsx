@@ -148,6 +148,12 @@ function MembersList({
     onInviteCreated: setSelectedInvites,
     onClose: onAddMembersClose,
     refetchInvites: () => void pendingInvites.refetch(),
+    // SaaS-only: proration check for SEAT_USAGE organizations
+    pricingModel: (organization as { pricingModel?: string }).pricingModel,
+    currentMaxMembers: activePlan.maxMembers,
+    currentCoreMembers: organization.members.filter(
+      (m) => m.role !== "EXTERNAL",
+    ).length,
   });
 
   const deleteMember = (userId: string) => {
