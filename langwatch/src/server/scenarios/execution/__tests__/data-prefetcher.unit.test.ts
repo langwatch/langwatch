@@ -55,6 +55,11 @@ describe("prefetchScenarioData", () => {
     model: "openai/gpt-4",
   };
 
+  const defaultModelParamsResult = {
+    success: true as const,
+    params: defaultModelParams,
+  };
+
   function createMockDeps(
     overrides: Partial<DataPrefetcherDependencies> = {},
   ): DataPrefetcherDependencies {
@@ -75,7 +80,7 @@ describe("prefetchScenarioData", () => {
     };
 
     const modelParamsProvider: ModelParamsProvider = {
-      prepare: vi.fn().mockResolvedValue(defaultModelParams),
+      prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
     };
 
     return {
@@ -102,7 +107,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("uses the prompt's configured model", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -137,7 +142,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("falls back to project defaultModel", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -179,7 +184,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("uses project defaultModel (agents have no model)", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -356,7 +361,11 @@ describe("prefetchScenarioData", () => {
               getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: {
-              prepare: vi.fn().mockResolvedValue(null),
+              prepare: vi.fn().mockResolvedValue({
+                success: false,
+                reason: "provider_not_enabled",
+                message: "Provider 'openai' is not enabled for this project",
+              }),
             },
           });
 
@@ -365,7 +374,8 @@ describe("prefetchScenarioData", () => {
 
           expect(result.success).toBe(false);
           if (!result.success) {
-            expect(result.error).toBe("Failed to prepare model params");
+            expect(result.error).toBe("Provider 'openai' is not enabled for this project");
+            expect(result.reason).toBe("provider_not_enabled");
           }
         });
       });
