@@ -2,6 +2,12 @@ import type { SemConvAttributes } from "langwatch/observability";
 
 export interface EventSourcedQueueProcessorOptions {
   concurrency?: number;
+  /**
+   * Maximum number of groups that can be processed in parallel.
+   * Only used by GroupQueueProcessorBullMq.
+   * @default 20
+   */
+  globalConcurrency?: number;
 }
 
 /**
@@ -99,6 +105,19 @@ export interface EventSourcedQueueDefinition<Payload> {
    * These attributes will be merged with common attributes like queue.name, queue.job_name, etc.
    */
   spanAttributes?: (payload: Payload) => SemConvAttributes;
+
+  /**
+   * Optional function to extract a group key from the payload.
+   * When provided, enables per-group sequential processing via the GroupQueue staging layer.
+   * Jobs with the same group key are processed sequentially (FIFO), while different groups
+   * are processed in parallel up to globalConcurrency.
+   *
+   * @example
+   * ```typescript
+   * groupKey: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
+   * ```
+   */
+  groupKey?: (payload: Payload) => string;
 }
 
 export interface EventSourcedQueueProcessor<Payload> {

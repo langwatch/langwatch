@@ -5,8 +5,9 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
-import { EventSourcedQueueProcessorBullMq } from "./bullmq";
+import { GroupQueueProcessorBullMq } from "./groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./memory";
+import { SimpleBullmqQueueProcessor } from "./simpleBullmq";
 
 /**
  * Factory interface for creating queue processors.
@@ -37,7 +38,13 @@ export class DefaultQueueProcessorFactory implements QueueProcessorFactory {
   ): EventSourcedQueueProcessor<Payload> {
     const effectiveConnection = this.redisConnection ?? connection;
     if (effectiveConnection) {
-      return new EventSourcedQueueProcessorBullMq<Payload>(
+      if (definition.groupKey) {
+        return new GroupQueueProcessorBullMq<Payload>(
+          definition,
+          effectiveConnection,
+        );
+      }
+      return new SimpleBullmqQueueProcessor<Payload>(
         definition,
         effectiveConnection,
       );
@@ -56,7 +63,13 @@ export class BullmqQueueProcessorFactory implements QueueProcessorFactory {
   create<Payload>(
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
-    return new EventSourcedQueueProcessorBullMq<Payload>(
+    if (definition.groupKey) {
+      return new GroupQueueProcessorBullMq<Payload>(
+        definition,
+        this.redisConnection,
+      );
+    }
+    return new SimpleBullmqQueueProcessor<Payload>(
       definition,
       this.redisConnection,
     );
