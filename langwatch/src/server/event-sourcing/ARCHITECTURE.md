@@ -179,7 +179,7 @@ This design enables:
 - Sequential ordering validation (check if previous sequence number was processed)
 - Failure detection (check if any events failed for the aggregate)
 
-See: [`library/streams/eventStream.ts`](./library/streams/eventStream.ts#L38-L68) for ordering implementation, [`library/services/validation/sequenceNumberCalculator.ts`](./library/services/validation/sequenceNumberCalculator.ts) for sequence number computation, [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) for validation orchestration, and [`library/stores/eventStore.types.ts`](./library/stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
+See: [`library/streams/eventStream.ts`](./library/streams/eventStream.ts#L38-L68) for ordering implementation, [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) for validation orchestration (sequence number computation, idempotency checking, failure detection, ordering validation), and [`library/stores/eventStore.types.ts`](./library/stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
 
 ### Concurrent Projection Updates
 
@@ -314,7 +314,7 @@ Before processing an event, the system checks `hasFailedEvents()` for the aggreg
 3. Clear checkpoints for failed events using `clearCheckpoint()`
 4. Events will be reprocessed automatically via queue retries or manual replay
 
-The `FailureDetector` component checks for failed events before processing. See: [`library/services/validation/failureDetector.ts`](./library/services/validation/failureDetector.ts) for failure detection and [`library/stores/eventHandlerCheckpointStore.types.ts`](./library/stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
+The `EventProcessorValidator` checks for failed events before processing. See: [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) for failure detection and [`library/stores/eventHandlerCheckpointStore.types.ts`](./library/stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
 
 ## Time Travel & Debugging
 
@@ -481,8 +481,7 @@ graph LR
 - **Event streams:** [`library/streams/eventStream.ts`](./library/streams/eventStream.ts)
 - **Main service:** [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts)
 - **Modular services:**
-  - **Validation:** [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) - Orchestrates validation
-  - **Validation components:** [`library/services/validation/sequenceNumberCalculator.ts`](./library/services/validation/sequenceNumberCalculator.ts), [`library/services/validation/idempotencyChecker.ts`](./library/services/validation/idempotencyChecker.ts), [`library/services/validation/orderingValidator.ts`](./library/services/validation/orderingValidator.ts), [`library/services/validation/failureDetector.ts`](./library/services/validation/failureDetector.ts)
+  - **Validation:** [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) - Sequence number computation, idempotency checking, failure detection, ordering validation
   - **Checkpoints:** [`library/services/checkpoints/checkpointManager.ts`](./library/services/checkpoints/checkpointManager.ts) - Manages checkpoint operations
   - **Queues:** [`library/services/queues/queueProcessorManager.ts`](./library/services/queues/queueProcessorManager.ts) - Manages queue processors
   - **Handlers:** [`library/services/handlers/eventHandlerDispatcher.ts`](./library/services/handlers/eventHandlerDispatcher.ts) - Dispatches events to handlers

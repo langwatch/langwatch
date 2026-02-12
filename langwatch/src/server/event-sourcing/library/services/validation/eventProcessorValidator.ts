@@ -6,10 +6,8 @@ import type {
   EventStore,
   EventStoreReadContext,
 } from "../../stores/eventStore.types";
-import { FailureDetector } from "./failureDetector";
-import { IdempotencyChecker } from "./idempotencyChecker";
-import { OrderingValidator } from "./orderingValidator";
-import { SequenceNumberCalculator } from "./sequenceNumberCalculator";
+import { buildCheckpointKey } from "../../utils/checkpointKey";
+import { SequentialOrderingError } from "../errorHandling";
 
 /**
  * Orchestrates event processing validation by coordinating sequence number calculation,
@@ -17,10 +15,10 @@ import { SequenceNumberCalculator } from "./sequenceNumberCalculator";
  * Shared validation logic used by both handlers and projections.
  */
 export class EventProcessorValidator<EventType extends Event = Event> {
-  private readonly sequenceNumberCalculator: SequenceNumberCalculator<EventType>;
-  private readonly idempotencyChecker: IdempotencyChecker<EventType>;
-  private readonly orderingValidator: OrderingValidator<EventType>;
-  private readonly failureDetector: FailureDetector<EventType>;
+  private readonly eventStore: EventStore<EventType>;
+  private readonly aggregateType: AggregateType;
+  private readonly processorCheckpointStore?: ProcessorCheckpointStore;
+  private readonly pipelineName: string;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:event-processor-validator",
   );
@@ -36,22 +34,10 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     processorCheckpointStore?: ProcessorCheckpointStore;
     pipelineName: string;
   }) {
-    this.sequenceNumberCalculator = new SequenceNumberCalculator(
-      eventStore,
-      aggregateType,
-    );
-    this.idempotencyChecker = new IdempotencyChecker(
-      processorCheckpointStore,
-      pipelineName,
-    );
-    this.orderingValidator = new OrderingValidator(
-      processorCheckpointStore,
-      pipelineName,
-    );
-    this.failureDetector = new FailureDetector(
-      processorCheckpointStore,
-      pipelineName,
-    );
+    this.eventStore = eventStore;
+    this.aggregateType = aggregateType;
+    this.processorCheckpointStore = processorCheckpointStore;
+    this.pipelineName = pipelineName;
   }
 
   /**
@@ -67,10 +53,30 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     event: EventType,
     context: EventStoreReadContext<EventType>,
   ): Promise<number> {
-    return await this.sequenceNumberCalculator.computeEventSequenceNumber(
-      event,
+    const count = await this.eventStore.countEventsBefore(
+      String(event.aggregateId),
       context,
+      this.aggregateType,
+      event.timestamp,
+      event.id,
     );
+
+    const sequenceNumber = count + 1;
+
+    this.logger.debug(
+      {
+        eventId: event.id,
+        timestamp: event.timestamp,
+        aggregateId: event.aggregateId,
+        aggregateType: this.aggregateType,
+        tenantId: context.tenantId,
+        count,
+        sequenceNumber,
+      },
+      "Computed sequence number for event",
+    );
+
+    return sequenceNumber;
   }
 
   /**
@@ -87,10 +93,26 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     event: EventType,
     events: readonly EventType[],
   ): number {
-    return this.sequenceNumberCalculator.computeSequenceNumberFromEvents(
-      event,
-      events,
+    const index = events.findIndex((e) => e.id === event.id);
+    if (index === -1) {
+      throw new Error(
+        `Event ${event.id} not found in events array for aggregate ${String(event.aggregateId)}`,
+      );
+    }
+    const sequenceNumber = index + 1;
+
+    this.logger.debug(
+      {
+        eventId: event.id,
+        aggregateId: event.aggregateId,
+        aggregateType: this.aggregateType,
+        index,
+        sequenceNumber,
+      },
+      "Computed sequence number from events array",
     );
+
+    return sequenceNumber;
   }
 
   /**
@@ -151,7 +173,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     // Check if any previous events failed (stop processing if so)
     // This check must happen BEFORE idempotency check to prevent overwriting failed checkpoints
     // and BEFORE ordering checks so it catches failures even when sequenceNumber is 1
-    const hasFailures = await this.failureDetector.hasFailedEvents(
+    const hasFailures = await this.hasFailedEvents(
       processorName,
       processorType,
       event,
@@ -160,7 +182,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     // Check if event already processed (idempotency) and atomically claim it
     // This happens even when there are failures to save a pending checkpoint for optimistic locking
     // but we still skip processing if there are failures
-    const alreadyProcessed = await this.idempotencyChecker.checkAndClaim(
+    const alreadyProcessed = await this.checkAndClaim(
       processorName,
       processorType,
       event,
@@ -190,7 +212,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     }
 
     // Enforce ordering: check if the immediate predecessor has been processed
-    await this.orderingValidator.validateOrdering(
+    await this.validateOrdering(
       processorName,
       processorType,
       event,
@@ -198,5 +220,320 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     );
 
     return sequenceNumber;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: Failure detection
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Checks if any previous events have failed processing for an aggregate.
+   * If failures are detected, processing should be stopped to prevent cascading failures.
+   */
+  private async hasFailedEvents(
+    processorName: string,
+    processorType: "handler" | "projection",
+    event: EventType,
+  ): Promise<boolean> {
+    if (!this.processorCheckpointStore || !this.pipelineName) {
+      return false;
+    }
+
+    return await this.processorCheckpointStore.hasFailedEvents(
+      this.pipelineName,
+      processorName,
+      processorType,
+      event.tenantId,
+      event.aggregateType,
+      String(event.aggregateId),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: Idempotency checking
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Checks if an event has already been processed and atomically claims it if not.
+   * This prevents TOCTOU race conditions where multiple processes try to process the same event.
+   *
+   * @returns True if already processed or claimed by another process, false if successfully claimed
+   */
+  private async checkAndClaim(
+    processorName: string,
+    processorType: "handler" | "projection",
+    event: EventType,
+    sequenceNumber: number,
+  ): Promise<boolean> {
+    if (!this.processorCheckpointStore || !this.pipelineName) {
+      return false;
+    }
+
+    // Build checkpoint key for the aggregate (not the event)
+    const checkpointKey = buildCheckpointKey(
+      event.tenantId,
+      this.pipelineName,
+      processorName,
+      event.aggregateType,
+      String(event.aggregateId),
+    );
+    const existingCheckpoint =
+      await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+
+    // If checkpoint exists and is processed, check if this sequence number was already processed
+    if (existingCheckpoint?.status === "processed") {
+      // If the checkpoint's sequence number is >= current sequence number, it's already processed
+      if (existingCheckpoint.sequenceNumber >= sequenceNumber) {
+        this.logger.debug(
+          {
+            processorName,
+            processorType,
+            eventId: event.id,
+            aggregateId: String(event.aggregateId),
+            sequenceNumber,
+            checkpointSequenceNumber: existingCheckpoint.sequenceNumber,
+          },
+          processorType === "handler"
+            ? "Event already processed, skipping"
+            : "Event already processed for projection, skipping",
+        );
+        return true; // Already processed
+      }
+
+      // If checkpoint has lower sequence number, allow processing (will update checkpoint)
+    }
+
+    // Don't overwrite failed checkpoints - failure detector should have caught this earlier
+    // but we check here as a safety measure to prevent overwriting failed checkpoints
+    if (existingCheckpoint?.status === "failed") {
+      this.logger.warn(
+        {
+          processorName,
+          processorType,
+          eventId: event.id,
+          aggregateId: String(event.aggregateId),
+          sequenceNumber,
+          failedSequenceNumber: existingCheckpoint.sequenceNumber,
+        },
+        "Cannot claim event - previous event failed. Failure detector should have caught this.",
+      );
+      return true; // Treat as already processed (blocked by failure)
+    }
+
+    // If checkpoint doesn't exist or has lower sequence number, atomically claim it by saving a pending checkpoint
+    // This prevents TOCTOU race conditions where multiple processes try to process the same event
+    // IMPORTANT: Don't save pending checkpoint if there's a processed checkpoint with lower sequence number,
+    // as this would overwrite it and break ordering validation. The pending checkpoint will be saved
+    // after ordering validation passes.
+    if (
+      !existingCheckpoint ||
+      existingCheckpoint.sequenceNumber < sequenceNumber
+    ) {
+      // If there's a processed checkpoint with lower sequence number, don't overwrite it yet
+      // Ordering validation needs to check it first. The pending checkpoint will be saved after validation.
+      if (
+        existingCheckpoint?.status === "processed" &&
+        existingCheckpoint.sequenceNumber < sequenceNumber
+      ) {
+        // Don't save pending checkpoint here - let ordering validation check the previous checkpoint first
+        // The pending checkpoint will be saved after ordering validation passes
+        return false; // Not processed, allow processing to continue
+      }
+
+      // Re-check for failed checkpoint right before saving to prevent race conditions
+      const recheckCheckpoint =
+        await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+      if (recheckCheckpoint?.status === "failed") {
+        this.logger.warn(
+          {
+            processorName,
+            processorType,
+            eventId: event.id,
+            aggregateId: String(event.aggregateId),
+            sequenceNumber,
+            failedSequenceNumber: recheckCheckpoint.sequenceNumber,
+          },
+          "Cannot claim event - failed checkpoint detected during claim. Failure detector should have caught this.",
+        );
+        return true; // Treat as already processed (blocked by failure)
+      }
+
+      try {
+        await this.processorCheckpointStore.saveCheckpoint(
+          event.tenantId,
+          checkpointKey,
+          processorType,
+          event,
+          "pending",
+          sequenceNumber,
+        );
+        return false; // Successfully claimed
+      } catch (error) {
+        // If save fails, another process may have claimed it - check again
+        const recheckCheckpoint =
+          await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+        if (
+          recheckCheckpoint?.status === "processed" &&
+          recheckCheckpoint.sequenceNumber >= sequenceNumber
+        ) {
+          // Another process already processed it
+          this.logger.debug(
+            {
+              processorName,
+              processorType,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              sequenceNumber,
+            },
+            processorType === "handler"
+              ? "Event already processed by another process, skipping"
+              : "Event already processed for projection by another process, skipping",
+          );
+          return true; // Already processed
+        }
+
+        // If still not processed, the error is unexpected - log and continue
+        // The pending checkpoint will be saved again later in CheckpointManager
+        this.logger.warn(
+          {
+            processorName,
+            processorType,
+            eventId: event.id,
+            aggregateId: String(event.aggregateId),
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Failed to save pending checkpoint during validation, continuing anyway",
+        );
+        return false; // Claim failed but continue anyway
+      }
+    } else if (existingCheckpoint.status === "pending") {
+      // A pending checkpoint exists - this could be from a previous failed attempt
+      // (e.g., ordering validation failed). We'll allow processing to continue
+      // and let ordering validation decide if it should proceed.
+      // The pending checkpoint will be overwritten when processing completes.
+      this.logger.debug(
+        {
+          processorName,
+          processorType,
+          eventId: event.id,
+          aggregateId: String(event.aggregateId),
+        },
+        "Pending checkpoint exists from previous attempt, allowing processing to continue",
+      );
+      return false; // Allow processing - ordering validation will decide
+    }
+
+    return false; // Not processed, not claimed
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: Ordering validation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Validates that the immediate predecessor (sequenceNumber - 1) has been processed.
+   * If sequenceNumber is 1, there is no predecessor, so validation always passes.
+   *
+   * @throws {SequentialOrderingError} If the immediate predecessor has not been processed
+   */
+  private async validateOrdering(
+    processorName: string,
+    processorType: "handler" | "projection",
+    event: EventType,
+    sequenceNumber: number,
+  ): Promise<void> {
+    if (!this.processorCheckpointStore || !this.pipelineName) {
+      return; // No checkpoint store means no ordering enforcement
+    }
+
+    // If sequenceNumber is 1, there's no predecessor to check
+    if (sequenceNumber <= 1) {
+      this.logger.debug(
+        {
+          eventId: event.id,
+          sequenceNumber,
+          processorName,
+          processorType,
+          reason: "sequenceNumber <= 1, no predecessor to check",
+        },
+        "Skipping ordering validation - first event",
+      );
+      return;
+    }
+
+    const previousSequenceNumber = sequenceNumber - 1;
+
+    this.logger.debug(
+      {
+        eventId: event.id,
+        sequenceNumber,
+        previousSequenceNumber,
+        processorName,
+        processorType,
+        aggregateId: String(event.aggregateId),
+        tenantId: event.tenantId,
+        pipelineName: this.pipelineName,
+      },
+      "Checking if previous event processed",
+    );
+
+    // Use getCheckpointBySequenceNumber to check if previousSequenceNumber was processed
+    // This method loads the aggregate checkpoint and verifies it's processed with sequence >= previousSequenceNumber
+    const previousCheckpoint =
+      await this.processorCheckpointStore.getCheckpointBySequenceNumber(
+        this.pipelineName,
+        processorName,
+        processorType,
+        event.tenantId,
+        event.aggregateType,
+        String(event.aggregateId),
+        previousSequenceNumber,
+      );
+
+    this.logger.debug(
+      {
+        eventId: event.id,
+        previousSequenceNumber,
+        found: previousCheckpoint !== null,
+        checkpointSequence: previousCheckpoint?.sequenceNumber ?? null,
+        checkpointStatus: previousCheckpoint?.status ?? null,
+        checkpointEventId: previousCheckpoint?.eventId ?? null,
+        checkpointKey: previousCheckpoint
+          ? `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`
+          : null,
+      },
+      "Previous checkpoint lookup result",
+    );
+
+    // If no processed checkpoint exists with sequence >= previousSequenceNumber, we must wait
+    if (!previousCheckpoint) {
+      // DEBUG: Try to find what checkpoints DO exist for this aggregate
+      const checkpointKey = `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`;
+      this.logger.warn(
+        {
+          processorName,
+          processorType,
+          eventId: event.id,
+          aggregateId: String(event.aggregateId),
+          sequenceNumber,
+          previousSequenceNumber,
+          tenantId: event.tenantId,
+          checkpointKey,
+          reason: "No checkpoint found for previous sequence number",
+        },
+        "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
+      );
+      throw new SequentialOrderingError(
+        previousSequenceNumber,
+        sequenceNumber,
+        event.id,
+        String(event.aggregateId),
+        event.tenantId,
+        {
+          processorName,
+          processorType,
+        },
+      );
+    }
   }
 }
