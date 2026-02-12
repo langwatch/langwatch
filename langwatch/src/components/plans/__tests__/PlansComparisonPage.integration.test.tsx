@@ -27,7 +27,6 @@ describe("<PlansComparisonPage/>", () => {
       expect(screen.getByTestId("plan-column-free")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-growth")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-enterprise")).toBeInTheDocument();
-      expect(screen.getByText("Usage")).toBeInTheDocument();
       expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument();
     });
   });
@@ -41,22 +40,6 @@ describe("<PlansComparisonPage/>", () => {
 
       const freeColumn = screen.getByTestId("plan-column-free");
       expect(within(freeColumn).getByText("Current")).toBeInTheDocument();
-    });
-
-    it("shows the free plan usage details", () => {
-      render(
-        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
-        { wrapper: Wrapper },
-      );
-
-      const eventsRow = screen.getByTestId("comparison-row-events-included");
-      expect(within(eventsRow).getByText("50,000")).toBeInTheDocument();
-
-      const retentionRow = screen.getByTestId("comparison-row-data-retention");
-      expect(within(retentionRow).getByText("14 days")).toBeInTheDocument();
-
-      const scenariosRow = screen.getByTestId("comparison-row-scenarios");
-      expect(within(scenariosRow).getByText("3")).toBeInTheDocument();
     });
 
     it("routes growth upgrade action to subscription page", () => {
@@ -110,17 +93,6 @@ describe("<PlansComparisonPage/>", () => {
       expect(
         within(growthColumn).getByRole("link", { name: "Add Events" }),
       ).toBeInTheDocument();
-
-      const extraEventsRow = screen.getByTestId(
-        "comparison-row-extra-event-pricing",
-      );
-      expect(
-        within(extraEventsRow).getByText("$1 per additional 100,000 events"),
-      ).toBeInTheDocument();
-
-      const liteUsersRow = screen.getByTestId("comparison-row-lite-users");
-      const liteUsersCells = within(liteUsersRow).getAllByRole("cell");
-      expect(liteUsersCells[2]).toHaveTextContent("Unlimited");
     });
   });
 

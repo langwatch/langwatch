@@ -5,11 +5,23 @@ import type { Currency } from "./billing-plans";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
 
+interface PlannedUser {
+  id: string;
+  email: string;
+  memberType: "core" | "lite";
+}
+
+function memberTypeToRole(memberType: "core" | "lite"): "MEMBER" | "EXTERNAL" {
+  return memberType === "core" ? "MEMBER" : "EXTERNAL";
+}
+
 export function useSubscriptionActions({
   organizationId,
   currency,
   billingPeriod,
   totalCoreMembers,
+  currentMaxMembers,
+  plannedUsers,
   onSeatsUpdated,
   organizationWithMembers,
 }: {
@@ -17,6 +29,8 @@ export function useSubscriptionActions({
   currency: Currency;
   billingPeriod: "monthly" | "annually";
   totalCoreMembers: number;
+  currentMaxMembers?: number;
+  plannedUsers: PlannedUser[];
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
 }) {
@@ -29,6 +43,7 @@ export function useSubscriptionActions({
     );
   }
   const createSubscription = subscriptionApi.create.useMutation();
+  const upgradeWithInvites = subscriptionApi.upgradeWithInvites?.useMutation();
   const addTeamMemberOrEvents =
     subscriptionApi.addTeamMemberOrEvents.useMutation();
   const manageSubscription = subscriptionApi.manage.useMutation();
@@ -36,6 +51,32 @@ export function useSubscriptionActions({
   const handleUpgrade = async () => {
     if (!organizationId) return;
 
+    // Separate invites (have email) from empty seats
+    const invitesWithEmail = plannedUsers
+      .filter((u) => u.email.trim() !== "")
+      .map((u) => ({
+        email: u.email,
+        role: memberTypeToRole(u.memberType),
+      }));
+
+    // If upgradeWithInvites is available and we have invites, use it
+    if (upgradeWithInvites && invitesWithEmail.length > 0) {
+      const result = await upgradeWithInvites.mutateAsync({
+        organizationId,
+        baseUrl: window.location.origin,
+        currency,
+        billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
+        totalSeats: totalCoreMembers,
+        invites: invitesWithEmail,
+      });
+
+      if (result.url) {
+        window.location.href = result.url;
+      }
+      return;
+    }
+
+    // Fallback to existing create mutation (no invites or mutation unavailable)
     const result = await createSubscription.mutateAsync({
       organizationId,
       baseUrl: window.location.origin,
@@ -53,13 +94,22 @@ export function useSubscriptionActions({
   const handleUpdateSeats = async () => {
     if (!organizationId) return;
 
+    const invitesWithEmail = plannedUsers
+      .filter((u) => u.email.trim() !== "")
+      .map((u) => ({ email: u.email, role: memberTypeToRole(u.memberType) }));
+
+    // Use plan.maxMembers as base (what's already paid for), add new planned core seats
+    const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "core").length;
+    const updateTotalMembers = (currentMaxMembers ?? totalCoreMembers) + plannedCoreCount;
+
     await addTeamMemberOrEvents.mutateAsync({
       organizationId,
       plan: "GROWTH_SEAT_USAGE",
       upgradeMembers: true,
       upgradeTraces: false,
-      totalMembers: totalCoreMembers,
+      totalMembers: updateTotalMembers,
       totalTraces: 0,
+      ...(invitesWithEmail.length > 0 ? { invites: invitesWithEmail } : {}),
     });
 
     onSeatsUpdated();
@@ -87,7 +137,7 @@ export function useSubscriptionActions({
     handleUpgrade,
     handleUpdateSeats,
     handleManageSubscription,
-    isUpgradeLoading: createSubscription.isPending,
+    isUpgradeLoading: createSubscription.isPending || (upgradeWithInvites?.isPending ?? false),
     isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,
     isManageLoading: manageSubscription.isPending,
   };
