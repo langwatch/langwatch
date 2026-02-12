@@ -140,6 +140,11 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
+const mockOpenSeats = vi.fn();
+vi.mock("../../../stores/upgradeModalStore", () => ({
+  useUpgradeModalStore: (selector: (state: { openSeats: typeof mockOpenSeats }) => unknown) =>
+    selector({ openSeats: mockOpenSeats }),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -860,7 +865,34 @@ describe("<SubscriptionPage/>", () => {
       expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
     });
 
-    it("calls addTeamMemberOrEvents with correct args when clicking Update subscription", async () => {
+    it("opens proration preview modal with correct params when clicking Update subscription", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat: maxMembers (20) + 1 planned = 21 total
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      await waitFor(() => {
+        expect(mockOpenSeats).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            currentSeats: 20,
+            newSeats: 21,
+            onConfirm: expect.any(Function),
+          })
+        );
+      });
+    });
+
+    it("calls addTeamMemberOrEvents when onConfirm callback is invoked", async () => {
       const user = userEvent.setup();
       const mockMutateAsync = vi.fn().mockResolvedValue({ success: true });
       mockAddTeamMemberOrEvents.mockReturnValue({
@@ -883,18 +915,20 @@ describe("<SubscriptionPage/>", () => {
 
       await user.click(screen.getByRole("button", { name: /Update subscription/i }));
 
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({
-            organizationId: "test-org-id",
-            plan: "GROWTH_SEAT_USAGE",
-            upgradeMembers: true,
-            upgradeTraces: false,
-            totalMembers: 21,
-            totalTraces: 0,
-          })
-        );
-      });
+      // Extract the onConfirm callback from the openSeats call and invoke it
+      const openSeatsCall = mockOpenSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
+      await openSeatsCall.onConfirm();
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "test-org-id",
+          plan: "GROWTH_SEAT_USAGE",
+          upgradeMembers: true,
+          upgradeTraces: false,
+          totalMembers: 21,
+          totalTraces: 0,
+        })
+      );
     });
   });
 
@@ -1137,7 +1171,7 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("clears planned users after successful seat update", async () => {
+    it("clears planned users after successful seat update via onConfirm", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
@@ -1154,6 +1188,10 @@ describe("<SubscriptionPage/>", () => {
       });
 
       await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      // Extract and invoke the onConfirm callback to simulate the modal confirmation
+      const openSeatsCall = mockOpenSeats.mock.calls.at(-1)![0] as { onConfirm: () => Promise<void> };
+      await openSeatsCall.onConfirm();
 
       // After successful update, planned users are cleared — count returns to existing members
       await waitFor(() => {

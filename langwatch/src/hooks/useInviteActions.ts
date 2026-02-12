@@ -2,13 +2,58 @@ import { OrganizationUserRole } from "@prisma/client";
 import type { SubmitHandler } from "react-hook-form";
 import type { MembersForm } from "../components/AddMembersForm";
 import { toaster } from "../components/ui/toaster";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { checkCompoundLimits } from "./useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "./useLicenseEnforcement";
 import { api } from "../utils/api";
 
 /**
+ * Determines whether inviting new core members requires a proration preview
+ * (seat expansion) before proceeding. Only applies to SEAT_USAGE organizations
+ * when the new total would exceed the current maxMembers.
+ */
+export function needsSeatProration({
+  pricingModel,
+  currentMaxMembers,
+  currentCoreMembers,
+  newCoreInviteCount,
+  hasNewFullMembers,
+}: {
+  pricingModel?: string;
+  currentMaxMembers?: number;
+  currentCoreMembers?: number;
+  newCoreInviteCount: number;
+  hasNewFullMembers: boolean;
+}): boolean {
+  if (pricingModel !== "SEAT_USAGE") return false;
+  if (!hasNewFullMembers) return false;
+  if (typeof currentMaxMembers !== "number") return false;
+  if (typeof currentCoreMembers !== "number") return false;
+
+  const projectedCoreCount = currentCoreMembers + newCoreInviteCount;
+  return projectedCoreCount > currentMaxMembers;
+}
+
+/**
+ * Calculates the new seat total when expanding seats.
+ * Uses maxMembers (what is already paid for) as the base, then adds new core invites.
+ */
+export function calculateNewSeatTotal({
+  currentMaxMembers,
+  newCoreInviteCount,
+}: {
+  currentMaxMembers: number;
+  newCoreInviteCount: number;
+}): number {
+  return currentMaxMembers + newCoreInviteCount;
+}
+
+/**
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
  * approve, reject, and delete. Keeps MembersList focused on rendering.
+ *
+ * When `pricingModel` is "SEAT_USAGE" and inviting core members would exceed
+ * `currentMaxMembers`, opens the proration preview modal before proceeding.
  */
 export function useInviteActions({
   organizationId,
@@ -17,6 +62,9 @@ export function useInviteActions({
   onInviteCreated,
   onClose,
   refetchInvites,
+  pricingModel,
+  currentMaxMembers,
+  currentCoreMembers,
 }: {
   organizationId: string;
   isAdmin: boolean;
@@ -24,9 +72,24 @@ export function useInviteActions({
   onInviteCreated: (invites: { inviteCode: string; email: string }[]) => void;
   onClose: () => void;
   refetchInvites: () => void;
+  /** Pricing model of the organization (e.g. "SEAT_USAGE", "TIERED"). */
+  pricingModel?: string;
+  /** Current maxMembers from the active plan (seats already paid for). */
+  currentMaxMembers?: number;
+  /** Current count of core (non-EXTERNAL) members in the organization. */
+  currentCoreMembers?: number;
 }) {
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
+  const openSeats = useUpgradeModalStore((s) => s.openSeats);
+
+  // SaaS-only: subscription API for seat expansion (not available in OSS builds).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionApi = (api as any).subscription;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const expandSeatsMutation = subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
+    | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
+    | undefined;
 
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const createInviteRequestMutation =
@@ -149,13 +212,60 @@ export function useInviteActions({
       (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
     );
 
-    const enforcements = [
-      ...(hasNewFullMembers ? [membersEnforcement] : []),
-      ...(hasNewLiteMembers ? [membersLiteEnforcement] : []),
-    ];
-
     const performMutation = isAdmin ? performAdminInvite : performInviteRequest;
-    checkCompoundLimits(enforcements, () => performMutation(data));
+
+    const proceed = () => {
+      const enforcements = [
+        ...(hasNewFullMembers ? [membersEnforcement] : []),
+        ...(hasNewLiteMembers ? [membersLiteEnforcement] : []),
+      ];
+      checkCompoundLimits(enforcements, () => performMutation(data));
+    };
+
+    const newCoreInviteCount = data.invites.filter(
+      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+    ).length;
+
+    if (
+      needsSeatProration({
+        pricingModel,
+        currentMaxMembers,
+        currentCoreMembers,
+        newCoreInviteCount,
+        hasNewFullMembers,
+      })
+    ) {
+      if (!expandSeatsMutation) {
+        // Fallback: proceed without proration if SaaS API not available
+        proceed();
+        return;
+      }
+
+      const newTotal = calculateNewSeatTotal({
+        currentMaxMembers: currentMaxMembers!,
+        newCoreInviteCount,
+      });
+
+      openSeats({
+        organizationId,
+        currentSeats: currentMaxMembers!,
+        newSeats: newTotal,
+        onConfirm: async () => {
+          await expandSeatsMutation.mutateAsync({
+            organizationId,
+            plan: "GROWTH_SEAT_USAGE",
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: newTotal,
+            totalTraces: 0,
+          });
+          proceed();
+        },
+      });
+      return;
+    }
+
+    proceed();
   };
 
   const approveInvite = (inviteId: string) => {
