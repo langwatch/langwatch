@@ -242,5 +242,29 @@ describe("SerializedHttpAgentAdapter", () => {
       const body = JSON.parse(callArgs?.body as string);
       expect(body.input).toBe("Hello");
     });
+
+    describe("when body template contains Liquid conditions", () => {
+      it("renders if/else based on input content", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          bodyTemplate:
+            '{"mode": "{% if input contains \'search\' %}search{% else %}chat{% endif %}", "query": "{{ input }}"}',
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        const input: AgentInput = {
+          ...defaultInput,
+          messages: [{ role: "user", content: "search for cats" }],
+          newMessages: [{ role: "user", content: "search for cats" }],
+        };
+
+        await adapter.call(input);
+
+        const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+        const body = JSON.parse(callArgs?.body as string);
+        expect(body.mode).toBe("search");
+        expect(body.query).toBe("search for cats");
+      });
+    });
   });
 });

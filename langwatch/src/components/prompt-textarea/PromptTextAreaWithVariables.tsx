@@ -20,10 +20,10 @@ import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
-  findUnclosedBraces,
-  parseVariablesFromText,
-  VARIABLE_REGEX,
-} from "./utils";
+  extractLiquidVariables,
+  tokenizeLiquidTemplate,
+} from "./liquidTokenizer";
+import { findUnclosedBraces } from "./utils";
 
 export const PromptTextAreaWithVariables = ({
   value,
@@ -172,9 +172,9 @@ export const PromptTextAreaWithVariables = ({
     borderless,
   });
 
-  // Variables used in text but not defined
+  // Variables used in text but not defined (Liquid-aware extraction)
   const usedVariables = useMemo(
-    () => parseVariablesFromText(localValue),
+    () => extractLiquidVariables(localValue).inputVariables,
     [localValue],
   );
 
@@ -247,54 +247,65 @@ export const PromptTextAreaWithVariables = ({
     [handleValueChange, menuOpen, openMenu, closeMenu, setMenuQuery],
   );
 
-  // Render function for rich-textarea - highlights variables
+  // Render function for rich-textarea - highlights Liquid tags and variables
   const renderText = useCallback(
     (text: string) => {
       if (!text) return null;
 
-      const parts: React.ReactNode[] = [];
-      let lastIndex = 0;
-      let match;
+      const tokens = tokenizeLiquidTemplate(text);
+      if (tokens.length === 0) return null;
 
-      const regex = new RegExp(VARIABLE_REGEX);
-      while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push(text.substring(lastIndex, match.index));
+      return tokens.map((token, index) => {
+        if (token.type === "plain-text") {
+          return token.value;
         }
 
-        const varName = match[1] ?? "";
-        const isInvalid = varName ? !existingVariableIds.has(varName) : true;
+        if (token.type === "variable") {
+          // Extract the variable name (before any filter pipe)
+          const inner = token.value.slice(2, -2).trim();
+          const varName = inner.split("|")[0]!.trim().split(".")[0]!.trim();
+          const isInvalid = varName ? !existingVariableIds.has(varName) : true;
 
-        const variableColor = isInvalid
-          ? "var(--chakra-colors-red-500)"
-          : "var(--chakra-colors-blue-500)";
+          const variableColor = isInvalid
+            ? "var(--chakra-colors-red-500)"
+            : "var(--chakra-colors-blue-500)";
 
-        parts.push(
+          return (
+            <span
+              key={`var-${index}`}
+              style={{
+                color: variableColor,
+                // In borderless mode with variable-width fonts (Inter), real fontWeight
+                // changes character width and breaks caret positioning. Use text-shadow
+                // for a "faux bold" effect that doesn't affect text metrics.
+                fontWeight: borderless ? undefined : 600,
+                textShadow: borderless
+                  ? `0px 0px 1px ${variableColor}`
+                  : undefined,
+              }}
+            >
+              {token.value}
+            </span>
+          );
+        }
+
+        // liquid-tag: highlight with a distinct color
+        const tagColor = "var(--chakra-colors-purple-500)";
+        return (
           <span
-            key={`var-${match.index}`}
+            key={`tag-${index}`}
             style={{
-              color: variableColor,
-              // In borderless mode with variable-width fonts (Inter), real fontWeight
-              // changes character width and breaks caret positioning. Use text-shadow
-              // for a "faux bold" effect that doesn't affect text metrics.
+              color: tagColor,
               fontWeight: borderless ? undefined : 600,
               textShadow: borderless
-                ? `0px 0px 1px ${variableColor}`
+                ? `0px 0px 1px ${tagColor}`
                 : undefined,
             }}
           >
-            {match[0]}
-          </span>,
+            {token.value}
+          </span>
         );
-
-        lastIndex = regex.lastIndex;
-      }
-
-      if (lastIndex < text.length) {
-        parts.push(text.substring(lastIndex));
-      }
-
-      return parts;
+      });
     },
     [existingVariableIds, borderless],
   );

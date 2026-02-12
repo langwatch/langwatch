@@ -1,13 +1,3 @@
-/** Regex for matching variables in the format {{variable_name}} */
-export const VARIABLE_REGEX = /\{\{([^}]+)\}\}/g;
-
-/** Extract variable names from text */
-export const parseVariablesFromText = (text: string): string[] => {
-  const matches = text.match(VARIABLE_REGEX);
-  if (!matches) return [];
-  return Array.from(new Set(matches.map((m) => m.slice(2, -2)))); // Remove {{ and }}
-};
-
 /** Find unclosed {{ before cursor position for triggering the variable menu */
 export const findUnclosedBraces = (
   text: string,
