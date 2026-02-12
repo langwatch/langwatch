@@ -148,7 +148,7 @@ export function TargetSelector({
             borderColor="border"
             position="sticky"
             top={0}
-            bg="white"
+            bg="bg"
             zIndex={10}
           >
             <Input

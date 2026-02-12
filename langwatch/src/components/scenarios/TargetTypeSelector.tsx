@@ -23,7 +23,7 @@ const TARGET_TYPE_OPTIONS = [
 ];
 
 /**
- * Dropdown selector for target type (prompt or HTTP agent).
+ * Dropdown selector for target type (prompt, HTTP agent, or code agent).
  */
 export function TargetTypeSelector({
   value,

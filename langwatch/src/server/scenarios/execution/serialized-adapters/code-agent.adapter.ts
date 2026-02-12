@@ -4,13 +4,18 @@
  * Operates with pre-fetched configuration data and doesn't require
  * database access. Designed to run in isolated worker threads.
  *
- * Executes Python code by sending a minimal DSL workflow to the
- * langwatch_nlp service's /execute_sync endpoint.
+ * Executes Python code by building a minimal DSL workflow (entry -> code -> end)
+ * and sending it to the langwatch_nlp service's /studio/execute_sync endpoint
+ * as an execute_flow event.
  */
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { nanoid } from "nanoid";
 import type { CodeAgentData } from "../types";
+
+/** Timeout for NLP service requests (2 minutes) */
+const NLP_FETCH_TIMEOUT_MS = 120_000;
 
 /**
  * Serialized code agent adapter that uses pre-fetched configuration.
@@ -22,6 +27,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   constructor(
     private readonly config: CodeAgentData,
     private readonly nlpServiceUrl: string,
+    private readonly apiKey: string,
   ) {
     super();
     this.name = "SerializedCodeAgentAdapter";
@@ -34,39 +40,50 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         ? lastUserMessage.content
         : JSON.stringify(lastUserMessage?.content ?? "");
 
+    const inputRecord = this.buildInputRecord(inputValue);
     const workflow = this.buildWorkflow(inputValue);
-    const result = await this.executeOnNlpService(workflow);
+    const result = await this.executeOnNlpService(workflow, inputRecord);
     return result;
   }
 
   /**
-   * Build a minimal DSL workflow with entry → code node for execution.
+   * Build a minimal DSL workflow with entry -> code -> end nodes for execution.
+   *
+   * The /studio/execute_sync endpoint returns result.get("end"), so we need
+   * an end node to capture the code node's outputs.
    */
   private buildWorkflow(inputValue: string) {
     const entryNodeId = "entry";
     const codeNodeId = "code_agent";
+    const endNodeId = "end";
 
-    // Build input fields with the scenario input value
-    const inputs = this.config.inputs.length > 0
-      ? this.config.inputs.map((inp) => ({
-          identifier: inp.identifier,
-          type: inp.type,
-          value: inputValue,
-        }))
-      : [{ identifier: "input", type: "str", value: inputValue }];
+    // Build input fields - only the first input receives the scenario message,
+    // remaining inputs get empty strings (code agents with multiple inputs
+    // should use the first input for the primary message).
+    const inputs =
+      this.config.inputs.length > 0
+        ? this.config.inputs.map((inp, index) => ({
+            identifier: inp.identifier,
+            type: inp.type,
+            value: index === 0 ? inputValue : "",
+          }))
+        : [{ identifier: "input", type: "str", value: inputValue }];
 
-    const outputs = this.config.outputs.length > 0
-      ? this.config.outputs
-      : [{ identifier: "output", type: "str" }];
+    const outputs =
+      this.config.outputs.length > 0
+        ? this.config.outputs
+        : [{ identifier: "output", type: "str" }];
 
     return {
-      workflow_id: "scenario-code-execution",
+      api_key: this.apiKey,
+      workflow_id: `scenario-code-${this.config.agentId}`,
       spec_version: "1.3",
       name: "Scenario Code Execution",
       icon: "🔧",
       description: "Minimal workflow for scenario code agent execution",
       version: "1.0",
-      default_llm: {},
+      template_adapter: "default" as const,
+      default_llm: null,
       nodes: [
         {
           id: entryNodeId,
@@ -103,85 +120,139 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             cls: "Code",
           },
         },
+        {
+          id: endNodeId,
+          type: "end",
+          position: { x: 400, y: 0 },
+          data: {
+            name: "End",
+            inputs: outputs.map((out) => ({
+              identifier: out.identifier,
+              type: out.type,
+            })),
+          },
+        },
       ],
-      edges: inputs.map((inp) => ({
-        id: `${entryNodeId}-${codeNodeId}-${inp.identifier}`,
-        source: entryNodeId,
-        sourceHandle: `${entryNodeId}.outputs.${inp.identifier}`,
-        target: codeNodeId,
-        targetHandle: `${codeNodeId}.inputs.${inp.identifier}`,
-        type: "default",
-      })),
+      edges: [
+        // entry -> code_agent edges (one per input)
+        ...inputs.map((inp) => ({
+          id: `${entryNodeId}-${codeNodeId}-${inp.identifier}`,
+          source: entryNodeId,
+          sourceHandle: `${entryNodeId}.outputs.${inp.identifier}`,
+          target: codeNodeId,
+          targetHandle: `${codeNodeId}.inputs.${inp.identifier}`,
+          type: "default",
+        })),
+        // code_agent -> end edges (one per output)
+        ...outputs.map((out) => ({
+          id: `${codeNodeId}-${endNodeId}-${out.identifier}`,
+          source: codeNodeId,
+          sourceHandle: `${codeNodeId}.outputs.${out.identifier}`,
+          target: endNodeId,
+          targetHandle: `${endNodeId}.inputs.${out.identifier}`,
+          type: "default",
+        })),
+      ],
       state: { execution: { status: "idle" } },
     };
   }
 
   /**
-   * Execute the workflow via the NLP service's /execute_sync endpoint.
+   * Execute the workflow via the NLP service's /studio/execute_sync endpoint.
+   *
+   * Uses execute_flow (not execute_component) because /execute_sync only
+   * monitors ExecutionStateChange events, which are emitted by execute_flow.
    */
-  private async executeOnNlpService(workflow: ReturnType<typeof this.buildWorkflow>): Promise<string> {
+  private async executeOnNlpService(
+    workflow: ReturnType<typeof this.buildWorkflow>,
+    inputRecord: Record<string, string>,
+  ): Promise<string> {
     const event = {
-      type: "execute_component",
+      type: "execute_flow" as const,
       payload: {
-        trace_id: `scenario-${Date.now()}`,
+        trace_id: `trace_${nanoid()}`,
         workflow,
-        node_id: "code_agent",
-        inputs: this.buildInputRecord(workflow),
+        inputs: [inputRecord],
+        manual_execution_mode: false,
+        do_not_trace: true,
       },
     };
 
-    const response = await fetch(`${this.nlpServiceUrl}/execute_sync`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(event),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      NLP_FETCH_TIMEOUT_MS,
+    );
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(
-        `Code execution failed: HTTP ${response.status}${body ? ` - ${body}` : ""}`,
+    try {
+      const response = await fetch(
+        `${this.nlpServiceUrl}/studio/execute_sync`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+          signal: controller.signal,
+        },
       );
-    }
 
-    const result = await response.json() as Record<string, unknown>;
-    return this.extractOutput(result);
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(
+          `Code execution failed: HTTP ${response.status}${body ? ` - ${body}` : ""}`,
+        );
+      }
+
+      const result = (await response.json()) as {
+        trace_id: string;
+        status: string;
+        result: Record<string, unknown> | null;
+      };
+      return this.extractOutput(result.result);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /**
-   * Build input values for the execute_component event.
+   * Build input values record for the execute_flow event.
+   * Only the first input receives the scenario message; others get empty strings.
    */
-  private buildInputRecord(workflow: ReturnType<typeof this.buildWorkflow>): Record<string, unknown> {
-    const codeNode = workflow.nodes.find((n) => n.id === "code_agent");
-    if (!codeNode) return {};
+  private buildInputRecord(inputValue: string): Record<string, string> {
+    const inputs =
+      this.config.inputs.length > 0
+        ? this.config.inputs
+        : [{ identifier: "input", type: "str" }];
 
-    const record: Record<string, unknown> = {};
-    for (const input of codeNode.data.inputs ?? []) {
-      record[input.identifier] = input.value ?? "";
+    const record: Record<string, string> = {};
+    for (let i = 0; i < inputs.length; i++) {
+      record[inputs[i]!.identifier] = i === 0 ? inputValue : "";
     }
     return record;
   }
 
   /**
    * Extract the output string from the NLP service response.
+   *
+   * The /studio/execute_sync endpoint returns:
+   * { trace_id, status: "success", result: <end node outputs> }
+   *
+   * The result is the output from the "end" node, which is a dict
+   * of output identifier -> value.
    */
-  private extractOutput(result: Record<string, unknown>): string {
-    // The NLP service returns the component outputs in the result
-    // Try common output patterns
+  private extractOutput(result: Record<string, unknown> | null): string {
+    if (!result) return "";
     if (typeof result === "string") return result;
 
-    // Check for outputs field (standard DSL response format)
-    const outputs = result.outputs as Record<string, unknown> | undefined;
-    if (outputs) {
-      const firstOutput = this.config.outputs[0]?.identifier ?? "output";
-      const value = outputs[firstOutput];
-      if (value !== undefined) return this.stringify(value);
+    // Try to extract by the first configured output identifier
+    const firstOutputId = this.config.outputs[0]?.identifier ?? "output";
+    const value = result[firstOutputId];
+    if (value !== undefined) return this.stringify(value);
 
-      // Return first available output
-      const firstValue = Object.values(outputs)[0];
-      if (firstValue !== undefined) return this.stringify(firstValue);
-    }
+    // Fallback: return first available value
+    const firstValue = Object.values(result)[0];
+    if (firstValue !== undefined) return this.stringify(firstValue);
 
-    // Fallback: stringify the whole result
+    // Last resort: stringify the whole result
     return this.stringify(result);
   }
 
