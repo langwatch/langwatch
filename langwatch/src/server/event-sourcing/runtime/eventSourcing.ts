@@ -103,14 +103,13 @@ export class EventSourcing {
    * ```
    */
   registerPipeline<EventType extends Event>() {
-    if (!this.runtime.eventStore || !this.runtime.distributedLock) {
+    if (!this.runtime.eventStore) {
       return new DisabledPipelineBuilder<EventType>();
     }
 
     return new PipelineBuilder<EventType>({
       eventStore: this.runtime.eventStore as EventStore<EventType>,
       queueProcessorFactory: this.runtime.queueProcessorFactory,
-      distributedLock: this.runtime.distributedLock,
       processorCheckpointStore: this.runtime.checkpointStore,
     });
   }
@@ -171,8 +170,7 @@ export class EventSourcing {
         // Return disabled pipeline if event sourcing is disabled
         if (
           !this.runtime.isEnabled ||
-          !this.runtime.eventStore ||
-          !this.runtime.distributedLock
+          !this.runtime.eventStore
         ) {
           // Log detailed reason for disabled state
           logger.warn(
@@ -180,7 +178,6 @@ export class EventSourcing {
               pipeline: definition.metadata.name,
               isEnabled: this.runtime.isEnabled,
               hasEventStore: !!this.runtime.eventStore,
-              hasDistributedLock: !!this.runtime.distributedLock,
             },
             "Returning DisabledPipeline - commands will be silently dropped",
           );
@@ -243,7 +240,6 @@ export class EventSourcing {
           projections: projectionsObject,
           eventHandlers: eventHandlersObject,
           queueProcessorFactory: this.runtime.queueProcessorFactory,
-          distributedLock: this.runtime.distributedLock,
           processorCheckpointStore: this.runtime.checkpointStore,
           parentLinks:
             definition.parentLinks.length > 0

@@ -14,8 +14,6 @@ import type {
 import type { EventSourcingService } from "../../library/services/eventSourcingService";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { EventStore } from "../../library/stores/eventStore.types";
-import type { DistributedLock } from "../../library/utils/distributedLock";
-
 /**
  * Static metadata about a pipeline for tooling and introspection.
  * This metadata is captured during pipeline building and exposed on the pipeline instance.
@@ -79,30 +77,6 @@ export interface EventSourcingPipelineDefinition<
    * selection (memory vs ClickHouse) and use the supplied implementation as-is.
    */
   processorCheckpointStore?: ProcessorCheckpointStore;
-  /**
-   * Optional distributed lock for preventing concurrent updates.
-   * Used for both projections and event handlers to serialize processing per aggregate.
-   * If not provided, concurrent processing may result in ordering validation failures.
-   */
-  distributedLock?: DistributedLock;
-  /**
-   * Time-to-live for handler locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  handlerLockTtlMs?: number;
-  /**
-   * Time-to-live for projection update locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 5 minutes
-   */
-  updateLockTtlMs?: number;
-  /**
-   * Time-to-live for command locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  commandLockTtlMs?: number;
   /**
    * Parent links defining relationships to other aggregate types.
    * Used by tools like deja-view to navigate between related aggregates.

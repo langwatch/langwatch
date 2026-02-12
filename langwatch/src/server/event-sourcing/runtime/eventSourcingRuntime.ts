@@ -2,8 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
 import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
-import type { DistributedLock } from "../library/utils/distributedLock";
-import { RedisDistributedLock } from "../library/utils/distributedLock";
 import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
@@ -28,7 +26,6 @@ const logger = createLogger("langwatch:event-sourcing:runtime");
 export interface RuntimeStores {
   eventStore: EventStore;
   checkpointStore?: ProcessorCheckpointStore;
-  distributedLock?: DistributedLock;
   queueProcessorFactory?: QueueProcessorFactory;
 }
 
@@ -44,7 +41,6 @@ export interface RuntimeStores {
 export class EventSourcingRuntime {
   private _eventStore?: EventStore;
   private _checkpointStore?: ProcessorCheckpointStore;
-  private _distributedLock?: DistributedLock;
   private _queueProcessorFactory?: QueueProcessorFactory;
   private _initialized = false;
   private _loggedDisabledWarning = false;
@@ -80,14 +76,6 @@ export class EventSourcingRuntime {
   get checkpointStore(): ProcessorCheckpointStore | undefined {
     this.ensureInitialized();
     return this._checkpointStore;
-  }
-
-  /**
-   * The distributed lock instance. Returns undefined if Redis is unavailable.
-   */
-  get distributedLock(): DistributedLock | undefined {
-    this.ensureInitialized();
-    return this._distributedLock;
   }
 
   /**
@@ -170,14 +158,6 @@ export class EventSourcingRuntime {
       forceClickHouseInTests,
     );
 
-    // Create distributed lock if Redis is available
-    if (redisConnection) {
-      this._distributedLock = new RedisDistributedLock(redisConnection);
-      logger.debug("Using Redis distributed lock");
-    } else {
-      logger.debug("Distributed lock unavailable (no Redis connection)");
-    }
-
     // Create queue processor factory
     this._queueProcessorFactory = new DefaultQueueProcessorFactory(
       redisConnection,
@@ -187,8 +167,7 @@ export class EventSourcingRuntime {
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
         checkpointStore: this._checkpointStore?.constructor.name ?? "none",
-        distributedLock: this._distributedLock ? "Redis" : "none",
-        queueProcessor: redisConnection ? "BullMQ" : "Memory",
+        queueProcessor: redisConnection ? "GroupQueue" : "Memory",
       },
       "Event sourcing runtime initialized",
     );
@@ -267,7 +246,6 @@ export class EventSourcingRuntime {
     runtime._initialized = true;
     runtime._eventStore = stores.eventStore;
     runtime._checkpointStore = stores.checkpointStore;
-    runtime._distributedLock = stores.distributedLock;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
 
     return runtime;
@@ -282,7 +260,6 @@ export class EventSourcingRuntime {
       eventStore: EventStore;
       checkpointStore: ProcessorCheckpointStore;
       queueProcessorFactory: QueueProcessorFactory;
-      distributedLock?: DistributedLock;
     },
   ): EventSourcingRuntime {
     const runtime = new EventSourcingRuntime(config);
@@ -291,7 +268,6 @@ export class EventSourcingRuntime {
     runtime._eventStore = stores.eventStore;
     runtime._checkpointStore = stores.checkpointStore;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
-    runtime._distributedLock = stores.distributedLock;
 
     return runtime;
   }

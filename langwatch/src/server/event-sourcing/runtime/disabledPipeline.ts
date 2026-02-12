@@ -25,7 +25,7 @@ class DisabledQueueProcessor<
   ) {}
 
   async send(payload: Payload): Promise<void> {
-    logger.warn(
+    logger.error(
       {
         pipeline: this.pipelineName,
         command: this.commandName,

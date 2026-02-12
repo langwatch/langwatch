@@ -19,10 +19,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../../library/queues";
-import {
-  createMockDistributedLock,
-  createTestEvent,
-} from "../../../library/services/__tests__/testHelpers";
+import { createTestEvent } from "../../../library/services/__tests__/testHelpers";
 import type { EventStore } from "../../../library/stores/eventStore.types";
 import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
 import type { QueueProcessorFactory } from "../../queue";
@@ -214,7 +211,6 @@ export function createTestPipelineBuilder<EventType extends Event = Event>(
   return new PipelineBuilder<EventType>({
     eventStore: mockEventStore,
     queueProcessorFactory: mockFactory,
-    distributedLock: createMockDistributedLock(),
   });
 }
 
@@ -399,7 +395,6 @@ export function createMinimalPipelineBuilder() {
     return new PipelineBuilder<TestEvent>({
       eventStore,
       queueProcessorFactory: factory,
-      distributedLock: createMockDistributedLock(),
     })
       .withName("test-pipeline")
       .withAggregateType("trace")

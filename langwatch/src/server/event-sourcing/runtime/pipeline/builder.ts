@@ -26,7 +26,6 @@ import type {
 } from "../../library/projection.types";
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
-import type { DistributedLock } from "../../library/utils/distributedLock";
 import { EventSourcingPipeline } from "../pipeline";
 import type { QueueProcessorFactory } from "../queue";
 import type {
@@ -38,10 +37,6 @@ import type {
 export interface PipelineBuilderOptions<EventType extends Event = Event> {
   eventStore: EventStore<EventType>;
   queueProcessorFactory?: QueueProcessorFactory;
-  distributedLock?: DistributedLock;
-  handlerLockTtlMs?: number;
-  updateLockTtlMs?: number;
-  commandLockTtlMs?: number;
   processorCheckpointStore?: ProcessorCheckpointStore;
 }
 
@@ -508,10 +503,6 @@ export class PipelineBuilderWithNameAndType<
       eventPublisher: this.eventPublisher,
       eventHandlers: eventHandlersObject,
       queueProcessorFactory: this.options.queueProcessorFactory,
-      distributedLock: this.options.distributedLock,
-      handlerLockTtlMs: this.options.handlerLockTtlMs,
-      updateLockTtlMs: this.options.updateLockTtlMs,
-      commandLockTtlMs: this.options.commandLockTtlMs,
       processorCheckpointStore: this.options.processorCheckpointStore,
       parentLinks: this.parentLinks.length > 0 ? this.parentLinks : undefined,
       metadata,

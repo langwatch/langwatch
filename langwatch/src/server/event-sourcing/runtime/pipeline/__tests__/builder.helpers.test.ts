@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 import { PipelineBuilder } from "../builder";
 import {
   BASE_COMMAND_HANDLER_SCHEMA,
@@ -32,7 +31,6 @@ describe("Pipeline Builder Helper Functions", () => {
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -65,7 +63,6 @@ describe("Pipeline Builder Helper Functions", () => {
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -98,7 +95,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -126,7 +122,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -152,7 +147,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -178,7 +172,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -217,7 +210,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -258,7 +250,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -284,7 +275,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -310,7 +300,6 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
