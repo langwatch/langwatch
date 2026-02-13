@@ -9,6 +9,7 @@ import type {
 } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
 import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
+import { experimentRunProcessingPipelineDefinition } from "../pipelines/experiment-run-processing/pipeline";
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
@@ -307,4 +308,12 @@ export const getTraceProcessingPipeline = createLazyPipeline(() =>
 
 export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(evaluationProcessingPipelineDefinition),
+);
+
+/**
+ * Returns the experiment run processing pipeline.
+ * Lazily initialized to avoid env validation at module load time.
+ */
+export const getExperimentRunProcessingPipeline = createLazyPipeline(() =>
+  getEventSourcing().register(experimentRunProcessingPipelineDefinition),
 );

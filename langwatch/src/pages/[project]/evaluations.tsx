@@ -384,7 +384,7 @@ function EvaluationsV2() {
                                   <Table.Cell>
                                     <HStack gap={1}>
                                       {experiment.runsSummary.latestRun
-                                        ?.timestamps?.finished_at ? (
+                                        ?.timestamps?.finishedAt ? (
                                         <>
                                           <LuCircleCheckBig
                                             size={14}
@@ -393,7 +393,7 @@ function EvaluationsV2() {
                                           <Text fontSize="sm">Completed</Text>
                                         </>
                                       ) : experiment.runsSummary.latestRun
-                                          ?.timestamps?.stopped_at ? (
+                                          ?.timestamps?.stoppedAt ? (
                                         <>
                                           <LuCircleX
                                             size={14}
@@ -402,10 +402,10 @@ function EvaluationsV2() {
                                           <Text fontSize="sm">Stopped</Text>
                                         </>
                                       ) : experiment.runsSummary.latestRun
-                                          ?.timestamps?.updated_at &&
+                                          ?.timestamps?.updatedAt &&
                                         Date.now() -
                                           experiment.runsSummary.latestRun
-                                            .timestamps.updated_at <
+                                            .timestamps.updatedAt <
                                           5 * 60 * 1000 ? (
                                         <>
                                           <Spinner size="xs" />

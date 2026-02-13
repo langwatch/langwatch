@@ -450,13 +450,10 @@ export class ClickHouseTraceService {
             hasUnsupportedFilters,
           } = generateClickHouseFilterConditions(input.filters ?? {});
 
-          // If there are unsupported filters, fall back to Elasticsearch
           if (hasUnsupportedFilters) {
-            this.logger.debug(
-              { projectId: input.projectId },
-              "Filters contain unsupported fields for ClickHouse, falling back to Elasticsearch",
+            throw new Error(
+              "Filters contain unsupported fields for ClickHouse",
             );
-            return null;
           }
 
           // Build the query with keyset pagination
