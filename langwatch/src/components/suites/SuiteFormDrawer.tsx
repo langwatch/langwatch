@@ -23,6 +23,7 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { useCallback } from "react";
 import {
   useDrawer,
@@ -336,21 +337,29 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   padding={3}
                   marginTop={2}
                 >
-                  <HStack gap={2} align="center">
-                    <Text fontSize="sm">Repeat count</Text>
-                    <Input
-                      type="number"
-                      size="sm"
-                      width="80px"
-                      min={1}
-                      max={100}
-                      value={form.repeatCountStr}
-                      onChange={(e) => form.setRepeatCountStr(e.target.value)}
-                    />
-                    <Text fontSize="xs" color="fg.muted">
-                      times per scenario x target
-                    </Text>
-                  </HStack>
+                  <VStack align="start" gap={1}>
+                    <HStack gap={2} align="center">
+                      <Text fontSize="sm">Repeat count</Text>
+                      <Input
+                        type="number"
+                        size="sm"
+                        width="80px"
+                        min={1}
+                        max={MAX_REPEAT_COUNT}
+                        value={form.repeatCountStr}
+                        onChange={(e) => form.setRepeatCountStr(e.target.value)}
+                        borderColor={form.errors.repeatCount ? "red.500" : undefined}
+                      />
+                      <Text fontSize="xs" color="fg.muted">
+                        times per scenario x target (max {MAX_REPEAT_COUNT})
+                      </Text>
+                    </HStack>
+                    {form.errors.repeatCount && (
+                      <Text fontSize="xs" color="red.500">
+                        {form.errors.repeatCount}
+                      </Text>
+                    )}
+                  </VStack>
                 </Box>
               </Collapsible.Content>
             </Collapsible.Root>
