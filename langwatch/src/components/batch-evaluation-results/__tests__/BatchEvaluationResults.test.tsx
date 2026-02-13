@@ -20,7 +20,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
+import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
 import { BatchEvaluationResults } from "../BatchEvaluationResults";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -84,59 +84,62 @@ const mockExperiment = {
 const mockRunsData = {
   runs: [
     {
-      run_id: "swift-bright-fox",
-      workflow_version: null,
+      runId: "swift-bright-fox",
+      workflowVersion: null,
       timestamps: {
-        created_at: Date.now() - 60000,
-        finished_at: Date.now(),
+        createdAt: Date.now() - 60000,
+        updatedAt: Date.now(),
+        finishedAt: Date.now(),
       },
       progress: 10,
       total: 10,
       summary: {
-        dataset_cost: 0.05,
-        evaluations_cost: 0.02,
+        datasetCost: 0.05,
+        evaluationsCost: 0.02,
         evaluations: {
           accuracy: {
             name: "accuracy",
-            average_score: 0.85,
-            average_passed: null,
+            averageScore: 0.85,
+            averagePassed: null,
           },
         },
       },
     },
     {
-      run_id: "calm-eager-owl",
-      workflow_version: null,
+      runId: "calm-eager-owl",
+      workflowVersion: null,
       timestamps: {
-        created_at: Date.now() - 120000,
-        finished_at: Date.now() - 60000,
+        createdAt: Date.now() - 120000,
+        updatedAt: Date.now() - 60000,
+        finishedAt: Date.now() - 60000,
       },
       progress: 10,
       total: 10,
       summary: {
-        dataset_cost: 0.04,
-        evaluations_cost: 0.01,
+        datasetCost: 0.04,
+        evaluationsCost: 0.01,
         evaluations: {
           accuracy: {
             name: "accuracy",
-            average_score: 0.9,
-            average_passed: null,
+            averageScore: 0.9,
+            averagePassed: null,
           },
         },
       },
     },
     {
-      run_id: "noble-vivid-storm",
-      workflow_version: null,
+      runId: "noble-vivid-storm",
+      workflowVersion: null,
       timestamps: {
-        created_at: Date.now() - 180000,
-        finished_at: Date.now() - 120000,
+        createdAt: Date.now() - 180000,
+        updatedAt: Date.now() - 120000,
+        finishedAt: Date.now() - 120000,
       },
       progress: 10,
       total: 10,
       summary: {
-        dataset_cost: 0.03,
-        evaluations_cost: 0,
+        datasetCost: 0.03,
+        evaluationsCost: 0,
         evaluations: {},
       },
     },
@@ -148,10 +151,10 @@ const mockSingleRunData = {
 };
 
 // Mock full run data (for table display)
-const createMockRunData = (runId: string): ESBatchEvaluation => ({
-  project_id: "project-1",
-  experiment_id: "exp-1",
-  run_id: runId,
+const createMockRunData = (runId: string): ExperimentRunWithItems => ({
+  experimentId: "exp-1",
+  runId: runId,
+  projectId: "project-1",
   progress: 10,
   total: 10,
   targets: [
@@ -166,7 +169,7 @@ const createMockRunData = (runId: string): ESBatchEvaluation => ({
   dataset: [
     {
       index: 0,
-      target_id: "target-1",
+      targetId: "target-1",
       entry: { question: "Hello" },
       predicted: { answer: "Hi there!" },
       cost: 0.001,
@@ -174,7 +177,7 @@ const createMockRunData = (runId: string): ESBatchEvaluation => ({
     },
     {
       index: 1,
-      target_id: "target-1",
+      targetId: "target-1",
       entry: { question: "World" },
       predicted: { answer: "Hello World!" },
       cost: 0.002,
@@ -185,7 +188,7 @@ const createMockRunData = (runId: string): ESBatchEvaluation => ({
     {
       evaluator: "accuracy",
       name: "accuracy",
-      target_id: "target-1",
+      targetId: "target-1",
       index: 0,
       status: "processed",
       score: 0.95,
@@ -194,7 +197,7 @@ const createMockRunData = (runId: string): ESBatchEvaluation => ({
     {
       evaluator: "accuracy",
       name: "accuracy",
-      target_id: "target-1",
+      targetId: "target-1",
       index: 1,
       status: "processed",
       score: 0.85,
@@ -202,10 +205,9 @@ const createMockRunData = (runId: string): ESBatchEvaluation => ({
     },
   ],
   timestamps: {
-    created_at: Date.now() - 60000,
-    inserted_at: Date.now() - 60000,
-    updated_at: Date.now(),
-    finished_at: Date.now(),
+    createdAt: Date.now() - 60000,
+    updatedAt: Date.now(),
+    finishedAt: Date.now(),
   },
 });
 
@@ -780,18 +782,18 @@ describe("BatchEvaluationResults Integration", () => {
       const interruptedRunData = {
         runs: [
           {
-            run_id: "interrupted-run",
-            workflow_version: null,
+            runId: "interrupted-run",
+            workflowVersion: null,
             timestamps: {
-              created_at: tenMinutesAgo - 60000,
-              updated_at: tenMinutesAgo, // Last update was 10 minutes ago
-              // No finished_at or stopped_at
+              createdAt: tenMinutesAgo - 60000,
+              updatedAt: tenMinutesAgo, // Last update was 10 minutes ago
+              // No finishedAt or stoppedAt
             },
             progress: 5,
             total: 10,
             summary: {
-              dataset_cost: 0.02,
-              evaluations_cost: 0.01,
+              datasetCost: 0.02,
+              evaluationsCost: 0.01,
               evaluations: {},
             },
           },

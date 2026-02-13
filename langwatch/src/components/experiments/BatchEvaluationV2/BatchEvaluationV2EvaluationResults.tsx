@@ -15,7 +15,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
-import type { ESBatchEvaluation } from "../../../server/experiments/types";
+import type { ExperimentRunWithItems } from "../../../server/evaluations-v3/services/types";
 import { api } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
 import { getEvaluationColumns } from "./utils";
@@ -67,7 +67,7 @@ export const useBatchEvaluationResults = ({
       acc[item.index] = item;
       return acc;
     },
-    {} as Record<number, ESBatchEvaluation["dataset"][number]>,
+    {} as Record<number, ExperimentRunWithItems["dataset"][number]>,
   );
 
   const datasetColumns = new Set(
@@ -94,7 +94,7 @@ export const useBatchEvaluationResults = ({
   let predictedColumns: Record<string, Set<string>> = {};
   for (const entry of entriesPredictions) {
     for (const [node, value] of Object.entries(entry)) {
-      for (const key of Object.keys(value)) {
+      for (const key of Object.keys(value as Record<string, unknown>)) {
         if (!predictedColumns[node]) {
           predictedColumns[node] = new Set();
         }
@@ -118,8 +118,8 @@ export const useBatchEvaluationResults = ({
     (acc, evaluation) => {
       // For V3 evaluations, group by target + evaluator
       // For V2, just use evaluator
-      const key = evaluation.target_id
-        ? `${evaluation.target_id}:${evaluation.evaluator}`
+      const key = evaluation.targetId
+        ? `${evaluation.targetId}:${evaluation.evaluator}`
         : evaluation.evaluator;
       if (!acc[key]) {
         acc[key] = [];
@@ -127,7 +127,7 @@ export const useBatchEvaluationResults = ({
       acc[key]!.push(evaluation);
       return acc;
     },
-    {} as Record<string, ESBatchEvaluation["evaluations"]>,
+    {} as Record<string, ExperimentRunWithItems["evaluations"]>,
   );
 
   // Get target metadata for display names
@@ -321,7 +321,7 @@ export const useBatchEvaluationDownloadCSV = ({
 
     const link = document.createElement("a");
     link.href = url;
-    const formattedDate = new Date(run.data.timestamps.created_at)
+    const formattedDate = new Date(run.data.timestamps.createdAt)
       .toISOString()
       .split("T")[0];
     const fileName = `${formattedDate}_${experiment.name}_${runId}.csv`;
@@ -365,7 +365,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     // Helper to format tab label for V3 (target + evaluator)
     const getTabLabel = (
       key: string,
-      results: ESBatchEvaluation["evaluations"],
+      results: ExperimentRunWithItems["evaluations"],
     ) => {
       // Check if this is a V3 target:evaluator key
       if (key.includes(":")) {

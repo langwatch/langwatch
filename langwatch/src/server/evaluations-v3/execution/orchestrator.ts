@@ -10,7 +10,6 @@
  * 6. Checks abort flags between executions
  */
 
-import { nanoid } from "nanoid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/evaluations-v3/types";
 import { isRowEmpty } from "~/evaluations-v3/utils/emptyRowDetection";
@@ -18,14 +17,15 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import { ExperimentRunDispatcher } from "../dispatch";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import type {
-  BatchEvaluationRepository,
   DatasetEntry,
   EvaluationEntry,
 } from "../repositories/batchEvaluation.repository";
@@ -386,7 +386,12 @@ export async function* executeCell(
         } catch (evalError) {
           // Yield error for this evaluator but continue with others
           logger.warn(
-            { error: evalError, evaluatorId, cell },
+            {
+              error: evalError,
+              evaluatorId,
+              rowIndex: cell.rowIndex,
+              targetId: cell.targetId,
+            },
             "Evaluator execution failed",
           );
           yield {
@@ -405,7 +410,10 @@ export async function* executeCell(
       }
     }
   } catch (error) {
-    logger.error({ error, cell }, "Cell execution failed");
+    logger.error(
+      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
+      "Cell execution failed",
+    );
     yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
   }
 }
@@ -515,6 +523,18 @@ export async function* runOrchestrator(
   // Set running flag
   await abortManager.setRunning(runId);
 
+  // Check if ClickHouse dual-write is enabled for this project
+  const dispatcher = ExperimentRunDispatcher.create();
+  let clickHouseEnabled = false;
+  try {
+    clickHouseEnabled = await dispatcher.isClickHouseEnabled(projectId);
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "Failed to check ClickHouse enabled status, proceeding without dual-write",
+    );
+  }
+
   // Get repository and initialize storage if enabled
   const repository =
     saveToEs && experimentId ? getDefaultBatchEvaluationRepository() : null;
@@ -582,6 +602,18 @@ export async function* runOrchestrator(
       total: totalCells,
       targets: targetMetadata,
     });
+
+    // Dispatch event to ClickHouse for dual-write (if enabled)
+    if (clickHouseEnabled) {
+      void dispatcher.startRun({
+        tenantId: projectId,
+        runId,
+        experimentId,
+        workflowVersionId: workflowVersionId ?? null,
+        total: totalCells,
+        targets: targetMetadata,
+      });
+    }
   }
 
   // Helper to save pending results
@@ -614,7 +646,7 @@ export async function* runOrchestrator(
 
   // Helper to process event for storage
   const processEventForStorage = (event: EvaluationV3Event) => {
-    if (!repository) return;
+    if (!repository || !experimentId) return;
 
     if (event.type === "target_result") {
       // Get the dataset row entry for this row index
@@ -631,6 +663,26 @@ export async function* runOrchestrator(
         error: event.error ?? null,
         trace_id: event.traceId ?? null,
       });
+
+      // Dispatch event to ClickHouse for dual-write (if enabled)
+      if (clickHouseEnabled) {
+        void dispatcher.recordTargetResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          entry: datasetEntry,
+          predicted:
+            event.output === null || event.output === undefined
+              ? null
+              : { output: event.output },
+          cost: event.cost ?? null,
+          duration: event.duration ?? null,
+          error: event.error ?? null,
+          traceId: event.traceId ?? null,
+        });
+      }
     } else if (event.type === "error") {
       // Store error events as dataset entries with the error message
       // This captures errors that occur during cell execution (e.g., network errors)
@@ -647,6 +699,23 @@ export async function* runOrchestrator(
           error: event.message,
           trace_id: null,
         });
+
+        // Dispatch error as target result to ClickHouse (if enabled)
+        if (clickHouseEnabled) {
+          void dispatcher.recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+          });
+        }
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
@@ -677,6 +746,33 @@ export async function* runOrchestrator(
             ? result.cost.amount
             : null,
       });
+
+      // Dispatch event to ClickHouse for dual-write (if enabled)
+      if (clickHouseEnabled) {
+        void dispatcher.recordEvaluatorResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          evaluatorId: event.evaluatorId,
+          evaluatorName: dbEvaluator?.name ?? null,
+          status: result.status,
+          score: result.status === "processed" ? result.score : null,
+          label: result.status === "processed" ? result.label : null,
+          passed: result.status === "processed" ? result.passed : null,
+          details:
+            result.status === "error"
+              ? result.details
+              : result.status === "processed"
+                ? result.details
+                : null,
+          cost:
+            result.status === "processed" && result.cost
+              ? result.cost.amount
+              : null,
+        });
+      }
     } else if (event.type === "progress") {
       pendingProgress = event.completed;
     }
@@ -904,6 +1000,16 @@ export async function* runOrchestrator(
           finishedAt: aborted ? undefined : finishedAt,
           stoppedAt: aborted ? finishedAt : undefined,
         });
+
+        // Dispatch completion event to ClickHouse for dual-write (if enabled)
+        if (clickHouseEnabled) {
+          void dispatcher.completeRun({
+            tenantId: projectId,
+            runId,
+            finishedAt: aborted ? null : finishedAt,
+            stoppedAt: aborted ? finishedAt : null,
+          });
+        }
       } catch (error) {
         logger.error(
           { error, runId },

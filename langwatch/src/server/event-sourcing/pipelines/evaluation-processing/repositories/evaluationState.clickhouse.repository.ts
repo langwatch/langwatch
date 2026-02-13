@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { parse } from "date-fns";
 import {
   ErrorCategory,
   SecurityError,
@@ -65,9 +66,11 @@ function timestampToDateTime64(timestampMs: number | null): string | null {
 /**
  * Converts a ClickHouse DateTime64(3) string to Unix millisecond timestamp.
  */
+const CLICKHOUSE_DATETIME64_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSX";
+
 function dateTime64ToTimestamp(dateTime64: string | null): number | null {
   if (dateTime64 === null) return null;
-  return parseInt(dateTime64, 10);
+  return parse(`${dateTime64}Z`, CLICKHOUSE_DATETIME64_FORMAT, new Date(0)).getTime();
 }
 
 /**
@@ -172,7 +175,7 @@ export class EvaluationStateRepositoryClickHouse<
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}
             AND EvaluationId = {evaluationId:String}
-          ORDER BY Version DESC
+          ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: {
