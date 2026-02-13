@@ -16,17 +16,19 @@ import {
   Heading,
   HStack,
   Input,
+  Separator,
   SimpleGrid,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
+import { Tooltip } from "~/components/ui/tooltip";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -38,11 +40,7 @@ import {
 } from "./billing-plans";
 import { useBillingPricing } from "./useBillingPricing";
 import { useSubscriptionActions } from "./useSubscriptionActions";
-
-/**
- * Member type for users in the organization
- */
-type MemberType = "core" | "lite";
+import { classifyMemberType, type MemberType } from "~/server/license-enforcement/member-classification";
 
 /**
  * User representation in the subscription context
@@ -65,8 +63,8 @@ interface EditableUser extends SubscriptionUser {
 }
 
 const memberTypeOptions = [
-  { label: "Full Member", value: "core" as const },
-  { label: "Lite Member", value: "lite" as const },
+  { label: "Full Member", value: "FullMember" as const },
+  { label: "Lite Member", value: "LiteMember" as const },
 ];
 
 const memberTypeCollection = createListCollection({ items: memberTypeOptions });
@@ -211,12 +209,12 @@ function CurrentPlanBlock({
  * Update Seats Block - allows Growth plan users to finalize seat changes
  */
 function UpdateSeatsBlock({
-  totalCoreMembers,
+  totalFullMembers,
   totalPrice,
   onUpdate,
   isLoading,
 }: {
-  totalCoreMembers: number;
+  totalFullMembers: number;
   totalPrice: string;
   onUpdate: () => void;
   isLoading?: boolean;
@@ -234,8 +232,8 @@ function UpdateSeatsBlock({
               Update Seats
             </Text>
             <Text fontSize="sm" color="gray.700">
-              {totalPrice} for {totalCoreMembers} core member
-              {totalCoreMembers !== 1 ? "s" : ""}
+              {totalPrice} for {totalFullMembers} Full Member
+              {totalFullMembers !== 1 ? "s" : ""}
             </Text>
           </VStack>
           <Button
@@ -261,6 +259,8 @@ function UpgradePlanBlock({
   pricePerSeat,
   totalPrice,
   coreMembers,
+  existingFullMembers,
+  pendingFullMemberCount,
   features,
   onUpgrade,
   isLoading,
@@ -269,6 +269,8 @@ function UpgradePlanBlock({
   pricePerSeat: React.ReactNode;
   totalPrice: string;
   coreMembers: number;
+  existingFullMembers: number;
+  pendingFullMemberCount: number;
   features: string[];
   onUpgrade?: () => void;
   isLoading?: boolean;
@@ -294,7 +296,7 @@ function UpgradePlanBlock({
                 fontWeight="medium"
                 color="gray.700"
               >
-                {totalPrice} per {coreMembers} core member
+                {totalPrice} per {coreMembers} Full Member
                 {coreMembers !== 1 ? "s" : ""}
               </Text>
             </VStack>
@@ -308,6 +310,56 @@ function UpgradePlanBlock({
               Upgrade now
             </Button>
           </Flex>
+
+          {/* Seat Breakdown */}
+          <Box
+            data-testid="seat-breakdown"
+            borderWidth={1}
+            borderColor="gray.200"
+            borderRadius="md"
+            padding={4}
+            bg="gray.50"
+          >
+            <Text fontSize="sm" fontWeight="semibold" mb={3}>
+              Seat Breakdown
+            </Text>
+
+            <VStack align="stretch" gap={2} fontSize="sm">
+              <HStack justify="space-between">
+                <Text color="gray.600">Active Full Members:</Text>
+                <Text fontWeight="medium" data-testid="active-full-members-count">
+                  {existingFullMembers}
+                </Text>
+              </HStack>
+
+              {pendingFullMemberCount > 0 && (
+                <HStack justify="space-between">
+                  <HStack gap={1}>
+                    <Text color="gray.600">Pending Invites:</Text>
+                    <Tooltip
+                      content="These invites will consume seats once accepted"
+                      positioning={{ placement: "top" }}
+                    >
+                      <Info size={14} color="var(--chakra-colors-gray-400)" />
+                    </Tooltip>
+                  </HStack>
+                  <Text fontWeight="medium" data-testid="pending-invites-count">
+                    {pendingFullMemberCount}
+                  </Text>
+                </HStack>
+              )}
+
+              <Separator my={1} />
+
+              <HStack justify="space-between">
+                <Text fontWeight="semibold">Total Seats:</Text>
+                <Text fontWeight="bold" data-testid="total-seats-count">
+                  {coreMembers}
+                </Text>
+              </HStack>
+            </VStack>
+          </Box>
+
           <SimpleGrid columns={3} gap={2}>
             {features.map((feature, index) => (
               <HStack key={index} gap={2}>
@@ -356,6 +408,15 @@ interface PlannedUser {
 }
 
 /**
+ * Pending invite with classified member type for display in the drawer
+ */
+interface PendingInviteWithMemberType {
+  id: string;
+  email: string;
+  memberType: MemberType;
+}
+
+/**
  * User management drawer component
  * Manages ephemeral state for planning upgrades - does NOT save to DB
  */
@@ -364,6 +425,9 @@ function UserManagementDrawer({
   onClose,
   users,
   plannedUsers,
+  pendingInvitesWithMemberType,
+  seatPrice,
+  currencySymbol: sym,
   isLoading,
   onSave,
 }: {
@@ -371,6 +435,9 @@ function UserManagementDrawer({
   onClose: () => void;
   users: SubscriptionUser[];
   plannedUsers: PlannedUser[];
+  pendingInvitesWithMemberType: PendingInviteWithMemberType[];
+  seatPrice: number;
+  currencySymbol: string;
   isLoading: boolean;
   onSave: (plannedUsers: PlannedUser[]) => void;
 }) {
@@ -396,7 +463,7 @@ function UserManagementDrawer({
     const newPlannedUser: PlannedUser = {
       id: `planned-${Date.now()}-${localPlannedUsers.length}`,
       email: "",
-      memberType: "core",
+      memberType: "FullMember",
     };
     setLocalPlannedUsers((prev) => [...prev, newPlannedUser]);
   };
@@ -425,6 +492,18 @@ function UserManagementDrawer({
     onClose();
   };
 
+  const activeFullMembers = editableUsers.filter(
+    (u) => u.memberType === "FullMember",
+  ).length;
+  const pendingFullMembers = pendingInvitesWithMemberType.filter(
+    (inv) => inv.memberType === "FullMember",
+  ).length;
+  const plannedFullMembers = localPlannedUsers.filter(
+    (u) => u.memberType === "FullMember",
+  ).length;
+  const totalFullMembersInDrawer = activeFullMembers + pendingFullMembers + plannedFullMembers;
+  const totalPriceInDrawer = totalFullMembersInDrawer * seatPrice;
+
   return (
     <Drawer.Root
       open={open}
@@ -449,42 +528,67 @@ function UserManagementDrawer({
             </Flex>
           ) : (
             <VStack align="start" gap={6} width="full">
-              {/* Current Members section */}
+              {/* Current Members section - includes active users and pending invites */}
               <VStack align="start" gap={3} width="full">
                 <Text fontWeight="semibold" fontSize="sm" color="gray.500">
                   Current Members
                 </Text>
+                {/* Active users */}
                 {editableUsers.map((user) => (
                   <HStack
                     key={user.id}
                     width="full"
-                    justifyContent="space-between"
-                    padding={3}
-                    borderWidth={1}
-                    borderRadius="md"
-                    borderColor="gray.200"
+                    justify="space-between"
                   >
-                    <VStack align="start" gap={1}>
-                      <Text fontWeight="medium">{user.name || user.email}</Text>
-                      <Text fontSize="sm" color="gray.500">
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="sm" fontWeight="medium" color="gray.600">
                         {user.email}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">
+                        Active
                       </Text>
                     </VStack>
                     <Badge
                       colorPalette={
-                        user.memberType === "core" ? "blue" : "gray"
+                        user.memberType === "FullMember" ? "blue" : "gray"
                       }
+                      variant="outline"
                     >
-                      {user.memberType === "core" ? "Core User" : "Lite User"}
+                      {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                    </Badge>
+                  </HStack>
+                ))}
+                {/* Pending invites (no separate header) */}
+                {pendingInvitesWithMemberType.map((invite) => (
+                  <HStack
+                    key={invite.id}
+                    width="full"
+                    justify="space-between"
+                    opacity={0.8}
+                    data-testid={`pending-invite-${invite.email}`}
+                  >
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                        {invite.email}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">
+                        Invited - Waiting for acceptance
+                      </Text>
+                    </VStack>
+                    <Badge
+                      colorPalette={invite.memberType === "FullMember" ? "blue" : "gray"}
+                      variant="outline"
+                    >
+                      {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
                     </Badge>
                   </HStack>
                 ))}
               </VStack>
 
-              {/* Pending Seats section */}
+              {/* New Planned Seats section (editable) */}
               <VStack align="start" gap={3} width="full">
                 <Text fontWeight="semibold" fontSize="sm" color="gray.500">
-                  Pending Seats
+                  New seats
                 </Text>
                 {localPlannedUsers.map((user, index) => (
                   <HStack
@@ -555,14 +659,68 @@ function UserManagementDrawer({
         </Drawer.Body>
 
         <Drawer.Footer>
-          <HStack width="full" justifyContent="flex-end">
-            <Button variant="ghost" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="blue" onClick={handleSave}>
-              Done
-            </Button>
-          </HStack>
+          <VStack width="full" gap={4}>
+            <VStack
+              data-testid="drawer-footer-breakdown"
+              align="stretch"
+              gap={2}
+              fontSize="sm"
+              padding={4}
+              bg="gray.50"
+              borderRadius="md"
+              width="full"
+            >
+              <HStack justify="space-between">
+                <Text color="gray.600">Active Members:</Text>
+                <Text fontWeight="medium" data-testid="active-members-footer-count">
+                  {activeFullMembers}
+                </Text>
+              </HStack>
+
+              {pendingFullMembers > 0 && (
+                <HStack justify="space-between">
+                  <Text color="gray.600">Pending Invites:</Text>
+                  <Text fontWeight="medium" data-testid="pending-invites-footer-count">
+                    {pendingFullMembers}
+                  </Text>
+                </HStack>
+              )}
+
+              {plannedFullMembers > 0 && (
+                <HStack justify="space-between">
+                  <Text color="gray.600">New Planned Seats:</Text>
+                  <Text fontWeight="medium" data-testid="planned-seats-footer-count">
+                    {plannedFullMembers}
+                  </Text>
+                </HStack>
+              )}
+
+              <Separator />
+
+              <HStack justify="space-between">
+                <Text fontWeight="bold">Total Seats:</Text>
+                <Text fontWeight="bold" data-testid="total-seats-footer-count">
+                  {totalFullMembersInDrawer}
+                </Text>
+              </HStack>
+
+              <HStack justify="space-between">
+                <Text fontWeight="bold">Monthly Price:</Text>
+                <Text fontWeight="bold" color="blue.600" data-testid="monthly-price-footer">
+                  {sym}{totalPriceInDrawer}
+                </Text>
+              </HStack>
+            </VStack>
+
+            <HStack width="full" justifyContent="flex-end">
+              <Button variant="ghost" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button colorPalette="blue" onClick={handleSave}>
+                Done
+              </Button>
+            </HStack>
+          </VStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
@@ -634,8 +792,9 @@ export function SubscriptionPage() {
       name: member.user.name ?? "",
       email: member.user.email ?? "",
       role: member.role,
-      memberType:
-        member.role === "EXTERNAL" ? ("lite" as const) : ("core" as const),
+      // Note: Using simplified classification (EXTERNAL = LiteMember, others = FullMember)
+      // Full classification with customRole permissions would require additional data
+      memberType: classifyMemberType(member.role, undefined),
     }));
   }, [organizationWithMembers.data]);
 
@@ -644,32 +803,46 @@ export function SubscriptionPage() {
   const isTieredPricingModel = organization?.pricingModel === "TIERED";
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan;
 
-  // N = core members + core PENDING invites, M = plan.maxMembers
-  const pendingCoreInviteCount = useMemo(() => {
-    if (!pendingInvites.data) return 0;
-    return pendingInvites.data.filter(
-      (i) => i.role !== "EXTERNAL" && i.status === "PENDING"
-    ).length;
+  // Classify and map pending invites to include in billing calculation
+  const pendingInvitesWithMemberType = useMemo(() => {
+    if (!pendingInvites.data) return [];
+    return pendingInvites.data
+      .filter((inv) => inv.status === "PENDING")
+      .map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        memberType: classifyMemberType(inv.role, undefined),
+      }));
   }, [pendingInvites.data]);
 
-  const existingCoreMembers = users.filter((u) => u.memberType === "core").length;
-  const plannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "core").length;
-  const seatUsageN = existingCoreMembers + pendingCoreInviteCount + plannedCoreSeatCount;
+  // Count pending Full Member invites for display
+  const pendingFullMemberCount = pendingInvitesWithMemberType.filter(
+    (inv) => inv.memberType === "FullMember"
+  ).length;
+
+  // Combine plannedUsers (from drawer) with pendingInvites (from DB) for billing calculation
+  const allPlannedUsers = [...plannedUsers, ...pendingInvitesWithMemberType];
+
+  const existingCoreMembers = users.filter((u) => u.memberType === "FullMember").length;
+  const plannedCoreSeatCount = allPlannedUsers.filter((u) => u.memberType === "FullMember").length;
+  const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
-  const totalUserCount = users.length + plannedUsers.length;
+  const totalUserCount = users.length + allPlannedUsers.length;
 
   const {
     sym,
     seatPrice,
-    totalCoreMembers,
-    plannedCoreMembers,
+    totalFullMembers,
+    plannedFullMembers,
     pricePerSeat,
     totalPriceFormatted,
-  } = useBillingPricing({ currency, billingPeriod, users, plannedUsers });
+  } = useBillingPricing({ currency, billingPeriod, users, plannedUsers: allPlannedUsers });
 
   // For update-seats flow: base on plan.maxMembers (what's already paid for), not recount of users
-  const updateTotalCoreMembers = (seatUsageM ?? totalCoreMembers) + plannedCoreSeatCount;
+  // Only count NEW planned users from drawer (NOT pending invites, they're already in maxMembers)
+  const newPlannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
+  const updateTotalCoreMembers = (seatUsageM ?? totalFullMembers) + newPlannedCoreSeatCount;
   const updateTotalPriceFormatted = `${sym}${updateTotalCoreMembers * seatPrice}/mo`;
 
   const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
@@ -687,11 +860,12 @@ export function SubscriptionPage() {
     organizationId: organization?.id,
     currency,
     billingPeriod,
-    totalCoreMembers,
+    totalFullMembers,
     currentMaxMembers: seatUsageM ?? undefined,
     plannedUsers,
     onSeatsUpdated: () => {
       setPlannedUsers([]);
+      void activePlan.refetch();
       void pendingInvites.refetch();
     },
     organizationWithMembers,
@@ -836,7 +1010,9 @@ export function SubscriptionPage() {
             }
             pricePerSeat={pricePerSeat}
             totalPrice={totalPriceFormatted}
-            coreMembers={totalCoreMembers}
+            coreMembers={totalFullMembers}
+            existingFullMembers={existingCoreMembers}
+            pendingFullMemberCount={pendingFullMemberCount}
             features={GROWTH_FEATURES}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}
@@ -846,7 +1022,7 @@ export function SubscriptionPage() {
         {/* Update Seats Block - show for Growth seat+usage plan when seats have been added */}
         {!isDeveloperPlan && plannedUsers.length > 0 && !isTieredPricingModel && (
           <UpdateSeatsBlock
-            totalCoreMembers={updateTotalCoreMembers}
+            totalFullMembers={updateTotalCoreMembers}
             totalPrice={updateTotalPriceFormatted}
             onUpdate={handleUpdateSeats}
             isLoading={isUpdateSeatsLoading}
@@ -862,6 +1038,9 @@ export function SubscriptionPage() {
         onClose={() => setIsDrawerOpen(false)}
         users={users}
         plannedUsers={plannedUsers}
+        pendingInvitesWithMemberType={pendingInvitesWithMemberType}
+        seatPrice={seatPrice}
+        currencySymbol={sym}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleSavePlannedUsers}
       />

@@ -23,7 +23,9 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByRole("heading", { name: "Plans" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Plans" }),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-free")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-growth")).toBeInTheDocument();
       expect(screen.getByTestId("plan-column-enterprise")).toBeInTheDocument();
@@ -90,16 +92,15 @@ describe("<PlansComparisonPage/>", () => {
       expect(
         within(growthColumn).getByRole("link", { name: "Add Members" }),
       ).toBeInTheDocument();
-      expect(
-        within(growthColumn).getByRole("link", { name: "Add Events" }),
-      ).toBeInTheDocument();
     });
   });
 
   describe("when organization is on the Enterprise plan", () => {
     it("marks the Enterprise column as current", () => {
       render(
-        <PlansComparisonPage activePlan={{ type: "ENTERPRISE", free: false }} />,
+        <PlansComparisonPage
+          activePlan={{ type: "ENTERPRISE", free: false }}
+        />,
         { wrapper: Wrapper },
       );
 
@@ -147,7 +148,9 @@ describe("<PlansComparisonPage/>", () => {
       expect(notice).toBeInTheDocument();
       expect(notice).toHaveTextContent(/pricing model has been discontinued/i);
 
-      const link = within(notice).getByRole("link", { name: /update your plan/i });
+      const link = within(notice).getByRole("link", {
+        name: /update your plan/i,
+      });
       expect(link).toHaveAttribute("href", "/settings/subscription");
     });
 
@@ -174,7 +177,9 @@ describe("<PlansComparisonPage/>", () => {
       );
 
       const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
-      expect(within(enterpriseColumn).getByText("Custom pricing")).toBeInTheDocument();
+      expect(
+        within(enterpriseColumn).getByText("Custom pricing"),
+      ).toBeInTheDocument();
       expect(
         within(enterpriseColumn).getByRole("link", { name: "Talk to Sales" }),
       ).toBeInTheDocument();

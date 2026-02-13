@@ -89,6 +89,7 @@ const mockOrganizationMembers = {
 const mockGetActivePlan = vi.fn(() => ({
   data: createMockPlan(),
   isLoading: false,
+  refetch: vi.fn(),
 }));
 
 const mockGetOrganizationWithMembers = vi.fn(() => ({
@@ -205,6 +206,7 @@ describe("<SubscriptionPage/>", () => {
     mockGetActivePlan.mockReturnValue({
       data: createMockPlan(),
       isLoading: false,
+      refetch: vi.fn(),
     });
     mockGetOrganizationWithMembers.mockReturnValue({
       data: mockOrganizationMembers,
@@ -337,6 +339,7 @@ describe("<SubscriptionPage/>", () => {
           maxMessagesPerMonth: 200000,
         }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
@@ -381,7 +384,7 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("shows Current Members and Pending Seats sections", async () => {
+    it("shows Current Members and New seats sections", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
@@ -389,19 +392,19 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Current Members")).toBeInTheDocument();
-        expect(screen.getByText("Pending Seats")).toBeInTheDocument();
+        expect(screen.getByText("New seats")).toBeInTheDocument();
       });
     });
 
-    it("shows a list of organization users", async () => {
+    it("shows a list of organization users by email", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByText("Admin User")).toBeInTheDocument();
-        expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+        expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+        expect(screen.getByText("jane@example.com")).toBeInTheDocument();
       });
     });
   });
@@ -414,9 +417,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        // Both users are Core Users (ADMIN and MEMBER roles map to core)
-        const coreUserBadges = screen.getAllByText("Core User");
-        expect(coreUserBadges.length).toBeGreaterThanOrEqual(2);
+        // Both users are Full Members (ADMIN and MEMBER roles map to FullMember)
+        const fullMemberBadges = screen.getAllByText("Full Member");
+        expect(fullMemberBadges.length).toBeGreaterThanOrEqual(2);
       });
     });
 
@@ -679,10 +682,10 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByRole("button", { name: /Done/i }));
 
       await waitFor(() => {
-        // 3 core members × €29 = €87/mo
+        // 3 Full Members × €29 = €87/mo
         const total = screen.getByTestId("upgrade-total");
         expect(total).toHaveTextContent("€87/mo");
-        expect(total).toHaveTextContent("3 core members");
+        expect(total).toHaveTextContent("3 Full Members");
       });
     });
 
@@ -746,6 +749,7 @@ describe("<SubscriptionPage/>", () => {
       mockGetActivePlan.mockReturnValue({
         data: createMockPlan({ maxMembers: 2 }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
@@ -839,6 +843,7 @@ describe("<SubscriptionPage/>", () => {
           maxMessagesPerMonth: 200000,
         }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
@@ -948,6 +953,7 @@ describe("<SubscriptionPage/>", () => {
           maxMessagesPerMonth: 200000,
         }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
@@ -988,6 +994,7 @@ describe("<SubscriptionPage/>", () => {
           maxMessagesPerMonth: 200000,
         }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
@@ -1070,6 +1077,7 @@ describe("<SubscriptionPage/>", () => {
             maxMessagesPerMonth: 20000,
           }),
           isLoading: false,
+          refetch: vi.fn(),
         });
 
         renderSubscriptionPage();
@@ -1091,6 +1099,7 @@ describe("<SubscriptionPage/>", () => {
             maxMessagesPerMonth: 20000,
           }),
           isLoading: false,
+          refetch: vi.fn(),
         });
 
         const user = userEvent.setup();
@@ -1168,6 +1177,7 @@ describe("<SubscriptionPage/>", () => {
           maxMessagesPerMonth: 200000,
         }),
         isLoading: false,
+        refetch: vi.fn(),
       });
     });
 
