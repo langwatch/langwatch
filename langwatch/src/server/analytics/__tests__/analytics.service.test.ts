@@ -149,7 +149,7 @@ describe("AnalyticsService", () => {
       expect(result).toBe(false);
     });
 
-    it("throws when Prisma throws an error", async () => {
+    it("returns false when Prisma throws an error", async () => {
       const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
       const fakePrisma = {
@@ -164,9 +164,9 @@ describe("AnalyticsService", () => {
         prisma: fakePrisma,
       });
 
-      await expect(
-        service.isClickHouseEnabled("test-project"),
-      ).rejects.toThrow("DB error");
+      const result = await service.isClickHouseEnabled("test-project");
+
+      expect(result).toBe(false);
     });
   });
 

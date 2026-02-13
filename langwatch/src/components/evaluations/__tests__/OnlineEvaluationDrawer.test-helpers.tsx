@@ -340,6 +340,22 @@ export function createApiMock() {
             error: null,
           })),
         },
+        getFieldNames: {
+          useQuery: vi.fn(() => ({
+            data: {
+              spanNames: [
+                { name: "openai/gpt-4", type: "llm" },
+                { name: "my-custom-span", type: "span" },
+              ],
+              metadataKeys: [
+                { key: "user_id" },
+                { key: "session_id" },
+              ],
+            },
+            isLoading: false,
+            error: null,
+          })),
+        },
       },
       licenseEnforcement: {
         checkLimit: {
