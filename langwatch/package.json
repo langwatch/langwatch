@@ -262,7 +262,7 @@
     "@types/lodash.omit": "^4.5.9",
     "@types/lodash.throttle": "^4.1.9",
     "@types/mermaid": "^9.1.0",
-    "@types/node": "^18.16.0",
+    "@types/node": "^25.2.3",
     "@types/nprogress": "^0.2.1",
     "@types/numeral": "^2.0.5",
     "@types/papaparse": "^5.3.14",

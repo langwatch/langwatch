@@ -19,7 +19,7 @@
     "nanoid": "^5.0.7"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^25.2.3",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

@@ -28,7 +28,7 @@
 		"langwatch": "^0.10.0"
 	},
 	"devDependencies": {
-		"@types/node": "^20.19.27",
+		"@types/node": "^25.2.3",
 		"tsup": "^8.5.1",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
