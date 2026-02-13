@@ -676,8 +676,8 @@ importers:
         specifier: ^0.1.13
         version: 0.1.13
       fishery:
-        specifier: ^2.2.3
-        version: 2.2.3
+        specifier: ^2.4.0
+        version: 2.4.0
       jest-mock-extended:
         specifier: ^4.0.0-beta1
         version: 4.0.0-beta1(@jest/globals@29.7.0)(jest@29.7.0(@types/node@18.19.103)(babel-plugin-macros@3.1.0))(typescript@5.9.3)
@@ -8623,8 +8623,8 @@ packages:
     resolution: {integrity: sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw==}
     engines: {node: '>=8'}
 
-  fishery@2.2.3:
-    resolution: {integrity: sha512-Rbp1PCPjNS5Yyuw2tRhVQ59wZ5Ciwv5+latMNx7JjhoZ5JF1TMgzs8J93wKYesLf3WXdXHovjY5dIDkf2EbMDw==}
+  fishery@2.4.0:
+    resolution: {integrity: sha512-QgeTlvgNhVGuMztrfAhlSIBs3rD3l9RMjl9I15yb/lnrx3njrOhvegr2L3LWdqvXwYfQjdQGpglyAfHH2J8DRA==}
 
   fix-dts-default-cjs-exports@1.0.1:
     resolution: {integrity: sha512-pVIECanWFC61Hzl2+oOCtoJ3F17kglZC/6N94eRWycFgBH35hHx0Li604ZIzhseh97mf2p0cv7vVrOZGoqhlEg==}
@@ -23678,7 +23678,7 @@ snapshots:
       locate-path: 5.0.0
       path-exists: 4.0.0
 
-  fishery@2.2.3:
+  fishery@2.4.0:
     dependencies:
       lodash.mergewith: 4.6.2
 
