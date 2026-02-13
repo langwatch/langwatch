@@ -250,6 +250,50 @@ export const tracerMiddleware = t.middleware(
   },
 );
 
+/** Processes a tRPC call result and logs accordingly. Extracted for testability. */
+export function handleTrpcCallLogging({
+  result,
+  path,
+  type,
+  duration,
+  userAgent,
+  statusCode,
+  log,
+  capture,
+}: {
+  result: { ok: boolean; error?: unknown };
+  path: string;
+  type: string;
+  duration: number;
+  userAgent: string | null;
+  statusCode: number | null;
+  log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
+  capture: (error: unknown) => void;
+}): void {
+  const logData: Record<string, any> = {
+    path,
+    type,
+    duration,
+    userAgent,
+    statusCode,
+  };
+
+  if (!result.ok) {
+    logData.error = result.error;
+
+    // Only capture 5xx errors to Sentry (actual bugs)
+    const resolvedStatus = statusCode ?? 500;
+    if (resolvedStatus >= 500) {
+      capture(result.error);
+    }
+
+    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    log[logLevel](logData, "trpc call");
+  } else {
+    log.info(logData, "trpc call");
+  }
+}
+
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
@@ -261,32 +305,22 @@ export const loggerMiddleware = t.middleware(
 
     return runWithContext(requestContext, async () => {
       const start = Date.now();
+      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+      // caught by callRecursive and returned as { ok: false, error } result
+      // objects. Use result.ok to detect errors — NOT try/catch.
       const result = await next();
       const duration = Date.now() - start;
 
-      const logData: Record<string, any> = {
+      handleTrpcCallLogging({
+        result,
         path,
         type,
         duration,
         userAgent: ctx.req?.headers["user-agent"] ?? null,
         statusCode: ctx.res?.statusCode ?? null,
-      };
-
-      if (!result.ok) {
-        const error = result.error;
-        logData.error = error;
-
-        // Only capture 5xx errors to Sentry (actual bugs)
-        const statusCode = logData.statusCode ?? 500;
-        if (statusCode >= 500) {
-          captureException(error);
-        }
-
-        const logLevel = getLogLevelFromStatusCode(statusCode);
-        logger[logLevel](logData, "trpc call");
-      } else {
-        logger.info(logData, "trpc call");
-      }
+        log: logger,
+        capture: captureException,
+      });
 
       return result;
     });
