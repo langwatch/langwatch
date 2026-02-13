@@ -1,4 +1,4 @@
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   EventStream,
   Projection,

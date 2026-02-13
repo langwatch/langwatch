@@ -1,7 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { EvaluatorResultEvent, TargetResultEvent } from "../schemas/events";

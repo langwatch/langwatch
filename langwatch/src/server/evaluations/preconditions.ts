@@ -1,5 +1,5 @@
 import safe from "safe-regex2";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
 import type { ElasticSearchTrace, RAGSpan, Span } from "../tracer/types";
 import { getEvaluatorDefinitions } from "./getEvaluator";
