@@ -4110,7 +4110,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-dspy"
-version = "0.1.28"
+version = "0.1.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -4121,9 +4121,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/92/dcc85b76a640bc704aef7ee7bf55c5eac2dcf35d6cdc8e9cb544ce9896bf/openinference_instrumentation_dspy-0.1.28.tar.gz", hash = "sha256:4813479bf8725dd6fa7c239d5a2f44ceb2903a8c171eabc517f61526191f7d59", size = 25977, upload-time = "2025-08-13T15:57:42.207Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/0e/814f43679ace2de68c4b91eab24db08623dc3da447cd935caca7205d3b65/openinference_instrumentation_dspy-0.1.33.tar.gz", hash = "sha256:b4079a564b2866dfb37c71a9ba36661b8312141959e1110eb13db27e248e2cd8", size = 26803, upload-time = "2026-01-08T03:52:04.056Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/cd/ed47507354432a41a839a326cecd05f22aac851f544a22d43a27140f769f/openinference_instrumentation_dspy-0.1.28-py3-none-any.whl", hash = "sha256:bfe8bd7735a0334439227a9cdb6ab4a9fb6aaed33bf062d43d52021a9ce7c5bb", size = 14829, upload-time = "2025-08-13T15:57:40.651Z" },
+    { url = "https://files.pythonhosted.org/packages/03/3c/7695eb832ffe7667e07911ad8ca8e92520e5c91562809ebbc2d8e15409c3/openinference_instrumentation_dspy-0.1.33-py3-none-any.whl", hash = "sha256:a0713d6c49f3f0178ff11acbe36785f2c09fdffa46e6442ca1d1c38b96d97526", size = 15360, upload-time = "2026-01-08T03:52:01.67Z" },
 ]
 
 [[package]]
