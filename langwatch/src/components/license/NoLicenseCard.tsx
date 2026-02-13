@@ -229,6 +229,15 @@ export function NoLicenseCard({
               Activate License
             </Button>
             <Link
+              href="https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f"
+              isExternal
+              color="blue.fg"
+              fontSize="sm"
+              _hover={{ textDecoration: "underline" }}
+            >
+              Purchase license
+            </Link>
+            <Link
               href="mailto:sales@langwatch.ai"
               isExternal
               color="blue.fg"
