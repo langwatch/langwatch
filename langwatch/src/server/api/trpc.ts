@@ -261,40 +261,34 @@ export const loggerMiddleware = t.middleware(
 
     return runWithContext(requestContext, async () => {
       const start = Date.now();
-      let error: unknown = null;
+      const result = await next();
+      const duration = Date.now() - start;
 
-      try {
-        return await next();
-      } catch (err) {
-        error = err;
-        throw err;
-      } finally {
-        const duration = Date.now() - start;
-        // Logger automatically includes context (traceId, spanId, userId, projectId, organizationId)
-        const logData: Record<string, any> = {
-          path,
-          type,
-          duration,
-          userAgent: ctx.req?.headers["user-agent"] ?? null,
-          statusCode: ctx.res?.statusCode ?? null,
-        };
+      const logData: Record<string, any> = {
+        path,
+        type,
+        duration,
+        userAgent: ctx.req?.headers["user-agent"] ?? null,
+        statusCode: ctx.res?.statusCode ?? null,
+      };
 
-        if (error) {
-          logData.error =
-            error instanceof Error ? error : JSON.stringify(error);
+      if (!result.ok) {
+        const error = result.error;
+        logData.error = error;
 
-          // Only capture 5xx errors to Sentry (actual bugs)
-          const statusCode = logData.statusCode ?? 500;
-          if (statusCode >= 500) {
-            captureException(error);
-          }
-
-          const logLevel = getLogLevelFromStatusCode(statusCode);
-          logger[logLevel](logData, "trpc call");
-        } else {
-          logger.info(logData, "trpc call");
+        // Only capture 5xx errors to Sentry (actual bugs)
+        const statusCode = logData.statusCode ?? 500;
+        if (statusCode >= 500) {
+          captureException(error);
         }
+
+        const logLevel = getLogLevelFromStatusCode(statusCode);
+        logger[logLevel](logData, "trpc call");
+      } else {
+        logger.info(logData, "trpc call");
       }
+
+      return result;
     });
   },
 );
