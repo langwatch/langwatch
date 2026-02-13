@@ -10,7 +10,7 @@ import type {
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
-import { getTestProject } from "~/utils/testUtils";
+import { getTestProject, isServiceReachable } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";
 import { buildCellWorkflow } from "../workflowBuilder";
 
@@ -21,25 +21,16 @@ import { buildCellWorkflow } from "../workflowBuilder";
  * - OPENAI_API_KEY in environment
  * - Database available for test project
  */
-// Skip when NLP service isn't available (CI or prisma-integration tests)
-const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE;
+// Skip when NLP service isn't reachable
+const wfNlpUrl = process.env.LANGWATCH_NLP_SERVICE;
+const wfNlpReachable = wfNlpUrl
+  ? await isServiceReachable(wfNlpUrl)
+  : false;
 
-describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
+describe.skipIf(!wfNlpReachable)("WorkflowExecution Integration", () => {
   let project: Project;
 
   beforeAll(async () => {
-    // Check if NLP service is available
-    const nlpServiceUrl = process.env.LANGWATCH_NLP_SERVICE;
-    if (!nlpServiceUrl) {
-      console.warn("LANGWATCH_NLP_SERVICE not set, tests may fail");
-    }
-
-    // Check for OpenAI key
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn("OPENAI_API_KEY not set, tests may fail");
-    }
-
-    // Get or create test project
     project = await getTestProject("workflow-execution");
   });
 

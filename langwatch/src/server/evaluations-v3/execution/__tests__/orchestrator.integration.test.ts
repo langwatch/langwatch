@@ -12,7 +12,7 @@ import {
   createInitialUIState,
 } from "~/evaluations-v3/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import { getTestProject } from "~/utils/testUtils";
+import { getTestProject, isServiceReachable } from "~/utils/testUtils";
 import { abortManager } from "../abortManager";
 import { type OrchestratorInput, runOrchestrator } from "../orchestrator";
 import type { EvaluationV3Event, ExecutionScope } from "../types";
@@ -21,14 +21,16 @@ import type { EvaluationV3Event, ExecutionScope } from "../types";
  * Integration tests for the orchestrator against langwatch_nlp.
  * Requires:
  * - LANGWATCH_NLP_SERVICE running on localhost:5561
+ * - LANGEVALS_ENDPOINT running on localhost:5562 (for evaluator tests)
  * - OPENAI_API_KEY in environment
  * - Redis available (for abort flags)
  * - Database available for test project
  */
-// Skip when NLP service isn't available (CI or prisma-integration tests)
-const hasNlpService = !!process.env.LANGWATCH_NLP_SERVICE;
+// Skip when NLP service isn't reachable
+const nlpUrl = process.env.LANGWATCH_NLP_SERVICE;
+const nlpReachable = nlpUrl ? await isServiceReachable(nlpUrl) : false;
 
-describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
+describe.skipIf(!nlpReachable)("Orchestrator Integration", () => {
   let project: Project;
 
   beforeAll(async () => {

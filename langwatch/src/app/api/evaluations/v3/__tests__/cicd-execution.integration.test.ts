@@ -3,29 +3,26 @@ import { ExperimentType } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
-import { getTestProject } from "~/utils/testUtils";
+import { getTestProject, isServiceReachable } from "~/utils/testUtils";
 
 /**
  * Integration tests for CI/CD Evaluation Execution endpoints.
  * Requires:
+ * - LangWatch dev server running on localhost:5560
  * - LANGWATCH_NLP_SERVICE running on localhost:5561
  * - OPENAI_API_KEY in environment
  * - Redis available (for run state)
  * - Database available for test project
  */
-describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
+const cicdBaseUrl = process.env.TEST_BASE_URL ?? "http://localhost:5560";
+const cicdServerReachable = await isServiceReachable(cicdBaseUrl);
+
+describe.skipIf(!cicdServerReachable)("CI/CD Evaluation Execution API", () => {
   let project: Project;
   let experiment: Experiment;
   const testSlug = `ci-cd-test-${Date.now()}`;
 
   beforeAll(async () => {
-    // Check if NLP service is available
-    const nlpServiceUrl = process.env.LANGWATCH_NLP_SERVICE;
-    if (!nlpServiceUrl) {
-      console.warn("LANGWATCH_NLP_SERVICE not set, tests may fail");
-    }
-
-    // Get or create test project
     project = await getTestProject("cicd-execution-test");
 
     // Create a test experiment with Evaluations V3 state

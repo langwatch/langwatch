@@ -5,7 +5,7 @@ import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { prisma } from "../../../../../server/db";
-import { getTestProject } from "../../../../../utils/testUtils";
+import { getTestProject, isServiceReachable } from "../../../../../utils/testUtils";
 import handler from "./evaluate";
 
 describe("Guardrail API Endpoint", () => {
@@ -128,13 +128,14 @@ describe("Guardrail API Endpoint", () => {
   });
 });
 
-// Skip these tests when running with testcontainers only (no Prisma/NLP service)
-// These tests require a PostgreSQL database and the NLP service running
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly =
-  !!process.env.TEST_CLICKHOUSE_URL && !process.env.LANGWATCH_NLP_SERVICE;
+// These tests require the LangEvals service running to execute evaluators
+// Check reachability at module load to use with describe.skipIf
+const langevalsUrl = process.env.LANGEVALS_ENDPOINT;
+const langevalsReachable = langevalsUrl
+  ? await isServiceReachable(langevalsUrl)
+  : false;
 
-describe.skipIf(isTestcontainersOnly)(
+describe.skipIf(!langevalsReachable)(
   "Evaluator API with evaluators/{id} path",
   () => {
     let project: Project;

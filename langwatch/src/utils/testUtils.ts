@@ -195,6 +195,22 @@ export const waitForResult = async <T>(
  * @param param0 - The request method, headers, and body.
  * @returns A mock request and response.
  */
+/**
+ * Checks if a service is reachable by making a HEAD/GET request.
+ * Useful for conditionally skipping integration tests that need external services.
+ */
+export async function isServiceReachable(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    await fetch(url, { method: "GET", signal: controller.signal });
+    clearTimeout(timeout);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const createNextApiMocks = ({
   method,
   headers,

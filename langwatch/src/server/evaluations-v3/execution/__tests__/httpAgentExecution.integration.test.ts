@@ -12,6 +12,7 @@
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
+import { isServiceReachable } from "~/utils/testUtils";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { TargetConfig, HttpConfig } from "~/evaluations-v3/types";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
@@ -35,15 +36,15 @@ import type { ExecutionCell } from "../types";
  * and it falls through to the code node case which fails.
  */
 
-describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
+const httpNlpUrl = process.env.LANGWATCH_NLP_SERVICE;
+const httpNlpReachable = httpNlpUrl
+  ? await isServiceReachable(httpNlpUrl)
+  : false;
+
+describe.skipIf(!httpNlpReachable)("HTTP Agent Execution Integration", () => {
   let project: Project;
 
   beforeAll(async () => {
-    const nlpServiceUrl = process.env.LANGWATCH_NLP_SERVICE;
-    if (!nlpServiceUrl) {
-      console.warn("LANGWATCH_NLP_SERVICE not set, tests may fail");
-    }
-
     project = await getTestProject("http-agent-execution");
   });
 
