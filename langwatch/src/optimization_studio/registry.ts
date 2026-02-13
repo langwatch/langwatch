@@ -1,14 +1,11 @@
 import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 
 import type {
   Code,
   Evaluator,
   Field,
-  PromptingTechnique,
   Signature,
 } from "./types/dsl";
-import { convertEvaluators } from "./utils/registryUtils";
 
 // Get defaults from the single source of truth
 const defaults = DEFAULT_FORM_VALUES.version.configData;
@@ -94,59 +91,19 @@ class Code(dspy.Module):
   })) as Field[],
 };
 
-const promptingTechniques: PromptingTechnique[] = [
-  {
-    cls: "ChainOfThought",
-    name: "ChainOfThought",
-    description:
-      "Drag and drop to an LLM signature to add a chain of thought prompting technique, adding a reasoning step to the LLM.",
-    parameters: [],
-  },
-];
-
-const ALLOWED_EVALUATORS = [
-  "langevals/exact_match",
-  "langevals/llm_answer_match",
-  "ragas/factual_correctness",
-  "lingua/language_detection",
-  "langevals/llm_boolean",
-  "langevals/llm_score",
-  "langevals/llm_category",
-  "ragas/faithfulness",
-  "ragas/context_precision",
-  "ragas/context_recall",
-  "ragas/context_f1",
-  "ragas/response_relevancy",
-  "ragas/response_context_precision",
-  "ragas/response_context_recall",
-  "ragas/summarization_score",
-  "langevals/basic",
-  "azure/prompt_injection",
-  "openai/moderation",
-  "presidio/pii_detection",
-  "langevals/valid_format",
-  "ragas/rubrics_based_scoring",
-  "ragas/sql_query_equivalence",
-  "ragas/bleu_score",
-  "ragas/rouge_score",
-];
-
-const evaluators: Evaluator[] = [
-  ...convertEvaluators(
-    Object.fromEntries(
-      Object.entries(AVAILABLE_EVALUATORS)
-        .filter(([cls, _evaluator]) => ALLOWED_EVALUATORS.includes(cls))
-        .sort(
-          ([clsA, _evaluatorA], [clsB, _evaluatorB]) =>
-            ALLOWED_EVALUATORS.indexOf(clsA) - ALLOWED_EVALUATORS.indexOf(clsB),
-        ),
-    ) as typeof AVAILABLE_EVALUATORS,
-  ),
-];
+/**
+ * Placeholder evaluator node data for use when dragging a new evaluator
+ * onto the canvas before the user has selected the evaluator type in the drawer.
+ */
+export const EVALUATOR_PLACEHOLDER: Evaluator = {
+  cls: "Evaluator",
+  name: "Evaluator",
+  description: "Drag to canvas to create an evaluator via the evaluator editor",
+  inputs: [{ identifier: "input", type: "str" }],
+  outputs: [{ identifier: "passed", type: "bool" }],
+};
 
 export const MODULES = {
   signature,
   code,
-  promptingTechniques,
-  evaluators,
 };

@@ -8,20 +8,20 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node, XYPosition } from "@xyflow/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { MODULES } from "../../registry";
-import type { ComponentType, Custom, Field } from "../../types/dsl";
+import { EVALUATOR_PLACEHOLDER, MODULES } from "../../registry";
+import type { ComponentType, Custom, Evaluator, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
 import { NodeComponents } from "../nodes";
-import { PromptingTechniqueDraggingNode } from "../nodes/PromptingTechniqueNode";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 import { NodeDraggable } from "./NodeDraggable";
 
@@ -59,13 +59,37 @@ export const NodeSelectionPanel = ({
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }) => {
-  const { propertiesExpanded, getWorkflow } = useWorkflowStore((state) => ({
-    propertiesExpanded: state.propertiesExpanded,
-    getWorkflow: state.getWorkflow,
-  }));
+  const { propertiesExpanded, getWorkflow, setNode, deleteNode } =
+    useWorkflowStore((state) => ({
+      propertiesExpanded: state.propertiesExpanded,
+      getWorkflow: state.getWorkflow,
+      setNode: state.setNode,
+      deleteNode: state.deleteNode,
+    }));
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
+  const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
+
+  // Track the placeholder node ID so we can clean it up if the drawer
+  // flow is cancelled without saving.
+  const pendingPlaceholderRef = useRef<string | null>(null);
+  // Tracks whether the evaluator drag-to-drawer flow is actively in progress.
+  const evaluatorFlowActiveRef = useRef(false);
+
+  // When the drawer closes (currentDrawer becomes undefined) and we still
+  // have a pending placeholder, the user cancelled -- remove the node.
+  useEffect(() => {
+    if (
+      pendingPlaceholderRef.current &&
+      evaluatorFlowActiveRef.current &&
+      !currentDrawer
+    ) {
+      deleteNode(pendingPlaceholderRef.current);
+      pendingPlaceholderRef.current = null;
+      evaluatorFlowActiveRef.current = false;
+    }
+  }, [currentDrawer, deleteNode]);
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -98,6 +122,59 @@ export const NodeSelectionPanel = ({
       version_id: publishedId,
     };
   };
+
+  const configureEvaluatorNode = useCallback(
+    (placeholderNodeId: string, evaluator: { id: string; name: string }) => {
+      pendingPlaceholderRef.current = null;
+      evaluatorFlowActiveRef.current = false;
+
+      setNode({
+        id: placeholderNodeId,
+        data: {
+          ...EVALUATOR_PLACEHOLDER,
+          name: evaluator.name,
+          evaluator: `evaluators/${evaluator.id}` as `evaluators/${string}`,
+          cls: "Evaluator",
+        } satisfies Evaluator,
+      });
+      closeDrawer();
+    },
+    [closeDrawer, setNode],
+  );
+
+  /**
+   * When an evaluator placeholder is dropped on the canvas, open the
+   * EvaluatorListDrawer so the user can pick an existing evaluator.
+   * From the list they can also click "New Evaluator" to create one.
+   * On close without selection: remove the placeholder node via the effect above.
+   */
+  const handleEvaluatorDragEnd = useCallback(
+    (item: { node?: { id?: string } }) => {
+      const placeholderNodeId = item.node?.id;
+      if (!placeholderNodeId) return;
+
+      pendingPlaceholderRef.current = placeholderNodeId;
+      evaluatorFlowActiveRef.current = true;
+
+      // When user selects an existing evaluator from the list
+      setFlowCallbacks("evaluatorList", {
+        onSelect: (evaluator) => {
+          configureEvaluatorNode(placeholderNodeId, evaluator);
+        },
+      });
+
+      // When user creates a new evaluator via the editor (list -> category -> type -> editor)
+      setFlowCallbacks("evaluatorEditor", {
+        onSave: (evaluator) => {
+          configureEvaluatorNode(placeholderNodeId, evaluator);
+          return true;
+        },
+      });
+
+      openDrawer("evaluatorList", undefined, { resetStack: true });
+    },
+    [openDrawer, configureEvaluatorNode],
+  );
 
   return (
     <Box
@@ -160,31 +237,14 @@ export const NodeSelectionPanel = ({
               </>
             )}
 
-          <Text fontWeight="500" paddingLeft={1}>
-            Prompting Techniques
-          </Text>
-          {MODULES.promptingTechniques.map((promptingTechnique) => {
-            return (
-              <NodeDraggable
-                key={promptingTechnique.name}
-                component={promptingTechnique}
-                type="prompting_technique"
-              />
-            );
-          })}
-
           <Text fontWeight="500" padding={1}>
             Evaluators
           </Text>
-          {MODULES.evaluators.map((evaluator) => {
-            return (
-              <NodeDraggable
-                key={evaluator.name}
-                component={evaluator}
-                type="evaluator"
-              />
-            );
-          })}
+          <NodeDraggable
+            component={EVALUATOR_PLACEHOLDER}
+            type="evaluator"
+            onDragEnd={handleEvaluatorDragEnd}
+          />
           {components &&
             components.length > 0 &&
             components.some((custom) => custom.isEvaluator) && (
@@ -280,10 +340,7 @@ export function CustomDragLayer() {
     return null;
   }
 
-  const ComponentNode =
-    item.node.type === "prompting_technique"
-      ? PromptingTechniqueDraggingNode
-      : NodeComponents[item.node.type as ComponentType];
+  const ComponentNode = NodeComponents[item.node.type as ComponentType];
 
   return (
     <div
@@ -294,7 +351,7 @@ export function CustomDragLayer() {
         left: currentOffset?.x ?? 0,
         top: currentOffset?.y ?? 0,
         transform: "translate(-50%, -50%)",
-        opacity: item.node.type === "prompting_technique" ? 1 : 0.5,
+        opacity: 0.5,
       }}
     >
       <ComponentNode
