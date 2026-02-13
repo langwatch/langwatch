@@ -1,7 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -16,7 +18,10 @@ import {
   evaluatorServiceMiddleware,
 } from "../../middleware/evaluator-service";
 import { baseResponses } from "../../shared/base-responses";
-import { apiResponseEvaluatorSchema } from "./schemas";
+import {
+  apiResponseEvaluatorSchema,
+  createEvaluatorInputSchema,
+} from "./schemas";
 
 const logger = createLogger("langwatch:api:evaluators");
 
@@ -118,5 +123,52 @@ app.get(
     }
 
     return c.json(apiResponseEvaluatorSchema.parse(evaluator));
+  },
+);
+
+// Create evaluator
+app.post(
+  "/",
+  describeRoute({
+    description: "Create a new evaluator",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(apiResponseEvaluatorSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", createEvaluatorInputSchema),
+  async (c) => {
+    const service = c.get("evaluatorService");
+    const project = c.get("project");
+    const data = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, name: data.name },
+      "Creating evaluator",
+    );
+
+    const evaluator = await service.create({
+      id: `evaluator_${nanoid()}`,
+      projectId: project.id,
+      name: data.name,
+      type: "evaluator",
+      config: data.config as Prisma.InputJsonValue,
+    });
+
+    const enriched = await service.enrichWithFields(evaluator);
+
+    logger.info(
+      { projectId: project.id, evaluatorId: enriched.id },
+      "Successfully created evaluator",
+    );
+
+    return c.json(apiResponseEvaluatorSchema.parse(enriched));
   },
 );

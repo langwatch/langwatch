@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 
 const evaluatorFieldSchema = z.object({
   identifier: z.string(),
@@ -24,3 +25,26 @@ export const apiResponseEvaluatorSchema = z.object({
 });
 
 export type ApiResponseEvaluator = z.infer<typeof apiResponseEvaluatorSchema>;
+
+const validEvaluatorTypes = new Set(Object.keys(AVAILABLE_EVALUATORS));
+
+export const createEvaluatorInputSchema = z.object({
+  name: z.string().min(1).max(255),
+  config: z
+    .record(z.unknown())
+    .refine(
+      (config) =>
+        typeof config.evaluatorType === "string" &&
+        config.evaluatorType.length > 0,
+      {
+        message:
+          'config must include an "evaluatorType" field (e.g. "langevals/exact_match")',
+      },
+    )
+    .refine(
+      (config) => validEvaluatorTypes.has(config.evaluatorType as string),
+      (config) => ({
+        message: `Unknown evaluatorType "${String(config.evaluatorType)}". Use GET /api/evaluators to list valid evaluator configurations, or refer to the docs for available evaluator types.`,
+      }),
+    ),
+});

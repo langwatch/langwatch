@@ -9,18 +9,18 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_evaluators_response_200_item_config_type_0 import GetApiEvaluatorsResponse200ItemConfigType0
-    from ..models.get_api_evaluators_response_200_item_fields_item import GetApiEvaluatorsResponse200ItemFieldsItem
-    from ..models.get_api_evaluators_response_200_item_output_fields_item import (
-        GetApiEvaluatorsResponse200ItemOutputFieldsItem,
+    from ..models.post_api_evaluators_response_200_config_type_0 import PostApiEvaluatorsResponse200ConfigType0
+    from ..models.post_api_evaluators_response_200_fields_item import PostApiEvaluatorsResponse200FieldsItem
+    from ..models.post_api_evaluators_response_200_output_fields_item import (
+        PostApiEvaluatorsResponse200OutputFieldsItem,
     )
 
 
-T = TypeVar("T", bound="GetApiEvaluatorsResponse200Item")
+T = TypeVar("T", bound="PostApiEvaluatorsResponse200")
 
 
 @_attrs_define
-class GetApiEvaluatorsResponse200Item:
+class PostApiEvaluatorsResponse200:
     """
     Attributes:
         id (str):
@@ -28,13 +28,13 @@ class GetApiEvaluatorsResponse200Item:
         name (str):
         slug (None | str):
         type_ (str):
-        config (GetApiEvaluatorsResponse200ItemConfigType0 | None):
+        config (None | PostApiEvaluatorsResponse200ConfigType0):
         workflow_id (None | str):
         copied_from_evaluator_id (None | str):
         created_at (str):
         updated_at (str):
-        fields (list[GetApiEvaluatorsResponse200ItemFieldsItem]):
-        output_fields (list[GetApiEvaluatorsResponse200ItemOutputFieldsItem]):
+        fields (list[PostApiEvaluatorsResponse200FieldsItem]):
+        output_fields (list[PostApiEvaluatorsResponse200OutputFieldsItem]):
         workflow_name (str | Unset):
         workflow_icon (str | Unset):
     """
@@ -44,21 +44,19 @@ class GetApiEvaluatorsResponse200Item:
     name: str
     slug: None | str
     type_: str
-    config: GetApiEvaluatorsResponse200ItemConfigType0 | None
+    config: None | PostApiEvaluatorsResponse200ConfigType0
     workflow_id: None | str
     copied_from_evaluator_id: None | str
     created_at: str
     updated_at: str
-    fields: list[GetApiEvaluatorsResponse200ItemFieldsItem]
-    output_fields: list[GetApiEvaluatorsResponse200ItemOutputFieldsItem]
+    fields: list[PostApiEvaluatorsResponse200FieldsItem]
+    output_fields: list[PostApiEvaluatorsResponse200OutputFieldsItem]
     workflow_name: str | Unset = UNSET
     workflow_icon: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.get_api_evaluators_response_200_item_config_type_0 import (
-            GetApiEvaluatorsResponse200ItemConfigType0,
-        )
+        from ..models.post_api_evaluators_response_200_config_type_0 import PostApiEvaluatorsResponse200ConfigType0
 
         id = self.id
 
@@ -72,7 +70,7 @@ class GetApiEvaluatorsResponse200Item:
         type_ = self.type_
 
         config: dict[str, Any] | None
-        if isinstance(self.config, GetApiEvaluatorsResponse200ItemConfigType0):
+        if isinstance(self.config, PostApiEvaluatorsResponse200ConfigType0):
             config = self.config.to_dict()
         else:
             config = self.config
@@ -128,12 +126,10 @@ class GetApiEvaluatorsResponse200Item:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_evaluators_response_200_item_config_type_0 import (
-            GetApiEvaluatorsResponse200ItemConfigType0,
-        )
-        from ..models.get_api_evaluators_response_200_item_fields_item import GetApiEvaluatorsResponse200ItemFieldsItem
-        from ..models.get_api_evaluators_response_200_item_output_fields_item import (
-            GetApiEvaluatorsResponse200ItemOutputFieldsItem,
+        from ..models.post_api_evaluators_response_200_config_type_0 import PostApiEvaluatorsResponse200ConfigType0
+        from ..models.post_api_evaluators_response_200_fields_item import PostApiEvaluatorsResponse200FieldsItem
+        from ..models.post_api_evaluators_response_200_output_fields_item import (
+            PostApiEvaluatorsResponse200OutputFieldsItem,
         )
 
         d = dict(src_dict)
@@ -152,18 +148,18 @@ class GetApiEvaluatorsResponse200Item:
 
         type_ = d.pop("type")
 
-        def _parse_config(data: object) -> GetApiEvaluatorsResponse200ItemConfigType0 | None:
+        def _parse_config(data: object) -> None | PostApiEvaluatorsResponse200ConfigType0:
             if data is None:
                 return data
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                config_type_0 = GetApiEvaluatorsResponse200ItemConfigType0.from_dict(data)
+                config_type_0 = PostApiEvaluatorsResponse200ConfigType0.from_dict(data)
 
                 return config_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(GetApiEvaluatorsResponse200ItemConfigType0 | None, data)
+            return cast(None | PostApiEvaluatorsResponse200ConfigType0, data)
 
         config = _parse_config(d.pop("config"))
 
@@ -188,14 +184,14 @@ class GetApiEvaluatorsResponse200Item:
         fields = []
         _fields = d.pop("fields")
         for fields_item_data in _fields:
-            fields_item = GetApiEvaluatorsResponse200ItemFieldsItem.from_dict(fields_item_data)
+            fields_item = PostApiEvaluatorsResponse200FieldsItem.from_dict(fields_item_data)
 
             fields.append(fields_item)
 
         output_fields = []
         _output_fields = d.pop("outputFields")
         for output_fields_item_data in _output_fields:
-            output_fields_item = GetApiEvaluatorsResponse200ItemOutputFieldsItem.from_dict(output_fields_item_data)
+            output_fields_item = PostApiEvaluatorsResponse200OutputFieldsItem.from_dict(output_fields_item_data)
 
             output_fields.append(output_fields_item)
 
@@ -203,7 +199,7 @@ class GetApiEvaluatorsResponse200Item:
 
         workflow_icon = d.pop("workflowIcon", UNSET)
 
-        get_api_evaluators_response_200_item = cls(
+        post_api_evaluators_response_200 = cls(
             id=id,
             project_id=project_id,
             name=name,
@@ -220,8 +216,8 @@ class GetApiEvaluatorsResponse200Item:
             workflow_icon=workflow_icon,
         )
 
-        get_api_evaluators_response_200_item.additional_properties = d
-        return get_api_evaluators_response_200_item
+        post_api_evaluators_response_200.additional_properties = d
+        return post_api_evaluators_response_200
 
     @property
     def additional_keys(self) -> list[str]:
