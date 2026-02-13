@@ -112,7 +112,7 @@
         "js-yaml": "^4.1.0",
         "liquidjs": "^10.21.1",
         "open": "^10.2.0",
-        "openapi-fetch": "^0.14.0",
+        "openapi-fetch": "^0.16.0",
         "ora": "^5.4.1",
         "prompts": "^2.4.2",
         "xksuid": "^0.0.4",

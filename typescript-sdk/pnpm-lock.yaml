@@ -86,8 +86,8 @@ importers:
         specifier: ^10.2.0
         version: 10.2.0
       openapi-fetch:
-        specifier: ^0.14.0
-        version: 0.14.0
+        specifier: ^0.16.0
+        version: 0.16.0
       ora:
         specifier: ^5.4.1
         version: 5.4.1
@@ -2117,8 +2117,8 @@ packages:
       zod:
         optional: true
 
-  openapi-fetch@0.14.0:
-    resolution: {integrity: sha512-PshIdm1NgdLvb05zp8LqRQMNSKzIlPkyMxYFxwyHR+UlKD4t2nUjkDhNxeRbhRSEd3x5EUNh2w5sJYwkhOH4fg==}
+  openapi-fetch@0.16.0:
+    resolution: {integrity: sha512-EVLlvcUOugBYMXhuITAm2Ihv9EmQ7b9gJYn7hg2wvcf/GxbanhQ9olDz9I3DcS0Jr4Jv/53I2oVuIYQsFHa9mA==}
 
   openapi-msw@1.3.0:
     resolution: {integrity: sha512-qRe9zEHSYRi9s9EimTF/IxsG6yvEilkg+pn4Y0QldkuIx+13HcjoNACEumVdpc87nR5AtPErbzuuWFv+cw6fhg==}
@@ -4685,7 +4685,7 @@ snapshots:
     optionalDependencies:
       zod: 4.3.6
 
-  openapi-fetch@0.14.0:
+  openapi-fetch@0.16.0:
     dependencies:
       openapi-typescript-helpers: 0.0.15
 
