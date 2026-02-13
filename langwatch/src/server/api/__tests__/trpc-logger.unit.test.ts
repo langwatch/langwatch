@@ -114,7 +114,10 @@ describe("handleTrpcCallLogging", () => {
           capture,
         });
 
-        expect(log.warn).toHaveBeenCalled();
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ error, statusCode: 404 }),
+          "trpc call",
+        );
         expect(capture).not.toHaveBeenCalled();
       });
     });

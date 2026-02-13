@@ -234,18 +234,21 @@ export const tracerMiddleware = t.middleware(
         },
       },
       async (span) => {
-        try {
-          return await next();
-        } catch (err) {
-          span.recordException(err as Error);
+        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+        // returned as { ok: false, error } result objects — NOT thrown.
+        const result = await next();
+
+        if (!result.ok) {
+          const err = result.error;
+          span.recordException(err instanceof Error ? err : new Error(String(err)));
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: err instanceof Error ? err.message : String(err),
           });
-          throw err;
-        } finally {
-          span.end();
         }
+
+        span.end();
+        return result;
       },
     );
   },
@@ -291,7 +294,7 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Only capture 5xx errors to Sentry (actual bugs)
+    // Only capture 5xx errors (actual bugs)
     if (resolvedStatus >= 500) {
       capture(result.error);
     }
