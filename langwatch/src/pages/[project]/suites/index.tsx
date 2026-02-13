@@ -230,6 +230,7 @@ function SuitesPageContent() {
               suite={selectedSuite}
               onEdit={() => handleEditSuite(selectedSuite.id)}
               onRun={() => handleRunSuite(selectedSuite.id)}
+              isRunning={runMutation.isPending}
             />
           )}
 

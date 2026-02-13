@@ -34,12 +34,14 @@ type SuiteDetailPanelProps = {
   suite: SimulationSuite;
   onEdit: () => void;
   onRun: () => void;
+  isRunning?: boolean;
 };
 
 export function SuiteDetailPanel({
   suite,
   onEdit,
   onRun,
+  isRunning = false,
 }: SuiteDetailPanelProps) {
   const targets = (() => {
     try {
@@ -87,7 +89,7 @@ export function SuiteDetailPanel({
               <Pencil size={14} />
               Edit
             </Button>
-            <Button size="sm" colorPalette="blue" onClick={onRun}>
+            <Button size="sm" colorPalette="blue" onClick={onRun} disabled={isRunning} loading={isRunning}>
               <Play size={14} />
               Run
             </Button>

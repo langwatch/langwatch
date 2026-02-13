@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { parseSuiteTargets, type SuiteTarget } from "~/server/suites/types";
 import type { SimulationSuite } from "@prisma/client";
 
@@ -215,8 +216,8 @@ export function useSuiteForm({
       newErrors.targets = "At least one target is required";
     }
     const parsedRepeat = parseInt(repeatCountStr, 10);
-    if (isNaN(parsedRepeat) || parsedRepeat < 1 || parsedRepeat > 100) {
-      newErrors.repeatCount = "Repeat count must be between 1 and 100";
+    if (isNaN(parsedRepeat) || parsedRepeat < 1 || parsedRepeat > MAX_REPEAT_COUNT) {
+      newErrors.repeatCount = `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -224,7 +225,7 @@ export function useSuiteForm({
 
   const buildFormData = useCallback(
     ({ projectId }: { projectId: string }) => {
-      const repeatCount = Math.min(100, Math.max(1, parseInt(repeatCountStr, 10) || 1));
+      const repeatCount = Math.min(MAX_REPEAT_COUNT, Math.max(1, parseInt(repeatCountStr, 10) || 1));
       return {
         projectId,
         name: name.trim(),
