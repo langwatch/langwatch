@@ -72,6 +72,22 @@ export type DeduplicationStrategy<Payload> =
   | "aggregate"
   | DeduplicationConfig<Payload>;
 
+/**
+ * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
+ */
+export function resolveDeduplicationStrategy<Payload>(
+  strategy: DeduplicationStrategy<Payload> | undefined,
+  createDefaultId: (payload: Payload) => string,
+): DeduplicationConfig<Payload> | undefined {
+  if (strategy === undefined) {
+    return undefined;
+  }
+  if (strategy === "aggregate") {
+    return { makeId: createDefaultId };
+  }
+  return strategy;
+}
+
 export interface EventSourcedQueueDefinition<Payload> {
   /**
    * Base name for the queue and job.
@@ -133,4 +149,18 @@ export interface EventSourcedQueueProcessor<Payload> {
    * For memory queues, this resolves immediately.
    */
   waitUntilReady(): Promise<void>;
+}
+
+/**
+ * Factory interface for creating queue processors.
+ * Allows dependency injection for testing and explicit control over implementation.
+ */
+export interface QueueProcessorFactory {
+  /**
+   * Creates a queue processor based on the provided definition.
+   * The factory decides which implementation (BullMQ or memory) to use.
+   */
+  create<Payload>(
+    definition: EventSourcedQueueDefinition<Payload>,
+  ): EventSourcedQueueProcessor<Payload>;
 }

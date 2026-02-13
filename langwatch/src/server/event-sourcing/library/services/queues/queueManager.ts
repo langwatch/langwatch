@@ -1,62 +1,56 @@
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
-import type { QueueProcessorFactory } from "../../../runtime/queue";
+import type { QueueProcessorFactory } from "../../queues";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
+import { resolveDeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import { ConfigurationError } from "../errorHandling";
 import {
   createCommandDispatcher,
-  resolveDeduplicationStrategy,
   type CommandHandlerOptions,
-} from "./commandDispatcher";
+} from "../commands/commandDispatcher";
+import { ConfigurationError } from "../errorHandling";
 
-const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
+const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
 /**
- * Manages queue processors for event handlers, projections, and commands.
+ * Manages queues for event handlers, projections, and commands.
  * Handles initialization, lifecycle, and job ID generation.
  */
-export class QueueProcessorManager<EventType extends Event = Event> {
+export class QueueManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
   private readonly pipelineName: string;
   private readonly logger = createLogger(
-    "langwatch:event-sourcing:queue-processor-manager",
+    "langwatch:event-sourcing:queue-manager",
   );
-  private readonly queueProcessorFactory?: QueueProcessorFactory;
+  private readonly queueFactory?: QueueProcessorFactory;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly handlerQueueProcessors = new Map<
-    string,
-    EventSourcedQueueProcessor<EventType>
-  >();
-  private readonly projectionQueueProcessors = new Map<
-    string,
-    EventSourcedQueueProcessor<EventType>
-  >();
-  private readonly commandQueueProcessors = new Map<
+  private readonly queues = new Map<
     string,
     EventSourcedQueueProcessor<any>
   >();
+  private handlerCount = 0;
+  private projectionCount = 0;
 
   constructor({
     aggregateType,
     pipelineName,
-    queueProcessorFactory,
+    queueFactory,
     featureFlagService,
   }: {
     aggregateType: AggregateType;
     pipelineName: string;
-    queueProcessorFactory?: QueueProcessorFactory;
+    queueFactory?: QueueProcessorFactory;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.pipelineName = pipelineName;
-    this.queueProcessorFactory = queueProcessorFactory;
+    this.queueFactory = queueFactory;
     this.featureFlagService = featureFlagService;
   }
 
@@ -68,15 +62,22 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     return `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
   }
 
+  private key(
+    type: "handler" | "projection" | "command",
+    name: string,
+  ): string {
+    return `${type}:${name}`;
+  }
+
   initializeHandlerQueues(
     eventHandlers: EventHandlerDefinitions<EventType>,
-    handleEventCallback: (
+    onEvent: (
       handlerName: string,
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.queueProcessorFactory) {
+    if (!this.queueFactory) {
       return;
     }
 
@@ -90,7 +91,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       const queueName = this.makePipelineQueueName(`handler/${handlerName}`);
 
-      const queueProcessor = this.queueProcessorFactory.create<EventType>({
+      const queueProcessor = this.queueFactory.create<EventType>({
         name: queueName,
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
@@ -102,25 +103,26 @@ export class QueueProcessorManager<EventType extends Event = Event> {
           : void 0,
         spanAttributes: handlerDef.options.spanAttributes,
         process: async (event: EventType) => {
-          await handleEventCallback(handlerName, event, {
+          await onEvent(handlerName, event, {
             tenantId: event.tenantId,
           });
         },
       });
 
-      this.handlerQueueProcessors.set(handlerName, queueProcessor);
+      this.queues.set(this.key("handler", handlerName), queueProcessor);
+      this.handlerCount++;
     }
   }
 
   initializeProjectionQueues(
     projections: Record<string, ProjectionDefinition<EventType, any>>,
-    processProjectionEventCallback: (
+    onEvent: (
       projectionName: string,
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.queueProcessorFactory) {
+    if (!this.queueFactory) {
       return;
     }
 
@@ -134,7 +136,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         `projection/${projectionName}`,
       );
 
-      const queueProcessor = this.queueProcessorFactory.create<EventType>({
+      const queueProcessor = this.queueFactory.create<EventType>({
         name: queueName,
         delay: projectionDef.options?.delay,
         deduplication: resolveDeduplicationStrategy(
@@ -150,34 +152,38 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         groupKey: (event: EventType) =>
           `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
         process: async (event: EventType) => {
-          await processProjectionEventCallback(projectionName, event, {
+          await onEvent(projectionName, event, {
             tenantId: event.tenantId,
           });
         },
       });
 
-      this.projectionQueueProcessors.set(projectionName, queueProcessor);
+      this.queues.set(
+        this.key("projection", projectionName),
+        queueProcessor,
+      );
+      this.projectionCount++;
     }
   }
 
   initializeCommandQueues<Payload>(
     commandRegistrations: Array<{
       name: string;
-      HandlerClass: CommandHandlerClass<any, any, EventType>;
+      handlerClass: CommandHandlerClass<any, any, EventType>;
       options?: CommandHandlerOptions<Payload>;
     }>,
-    storeEventsFn: (
+    storeEvents: (
       events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
     pipelineName: string,
   ): void {
-    if (!this.queueProcessorFactory) {
+    if (!this.queueFactory) {
       return;
     }
 
     for (const registration of commandRegistrations) {
-      const handlerClass = registration.HandlerClass;
+      const handlerClass = registration.handlerClass;
       const schema = handlerClass.schema;
       const commandType = schema.type;
       const handlerInstance = new handlerClass();
@@ -194,14 +200,14 @@ export class QueueProcessorManager<EventType extends Event = Event> {
           registration.options?.spanAttributes ??
           handlerClass.getSpanAttributes?.bind(handlerClass),
         killSwitch: registration.options?.killSwitch,
-        lockTtlMs: registration.options?.lockTtlMs,
+
       };
 
       const commandName = handlerClass.dispatcherName ?? registration.name;
 
-      if (this.commandQueueProcessors.has(commandName)) {
+      if (this.queues.has(this.key("command", commandName))) {
         throw new ConfigurationError(
-          "QueueProcessorManager",
+          "QueueManager",
           `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
           { commandName },
         );
@@ -216,8 +222,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         options,
         getAggregateId,
         queueName,
-        storeEventsFn,
-        factory: this.queueProcessorFactory,
+        storeEventsFn: storeEvents,
+        factory: this.queueFactory,
         aggregateType: this.aggregateType,
         commandName,
         featureFlagService: this.featureFlagService,
@@ -225,120 +231,64 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         logger,
       });
 
-      this.commandQueueProcessors.set(commandName, dispatcher);
+      this.queues.set(this.key("command", commandName), dispatcher);
     }
   }
 
-  getHandlerQueueProcessor(
+  hasHandlerQueues(): boolean {
+    return this.handlerCount > 0;
+  }
+
+  hasProjectionQueues(): boolean {
+    return this.projectionCount > 0;
+  }
+
+  getHandlerQueue(
     handlerName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
-    return this.handlerQueueProcessors.get(handlerName);
+    return this.queues.get(this.key("handler", handlerName)) as
+      | EventSourcedQueueProcessor<EventType>
+      | undefined;
   }
 
-  getProjectionQueueProcessor(
+  getProjectionQueue(
     projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
-    return this.projectionQueueProcessors.get(projectionName);
+    return this.queues.get(this.key("projection", projectionName)) as
+      | EventSourcedQueueProcessor<EventType>
+      | undefined;
   }
 
-  getHandlerQueueProcessors(): Map<
-    string,
-    EventSourcedQueueProcessor<EventType>
-  > {
-    return this.handlerQueueProcessors;
-  }
-
-  getProjectionQueueProcessors(): Map<
-    string,
-    EventSourcedQueueProcessor<EventType>
-  > {
-    return this.projectionQueueProcessors;
-  }
-
-  getCommandQueueProcessor<Payload>(
+  getCommandQueue<Payload>(
     commandName: string,
   ): EventSourcedQueueProcessor<Payload> | undefined {
-    return this.commandQueueProcessors.get(commandName) as
+    return this.queues.get(this.key("command", commandName)) as
       | EventSourcedQueueProcessor<Payload>
       | undefined;
   }
 
-  getCommandQueueProcessors(): Map<string, EventSourcedQueueProcessor<any>> {
-    return this.commandQueueProcessors;
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
+    const result = new Map<string, EventSourcedQueueProcessor<any>>();
+    const prefix = "command:";
+    for (const [key, value] of this.queues) {
+      if (key.startsWith(prefix)) {
+        result.set(key.slice(prefix.length), value);
+      }
+    }
+    return result;
   }
 
   async waitUntilReady(): Promise<void> {
-    const readyPromises: Promise<void>[] = [];
-
-    for (const queueProcessor of this.handlerQueueProcessors.values()) {
-      readyPromises.push(queueProcessor.waitUntilReady());
-    }
-
-    for (const queueProcessor of this.projectionQueueProcessors.values()) {
-      readyPromises.push(queueProcessor.waitUntilReady());
-    }
-
-    for (const queueProcessor of this.commandQueueProcessors.values()) {
-      readyPromises.push(queueProcessor.waitUntilReady());
-    }
-
-    await Promise.all(readyPromises);
-
-    this.logger.debug(
-      {
-        handlerCount: this.handlerQueueProcessors.size,
-        projectionCount: this.projectionQueueProcessors.size,
-        commandCount: this.commandQueueProcessors.size,
-      },
-      "All queue processors ready",
+    await Promise.all(
+      [...this.queues.values()].map((q) => q.waitUntilReady()),
     );
+    this.logger.debug({ queueCount: this.queues.size }, "All queues ready");
   }
 
   async close(): Promise<void> {
-    const closePromises: Promise<void>[] = [];
-
-    for (const [
-      handlerName,
-      queueProcessor,
-    ] of this.handlerQueueProcessors.entries()) {
-      this.logger.debug(
-        { handlerName },
-        "Closing queue processor for event handler",
-      );
-      closePromises.push(queueProcessor.close());
-    }
-
-    for (const [
-      projectionName,
-      queueProcessor,
-    ] of this.projectionQueueProcessors.entries()) {
-      this.logger.debug(
-        { projectionName },
-        "Closing queue processor for projection",
-      );
-      closePromises.push(queueProcessor.close());
-    }
-
-    for (const [
-      commandName,
-      queueProcessor,
-    ] of this.commandQueueProcessors.entries()) {
-      this.logger.debug(
-        { commandName },
-        "Closing queue processor for command handler",
-      );
-      closePromises.push(queueProcessor.close());
-    }
-
-    await Promise.allSettled(closePromises);
-
-    this.logger.debug(
-      {
-        handlerCount: this.handlerQueueProcessors.size,
-        projectionCount: this.projectionQueueProcessors.size,
-        commandCount: this.commandQueueProcessors.size,
-      },
-      "All queue processors closed",
+    await Promise.allSettled(
+      [...this.queues.values()].map((q) => q.close()),
     );
+    this.logger.debug({ queueCount: this.queues.size }, "All queues closed");
   }
 }

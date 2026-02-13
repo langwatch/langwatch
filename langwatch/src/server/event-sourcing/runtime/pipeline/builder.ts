@@ -7,7 +7,6 @@ import type {
   EventPublisher,
   EventSourcedQueueProcessor,
   EventStore,
-  EventStoreReadContext,
   ExtractCommandHandlerPayload,
   ParentLink,
   Projection,
@@ -25,9 +24,9 @@ import type {
   ProjectionTypeMap,
 } from "../../library/projection.types";
 import { ConfigurationError } from "../../library/services/errorHandling";
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
 import { EventSourcingPipeline } from "../pipeline";
-import type { QueueProcessorFactory } from "../queue";
+import type { QueueProcessorFactory } from "../../library/queues";
 import type {
   PipelineMetadata,
   PipelineWithCommandHandlers,
@@ -37,7 +36,7 @@ import type {
 export interface PipelineBuilderOptions<EventType extends Event = Event> {
   eventStore: EventStore<EventType>;
   queueProcessorFactory?: QueueProcessorFactory;
-  processorCheckpointStore?: ProcessorCheckpointStore;
+  processorCheckpointStore?: CheckpointStore;
 }
 
 /**
@@ -76,11 +75,6 @@ export interface CommandHandlerOptions<Payload> {
     payload: Payload,
   ) => Record<string, string | number | boolean>;
 
-  /**
-   * Optional: Lock TTL in milliseconds for this command handler.
-   * Default: Uses commandLockTtlMs from PipelineBuilderOptions, or 30000ms
-   */
-  lockTtlMs?: number;
 }
 
 /**
@@ -486,6 +480,16 @@ export class PipelineBuilderWithNameAndType<
       })),
     };
 
+    // Build command registrations
+    const commandRegistrations =
+      this.commandHandlers.length > 0
+        ? this.commandHandlers.map((reg) => ({
+            name: reg.name,
+            handlerClass: reg.HandlerClass,
+            options: reg.options,
+          }))
+        : undefined;
+
     const pipeline = new EventSourcingPipeline<
       EventType,
       RegisteredProjections
@@ -500,43 +504,16 @@ export class PipelineBuilderWithNameAndType<
       processorCheckpointStore: this.options.processorCheckpointStore,
       parentLinks: this.parentLinks.length > 0 ? this.parentLinks : undefined,
       metadata,
+      commandRegistrations,
     });
 
-    // Create dispatchers now that we have the service
-    // The service's storeEvents method will handle storing events and dispatching to handlers
-    const storeEventsFn = async (
-      events: EventType[],
-      context: EventStoreReadContext<EventType>,
-    ) => {
-      await pipeline.service.storeEvents(events, context);
-    };
-
-    // Initialize command queues using the service's queue manager
-    if (this.commandHandlers.length > 0) {
-      const queueManager = pipeline.service.getQueueManager();
-      queueManager.initializeCommandQueues(
-        this.commandHandlers.map((reg) => ({
-          name: reg.name,
-          HandlerClass: reg.HandlerClass,
-          options: reg.options,
-        })),
-        storeEventsFn,
-        this.name,
-      );
-    }
-
-    // Get command dispatchers from the queue manager and attach to pipeline
-    const commandProcessors = pipeline.service
-      .getQueueManager()
-      .getCommandQueueProcessors();
+    // Get command dispatchers and attach to pipeline
+    const commandProcessors = pipeline.service.getCommandQueues();
     const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
     for (const [commandName, processor] of commandProcessors.entries()) {
       dispatchers[commandName] = processor;
     }
 
-    // Attach dispatchers under a `commands` property
-    // Type assertion is safe because we track the command handlers in the type system
-    // and create dispatchers that match those types at runtime
     return Object.assign(pipeline, {
       commands: dispatchers,
     }) as PipelineWithCommandHandlers<

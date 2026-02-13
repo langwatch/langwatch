@@ -5,6 +5,6 @@ export {
   DefaultQueueProcessorFactory,
   defaultQueueProcessorFactory,
   MemoryQueueProcessorFactory,
-  type QueueProcessorFactory,
 } from "./factory";
+export type { QueueProcessorFactory } from "../../library/queues";
 export { EventSourcedQueueProcessorMemory } from "./memory";

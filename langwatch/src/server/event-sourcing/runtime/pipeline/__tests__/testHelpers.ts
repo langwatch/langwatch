@@ -14,7 +14,7 @@ import type { ProjectionHandler } from "../../../library/domain/handlers/project
 import type { ProjectionHandlerClass } from "../../../library/domain/handlers/projectionHandlerClass";
 import { createTenantId } from "../../../library/domain/tenantId";
 import type { Event, Projection } from "../../../library/domain/types";
-import type { EventPublisher } from "../../../library/publishing/eventPublisher.types";
+import type { EventPublisher } from "../../../library/eventPublisher.types";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
@@ -22,7 +22,7 @@ import type {
 import { createTestEvent } from "../../../library/services/__tests__/testHelpers";
 import type { EventStore } from "../../../library/stores/eventStore.types";
 import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
-import type { QueueProcessorFactory } from "../../queue";
+import type { QueueProcessorFactory } from "../../../library/queues";
 import { PipelineBuilder } from "../builder";
 
 /**

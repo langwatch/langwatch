@@ -4,24 +4,11 @@ import { connection } from "../../../redis";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  QueueProcessorFactory,
 } from "../../library/queues";
 import { GroupQueueProcessorBullMq } from "./groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./memory";
 import { SimpleBullmqQueueProcessor } from "./simpleBullmq";
-
-/**
- * Factory interface for creating queue processors.
- * Allows dependency injection for testing and explicit control over implementation.
- */
-export interface QueueProcessorFactory {
-  /**
-   * Creates a queue processor based on the provided definition.
-   * The factory decides which implementation (BullMQ or memory) to use.
-   */
-  create<Payload>(
-    definition: EventSourcedQueueDefinition<Payload>,
-  ): EventSourcedQueueProcessor<Payload>;
-}
 
 /**
  * Default factory implementation that auto-detects Redis availability.

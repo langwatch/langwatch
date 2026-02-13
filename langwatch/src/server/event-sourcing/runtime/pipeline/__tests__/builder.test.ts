@@ -594,7 +594,7 @@ describe("PipelineBuilder", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
 
       // Configure mock to return the event when getEvents is called
-      // This is needed because BatchEventProcessor fetches events from the store
+      // This is needed because ProjectionBatchProcessor fetches events from the store
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
       const builder = new PipelineBuilder<TestEvent>({
@@ -710,7 +710,7 @@ describe("PipelineBuilder", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
 
       // Configure mock to return the event when getEvents is called
-      // This is needed because BatchEventProcessor fetches events from the store
+      // This is needed because ProjectionBatchProcessor fetches events from the store
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
       const builder = new PipelineBuilder<TestEvent>({
@@ -1220,10 +1220,9 @@ describe("PipelineBuilder", () => {
       }
     });
 
-    it("dispatcher.send() calls storeEventsFn with events array returned from handler.handle() when events.length > 0", async () => {
+    it("dispatcher.send() stores events returned from handler.handle() when events.length > 0", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
-      const storeEventsSpy = vi.fn().mockResolvedValue(void 0);
 
       const events: TestEvent[] = [
         createTestEventForBuilder("aggregate-1", createTenantId("tenant-1")),
@@ -1245,9 +1244,6 @@ describe("PipelineBuilder", () => {
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
-      const serviceStoreEventsSpy = vi.spyOn(pipeline.service, "storeEvents");
-      serviceStoreEventsSpy.mockImplementation(storeEventsSpy);
-
       const payload: TestCommandPayload = {
         tenantId: "tenant-1",
         id: "aggregate-1",
@@ -1256,15 +1252,16 @@ describe("PipelineBuilder", () => {
 
       await pipeline.commands.testDispatcher?.send(payload);
 
-      expect(storeEventsSpy).toHaveBeenCalledWith(events, {
-        tenantId: createTenantId("tenant-1"),
-      });
+      expect(eventStore.storeEvents).toHaveBeenCalledWith(
+        expect.arrayContaining(events),
+        { tenantId: createTenantId("tenant-1") },
+        "trace",
+      );
     });
 
-    it("dispatcher.send() does not call storeEventsFn when handler.handle() returns empty array", async () => {
+    it("dispatcher.send() does not store events when handler.handle() returns empty array", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
-      const storeEventsSpy = vi.fn().mockResolvedValue(void 0);
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
@@ -1282,9 +1279,6 @@ describe("PipelineBuilder", () => {
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
-      const serviceStoreEventsSpy = vi.spyOn(pipeline.service, "storeEvents");
-      serviceStoreEventsSpy.mockImplementation(storeEventsSpy);
-
       const payload: TestCommandPayload = {
         tenantId: "tenant-1",
         id: "aggregate-1",
@@ -1293,7 +1287,9 @@ describe("PipelineBuilder", () => {
 
       await pipeline.commands.testDispatcher?.send(payload);
 
-      expect(storeEventsSpy).not.toHaveBeenCalled();
+      // commandDispatcher checks events.length > 0 before calling storeEvents
+      // storeEvents on the service is never called, so eventStore.storeEvents is never called
+      expect(eventStore.storeEvents).not.toHaveBeenCalled();
     });
 
     it("dispatcher.send() propagates errors thrown by handler.handle() method", async () => {

@@ -6,15 +6,15 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { EventHandlerDefinition } from "../eventHandler.types";
 import type { ProjectionDefinition } from "../projection.types";
-import type { EventPublisher } from "../publishing/eventPublisher.types";
-import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
+import type { EventPublisher } from "../eventPublisher.types";
+import type { EventSourcedQueueProcessor } from "../queues";
+import type { CheckpointStore } from "../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
 } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
-import { BatchEventProcessor } from "./batch/batchEventProcessor";
-import { CheckpointManager } from "./checkpoints/checkpointManager";
+import { ProjectionBatchProcessor } from "./batch/projectionBatchProcessor";
 import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
@@ -23,8 +23,8 @@ import type {
 } from "./eventSourcingService.types";
 import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
-import { QueueProcessorManager } from "./queues/queueProcessorManager";
-import { EventProcessorValidator } from "./validation/eventProcessorValidator";
+import { QueueManager } from "./queues/queueManager";
+import { ProjectionValidator } from "./validation/projectionValidator";
 
 /**
  * Main service that orchestrates event sourcing.
@@ -55,15 +55,14 @@ export class EventSourcingService<
     EventHandlerDefinition<EventType>
   >;
   private readonly options: EventSourcingOptions<EventType>;
-  private readonly queueManager: QueueProcessorManager<EventType>;
+  private readonly queueManager: QueueManager<EventType>;
   private readonly handlerDispatcher: EventHandlerDispatcher<EventType>;
   private readonly projectionUpdater: ProjectionUpdater<
     EventType,
     ProjectionTypes
   >;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly projectionBatchProcessor?: BatchEventProcessor<EventType>;
-  private readonly checkpointManager: CheckpointManager<EventType>;
+  private readonly checkpointStore?: CheckpointStore;
 
   constructor({
     pipelineName,
@@ -72,13 +71,14 @@ export class EventSourcingService<
     projections,
     eventPublisher,
     eventHandlers,
-    processorCheckpointStore,
+    checkpointStore,
     serviceOptions,
     logger,
-    queueProcessorFactory,
+    queueFactory,
     featureFlagService,
+    commandRegistrations,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
-    processorCheckpointStore?: ProcessorCheckpointStore;
+    checkpointStore?: CheckpointStore;
   }) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
@@ -95,11 +95,12 @@ export class EventSourcingService<
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
     this.featureFlagService = featureFlagService;
+    this.checkpointStore = checkpointStore;
 
     // Warn in production if queue factory is not provided (handlers will be synchronous)
     if (
       process.env.NODE_ENV === "production" &&
-      !queueProcessorFactory &&
+      !queueFactory &&
       eventHandlers &&
       Object.keys(eventHandlers).length > 0
     ) {
@@ -114,7 +115,7 @@ export class EventSourcingService<
     // Warn in production if queue factory is not provided (projections will be synchronous)
     if (
       process.env.NODE_ENV === "production" &&
-      !queueProcessorFactory &&
+      !queueFactory &&
       projections &&
       Object.keys(projections).length > 0
     ) {
@@ -127,22 +128,17 @@ export class EventSourcingService<
     }
 
     // Initialize components
-    const validator = new EventProcessorValidator({
+    const validator = new ProjectionValidator({
       eventStore,
       aggregateType,
-      processorCheckpointStore,
+      checkpointStore,
       pipelineName: this.pipelineName,
     });
 
-    this.checkpointManager = new CheckpointManager(
-      this.pipelineName,
-      processorCheckpointStore,
-    );
-
-    this.queueManager = new QueueProcessorManager<EventType>({
+    this.queueManager = new QueueManager<EventType>({
       aggregateType,
       pipelineName: this.pipelineName,
-      queueProcessorFactory,
+      queueFactory,
       featureFlagService: this.featureFlagService,
     });
 
@@ -157,29 +153,18 @@ export class EventSourcingService<
       aggregateType,
       eventStore,
       projections: this.projections,
-      processorCheckpointStore,
+      checkpointStore,
+      pipelineName: this.pipelineName,
       ordering: this.options.ordering ?? "timestamp",
       validator,
-      checkpointManager: this.checkpointManager,
       queueManager: this.queueManager,
       featureFlagService: this.featureFlagService,
     });
 
-    // Create batch processor for projection queue-based processing
-    // Projections handle the BullMQ deduplication issue by fetching all unprocessed events
-    if (queueProcessorFactory) {
-      this.projectionBatchProcessor = new BatchEventProcessor<EventType>(
-        eventStore,
-        processorCheckpointStore,
-        this.pipelineName,
-        aggregateType,
-      );
-    }
-
     // Initialize queue processors for event handlers if factory is provided
     // Handler queues use SimpleBullmqQueueProcessor (no groupKey) - each event
     // is processed independently with no checkpoints or batch processing
-    if (queueProcessorFactory && eventHandlers) {
+    if (queueFactory && eventHandlers) {
       this.queueManager.initializeHandlerQueues(
         eventHandlers,
         async (handlerName, event, _context) => {
@@ -197,117 +182,27 @@ export class EventSourcingService<
     }
 
     // Initialize queue processors for projections if factory is provided
-    if (queueProcessorFactory && projections) {
-      this.queueManager.initializeProjectionQueues(
-        projections,
-        async (projectionName, triggerEvent, _context) => {
-          // Use batch processor to handle all unprocessed events for this aggregate
-          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
-          if (this.projectionBatchProcessor) {
-            await this.projectionBatchProcessor.processUnprocessedEvents(
-              triggerEvent,
-              projectionName,
-              "projection",
-              async (event, sequenceNumber, context) => {
-                await this.processProjectionEvent(
-                  projectionName,
-                  event,
-                  sequenceNumber,
-                  context,
-                );
-              },
-            );
-          } else {
-            // Fallback to single-event processing if no batch processor
-            const projectionDef = this.projections?.get(projectionName);
-            if (!projectionDef) {
-              throw new ConfigurationError(
-                "EventSourcingService",
-                `Projection "${projectionName}" not found`,
-                { projectionName },
-              );
-            }
-            await this.projectionUpdater.processProjectionEvent(
-              projectionName,
-              projectionDef,
-              triggerEvent,
-              { tenantId: triggerEvent.tenantId },
-            );
-          }
-        },
+    if (queueFactory && projections) {
+      const batchProcessor = new ProjectionBatchProcessor<EventType>(
+        eventStore,
+        checkpointStore,
+        this.pipelineName,
+        aggregateType,
       );
-    }
-  }
-
-  /**
-   * Processes a single projection event within a batch.
-   * Called by BatchEventProcessor for each unprocessed event.
-   */
-  private async processProjectionEvent(
-    projectionName: string,
-    event: EventType,
-    sequenceNumber: number,
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
-    const projectionDef = this.projections?.get(projectionName);
-    if (!projectionDef) {
-      throw new ConfigurationError(
-        "EventSourcingService",
-        `Projection "${projectionName}" not found`,
-        { projectionName },
-      );
+      this.projectionUpdater.initializeQueues(batchProcessor);
     }
 
-    // Save pending checkpoint before processing
-    await this.checkpointManager.saveCheckpointSafely(
-      projectionName,
-      "projection",
-      event,
-      "pending",
-      sequenceNumber,
-    );
-
-    try {
-      // Fetch ALL events for the aggregate, not just up to current event.
-      // Using getEventsUpTo() misses concurrent events that share the same
-      // timestamp but have a higher EventId than the trigger event, which
-      // causes incomplete projections (e.g. trace summaries with fewer spans).
-      // This matches BatchEventProcessor's approach (see its getEvents() call).
-      const allEvents = await this.eventStore.getEvents(
-        String(event.aggregateId),
-        context,
-        this.aggregateType,
+    // Initialize command queues (after all fields are set so storeEvents works)
+    if (
+      queueFactory &&
+      commandRegistrations &&
+      commandRegistrations.length > 0
+    ) {
+      this.queueManager.initializeCommandQueues(
+        commandRegistrations,
+        this.storeEvents.bind(this),
+        pipelineName,
       );
-
-      // Update the projection with all events
-      await this.projectionUpdater.updateProjectionByName(
-        projectionName,
-        String(event.aggregateId),
-        context,
-        { events: allEvents },
-      );
-
-      // Save processed checkpoint on success
-      await this.checkpointManager.saveCheckpointSafely(
-        projectionName,
-        "projection",
-        event,
-        "processed",
-        sequenceNumber,
-      );
-    } catch (error) {
-      // Save failed checkpoint on error
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await this.checkpointManager.saveCheckpointSafely(
-        projectionName,
-        "projection",
-        event,
-        "failed",
-        sequenceNumber,
-        errorMessage,
-      );
-      throw error;
     }
   }
 
@@ -539,11 +434,11 @@ export class EventSourcingService<
   }
 
   /**
-   * Gets the queue processor manager for this service.
-   * Used by the pipeline builder to initialize command queues.
+   * Gets the command queue dispatchers created during initialization.
+   * Returns a map of command name to queue processor.
    */
-  getQueueManager(): QueueProcessorManager<EventType> {
-    return this.queueManager;
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
+    return this.queueManager.getCommandQueues();
   }
 
   /**

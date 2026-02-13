@@ -45,7 +45,6 @@ export type {
   ProjectionHandlerClassStatic,
 } from "./domain/handlers/projectionHandlerClass";
 export type {
-  ExtractAggregateId,
   ExtractEventPayload,
   ExtractProjectionData,
   InferEventStoreEvent,
@@ -87,20 +86,25 @@ export type {
   ProjectionDefinition,
   ProjectionDefinitions,
 } from "./projection.types";
-export type { EventPublisher } from "./publishing/eventPublisher.types";
+export type { EventPublisher } from "./eventPublisher.types";
 export type {
   DeduplicationConfig,
   DeduplicationStrategy,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
+  QueueProcessorFactory,
 } from "./queues";
 export { EventSourcingService } from "./services/eventSourcingService";
 export type {
   EventSourcingOptions,
   UpdateProjectionOptions,
 } from "./services/eventSourcingService.types";
-export type { ProcessorCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
+export type { CheckpointStore } from "./stores/checkpointStore.types";
+/**
+ * @deprecated Use CheckpointStore instead
+ */
+export type { CheckpointStore as ProcessorCheckpointStore } from "./stores/checkpointStore.types";
 export type {
   EventStore,
   EventStoreReadContext,

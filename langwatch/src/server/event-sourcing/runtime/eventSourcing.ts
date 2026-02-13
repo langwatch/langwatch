@@ -4,7 +4,6 @@ import type {
   Event,
   EventSourcedQueueProcessor,
   EventStore,
-  EventStoreReadContext,
   Projection,
   StaticPipelineDefinition,
 } from "../library";
@@ -232,6 +231,16 @@ export class EventSourcing {
             ? Object.fromEntries(Array.from(eventHandlers))
             : undefined;
 
+        // Build command registrations for the service
+        const commandRegistrations =
+          definition.commands.length > 0
+            ? definition.commands.map((cmd) => ({
+                name: cmd.name,
+                handlerClass: cmd.handlerClass,
+                options: cmd.options,
+              }))
+            : undefined;
+
         // Create the pipeline
         const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
           name: definition.metadata.name,
@@ -247,34 +256,11 @@ export class EventSourcing {
               : undefined,
           metadata: definition.metadata,
           featureFlagService: definition.featureFlagService,
+          commandRegistrations,
         });
 
-        // Create store events function for command handlers
-        const storeEventsFn = async (
-          events: EventType[],
-          context: EventStoreReadContext<EventType>,
-        ) => {
-          await pipeline.service.storeEvents(events, context);
-        };
-
-        // Initialize command queues
-        if (definition.commands.length > 0) {
-          const queueManager = pipeline.service.getQueueManager();
-          queueManager.initializeCommandQueues(
-            definition.commands.map((cmd) => ({
-              name: cmd.name,
-              HandlerClass: cmd.handlerClass,
-              options: cmd.options,
-            })),
-            storeEventsFn,
-            definition.metadata.name,
-          );
-        }
-
         // Get command dispatchers
-        const commandProcessors = pipeline.service
-          .getQueueManager()
-          .getCommandQueueProcessors();
+        const commandProcessors = pipeline.service.getCommandQueues();
         const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
         for (const [commandName, processor] of commandProcessors.entries()) {
           dispatchers[commandName] = processor;
@@ -304,9 +290,7 @@ export function getEventSourcing(): EventSourcing {
   return _eventSourcingInstance;
 }
 
-// Helper function to create a lazily initialized singleton.
-// This pattern ensures the getter always returns a non-nullable type
-// while avoiding env validation at module load time.
+// Creates a lazily initialized singleton, avoiding env validation at module load time.
 function createLazyPipeline<T>(factory: () => T): () => T {
   let instance: T | null = null;
   return () => {
@@ -317,18 +301,10 @@ function createLazyPipeline<T>(factory: () => T): () => T {
   };
 }
 
-/**
- * Returns the trace processing pipeline.
- * Lazily initialized to avoid env validation at module load time.
- */
 export const getTraceProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(traceProcessingPipelineDefinition),
 );
 
-/**
- * Returns the evaluation processing pipeline.
- * Lazily initialized to avoid env validation at module load time.
- */
 export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(evaluationProcessingPipelineDefinition),
 );

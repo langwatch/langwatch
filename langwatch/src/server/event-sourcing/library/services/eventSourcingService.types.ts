@@ -1,5 +1,6 @@
 import type { createLogger } from "../../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { EventHandlerDefinitions } from "../eventHandler.types";
@@ -7,10 +8,11 @@ import type {
   ProjectionDefinitions,
   ProjectionTypeMap,
 } from "../projection.types";
-import type { EventPublisher } from "../publishing/eventPublisher.types";
-import type { EventSourcedQueueProcessor } from "../queues";
+import type { EventPublisher } from "../eventPublisher.types";
+import type { QueueProcessorFactory } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
+import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 /**
  * Options for configuring event sourcing behavior.
  */
@@ -74,7 +76,7 @@ export interface EventSourcingServiceOptions<
   eventPublisher?: EventPublisher<EventType>;
   /**
    * Map of event handler definitions for reacting to events.
-   * Handlers are dispatched asynchronously via queues after events are stored (if queueProcessorFactory is provided),
+   * Handlers are dispatched asynchronously via queues after events are stored (if queueFactory is provided),
    * or synchronously as a fallback (not recommended for production).
    * Handler errors are logged but do not fail the storage operation.
    */
@@ -91,7 +93,7 @@ export interface EventSourcingServiceOptions<
   logger?: ReturnType<typeof createLogger>;
 
   /**
-   * Optional queue processor factory for creating queues for event handlers.
+   * Optional queue factory for creating queues for event handlers.
    *
    * **Performance:** Without a queue factory, event handlers execute synchronously during event storage,
    * blocking the storage operation. This is not recommended for production.
@@ -99,24 +101,19 @@ export interface EventSourcingServiceOptions<
    * **Concurrency:** Queue processors handle retries, idempotency, and concurrency limits automatically.
    * Each handler gets its own queue, and handlers are processed in dependency order.
    */
-  queueProcessorFactory?: {
-    create<Payload>(definition: {
-      name: string;
-      process: (payload: Payload) => Promise<void>;
-      delay?: number;
-      deduplication?: {
-        makeId: (payload: Payload) => string;
-        ttlMs?: number;
-      };
-      options?: { concurrency?: number };
-      spanAttributes?: (
-        payload: Payload,
-      ) => Record<string, string | number | boolean>;
-    }): EventSourcedQueueProcessor<Payload>;
-  };
+  queueFactory?: QueueProcessorFactory;
   /**
    * Optional feature flag service for kill switches.
    * When provided, enables automatic feature flag-based kill switches for components.
    */
   featureFlagService?: FeatureFlagServiceInterface;
+  /**
+   * Command handler registrations for this pipeline.
+   * Requires queueFactory to be set.
+   */
+  commandRegistrations?: Array<{
+    name: string;
+    handlerClass: CommandHandlerClass<any, any, EventType>;
+    options?: CommandHandlerOptions<unknown>;
+  }>;
 }

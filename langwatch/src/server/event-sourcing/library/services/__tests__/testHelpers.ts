@@ -13,8 +13,8 @@ import type {
   ProjectionDefinition,
   ProjectionOptions,
 } from "../../projection.types";
-import type { EventPublisher } from "../../publishing/eventPublisher.types";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { EventPublisher } from "../../eventPublisher.types";
+import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -147,9 +147,9 @@ export function createMockProjectionDefinition<
 }
 
 /**
- * Creates a mock ProcessorCheckpointStore with default implementations.
+ * Creates a mock CheckpointStore with default implementations.
  */
-export function createMockProcessorCheckpointStore(): ProcessorCheckpointStore {
+export function createMockCheckpointStore(): CheckpointStore {
   return {
     saveCheckpoint: vi.fn().mockResolvedValue(void 0),
     loadCheckpoint: vi.fn().mockResolvedValue(null),

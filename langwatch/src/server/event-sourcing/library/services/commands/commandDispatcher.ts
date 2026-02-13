@@ -1,7 +1,6 @@
 import type { createLogger } from "~/utils/logger/server";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
-import type { QueueProcessorFactory } from "../../../runtime/queue";
 import type { Command, CommandHandler } from "../../commands/command";
 import { createCommand } from "../../commands/command";
 import type { CommandSchema } from "../../commands/commandSchema";
@@ -11,8 +10,13 @@ import type { TenantId } from "../../domain/tenantId";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
-import type { DeduplicationConfig, DeduplicationStrategy } from "../../queues";
-import type { EventSourcedQueueProcessor } from "../../queues";
+import type { KillSwitchOptions } from "../../pipeline/types";
+import type {
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+  QueueProcessorFactory,
+} from "../../queues";
+import { resolveDeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import { EventUtils } from "../../utils/event.utils";
 import { isComponentDisabled } from "../../utils/killSwitch";
@@ -27,14 +31,6 @@ interface HasTenantId {
 }
 
 /**
- * Kill switch options for event sourcing components.
- */
-export interface KillSwitchOptions {
-  customKey?: string;
-  defaultValue?: boolean;
-}
-
-/**
  * Options for configuring a command handler.
  */
 export interface CommandHandlerOptions<Payload> {
@@ -46,23 +42,6 @@ export interface CommandHandlerOptions<Payload> {
     payload: Payload,
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
-  lockTtlMs?: number;
-}
-
-/**
- * Resolves a deduplication strategy to a concrete DeduplicationConfig or undefined.
- */
-export function resolveDeduplicationStrategy<Payload>(
-  strategy: DeduplicationStrategy<Payload> | undefined,
-  createDefaultId: (payload: Payload) => string,
-): DeduplicationConfig<Payload> | undefined {
-  if (strategy === undefined) {
-    return undefined;
-  }
-  if (strategy === "aggregate") {
-    return { makeId: createDefaultId };
-  }
-  return strategy;
 }
 
 /**
