@@ -35,8 +35,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         config (GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None):
         workflow_id (None | str):
         copied_from_evaluator_id (None | str):
-        created_at (float | str):
-        updated_at (float | str):
+        created_at (str):
+        updated_at (str):
         fields (list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]):
         output_fields (list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]):
         workflow_name (str | Unset):
@@ -51,8 +51,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
     config: GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None
     workflow_id: None | str
     copied_from_evaluator_id: None | str
-    created_at: float | str
-    updated_at: float | str
+    created_at: str
+    updated_at: str
     fields: list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]
     output_fields: list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]
     workflow_name: str | Unset = UNSET
@@ -87,10 +87,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         copied_from_evaluator_id: None | str
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
-        created_at: float | str
         created_at = self.created_at
 
-        updated_at: float | str
         updated_at = self.updated_at
 
         fields = []
@@ -189,15 +187,9 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 
-        def _parse_created_at(data: object) -> float | str:
-            return cast(float | str, data)
+        created_at = d.pop("createdAt")
 
-        created_at = _parse_created_at(d.pop("createdAt"))
-
-        def _parse_updated_at(data: object) -> float | str:
-            return cast(float | str, data)
-
-        updated_at = _parse_updated_at(d.pop("updatedAt"))
+        updated_at = d.pop("updatedAt")
 
         fields = []
         _fields = d.pop("fields")

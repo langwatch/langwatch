@@ -5,3 +5,7 @@ export type EvaluatorResponse = NonNullable<
 >[number];
 
 export type EvaluatorField = EvaluatorResponse["fields"][number];
+
+export type CreateEvaluatorBody = NonNullable<
+  paths["/api/evaluators"]["post"]["requestBody"]
+>["content"]["application/json"];

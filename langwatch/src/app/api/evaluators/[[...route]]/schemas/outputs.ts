@@ -24,3 +24,8 @@ export const apiResponseEvaluatorSchema = z.object({
 });
 
 export type ApiResponseEvaluator = z.infer<typeof apiResponseEvaluatorSchema>;
+
+export const createEvaluatorInputSchema = z.object({
+  name: z.string().min(1).max(255),
+  config: z.record(z.unknown()),
+});
