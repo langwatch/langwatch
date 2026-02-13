@@ -156,7 +156,7 @@ export class SimpleBullmqQueueProcessor<Payload>
     };
     this.worker = new Worker<Payload>(
       this.queueName,
-      async (job) => this.processJob(job),
+      async (job, token) => this.processJob(job, token),
       workerOptions,
     );
 
@@ -257,7 +257,7 @@ export class SimpleBullmqQueueProcessor<Payload>
    * Processes a single job from BullMQ.
    * Handles CH replication lag with exponential backoff.
    */
-  private async processJob(job: Job<Payload>): Promise<void> {
+  private async processJob(job: Job<Payload>, token?: string): Promise<void> {
     // Extract payload and context, supporting both legacy __payload wrapper and new flat format
     const rawData = job.data as Record<string, unknown>;
     let payload: Payload;
@@ -342,7 +342,7 @@ export class SimpleBullmqQueueProcessor<Payload>
           );
 
           const targetTimestamp = Date.now() + exponentialDelayMs;
-          await job.moveToDelayed(targetTimestamp, job.token);
+          await job.moveToDelayed(targetTimestamp, token);
           throw new DelayedError();
         }
 
@@ -430,10 +430,11 @@ export class SimpleBullmqQueueProcessor<Payload>
     };
 
     try {
+      let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
         closeWithTimeout(),
-        new Promise<never>((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          shutdownTimer = setTimeout(
             () =>
               reject(
                 new QueueError(
@@ -443,9 +444,10 @@ export class SimpleBullmqQueueProcessor<Payload>
                 ),
               ),
             SIMPLE_QUEUE_CONFIG.shutdownTimeoutMs,
-          ),
-        ),
+          );
+        }),
       ]);
+      clearTimeout(shutdownTimer);
 
       this.logger.info(
         { queueName: this.queueName },

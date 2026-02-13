@@ -121,6 +121,7 @@ export class GroupQueueProcessorBullMq<Payload>
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly groupKey: (payload: Payload) => string;
   private readonly redisConnection: IORedis | Cluster;
+  private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
   private readonly globalConcurrency: number;
 
@@ -158,6 +159,11 @@ export class GroupQueueProcessorBullMq<Payload>
     }
 
     this.redisConnection = effectiveConnection;
+    // Dedicated connection for BRPOP to avoid blocking the shared connection
+    this.blockingConnection =
+      "duplicate" in effectiveConnection && typeof effectiveConnection.duplicate === "function"
+        ? effectiveConnection.duplicate()
+        : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -203,7 +209,7 @@ export class GroupQueueProcessorBullMq<Payload>
     };
     this.worker = new Worker<Payload>(
       this.queueName,
-      async (job) => this.processJob(job),
+      async (job, token) => this.processJob(job, token),
       workerOptions,
     );
 
@@ -393,8 +399,9 @@ export class GroupQueueProcessorBullMq<Payload>
    */
   private async waitForSignal(): Promise<void> {
     const signalKey = this.scripts.getSignalKey();
-    // BRPOP blocks until a signal arrives or timeout elapses
-    await this.redisConnection.brpop(
+    // BRPOP blocks until a signal arrives or timeout elapses.
+    // Uses a dedicated connection to avoid blocking the shared connection.
+    await this.blockingConnection.brpop(
       signalKey,
       GROUP_QUEUE_CONFIG.signalTimeoutSec,
     );
@@ -471,7 +478,7 @@ export class GroupQueueProcessorBullMq<Payload>
    * Simplified vs old bullmq.ts: no ordering/lock error handling needed.
    * Keeps CH replication lag handling.
    */
-  private async processJob(job: Job<Payload>): Promise<void> {
+  private async processJob(job: Job<Payload>, token?: string): Promise<void> {
     // Extract payload and context, supporting both legacy __payload wrapper and new flat format
     const rawData = job.data as Record<string, unknown>;
     let payload: Payload;
@@ -556,7 +563,7 @@ export class GroupQueueProcessorBullMq<Payload>
           );
 
           const targetTimestamp = Date.now() + exponentialDelayMs;
-          await job.moveToDelayed(targetTimestamp, job.token);
+          await job.moveToDelayed(targetTimestamp, token);
           throw new DelayedError();
         }
 
@@ -643,7 +650,7 @@ export class GroupQueueProcessorBullMq<Payload>
   private generateStagedJobId(payload: Payload): string {
     const payloadWithId = payload as { id?: string };
     const payloadId = payloadWithId.id ?? crypto.randomUUID();
-    return `${payloadId}`;
+    return payloadId;
   }
 
   /**
@@ -755,13 +762,23 @@ export class GroupQueueProcessorBullMq<Payload>
           "Queue events closed",
         );
       }
+
+      // Close the dedicated blocking connection if it was duplicated
+      if (this.blockingConnection !== this.redisConnection) {
+        await this.blockingConnection.quit();
+        this.logger.debug(
+          { queueName: this.queueName },
+          "Blocking connection closed",
+        );
+      }
     };
 
     try {
+      let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
         closeWithTimeout(),
-        new Promise<never>((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          shutdownTimer = setTimeout(
             () =>
               reject(
                 new QueueError(
@@ -771,9 +788,10 @@ export class GroupQueueProcessorBullMq<Payload>
                 ),
               ),
             GROUP_QUEUE_CONFIG.shutdownTimeoutMs,
-          ),
-        ),
+          );
+        }),
       ]);
+      clearTimeout(shutdownTimer);
 
       this.logger.info(
         { queueName: this.queueName },
