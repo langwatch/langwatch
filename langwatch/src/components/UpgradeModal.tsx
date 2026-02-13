@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
 import { useState } from "react";
 import {
+  Badge,
   Button,
   HStack,
   Separator,
@@ -79,8 +80,8 @@ function LimitContent({
             </>
           ) : (
             <Text>
-              You've reached the limit of{" "}
-              {LIMIT_TYPE_LABELS[variant.limitType]} on your current plan.
+              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
+              on your current plan.
             </Text>
           )}
         </VStack>
@@ -95,6 +96,14 @@ function LimitContent({
       </Dialog.Footer>
     </>
   );
+}
+
+function formatCents(cents: string | number): string {
+  const value = typeof cents === "string" ? parseInt(cents, 10) : cents;
+  if (isNaN(value)) return "$0.00";
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${(abs / 100).toFixed(2)}`;
 }
 
 function SeatsContent({
@@ -116,7 +125,7 @@ function SeatsContent({
       organizationId: variant.organizationId,
       newTotalSeats: variant.newSeats,
     },
-    { enabled: open }
+    { enabled: open },
   ) as
     | {
         data?: {
@@ -157,7 +166,8 @@ function SeatsContent({
   return (
     <>
       <Dialog.Header>
-        <Dialog.Title>Confirm Seat Update</Dialog.Title>
+        <Crown />
+        <Dialog.Title>Confirm seat update</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body>
         {!subscriptionApi ? (
@@ -169,29 +179,45 @@ function SeatsContent({
         ) : isError ? (
           <Text color="red.500">{errorMessage}</Text>
         ) : (
-          <VStack gap={3} align="stretch">
-            <Text>
-              Current seats: {variant.currentSeats} → New seats:{" "}
-              {variant.newSeats}
-            </Text>
-            {data?.lineItems?.map((item, index) => (
-              <HStack key={index} justify="space-between">
-                <Text fontSize="sm">{item.description}</Text>
-                <Text fontSize="sm">{item.amount}</Text>
-              </HStack>
-            ))}
+          <VStack gap={6} align="stretch" paddingY={2}>
+            <HStack justify="space-between" paddingX={2}>
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" color="gray.500">
+                  Current seats
+                </Text>
+                <Text fontSize="2xl" fontWeight="bold">
+                  {variant.currentSeats}
+                </Text>
+              </VStack>
+              <Text fontSize="xl" color="gray.400" alignSelf="center">
+                →
+              </Text>
+              <VStack align="end" gap={1}>
+                <Text fontSize="sm" color="gray.500">
+                  New total seats
+                </Text>
+                <Text fontSize="2xl" fontWeight="bold">
+                  {variant.newSeats}
+                </Text>
+              </VStack>
+            </HStack>
+
             <Separator />
+
             {data && (
-              <>
-                <HStack justify="space-between">
-                  <Text fontWeight="medium">Due now (prorated):</Text>
-                  <Text fontWeight="medium">{data.amountDue}</Text>
+              <HStack justify="space-between" paddingX={2}>
+                <HStack gap={2}>
+                  <Text fontWeight="normal" fontSize="md">
+                    Due now
+                  </Text>
+                  <Badge colorPalette="blue" variant="subtle" size="sm">
+                    prorated
+                  </Badge>
                 </HStack>
-                <HStack justify="space-between">
-                  <Text fontWeight="medium">New recurring price:</Text>
-                  <Text fontWeight="medium">{data.recurringTotal}/month</Text>
-                </HStack>
-              </>
+                <Text fontWeight="semibold" fontSize="lg">
+                  {formatCents(data.amountDue)}
+                </Text>
+              </HStack>
             )}
           </VStack>
         )}

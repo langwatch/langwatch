@@ -4,8 +4,7 @@ import {
   ANNUAL_DISCOUNT,
   currencySymbol,
 } from "./billing-plans";
-
-type MemberType = "core" | "lite";
+import { type MemberType } from "~/server/license-enforcement/member-classification";
 
 interface HasMemberType {
   memberType: MemberType;
@@ -27,21 +26,21 @@ export function useBillingPricing({
   const annualSeatPrice = Math.round(basePrice * (1 - ANNUAL_DISCOUNT));
   const seatPrice = billingPeriod === "annually" ? annualSeatPrice : basePrice;
 
-  const existingCoreMembers = users.filter(
-    (u) => u.memberType === "core",
+  const existingFullMembers = users.filter(
+    (u) => u.memberType === "FullMember",
   ).length;
-  const plannedCoreMembers = plannedUsers.filter(
-    (u) => u.memberType === "core",
+  const plannedFullMembers = plannedUsers.filter(
+    (u) => u.memberType === "FullMember",
   ).length;
-  const totalCoreMembers = existingCoreMembers + plannedCoreMembers;
-  const totalPrice = totalCoreMembers * seatPrice;
+  const totalFullMembers = existingFullMembers + plannedFullMembers;
+  const totalPrice = totalFullMembers * seatPrice;
 
   return {
     sym,
     seatPrice,
-    existingCoreMembers,
-    plannedCoreMembers,
-    totalCoreMembers,
+    existingFullMembers,
+    plannedFullMembers,
+    totalFullMembers,
     totalPrice,
     pricePerSeat: `${sym}${seatPrice} per seat/mo`,
     totalPriceFormatted: `${sym}${totalPrice}/mo`,
