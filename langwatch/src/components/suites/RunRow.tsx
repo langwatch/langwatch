@@ -24,7 +24,7 @@ type RunRowProps = {
 };
 
 function OverallStatusIcon({ summary }: { summary: BatchRunSummary }) {
-  if (summary.inProgressCount > 0 && summary.passedCount === 0 && summary.failedCount === 0) {
+  if (summary.inProgressCount > 0) {
     return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
   }
   if (summary.failedCount > 0) {

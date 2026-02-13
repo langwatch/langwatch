@@ -90,7 +90,19 @@ export const suiteRouter = createTRPCRouter({
   getQueueStatus: protectedProcedure
     .input(projectSchema.extend({ suiteId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // Verify suite belongs to the authorized project
+      const service = SuiteService.fromPrisma(ctx.prisma);
+      const suite = await service.getById({
+        id: input.suiteId,
+        projectId: input.projectId,
+      });
+      if (!suite) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Suite not found",
+        });
+      }
       return SuiteService.getQueueStatus({ suiteId: input.suiteId });
     }),
 

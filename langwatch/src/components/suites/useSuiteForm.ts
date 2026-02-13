@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseSuiteTargets, type SuiteTarget } from "~/server/suites/types";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 
 interface Scenario {
   id: string;
@@ -35,7 +35,7 @@ interface AvailableTarget {
 
 interface UseSuiteFormParams {
   /** Suite data for edit mode (null for create mode). */
-  suite: SimulationSuiteConfiguration | null | undefined;
+  suite: SimulationSuite | null | undefined;
   /** Whether the drawer is currently open. */
   isOpen: boolean;
   /** Suite ID from drawer params (present in edit mode). */
@@ -214,13 +214,17 @@ export function useSuiteForm({
     if (selectedTargets.length === 0) {
       newErrors.targets = "At least one target is required";
     }
+    const parsedRepeat = parseInt(repeatCountStr, 10);
+    if (isNaN(parsedRepeat) || parsedRepeat < 1 || parsedRepeat > 100) {
+      newErrors.repeatCount = "Repeat count must be between 1 and 100";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [name, selectedScenarioIds, selectedTargets]);
+  }, [name, selectedScenarioIds, selectedTargets, repeatCountStr]);
 
   const buildFormData = useCallback(
     ({ projectId }: { projectId: string }) => {
-      const repeatCount = Math.max(1, parseInt(repeatCountStr, 10) || 1);
+      const repeatCount = Math.min(100, Math.max(1, parseInt(repeatCountStr, 10) || 1));
       return {
         projectId,
         name: name.trim(),

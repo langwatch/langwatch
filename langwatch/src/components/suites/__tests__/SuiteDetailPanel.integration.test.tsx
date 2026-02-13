@@ -11,7 +11,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 
@@ -52,12 +52,13 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 function makeSuite(
-  overrides: Partial<SimulationSuiteConfiguration> = {},
-): SimulationSuiteConfiguration {
+  overrides: Partial<SimulationSuite> = {},
+): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "proj_1",
     name: "Critical Path",
+    slug: "critical-path",
     description: "Core test scenarios",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [{ type: "http", referenceId: "agent_1" }],

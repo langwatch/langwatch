@@ -21,7 +21,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback } from "react";
 import {
@@ -40,7 +40,7 @@ import { TargetPicker } from "./TargetPicker";
 
 /** Callbacks passed via flowCallbacks from the parent page. */
 export type SuiteFormDrawerProps = {
-  onSaved?: (suite: SimulationSuiteConfiguration) => void;
+  onSaved?: (suite: SimulationSuite) => void;
   onRan?: (suiteId: string) => void;
 };
 
@@ -173,7 +173,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     if (!form.validate() || !project) return;
     const data = form.buildFormData({ projectId: project.id });
 
-    const onSuccess = (saved: SimulationSuiteConfiguration) => {
+    const onSuccess = (saved: SimulationSuite) => {
       runMutation.mutate({ projectId: data.projectId, id: saved.id });
       onRan?.(saved.id);
     };

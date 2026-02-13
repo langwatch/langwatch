@@ -1,14 +1,14 @@
 /**
  * Suite Service
  *
- * Business logic for simulation suite configurations.
+ * Business logic for simulation suites.
  * Handles CRUD, duplication, and run scheduling.
  */
 
 import { SpanKind } from "@opentelemetry/api";
 import type {
   PrismaClient,
-  SimulationSuiteConfiguration,
+  SimulationSuite,
 } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -29,6 +29,7 @@ import {
   SuiteDomainError,
 } from "./errors";
 import { createLogger } from "~/utils/logger/server";
+import { slugify } from "~/utils/slugify";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
@@ -70,8 +71,8 @@ export class SuiteService {
   }
 
   async create(
-    input: CreateSuiteInput,
-  ): Promise<SimulationSuiteConfiguration> {
+    input: Omit<CreateSuiteInput, "slug">,
+  ): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteService.create",
       {
@@ -82,7 +83,12 @@ export class SuiteService {
       },
       async (span) => {
         logger.debug({ projectId: input.projectId }, "Creating suite");
-        const result = await this.repository.create(input);
+        const slug = slugify(input.name);
+        await this.ensureSlugAvailable({
+          slug,
+          projectId: input.projectId,
+        });
+        const result = await this.repository.create({ ...input, slug });
         span.setAttribute("suite.id", result.id);
         return result;
       },
@@ -91,7 +97,7 @@ export class SuiteService {
 
   async getAll(params: {
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration[]> {
+  }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteService.getAll",
       {
@@ -112,7 +118,7 @@ export class SuiteService {
   async getById(params: {
     id: string;
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration | null> {
+  }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
       "SuiteService.getById",
       {
@@ -137,8 +143,8 @@ export class SuiteService {
   async update(params: {
     id: string;
     projectId: string;
-    data: UpdateSuiteInput;
-  }): Promise<SimulationSuiteConfiguration> {
+    data: Omit<UpdateSuiteInput, "slug">;
+  }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteService.update",
       {
@@ -153,7 +159,21 @@ export class SuiteService {
           { projectId: params.projectId, suiteId: params.id },
           "Updating suite",
         );
-        return await this.repository.update(params);
+        const data: UpdateSuiteInput = { ...params.data };
+        if (params.data.name) {
+          const slug = slugify(params.data.name);
+          await this.ensureSlugAvailable({
+            slug,
+            projectId: params.projectId,
+            excludeId: params.id,
+          });
+          data.slug = slug;
+        }
+        return await this.repository.update({
+          id: params.id,
+          projectId: params.projectId,
+          data,
+        });
       },
     );
   }
@@ -161,7 +181,7 @@ export class SuiteService {
   async duplicate(params: {
     id: string;
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration> {
+  }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteService.duplicate",
       {
@@ -180,9 +200,16 @@ export class SuiteService {
         if (!original) {
           throw new SuiteDomainError("Suite not found");
         }
+        const newName = `${original.name} (copy)`;
+        const slug = slugify(newName);
+        await this.ensureSlugAvailable({
+          slug,
+          projectId: original.projectId,
+        });
         const result = await this.repository.create({
           projectId: original.projectId,
-          name: `${original.name} (copy)`,
+          name: newName,
+          slug,
           description: original.description,
           scenarioIds: original.scenarioIds,
           targets: parseSuiteTargets(original.targets),
@@ -198,7 +225,7 @@ export class SuiteService {
   async delete(params: {
     id: string;
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration | null> {
+  }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
       "SuiteService.delete",
       {
@@ -231,7 +258,7 @@ export class SuiteService {
    * @throws {InvalidTargetReferencesError} if any target references are invalid
    */
   async run(params: {
-    suite: SimulationSuiteConfiguration;
+    suite: SimulationSuite;
     projectId: string;
     deps: SuiteRunDependencies;
   }): Promise<SuiteRunResult> {
@@ -312,27 +339,37 @@ export class SuiteService {
   }): Promise<QueueStatus> {
     const setId = getSuiteSetId(params.suiteId);
 
-    const jobs = await scenarioQueue.getJobs(["waiting", "active"]);
+    const [waitingJobs, activeJobs] = await Promise.all([
+      scenarioQueue.getJobs(["waiting"]),
+      scenarioQueue.getJobs(["active"]),
+    ]);
 
-    let waiting = 0;
-    let active = 0;
-
-    for (const job of jobs) {
-      if (job.data?.setId !== setId) continue;
-
-      const state = await job.getState();
-      if (state === "waiting") {
-        waiting++;
-      } else if (state === "active") {
-        active++;
-      }
-    }
+    const waiting = waitingJobs.filter((job) => job.data?.setId === setId).length;
+    const active = activeJobs.filter((job) => job.data?.setId === setId).length;
 
     return { waiting, active };
   }
 
+  /**
+   * Check that the slug is not already taken within the project.
+   * Optionally exclude a specific suite ID (for updates).
+   */
+  private async ensureSlugAvailable(params: {
+    slug: string;
+    projectId: string;
+    excludeId?: string;
+  }): Promise<void> {
+    const existing = await this.repository.findBySlug({
+      slug: params.slug,
+      projectId: params.projectId,
+    });
+    if (existing && existing.id !== params.excludeId) {
+      throw new SuiteDomainError("A suite with this name already exists");
+    }
+  }
+
   private async validateReferences(params: {
-    suite: SimulationSuiteConfiguration;
+    suite: SimulationSuite;
     projectId: string;
     targets: SuiteTarget[];
     deps: SuiteRunDependencies;
@@ -374,7 +411,7 @@ export class SuiteService {
   }
 
   private async scheduleJobs(params: {
-    suite: SimulationSuiteConfiguration;
+    suite: SimulationSuite;
     targets: SuiteTarget[];
     projectId: string;
     setId: string;

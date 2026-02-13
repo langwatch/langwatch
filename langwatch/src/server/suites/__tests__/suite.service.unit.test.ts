@@ -9,18 +9,18 @@ import {
   InvalidTargetReferencesError,
 } from "../errors";
 import type { SuiteRepository } from "../suite.repository";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 
 type MockJob = {
   data: { setId: string };
-  getState: () => Promise<string>;
+  getState?: () => Promise<string>;
 };
 
 // Mock the scenario queue module
 const { mockRemove, mockGetJob, mockGetJobs } = vi.hoisted(() => ({
   mockRemove: vi.fn(() => Promise.resolve()),
   mockGetJob: vi.fn(() => Promise.resolve({ remove: vi.fn(() => Promise.resolve()) })),
-  mockGetJobs: vi.fn((): Promise<MockJob[]> => Promise.resolve([])),
+  mockGetJobs: vi.fn((_states?: string[]): Promise<MockJob[]> => Promise.resolve([])),
 }));
 
 vi.mock("../../scenarios/scenario.queue", () => ({
@@ -40,12 +40,13 @@ const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 const mockGenerateBatchRunId = vi.mocked(generateBatchRunId);
 
 function makeSuite(
-  overrides: Partial<SimulationSuiteConfiguration> = {},
-): SimulationSuiteConfiguration {
+  overrides: Partial<SimulationSuite> = {},
+): SimulationSuite {
   return {
     id: "suite_abc123",
     projectId: "proj_1",
     name: "Test Suite",
+    slug: "test-suite",
     description: null,
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [
@@ -113,9 +114,10 @@ describe("SuiteService", () => {
     let service: SuiteService;
 
     beforeEach(() => {
-      const mockRepository: Pick<SuiteRepository, "create" | "findById" | "findAll" | "update" | "archive"> = {
+      const mockRepository: Pick<SuiteRepository, "create" | "findById" | "findBySlug" | "findAll" | "update" | "archive"> = {
         create: vi.fn(),
         findById: vi.fn(),
+        findBySlug: vi.fn(),
         findAll: vi.fn(),
         update: vi.fn(),
         archive: vi.fn(),
@@ -297,6 +299,7 @@ describe("SuiteService", () => {
     let mockRepository: {
       create: ReturnType<typeof vi.fn>;
       findById: ReturnType<typeof vi.fn>;
+      findBySlug: ReturnType<typeof vi.fn>;
       findAll: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
       archive: ReturnType<typeof vi.fn>;
@@ -306,6 +309,7 @@ describe("SuiteService", () => {
       mockRepository = {
         create: vi.fn(),
         findById: vi.fn(),
+        findBySlug: vi.fn().mockResolvedValue(null),
         findAll: vi.fn(),
         update: vi.fn(),
         archive: vi.fn(),
@@ -409,6 +413,7 @@ describe("SuiteService", () => {
     let mockRepository: {
       create: ReturnType<typeof vi.fn>;
       findById: ReturnType<typeof vi.fn>;
+      findBySlug: ReturnType<typeof vi.fn>;
       findAll: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
       archive: ReturnType<typeof vi.fn>;
@@ -418,6 +423,7 @@ describe("SuiteService", () => {
       mockRepository = {
         create: vi.fn(),
         findById: vi.fn(),
+        findBySlug: vi.fn().mockResolvedValue(null),
         findAll: vi.fn(),
         update: vi.fn(),
         archive: vi.fn(),
@@ -468,13 +474,22 @@ describe("SuiteService", () => {
           const suiteId = "suite_abc123";
           const setId = "__internal__suite_abc123__suite";
 
-          mockGetJobs.mockResolvedValue([
-            { data: { setId }, getState: () => Promise.resolve("waiting") },
-            { data: { setId }, getState: () => Promise.resolve("waiting") },
-            { data: { setId }, getState: () => Promise.resolve("waiting") },
-            { data: { setId }, getState: () => Promise.resolve("active") },
-            { data: { setId: "other_set" }, getState: () => Promise.resolve("waiting") },
-          ]);
+          mockGetJobs.mockImplementation((states?: string[]) => {
+            if (states?.includes("waiting")) {
+              return Promise.resolve([
+                { data: { setId } },
+                { data: { setId } },
+                { data: { setId } },
+                { data: { setId: "other_set" } },
+              ]);
+            }
+            if (states?.includes("active")) {
+              return Promise.resolve([
+                { data: { setId } },
+              ]);
+            }
+            return Promise.resolve([]);
+          });
 
           const result = await SuiteService.getQueueStatus({ suiteId });
 
@@ -491,7 +506,9 @@ describe("SuiteService", () => {
         it("returns 0 waiting and 0 active", async () => {
           mockGetJobs.mockResolvedValue([]);
 
-          const result = await SuiteService.getQueueStatus({ suiteId: "suite_empty" });
+          const result = await SuiteService.getQueueStatus({
+            suiteId: "suite_empty",
+          });
 
           expect(result).toEqual({
             waiting: 0,
@@ -507,12 +524,21 @@ describe("SuiteService", () => {
           const targetSetId = "__internal__suite_target__suite";
           const otherSetId = "__internal__suite_other__suite";
 
-          mockGetJobs.mockResolvedValue([
-            { data: { setId: targetSetId }, getState: () => Promise.resolve("waiting") },
-            { data: { setId: otherSetId }, getState: () => Promise.resolve("waiting") },
-            { data: { setId: targetSetId }, getState: () => Promise.resolve("active") },
-            { data: { setId: otherSetId }, getState: () => Promise.resolve("active") },
-          ]);
+          mockGetJobs.mockImplementation((states?: string[]) => {
+            if (states?.includes("waiting")) {
+              return Promise.resolve([
+                { data: { setId: targetSetId } },
+                { data: { setId: otherSetId } },
+              ]);
+            }
+            if (states?.includes("active")) {
+              return Promise.resolve([
+                { data: { setId: targetSetId } },
+                { data: { setId: otherSetId } },
+              ]);
+            }
+            return Promise.resolve([]);
+          });
 
           const result = await SuiteService.getQueueStatus({ suiteId: "suite_target" });
 

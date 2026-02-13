@@ -12,7 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { SuiteSidebar } from "../SuiteSidebar";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -20,12 +20,13 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 function makeSuite(
-  overrides: Partial<SimulationSuiteConfiguration> = {},
-): SimulationSuiteConfiguration {
+  overrides: Partial<SimulationSuite> = {},
+): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "project_1",
     name: "Critical Path",
+    slug: "critical-path",
     description: null,
     scenarioIds: [],
     targets: [],
@@ -39,7 +40,7 @@ function makeSuite(
 }
 
 const defaultProps = {
-  suites: [] as SimulationSuiteConfiguration[],
+  suites: [] as SimulationSuite[],
   selectedSuiteId: null,
   onSelectSuite: vi.fn(),
   onNewSuite: vi.fn(),

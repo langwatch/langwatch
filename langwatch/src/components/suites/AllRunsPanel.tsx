@@ -73,7 +73,7 @@ export function AllRunsPanel() {
     },
     {
       enabled: !!project,
-      refetchInterval: cursor === undefined ? 5000 : undefined, // Only auto-refresh first page
+      refetchInterval: pages.length <= 1 ? 5000 : undefined, // Disable auto-refresh after Load More
     },
   );
 

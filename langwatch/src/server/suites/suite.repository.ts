@@ -1,5 +1,5 @@
 /**
- * Repository for SimulationSuiteConfiguration persistence.
+ * Repository for SimulationSuite persistence.
  *
  * Handles all database operations for suite configurations.
  * Uses the Repository pattern consistent with ScenarioRepository.
@@ -9,7 +9,7 @@ import { SpanKind } from "@opentelemetry/api";
 import type {
   Prisma,
   PrismaClient,
-  SimulationSuiteConfiguration,
+  SimulationSuite,
 } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
@@ -19,7 +19,7 @@ const tracer = getLangWatchTracer("langwatch.suites.repository");
 const logger = createLogger("langwatch:suites:repository");
 
 export type CreateSuiteInput = Omit<
-  Prisma.SimulationSuiteConfigurationUncheckedCreateInput,
+  Prisma.SimulationSuiteUncheckedCreateInput,
   "id" | "createdAt" | "updatedAt" | "archivedAt"
 >;
 
@@ -30,7 +30,7 @@ export class SuiteRepository {
 
   async create(
     input: CreateSuiteInput,
-  ): Promise<SimulationSuiteConfiguration> {
+  ): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.create",
       {
@@ -38,7 +38,7 @@ export class SuiteRepository {
         attributes: {
           "db.system": "postgresql",
           "db.operation": "INSERT",
-          "db.table": "SimulationSuiteConfiguration",
+          "db.table": "SimulationSuite",
           "tenant.id": input.projectId,
         },
       },
@@ -47,7 +47,7 @@ export class SuiteRepository {
           { projectId: input.projectId, operation: "INSERT" },
           "Inserting suite",
         );
-        const result = await this.prisma.simulationSuiteConfiguration.create({
+        const result = await this.prisma.simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             ...input,
@@ -62,7 +62,7 @@ export class SuiteRepository {
   async findById(params: {
     id: string;
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration | null> {
+  }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
       "SuiteRepository.findById",
       {
@@ -70,7 +70,7 @@ export class SuiteRepository {
         attributes: {
           "db.system": "postgresql",
           "db.operation": "SELECT",
-          "db.table": "SimulationSuiteConfiguration",
+          "db.table": "SimulationSuite",
           "tenant.id": params.projectId,
           "suite.id": params.id,
         },
@@ -81,7 +81,7 @@ export class SuiteRepository {
           "Finding suite by id",
         );
         const result =
-          await this.prisma.simulationSuiteConfiguration.findFirst({
+          await this.prisma.simulationSuite.findFirst({
             where: {
               id: params.id,
               projectId: params.projectId,
@@ -94,9 +94,48 @@ export class SuiteRepository {
     );
   }
 
+  /**
+   * Find a non-archived suite by its slug within a project.
+   * Used for slug conflict detection and future API lookup.
+   */
+  async findBySlug(params: {
+    slug: string;
+    projectId: string;
+  }): Promise<SimulationSuite | null> {
+    return tracer.withActiveSpan(
+      "SuiteRepository.findBySlug",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "SELECT",
+          "db.table": "SimulationSuite",
+          "tenant.id": params.projectId,
+          "suite.slug": params.slug,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, slug: params.slug, operation: "SELECT" },
+          "Finding suite by slug",
+        );
+        const result =
+          await this.prisma.simulationSuite.findFirst({
+            where: {
+              slug: params.slug,
+              projectId: params.projectId,
+              archivedAt: null,
+            },
+          });
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
+  }
+
   async findAll(params: {
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration[]> {
+  }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteRepository.findAll",
       {
@@ -104,7 +143,7 @@ export class SuiteRepository {
         attributes: {
           "db.system": "postgresql",
           "db.operation": "SELECT",
-          "db.table": "SimulationSuiteConfiguration",
+          "db.table": "SimulationSuite",
           "tenant.id": params.projectId,
         },
       },
@@ -114,7 +153,7 @@ export class SuiteRepository {
           "Finding all suites",
         );
         const result =
-          await this.prisma.simulationSuiteConfiguration.findMany({
+          await this.prisma.simulationSuite.findMany({
             where: {
               projectId: params.projectId,
               archivedAt: null,
@@ -131,7 +170,7 @@ export class SuiteRepository {
     id: string;
     projectId: string;
     data: UpdateSuiteInput;
-  }): Promise<SimulationSuiteConfiguration> {
+  }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.update",
       {
@@ -139,7 +178,7 @@ export class SuiteRepository {
         attributes: {
           "db.system": "postgresql",
           "db.operation": "UPDATE",
-          "db.table": "SimulationSuiteConfiguration",
+          "db.table": "SimulationSuite",
           "tenant.id": params.projectId,
           "suite.id": params.id,
         },
@@ -149,7 +188,7 @@ export class SuiteRepository {
           { projectId: params.projectId, suiteId: params.id, operation: "UPDATE" },
           "Updating suite",
         );
-        return this.prisma.simulationSuiteConfiguration.update({
+        return this.prisma.simulationSuite.update({
           where: { id: params.id, projectId: params.projectId, archivedAt: null },
           data: params.data,
         });
@@ -164,7 +203,7 @@ export class SuiteRepository {
   async archive(params: {
     id: string;
     projectId: string;
-  }): Promise<SimulationSuiteConfiguration | null> {
+  }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
       "SuiteRepository.archive",
       {
@@ -172,7 +211,7 @@ export class SuiteRepository {
         attributes: {
           "db.system": "postgresql",
           "db.operation": "UPDATE",
-          "db.table": "SimulationSuiteConfiguration",
+          "db.table": "SimulationSuite",
           "tenant.id": params.projectId,
           "suite.id": params.id,
         },
@@ -183,14 +222,14 @@ export class SuiteRepository {
           "Archiving suite",
         );
         const suite =
-          await this.prisma.simulationSuiteConfiguration.findFirst({
+          await this.prisma.simulationSuite.findFirst({
             where: { id: params.id, projectId: params.projectId },
           });
         if (!suite) {
           span.setAttribute("result.found", false);
           return null;
         }
-        const result = await this.prisma.simulationSuiteConfiguration.update({
+        const result = await this.prisma.simulationSuite.update({
           where: { id: params.id, projectId: params.projectId },
           data: { archivedAt: suite.archivedAt ?? new Date() },
         });

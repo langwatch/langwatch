@@ -8,7 +8,7 @@
  */
 
 import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -37,7 +37,7 @@ export type RunHistoryStats = {
 };
 
 type RunHistoryListProps = {
-  suite: SimulationSuiteConfiguration;
+  suite: SimulationSuite;
   onStatsReady?: (stats: RunHistoryStats) => void;
 };
 
@@ -106,7 +106,10 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   );
 
   // Build target name lookup and compute expected job count
-  const targets = parseSuiteTargets(suite.targets);
+  const targets = useMemo(
+    () => parseSuiteTargets(suite.targets),
+    [suite.targets],
+  );
   const expectedJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
   const targetNameMap = useMemo(() => {

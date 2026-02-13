@@ -3,7 +3,7 @@
  */
 
 import { Box, HStack, Input, Separator, Text, VStack } from "@chakra-ui/react";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { FolderOpen, List, Play, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -15,7 +15,7 @@ export type SuiteRunSummary = {
 };
 
 type SuiteSidebarProps = {
-  suites: SimulationSuiteConfiguration[];
+  suites: SimulationSuite[];
   selectedSuiteId: string | "all-runs" | null;
   runSummaries?: Map<string, SuiteRunSummary>;
   onSelectSuite: (id: string | "all-runs") => void;
@@ -174,7 +174,7 @@ function SuiteListItem({
   onRun,
   onContextMenu,
 }: {
-  suite: SimulationSuiteConfiguration;
+  suite: SimulationSuite;
   isSelected: boolean;
   runSummary?: SuiteRunSummary;
   onSelect: () => void;
@@ -183,20 +183,30 @@ function SuiteListItem({
 }) {
   return (
     <HStack
-      as="button"
+      role="group"
       paddingX={2}
       paddingY={2}
       borderRadius="md"
       cursor="pointer"
       bg={isSelected ? "bg.emphasized" : "transparent"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
-      onClick={onSelect}
       onContextMenu={onContextMenu}
       justify="space-between"
-      textAlign="left"
       width="full"
     >
-      <VStack align="start" gap={0} flex={1} overflow="hidden">
+      <VStack
+        as="button"
+        align="start"
+        gap={0}
+        flex={1}
+        overflow="hidden"
+        onClick={onSelect}
+        textAlign="left"
+        cursor="pointer"
+        bg="transparent"
+        border="none"
+        padding={0}
+      >
         <HStack gap={1.5}>
           <FolderOpen size={14} />
           <Text fontSize="sm" fontWeight="medium" truncate>
@@ -214,10 +224,7 @@ function SuiteListItem({
       </VStack>
       <Box
         as="button"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation();
-          onRun();
-        }}
+        onClick={onRun}
         paddingX={1}
         paddingY={0.5}
         borderRadius="sm"

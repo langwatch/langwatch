@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import {
   Activity,
   CheckCircle,
@@ -31,7 +31,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { RunHistoryList, type RunHistoryStats } from "./RunHistoryList";
 
 type SuiteDetailPanelProps = {
-  suite: SimulationSuiteConfiguration;
+  suite: SimulationSuite;
   onEdit: () => void;
   onRun: () => void;
 };
@@ -41,7 +41,13 @@ export function SuiteDetailPanel({
   onEdit,
   onRun,
 }: SuiteDetailPanelProps) {
-  const targets = parseSuiteTargets(suite.targets);
+  const targets = (() => {
+    try {
+      return parseSuiteTargets(suite.targets);
+    } catch {
+      return [];
+    }
+  })();
   const jobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
 

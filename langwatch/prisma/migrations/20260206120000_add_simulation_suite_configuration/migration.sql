@@ -1,8 +1,9 @@
 -- CreateTable
-CREATE TABLE "SimulationSuiteConfiguration" (
+CREATE TABLE "SimulationSuite" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
     "description" TEXT,
     "scenarioIds" TEXT[],
     "targets" JSONB NOT NULL,
@@ -12,8 +13,11 @@ CREATE TABLE "SimulationSuiteConfiguration" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "SimulationSuiteConfiguration_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SimulationSuite_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX "SimulationSuiteConfiguration_projectId_idx" ON "SimulationSuiteConfiguration"("projectId");
+CREATE INDEX "SimulationSuite_projectId_idx" ON "SimulationSuite"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SimulationSuite_projectId_slug_key" ON "SimulationSuite"("projectId", "slug");

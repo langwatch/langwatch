@@ -7,7 +7,7 @@
  */
 
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
@@ -124,7 +124,7 @@ function SuitesPageContent() {
 
   // Handlers
   const handleSuiteSaved = useCallback(
-    (suite: SimulationSuiteConfiguration) => {
+    (suite: SimulationSuite) => {
       setSelectedSuiteId(suite.id);
     },
     [],
@@ -155,7 +155,7 @@ function SuitesPageContent() {
 
   const handleRunSuite = useCallback(
     (suiteId: string) => {
-      if (!project) return;
+      if (!project || runMutation.isPending) return;
       setSelectedSuiteId(suiteId);
       runMutation.mutate({ projectId: project.id, id: suiteId });
     },

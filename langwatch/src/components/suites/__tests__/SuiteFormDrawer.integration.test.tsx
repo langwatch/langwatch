@@ -15,7 +15,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SimulationSuiteConfiguration } from "@prisma/client";
+import type { SimulationSuite } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SuiteFormDrawer } from "../SuiteFormDrawer";
 
@@ -57,7 +57,7 @@ const mocks = vi.hoisted(() => ({
   mockRunMutate: vi.fn(),
   mockDrawerOpen: vi.fn(() => true),
   mockDrawerParams: {} as Record<string, string | undefined>,
-  mockGetByIdData: null as SimulationSuiteConfiguration | null,
+  mockGetByIdData: null as SimulationSuite | null,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -166,12 +166,13 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 function makeSuiteConfig(
-  overrides: Partial<SimulationSuiteConfiguration> = {},
-): SimulationSuiteConfiguration {
+  overrides: Partial<SimulationSuite> = {},
+): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "proj_1",
     name: "My Suite",
+    slug: "my-suite",
     description: "A test suite",
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],
