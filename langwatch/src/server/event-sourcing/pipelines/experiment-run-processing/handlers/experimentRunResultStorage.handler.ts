@@ -32,7 +32,7 @@ interface ClickHouseExperimentRunResultRecord {
   Passed: number | null;
   EvaluationDetails: string | null;
   EvaluationCost: number | null;
-  CreatedAt: string;
+  CreatedAt: number;
 }
 
 type ExperimentRunResultEvent = TargetResultEvent | EvaluatorResultEvent;
@@ -152,7 +152,7 @@ export class ExperimentRunResultStorageHandler
       Passed: null,
       EvaluationDetails: null,
       EvaluationCost: null,
-      CreatedAt: new Date(event.timestamp).toISOString(),
+      CreatedAt: event.timestamp / 1000,
     };
   }
 
@@ -195,7 +195,7 @@ export class ExperimentRunResultStorageHandler
             : 0,
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
-      CreatedAt: new Date(event.timestamp).toISOString(),
+      CreatedAt: event.timestamp / 1000,
     };
   }
 

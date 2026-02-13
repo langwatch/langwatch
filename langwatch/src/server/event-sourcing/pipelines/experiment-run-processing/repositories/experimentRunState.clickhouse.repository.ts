@@ -40,20 +40,21 @@ interface ClickHouseExperimentRunRecord {
   AvgScore: number | null;
   PassRate: number | null;
   Targets: string;
-  CreatedAt: string;
-  UpdatedAt: string;
-  FinishedAt: string | null;
-  StoppedAt: string | null;
+  CreatedAt: string | number;
+  UpdatedAt: string | number;
+  FinishedAt: string | number | null;
+  StoppedAt: string | number | null;
   LastProcessedEventId: string;
 }
 
-function timestampToDateTime64(timestampMs: number | null): string | null {
+function timestampToDateTime64(timestampMs: number | null): number | null {
   if (timestampMs === null) return null;
-  return new Date(timestampMs).toISOString();
+  return timestampMs / 1000;
 }
 
-function dateTime64ToTimestamp(dateTime64: string | null): number | null {
+function dateTime64ToTimestamp(dateTime64: string | number | null): number | null {
   if (dateTime64 === null) return null;
+  if (typeof dateTime64 === "number") return dateTime64 * 1000;
   return new Date(dateTime64).getTime();
 }
 
@@ -111,8 +112,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScore: data.AvgScore,
       PassRate: data.PassRate,
       Targets: data.Targets,
-      CreatedAt: timestampToDateTime64(data.CreatedAt) ?? "0",
-      UpdatedAt: timestampToDateTime64(data.UpdatedAt) ?? "0",
+      CreatedAt: timestampToDateTime64(data.CreatedAt) ?? 0,
+      UpdatedAt: timestampToDateTime64(data.UpdatedAt) ?? 0,
       FinishedAt: timestampToDateTime64(data.FinishedAt),
       StoppedAt: timestampToDateTime64(data.StoppedAt),
       LastProcessedEventId: lastProcessedEventId,
