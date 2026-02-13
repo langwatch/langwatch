@@ -79,6 +79,20 @@ describe("extractLiquidVariables()", () => {
     });
   });
 
+  describe("when text contains for loops with range literals", () => {
+    it("does not treat range literals like (1..5) as variables", () => {
+      const result = extractLiquidVariables(
+        "{% for i in (1..5) %}{{ i }}{% endfor %}"
+      );
+
+      expect(result.loopVariables).toContain("i");
+      expect(result.inputVariables).not.toContain("(1");
+      expect(result.inputVariables).not.toContain("1");
+      expect(result.inputVariables).not.toContain("(1..5)");
+      expect(result.inputVariables).toHaveLength(0);
+    });
+  });
+
   describe("when text contains nested Liquid structures", () => {
     it("extracts the collection as input variable and loop iterator as loop variable", () => {
       const result = extractLiquidVariables(

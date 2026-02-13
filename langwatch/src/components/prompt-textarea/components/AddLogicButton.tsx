@@ -1,17 +1,17 @@
 import { Button, type ButtonProps, Text } from "@chakra-ui/react";
-import { Braces } from "lucide-react";
+import { Code2 } from "lucide-react";
 import { forwardRef } from "react";
 
-type AddVariableButtonProps = {
+type AddLogicButtonProps = {
   onClick: (e: React.MouseEvent) => void;
 } & ButtonProps;
 
 /**
- * Button for adding variables, shown on hover in the textarea.
+ * Button for adding template logic constructs, shown on hover in the textarea.
  */
-export const AddVariableButton = forwardRef<
+export const AddLogicButton = forwardRef<
   HTMLButtonElement,
-  AddVariableButtonProps
+  AddLogicButtonProps
 >(({ onClick, ...props }, ref) => {
   return (
     <Button
@@ -26,11 +26,11 @@ export const AddVariableButton = forwardRef<
       {...props}
     >
       <Text fontSize="xs" marginRight={1} fontWeight="500">
-        Add variable
+        Add logic
       </Text>
-      <Braces size={14} />
+      <Code2 size={14} />
     </Button>
   );
 });
 
-AddVariableButton.displayName = "AddVariableButton";
+AddLogicButton.displayName = "AddLogicButton";

@@ -209,14 +209,18 @@ function extractVariablesFromTag(
 
   if (keyword === "for" && parts.length >= 4 && parts[2] === "in") {
     // {% for item in items %} - item is loop var, items is input var
+    // {% for i in (1..5) %} - i is loop var, (1..5) is a range literal (not a variable)
     const iterator = parts[1]!;
     const collection = parts[3]!;
 
     context.loopVariables.add(iterator);
 
-    const rootCollection = collection.split(".")[0]!;
-    if (rootCollection && !LIQUID_KEYWORDS.has(rootCollection)) {
-      context.inputVariables.add(rootCollection);
+    // Skip range literals like (1..5) or (1..items.size)
+    if (!collection.startsWith("(")) {
+      const rootCollection = collection.split(".")[0]!;
+      if (rootCollection && !LIQUID_KEYWORDS.has(rootCollection)) {
+        context.inputVariables.add(rootCollection);
+      }
     }
   } else if (keyword === "assign" && parts.length >= 2) {
     // {% assign greeting = 'Hello' %} - greeting is assigned
