@@ -283,20 +283,29 @@ export function handleTrpcCallLogging({
   };
 
   if (!result.ok) {
-    logData.error = result.error;
+    // Serialize error compactly to avoid multi-line stack traces creating
+    // separate log entries in the logging system. Keep the raw error for
+    // Sentry/PostHog capture but log only message + code.
+    const err = result.error;
+    logData.error =
+      err instanceof TRPCError
+        ? { code: err.code, message: err.message }
+        : err instanceof Error
+          ? { message: err.message }
+          : String(err);
 
     // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
     // The response status hasn't been set yet at middleware time — tRPC sets
     // it later when serializing the response. So we map it ourselves.
     const resolvedStatus =
-      result.error instanceof TRPCError
-        ? getHTTPStatusCodeFromError(result.error)
+      err instanceof TRPCError
+        ? getHTTPStatusCodeFromError(err)
         : 500;
     logData.statusCode = resolvedStatus;
 
     // Only capture 5xx errors (actual bugs)
     if (resolvedStatus >= 500) {
-      capture(result.error);
+      capture(err);
     }
 
     const logLevel = getLogLevelFromStatusCode(resolvedStatus);

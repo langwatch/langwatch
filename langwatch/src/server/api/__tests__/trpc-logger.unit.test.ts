@@ -63,7 +63,7 @@ describe("handleTrpcCallLogging", () => {
         expect(log.error).toHaveBeenCalledWith(
           expect.objectContaining({
             path: "suites.getAll",
-            error,
+            error: { code: "INTERNAL_SERVER_ERROR", message: "boom" },
             statusCode: 500,
           }),
           "trpc call",
@@ -90,7 +90,10 @@ describe("handleTrpcCallLogging", () => {
         });
 
         expect(log.warn).toHaveBeenCalledWith(
-          expect.objectContaining({ error, statusCode: 400 }),
+          expect.objectContaining({
+            error: { code: "BAD_REQUEST", message: "bad request" },
+            statusCode: 400,
+          }),
           "trpc call",
         );
         expect(capture).not.toHaveBeenCalled();
@@ -115,7 +118,10 @@ describe("handleTrpcCallLogging", () => {
         });
 
         expect(log.warn).toHaveBeenCalledWith(
-          expect.objectContaining({ error, statusCode: 404 }),
+          expect.objectContaining({
+            error: { code: "NOT_FOUND", message: "not found" },
+            statusCode: 404,
+          }),
           "trpc call",
         );
         expect(capture).not.toHaveBeenCalled();
@@ -136,7 +142,10 @@ describe("handleTrpcCallLogging", () => {
         });
 
         expect(log.error).toHaveBeenCalledWith(
-          expect.objectContaining({ statusCode: 500 }),
+          expect.objectContaining({
+            error: { message: "unexpected" },
+            statusCode: 500,
+          }),
           "trpc call",
         );
         expect(capture).toHaveBeenCalledWith(error);
