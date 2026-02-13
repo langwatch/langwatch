@@ -499,7 +499,7 @@ export class ProjectionValidator<EventType extends Event = Event> {
         checkpointStatus: previousCheckpoint?.status ?? null,
         checkpointEventId: previousCheckpoint?.eventId ?? null,
         checkpointKey: previousCheckpoint
-          ? `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`
+          ? buildCheckpointKey(event.tenantId, this.pipelineName, processorName, event.aggregateType, String(event.aggregateId))
           : null,
       },
       "Previous checkpoint lookup result",
@@ -508,7 +508,7 @@ export class ProjectionValidator<EventType extends Event = Event> {
     // If no processed checkpoint exists with sequence >= previousSequenceNumber, we must wait
     if (!previousCheckpoint) {
       // DEBUG: Try to find what checkpoints DO exist for this aggregate
-      const checkpointKey = `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`;
+      const checkpointKey = buildCheckpointKey(event.tenantId, this.pipelineName, processorName, event.aggregateType, String(event.aggregateId));
       this.logger.warn(
         {
           processorName,

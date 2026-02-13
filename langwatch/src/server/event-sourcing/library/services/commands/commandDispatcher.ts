@@ -82,7 +82,7 @@ export function createCommandDispatcher<
   killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
 }): EventSourcedQueueProcessor<Payload> {
-  const createDefaultCommandDeduplicationId = (payload: Payload): string => {
+  const buildCommandKey = (payload: Payload): string => {
     const aggregateId = getAggregateId(payload);
     return `${String(payload.tenantId)}:${aggregateType}:${String(aggregateId)}`;
   };
@@ -92,14 +92,13 @@ export function createCommandDispatcher<
     delay: options.delay,
     deduplication: resolveDeduplicationStrategy(
       options.deduplication,
-      createDefaultCommandDeduplicationId,
+      buildCommandKey,
     ),
     spanAttributes: options.spanAttributes,
     options: options.concurrency
       ? { concurrency: options.concurrency }
       : void 0,
-    groupKey: (payload: Payload) =>
-      `${String(payload.tenantId)}:${aggregateType}:${String(getAggregateId(payload))}`,
+    groupKey: buildCommandKey,
     async process(payload: Payload) {
       const validation = commandSchema.validate(payload);
       if (!validation.success) {
