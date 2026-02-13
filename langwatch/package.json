@@ -162,7 +162,7 @@
     "jsonpath-plus": "^10.3.0",
     "jsonwebtoken": "^9.0.2",
     "langwatch": "^0.4.2",
-    "libphonenumber-js": "^1.12.24",
+    "libphonenumber-js": "^1.12.36",
     "liquidjs": "^10.24.0",
     "lodash-es": "^4.17.23",
     "lodash.clonedeep": "^4.5.0",
