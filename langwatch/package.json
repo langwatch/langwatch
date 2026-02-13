@@ -222,7 +222,7 @@
     "require-in-the-middle": "7.5.1",
     "rich-textarea": "^0.27.0",
     "safe-regex2": "^4.0.1",
-    "sass": "^1.79.0",
+    "sass": "^1.97.3",
     "shiki": "^3.22.0",
     "slugify": "^1.6.6",
     "string-replace-loader": "^3.1.0",
