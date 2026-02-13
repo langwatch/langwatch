@@ -11,6 +11,7 @@ import {
 import { Upload, X } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
+import { Tooltip } from "~/components/ui/tooltip";
 import { formatFileSize } from "./licenseStatusUtils";
 
 type ActivationMethod = "file" | "key";
@@ -63,7 +64,7 @@ export function NoLicenseCard({
       const file = e.dataTransfer.files[0];
       if (file) handleFileSelect(file);
     },
-    [handleFileSelect]
+    [handleFileSelect],
   );
 
   const handleDropzoneClick = useCallback(() => {
@@ -75,7 +76,7 @@ export function NoLicenseCard({
       const file = e.target.files?.[0];
       if (file) handleFileSelect(file);
     },
-    [handleFileSelect]
+    [handleFileSelect],
   );
 
   const handleRemoveFile = useCallback(() => {
@@ -122,7 +123,9 @@ export function NoLicenseCard({
 
           <RadioGroup
             value={activationMethod}
-            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
+            onValueChange={(e) =>
+              handleMethodChange(e.value as ActivationMethod)
+            }
             disabled={isActivating}
           >
             <HStack gap={4}>
@@ -228,6 +231,16 @@ export function NoLicenseCard({
             >
               Activate License
             </Button>
+            <Tooltip content="After purchase, your license will be generated and delivered to your email.">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  href="https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f"
+                  isExternal
+                >
+                  Purchase license
+                </Link>
+              </Button>
+            </Tooltip>
             <Link
               href="mailto:sales@langwatch.ai"
               isExternal
