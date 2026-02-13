@@ -7,7 +7,7 @@ import type {
 } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
 import type { PromptTextAreaOnAddMention } from "../types";
-import { setTextareaValueUndoable } from "../utils";
+import { getCaretCoordinates, setTextareaValueUndoable } from "../utils";
 
 type UseVariableMenuProps = {
   localValue: string;
@@ -27,6 +27,10 @@ type UseVariableMenuProps = {
     field: string,
     content: PromptTextAreaOnAddMention,
   ) => string | void;
+  /** Shared caret position ref (owned by parent, shared across menus) */
+  caretPositionRef: React.RefObject<CaretPosition | null>;
+  /** Shared last user cursor position ref (owned by parent, shared across menus) */
+  lastUserCursorPosRef: React.RefObject<number>;
 };
 
 export const useVariableMenu = ({
@@ -39,6 +43,8 @@ export const useVariableMenu = ({
   onSetVariableMapping,
   otherNodesFields,
   onAddEdge,
+  caretPositionRef,
+  lastUserCursorPosRef,
 }: UseVariableMenuProps) => {
   // Menu state
   const [menuOpen, setMenuOpen] = useState(false);
@@ -49,12 +55,6 @@ export const useVariableMenu = ({
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // When true, menu was opened via button (shows search input, inserts full {{var}})
   const [buttonMenuMode, setButtonMenuMode] = useState(false);
-
-  // Track latest caret position from RichTextarea
-  const caretPositionRef = useRef<CaretPosition | null>(null);
-
-  // Track last user-set cursor position for "Add variable" button insertion
-  const lastUserCursorPosRef = useRef(-1);
 
   // Ref to the add variable button for positioning
   const addButtonRef = useRef<HTMLButtonElement>(null);
@@ -112,50 +112,17 @@ export const useVariableMenu = ({
     setHighlightedIndex(0);
   }, [menuQuery]);
 
-  // Handle selection change from RichTextarea
-  const handleSelectionChange = useCallback(
-    (pos: CaretPosition) => {
-      caretPositionRef.current = pos;
-      // Track user cursor position for "Add variable" button via native textarea
-      if (pos.focused) {
-        const nativeTextarea = containerRef.current?.querySelector("textarea");
-        if (nativeTextarea?.selectionStart !== undefined) {
-          lastUserCursorPosRef.current = nativeTextarea.selectionStart;
-        }
-      }
-    },
-    [containerRef],
-  );
-
-  // Calculate caret position for menu
-  const getCaretCoordinates = useCallback(() => {
-    const pos = caretPositionRef.current;
-    if (pos?.focused) {
-      return {
-        top: pos.top + pos.height + 4,
-        left: pos.left,
-      };
-    }
-
-    // Fallback: use container position
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    return {
-      top: (containerRect?.top ?? 0) + 30,
-      left: (containerRect?.left ?? 0) + 10,
-    };
-  }, [containerRef]);
-
   // Open the menu
   const openMenu = useCallback(
     (start: number, query: string) => {
-      const coords = getCaretCoordinates();
+      const coords = getCaretCoordinates({ caretPositionRef, containerRef });
       setMenuPosition(coords);
       setMenuQuery(query);
       setTriggerStart(start);
       setHighlightedIndex(0);
       setMenuOpen(true);
     },
-    [getCaretCoordinates],
+    [caretPositionRef, containerRef],
   );
 
   // Close the menu
@@ -426,7 +393,6 @@ export const useVariableMenu = ({
     optionCount,
     addButtonRef,
     // Handlers
-    handleSelectionChange,
     openMenu,
     closeMenu,
     selectHighlightedOption,

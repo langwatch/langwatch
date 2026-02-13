@@ -1,10 +1,12 @@
 """
-Unit tests for Anthropic empty content block filtering.
+Unit tests for TemplateAdapter.
 
-Tests the _filter_empty_content_messages function and format() method
-to ensure empty content is filtered before sending to Anthropic API.
+Tests the _filter_empty_content_messages function, format() method,
+and Liquid template rendering through the adapter.
 
-Regression test for: "text content blocks must be non-empty"
+Covers:
+- Anthropic empty content block filtering (regression: "text content blocks must be non-empty")
+- Liquid condition and loop rendering in message templates
 """
 
 import pytest
@@ -276,3 +278,73 @@ class TestTemplateAdapterEmptySystemMessage:
         system_messages = [msg for msg in result if msg.get("role") == "system"]
         assert len(system_messages) == 1
         assert system_messages[0]["content"] == "You are a helpful assistant"
+
+
+class TestTemplateAdapterLiquidRendering:
+    """Tests for Liquid template rendering through TemplateAdapter.format()."""
+
+    def _make_signature_with_messages(self, messages, instructions=""):
+        """Create a mock signature with _messages and minimal fields."""
+        from unittest.mock import MagicMock
+        from pydantic import Field
+
+        signature = MagicMock()
+        signature._messages = Field(default=messages)
+        signature.instructions = instructions
+        signature.input_fields = {}
+        signature.output_fields = {}
+        return signature
+
+    def test_renders_liquid_conditions_in_message_templates(self):
+        """Given a message template with Liquid if/endif, renders based on inputs."""
+        from unittest.mock import MagicMock, patch
+
+        adapter = TemplateAdapter()
+        template = "{% if context %}Use this context: {{ context }}{% endif %}Question: {{ question }}"
+        signature = self._make_signature_with_messages(
+            [{"role": "user", "content": template}]
+        )
+        adapter._get_history_field_name = MagicMock(return_value=None)
+        adapter.format_demos = MagicMock(return_value=[])
+
+        inputs = {"question": "What is AI?", "context": "AI is artificial intelligence"}
+
+        with patch(
+            "langwatch_nlp.studio.dspy.template_adapter.split_message_content_for_custom_types",
+            side_effect=lambda x: x,
+        ):
+            result = adapter.format(signature, demos=[], inputs=inputs)
+
+        # Find the user message (skip system if present)
+        user_messages = [msg for msg in result if msg.get("role") == "user"]
+        assert len(user_messages) == 1
+        content = user_messages[0]["content"]
+        assert "Use this context: AI is artificial intelligence" in content
+        assert "Question: What is AI?" in content
+
+    def test_renders_liquid_conditions_with_missing_optional_input(self):
+        """Given a message template with Liquid if/endif and missing optional input, omits conditional block."""
+        from unittest.mock import MagicMock, patch
+
+        adapter = TemplateAdapter()
+        template = "{% if context %}Use this context: {{ context }}{% endif %}Question: {{ question }}"
+        signature = self._make_signature_with_messages(
+            [{"role": "user", "content": template}]
+        )
+        adapter._get_history_field_name = MagicMock(return_value=None)
+        adapter.format_demos = MagicMock(return_value=[])
+
+        # context is not provided - should be treated as falsy
+        inputs = {"question": "What is AI?"}
+
+        with patch(
+            "langwatch_nlp.studio.dspy.template_adapter.split_message_content_for_custom_types",
+            side_effect=lambda x: x,
+        ):
+            result = adapter.format(signature, demos=[], inputs=inputs)
+
+        user_messages = [msg for msg in result if msg.get("role") == "user"]
+        assert len(user_messages) == 1
+        content = user_messages[0]["content"]
+        assert "Use this context" not in content
+        assert "Question: What is AI?" in content
