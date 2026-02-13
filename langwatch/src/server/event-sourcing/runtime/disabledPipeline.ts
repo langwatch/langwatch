@@ -11,7 +11,7 @@ import type {
 const logger = createLogger("langwatch:event-sourcing:disabled");
 
 /**
- * A no-op queue processor that logs warnings when commands are sent.
+ * A no-op queue processor that logs errors when commands are sent.
  */
 class DisabledQueueProcessor<
   Payload,

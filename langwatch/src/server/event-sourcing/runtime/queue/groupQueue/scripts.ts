@@ -158,6 +158,9 @@ export interface DispatchResult {
 /**
  * TypeScript wrapper for the 4 group queue Lua scripts.
  * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
+ * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
+ * instead of passing them via KEYS[]; this is safe because keyPrefix includes the hash
+ * tag, so all derived keys hash to the same Redis Cluster slot.
  */
 export class GroupStagingScripts {
   private readonly keyPrefix: string;

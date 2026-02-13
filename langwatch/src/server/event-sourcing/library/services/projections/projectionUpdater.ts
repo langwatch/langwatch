@@ -149,11 +149,10 @@ export class ProjectionUpdater<
    * Otherwise, projections are updated inline.
    *
    * **Concurrency:** Projection updates for different aggregates run concurrently.
-   * Updates for the same aggregate are serialized via distributed lock (required).
+   * Updates for the same aggregate are serialized via GroupQueue at the queue level.
    *
    * **Failure Modes:**
    * - Errors in individual projection updates are logged but don't fail the operation
-   * - Lock acquisition failures throw (but are caught and logged at this level)
    */
   async updateProjectionsForAggregates(
     events: readonly EventType[],
@@ -628,7 +627,7 @@ export class ProjectionUpdater<
    * @param context - Security context with required tenantId for event store access
    * @param options - Optional options including projection store context override
    * @returns Object containing both the updated projection and the events that were processed
-   * @throws {Error} If projection name not found, no events found, lock acquisition fails, or tenantId is invalid
+   * @throws {Error} If projection name not found, no events found, or tenantId is invalid
    */
   async updateProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,

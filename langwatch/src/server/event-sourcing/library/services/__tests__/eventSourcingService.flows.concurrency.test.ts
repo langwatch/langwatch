@@ -29,8 +29,8 @@ describe("EventSourcingService - Concurrency Flows", () => {
     vi.restoreAllMocks();
   });
 
-  describe("without distributed lock", () => {
-    it("service works without distributed lock", async () => {
+  describe("without queue-based ordering", () => {
+    it("service works without queue-based ordering", async () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();

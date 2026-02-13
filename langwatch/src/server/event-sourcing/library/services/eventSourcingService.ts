@@ -335,20 +335,16 @@ export class EventSourcingService<
    * Projections are automatically updated after events are stored via storeEvents(),
    * but this method can be used for manual updates (e.g., recovery or reprocessing).
    *
-   * **Concurrency:** Uses distributed lock (if configured) to prevent concurrent updates of the same
-   * aggregate projection. The lock key includes the projection name to ensure different projections
-   * for the same aggregate can be updated concurrently, while the same projection is updated serially.
-   * Lock key format: `update:${aggregateType}:${aggregateId}:${projectionName}`
-   * If lock acquisition fails, throws an error (caller should retry via queue).
-   * Without a distributed lock, concurrent updates may result in lost updates (last write wins).
+   * **Concurrency:** When using GroupQueue, per-aggregate ordering is enforced at the queue level,
+   * ensuring projections for the same aggregate are updated serially. Different aggregates
+   * can be updated concurrently. Without queue-based processing, concurrent updates for the
+   * same aggregate may result in lost updates (last write wins).
    *
-   * **Performance:** O(n) where n is the number of events for the aggregate. Lock acquisition adds
-   * network latency if using Redis-based locks.
+   * **Performance:** O(n) where n is the number of events for the aggregate.
    *
    * **Failure Modes:**
    * - Throws if projection name not found
    * - Throws if no events found for aggregate
-   * - Throws if distributed lock cannot be acquired (if lock is configured)
    * - Throws if tenantId is invalid
    * - Projection store errors propagate (not caught)
    *
@@ -357,7 +353,7 @@ export class EventSourcingService<
    * @param context - Security context with required tenantId for event store access
    * @param options - Optional options including projection store context override
    * @returns Object containing both the updated projection and the events that were processed
-   * @throws {Error} If projection name not found, no events found, lock acquisition fails, or tenantId is invalid
+   * @throws {Error} If projection name not found, no events found, or tenantId is invalid
    */
   async updateProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
