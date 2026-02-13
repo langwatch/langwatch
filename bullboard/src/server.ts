@@ -16,6 +16,8 @@ import { serve } from "@hono/node-server";
 import { Queue } from "bullmq";
 import { Hono } from "hono";
 import IORedis from "ioredis";
+import { createGroupQueueRoutes } from "./groupQueues";
+import { discoverQueueNames, isGroupQueue, stripHashTag } from "./redisQueues";
 
 const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
 if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
@@ -34,28 +36,24 @@ async function main() {
     maxRetriesPerRequest: null,
   });
 
-  // Discover all queues from Redis - handles both standalone and cluster mode
-  const allBullKeys = await connection.keys("bull:*");
-
-  // Extract queue names, keeping braces for cluster mode queues
-  // e.g., "bull:{scenarios}:waiting" -> "{scenarios}"
-  // e.g., "bull:collector:waiting" -> "collector"
-  const queueNames = Array.from(
-    new Set(
-      allBullKeys.map((key) => key.split(":")[1]).filter(Boolean)
-    )
-  ) as string[];
+  const queueNames = await discoverQueueNames(connection);
+  const groupQueueNames = queueNames.filter(isGroupQueue);
 
   console.log("Discovered queues:", queueNames);
+  console.log("Group queues:", groupQueueNames.map(stripHashTag));
 
-  // For display, strip braces but keep them for the actual Queue connection
   const queues = queueNames.map((name) => {
-    const displayName = name.replace("{", "").replace("}", "");
-    return new BullMQAdapter(new Queue(name, { connection }), { displayName });
+    return new BullMQAdapter(
+      new Queue(name, { connection }),
+      { displayName: stripHashTag(name) },
+    );
   });
 
   const serverAdapter = new HonoAdapter(serveStatic);
   serverAdapter.setBasePath("/");
+  serverAdapter.setUIConfig({
+    miscLinks: [{ text: "Groups", url: "/groups" }],
+  });
 
   createBullBoard({
     queues,
@@ -63,6 +61,9 @@ async function main() {
   });
 
   const app = new Hono({ strict: false });
+
+  // Mount group queue routes before BullBoard so /groups and /api/group-queues are matched first
+  app.route("/", createGroupQueueRoutes(connection, groupQueueNames));
   app.route("/", serverAdapter.registerPlugin());
 
   console.log(`Bull Board running on http://localhost:${PORT}`);
