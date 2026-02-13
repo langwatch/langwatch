@@ -665,7 +665,10 @@ export class ScenarioEventRepository {
       }
       throw new Error("Cursor must be a non-empty array");
     } catch (e) {
-      captureException({ message: "Malformed cursor", cursor, error: e });
+      captureException(
+        e instanceof Error ? e : new Error(`Malformed cursor: ${cursor}`),
+        { extra: { cursor } },
+      );
       throw new Error(`Malformed cursor: ${cursor}`);
     }
   }
