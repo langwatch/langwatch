@@ -2,6 +2,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
 import type { Currency } from "./billing-plans";
+import { type MemberType } from "~/server/license-enforcement/member-classification";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
@@ -9,18 +10,18 @@ type TRPCRefetchFn = { refetch: () => any };
 interface PlannedUser {
   id: string;
   email: string;
-  memberType: "core" | "lite";
+  memberType: MemberType;
 }
 
-function memberTypeToRole(memberType: "core" | "lite"): "MEMBER" | "EXTERNAL" {
-  return memberType === "core" ? "MEMBER" : "EXTERNAL";
+function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
+  return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
 }
 
 export function useSubscriptionActions({
   organizationId,
   currency,
   billingPeriod,
-  totalCoreMembers,
+  totalFullMembers,
   currentMaxMembers,
   plannedUsers,
   onSeatsUpdated,
@@ -29,7 +30,7 @@ export function useSubscriptionActions({
   organizationId: string | undefined;
   currency: Currency;
   billingPeriod: "monthly" | "annually";
-  totalCoreMembers: number;
+  totalFullMembers: number;
   currentMaxMembers?: number;
   plannedUsers: PlannedUser[];
   onSeatsUpdated: () => void;
@@ -69,7 +70,7 @@ export function useSubscriptionActions({
         baseUrl: window.location.origin,
         currency,
         billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
-        totalSeats: totalCoreMembers,
+        totalSeats: totalFullMembers,
         invites: invitesWithEmail,
       });
 
@@ -84,7 +85,7 @@ export function useSubscriptionActions({
       organizationId,
       baseUrl: window.location.origin,
       plan: "GROWTH_SEAT_USAGE",
-      membersToAdd: totalCoreMembers,
+      membersToAdd: totalFullMembers,
       currency,
       billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
     });
@@ -101,13 +102,13 @@ export function useSubscriptionActions({
       .filter((u) => u.email.trim() !== "")
       .map((u) => ({ email: u.email, role: memberTypeToRole(u.memberType) }));
 
-    // Use plan.maxMembers as base (what's already paid for), add new planned core seats
-    const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "core").length;
-    const updateTotalMembers = (currentMaxMembers ?? totalCoreMembers) + plannedCoreCount;
+    // Use plan.maxMembers as base (what's already paid for), add new planned Full Member seats
+    const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
+    const updateTotalMembers = (currentMaxMembers ?? totalFullMembers) + plannedCoreCount;
 
     openSeats({
       organizationId,
-      currentSeats: currentMaxMembers ?? totalCoreMembers,
+      currentSeats: currentMaxMembers ?? totalFullMembers,
       newSeats: updateTotalMembers,
       onConfirm: async () => {
         await addTeamMemberOrEvents.mutateAsync({

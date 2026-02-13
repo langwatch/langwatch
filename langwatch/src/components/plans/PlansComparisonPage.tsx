@@ -128,9 +128,6 @@ function PlanCardActions({
           <Button asChild width="full" colorPalette="orange" variant="solid">
             <Link href="/settings/members">Add Members</Link>
           </Button>
-          <Button asChild width="full" colorPalette="orange" variant="outline">
-            <Link href="/settings/subscription">Add Events</Link>
-          </Button>
         </VStack>
       );
     }

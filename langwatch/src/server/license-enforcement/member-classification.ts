@@ -1,6 +1,6 @@
 import { OrganizationUserRole } from "@prisma/client";
 
-export type MemberType = "FullMember" | "MemberLite";
+export type MemberType = "FullMember" | "LiteMember";
 
 /**
  * Checks if a permission string represents a view-only action.
@@ -26,7 +26,7 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
 }
 
 /**
- * Classifies a member as FullMember or MemberLite based on role and permissions.
+ * Classifies a member as FullMember or LiteMember based on role and permissions.
  *
  * Classification rules:
  * - ADMIN or MEMBER roles are always FullMember
@@ -61,7 +61,7 @@ export function classifyMemberType(
   }
 
   // EXTERNAL role with no permissions or view-only permissions is Lite Member
-  return "MemberLite";
+  return "LiteMember";
 }
 
 /**
@@ -87,11 +87,11 @@ export function isFullMember(
  * @param permissions - Optional array of permission strings from custom role
  * @returns true if the member is a Lite Member
  */
-export function isMemberLite(
+export function isLiteMember(
   role: OrganizationUserRole,
   permissions: string[] | undefined
 ): boolean {
-  return classifyMemberType(role, permissions) === "MemberLite";
+  return classifyMemberType(role, permissions) === "LiteMember";
 }
 
 export type RoleChangeType =
