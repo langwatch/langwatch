@@ -118,7 +118,7 @@ importers:
         version: 2.0.2
       '@langwatch/scenario':
         specifier: file:vendor/langwatch-scenario-0.4.0.tgz
-        version: file:vendor/langwatch-scenario-0.4.0.tgz(3d5ac4641fea50276c248bdbd10784cc)
+        version: file:vendor/langwatch-scenario-0.4.0.tgz(b53d8748e92f80d4cca7bd658a5c6b4b)
       '@microlink/react-json-view':
         specifier: ^1.23.1
         version: 1.23.1(@types/react@19.0.10)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -346,7 +346,7 @@ importers:
         version: 9.0.2
       langwatch:
         specifier: ^0.4.2
-        version: 0.4.2(ebfca23317d94f5216aaa50e1d832325)
+        version: 0.4.2(16e1e4be6a26111dd7ecff0940e49782)
       libphonenumber-js:
         specifier: ^1.12.24
         version: 1.12.24
@@ -731,8 +731,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.0
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.1.0
-        version: 2.2.0(@opentelemetry/api@1.9.0)
+        specifier: ^2.5.1
+        version: 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http':
         specifier: ^0.205.0
         version: 0.205.0(@opentelemetry/api@1.9.0)
@@ -747,7 +747,7 @@ importers:
         version: 1.36.0
       langwatch:
         specifier: ^0.13.0
-        version: 0.13.0(94e2f4f7918cef9a5a277764a7c38d7e)
+        version: 0.13.0(6d39da4e86a0b9c4e7945ad8f57603a8)
       nanoid:
         specifier: ^5.0.7
         version: 5.1.6
@@ -836,7 +836,7 @@ importers:
         version: 17.2.3
       langwatch:
         specifier: ^0.10.0
-        version: 0.10.0(0bc9b80fd8792acf10dc579bec70fc74)
+        version: 0.10.0(aeeb981ab5554019423f12ac431fea80)
     devDependencies:
       '@types/node':
         specifier: ^20.19.27
@@ -860,8 +860,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.0
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.1.0
-        version: 2.2.0(@opentelemetry/api@1.9.0)
+        specifier: ^2.5.1
+        version: 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http':
         specifier: ^0.205.0
         version: 0.205.0(@opentelemetry/api@1.9.0)
@@ -876,7 +876,7 @@ importers:
         version: 1.36.0
       langwatch:
         specifier: ^0.13.0
-        version: 0.13.0(94e2f4f7918cef9a5a277764a7c38d7e)
+        version: 0.13.0(6d39da4e86a0b9c4e7945ad8f57603a8)
       nanoid:
         specifier: ^5.0.7
         version: 5.1.6
@@ -3986,8 +3986,8 @@ packages:
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
-  '@opentelemetry/context-async-hooks@2.2.0':
-    resolution: {integrity: sha512-qRkLWiUEZNAmYapZ7KGS5C4OmBLcP/H2foXeOEaowYCR0wi89fHejrfYfbuLVCMLp/dWZXKvQusdbUEZjERfwQ==}
+  '@opentelemetry/context-async-hooks@2.5.1':
+    resolution: {integrity: sha512-MHbu8XxCHcBn6RwvCt2Vpn1WnLMNECfNKYB14LI5XypcgH4IE0/DiVifVR9tAkwPMyLXN8dOoPJfya3IryLQVw==}
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
@@ -16966,14 +16966,14 @@ snapshots:
 
   '@langwatch/ksuid@2.0.2': {}
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.0.tgz(3d5ac4641fea50276c248bdbd10784cc)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.0.tgz(b53d8748e92f80d4cca7bd658a5c6b4b)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 2.0.89(zod@3.25.76)
       '@openai/agents': 0.3.7(@cfworker/json-schema@4.1.1)(bufferutil@4.0.9)(hono@4.11.7)(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)
       ai: 5.0.53(zod@3.25.76)
       chalk: 5.6.2
-      langwatch: 0.9.0(b08a38c44c89fe9f296c2c4c6b578778)
+      langwatch: 0.9.0(5759f21d37cc6a9e69580702f675d92e)
       open: 11.0.0
       rxjs: 7.8.2
       vitest: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@18.19.103)(@vitest/ui@4.0.18)(jsdom@27.3.0(bufferutil@4.0.9))(sass@1.79.0)(terser@5.46.0)(tsx@4.19.1)(yaml@2.8.1)
@@ -17433,7 +17433,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
 
-  '@opentelemetry/context-async-hooks@2.2.0(@opentelemetry/api@1.9.0)':
+  '@opentelemetry/context-async-hooks@2.5.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
 
@@ -24835,7 +24835,7 @@ snapshots:
       '@opentelemetry/sdk-trace-base': 2.5.0(@opentelemetry/api@1.9.0)
       openai: 6.15.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76)
 
-  langwatch@0.10.0(0bc9b80fd8792acf10dc579bec70fc74):
+  langwatch@0.10.0(aeeb981ab5554019423f12ac431fea80):
     dependencies:
       '@ai-sdk/openai': 2.0.90(zod@3.25.76)
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.0(@opentelemetry/api@1.9.0))(openai@6.15.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76))
@@ -24843,7 +24843,7 @@ snapshots:
       '@langchain/openai': 0.6.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.0(@opentelemetry/api@1.9.0))(openai@6.15.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76)))(ws@8.19.0(bufferutil@4.0.9))
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/context-async-hooks': 2.2.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/context-async-hooks': 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-zone': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.205.0(@opentelemetry/api@1.9.0)
@@ -24872,7 +24872,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  langwatch@0.13.0(94e2f4f7918cef9a5a277764a7c38d7e):
+  langwatch@0.13.0(6d39da4e86a0b9c4e7945ad8f57603a8):
     dependencies:
       '@ai-sdk/openai': 2.0.90(zod@3.25.76)
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.0(@opentelemetry/api@1.9.0))(openai@6.15.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76))
@@ -24880,7 +24880,7 @@ snapshots:
       '@langchain/openai': 0.6.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.0(@opentelemetry/api@1.9.0))(openai@6.15.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76)))(ws@8.19.0(bufferutil@4.0.9))
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/context-async-hooks': 2.2.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/context-async-hooks': 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-zone': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.205.0(@opentelemetry/api@1.9.0)
@@ -24909,7 +24909,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  langwatch@0.4.2(ebfca23317d94f5216aaa50e1d832325):
+  langwatch@0.4.2(16e1e4be6a26111dd7ecff0940e49782):
     dependencies:
       '@ai-sdk/openai': 2.0.27(zod@3.25.76)
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76))
@@ -24917,7 +24917,7 @@ snapshots:
       '@langchain/openai': 0.6.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(ws@8.18.2(bufferutil@4.0.9))
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.203.0
-      '@opentelemetry/context-async-hooks': 2.2.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/context-async-hooks': 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-zone': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.203.0(@opentelemetry/api@1.9.0)
@@ -24946,7 +24946,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  langwatch@0.9.0(b08a38c44c89fe9f296c2c4c6b578778):
+  langwatch@0.9.0(5759f21d37cc6a9e69580702f675d92e):
     dependencies:
       '@ai-sdk/openai': 2.0.89(zod@3.25.76)
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76))
@@ -24954,7 +24954,7 @@ snapshots:
       '@langchain/openai': 0.6.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(ws@8.18.2(bufferutil@4.0.9))
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/context-async-hooks': 2.2.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/context-async-hooks': 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-zone': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.205.0(@opentelemetry/api@1.9.0)
