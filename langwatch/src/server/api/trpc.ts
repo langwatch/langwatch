@@ -15,6 +15,7 @@ import {
   type Simplify,
   TRPCError,
 } from "@trpc/server";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
@@ -281,8 +282,16 @@ export function handleTrpcCallLogging({
   if (!result.ok) {
     logData.error = result.error;
 
+    // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
+    // The response status hasn't been set yet at middleware time — tRPC sets
+    // it later when serializing the response. So we map it ourselves.
+    const resolvedStatus =
+      result.error instanceof TRPCError
+        ? getHTTPStatusCodeFromError(result.error)
+        : 500;
+    logData.statusCode = resolvedStatus;
+
     // Only capture 5xx errors to Sentry (actual bugs)
-    const resolvedStatus = statusCode ?? 500;
     if (resolvedStatus >= 500) {
       capture(result.error);
     }

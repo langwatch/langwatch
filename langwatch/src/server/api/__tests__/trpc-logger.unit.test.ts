@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { handleTrpcCallLogging } from "../trpc";
 
@@ -43,15 +44,17 @@ describe("handleTrpcCallLogging", () => {
   });
 
   describe("given a failed result", () => {
-    describe("when status is 500", () => {
-      it("logs at error level and captures the exception", () => {
+    describe("when error is INTERNAL_SERVER_ERROR", () => {
+      it("derives 500 from TRPCError code, logs at error level, and captures", () => {
         const log = createMockLog();
         const capture = vi.fn();
-        const error = new Error("boom");
+        const error = new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "boom",
+        });
 
         handleTrpcCallLogging({
           ...baseArgs,
-          statusCode: 500,
           result: { ok: false, error },
           log,
           capture,
@@ -70,15 +73,17 @@ describe("handleTrpcCallLogging", () => {
       });
     });
 
-    describe("when status is 400", () => {
-      it("logs at warn level and does not capture", () => {
+    describe("when error is BAD_REQUEST", () => {
+      it("derives 400 from TRPCError code and logs at warn level", () => {
         const log = createMockLog();
         const capture = vi.fn();
-        const error = new Error("bad request");
+        const error = new TRPCError({
+          code: "BAD_REQUEST",
+          message: "bad request",
+        });
 
         handleTrpcCallLogging({
           ...baseArgs,
-          statusCode: 400,
           result: { ok: false, error },
           log,
           capture,
@@ -93,40 +98,45 @@ describe("handleTrpcCallLogging", () => {
       });
     });
 
-    describe("when statusCode is null", () => {
-      it("defaults to 500 behavior (error + capture)", () => {
+    describe("when error is NOT_FOUND", () => {
+      it("derives 404 from TRPCError code and logs at warn level", () => {
         const log = createMockLog();
         const capture = vi.fn();
-        const error = new Error("no status");
-
-        handleTrpcCallLogging({
-          ...baseArgs,
-          statusCode: null,
-          result: { ok: false, error },
-          log,
-          capture,
+        const error = new TRPCError({
+          code: "NOT_FOUND",
+          message: "not found",
         });
 
-        expect(log.error).toHaveBeenCalled();
-        expect(capture).toHaveBeenCalledWith(error);
-      });
-    });
-
-    describe("when status is 404", () => {
-      it("logs at warn level (client error range)", () => {
-        const log = createMockLog();
-        const capture = vi.fn();
-
         handleTrpcCallLogging({
           ...baseArgs,
-          statusCode: 404,
-          result: { ok: false, error: new Error("not found") },
+          result: { ok: false, error },
           log,
           capture,
         });
 
         expect(log.warn).toHaveBeenCalled();
         expect(capture).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when error is a plain Error (not TRPCError)", () => {
+      it("defaults to 500 behavior", () => {
+        const log = createMockLog();
+        const capture = vi.fn();
+        const error = new Error("unexpected");
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          result: { ok: false, error },
+          log,
+          capture,
+        });
+
+        expect(log.error).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: 500 }),
+          "trpc call",
+        );
+        expect(capture).toHaveBeenCalledWith(error);
       });
     });
   });
