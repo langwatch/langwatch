@@ -233,13 +233,12 @@ export function NoLicenseCard({
             </Button>
             <Tooltip content="After purchase, your license will be generated and delivered to your email.">
               <Button asChild variant="outline" size="sm">
-                <a
+                <Link
                   href="https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  isExternal
                 >
                   Purchase license
-                </a>
+                </Link>
               </Button>
             </Tooltip>
             <Link
