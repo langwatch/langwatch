@@ -274,7 +274,7 @@
     "@vitest/coverage-v8": "^4.0.17",
     "@vitest/ui": "^4.0.17",
     "encoding": "^0.1.13",
-    "fishery": "^2.2.3",
+    "fishery": "^2.4.0",
     "jest-mock-extended": "^4.0.0-beta1",
     "jsdom": "^27.3.0",
     "node-mocks-http": "^1.17.2",
