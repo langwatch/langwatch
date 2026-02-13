@@ -1,9 +1,6 @@
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType, Event, ParentLink, Projection } from "../library";
-import type {
-  EventSourcedQueueDefinition,
-  EventSourcedQueueProcessor,
-} from "../library/queues";
+import type { EventSourcedQueueProcessor } from "../library/queues";
 import type { EventSourcingService } from "../library/services/eventSourcingService";
 import type {
   PipelineMetadata,
@@ -14,7 +11,7 @@ import type {
 const logger = createLogger("langwatch:event-sourcing:disabled");
 
 /**
- * A no-op queue processor that logs warnings when commands are sent.
+ * A no-op queue processor that logs errors when commands are sent.
  */
 class DisabledQueueProcessor<
   Payload,
@@ -25,7 +22,7 @@ class DisabledQueueProcessor<
   ) {}
 
   async send(payload: Payload): Promise<void> {
-    logger.warn(
+    logger.error(
       {
         pipeline: this.pipelineName,
         command: this.commandName,
@@ -57,15 +54,8 @@ class DisabledEventSourcingService {
     );
   }
 
-  getQueueManager() {
-    return {
-      initializeCommandQueues: () => {
-        logger.debug(
-          "initializeCommandQueues ignored: event sourcing is disabled",
-        );
-      },
-      getCommandQueueProcessors: () => new Map(),
-    };
+  getCommandQueues() {
+    return new Map();
   }
 }
 
@@ -115,55 +105,15 @@ export class DisabledPipeline<
  * Builder that mimics PipelineBuilder API but builds DisabledPipeline.
  * Allows code to use the same builder pattern without errors when event sourcing is disabled.
  */
-export class DisabledPipelineBuilder<EventType extends Event = Event> {
-  private _name = "unknown";
-  private _aggregateType: AggregateType = "unknown" as AggregateType;
-  private _hasLoggedWarning = false;
-
-  private logWarningOnce(): void {
-    if (!this._hasLoggedWarning) {
-      logger.warn(
-        { pipeline: this._name },
-        "Building disabled pipeline: event sourcing is disabled (ENABLE_EVENT_SOURCING=false)",
-      );
-      this._hasLoggedWarning = true;
-    }
-  }
-
-  withName(name: string): DisabledPipelineBuilderWithName<EventType> {
-    this._name = name;
-    return new DisabledPipelineBuilderWithName(name);
-  }
-
-  build(): never {
-    throw new Error("Pipeline name is required");
-  }
-}
-
-export class DisabledPipelineBuilderWithName<EventType extends Event = Event> {
-  constructor(private readonly _name: string) {}
-
-  withAggregateType(
-    aggregateType: AggregateType,
-  ): DisabledPipelineBuilderWithNameAndType<EventType> {
-    return new DisabledPipelineBuilderWithNameAndType(
-      this._name,
-      aggregateType,
-    );
-  }
-
-  build(): never {
-    throw new Error("Aggregate type is required");
-  }
-}
-
-export class DisabledPipelineBuilderWithNameAndType<
+export class DisabledPipelineBuilder<
   EventType extends Event = Event,
   ProjectionTypes extends Record<string, Projection> = Record<
     string,
     Projection
   >,
 > {
+  private _name = "unknown";
+  private _aggregateType: AggregateType = "unknown" as AggregateType;
   private _hasLoggedWarning = false;
   private _projections: Array<{ name: string; handlerClassName: string }> = [];
   private _eventHandlers: Array<{
@@ -173,11 +123,6 @@ export class DisabledPipelineBuilderWithNameAndType<
   }> = [];
   private _commands: Array<{ name: string; handlerClassName: string }> = [];
 
-  constructor(
-    private readonly _name: string,
-    private readonly _aggregateType: AggregateType,
-  ) {}
-
   private logWarningOnce(): void {
     if (!this._hasLoggedWarning) {
       logger.info(
@@ -186,6 +131,16 @@ export class DisabledPipelineBuilderWithNameAndType<
       );
       this._hasLoggedWarning = true;
     }
+  }
+
+  withName(name: string): this {
+    this._name = name;
+    return this;
+  }
+
+  withAggregateType(aggregateType: AggregateType): this {
+    this._aggregateType = aggregateType;
+    return this;
   }
 
   withProjection(name: string, HandlerClass: { name: string }): this {

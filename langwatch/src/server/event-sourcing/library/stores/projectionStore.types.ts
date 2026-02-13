@@ -83,7 +83,7 @@ export type ProjectionStoreWriteContext = ProjectionStoreReadContext;
  *
  * This would allow detection of concurrent updates and enable retry logic or
  * conflict resolution strategies. However, this adds complexity and may not be
- * necessary if distributed locks are used at the service level (see EventSourcingService).
+ * necessary if queue-level ordering (GroupQueue) is used at the service level (see EventSourcingService).
  */
 export interface ProjectionStore<
   ProjectionType extends Projection = Projection,

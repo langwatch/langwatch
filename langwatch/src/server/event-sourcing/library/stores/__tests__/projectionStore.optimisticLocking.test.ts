@@ -73,11 +73,11 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
       expect(true).toBe(true); // Placeholder assertion
     });
 
-    it("optimistic locking should work with distributed locking when implemented", () => {
+    it("optimistic locking should work with queue-level ordering when implemented", () => {
       // This test documents expected behavior for future implementation
       // When optimistic locking is implemented:
-      // - Can be used together with distributed locking
-      // - Distributed locking prevents concurrent rebuilds
+      // - Can be used together with queue-level ordering (GroupQueue)
+      // - GroupQueue prevents concurrent rebuilds by serializing per aggregate
       // - Optimistic locking detects version conflicts during updates
       expect(true).toBe(true); // Placeholder assertion
     });

@@ -12,7 +12,6 @@ import type { DeduplicationStrategy } from "./queues";
  */
 export interface EventHandlerOptions<
   EventType extends Event = Event,
-  AvailableDependencies extends string = string,
 > {
   /**
    * Optional: Event types this handler is interested in.
@@ -39,13 +38,6 @@ export interface EventHandlerOptions<
     event: EventType,
   ) => Record<string, string | number | boolean>;
   /**
-   * Optional: List of handler and projection names this handler depends on.
-   * Handlers will be executed after all dependencies complete.
-   * Can depend on both event handlers and projections.
-   */
-  dependsOn?: AvailableDependencies[];
-
-  /**
    * Optional: Whether to disable the handler.
    */
   disabled?: boolean;
@@ -63,7 +55,6 @@ export interface EventHandlerOptions<
  */
 export interface EventHandlerDefinition<
   EventType extends Event = Event,
-  AvailableDependencies extends string = string,
 > {
   /**
    * Unique name for this handler within the pipeline.
@@ -77,7 +68,7 @@ export interface EventHandlerDefinition<
   /**
    * Options for configuring the handler.
    */
-  options: EventHandlerOptions<EventType, AvailableDependencies>;
+  options: EventHandlerOptions<EventType>;
 }
 
 /**

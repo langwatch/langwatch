@@ -29,7 +29,6 @@ export interface CommandHandlerOptions<Payload = any> {
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
-  lockTtlMs?: number;
 }
 
 /**
@@ -83,7 +82,7 @@ export interface StaticPipelineDefinition<
     string,
     {
       handlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType, any>;
+      options?: EventHandlerOptions<EventType>;
     }
   >;
 

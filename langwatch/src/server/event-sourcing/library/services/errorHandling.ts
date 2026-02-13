@@ -271,30 +271,6 @@ export class StoreError extends BaseEventSourcingError {
 }
 
 /**
- * Error thrown when distributed lock acquisition fails.
- */
-export class LockError extends RecoverableError {
-  override readonly name = "LockError";
-  readonly lockKey: string;
-  readonly operation: string;
-
-  constructor(
-    lockKey: string,
-    operation: string,
-    message: string,
-    context: Record<string, unknown> = {},
-  ) {
-    super(message, {
-      ...context,
-      lockKey,
-      operation,
-    });
-    this.lockKey = lockKey;
-    this.operation = operation;
-  }
-}
-
-/**
  * Error thrown when no events are found for an aggregate.
  * This typically occurs due to ClickHouse replication lag - events exist
  * but aren't yet visible. This is a recoverable condition that should be retried.
@@ -453,25 +429,6 @@ export function isSequentialOrderingError(
     error instanceof Error &&
     "previousSequenceNumber" in error &&
     typeof (error as SequentialOrderingError).previousSequenceNumber === "number"
-  );
-}
-
-/**
- * Type guard to check if an error is a LockError.
- * Lock errors are expected when concurrent processes try to update the same resource.
- *
- * Note: Uses property checks in addition to instanceof to handle cases where
- * bundling/code-splitting causes class identity issues across module boundaries.
- */
-export function isLockError(error: unknown): error is LockError {
-  if (error instanceof LockError) {
-    return true;
-  }
-  // Fallback: check for unique property that only LockError has
-  return (
-    error instanceof Error &&
-    "lockKey" in error &&
-    typeof (error as LockError).lockKey === "string"
   );
 }
 

@@ -4,7 +4,7 @@ import type { AggregateType } from "../../library/domain/aggregateType";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
 import { ConfigurationError } from "../../library/services/errorHandling";
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
 import {
   buildCheckpointKey,
   parseCheckpointKey,
@@ -16,7 +16,7 @@ import type {
 import { CheckpointRepositoryMemory } from "./repositories/checkpointRepositoryMemory";
 
 /**
- * In-memory implementation of ProcessorCheckpointStore.
+ * In-memory implementation of CheckpointStore (ProcessorCheckpointStore).
  * Used for tests and local development.
  *
  * **WARNING: NOT THREAD-SAFE**
@@ -32,7 +32,7 @@ import { CheckpointRepositoryMemory } from "./repositories/checkpointRepositoryM
  * This implementation will throw an error if used in production environments
  * to prevent accidental deployment of non-thread-safe code in multi-instance setups.
  */
-export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore {
+export class ProcessorCheckpointStoreMemory implements CheckpointStore {
   private readonly repository: CheckpointRepository;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:processor-checkpoint-store:memory",
@@ -43,7 +43,7 @@ export class ProcessorCheckpointStoreMemory implements ProcessorCheckpointStore 
     if (process.env.NODE_ENV === "production") {
       throw new ConfigurationError(
         "ProcessorCheckpointStoreMemory",
-        "ProcessorCheckpointStoreMemory is not thread-safe and cannot be used in production. Use ProcessorCheckpointStoreClickHouse or another thread-safe implementation instead.",
+        "ProcessorCheckpointStoreMemory is not thread-safe and cannot be used in production. Use CheckpointStoreClickHouse or another thread-safe implementation instead.",
       );
     }
     this.repository = repository ?? new CheckpointRepositoryMemory();

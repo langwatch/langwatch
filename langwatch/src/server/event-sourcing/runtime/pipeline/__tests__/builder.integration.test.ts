@@ -4,7 +4,6 @@ import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
 import { createTenantId } from "../../../library/domain/tenantId";
 import type { Projection } from "../../../library/domain/types";
-import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 import { ProcessorCheckpointStoreMemory } from "../../stores/processorCheckpointStoreMemory";
@@ -41,10 +40,8 @@ describe("PipelineBuilder Integration Tests", () => {
   describe("Complete Pipeline Build Contract", () => {
     it("builds pipeline with name, aggregateType, and service when minimal configuration provided", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace");
@@ -83,10 +80,8 @@ describe("PipelineBuilder Integration Tests", () => {
         createTestProjection("proj-id", "aggregate-1", tenantId),
       );
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -124,10 +119,8 @@ describe("PipelineBuilder Integration Tests", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
       const context = { tenantId };
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -153,10 +146,8 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const event = createTestEventForBuilder("aggregate-1", tenantId);
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -178,11 +169,9 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >();
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -239,11 +228,9 @@ describe("PipelineBuilder Integration Tests", () => {
         createTestProjection("proj-id", "aggregate-1", tenantId),
       );
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -275,10 +262,8 @@ describe("PipelineBuilder Integration Tests", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
       const context = { tenantId };
 
-      const distributedLock = createMockDistributedLock();
       const builder = new PipelineBuilder<TestEvent>({
         eventStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace");
@@ -308,11 +293,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -358,11 +341,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -410,11 +391,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -453,11 +432,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -491,11 +468,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -525,11 +500,9 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: handleSpy,
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -564,11 +537,9 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >({});
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("trace-processing")
         .withAggregateType("trace")
@@ -602,11 +573,9 @@ describe("PipelineBuilder Integration Tests", () => {
         dispatcherName: "triggerTraceAggregation",
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("trace-processing")
         .withAggregateType("trace")
@@ -637,11 +606,9 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >();
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -664,11 +631,9 @@ describe("PipelineBuilder Integration Tests", () => {
         dispatcherName: "staticDispatcherName",
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -697,11 +662,9 @@ describe("PipelineBuilder Integration Tests", () => {
         }
       }
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -720,11 +683,9 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >({});
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -788,12 +749,10 @@ describe("PipelineBuilder Integration Tests", () => {
         },
       });
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -861,11 +820,9 @@ describe("PipelineBuilder Integration Tests", () => {
       const aggregateId1 = "aggregate-1";
       const aggregateId2 = "aggregate-2";
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -931,11 +888,9 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -971,12 +926,10 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
@@ -1068,12 +1021,10 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
-        distributedLock,
       })
         .withName("test-pipeline")
         .withAggregateType("trace")

@@ -77,9 +77,9 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
     }
 
     // Accept if processed, or if pending with exact sequence match
-    // With distributed locking, if the previous event is "pending" with the exact previous sequence,
-    // it means it's currently being processed (or just finished). Since we have the lock now,
-    // the previous event must have finished and released the lock.
+    // With queue-level ordering (GroupQueue), if the previous event is "pending" with the exact
+    // previous sequence, it means it's currently being processed (or just finished). Since GroupQueue
+    // serializes processing per aggregate, the previous event must have finished.
     if (
       record.Status === "processed" ||
       (record.Status === "pending" && record.SequenceNumber === sequenceNumber)

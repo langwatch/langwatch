@@ -5,10 +5,9 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockDistributedLock,
   createMockEventHandler,
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -64,7 +63,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       const result = await service.updateProjectionByName(
@@ -139,7 +137,6 @@ describe("EventSourcingService - Projection Flows", () => {
         serviceOptions: {
           ordering: "timestamp",
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await service.updateProjectionByName(
@@ -189,7 +186,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await service.updateProjectionByName(
@@ -220,7 +216,6 @@ describe("EventSourcingService - Projection Flows", () => {
             createMockProjectionStore(),
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -238,7 +233,6 @@ describe("EventSourcingService - Projection Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -279,7 +273,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -325,7 +318,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -363,7 +355,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       const result = await service.getProjectionByName(
@@ -392,7 +383,6 @@ describe("EventSourcingService - Projection Flows", () => {
             createMockProjectionStore(),
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -410,7 +400,6 @@ describe("EventSourcingService - Projection Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -447,7 +436,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       const result = await service.hasProjectionByName(
@@ -476,7 +464,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       const result = await service.hasProjectionByName(
@@ -501,7 +488,6 @@ describe("EventSourcingService - Projection Flows", () => {
             createMockProjectionStore(),
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -519,7 +505,6 @@ describe("EventSourcingService - Projection Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
       });
 
       await expect(
@@ -558,7 +543,6 @@ describe("EventSourcingService - Projection Flows", () => {
             createMockProjectionStore(),
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       const names = service.getProjectionNames();
@@ -602,7 +586,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await service.storeEvents(events, context);
@@ -662,7 +645,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore2,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await service.storeEvents(events, context);
@@ -703,7 +685,6 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
       });
 
       await service.storeEvents(events, context);
@@ -718,7 +699,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -745,8 +726,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
+        checkpointStore: checkpointStore,
       });
 
       await service.storeEvents(events, context);
@@ -810,7 +790,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -835,8 +815,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
+        checkpointStore: checkpointStore,
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -878,7 +857,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -921,8 +900,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
+        checkpointStore: checkpointStore,
       });
 
       // Process event1 - should fail
@@ -952,7 +930,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -980,8 +958,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
-        distributedLock: createMockDistributedLock(),
+        checkpointStore: checkpointStore,
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();

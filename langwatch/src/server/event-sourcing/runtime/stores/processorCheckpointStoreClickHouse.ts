@@ -5,7 +5,7 @@ import { EventUtils } from "../../library";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
 import {
   buildCheckpointKey,
   parseCheckpointKey,
@@ -40,7 +40,7 @@ import type {
  *
  * Schema in /server/clickhouse/migrations/00003_create_processor_checkpoints.sql
  */
-export class ProcessorCheckpointStoreClickHouse implements ProcessorCheckpointStore {
+export class ProcessorCheckpointStoreClickHouse implements CheckpointStore {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.checkpoint-store.clickhouse",
   );

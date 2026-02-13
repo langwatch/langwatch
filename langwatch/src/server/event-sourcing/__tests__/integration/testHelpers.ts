@@ -2,7 +2,6 @@ import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../library";
 import { createTenantId } from "../../library";
 import { buildCheckpointKey } from "../../library/utils/checkpointKey";
-import { RedisDistributedLock } from "../../library/utils/distributedLock";
 import { EventSourcing } from "../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
 import type {
@@ -103,9 +102,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     redisConnection,
   );
 
-  // Create distributed lock
-  const distributedLock = new RedisDistributedLock(redisConnection);
-
   // Create EventSourcingRuntime with test stores
   const runtime = EventSourcingRuntime.createWithStores(
     {
@@ -121,7 +117,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
       eventStore,
       checkpointStore: processorCheckpointStore,
       queueProcessorFactory,
-      distributedLock,
     },
   );
 

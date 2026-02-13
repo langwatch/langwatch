@@ -4,13 +4,11 @@ import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventUtils } from "../../index";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
 } from "../../stores/eventStore.types";
-import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
-import { LockError } from "../errorHandling";
 
 /**
  * Result of batch event processing.
@@ -42,7 +40,7 @@ export interface BatchProcessingContext<EventType extends Event = Event> {
 
 /**
  * Callback function to process a single event.
- * Called by BatchEventProcessor for each unprocessed event in sequence.
+ * Called by ProjectionBatchProcessor for each unprocessed event in sequence.
  *
  * @param event - The event to process
  * @param sequenceNumber - The sequence number of the event (1-indexed)
@@ -55,16 +53,6 @@ export type SingleEventProcessor<EventType extends Event = Event> = (
   sequenceNumber: number,
   context: EventStoreReadContext<EventType>,
 ) => Promise<void>;
-
-/**
- * Options for batch event processing.
- */
-export interface BatchProcessingOptions {
-  /** Lock TTL in milliseconds */
-  lockTtlMs?: number;
-  /** Whether to skip failure detection (useful for recovery scenarios) */
-  skipFailureDetection?: boolean;
-}
 
 /**
  * Processes events in batches, resolving all unprocessed events from the event store.
@@ -82,10 +70,9 @@ export interface BatchProcessingOptions {
  *
  * @example
  * ```typescript
- * const batchProcessor = new BatchEventProcessor({
+ * const batchProcessor = new ProjectionBatchProcessor({
  *   eventStore,
- *   processorCheckpointStore,
- *   distributedLock,
+ *   checkpointStore,
  *   pipelineName: "trace-processing",
  *   aggregateType: "trace",
  * });
@@ -103,7 +90,7 @@ export interface BatchProcessingOptions {
  * );
  * ```
  */
-export class BatchEventProcessor<EventType extends Event = Event> {
+export class ProjectionBatchProcessor<EventType extends Event = Event> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.batch-event-processor",
   );
@@ -113,10 +100,9 @@ export class BatchEventProcessor<EventType extends Event = Event> {
 
   constructor(
     private readonly eventStore: EventStore<EventType>,
-    private readonly processorCheckpointStore:
-      | ProcessorCheckpointStore
+    private readonly checkpointStore:
+      | CheckpointStore
       | undefined,
-    private readonly distributedLock: DistributedLock,
     private readonly pipelineName: string,
     private readonly aggregateType: AggregateType,
   ) {}
@@ -131,9 +117,7 @@ export class BatchEventProcessor<EventType extends Event = Event> {
    * @param processorName - Name of the processor (handler or projection)
    * @param processorType - Type of processor ("handler" or "projection")
    * @param processEvent - Callback to process a single event
-   * @param options - Optional processing options
    * @returns Result of batch processing
-   * @throws {LockError} If lock cannot be acquired
    * @throws {Error} If processing fails (after partial success, will have checkpointed progress)
    */
   async processUnprocessedEvents(
@@ -141,7 +125,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     processorName: string,
     processorType: "handler" | "projection",
     processEvent: SingleEventProcessor<EventType>,
-    options?: BatchProcessingOptions,
   ): Promise<BatchProcessingResult> {
     const context: BatchProcessingContext<EventType> = {
       tenantId: triggerEvent.tenantId,
@@ -152,11 +135,11 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     // Validate tenant ID at entry point for security
     EventUtils.validateTenantId(
       { tenantId: context.tenantId },
-      "BatchEventProcessor.processUnprocessedEvents",
+      "ProjectionBatchProcessor.processUnprocessedEvents",
     );
 
     return await this.tracer.withActiveSpan(
-      "BatchEventProcessor.processUnprocessedEvents",
+      "ProjectionBatchProcessor.processUnprocessedEvents",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -169,38 +152,14 @@ export class BatchEventProcessor<EventType extends Event = Event> {
         },
       },
       async (span) => {
-        // Acquire distributed lock for the entire batch
-        const lockKey = this.buildLockKey(processorName, context);
-        const lockTtlMs = options?.lockTtlMs ?? 60000; // Default 60s for batch
-
-        const lockHandle = await this.distributedLock.acquire(
-          lockKey,
-          lockTtlMs,
-        );
-
-        if (!lockHandle) {
-          throw new LockError(
-            lockKey,
-            "processUnprocessedEvents",
-            `Cannot acquire lock for batch processing: ${lockKey}. Another process is handling this aggregate.`,
-            {
-              processorName,
-              processorType,
-              aggregateId: context.aggregateId,
-              tenantId: String(context.tenantId),
-            },
-          );
-        }
-
-        try {
           const eventStoreContext: EventStoreReadContext<EventType> = {
             tenantId: context.tenantId,
           };
 
-          // Check for failed events (unless skipped)
-          if (!options?.skipFailureDetection && this.processorCheckpointStore) {
+          // Check for failed events
+          if (this.checkpointStore) {
             const hasFailures =
-              await this.processorCheckpointStore.hasFailedEvents(
+              await this.checkpointStore.hasFailedEvents(
                 this.pipelineName,
                 processorName,
                 processorType,
@@ -419,9 +378,6 @@ export class BatchEventProcessor<EventType extends Event = Event> {
             success: true,
             lastProcessedSequence: currentSequence,
           };
-        } finally {
-          await this.releaseLock(lockHandle, processorName, context);
-        }
       },
     );
   }
@@ -434,12 +390,12 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     processorType: "handler" | "projection",
     context: BatchProcessingContext<EventType>,
   ): Promise<number> {
-    if (!this.processorCheckpointStore) {
+    if (!this.checkpointStore) {
       return 0; // No checkpoint store means start from beginning
     }
 
     const checkpoint =
-      await this.processorCheckpointStore.getLastProcessedEvent(
+      await this.checkpointStore.getLastProcessedEvent(
         this.pipelineName,
         processorName,
         processorType,
@@ -471,37 +427,4 @@ export class BatchEventProcessor<EventType extends Event = Event> {
     });
   }
 
-  /**
-   * Builds the lock key for batch processing.
-   */
-  private buildLockKey(
-    processorName: string,
-    context: BatchProcessingContext<EventType>,
-  ): string {
-    return `batch:${String(context.tenantId)}:${context.aggregateType}:${context.aggregateId}:${processorName}`;
-  }
-
-  /**
-   * Releases the distributed lock with error handling.
-   */
-  private async releaseLock(
-    lockHandle: LockHandle,
-    processorName: string,
-    context: BatchProcessingContext<EventType>,
-  ): Promise<void> {
-    try {
-      await this.distributedLock.release(lockHandle);
-    } catch (error) {
-      // Lock release failure is non-critical - processing already completed
-      this.logger.error(
-        {
-          processorName,
-          aggregateId: context.aggregateId,
-          tenantId: String(context.tenantId),
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to release distributed lock after batch processing",
-      );
-    }
-  }
 }

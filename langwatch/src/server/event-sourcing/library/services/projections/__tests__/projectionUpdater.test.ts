@@ -5,11 +5,10 @@ import type { EventSourcedQueueProcessor } from "../../../queues";
 import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import { EventUtils } from "../../../utils/event.utils";
 import {
-  createMockDistributedLock,
   createMockEventHandler,
   createMockEventStore,
   createMockLogger,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -19,10 +18,9 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { CheckpointManager } from "../../checkpoints/checkpointManager";
-import { LockError, SequentialOrderingError } from "../../errorHandling";
-import { QueueProcessorManager } from "../../queues/queueProcessorManager";
-import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
+import { SequentialOrderingError } from "../../errorHandling";
+import { QueueManager } from "../../queues/queueManager";
+import { ProjectionValidator } from "../../validation/projectionValidator";
 import { ProjectionUpdater } from "../projectionUpdater";
 
 // Mock EventUtils
@@ -53,10 +51,8 @@ describe("ProjectionUpdater", () => {
   function createUpdater(options: {
     projections?: Map<string, any>;
     processorCheckpointStore?: any;
-    distributedLock?: any;
-    queueManager?: QueueProcessorManager<Event>;
-    validator?: EventProcessorValidator<Event>;
-    checkpointManager?: CheckpointManager<Event>;
+    queueManager?: QueueManager<Event>;
+    validator?: ProjectionValidator<Event>;
     logger?: any;
     ordering?: "timestamp" | "as-is";
   }): ProjectionUpdater<Event> {
@@ -66,23 +62,16 @@ describe("ProjectionUpdater", () => {
 
     const validator =
       options.validator ??
-      new EventProcessorValidator({
+      new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: options.processorCheckpointStore,
+        checkpointStore: options.processorCheckpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
-    const checkpointManager =
-      options.checkpointManager ??
-      new CheckpointManager(
-        TEST_CONSTANTS.PIPELINE_NAME,
-        options.processorCheckpointStore,
-      );
-
     const queueManager =
       options.queueManager ??
-      new QueueProcessorManager({
+      new QueueManager({
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
@@ -99,12 +88,10 @@ describe("ProjectionUpdater", () => {
       aggregateType,
       eventStore,
       projections: options.projections,
-      processorCheckpointStore: options.processorCheckpointStore,
-      distributedLock: options.distributedLock ?? createMockDistributedLock(),
-      updateLockTtlMs: 5000,
+      checkpointStore: options.processorCheckpointStore,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       ordering: options.ordering ?? "timestamp",
       validator,
-      checkpointManager,
       queueManager,
     });
   }
@@ -121,7 +108,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -135,10 +122,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -192,7 +179,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -206,10 +193,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -252,77 +239,6 @@ describe("ProjectionUpdater", () => {
       );
     });
 
-    it("retries lock errors without marking checkpoint as failed", async () => {
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore();
-      const projectionDef = createMockProjectionDefinition(
-        "projection1",
-        projectionHandler,
-        projectionStore,
-      );
-      const projections = new Map([["projection1", projectionDef]]);
-
-      const checkpointStore = createMockProcessorCheckpointStore();
-      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
-      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-
-      const eventStore = createMockEventStore<Event>();
-      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
-      eventStore.getEvents = vi.fn().mockResolvedValue([event]);
-
-      const validator = new EventProcessorValidator({
-        eventStore,
-        aggregateType,
-        processorCheckpointStore: checkpointStore,
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-      });
-
-      const updater = createUpdater({
-        projections,
-        processorCheckpointStore: checkpointStore,
-        validator,
-      });
-      (updater as any).eventStore = eventStore;
-
-      const lockError = new LockError(
-        "lock:test",
-        "updateProjection",
-        "Cannot acquire lock",
-        {
-          projectionName: "projection1",
-        },
-      );
-
-      const updateSpy = vi
-        .spyOn(updater as any, "updateProjectionByName")
-        .mockRejectedValue(lockError);
-
-      await expect(
-        updater.processProjectionEvent(
-          "projection1",
-          projectionDef,
-          event,
-          context,
-        ),
-      ).rejects.toBe(lockError);
-
-      const savedStatuses = vi
-        .mocked(checkpointStore.saveCheckpoint)
-        .mock.calls.map((call) => call[4]);
-
-      expect(savedStatuses).not.toContain("failed");
-      expect(
-        savedStatuses.filter((status) => status === "pending").length,
-      ).toBe(2);
-      expect(updateSpy).toHaveBeenCalled();
-    });
-
     it("retries ordering errors without marking checkpoint as failed", async () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore();
@@ -333,7 +249,7 @@ describe("ProjectionUpdater", () => {
       );
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -347,10 +263,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -395,7 +311,7 @@ describe("ProjectionUpdater", () => {
   });
 
   describe("updateProjectionByName", () => {
-    it("updates projection successfully with distributed lock", async () => {
+    it("updates projection successfully", async () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore();
       const projections = new Map([
@@ -408,10 +324,6 @@ describe("ProjectionUpdater", () => {
           ),
         ],
       ]);
-
-      const distributedLock = createMockDistributedLock();
-      const lockHandle = { key: "test-key", value: "test-value" };
-      distributedLock.acquire = vi.fn().mockResolvedValue(lockHandle);
 
       const eventStore = createMockEventStore<Event>();
       const events = [
@@ -429,7 +341,6 @@ describe("ProjectionUpdater", () => {
 
       const updater = createUpdater({
         projections,
-        distributedLock,
       });
       (updater as any).eventStore = eventStore;
 
@@ -439,11 +350,8 @@ describe("ProjectionUpdater", () => {
         context,
       );
 
-      expect(distributedLock.acquire).toHaveBeenCalled();
       expect(projectionHandler.handle).toHaveBeenCalled();
       expect(projectionStore.storeProjection).toHaveBeenCalled();
-      expect(distributedLock.release).toHaveBeenCalledWith(lockHandle);
-      // updateProjectionByName now returns both projection and events
       expect(result).not.toBeNull();
       expect(result).toHaveProperty("projection");
       expect(result).toHaveProperty("events");
@@ -489,31 +397,6 @@ describe("ProjectionUpdater", () => {
       );
     });
 
-    it("throws when distributed lock cannot be acquired", async () => {
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projections = new Map([
-        [
-          "projection1",
-          createMockProjectionDefinition("projection1", projectionHandler),
-        ],
-      ]);
-
-      const distributedLock = createMockDistributedLock();
-      distributedLock.acquire = vi.fn().mockResolvedValue(null);
-
-      const updater = createUpdater({
-        projections,
-        distributedLock,
-      });
-
-      await expect(
-        updater.updateProjectionByName(
-          "projection1",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
-      ).rejects.toThrow("Cannot acquire lock for projection update");
-    });
   });
 
   describe("processProjectionEvent - batch checkpointing", () => {
@@ -528,7 +411,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -633,10 +516,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -723,7 +606,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -809,10 +692,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator1 = new EventProcessorValidator({
+      const validator1 = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -876,10 +759,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator2 = new EventProcessorValidator({
+      const validator2 = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -941,7 +824,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -1045,10 +928,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 

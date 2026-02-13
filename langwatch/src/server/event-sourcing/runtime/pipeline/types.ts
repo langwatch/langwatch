@@ -1,4 +1,5 @@
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+import type { CommandHandlerClass } from "../../library/commands/commandHandlerClass";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { Event, ParentLink, Projection } from "../../library/domain/types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
@@ -6,16 +7,15 @@ import type {
   ProjectionDefinitions,
   ProjectionTypeMap,
 } from "../../library/projection.types";
-import type { EventPublisher } from "../../library/publishing/eventPublisher.types";
+import type { EventPublisher } from "../../library/eventPublisher.types";
 import type {
-  EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  QueueProcessorFactory,
 } from "../../library/queues";
+import type { CommandHandlerOptions } from "../../library/services/commands/commandDispatcher";
 import type { EventSourcingService } from "../../library/services/eventSourcingService";
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
 import type { EventStore } from "../../library/stores/eventStore.types";
-import type { DistributedLock } from "../../library/utils/distributedLock";
-
 /**
  * Static metadata about a pipeline for tooling and introspection.
  * This metadata is captured during pipeline building and exposed on the pipeline instance.
@@ -69,40 +69,12 @@ export interface EventSourcingPipelineDefinition<
    * Optional queue processor factory for creating queues for event handlers.
    * If not provided, event handlers will be executed synchronously (not recommended for production).
    */
-  queueProcessorFactory?: {
-    create<Payload>(
-      definition: EventSourcedQueueDefinition<Payload>,
-    ): EventSourcedQueueProcessor<Payload>;
-  };
+  queueProcessorFactory?: QueueProcessorFactory;
   /**
    * Optional preconfigured checkpoint store. When provided we skip automatic
    * selection (memory vs ClickHouse) and use the supplied implementation as-is.
    */
-  processorCheckpointStore?: ProcessorCheckpointStore;
-  /**
-   * Optional distributed lock for preventing concurrent updates.
-   * Used for both projections and event handlers to serialize processing per aggregate.
-   * If not provided, concurrent processing may result in ordering validation failures.
-   */
-  distributedLock?: DistributedLock;
-  /**
-   * Time-to-live for handler locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  handlerLockTtlMs?: number;
-  /**
-   * Time-to-live for projection update locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 5 minutes
-   */
-  updateLockTtlMs?: number;
-  /**
-   * Time-to-live for command locks in milliseconds.
-   * Prevents locks from being held indefinitely if a process crashes.
-   * Default: 30 seconds
-   */
-  commandLockTtlMs?: number;
+  processorCheckpointStore?: CheckpointStore;
   /**
    * Parent links defining relationships to other aggregate types.
    * Used by tools like deja-view to navigate between related aggregates.
@@ -113,6 +85,15 @@ export interface EventSourcingPipelineDefinition<
    * When provided, enables automatic feature flag-based kill switches for components.
    */
   featureFlagService?: FeatureFlagServiceInterface;
+  /**
+   * Command handler registrations for this pipeline.
+   * Requires queueProcessorFactory to be set.
+   */
+  commandRegistrations?: Array<{
+    name: string;
+    handlerClass: CommandHandlerClass<any, any, EventType>;
+    options?: CommandHandlerOptions<unknown>;
+  }>;
 }
 
 export interface RegisteredPipeline<

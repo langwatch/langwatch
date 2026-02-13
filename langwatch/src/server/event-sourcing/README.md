@@ -89,14 +89,13 @@ The library contains no feature/product specifcs, so this is not the section you
 - **`commands/`** - Command handling (Command, CommandHandler, CommandSchema)
 - **`streams/`** - EventStream for ordered event processing
 - **`services/`** - EventSourcingService (main orchestration) and modular services:
-  - **`services/validation/`** - EventProcessorValidator, SequenceNumberCalculator, IdempotencyChecker, OrderingValidator, FailureDetector
-  - **`services/checkpoints/`** - CheckpointManager (checkpoint operations with error handling)
-  - **`services/queues/`** - QueueProcessorManager (manages queue processors for handlers, projections, commands)
+  - **`services/validation/`** - ProjectionValidator, SequenceNumberCalculator, IdempotencyChecker, OrderingValidator, FailureDetector
+  - **`services/checkpoints/`** - `saveCheckpointSafely` function (checkpoint operations with error handling)
+  - **`services/queues/`** - QueueManager (manages queues for handlers, projections, commands)
   - **`services/handlers/`** - EventHandlerDispatcher (dispatches events to handlers)
   - **`services/projections/`** - ProjectionUpdater (handles projection updates)
   - **`services/errorHandling.ts`** - Standardized error categorization and handling
-  - **`services/dispatchStrategy.ts`** - Dispatch strategy pattern (sync vs async)
-- **`stores/`** - Store interfaces (EventStore, ProjectionStore, ProcessorCheckpointStore)
+- **`stores/`** - Store interfaces (EventStore, ProjectionStore, CheckpointStore)
 - **`domain/handlers/`** - Handler interfaces (EventHandler, ProjectionHandler)
 - **`publishing/`** - Event publishing interface
 - **`queues/`** - Queue processor interfaces
@@ -155,25 +154,6 @@ class MyEventStore implements EventStore<MyEvent> {
 - Never trust tenant context from external sources
 
 See: [Security & Concurrency Guide](../../../.cursor/docs/06-event-sourcing-library.md)
-
-### Distributed Locking
-
-For production deployments with multiple workers, provide a `DistributedLock` to prevent concurrent projection updates:
-
-```typescript
-import { RedisDistributedLock } from "./library";
-
-const pipeline = eventSourcing
-  .registerPipeline<MyEvent, MyProjection>()
-  .withName("my_pipeline")
-  .withAggregateType("my_aggregate")
-  .withEventProjection("summary", store, handler)
-  .build();
-
-// Lock is automatically used when updating projections
-```
-
-Without distributed locking, concurrent updates to the same aggregate projection may result in lost updates.
 
 ### Testing
 
@@ -306,10 +286,10 @@ const pipeline = eventSourcing
 
 - **Sequential ordering**: Events are processed in sequence number order per aggregate
 - **Per-aggregate checkpoints**: One checkpoint per aggregate tracks the last processed event (checkpoint key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
-- **Idempotency**: Already processed events are automatically skipped via EventProcessorValidator
+- **Idempotency**: Already processed events are automatically skipped via ProjectionValidator
 - **Failure handling**: If an event fails, subsequent events for that aggregate stop processing
 - **Queue-based**: Events are processed asynchronously via queues (BullMQ or Memory)
-- **Validation**: EventProcessorValidator orchestrates sequence number calculation, idempotency checking, ordering validation, and failure detection
+- **Validation**: ProjectionValidator orchestrates sequence number calculation, idempotency checking, ordering validation, and failure detection
 
 #### Multiple Projections
 
@@ -440,7 +420,7 @@ The system computes sequence numbers (1-indexed) for each event within its aggre
 - If any event fails, subsequent events for that aggregate stop processing
 - This ensures consistency and prevents out-of-order processing
 
-Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1. The `EventProcessorValidator` orchestrates validation by coordinating `SequenceNumberCalculator`, `IdempotencyChecker`, `OrderingValidator`, and `FailureDetector`.
+Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1. The `ProjectionValidator` orchestrates validation by coordinating `SequenceNumberCalculator`, `IdempotencyChecker`, `OrderingValidator`, and `FailureDetector`.
 
 ### Additional Resources
 
@@ -451,6 +431,6 @@ Sequence numbers are computed using `countEventsBefore()` - the number of events
   - `domain/types.ts` - Core types (Event, Projection)
   - `stores/eventStore.types.ts` - Event store interface
   - `stores/projectionStore.types.ts` - Projection store interface
-  - `stores/eventHandlerCheckpointStore.types.ts` - Processor checkpoint store interface
+  - `stores/checkpointStore.types.ts` - Checkpoint store interface
   - `services/eventSourcingService.ts` - Main service
   - `utils/event.utils.ts` - Utilities

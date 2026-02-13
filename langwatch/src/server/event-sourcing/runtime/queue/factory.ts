@@ -4,23 +4,11 @@ import { connection } from "../../../redis";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  QueueProcessorFactory,
 } from "../../library/queues";
-import { EventSourcedQueueProcessorBullMq } from "./bullmq";
+import { GroupQueueProcessorBullMq } from "./groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./memory";
-
-/**
- * Factory interface for creating queue processors.
- * Allows dependency injection for testing and explicit control over implementation.
- */
-export interface QueueProcessorFactory {
-  /**
-   * Creates a queue processor based on the provided definition.
-   * The factory decides which implementation (BullMQ or memory) to use.
-   */
-  create<Payload>(
-    definition: EventSourcedQueueDefinition<Payload>,
-  ): EventSourcedQueueProcessor<Payload>;
-}
+import { SimpleBullmqQueueProcessor } from "./simpleBullmq";
 
 /**
  * Default factory implementation that auto-detects Redis availability.
@@ -37,7 +25,13 @@ export class DefaultQueueProcessorFactory implements QueueProcessorFactory {
   ): EventSourcedQueueProcessor<Payload> {
     const effectiveConnection = this.redisConnection ?? connection;
     if (effectiveConnection) {
-      return new EventSourcedQueueProcessorBullMq<Payload>(
+      if (definition.groupKey) {
+        return new GroupQueueProcessorBullMq<Payload>(
+          definition,
+          effectiveConnection,
+        );
+      }
+      return new SimpleBullmqQueueProcessor<Payload>(
         definition,
         effectiveConnection,
       );
@@ -56,7 +50,13 @@ export class BullmqQueueProcessorFactory implements QueueProcessorFactory {
   create<Payload>(
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
-    return new EventSourcedQueueProcessorBullMq<Payload>(
+    if (definition.groupKey) {
+      return new GroupQueueProcessorBullMq<Payload>(
+        definition,
+        this.redisConnection,
+      );
+    }
+    return new SimpleBullmqQueueProcessor<Payload>(
       definition,
       this.redisConnection,
     );

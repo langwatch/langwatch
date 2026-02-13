@@ -201,17 +201,6 @@ function createProjection<Data = unknown>(
 }
 
 /**
- * Checks if an event belongs to a specific aggregate.
- *
- * @param event - The event to check
- * @param aggregateId - The aggregate ID to check against
- * @returns True if the event belongs to the aggregate, false otherwise
- */
-function eventBelongsToAggregate(event: Event, aggregateId: string): boolean {
-  return event.aggregateId === aggregateId;
-}
-
-/**
  * Sorts events chronologically by timestamp (earliest first).
  * Returns a new array without mutating the input.
  *
@@ -243,36 +232,6 @@ function createEventStream<
   ordering: EventOrderingStrategy<EventType> = "timestamp",
 ): EventStream<TTenantId, EventType> {
   return new EventStream(aggregateId, tenantId, events, { ordering });
-}
-
-/**
- * Filters events to only include those matching the specified event type.
- *
- * @param events - Events to filter
- * @param eventType - Event type to match
- * @returns New array containing only matching events
- */
-function filterEventsByType(
-  events: readonly Event[],
-  eventType: string,
-): Event[] {
-  return events.filter((event) => event.type === eventType);
-}
-
-/**
- * Returns the projection with the highest version number from an array.
- *
- * @param projections - Array of projections to search
- * @returns The latest projection, or null if the array is empty
- */
-function getLatestProjection<ProjectionType extends Projection>(
-  projections: readonly ProjectionType[],
-): ProjectionType | null {
-  if (projections.length === 0) return null;
-
-  return projections.reduce((latest, current) =>
-    current.version > latest.version ? current : latest,
-  );
 }
 
 /**
@@ -381,10 +340,7 @@ export const EventUtils = {
   createEvent,
   createEventStream,
   createProjection,
-  eventBelongsToAggregate,
   sortEventsByTimestamp,
-  filterEventsByType,
-  getLatestProjection,
   isValidEvent,
   isValidProjection,
   validateTenantId,

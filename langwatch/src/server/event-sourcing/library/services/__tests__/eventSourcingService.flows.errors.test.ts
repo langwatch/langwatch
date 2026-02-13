@@ -2,13 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventPublisher,
   createMockEventReactionHandler,
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -44,7 +43,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -85,7 +84,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
             projectionStore,
           ),
         },
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -131,7 +130,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
         eventPublisher,
         logger: logger as any,
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -166,7 +165,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
         eventPublisher,
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -206,7 +205,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
         eventPublisher,
         logger: logger as any,
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -258,7 +257,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -293,7 +292,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         eventHandlers: {
           handler1: createMockEventHandlerDefinition("handler1", handler1),
           handler2: createMockEventHandlerDefinition("handler2", handler2),
@@ -324,7 +323,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -368,7 +367,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -424,7 +423,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         projections: {
           projection1: createMockProjectionDefinition(
             "projection1",
@@ -466,7 +465,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -506,7 +505,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -538,7 +537,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("checkpoint save errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -560,11 +559,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         logger: logger as any,
       });
 
@@ -586,7 +585,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("handler execution succeeds despite checkpoint failure", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
 
       checkpointStore.saveCheckpoint = vi
         .fn()
@@ -596,11 +595,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event = createTestEvent(
@@ -617,89 +616,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("lock errors", () => {
-    it("lock acquisition errors are handled gracefully", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
-      const distributedLock = createMockDistributedLock();
-
-      const lockError = new Error("Lock acquisition failed");
-      distributedLock.acquire = vi.fn().mockRejectedValue(lockError);
-
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
-        distributedLock,
-      });
-
-      await expect(
-        service.updateProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
-      ).rejects.toThrow("Lock acquisition failed");
-    });
-
-    it("lock release errors don't fail update", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
-      const distributedLock = createMockDistributedLock();
-      const lockHandle = { key: "test-key", value: "test-value" };
-      const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
-      ];
-
-      eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
-      distributedLock.acquire = vi.fn().mockResolvedValue(lockHandle);
-      distributedLock.release = vi
-        .fn()
-        .mockRejectedValue(new Error("Lock release failed"));
-
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
-        distributedLock,
-      });
-
-      // Should not throw even if lock release fails
-      await expect(
-        service.updateProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
-      ).resolves.not.toThrow();
-    });
-  });
-
   describe("missing dependencies", () => {
     it("service works with minimal configuration", async () => {
       const eventStore = createMockEventStore<Event>();
@@ -707,7 +623,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
       });
 
       const events = [
@@ -727,7 +643,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         // No eventPublisher, eventHandlers, projections, etc.
       });
 
@@ -749,7 +665,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        distributedLock: createMockDistributedLock(),
+
         projections: {
           projection: createMockProjectionDefinition(
             "projection",

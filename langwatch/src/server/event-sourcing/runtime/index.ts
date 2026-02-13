@@ -32,7 +32,7 @@ export {
   BullmqQueueProcessorFactory,
   DefaultQueueProcessorFactory,
   defaultQueueProcessorFactory,
-  EventSourcedQueueProcessorBullmq,
+  GroupQueueProcessorBullMq,
   EventSourcedQueueProcessorMemory,
   MemoryQueueProcessorFactory,
   type QueueProcessorFactory,

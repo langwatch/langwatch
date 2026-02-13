@@ -15,7 +15,7 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { QueueProcessorManager } from "../queueProcessorManager";
+import { QueueManager } from "../queueManager";
 
 /**
  * Creates a mock command handler class for testing.
@@ -47,7 +47,7 @@ function createMockCommandHandlerClass(
   return MockCommandHandler as any;
 }
 
-describe("QueueProcessorManager", () => {
+describe("QueueManager", () => {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
 
@@ -66,7 +66,7 @@ describe("QueueProcessorManager", () => {
 
   describe("initializeHandlerQueues", () => {
     it("does nothing when queue factory is not provided", () => {
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -78,7 +78,7 @@ describe("QueueProcessorManager", () => {
 
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
-      expect(manager.getHandlerQueueProcessors().size).toBe(0);
+      expect(manager.hasHandlerQueues()).toBe(false);
     });
 
     it("initializes queue processors for all handlers", () => {
@@ -92,10 +92,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -107,11 +107,10 @@ describe("QueueProcessorManager", () => {
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
       expect(queueFactory.create).toHaveBeenCalledTimes(2);
-      expect(manager.getHandlerQueueProcessors().size).toBe(2);
-      expect(manager.getHandlerQueueProcessor("handler1")).toBe(
+      expect(manager.getHandlerQueue("handler1")).toBe(
         mockQueueProcessor,
       );
-      expect(manager.getHandlerQueueProcessor("handler2")).toBe(
+      expect(manager.getHandlerQueue("handler2")).toBe(
         mockQueueProcessor,
       );
     });
@@ -128,10 +127,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -161,10 +160,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -190,10 +189,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -232,10 +231,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -259,7 +258,7 @@ describe("QueueProcessorManager", () => {
 
   describe("initializeProjectionQueues", () => {
     it("does nothing when queue factory is not provided", () => {
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -274,7 +273,7 @@ describe("QueueProcessorManager", () => {
         processProjectionEventCallback,
       );
 
-      expect(manager.getProjectionQueueProcessors().size).toBe(0);
+      expect(manager.hasProjectionQueues()).toBe(false);
     });
 
     it("initializes queue processors for all projections", () => {
@@ -288,10 +287,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const projections = {
@@ -306,11 +305,10 @@ describe("QueueProcessorManager", () => {
       );
 
       expect(queueFactory.create).toHaveBeenCalledTimes(2);
-      expect(manager.getProjectionQueueProcessors().size).toBe(2);
-      expect(manager.getProjectionQueueProcessor("projection1")).toBe(
+      expect(manager.getProjectionQueue("projection1")).toBe(
         mockQueueProcessor,
       );
-      expect(manager.getProjectionQueueProcessor("projection2")).toBe(
+      expect(manager.getProjectionQueue("projection2")).toBe(
         mockQueueProcessor,
       );
     });
@@ -326,10 +324,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const projections = {
@@ -358,10 +356,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const projections = {
@@ -408,10 +406,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const customDeduplicationId = vi.fn(
@@ -459,10 +457,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const projections = {
@@ -496,10 +494,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const projections = {
@@ -527,7 +525,7 @@ describe("QueueProcessorManager", () => {
 
   describe("initializeCommandQueues", () => {
     it("does nothing when queue factory is not provided", () => {
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -535,7 +533,7 @@ describe("QueueProcessorManager", () => {
       const commandRegistrations = [
         {
           name: "command1",
-          HandlerClass: createMockCommandHandlerClass("command1"),
+          handlerClass: createMockCommandHandlerClass("command1"),
         },
       ];
       const storeEventsFn = vi.fn();
@@ -546,7 +544,7 @@ describe("QueueProcessorManager", () => {
         "test-pipeline",
       );
 
-      expect(manager.getCommandQueueProcessors().size).toBe(0);
+      expect(manager.getCommandQueues().size).toBe(0);
     });
 
     it("initializes queue processors for all command handlers", () => {
@@ -560,20 +558,20 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const commandRegistrations = [
         {
           name: "command1",
-          HandlerClass: createMockCommandHandlerClass("command1"),
+          handlerClass: createMockCommandHandlerClass("command1"),
         },
         {
           name: "command2",
-          HandlerClass: createMockCommandHandlerClass("command2"),
+          handlerClass: createMockCommandHandlerClass("command2"),
         },
       ];
       const storeEventsFn = vi.fn();
@@ -585,10 +583,10 @@ describe("QueueProcessorManager", () => {
       );
 
       expect(queueFactory.create).toHaveBeenCalledTimes(2);
-      expect(manager.getCommandQueueProcessors().size).toBe(2);
+      expect(manager.getCommandQueues().size).toBe(2);
       // The manager wraps the processor with validation, so we check the interface exists
-      const command1Processor = manager.getCommandQueueProcessor("command1");
-      const command2Processor = manager.getCommandQueueProcessor("command2");
+      const command1Processor = manager.getCommandQueue("command1");
+      const command2Processor = manager.getCommandQueue("command2");
       expect(command1Processor).toBeDefined();
       expect(command2Processor).toBeDefined();
       expect(typeof command1Processor?.send).toBe("function");
@@ -608,16 +606,16 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const commandRegistrations = [
         {
           name: "command1",
-          HandlerClass: createMockCommandHandlerClass("command1"),
+          handlerClass: createMockCommandHandlerClass("command1"),
         },
       ];
       const storeEventsFn = vi.fn();
@@ -667,10 +665,10 @@ describe("QueueProcessorManager", () => {
           .mockReturnValueOnce(commandQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {
@@ -691,7 +689,7 @@ describe("QueueProcessorManager", () => {
       const commandRegistrations = [
         {
           name: "command1",
-          HandlerClass: createMockCommandHandlerClass("command1"),
+          handlerClass: createMockCommandHandlerClass("command1"),
         },
       ];
       const storeEventsFn = vi.fn();
@@ -719,10 +717,10 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(handlerQueueProcessor),
       };
 
-      const manager = new QueueProcessorManager({
+      const manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
-        queueProcessorFactory: queueFactory as any,
+        queueFactory: queueFactory as any,
       });
 
       const handlers = {

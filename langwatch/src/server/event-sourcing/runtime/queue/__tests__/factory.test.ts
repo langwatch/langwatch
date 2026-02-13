@@ -89,7 +89,7 @@ describe("BullmqQueueProcessorFactory", () => {
   });
 
   describe("create", () => {
-    it("throws error when Redis connection is missing", () => {
+    it("throws error when Redis connection is missing (no groupKey)", () => {
       connectionSpy.mockReturnValue(undefined);
 
       const processFn = vi.fn().mockResolvedValue(void 0);
@@ -101,7 +101,24 @@ describe("BullmqQueueProcessorFactory", () => {
       expect(() => {
         factory.create(definition);
       }).toThrow(
-        "BullMQ queue processor requires Redis connection. Use memory implementation instead.",
+        "Simple queue processor requires Redis connection",
+      );
+    });
+
+    it("throws error when Redis connection is missing (with groupKey)", () => {
+      connectionSpy.mockReturnValue(undefined);
+
+      const processFn = vi.fn().mockResolvedValue(void 0);
+      const definition: EventSourcedQueueDefinition<string> = {
+        name: "test-queue-error-group",
+        process: processFn,
+        groupKey: (payload: string) => payload,
+      };
+
+      expect(() => {
+        factory.create(definition);
+      }).toThrow(
+        "Group queue processor requires Redis connection",
       );
     });
   });

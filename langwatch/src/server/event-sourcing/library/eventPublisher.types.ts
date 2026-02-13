@@ -1,5 +1,5 @@
-import type { Event } from "../domain/types";
-import type { EventStoreReadContext } from "../stores/eventStore.types";
+import type { Event } from "./domain/types";
+import type { EventStoreReadContext } from "./stores/eventStore.types";
 
 /**
  * Interface for publishing events to external systems (message queues, event buses, etc.).

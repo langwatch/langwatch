@@ -77,10 +77,6 @@ export class EventSourcingPipeline<
       "Initialized event-sourcing pipeline",
     );
 
-    if (!definition.distributedLock) {
-      throw new Error("distributedLock is required for EventSourcingService");
-    }
-
     Object.defineProperty(this, "service", {
       value: new EventSourcingService<EventType, ProjectionTypes>({
         pipelineName: definition.name,
@@ -89,13 +85,10 @@ export class EventSourcingPipeline<
         projections: definition.projections,
         eventPublisher: definition.eventPublisher,
         eventHandlers: definition.eventHandlers,
-        processorCheckpointStore: definition.processorCheckpointStore,
-        queueProcessorFactory: definition.queueProcessorFactory,
-        distributedLock: definition.distributedLock,
-        handlerLockTtlMs: definition.handlerLockTtlMs,
-        updateLockTtlMs: definition.updateLockTtlMs,
-        commandLockTtlMs: definition.commandLockTtlMs,
+        checkpointStore: definition.processorCheckpointStore,
+        queueFactory: definition.queueProcessorFactory,
         featureFlagService: definition.featureFlagService,
+        commandRegistrations: definition.commandRegistrations,
       }),
       writable: false,
       enumerable: true,

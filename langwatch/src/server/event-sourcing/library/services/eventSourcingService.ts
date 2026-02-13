@@ -6,27 +6,25 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { EventHandlerDefinition } from "../eventHandler.types";
 import type { ProjectionDefinition } from "../projection.types";
-import type { EventPublisher } from "../publishing/eventPublisher.types";
-import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
+import type { EventPublisher } from "../eventPublisher.types";
+import type { EventSourcedQueueProcessor } from "../queues";
+import type { CheckpointStore } from "../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
 } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
-import { BatchEventProcessor } from "./batch/batchEventProcessor";
-import { CheckpointManager } from "./checkpoints/checkpointManager";
+import { ProjectionBatchProcessor } from "./batch/projectionBatchProcessor";
 import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-  ReplayEventsOptions,
   UpdateProjectionOptions,
 } from "./eventSourcingService.types";
-import { DEFAULT_UPDATE_LOCK_TTL_MS } from "./eventSourcingService.types";
 import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
-import { QueueProcessorManager } from "./queues/queueProcessorManager";
-import { EventProcessorValidator } from "./validation/eventProcessorValidator";
+import { QueueManager } from "./queues/queueManager";
+import { ProjectionValidator } from "./validation/projectionValidator";
 
 /**
  * Main service that orchestrates event sourcing.
@@ -57,16 +55,14 @@ export class EventSourcingService<
     EventHandlerDefinition<EventType>
   >;
   private readonly options: EventSourcingOptions<EventType>;
-  private readonly queueManager: QueueProcessorManager<EventType>;
+  private readonly queueManager: QueueManager<EventType>;
   private readonly handlerDispatcher: EventHandlerDispatcher<EventType>;
   private readonly projectionUpdater: ProjectionUpdater<
     EventType,
     ProjectionTypes
   >;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly handlerBatchProcessor?: BatchEventProcessor<EventType>;
-  private readonly projectionBatchProcessor?: BatchEventProcessor<EventType>;
-  private readonly checkpointManager: CheckpointManager<EventType>;
+  private readonly checkpointStore?: CheckpointStore;
 
   constructor({
     pipelineName,
@@ -75,16 +71,14 @@ export class EventSourcingService<
     projections,
     eventPublisher,
     eventHandlers,
-    processorCheckpointStore,
+    checkpointStore,
     serviceOptions,
     logger,
-    distributedLock,
-    updateLockTtlMs = DEFAULT_UPDATE_LOCK_TTL_MS,
-    handlerLockTtlMs = 30000,
-    queueProcessorFactory,
+    queueFactory,
     featureFlagService,
+    commandRegistrations,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
-    processorCheckpointStore?: ProcessorCheckpointStore;
+    checkpointStore?: CheckpointStore;
   }) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
@@ -101,21 +95,12 @@ export class EventSourcingService<
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
     this.featureFlagService = featureFlagService;
-
-    // Warn in production if distributed lock is not provided
-    if (process.env.NODE_ENV === "production" && !distributedLock) {
-      this.logger.warn(
-        {
-          aggregateType,
-        },
-        "[SECURITY] EventSourcingService initialized without distributed lock in production. Concurrent updates of the same aggregate projection may result in lost updates (last write wins). Consider providing a DistributedLock implementation.",
-      );
-    }
+    this.checkpointStore = checkpointStore;
 
     // Warn in production if queue factory is not provided (handlers will be synchronous)
     if (
       process.env.NODE_ENV === "production" &&
-      !queueProcessorFactory &&
+      !queueFactory &&
       eventHandlers &&
       Object.keys(eventHandlers).length > 0
     ) {
@@ -130,7 +115,7 @@ export class EventSourcingService<
     // Warn in production if queue factory is not provided (projections will be synchronous)
     if (
       process.env.NODE_ENV === "production" &&
-      !queueProcessorFactory &&
+      !queueFactory &&
       projections &&
       Object.keys(projections).length > 0
     ) {
@@ -143,34 +128,24 @@ export class EventSourcingService<
     }
 
     // Initialize components
-    const validator = new EventProcessorValidator({
+    const validator = new ProjectionValidator({
       eventStore,
       aggregateType,
-      processorCheckpointStore,
+      checkpointStore,
       pipelineName: this.pipelineName,
     });
 
-    this.checkpointManager = new CheckpointManager(
-      this.pipelineName,
-      processorCheckpointStore,
-    );
-
-    this.queueManager = new QueueProcessorManager<EventType>({
+    this.queueManager = new QueueManager<EventType>({
       aggregateType,
       pipelineName: this.pipelineName,
-      queueProcessorFactory,
+      queueFactory,
       featureFlagService: this.featureFlagService,
     });
 
     this.handlerDispatcher = new EventHandlerDispatcher<EventType>({
       aggregateType,
       eventHandlers: this.eventHandlers,
-      processorCheckpointStore,
-      validator,
-      checkpointManager: this.checkpointManager,
       queueManager: this.queueManager,
-      distributedLock,
-      handlerLockTtlMs,
       featureFlagService: this.featureFlagService,
     });
 
@@ -178,246 +153,56 @@ export class EventSourcingService<
       aggregateType,
       eventStore,
       projections: this.projections,
-      processorCheckpointStore,
-      distributedLock,
-      updateLockTtlMs,
+      checkpointStore,
+      pipelineName: this.pipelineName,
       ordering: this.options.ordering ?? "timestamp",
       validator,
-      checkpointManager: this.checkpointManager,
       queueManager: this.queueManager,
       featureFlagService: this.featureFlagService,
     });
 
-    // Create batch processors for queue-based processing
-    // These handle the BullMQ deduplication issue by fetching all unprocessed events
-    if (queueProcessorFactory && distributedLock) {
-      this.handlerBatchProcessor = new BatchEventProcessor<EventType>(
-        eventStore,
-        processorCheckpointStore,
-        distributedLock,
-        this.pipelineName,
-        aggregateType,
-      );
-
-      this.projectionBatchProcessor = new BatchEventProcessor<EventType>(
-        eventStore,
-        processorCheckpointStore,
-        distributedLock,
-        this.pipelineName,
-        aggregateType,
-      );
-    }
-
     // Initialize queue processors for event handlers if factory is provided
-    if (queueProcessorFactory && eventHandlers) {
+    // Handler queues use SimpleBullmqQueueProcessor (no groupKey) - each event
+    // is processed independently with no checkpoints or batch processing
+    if (queueFactory && eventHandlers) {
       this.queueManager.initializeHandlerQueues(
         eventHandlers,
-        async (handlerName, triggerEvent, _context) => {
-          // Use batch processor to handle all unprocessed events for this aggregate
-          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
-          if (this.handlerBatchProcessor) {
-            await this.handlerBatchProcessor.processUnprocessedEvents(
-              triggerEvent,
-              handlerName,
-              "handler",
-              async (event, sequenceNumber, context) => {
-                await this.processHandlerEvent(
-                  handlerName,
-                  event,
-                  sequenceNumber,
-                  context,
-                );
-              },
-            );
-          } else {
-            // Fallback to single-event processing if no batch processor
-            const handlerDef = this.eventHandlers?.get(handlerName);
-            if (!handlerDef) {
-              throw new ConfigurationError(
-                "EventSourcingService",
-                `Handler "${handlerName}" not found`,
-                { handlerName },
-              );
-            }
-            await this.handlerDispatcher.handleEvent(
-              handlerName,
-              handlerDef,
-              triggerEvent,
-              { tenantId: triggerEvent.tenantId },
+        async (handlerName, event, _context) => {
+          const handlerDef = this.eventHandlers?.get(handlerName);
+          if (!handlerDef) {
+            throw new ConfigurationError(
+              "EventSourcingService",
+              `Handler "${handlerName}" not found`,
+              { handlerName },
             );
           }
+          await handlerDef.handler.handle(event);
         },
       );
     }
 
     // Initialize queue processors for projections if factory is provided
-    if (queueProcessorFactory && projections) {
-      this.queueManager.initializeProjectionQueues(
-        projections,
-        async (projectionName, triggerEvent, _context) => {
-          // Use batch processor to handle all unprocessed events for this aggregate
-          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
-          if (this.projectionBatchProcessor) {
-            await this.projectionBatchProcessor.processUnprocessedEvents(
-              triggerEvent,
-              projectionName,
-              "projection",
-              async (event, sequenceNumber, context) => {
-                await this.processProjectionEvent(
-                  projectionName,
-                  event,
-                  sequenceNumber,
-                  context,
-                );
-              },
-            );
-          } else {
-            // Fallback to single-event processing if no batch processor
-            const projectionDef = this.projections?.get(projectionName);
-            if (!projectionDef) {
-              throw new ConfigurationError(
-                "EventSourcingService",
-                `Projection "${projectionName}" not found`,
-                { projectionName },
-              );
-            }
-            await this.projectionUpdater.processProjectionEvent(
-              projectionName,
-              projectionDef,
-              triggerEvent,
-              { tenantId: triggerEvent.tenantId },
-            );
-          }
-        },
+    if (queueFactory && projections) {
+      const batchProcessor = new ProjectionBatchProcessor<EventType>(
+        eventStore,
+        checkpointStore,
+        this.pipelineName,
+        aggregateType,
       );
-    }
-  }
-
-  /**
-   * Processes a single handler event within a batch.
-   * Called by BatchEventProcessor for each unprocessed event.
-   */
-  private async processHandlerEvent(
-    handlerName: string,
-    event: EventType,
-    sequenceNumber: number,
-    _context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
-    const handlerDef = this.eventHandlers?.get(handlerName);
-    if (!handlerDef) {
-      throw new ConfigurationError(
-        "EventSourcingService",
-        `Handler "${handlerName}" not found`,
-        { handlerName },
-      );
+      this.projectionUpdater.initializeQueues(batchProcessor);
     }
 
-    // Save pending checkpoint before processing
-    await this.checkpointManager.saveCheckpointSafely(
-      handlerName,
-      "handler",
-      event,
-      "pending",
-      sequenceNumber,
-    );
-
-    try {
-      // Execute the handler
-      await handlerDef.handler.handle(event);
-
-      // Save processed checkpoint on success
-      await this.checkpointManager.saveCheckpointSafely(
-        handlerName,
-        "handler",
-        event,
-        "processed",
-        sequenceNumber,
+    // Initialize command queues (after all fields are set so storeEvents works)
+    if (
+      queueFactory &&
+      commandRegistrations &&
+      commandRegistrations.length > 0
+    ) {
+      this.queueManager.initializeCommandQueues(
+        commandRegistrations,
+        this.storeEvents.bind(this),
+        pipelineName,
       );
-    } catch (error) {
-      // Save failed checkpoint on error
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await this.checkpointManager.saveCheckpointSafely(
-        handlerName,
-        "handler",
-        event,
-        "failed",
-        sequenceNumber,
-        errorMessage,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Processes a single projection event within a batch.
-   * Called by BatchEventProcessor for each unprocessed event.
-   */
-  private async processProjectionEvent(
-    projectionName: string,
-    event: EventType,
-    sequenceNumber: number,
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
-    const projectionDef = this.projections?.get(projectionName);
-    if (!projectionDef) {
-      throw new ConfigurationError(
-        "EventSourcingService",
-        `Projection "${projectionName}" not found`,
-        { projectionName },
-      );
-    }
-
-    // Save pending checkpoint before processing
-    await this.checkpointManager.saveCheckpointSafely(
-      projectionName,
-      "projection",
-      event,
-      "pending",
-      sequenceNumber,
-    );
-
-    try {
-      // Fetch ALL events for the aggregate, not just up to current event.
-      // Using getEventsUpTo() misses concurrent events that share the same
-      // timestamp but have a higher EventId than the trigger event, which
-      // causes incomplete projections (e.g. trace summaries with fewer spans).
-      // This matches BatchEventProcessor's approach (see its getEvents() call).
-      const allEvents = await this.eventStore.getEvents(
-        String(event.aggregateId),
-        context,
-        this.aggregateType,
-      );
-
-      // Update the projection with all events
-      await this.projectionUpdater.updateProjectionByName(
-        projectionName,
-        String(event.aggregateId),
-        context,
-        { events: allEvents },
-      );
-
-      // Save processed checkpoint on success
-      await this.checkpointManager.saveCheckpointSafely(
-        projectionName,
-        "projection",
-        event,
-        "processed",
-        sequenceNumber,
-      );
-    } catch (error) {
-      // Save failed checkpoint on error
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      await this.checkpointManager.saveCheckpointSafely(
-        projectionName,
-        "projection",
-        event,
-        "failed",
-        sequenceNumber,
-        errorMessage,
-      );
-      throw error;
     }
   }
 
@@ -434,7 +219,7 @@ export class EventSourcingService<
    * 4. Projections are automatically updated - errors are logged but don't fail
    *
    * **Concurrency:** Safe for concurrent calls with different aggregateIds. Concurrent calls for the same
-   * aggregateId are safe at the event store level, but projection updates may conflict (use distributedLock).
+   * aggregateId are safe at the event store level. Per-group ordering in GroupQueue serializes processing per aggregate.
    *
    * **Failure Modes:**
    * - Event store failures throw and prevent storage
@@ -550,20 +335,16 @@ export class EventSourcingService<
    * Projections are automatically updated after events are stored via storeEvents(),
    * but this method can be used for manual updates (e.g., recovery or reprocessing).
    *
-   * **Concurrency:** Uses distributed lock (if configured) to prevent concurrent updates of the same
-   * aggregate projection. The lock key includes the projection name to ensure different projections
-   * for the same aggregate can be updated concurrently, while the same projection is updated serially.
-   * Lock key format: `update:${aggregateType}:${aggregateId}:${projectionName}`
-   * If lock acquisition fails, throws an error (caller should retry via queue).
-   * Without a distributed lock, concurrent updates may result in lost updates (last write wins).
+   * **Concurrency:** When using GroupQueue, per-aggregate ordering is enforced at the queue level,
+   * ensuring projections for the same aggregate are updated serially. Different aggregates
+   * can be updated concurrently. Without queue-based processing, concurrent updates for the
+   * same aggregate may result in lost updates (last write wins).
    *
-   * **Performance:** O(n) where n is the number of events for the aggregate. Lock acquisition adds
-   * network latency if using Redis-based locks.
+   * **Performance:** O(n) where n is the number of events for the aggregate.
    *
    * **Failure Modes:**
    * - Throws if projection name not found
    * - Throws if no events found for aggregate
-   * - Throws if distributed lock cannot be acquired (if lock is configured)
    * - Throws if tenantId is invalid
    * - Projection store errors propagate (not caught)
    *
@@ -572,7 +353,7 @@ export class EventSourcingService<
    * @param context - Security context with required tenantId for event store access
    * @param options - Optional options including projection store context override
    * @returns Object containing both the updated projection and the events that were processed
-   * @throws {Error} If projection name not found, no events found, lock acquisition fails, or tenantId is invalid
+   * @throws {Error} If projection name not found, no events found, or tenantId is invalid
    */
   async updateProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
@@ -649,94 +430,11 @@ export class EventSourcingService<
   }
 
   /**
-   * Replays events up to a specific timestamp (time travel) for a specific projection.
-   *
-   * This allows updating projections as they existed at a point in time.
-   *
-   * **Status:** Not implemented - always throws "Not implemented" error.
-   *
-   * **Intended Behavior (when implemented):**
-   * - Filters events by timestamp (upToTimestamp)
-   * - Rebuilds projection from filtered events
-   * - Returns projection as it would have existed at that point in time
-   *
-   * @param projectionName - Name of the projection to replay
-   * @param aggregateId - The aggregate to replay events for
-   * @param context - Security context with required tenantId for event store access
-   * @param options - Options including upToTimestamp and projection store context
-   * @returns The projection as it would have existed at the specified timestamp
-   * @throws {Error} Always throws "Not implemented" error
-   *
-   * @example
-   * ```typescript
-   * // Replay events up to a specific point in time
-   * const projection = await service.replayEvents("trace-summary", "trace-123", context, {
-   *   upToTimestamp: Date.parse("2024-01-15T10:00:00Z"),
-   * });
-   * ```
+   * Gets the command queue dispatchers created during initialization.
+   * Returns a map of command name to queue processor.
    */
-  async replayEvents<ProjectionName extends keyof ProjectionTypes & string>(
-    _projectionName: ProjectionName,
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _options?: ReplayEventsOptions<EventType>,
-  ): Promise<ProjectionTypes[ProjectionName]> {
-    throw new ConfigurationError(
-      "EventSourcingService",
-      "Method not implemented",
-    );
-  }
-
-  /**
-   * Replays events for a specific event handler.
-   *
-   * Useful for reprocessing events after handler changes or recovering from failures.
-   *
-   * **Status:** Not implemented - always throws "Not implemented" error.
-   *
-   * **Intended Behavior (when implemented):**
-   * - Fetches events for the aggregate (optionally from a specific event ID)
-   * - Re-executes the handler for each event
-   * - Updates checkpoints after successful processing
-   *
-   * @param handlerName - Name of the handler to replay events for
-   * @param aggregateId - The aggregate to replay events for
-   * @param context - Security context with required tenantId
-   * @param options - Options including fromEventId to start from a specific event
-   * @returns Promise that resolves when replay is complete
-   * @throws {Error} Always throws "Not implemented" error
-   *
-   * @example
-   * ```typescript
-   * // Replay all events for a handler
-   * await service.replayEventsForHandler("clickhouse-writer", "trace-123", context);
-   *
-   * // Replay from a specific event ID
-   * await service.replayEventsForHandler("clickhouse-writer", "trace-123", context, {
-   *   fromEventId: "trace_123:1234567890:lw.obs.span_ingestion.recorded"
-   * });
-   * ```
-   */
-  async replayEventsForHandler(
-    _handlerName: string,
-    _aggregateId: string,
-    _context: EventStoreReadContext<EventType>,
-    _options?: {
-      fromEventId?: string;
-    },
-  ): Promise<void> {
-    throw new ConfigurationError(
-      "EventSourcingService",
-      "Method not implemented",
-    );
-  }
-
-  /**
-   * Gets the queue processor manager for this service.
-   * Used by the pipeline builder to initialize command queues.
-   */
-  getQueueManager(): QueueProcessorManager<EventType> {
-    return this.queueManager;
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
+    return this.queueManager.getCommandQueues();
   }
 
   /**

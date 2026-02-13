@@ -1,9 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
-import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
-import type { DistributedLock } from "../library/utils/distributedLock";
-import { RedisDistributedLock } from "../library/utils/distributedLock";
+import type { CheckpointStore } from "../library/stores/checkpointStore.types";
 import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
@@ -27,8 +25,7 @@ const logger = createLogger("langwatch:event-sourcing:runtime");
  */
 export interface RuntimeStores {
   eventStore: EventStore;
-  checkpointStore?: ProcessorCheckpointStore;
-  distributedLock?: DistributedLock;
+  checkpointStore?: CheckpointStore;
   queueProcessorFactory?: QueueProcessorFactory;
 }
 
@@ -43,8 +40,7 @@ export interface RuntimeStores {
  */
 export class EventSourcingRuntime {
   private _eventStore?: EventStore;
-  private _checkpointStore?: ProcessorCheckpointStore;
-  private _distributedLock?: DistributedLock;
+  private _checkpointStore?: CheckpointStore;
   private _queueProcessorFactory?: QueueProcessorFactory;
   private _initialized = false;
   private _loggedDisabledWarning = false;
@@ -77,17 +73,9 @@ export class EventSourcingRuntime {
   /**
    * The checkpoint store instance. Returns undefined if event sourcing is disabled.
    */
-  get checkpointStore(): ProcessorCheckpointStore | undefined {
+  get checkpointStore(): CheckpointStore | undefined {
     this.ensureInitialized();
     return this._checkpointStore;
-  }
-
-  /**
-   * The distributed lock instance. Returns undefined if Redis is unavailable.
-   */
-  get distributedLock(): DistributedLock | undefined {
-    this.ensureInitialized();
-    return this._distributedLock;
   }
 
   /**
@@ -170,14 +158,6 @@ export class EventSourcingRuntime {
       forceClickHouseInTests,
     );
 
-    // Create distributed lock if Redis is available
-    if (redisConnection) {
-      this._distributedLock = new RedisDistributedLock(redisConnection);
-      logger.debug("Using Redis distributed lock");
-    } else {
-      logger.debug("Distributed lock unavailable (no Redis connection)");
-    }
-
     // Create queue processor factory
     this._queueProcessorFactory = new DefaultQueueProcessorFactory(
       redisConnection,
@@ -187,8 +167,7 @@ export class EventSourcingRuntime {
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
         checkpointStore: this._checkpointStore?.constructor.name ?? "none",
-        distributedLock: this._distributedLock ? "Redis" : "none",
-        queueProcessor: redisConnection ? "BullMQ" : "Memory",
+        queueProcessor: redisConnection ? "GroupQueue" : "Memory",
       },
       "Event sourcing runtime initialized",
     );
@@ -199,7 +178,7 @@ export class EventSourcingRuntime {
     clickHouseClient: ClickHouseClient | undefined,
     isTestEnvironment: boolean,
     forceClickHouseInTests: boolean,
-  ): ProcessorCheckpointStore | undefined {
+  ): CheckpointStore | undefined {
     const isProduction = process.env.NODE_ENV === "production";
 
     // In test environment, use memory unless forced to use ClickHouse
@@ -267,7 +246,6 @@ export class EventSourcingRuntime {
     runtime._initialized = true;
     runtime._eventStore = stores.eventStore;
     runtime._checkpointStore = stores.checkpointStore;
-    runtime._distributedLock = stores.distributedLock;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
 
     return runtime;
@@ -280,9 +258,8 @@ export class EventSourcingRuntime {
     config: EventSourcingConfig,
     stores: {
       eventStore: EventStore;
-      checkpointStore: ProcessorCheckpointStore;
+      checkpointStore: CheckpointStore;
       queueProcessorFactory: QueueProcessorFactory;
-      distributedLock?: DistributedLock;
     },
   ): EventSourcingRuntime {
     const runtime = new EventSourcingRuntime(config);
@@ -291,7 +268,6 @@ export class EventSourcingRuntime {
     runtime._eventStore = stores.eventStore;
     runtime._checkpointStore = stores.checkpointStore;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
-    runtime._distributedLock = stores.distributedLock;
 
     return runtime;
   }

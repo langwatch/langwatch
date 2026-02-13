@@ -4,16 +4,16 @@ import type { Event } from "../../../domain/types";
 import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import {
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { EventProcessorValidator } from "../eventProcessorValidator";
+import { ProjectionValidator } from "../projectionValidator";
 
-describe("EventProcessorValidator", () => {
+describe("ProjectionValidator", () => {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
   const context = createTestEventStoreReadContext(tenantId);
@@ -33,7 +33,7 @@ describe("EventProcessorValidator", () => {
       const eventStore = createMockEventStore<Event>();
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(5);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -64,7 +64,7 @@ describe("EventProcessorValidator", () => {
       const eventStore = createMockEventStore<Event>();
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -91,7 +91,7 @@ describe("EventProcessorValidator", () => {
         const eventStore = createMockEventStore<Event>();
         eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -118,16 +118,16 @@ describe("EventProcessorValidator", () => {
       it("returns null when event already processed", async () => {
         const eventStore = createMockEventStore<Event>();
         eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue({
           status: "processed",
           sequenceNumber: 1,
         });
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -160,14 +160,14 @@ describe("EventProcessorValidator", () => {
         const eventStore = createMockEventStore<Event>();
         eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
         eventStore.getEvents = vi.fn().mockResolvedValue([]);
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
         checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -193,14 +193,14 @@ describe("EventProcessorValidator", () => {
         const eventStore = createMockEventStore<Event>();
         eventStore.countEventsBefore = vi.fn().mockResolvedValue(1);
         eventStore.getEvents = vi.fn().mockResolvedValue([]);
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
         checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -268,7 +268,7 @@ describe("EventProcessorValidator", () => {
           .fn()
           .mockResolvedValue([earlierEvent, laterEvent]);
 
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi
           .fn()
           .mockImplementation((processorName, processorType, eventId) => {
@@ -284,10 +284,10 @@ describe("EventProcessorValidator", () => {
           });
         checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -346,7 +346,7 @@ describe("EventProcessorValidator", () => {
           .fn()
           .mockResolvedValue([earlierEvent, laterEvent]);
 
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi
           .fn()
           .mockImplementation((checkpointKey: string) => {
@@ -389,10 +389,10 @@ describe("EventProcessorValidator", () => {
             aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           });
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -427,17 +427,17 @@ describe("EventProcessorValidator", () => {
         eventStore.countEventsBefore = vi.fn().mockResolvedValueOnce(0); // event sequence = 1
         eventStore.getEvents = vi.fn().mockResolvedValue([earlierEvent, event]);
 
-        const checkpointStore = createMockProcessorCheckpointStore();
+        const checkpointStore = createMockCheckpointStore();
         checkpointStore.loadCheckpoint = vi.fn().mockResolvedValueOnce(null); // event not processed
         checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
         checkpointStore.getCheckpointBySequenceNumber = vi
           .fn()
           .mockResolvedValue(null);
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
-          processorCheckpointStore: checkpointStore,
+          checkpointStore: checkpointStore,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         });
 
@@ -460,7 +460,7 @@ describe("EventProcessorValidator", () => {
           .fn()
           .mockRejectedValue(new Error("Database error"));
 
-        const validator = new EventProcessorValidator({
+        const validator = new ProjectionValidator({
           eventStore,
           aggregateType,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
