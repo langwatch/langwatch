@@ -17,10 +17,16 @@ import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { EVALUATOR_PLACEHOLDER, MODULES } from "../../registry";
 import type { ComponentType, Custom, Evaluator, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
+import { buildEvaluatorFromType } from "../../utils/registryUtils";
 import { NodeComponents } from "../nodes";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 import { NodeDraggable } from "./NodeDraggable";
@@ -124,19 +130,10 @@ export const NodeSelectionPanel = ({
   };
 
   const configureEvaluatorNode = useCallback(
-    (placeholderNodeId: string, evaluator: { id: string; name: string }) => {
+    (placeholderNodeId: string, nodeData: Evaluator) => {
       pendingPlaceholderRef.current = null;
       evaluatorFlowActiveRef.current = false;
-
-      setNode({
-        id: placeholderNodeId,
-        data: {
-          ...EVALUATOR_PLACEHOLDER,
-          name: evaluator.name,
-          evaluator: `evaluators/${evaluator.id}` as `evaluators/${string}`,
-          cls: "Evaluator",
-        } satisfies Evaluator,
-      });
+      setNode({ id: placeholderNodeId, data: nodeData });
       closeDrawer();
     },
     [closeDrawer, setNode],
@@ -158,15 +155,61 @@ export const NodeSelectionPanel = ({
 
       // When user selects an existing evaluator from the list
       setFlowCallbacks("evaluatorList", {
-        onSelect: (evaluator) => {
-          configureEvaluatorNode(placeholderNodeId, evaluator);
+        onSelect: (evaluator: EvaluatorWithFields) => {
+          const config = evaluator.config as { evaluatorType?: string } | null;
+          const evaluatorType = config?.evaluatorType;
+
+          let nodeData: Evaluator;
+          if (evaluatorType && evaluatorType in AVAILABLE_EVALUATORS) {
+            // Built-in evaluator: use buildEvaluatorFromType for correct inputs/outputs
+            nodeData = buildEvaluatorFromType(
+              evaluatorType as EvaluatorTypes,
+              AVAILABLE_EVALUATORS,
+            );
+            nodeData.name = evaluator.name;
+            nodeData.evaluator =
+              `evaluators/${evaluator.id}` as `evaluators/${string}`;
+          } else {
+            // Workflow evaluator: map fields directly
+            nodeData = {
+              cls: "Evaluator",
+              name: evaluator.name,
+              evaluator:
+                `evaluators/${evaluator.id}` as `evaluators/${string}`,
+              inputs: evaluator.fields.map((f) => ({
+                identifier: f.identifier,
+                type: f.type === "list" ? "list[str]" : f.type,
+                ...(f.optional ? { optional: true } : {}),
+              })) as Field[],
+              outputs: evaluator.outputFields.map((f) => ({
+                identifier: f.identifier,
+                type: f.type,
+              })) as Field[],
+            };
+          }
+          configureEvaluatorNode(placeholderNodeId, nodeData);
         },
       });
 
       // When user creates a new evaluator via the editor (list -> category -> type -> editor)
       setFlowCallbacks("evaluatorEditor", {
         onSave: (evaluator) => {
-          configureEvaluatorNode(placeholderNodeId, evaluator);
+          let nodeData: Evaluator;
+          if (
+            evaluator.evaluatorType &&
+            evaluator.evaluatorType in AVAILABLE_EVALUATORS
+          ) {
+            nodeData = buildEvaluatorFromType(
+              evaluator.evaluatorType as EvaluatorTypes,
+              AVAILABLE_EVALUATORS,
+            );
+          } else {
+            nodeData = { ...EVALUATOR_PLACEHOLDER };
+          }
+          nodeData.name = evaluator.name;
+          nodeData.evaluator =
+            `evaluators/${evaluator.id}` as `evaluators/${string}`;
+          configureEvaluatorNode(placeholderNodeId, nodeData);
           return true;
         },
       });
@@ -213,6 +256,12 @@ export const NodeSelectionPanel = ({
 
           <NodeDraggable component={MODULES.code} type="code" />
 
+          <NodeDraggable
+            component={EVALUATOR_PLACEHOLDER}
+            type="evaluator"
+            onDragEnd={handleEvaluatorDragEnd}
+          />
+
           {components &&
             components.length > 0 &&
             components.some((custom) => custom.isComponent) && (
@@ -237,14 +286,6 @@ export const NodeSelectionPanel = ({
               </>
             )}
 
-          <Text fontWeight="500" padding={1}>
-            Evaluators
-          </Text>
-          <NodeDraggable
-            component={EVALUATOR_PLACEHOLDER}
-            type="evaluator"
-            onDragEnd={handleEvaluatorDragEnd}
-          />
           {components &&
             components.length > 0 &&
             components.some((custom) => custom.isEvaluator) && (
