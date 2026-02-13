@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   TYPE_LABELS,
@@ -114,16 +115,19 @@ export const VariablesSection = ({
   const shouldShowAddButton = showAddButton ?? canAddRemove;
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleAddVariable = useCallback(() => {
-    const existingIdentifiers = variables.map((v) => v.identifier);
-    const newIdentifier = generateUniqueIdentifier(
-      "input",
-      existingIdentifiers,
-    );
-    onChange([...variables, { identifier: newIdentifier, type: "str" }]);
-    // Auto-focus the new variable name
-    setEditingId(newIdentifier);
-  }, [variables, onChange]);
+  const handleAddVariable = useCallback(
+    (type: FieldType = "str") => {
+      const existingIdentifiers = variables.map((v) => v.identifier);
+      const newIdentifier = generateUniqueIdentifier(
+        "input",
+        existingIdentifiers,
+      );
+      onChange([...variables, { identifier: newIdentifier, type }]);
+      // Auto-focus the new variable name
+      setEditingId(newIdentifier);
+    },
+    [variables, onChange],
+  );
 
   const handleRemoveVariable = useCallback(
     (identifier: string) => {
@@ -192,15 +196,34 @@ export const VariablesSection = ({
         </Text>
         <Spacer />
         {shouldShowAddButton && !readOnly && (
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={handleAddVariable}
-            data-testid="add-variable-button"
-          >
-            <Plus size={14} />
-            Add
-          </Button>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                size="xs"
+                variant="outline"
+                data-testid="add-variable-button"
+              >
+                <Plus size={14} />
+                Add
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              {INPUT_TYPE_OPTIONS.map((option) => (
+                <Menu.Item
+                  key={option.value}
+                  value={option.value}
+                  onClick={() =>
+                    handleAddVariable(option.value as FieldType)
+                  }
+                >
+                  <HStack gap={2}>
+                    <VariableTypeIcon type={option.value} size={14} />
+                    <Text>{option.label}</Text>
+                  </HStack>
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Root>
         )}
       </HStack>
 

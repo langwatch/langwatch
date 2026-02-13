@@ -299,6 +299,10 @@ function inputOutputTypeToDatasetColumnType(
       return "list";
     case "dict":
       return "json";
+    case "list":
+      return "list";
+    case "chat_messages":
+      return "json";
     default:
       type_ satisfies never;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions

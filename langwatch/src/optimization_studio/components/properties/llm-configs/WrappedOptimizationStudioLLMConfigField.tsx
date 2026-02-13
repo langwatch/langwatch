@@ -1,7 +1,10 @@
 import { VStack } from "@chakra-ui/react";
-import { Controller, useFormContext } from "react-hook-form";
+import { useCallback, useMemo, useRef } from "react";
+import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import type { Output, OutputType } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
+import type { LlmConfigOutputType } from "~/types";
 import { LLMConfigFormatUtils } from "./llm-config-format-utils";
 import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
 
@@ -13,6 +16,48 @@ export function WrappedOptimizationStudioLLMConfigField() {
   const { control, formState, trigger } =
     useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
+
+  // Outputs field array for structured outputs
+  const outputsFieldArray = useFieldArray({
+    control,
+    name: "version.configData.outputs",
+  });
+
+  // Watch outputs for the popover
+  const watchedOutputs = useWatch({
+    control,
+    name: "version.configData.outputs",
+  });
+
+  // Memoize outputs to prevent unnecessary re-renders of the popover tree
+  const outputs: Output[] = useMemo(
+    () =>
+      (watchedOutputs ?? []).map((output) => ({
+        identifier: output.identifier,
+        type: output.type as OutputType,
+        json_schema: output.json_schema,
+      })),
+    [watchedOutputs],
+  );
+
+  // Stable callback using ref pattern — react-hook-form's useFieldArray returns
+  // a new object on every render, which would make handleOutputsChange unstable
+  // and cause excessive re-renders of the popover tree
+  const outputsFieldArrayRef = useRef(outputsFieldArray);
+  outputsFieldArrayRef.current = outputsFieldArray;
+
+  const handleOutputsChange = useCallback(
+    (newOutputs: Output[]) => {
+      outputsFieldArrayRef.current.replace(
+        newOutputs.map((o) => ({
+          identifier: o.identifier,
+          type: o.type as LlmConfigOutputType,
+          json_schema: o.json_schema as { type: string } | undefined,
+        })),
+      );
+    },
+    [],
+  );
 
   return (
     <VStack align="start" width="full">
@@ -34,6 +79,9 @@ export function WrappedOptimizationStudioLLMConfigField() {
                   field.onChange(LLMConfigFormatUtils.dslToFormFormat(values));
                   void trigger?.("version.configData.llm");
                 }}
+                outputs={outputs}
+                onOutputsChange={handleOutputsChange}
+                showStructuredOutputs={true}
               />
             );
           }}

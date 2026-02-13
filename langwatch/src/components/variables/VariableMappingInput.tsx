@@ -306,7 +306,7 @@ export const VariableMappingInput = ({
     // If we're in nested selection mode, filter the nested fields
     if (currentDropdownContext.fields && currentDropdownContext.source) {
       const filtered = currentDropdownContext.fields.filter((field) =>
-        (field.label ?? field.name)
+        (field.label ?? field.name ?? "")
           .toLowerCase()
           .includes(searchQuery.toLowerCase()),
       );
@@ -925,7 +925,7 @@ export const VariableMappingInput = ({
                           <VariableTypeIcon type={field.type} size={12} />
                           <Text fontSize="13px" fontFamily="mono" flex={1}>
                             {(() => {
-                              const label = field.label ?? field.name;
+                              const label = field.label ?? field.name ?? "";
                               // Render "* (description)" with gray parenthesis part
                               if (label.startsWith("* (") && label.endsWith(")")) {
                                 const parenContent = label.slice(2); // "(description)"

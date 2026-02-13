@@ -145,7 +145,9 @@ describe("Playground Variables Section Integration", () => {
         onChange,
       });
 
+      // Open the type picker menu and select "Text"
       await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       // onChange should be called with the new variable added
       expect(onChange).toHaveBeenCalledWith([

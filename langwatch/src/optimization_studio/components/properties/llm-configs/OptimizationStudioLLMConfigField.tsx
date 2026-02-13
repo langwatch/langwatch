@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
+import type { Output } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -13,6 +14,12 @@ type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;
   onChange: (llmConfig: LLMConfig) => void;
   showProviderKeyMessage?: boolean;
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
 };
 
 /**
@@ -26,6 +33,9 @@ export function OptimizationStudioLLMConfigField({
   llmConfig,
   onChange,
   showProviderKeyMessage = true,
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
 }: OptimizationStudioLLMConfigFieldProps) {
   const model = llmConfig?.model ?? "";
   const { modelOption } = useModelSelectionOptions(
@@ -60,6 +70,9 @@ export function OptimizationStudioLLMConfigField({
       modelOption={modelOption}
       requiresCustomKey={requiresCustomKey}
       showProviderKeyMessage={showProviderKeyMessage}
+      outputs={outputs}
+      onOutputsChange={onOutputsChange}
+      showStructuredOutputs={showStructuredOutputs}
     />
   );
 }
