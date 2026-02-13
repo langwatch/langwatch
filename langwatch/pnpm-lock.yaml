@@ -396,8 +396,8 @@ importers:
         specifier: ^4.2.0
         version: 4.2.0
       nanoid:
-        specifier: ^3.3.8
-        version: 3.3.11
+        specifier: ^5.1.6
+        version: 5.1.6
       next:
         specifier: ^15.5.10
         version: 15.5.10(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(babel-plugin-macros@3.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.79.0)
@@ -749,7 +749,7 @@ importers:
         specifier: ^0.13.0
         version: 0.13.0(6d39da4e86a0b9c4e7945ad8f57603a8)
       nanoid:
-        specifier: ^5.0.7
+        specifier: ^5.1.6
         version: 5.1.6
     devDependencies:
       '@types/node':
@@ -878,7 +878,7 @@ importers:
         specifier: ^0.13.0
         version: 0.13.0(6d39da4e86a0b9c4e7945ad8f57603a8)
       nanoid:
-        specifier: ^5.0.7
+        specifier: ^5.1.6
         version: 5.1.6
     devDependencies:
       '@types/node':

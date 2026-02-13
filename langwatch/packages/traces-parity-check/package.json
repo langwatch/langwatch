@@ -16,7 +16,7 @@
     "@opentelemetry/sdk-trace-base": "^2.1.0",
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "langwatch": "^0.13.0",
-    "nanoid": "^5.0.7"
+    "nanoid": "^5.1.6"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
