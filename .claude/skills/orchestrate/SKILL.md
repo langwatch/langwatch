@@ -47,7 +47,16 @@ Be aware of context size. When context grows large, ask the user if they'd like 
 - Read the feature file to understand acceptance criteria
 - Create tasks for each acceptance criterion
 
-### 2. User Approval (Required)
+### 2. Challenge (Required)
+- Invoke `/challenge` with the feature file / plan
+- The devils-advocate agent will stress-test the proposal
+- Look for: hidden assumptions, failure modes, scope creep, missing edge cases
+- If significant issues found:
+  - Update the feature file to address them
+  - Re-run `/challenge` to verify fixes
+- If approved → proceed to User Approval
+
+### 3. User Approval (Required)
 - **STOP and show the feature file to the user**
 - Present the acceptance criteria and scenarios clearly
 - Ask explicitly: "Please review the feature file. Do you approve this plan?"
@@ -58,7 +67,7 @@ Be aware of context size. When context grows large, ask the user if they'd like 
   - Ask for approval again
 - Only after explicit approval → proceed to Test Review
 
-### 3. Test Review (Required)
+### 4. Test Review (Required)
 - Invoke `/test-review` on the feature file
 - Validates pyramid placement before any implementation begins
 - Checks that `@e2e`, `@integration`, `@unit` tags are appropriate
@@ -67,24 +76,24 @@ Be aware of context size. When context grows large, ask the user if they'd like 
   - Re-run `/test-review` to confirm fixes
 - If approved → proceed to Implement
 
-### 4. Implement
+### 5. Implement
 - Mark task as `in_progress`
 - Invoke `/code` with the feature file path and requirements
 - Coder agent implements with TDD and returns a summary
 - Mark task as `completed` when done
 
-### 5. Verify
+### 6. Verify
 - Check the coder's summary against acceptance criteria
 - If incomplete → invoke `/code` again with specific feedback
 - Max 3 iterations, then escalate to user
 
-### 6. Review (Required)
+### 7. Review (Required)
 - Mark review task as `in_progress`
 - Invoke `/review` to run quality gate
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 7. E2E Verification (Conditional)
+### 8. E2E Verification (Conditional)
 - Check if feature file has `@e2e` tagged scenarios
 - If yes:
   - Mark e2e task as `in_progress`
@@ -98,7 +107,7 @@ Be aware of context size. When context grows large, ask the user if they'd like 
   - If all pass → mark task as `completed`
 - If no `@e2e` scenarios → skip to Complete
 
-### 8. Self-Check (Required)
+### 9. Self-Check (Required)
 
 Before completing, verify you didn't make mistakes:
 
@@ -123,7 +132,7 @@ If ANY check fails:
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
-### 9. Complete
+### 10. Complete
 - Verify all tasks are completed
 - Verify self-check passed
 - Report summary to user (include E2E test status if applicable)
