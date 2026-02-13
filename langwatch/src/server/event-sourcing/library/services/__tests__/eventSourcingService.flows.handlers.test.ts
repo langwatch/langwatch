@@ -127,7 +127,7 @@ describe("EventSourcingService - Handler Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        queueProcessorFactory: mockQueueFactory,
+        queueFactory: mockQueueFactory,
       });
 
       const event = createTestEvent(

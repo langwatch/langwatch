@@ -12,7 +12,7 @@ import {
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -160,7 +160,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler();
       const projectionStore = createMockProjectionStore();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const events = [
@@ -185,7 +185,7 @@ describe("EventSourcingService - Security Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       await service.storeEvents(events, context1);
@@ -216,7 +216,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("handlers do not create checkpoints (no checkpoint scoping needed)", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
@@ -226,7 +226,7 @@ describe("EventSourcingService - Security Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const events = [
@@ -591,7 +591,7 @@ describe("EventSourcingService - Security Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const tenantId1 = createTestTenantId("tenant-1");
@@ -666,7 +666,7 @@ describe("EventSourcingService - Security Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const tenantId1 = createTestTenantId("tenant-1");
@@ -750,7 +750,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("cross-tenant access attempts in recovery are prevented", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
@@ -758,7 +758,7 @@ describe("EventSourcingService - Security Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const tenantId1 = createTestTenantId("tenant-1");
@@ -796,7 +796,7 @@ describe("EventSourcingService - Security Flows", () => {
         new EventRepositoryMemory(),
       );
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
@@ -804,7 +804,7 @@ describe("EventSourcingService - Security Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const context = createTestEventStoreReadContext(tenantId1);

@@ -10,7 +10,7 @@ import type {
   Projection,
 } from "../../domain/types";
 import type { ProjectionDefinition } from "../../projection.types";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -18,7 +18,8 @@ import type {
 import type { EventStream } from "../../streams/eventStream";
 import { EventUtils } from "../../utils/event.utils";
 import { isComponentDisabled } from "../../utils/killSwitch";
-import type { CheckpointManager } from "../checkpoints/checkpointManager";
+import type { ProjectionBatchProcessor } from "../batch/projectionBatchProcessor";
+import { saveCheckpointSafely } from "../checkpoints/saveCheckpointSafely";
 import {
   ConfigurationError,
   categorizeError,
@@ -27,8 +28,8 @@ import {
   NoEventsFoundError,
 } from "../errorHandling";
 import type { UpdateProjectionOptions } from "../eventSourcingService.types";
-import type { QueueProcessorManager } from "../queues/queueProcessorManager";
-import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
+import type { QueueManager } from "../queues/queueManager";
+import type { ProjectionValidator } from "../validation/projectionValidator";
 
 /**
  * Manages projection updates for event sourcing.
@@ -53,43 +54,92 @@ export class ProjectionUpdater<
     string,
     ProjectionDefinition<EventType, any>
   >;
-  private readonly processorCheckpointStore?: ProcessorCheckpointStore;
+  private readonly checkpointStore?: CheckpointStore;
+  private readonly pipelineName: string;
   private readonly ordering: EventOrderingStrategy<EventType>;
-  private readonly validator: EventProcessorValidator<EventType>;
-  private readonly checkpointManager: CheckpointManager<EventType>;
-  private readonly queueManager: QueueProcessorManager<EventType>;
+  private readonly validator: ProjectionValidator<EventType>;
+  private readonly queueManager: QueueManager<EventType>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     aggregateType,
     eventStore,
     projections,
-    processorCheckpointStore,
+    checkpointStore,
+    pipelineName,
     ordering,
     validator,
-    checkpointManager,
     queueManager,
     featureFlagService,
   }: {
     aggregateType: AggregateType;
     eventStore: EventStore<EventType>;
     projections?: Map<string, ProjectionDefinition<EventType, any>>;
-    processorCheckpointStore?: ProcessorCheckpointStore;
+    checkpointStore?: CheckpointStore;
+    pipelineName: string;
     ordering: EventOrderingStrategy<EventType>;
-    validator: EventProcessorValidator<EventType>;
-    checkpointManager: CheckpointManager<EventType>;
-    queueManager: QueueProcessorManager<EventType>;
+    validator: ProjectionValidator<EventType>;
+    queueManager: QueueManager<EventType>;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.eventStore = eventStore;
     this.projections = projections;
-    this.processorCheckpointStore = processorCheckpointStore;
+    this.checkpointStore = checkpointStore;
+    this.pipelineName = pipelineName;
     this.ordering = ordering;
     this.validator = validator;
-    this.checkpointManager = checkpointManager;
     this.queueManager = queueManager;
     this.featureFlagService = featureFlagService;
+  }
+
+  /**
+   * Initializes projection queue processors.
+   * Wires each projection's queue to route through batch processing (if available)
+   * or single-event processing.
+   */
+  initializeQueues(
+    batchProcessor?: ProjectionBatchProcessor<EventType>,
+  ): void {
+    if (!this.projections) return;
+
+    this.queueManager.initializeProjectionQueues(
+      Object.fromEntries(this.projections),
+      async (projectionName, triggerEvent, _context) => {
+        const projectionDef = this.projections?.get(projectionName);
+        if (!projectionDef) {
+          throw new ConfigurationError(
+            "ProjectionUpdater",
+            `Projection "${projectionName}" not found`,
+            { projectionName },
+          );
+        }
+
+        if (batchProcessor) {
+          await batchProcessor.processUnprocessedEvents(
+            triggerEvent,
+            projectionName,
+            "projection",
+            async (event, sequenceNumber, context) => {
+              await this.processProjectionEvent(
+                projectionName,
+                projectionDef,
+                event,
+                context,
+                { sequenceNumber },
+              );
+            },
+          );
+        } else {
+          await this.processProjectionEvent(
+            projectionName,
+            projectionDef,
+            triggerEvent,
+            { tenantId: triggerEvent.tenantId },
+          );
+        }
+      },
+    );
   }
 
   /**
@@ -122,8 +172,7 @@ export class ProjectionUpdater<
     }
 
     const projectionCount = this.projections.size;
-    const hasProjectionQueues =
-      this.queueManager.getProjectionQueueProcessors().size > 0;
+    const hasProjectionQueues = this.queueManager.hasProjectionQueues();
     const dispatchMode = hasProjectionQueues ? "async" : "sync";
 
     this.logger.info(
@@ -268,8 +317,7 @@ export class ProjectionUpdater<
         attributes: {
           "aggregate.type": this.aggregateType,
           "event.count": events.length,
-          "projection.count":
-            this.queueManager.getProjectionQueueProcessors().size,
+          "projection.count": this.projections?.size ?? 0,
         },
       },
       async (span) => {
@@ -284,10 +332,10 @@ export class ProjectionUpdater<
         for (const event of events) {
           for (const projectionName of this.projections.keys()) {
             // Check if processing should continue (no failed events for this aggregate)
-            if (this.processorCheckpointStore) {
+            if (this.checkpointStore) {
               const hasFailures =
-                await this.processorCheckpointStore.hasFailedEvents(
-                  this.checkpointManager.getPipelineName(),
+                await this.checkpointStore.hasFailedEvents(
+                  this.pipelineName,
                   projectionName,
                   "projection",
                   event.tenantId,
@@ -312,7 +360,7 @@ export class ProjectionUpdater<
               }
             }
             const queueProcessor =
-              this.queueManager.getProjectionQueueProcessor(projectionName);
+              this.queueManager.getProjectionQueue(projectionName);
             if (!queueProcessor) {
               this.logger.warn(
                 {
@@ -383,7 +431,13 @@ export class ProjectionUpdater<
   /**
    * Processes a single event for a projection and updates checkpoint on success.
    * Implements per-event checkpointing with failure detection.
-   * Uses shared validation and checkpointing logic via validateEventProcessing and saveCheckpointSafely.
+   *
+   * Two modes:
+   * - **Sync path** (no `sequenceNumber`): validates via ProjectionValidator (idempotency,
+   *   ordering, failure detection), checks kill switch, then checkpoints.
+   * - **Batch/queue path** (`sequenceNumber` provided): skips validation (ProjectionBatchProcessor
+   *   already handled it), goes straight to checkpoint lifecycle.
+   *
    * Note: Projections rebuild from all events for the aggregate, but we checkpoint per-event
    * to track which events have been processed and detect failures.
    */
@@ -392,6 +446,7 @@ export class ProjectionUpdater<
     projectionDef: ProjectionDefinition<EventType, any>,
     event: EventType,
     context: EventStoreReadContext<EventType>,
+    options?: { sequenceNumber?: number },
   ): Promise<void> {
     await this.tracer.withActiveSpan(
       "ProjectionUpdater.processProjectionEvent",
@@ -409,74 +464,74 @@ export class ProjectionUpdater<
       async () => {
         EventUtils.validateTenantId(context, "processProjectionEvent");
 
-        // Check kill switch - if enabled, skip projection processing
-        const disabled = await isComponentDisabled({
-          featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
-          componentType: "projection",
-          componentName: projectionName,
-          tenantId: event.tenantId,
-          customKey: projectionDef.options?.killSwitch?.customKey,
-          logger: this.logger,
-        });
-        if (disabled) {
-          return; // Skip projection processing
-        }
+        let sequenceNumber: number;
+        let allEvents: readonly EventType[] | undefined;
 
-        // Fetch ALL events for the aggregate, not just up to current event.
-        // Using getEventsUpTo() misses concurrent events that share the same
-        // timestamp but have a higher EventId than the trigger event, which
-        // causes incomplete projections (e.g. trace summaries with fewer spans).
-        const allEvents = await this.eventStore.getEvents(
-          String(event.aggregateId),
-          context,
-          this.aggregateType,
-        );
+        if (options?.sequenceNumber !== undefined) {
+          // Batch/queue path: sequence number pre-computed by ProjectionBatchProcessor
+          sequenceNumber = options.sequenceNumber;
+        } else {
+          // Sync path: check kill switch and validate
 
-        // Validate event processing prerequisites (sequence number, idempotency, ordering)
-        // Pass allEvents for sequence number computation
-        const sequenceNumber = await this.validator.validateEventProcessing(
-          projectionName,
-          "projection",
-          event,
-          context,
-          {
-            events: allEvents,
-          },
-        );
+          const disabled = await isComponentDisabled({
+            featureFlagService: this.featureFlagService,
+            aggregateType: this.aggregateType,
+            componentType: "projection",
+            componentName: projectionName,
+            tenantId: event.tenantId,
+            customKey: projectionDef.options?.killSwitch?.customKey,
+            logger: this.logger,
+          });
+          if (disabled) {
+            return;
+          }
 
-        this.logger.debug(
-          {
-            projectionName,
-            eventId: event.id,
-            sequenceNumber: sequenceNumber ?? null,
-          },
-          "Validation result",
-        );
-
-        // If validation returned null, processing should be skipped (already processed or has failures)
-        if (sequenceNumber === null) {
-          this.logger.debug(
-            {
-              projectionName,
-              eventId: event.id,
-            },
-            "Skipping processing (already processed or has failures)",
+          // Fetch ALL events for the aggregate for validation + projection rebuild
+          allEvents = await this.eventStore.getEvents(
+            String(event.aggregateId),
+            context,
+            this.aggregateType,
           );
-          return;
-        }
 
-        try {
-          // Save checkpoint as "pending" before processing
-          await this.checkpointManager.saveCheckpointSafely(
+          const validated = await this.validator.validateEventProcessing(
             projectionName,
             "projection",
             event,
-            "pending",
-            sequenceNumber,
+            context,
+            { events: allEvents },
           );
 
-          // Rebuild projection from all events for the aggregate
+          if (validated === null) {
+            this.logger.debug(
+              { projectionName, eventId: event.id },
+              "Skipping processing (already processed or has failures)",
+            );
+            return;
+          }
+          sequenceNumber = validated;
+        }
+
+        // Common checkpoint lifecycle: pending → update → processed/failed
+        try {
+          await saveCheckpointSafely({
+            checkpointStore: this.checkpointStore,
+            pipelineName: this.pipelineName,
+            componentName: projectionName,
+            componentType: "projection",
+            event,
+            status: "pending",
+            sequenceNumber,
+          });
+
+          // Fetch events if not already fetched (batch path)
+          if (!allEvents) {
+            allEvents = await this.eventStore.getEvents(
+              String(event.aggregateId),
+              context,
+              this.aggregateType,
+            );
+          }
+
           await this.updateProjectionByName(
             projectionName,
             String(event.aggregateId),
@@ -484,14 +539,15 @@ export class ProjectionUpdater<
             { events: allEvents },
           );
 
-          // Checkpoint the event we just processed
-          await this.checkpointManager.saveCheckpointSafely(
-            projectionName,
-            "projection",
+          await saveCheckpointSafely({
+            checkpointStore: this.checkpointStore,
+            pipelineName: this.pipelineName,
+            componentName: projectionName,
+            componentType: "projection",
             event,
-            "processed",
+            status: "processed",
             sequenceNumber,
-          );
+          });
 
           this.logger.debug(
             {
@@ -520,14 +576,16 @@ export class ProjectionUpdater<
               "Projection processing delayed; events not yet visible, will retry",
             );
           } else {
-            await this.checkpointManager.saveCheckpointSafely(
-              projectionName,
-              "projection",
+            await saveCheckpointSafely({
+              checkpointStore: this.checkpointStore,
+              pipelineName: this.pipelineName,
+              componentName: projectionName,
+              componentType: "projection",
               event,
-              "failed",
+              status: "failed",
               sequenceNumber,
               errorMessage,
-            );
+            });
 
             this.logger.error(
               {

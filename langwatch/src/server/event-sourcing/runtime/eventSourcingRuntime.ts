@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
-import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../library/stores/checkpointStore.types";
 import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
@@ -25,7 +25,7 @@ const logger = createLogger("langwatch:event-sourcing:runtime");
  */
 export interface RuntimeStores {
   eventStore: EventStore;
-  checkpointStore?: ProcessorCheckpointStore;
+  checkpointStore?: CheckpointStore;
   queueProcessorFactory?: QueueProcessorFactory;
 }
 
@@ -40,7 +40,7 @@ export interface RuntimeStores {
  */
 export class EventSourcingRuntime {
   private _eventStore?: EventStore;
-  private _checkpointStore?: ProcessorCheckpointStore;
+  private _checkpointStore?: CheckpointStore;
   private _queueProcessorFactory?: QueueProcessorFactory;
   private _initialized = false;
   private _loggedDisabledWarning = false;
@@ -73,7 +73,7 @@ export class EventSourcingRuntime {
   /**
    * The checkpoint store instance. Returns undefined if event sourcing is disabled.
    */
-  get checkpointStore(): ProcessorCheckpointStore | undefined {
+  get checkpointStore(): CheckpointStore | undefined {
     this.ensureInitialized();
     return this._checkpointStore;
   }
@@ -178,7 +178,7 @@ export class EventSourcingRuntime {
     clickHouseClient: ClickHouseClient | undefined,
     isTestEnvironment: boolean,
     forceClickHouseInTests: boolean,
-  ): ProcessorCheckpointStore | undefined {
+  ): CheckpointStore | undefined {
     const isProduction = process.env.NODE_ENV === "production";
 
     // In test environment, use memory unless forced to use ClickHouse
@@ -258,7 +258,7 @@ export class EventSourcingRuntime {
     config: EventSourcingConfig,
     stores: {
       eventStore: EventStore;
-      checkpointStore: ProcessorCheckpointStore;
+      checkpointStore: CheckpointStore;
       queueProcessorFactory: QueueProcessorFactory;
     },
   ): EventSourcingRuntime {

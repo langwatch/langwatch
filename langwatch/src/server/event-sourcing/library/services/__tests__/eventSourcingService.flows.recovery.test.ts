@@ -48,7 +48,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -118,7 +118,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -167,7 +167,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -232,7 +232,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -287,7 +287,7 @@ describe("EventSourcingService - Recovery Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -402,7 +402,7 @@ describe("EventSourcingService - Recovery Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -481,7 +481,7 @@ describe("EventSourcingService - Recovery Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -563,7 +563,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(

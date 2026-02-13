@@ -7,7 +7,7 @@ import {
   cleanupTestEnvironment,
   createMockEventHandler,
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -699,7 +699,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -726,7 +726,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       await service.storeEvents(events, context);
@@ -790,7 +790,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -815,7 +815,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -857,7 +857,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -900,7 +900,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       // Process event1 - should fail
@@ -930,7 +930,7 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -958,7 +958,7 @@ describe("EventSourcingService - Projection Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();

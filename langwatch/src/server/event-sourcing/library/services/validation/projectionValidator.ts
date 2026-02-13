@@ -1,7 +1,7 @@
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -14,10 +14,10 @@ import { SequentialOrderingError } from "../errorHandling";
  * idempotency checking, failure detection, and ordering validation.
  * Shared validation logic used by both handlers and projections.
  */
-export class EventProcessorValidator<EventType extends Event = Event> {
+export class ProjectionValidator<EventType extends Event = Event> {
   private readonly eventStore: EventStore<EventType>;
   private readonly aggregateType: AggregateType;
-  private readonly processorCheckpointStore?: ProcessorCheckpointStore;
+  private readonly checkpointStore?: CheckpointStore;
   private readonly pipelineName: string;
   private readonly logger = createLogger(
     "langwatch:event-sourcing:event-processor-validator",
@@ -26,17 +26,17 @@ export class EventProcessorValidator<EventType extends Event = Event> {
   constructor({
     eventStore,
     aggregateType,
-    processorCheckpointStore,
+    checkpointStore,
     pipelineName,
   }: {
     eventStore: EventStore<EventType>;
     aggregateType: AggregateType;
-    processorCheckpointStore?: ProcessorCheckpointStore;
+    checkpointStore?: CheckpointStore;
     pipelineName: string;
   }) {
     this.eventStore = eventStore;
     this.aggregateType = aggregateType;
-    this.processorCheckpointStore = processorCheckpointStore;
+    this.checkpointStore = checkpointStore;
     this.pipelineName = pipelineName;
   }
 
@@ -235,11 +235,11 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     processorType: "handler" | "projection",
     event: EventType,
   ): Promise<boolean> {
-    if (!this.processorCheckpointStore || !this.pipelineName) {
+    if (!this.checkpointStore || !this.pipelineName) {
       return false;
     }
 
-    return await this.processorCheckpointStore.hasFailedEvents(
+    return await this.checkpointStore.hasFailedEvents(
       this.pipelineName,
       processorName,
       processorType,
@@ -265,7 +265,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     event: EventType,
     sequenceNumber: number,
   ): Promise<boolean> {
-    if (!this.processorCheckpointStore || !this.pipelineName) {
+    if (!this.checkpointStore || !this.pipelineName) {
       return false;
     }
 
@@ -278,7 +278,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
       String(event.aggregateId),
     );
     const existingCheckpoint =
-      await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+      await this.checkpointStore.loadCheckpoint(checkpointKey);
 
     // If checkpoint exists and is processed, check if this sequence number was already processed
     if (existingCheckpoint?.status === "processed") {
@@ -342,7 +342,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
 
       // Re-check for failed checkpoint right before saving to prevent race conditions
       const recheckCheckpoint =
-        await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+        await this.checkpointStore.loadCheckpoint(checkpointKey);
       if (recheckCheckpoint?.status === "failed") {
         this.logger.warn(
           {
@@ -359,7 +359,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
       }
 
       try {
-        await this.processorCheckpointStore.saveCheckpoint(
+        await this.checkpointStore.saveCheckpoint(
           event.tenantId,
           checkpointKey,
           processorType,
@@ -371,7 +371,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
       } catch (error) {
         // If save fails, another process may have claimed it - check again
         const recheckCheckpoint =
-          await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+          await this.checkpointStore.loadCheckpoint(checkpointKey);
         if (
           recheckCheckpoint?.status === "processed" &&
           recheckCheckpoint.sequenceNumber >= sequenceNumber
@@ -393,7 +393,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
         }
 
         // If still not processed, the error is unexpected - log and continue
-        // The pending checkpoint will be saved again later in CheckpointManager
+        // The pending checkpoint will be saved again later in saveCheckpointSafely
         this.logger.warn(
           {
             processorName,
@@ -442,7 +442,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     event: EventType,
     sequenceNumber: number,
   ): Promise<void> {
-    if (!this.processorCheckpointStore || !this.pipelineName) {
+    if (!this.checkpointStore || !this.pipelineName) {
       return; // No checkpoint store means no ordering enforcement
     }
 
@@ -480,7 +480,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     // Use getCheckpointBySequenceNumber to check if previousSequenceNumber was processed
     // This method loads the aggregate checkpoint and verifies it's processed with sequence >= previousSequenceNumber
     const previousCheckpoint =
-      await this.processorCheckpointStore.getCheckpointBySequenceNumber(
+      await this.checkpointStore.getCheckpointBySequenceNumber(
         this.pipelineName,
         processorName,
         processorType,

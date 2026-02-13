@@ -9,17 +9,6 @@ import type { Event, Projection } from "./types";
 import { EventSchema, ProjectionSchema } from "./types";
 
 /**
- * Extracts the aggregate ID type from an Event type.
- *
- * @example
- * ```typescript
- * type MyEvent = Event<"trace-123", MyPayload>;
- * type TraceId = ExtractAggregateId<MyEvent>; // "trace-123"
- * ```
- */
-export type ExtractAggregateId<_TEvent extends Event> = string;
-
-/**
  * Extracts the payload type from an Event type.
  *
  * @example

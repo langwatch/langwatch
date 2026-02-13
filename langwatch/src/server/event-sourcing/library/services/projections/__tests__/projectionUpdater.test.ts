@@ -8,7 +8,7 @@ import {
   createMockEventHandler,
   createMockEventStore,
   createMockLogger,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -18,10 +18,9 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { CheckpointManager } from "../../checkpoints/checkpointManager";
 import { SequentialOrderingError } from "../../errorHandling";
-import { QueueProcessorManager } from "../../queues/queueProcessorManager";
-import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
+import { QueueManager } from "../../queues/queueManager";
+import { ProjectionValidator } from "../../validation/projectionValidator";
 import { ProjectionUpdater } from "../projectionUpdater";
 
 // Mock EventUtils
@@ -52,9 +51,8 @@ describe("ProjectionUpdater", () => {
   function createUpdater(options: {
     projections?: Map<string, any>;
     processorCheckpointStore?: any;
-    queueManager?: QueueProcessorManager<Event>;
-    validator?: EventProcessorValidator<Event>;
-    checkpointManager?: CheckpointManager<Event>;
+    queueManager?: QueueManager<Event>;
+    validator?: ProjectionValidator<Event>;
     logger?: any;
     ordering?: "timestamp" | "as-is";
   }): ProjectionUpdater<Event> {
@@ -64,23 +62,16 @@ describe("ProjectionUpdater", () => {
 
     const validator =
       options.validator ??
-      new EventProcessorValidator({
+      new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: options.processorCheckpointStore,
+        checkpointStore: options.processorCheckpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
-    const checkpointManager =
-      options.checkpointManager ??
-      new CheckpointManager(
-        TEST_CONSTANTS.PIPELINE_NAME,
-        options.processorCheckpointStore,
-      );
-
     const queueManager =
       options.queueManager ??
-      new QueueProcessorManager({
+      new QueueManager({
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
@@ -97,10 +88,10 @@ describe("ProjectionUpdater", () => {
       aggregateType,
       eventStore,
       projections: options.projections,
-      processorCheckpointStore: options.processorCheckpointStore,
+      checkpointStore: options.processorCheckpointStore,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       ordering: options.ordering ?? "timestamp",
       validator,
-      checkpointManager,
       queueManager,
     });
   }
@@ -117,7 +108,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -131,10 +122,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -188,7 +179,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -202,10 +193,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -258,7 +249,7 @@ describe("ProjectionUpdater", () => {
       );
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -272,10 +263,10 @@ describe("ProjectionUpdater", () => {
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
       eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -420,7 +411,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -525,10 +516,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -615,7 +606,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -701,10 +692,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator1 = new EventProcessorValidator({
+      const validator1 = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -768,10 +759,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator2 = new EventProcessorValidator({
+      const validator2 = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 
@@ -833,7 +824,7 @@ describe("ProjectionUpdater", () => {
 
       const projections = new Map([["projection1", projectionDef]]);
 
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
 
@@ -937,10 +928,10 @@ describe("ProjectionUpdater", () => {
           },
         );
 
-      const validator = new EventProcessorValidator({
+      const validator = new ProjectionValidator({
         eventStore,
         aggregateType,
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
 

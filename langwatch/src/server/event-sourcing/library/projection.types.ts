@@ -20,18 +20,6 @@ export interface ProjectionOptions<EventType extends Event = Event> {
   deduplication?: DeduplicationStrategy<EventType>;
 
   /**
-   * Maximum batch size for processing. When set, events are accumulated
-   * before processing. Only used when deduplication is enabled.
-   *
-   * This limits the number of events that can be accumulated during the
-   * deduplication period. If more events arrive, they will still be processed
-   * but may require multiple batches.
-   *
-   * Default: undefined (no batching limit)
-   */
-  maxBatchSize?: number;
-
-  /**
    * Kill switch configuration for this projection.
    * When the feature flag is true, the projection is disabled.
    */

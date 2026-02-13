@@ -7,7 +7,7 @@ import {
   createMockEventPublisher,
   createMockEventReactionHandler,
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createMockProjectionDefinition,
   createMockProjectionStore,
   createTestAggregateType,
@@ -537,7 +537,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("checkpoint save errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -563,7 +563,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
         logger: logger as any,
       });
 
@@ -585,7 +585,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("handler execution succeeds despite checkpoint failure", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockProcessorCheckpointStore();
+      const checkpointStore = createMockCheckpointStore();
 
       checkpointStore.saveCheckpoint = vi
         .fn()
@@ -599,7 +599,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event = createTestEvent(

@@ -49,7 +49,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -99,7 +99,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -160,7 +160,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -208,7 +208,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -275,7 +275,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       // Create events with same timestamp but different IDs
@@ -362,7 +362,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -453,7 +453,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -516,7 +516,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
@@ -617,7 +617,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       // Mock projection handler
@@ -686,7 +686,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             createMockProjectionStore(),
           ),
         },
-        processorCheckpointStore: checkpointStore2,
+        checkpointStore: checkpointStore2,
       });
 
       // Store same events
@@ -728,7 +728,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -812,7 +812,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
             projectionStore,
           ),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       // Mock projection handler
@@ -912,7 +912,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -958,7 +958,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -1015,7 +1015,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -1070,7 +1070,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler1: createMockEventHandlerDefinition("handler1", handler1),
           handler2: createMockEventHandlerDefinition("handler2", handler2),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -1119,7 +1119,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const aggregateId1 = "aggregate-1";
@@ -1210,7 +1210,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        processorCheckpointStore: checkpointStore,
+        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(

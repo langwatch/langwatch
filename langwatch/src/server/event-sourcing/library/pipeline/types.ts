@@ -29,7 +29,6 @@ export interface CommandHandlerOptions<Payload = any> {
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
-  lockTtlMs?: number;
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   ErrorCategory,
   handleError,
 } from "../errorHandling";
-import type { QueueProcessorManager } from "../queues/queueProcessorManager";
+import type { QueueManager } from "../queues/queueManager";
 
 /**
  * Dispatches events to registered event handlers.
@@ -29,7 +29,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     string,
     EventHandlerDefinition<EventType>
   >;
-  private readonly queueManager: QueueProcessorManager<EventType>;
+  private readonly queueManager: QueueManager<EventType>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
@@ -40,7 +40,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
   }: {
     aggregateType: AggregateType;
     eventHandlers?: Map<string, EventHandlerDefinition<EventType>>;
-    queueManager: QueueProcessorManager<EventType>;
+    queueManager: QueueManager<EventType>;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
@@ -82,14 +82,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           "tenant.id": context.tenantId,
           "handler.count": this.eventHandlers.size,
           "dispatch.mode":
-            this.queueManager.getHandlerQueueProcessors().size > 0
+            this.queueManager.hasHandlerQueues()
               ? "async"
               : "sync",
         },
       },
       async () => {
         // If queue processors are available, use async queue-based dispatch
-        if (this.queueManager.getHandlerQueueProcessors().size > 0) {
+        if (this.queueManager.hasHandlerQueues()) {
           await this.dispatchEventsToQueues(events);
           return;
         }
@@ -98,6 +98,49 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         await this.dispatchEventsSynchronously(events, context);
       },
     );
+  }
+
+  /**
+   * Iterates over events × matching handlers, applying shared filtering logic:
+   * - Skip disabled handlers (via options.disabled)
+   * - Skip handlers disabled via kill switch
+   * - Skip handlers that don't match the event type
+   *
+   * The action callback receives each matching (event, handler) pair.
+   */
+  private async forEachMatchingHandler(
+    events: readonly EventType[],
+    action: (params: {
+      event: EventType;
+      handlerName: string;
+      handlerDef: EventHandlerDefinition<EventType>;
+    }) => Promise<void>,
+  ): Promise<void> {
+    const sortedHandlers = this.getHandlerNames();
+
+    for (const event of events) {
+      for (const handlerName of sortedHandlers) {
+        const handlerDef = this.eventHandlers?.get(handlerName);
+        if (!handlerDef) continue;
+
+        const disabled = await isComponentDisabled({
+          featureFlagService: this.featureFlagService,
+          aggregateType: this.aggregateType,
+          componentType: "eventHandler",
+          componentName: handlerName,
+          tenantId: event.tenantId,
+          customKey: handlerDef.options.killSwitch?.customKey,
+          logger: this.logger,
+        });
+        if (disabled) continue;
+
+        const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
+        if (handlerEventTypes?.length && !handlerEventTypes.includes(event.type))
+          continue;
+
+        await action({ event, handlerName, handlerDef });
+      }
+    }
   }
 
   /**
@@ -114,55 +157,21 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         attributes: {
           "aggregate.type": this.aggregateType,
           "event.count": events.length,
-          "handler.count": this.queueManager.getHandlerQueueProcessors().size,
+          "handler.count": this.eventHandlers?.size ?? 0,
         },
       },
       async (span) => {
-        const sortedHandlers = this.getHandlerNames();
-
-        // Dispatch events to queues in registration order (actual processing order maintained by queue workers)
-        for (const event of events) {
-          for (const handlerName of sortedHandlers) {
-            const handlerDef = this.eventHandlers?.get(handlerName);
-            if (!handlerDef) {
-              continue;
-            }
-
-            // Check kill switch - if enabled, skip event handler processing
-            const disabled = await isComponentDisabled({
-              featureFlagService: this.featureFlagService,
-              aggregateType: this.aggregateType,
-              componentType: "eventHandler",
-              componentName: handlerName,
-              tenantId: event.tenantId,
-              customKey: handlerDef.options.killSwitch?.customKey,
-              logger: this.logger,
-            });
-            if (disabled) {
-              continue; // Skip this handler
-            }
-
-            // Get event types this handler is interested in
-            const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
-
-            // Filter by event type if handler specifies event types
-            if (handlerEventTypes && handlerEventTypes.length > 0) {
-              if (!handlerEventTypes.includes(event.type)) {
-                continue;
-              }
-            }
-
+        await this.forEachMatchingHandler(
+          events,
+          async ({ event, handlerName }) => {
             const queueProcessor =
-              this.queueManager.getHandlerQueueProcessor(handlerName);
+              this.queueManager.getHandlerQueue(handlerName);
             if (!queueProcessor) {
               this.logger.warn(
-                {
-                  handlerName,
-                  eventType: event.type,
-                },
+                { handlerName, eventType: event.type },
                 "Queue processor not found for handler, skipping",
               );
-              continue;
+              return;
             }
 
             try {
@@ -180,23 +189,20 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 "error.message":
                   error instanceof Error ? error.message : String(error),
               });
-              // Queue processor handles retries internally
-              if (this.logger) {
-                this.logger.error(
-                  {
-                    handlerName,
-                    eventType: event.type,
-                    aggregateId: String(event.aggregateId),
-                    tenantId: event.tenantId,
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                  },
-                  "Failed to dispatch event to handler queue",
-                );
-              }
+              this.logger.error(
+                {
+                  handlerName,
+                  eventType: event.type,
+                  aggregateId: String(event.aggregateId),
+                  tenantId: event.tenantId,
+                  error:
+                    error instanceof Error ? error.message : String(error),
+                },
+                "Failed to dispatch event to handler queue",
+              );
             }
-          }
-        }
+          },
+        );
       },
     );
   }
@@ -221,37 +227,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         },
       },
       async (span) => {
-        const sortedHandlers = this.getHandlerNames();
-
-        for (const event of events) {
-          for (const handlerName of sortedHandlers) {
-            const handlerDef = this.eventHandlers?.get(handlerName);
-            if (!handlerDef) {
-              continue;
-            }
-
-            // Check kill switch - if enabled, skip event handler processing
-            const disabled = await isComponentDisabled({
-              featureFlagService: this.featureFlagService,
-              aggregateType: this.aggregateType,
-              componentType: "eventHandler",
-              componentName: handlerName,
-              tenantId: event.tenantId,
-              customKey: handlerDef.options.killSwitch?.customKey,
-              logger: this.logger,
-            });
-            if (disabled) {
-              continue; // Skip this handler
-            }
-
-            const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
-
-            if (handlerEventTypes && handlerEventTypes.length > 0) {
-              if (!handlerEventTypes.includes(event.type)) {
-                continue;
-              }
-            }
-
+        await this.forEachMatchingHandler(
+          events,
+          async ({ event, handlerName, handlerDef }) => {
             try {
               span.addEvent("handler.handle.start", {
                 "handler.name": handlerName,
@@ -271,7 +249,6 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                   error instanceof Error ? error.message : String(error),
               });
 
-              // Handler errors are non-critical - log but continue processing
               handleError(error, ErrorCategory.NON_CRITICAL, this.logger, {
                 handlerName,
                 eventType: event.type,
@@ -279,8 +256,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 tenantId: event.tenantId,
               });
             }
-          }
-        }
+          },
+        );
       },
     );
   }

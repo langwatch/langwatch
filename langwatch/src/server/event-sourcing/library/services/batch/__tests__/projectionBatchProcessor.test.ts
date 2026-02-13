@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event, ProcessorCheckpoint } from "../../../domain/types";
-import type { ProcessorCheckpointStore } from "../../../stores/eventHandlerCheckpointStore.types";
+import type { CheckpointStore } from "../../../stores/checkpointStore.types";
 import type { EventStore } from "../../../stores/eventStore.types";
 import {
   createMockEventStore,
-  createMockProcessorCheckpointStore,
+  createMockCheckpointStore,
   createTestContext,
   createTestEvent,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { BatchEventProcessor } from "../batchEventProcessor";
+import { ProjectionBatchProcessor } from "../projectionBatchProcessor";
 
-describe("BatchEventProcessor", () => {
+describe("ProjectionBatchProcessor", () => {
   let eventStore: EventStore<Event>;
-  let checkpointStore: ProcessorCheckpointStore;
-  let batchProcessor: BatchEventProcessor<Event>;
+  let checkpointStore: CheckpointStore;
+  let batchProcessor: ProjectionBatchProcessor<Event>;
 
   const { aggregateType, tenantId } = createTestContext();
   const pipelineName = TEST_CONSTANTS.PIPELINE_NAME;
@@ -24,9 +24,9 @@ describe("BatchEventProcessor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     eventStore = createMockEventStore<Event>();
-    checkpointStore = createMockProcessorCheckpointStore();
+    checkpointStore = createMockCheckpointStore();
 
-    batchProcessor = new BatchEventProcessor(
+    batchProcessor = new ProjectionBatchProcessor(
       eventStore,
       checkpointStore,
       pipelineName,
@@ -417,43 +417,9 @@ describe("BatchEventProcessor", () => {
       });
     });
 
-    describe("when skipFailureDetection is true", () => {
-      it("processes events even when failures exist", async () => {
-        vi.mocked(checkpointStore.hasFailedEvents).mockResolvedValue(true);
-
-        // Trigger event is the only event
-        const triggerEvent = createTestEvent(
-          aggregateId,
-          aggregateType,
-          tenantId,
-          void 0,
-          1000,
-        );
-
-        vi.mocked(eventStore.getEvents).mockResolvedValue([triggerEvent]);
-        vi.mocked(checkpointStore.getLastProcessedEvent).mockResolvedValue(
-          null,
-        );
-
-        const processEvent = vi.fn().mockResolvedValue(void 0);
-
-        const result = await batchProcessor.processUnprocessedEvents(
-          triggerEvent,
-          processorName,
-          "handler",
-          processEvent,
-          { skipFailureDetection: true },
-        );
-
-        expect(result.success).toBe(true);
-        expect(result.processedCount).toBe(1);
-        expect(processEvent).toHaveBeenCalledTimes(1);
-      });
-    });
-
     describe("when no checkpoint store is configured", () => {
       it("processes all events from the beginning", async () => {
-        const batchProcessorNoCheckpoint = new BatchEventProcessor(
+        const batchProcessorNoCheckpoint = new ProjectionBatchProcessor(
           eventStore,
           void 0, // No checkpoint store
           pipelineName,

@@ -11,7 +11,7 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { QueueProcessorManager } from "../../queues/queueProcessorManager";
+import { QueueManager } from "../../queues/queueManager";
 import { EventHandlerDispatcher } from "../eventHandlerDispatcher";
 
 describe("EventHandlerDispatcher", () => {
@@ -31,11 +31,11 @@ describe("EventHandlerDispatcher", () => {
 
   function createDispatcher(options: {
     eventHandlers?: Map<string, any>;
-    queueManager?: QueueProcessorManager<Event>;
+    queueManager?: QueueManager<Event>;
   }): EventHandlerDispatcher<Event> {
     const queueManager =
       options.queueManager ??
-      new QueueProcessorManager({
+      new QueueManager({
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
@@ -69,15 +69,16 @@ describe("EventHandlerDispatcher", () => {
         waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
-      const queueManager = new QueueProcessorManager({
+      const queueManager = new QueueManager({
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
       // Manually add queue processor to simulate initialization
-      (queueManager as any).handlerQueueProcessors.set(
-        "handler1",
+      (queueManager as any).queues.set(
+        "handler:handler1",
         mockQueueProcessor,
       );
+      (queueManager as any).handlerCount = 1;
 
       const dispatcher = createDispatcher({
         eventHandlers,
@@ -178,18 +179,19 @@ describe("EventHandlerDispatcher", () => {
         waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
 
-      const queueManager = new QueueProcessorManager({
+      const queueManager = new QueueManager({
         aggregateType,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
-      (queueManager as any).handlerQueueProcessors.set(
-        "enabledHandler",
+      (queueManager as any).queues.set(
+        "handler:enabledHandler",
         enabledQueueProcessor,
       );
-      (queueManager as any).handlerQueueProcessors.set(
-        "disabledHandler",
+      (queueManager as any).queues.set(
+        "handler:disabledHandler",
         disabledQueueProcessor,
       );
+      (queueManager as any).handlerCount = 2;
 
       const dispatcher = createDispatcher({
         eventHandlers,
