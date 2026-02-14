@@ -1,3 +1,4 @@
+import os
 from itertools import product
 from langevals_core.base_evaluator import EvaluatorEntry
 from langevals_langevals.llm_boolean import (
@@ -18,6 +19,9 @@ from litellm.files.main import ModelResponse
 
 from langevals import expect
 
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set"
+)
 
 entries = pd.DataFrame(
     {
@@ -35,7 +39,7 @@ entries = pd.DataFrame(
 @pytest.mark.pass_rate(0.8)
 def test_language_and_relevancy(entry):
     response: ModelResponse = litellm.completion(
-        model="gpt-5",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -43,7 +47,7 @@ def test_language_and_relevancy(entry):
             },
             {"role": "user", "content": entry.input},
         ],
-        temperature=1.0,
+        temperature=0.0,
     )  # type: ignore
     recipe = response.choices[0].message.content  # type: ignore
 

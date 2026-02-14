@@ -70,9 +70,13 @@ jobs:
         working-directory: langevals
         run: uv sync --all-extras --all-groups
 
-      - name: Run tests (collect only, most tests require API keys)
+      - name: Run tests
         working-directory: langevals
-        run: uv run pytest --collect-only
+        env:
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          AZURE_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
+          AZURE_API_BASE: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
+        run: uv run pytest -x -v
 
   docker-build:
     if: >

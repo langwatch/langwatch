@@ -1,3 +1,5 @@
+import os
+
 from langevals_langevals.llm_boolean import (
     CustomLLMBooleanEvaluator,
     CustomLLMBooleanSettings,
@@ -10,6 +12,11 @@ from langevals_ragas.lib.common import RagasSettings
 import pytest
 
 from langevals import expect
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("AZURE_API_KEY"),
+    reason="Azure OpenAI credentials not set",
+)
 
 
 def test_azure_evaluation_with_custom_deployment():

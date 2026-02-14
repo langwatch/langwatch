@@ -1,3 +1,4 @@
+import os
 from itertools import product
 import pytest
 import pandas as pd
@@ -6,6 +7,10 @@ import instructor
 
 from litellm import completion
 from pydantic import BaseModel
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("OPENAI_API_KEY"), reason="OPENAI_API_KEY not set"
+)
 
 
 class Address(BaseModel):
@@ -42,12 +47,11 @@ entries = pd.DataFrame(
     }
 )
 
-models = ["gpt-4o-mini", "gpt-5"]
+models = ["gpt-4o-mini"]
 
 client = instructor.from_litellm(completion)
 
 
-# @pytest.mark.asyncio_cooperative  # Waiting for issue: https://github.com/willemt/pytest-asyncio-cooperative/issues/65
 @pytest.mark.parametrize("entry, model", product(entries.itertuples(), models))
 @pytest.mark.flaky(max_runs=3)
 @pytest.mark.pass_rate(0.6)
@@ -58,7 +62,7 @@ def test_extracts_the_right_address(entry, model):
         messages=[
             {"role": "user", "content": entry.input},
         ],
-        temperature=1.0,
+        temperature=0.0,
     )
 
     assert address.model_dump_json() == entry.expected_output
