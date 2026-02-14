@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Tests that verify edited cell values are immediately visible in the table.
- * This tests the full rendering path, not just the store update.
+ * Tests for cell validation in boolean and number columns.
+ * Validates input transformation and error display.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -144,9 +144,26 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-describe("Cell editing display - inline dataset", () => {
+describe("Number column validation", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
+
+    // Add dataset with number column
+    const store = useEvaluationsV3Store.getState();
+    store.addDataset({
+      id: "num_test",
+      name: "Number Test",
+      type: "saved",
+      datasetId: "db-num-123",
+      columns: [
+        { id: "input_0", name: "input", type: "string" },
+        { id: "score_1", name: "score", type: "number" },
+      ],
+      savedRecords: [
+        { id: "rec1", input: "hello", score: "" },
+      ],
+    });
+    store.setActiveDataset("num_test");
   });
 
   afterEach(() => {
@@ -154,85 +171,137 @@ describe("Cell editing display - inline dataset", () => {
     vi.clearAllMocks();
   });
 
-  it("shows updated value immediately after editing inline cell", async () => {
+  it("accepts integer and saves correctly", async () => {
     const user = userEvent.setup();
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
-    // Find the first input cell (row 0, column 'input')
-    const cell = screen.getByTestId("cell-0-input");
-    // Cell has initial sample data from createInitialInlineDataset
-
-    // Double-click to enter edit mode
+    const cell = screen.getByTestId("cell-0-score_1");
     await user.dblClick(cell);
 
-    // Find the textarea and clear it, then type new value
     const textarea = await screen.findByRole("textbox");
-    await user.clear(textarea);
-    await user.type(textarea, "test value");
-
-    // Press Enter to save
+    await user.type(textarea, "42");
     await user.keyboard("{Enter}");
 
-    // The cell should immediately show the new value
     await waitFor(() => {
-      const updatedCell = screen.getByTestId("cell-0-input");
-      expect(updatedCell).toHaveTextContent("test value");
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("42");
     });
   });
 
-  it("shows updated value after editing multiple cells", async () => {
+  it("accepts float with period decimal separator", async () => {
     const user = userEvent.setup();
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
-    // Edit first cell
-    const cell1 = screen.getByTestId("cell-0-input");
-    await user.dblClick(cell1);
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "3.14");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("3.14");
+    });
+  });
+
+  it("accepts float with comma decimal separator and normalizes to period", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "1,5");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("1.5");
+    });
+  });
+
+  it("accepts negative numbers", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "-10");
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("-10");
+    });
+  });
+
+  it("rejects non-numeric value and shows error", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "abc");
+    await user.keyboard("{Enter}");
+
+    // Editor should still be open with error message
+    await waitFor(() => {
+      expect(screen.getByText(/Invalid number/i)).toBeInTheDocument();
+    });
+
+    // Cell should not have the invalid value
+    expect(screen.getByTestId("cell-0-score_1")).not.toHaveTextContent("abc");
+  });
+
+  it("rejects mixed alphanumeric value", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "12abc");
+    await user.keyboard("{Enter}");
+
+    // Editor should still be open with error message
+    await waitFor(() => {
+      expect(screen.getByText(/Invalid number/i)).toBeInTheDocument();
+    });
+  });
+
+  it("allows empty value", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    // First set a value
+    const cell = screen.getByTestId("cell-0-score_1");
+    await user.dblClick(cell);
     let textarea = await screen.findByRole("textbox");
-    await user.type(textarea, "first");
+    await user.type(textarea, "42");
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-input")).toHaveTextContent("first");
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("42");
     });
 
-    // Edit second cell
-    const cell2 = screen.getByTestId("cell-1-input");
-    await user.dblClick(cell2);
+    // Now clear it
+    await user.dblClick(screen.getByTestId("cell-0-score_1"));
     textarea = await screen.findByRole("textbox");
-    await user.type(textarea, "second");
+    await user.clear(textarea);
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-1-input")).toHaveTextContent("second");
+      expect(screen.getByTestId("cell-0-score_1")).toHaveTextContent("");
     });
-
-    // Both values should still be visible
-    expect(screen.getByTestId("cell-0-input")).toHaveTextContent("first");
-    expect(screen.getByTestId("cell-1-input")).toHaveTextContent("second");
   });
 });
 
-describe("Cell editing display - saved dataset", () => {
+describe("Cell editing cancellation behavior", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
-
-    // Add a saved dataset with records
-    const store = useEvaluationsV3Store.getState();
-    store.addDataset({
-      id: "saved_test",
-      name: "Test Saved",
-      type: "saved",
-      datasetId: "db-dataset-123",
-      columns: [
-        { id: "question_0", name: "question", type: "string" },
-        { id: "answer_1", name: "answer", type: "string" },
-      ],
-      savedRecords: [
-        { id: "rec1", question: "What is 2+2?", answer: "4" },
-        { id: "rec2", question: "What is the capital?", answer: "Paris" },
-      ],
-    });
-    store.setActiveDataset("saved_test");
   });
 
   afterEach(() => {
@@ -240,44 +309,25 @@ describe("Cell editing display - saved dataset", () => {
     vi.clearAllMocks();
   });
 
-  it("shows saved dataset values in cells", async () => {
-    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("cell-0-question_0")).toHaveTextContent(
-        "What is 2+2?",
-      );
-      expect(screen.getByTestId("cell-0-answer_1")).toHaveTextContent("4");
-      expect(screen.getByTestId("cell-1-question_0")).toHaveTextContent(
-        "What is the capital?",
-      );
-    });
-  });
-
-  it("shows updated value immediately after editing saved cell", async () => {
+  it("cancels edit on blur (click outside) without saving", async () => {
     const user = userEvent.setup();
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
-    // Wait for initial render
-    await waitFor(() => {
-      expect(screen.getByTestId("cell-0-answer_1")).toHaveTextContent("4");
-    });
-
-    // Double-click to edit
-    const cell = screen.getByTestId("cell-0-answer_1");
+    const cell = screen.getByTestId("cell-0-input");
     await user.dblClick(cell);
 
-    // Find textarea and update
     const textarea = await screen.findByRole("textbox");
-    await user.clear(textarea);
-    await user.type(textarea, "four");
+    await user.type(textarea, "test value");
 
-    // Press Enter to save
-    await user.keyboard("{Enter}");
+    // Click outside (blur)
+    await user.click(document.body);
 
-    // Value should update immediately
+    // Wait for blur timeout
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-answer_1")).toHaveTextContent("four");
-    });
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    }, { timeout: 500 });
+
+    // Value should NOT be saved (blur cancels)
+    expect(screen.getByTestId("cell-0-input")).not.toHaveTextContent("test value");
   });
 });
