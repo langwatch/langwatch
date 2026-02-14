@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType } from "../../types/dsl";
+import type { Component, ComponentType, Evaluator } from "../../types/dsl";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
 import { CustomPropertiesPanel } from "../properties/CustomPropertiesPanel";
 import { EndPropertiesPanel } from "../properties/EndPropertiesPanel";
@@ -52,9 +52,16 @@ export function StudioNodeDrawer() {
       })),
     );
 
-  const PanelComponent = selectedNode
-    ? ComponentPropertiesPanelMap[selectedNode.type as ComponentType]
-    : undefined;
+  // Don't open the drawer for evaluator nodes without an evaluator set
+  // (they're still in the "Choose Evaluator" flow)
+  const isEmptyEvaluator =
+    selectedNode?.type === "evaluator" &&
+    !(selectedNode.data as Evaluator).evaluator;
+
+  const PanelComponent =
+    selectedNode && !isEmptyEvaluator
+      ? ComponentPropertiesPanelMap[selectedNode.type as ComponentType]
+      : undefined;
 
   return (
     <>
@@ -80,7 +87,7 @@ export function StudioNodeDrawer() {
       {/* All node types go through StudioDrawerWrapper */}
       <InsideDrawerProvider>
         <StudioDrawerWrapper
-          node={selectedNode}
+          node={isEmptyEvaluator ? undefined : selectedNode}
           onClose={deselectAllNodes}
         >
           {selectedNode && PanelComponent && (

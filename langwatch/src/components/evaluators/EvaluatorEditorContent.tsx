@@ -74,7 +74,7 @@ export function EvaluatorEditorContent({
   hasSettings,
   effectiveEvaluatorDef,
   mappingsConfig,
-  variant: _variant = "drawer",
+  variant = "drawer",
 }: EvaluatorEditorContentProps) {
   return (
     <FormProvider {...form}>
@@ -159,6 +159,7 @@ export function EvaluatorEditorContent({
               initialMappings={mappingsConfig.initialMappings}
               onMappingChange={mappingsConfig.onMappingChange}
               scrollToMissingOnMount={true}
+              variant={variant}
             />
           </Box>
         )}

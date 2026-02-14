@@ -146,20 +146,11 @@ export function StudioDrawerWrapper({
       <HStack gap={0} flexShrink={0}>
         {showControls && (
           <>
-            <HStack
-              gap={2}
-              onClick={() => {
-                if (!propertiesExpanded) {
-                  setPropertiesExpanded(true);
-                }
-              }}
-            >
-              <ComponentExecutionButton
-                node={node}
-                size="sm"
-                iconSize={16}
-              />
-            </HStack>
+            <ComponentExecutionButton
+              node={node}
+              size="sm"
+              iconSize={16}
+            />
 
             <Button
               variant="ghost"

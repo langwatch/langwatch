@@ -172,17 +172,26 @@ function DbEvaluatorPanel({
 
   // Watch form changes and persist to node.data.localConfig (debounced to
   // avoid flooding the store on every keystroke).
+  // Only set localConfig when values actually differ from the saved state.
   const debouncedSetLocalConfig = useDebouncedCallback(
     (formValues: { name?: string; settings?: Record<string, unknown> }) => {
-      setNode({
-        id: node.id,
-        data: {
-          localConfig: {
-            name: formValues.name as string,
-            settings: formValues.settings as Record<string, unknown>,
+      const nameChanged = formValues.name !== dbName;
+      const settingsChanged =
+        JSON.stringify(formValues.settings) !== JSON.stringify(dbSettings);
+      if (nameChanged || settingsChanged) {
+        setNode({
+          id: node.id,
+          data: {
+            localConfig: {
+              name: formValues.name as string,
+              settings: formValues.settings as Record<string, unknown>,
+            },
           },
-        },
-      });
+        });
+      } else {
+        // Form matches saved state — clear any local config
+        setNode({ id: node.id, data: { localConfig: undefined } });
+      }
     },
     300,
     { trailing: true },
@@ -266,22 +275,27 @@ function DbEvaluatorPanel({
   ]);
 
   const handleDiscard = useCallback(() => {
+    debouncedSetLocalConfig.cancel();
     form.reset({ name: dbName, settings: dbSettings });
     setNode({ id: node.id, data: { localConfig: undefined } });
-  }, [form, dbName, dbSettings, setNode, node.id]);
+  }, [form, dbName, dbSettings, setNode, node.id, debouncedSetLocalConfig]);
+
+  const hasLocalChanges = !!localConfig;
 
   // Register footer with the drawer wrapper
   const footerContent = useMemo(
     () => (
       <HStack width="full">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDiscard}
-          data-testid="evaluator-discard-button"
-        >
-          Discard
-        </Button>
+        {hasLocalChanges && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDiscard}
+            data-testid="evaluator-discard-button"
+          >
+            Discard
+          </Button>
+        )}
         <Spacer />
         <Button
           variant="outline"
@@ -302,7 +316,7 @@ function DbEvaluatorPanel({
         </Button>
       </HStack>
     ),
-    [handleDiscard, handleApply, handleSave, updateMutation.isPending],
+    [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
   useRegisterDrawerFooter(footerContent);
 

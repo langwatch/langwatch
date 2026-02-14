@@ -343,8 +343,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           fontWeight={500}
           minWidth="0"
           flexShrink={1}
-          lineClamp={2}
-          wordBreak="break-all"
+          lineClamp={1}
           width="full"
         >
           {getNodeDisplayName(props)}

@@ -38,6 +38,8 @@ export type EvaluatorMappingsSectionProps = {
   ) => void;
   /** Whether to scroll to the first missing mapping on mount */
   scrollToMissingOnMount?: boolean;
+  /** Visual variant — "studio" hides the red required fields error */
+  variant?: "drawer" | "studio";
 };
 
 /**
@@ -56,6 +58,7 @@ export function EvaluatorMappingsSection({
   initialMappings,
   onMappingChange,
   scrollToMissingOnMount = false,
+  variant,
 }: EvaluatorMappingsSectionProps) {
   const { project } = useOrganizationTeamProject();
 
@@ -202,6 +205,7 @@ export function EvaluatorMappingsSection({
         onMappingChange={handleMappingChange}
         readOnly={true} // Can't add/remove evaluator inputs
         missingMappingIds={missingMappingIds}
+        showMissingMappingsError={variant !== "studio"}
       />
     </Box>
   );
