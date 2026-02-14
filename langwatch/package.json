@@ -135,7 +135,7 @@
     "bullmq": "^5.66.2",
     "bullmq-otel": "^1.0.1",
     "chakra-react-select": "^6.0.1",
-    "clsx": "1.2.1",
+    "clsx": "2.1.1",
     "cookie": "^0.7.0",
     "date-fns": "^2.30.0",
     "debug": "^4.3.5",
