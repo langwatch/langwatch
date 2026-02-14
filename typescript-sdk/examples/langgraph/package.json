@@ -14,7 +14,7 @@
   "dependencies": {
     "@langchain/openai": "^0.6.3",
     "@langchain/core": "^0.3.66",
-    "@langchain/community": "^0.3.50",
+    "@langchain/community": "^1.1.14",
     "langchain": "^0.3.30",
     "@langchain/langgraph": "^0.4.3",
     "@opentelemetry/context-async-hooks": "^2.0.1",
