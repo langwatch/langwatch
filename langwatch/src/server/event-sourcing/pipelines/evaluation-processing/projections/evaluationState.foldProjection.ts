@@ -1,6 +1,6 @@
 import type { Projection } from "../../../library";
 import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
-import { EVALUATION_PROCESSING_EVENT_TYPES } from "../schemas/constants";
+import { EVALUATION_PROCESSING_EVENT_TYPES, EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
   isEvaluationCompletedEvent,
@@ -55,6 +55,7 @@ export const evaluationStateFoldProjection: FoldProjectionDefinition<
   EvaluationProcessingEvent
 > = {
   name: "evaluationState",
+  version: EVALUATION_PROJECTION_VERSIONS.STATE,
   eventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
 
   init(): EvaluationStateData {

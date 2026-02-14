@@ -1,7 +1,7 @@
 import type { Projection } from "../../../library";
 import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
-import { TRACE_PROCESSING_EVENT_TYPES } from "../schemas/constants";
+import { TRACE_PROCESSING_EVENT_TYPES, TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent, isTopicAssignedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
@@ -457,6 +457,7 @@ export const traceSummaryFoldProjection: FoldProjectionDefinition<
   TraceProcessingEvent
 > = {
   name: "traceSummary",
+  version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
   eventTypes: TRACE_PROCESSING_EVENT_TYPES,
 
   init(): TraceSummaryData {

@@ -114,12 +114,14 @@ export function createMockFoldProjectionDefinition<
     init?: () => any;
     apply?: (state: any, event: TEvent) => any;
     eventTypes?: readonly string[];
+    version?: string;
     options?: FoldProjectionDefinition<any, TEvent>["options"];
   },
 ): FoldProjectionDefinition<any, TEvent> {
   const store = overrides?.store ?? createMockFoldProjectionStore();
   return {
     name,
+    version: overrides?.version ?? "2025-01-01",
     eventTypes: overrides?.eventTypes ?? EVENT_TYPES,
     init: overrides?.init ?? vi.fn().mockReturnValue({}),
     apply: overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),

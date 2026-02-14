@@ -183,6 +183,19 @@ async function waitForTraceSummary(
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
+  // Final attempt
+  try {
+    const projection = await pipeline.service.getProjectionByName(
+      "traceSummary",
+      traceId,
+      { tenantId },
+    );
+    const data = projection?.data as TraceSummaryData | undefined;
+    if (data && data.SpanCount >= expectedSpanCount) {
+      return;
+    }
+  } catch { /* ignore */ }
+
   throw new Error(
     `Timeout waiting for trace summary. Expected SpanCount >= ${expectedSpanCount} for trace ${traceId}`,
   );
@@ -220,6 +233,19 @@ async function waitForTopicAssignment(
     const currentInterval = elapsed < 500 ? pollIntervalMs : elapsed < 1500 ? pollIntervalMs * 2 : 300;
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
+
+  // Final attempt
+  try {
+    const projection = await pipeline.service.getProjectionByName(
+      "traceSummary",
+      traceId,
+      { tenantId },
+    );
+    const data = projection?.data as TraceSummaryData | undefined;
+    if (data && data.TopicId === expectedTopicId) {
+      return;
+    }
+  } catch { /* ignore */ }
 
   throw new Error(
     `Timeout waiting for topic assignment. Expected TopicId "${expectedTopicId}" for trace ${traceId}`,
@@ -260,6 +286,23 @@ async function waitForStoredSpans(
 
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+
+  // Final attempt
+  try {
+    const result = await clickHouseClient.query({
+      query: `
+        SELECT COUNT(*) as count
+        FROM stored_spans
+        WHERE TraceId = {traceId:String}
+          AND TenantId = {tenantId:String}
+      `,
+      query_params: { traceId, tenantId },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{ count: number | string }>();
+    const count = Number(rows[0]?.count ?? 0);
+    if (count >= expectedCount) return count;
+  } catch { /* ignore */ }
 
   throw new Error(
     `Timeout waiting for stored spans. Expected ${expectedCount} for trace ${traceId}`,

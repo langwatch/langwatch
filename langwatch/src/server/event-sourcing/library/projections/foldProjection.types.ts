@@ -37,6 +37,9 @@ export interface FoldProjectionDefinition<
   /** Unique name for this projection within the pipeline. */
   name: string;
 
+  /** Schema version (YYYY-MM-DD calendar date) for this projection's stored data. */
+  version: string;
+
   /** Event types this projection reacts to. Used by the router to dispatch. */
   eventTypes: readonly string[];
 

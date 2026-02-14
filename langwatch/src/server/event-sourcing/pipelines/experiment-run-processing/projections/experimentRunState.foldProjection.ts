@@ -1,6 +1,6 @@
 import type { Projection } from "../../../library";
 import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
-import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../schemas/constants";
+import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES, EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import {
   isExperimentRunCompletedEvent,
@@ -58,6 +58,7 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
   ExperimentRunProcessingEvent
 > = {
   name: "experimentRunState",
+  version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
   eventTypes: EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 
   init(): ExperimentRunStateData {

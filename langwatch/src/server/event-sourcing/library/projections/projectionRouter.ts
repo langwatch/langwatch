@@ -417,7 +417,7 @@ export class ProjectionRouter<
       id: `${projectionName}:${context.tenantId}:${aggregateId}`,
       aggregateId,
       tenantId: context.tenantId,
-      version: new Date().toISOString().split("T")[0]!,
+      version: fold.version,
       data: state,
     } as ProjectionTypes[ProjectionName];
   }

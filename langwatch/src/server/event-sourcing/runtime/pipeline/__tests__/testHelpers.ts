@@ -210,6 +210,7 @@ export function createMockFoldProjection<
 }): FoldProjectionDefinition<State, E> {
   return {
     name: config?.name ?? "test-fold-projection",
+    version: "2025-01-01",
     eventTypes: config?.eventTypes ?? [EVENT_TYPES[0]],
     init: config?.init ?? (() => ({}) as State),
     apply: config?.apply ?? ((state) => state),

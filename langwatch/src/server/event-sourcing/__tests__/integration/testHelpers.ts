@@ -283,7 +283,9 @@ async function getEventHandlerCount(
 ): Promise<number> {
   const clickHouseClient = getTestClickHouseClient();
   if (!clickHouseClient) {
-    return 0;
+    throw new Error(
+      "ClickHouse client not available. Integration tests require ClickHouse.",
+    );
   }
 
   try {

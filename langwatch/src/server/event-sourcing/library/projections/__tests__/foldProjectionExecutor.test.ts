@@ -121,7 +121,7 @@ describe("FoldProjectionExecutor.execute", () => {
   });
 
   describe("when event type does not match", () => {
-    it("stores state unchanged", async () => {
+    it("returns state without storing", async () => {
       const store = createMockFoldProjectionStore<{ count: number }>();
       (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 3 });
 
@@ -148,7 +148,7 @@ describe("FoldProjectionExecutor.execute", () => {
       const result = await executor.execute(foldDef, event, context);
 
       expect(result).toEqual({ count: 3 });
-      expect(store.store).toHaveBeenCalledWith({ count: 3 }, context);
+      expect(store.store).not.toHaveBeenCalled();
     });
   });
 

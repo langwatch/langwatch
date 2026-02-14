@@ -217,7 +217,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
-    ready: () => new Promise((resolve) => setTimeout(resolve, 200)),
+    ready: () => pipeline.service.waitUntilReady(),
   } as PipelineWithCommandHandlers<
     any,
     {
@@ -292,6 +292,20 @@ async function waitForEvaluationState(
           : Math.min(pollIntervalMs * 3, 300);
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
+
+  // Final attempt
+  try {
+    const projection = (await pipeline.service.getProjectionByName(
+      "evaluationState",
+      evaluationId,
+      { tenantId },
+    )) as EvaluationState | null;
+
+    if (projection && projection.data.Status === expectedStatus) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return;
+    }
+  } catch { /* ignore */ }
 
   throw new Error(
     `Timeout waiting for evaluation state. Expected status "${expectedStatus}" for evaluation ${evaluationId}`,

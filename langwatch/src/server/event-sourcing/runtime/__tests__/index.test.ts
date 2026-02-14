@@ -68,6 +68,7 @@ describe("EventSourcingPipeline", () => {
     it("creates service with all optional fields when provided", () => {
       const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
         name: "test-fold",
+        version: "2025-01-01",
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,
@@ -230,6 +231,7 @@ describe("EventSourcingPipeline", () => {
     it("works with full definition containing all optional fields", () => {
       const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
         name: "test-fold",
+        version: "2025-01-01",
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,
