@@ -9,7 +9,7 @@ from langevals_lingua.language_detection import (
     LinguaLanguageDetectionEvaluator,
     LinguaLanguageDetectionSettings,
 )
-from langevals_ragas.answer_relevancy import RagasAnswerRelevancyEvaluator
+from langevals_ragas.response_relevancy import RagasResponseRelevancyEvaluator
 import pytest
 import pandas as pd
 
@@ -53,7 +53,7 @@ def test_language_and_relevancy(entry):
             expected_language="EN",
         )
     )
-    answer_relevancy_checker = RagasAnswerRelevancyEvaluator()
+    answer_relevancy_checker = RagasResponseRelevancyEvaluator()
 
     expect(input=entry.input, output=recipe).to_pass(language_checker)
     expect(input=entry.input, output=recipe).score(
