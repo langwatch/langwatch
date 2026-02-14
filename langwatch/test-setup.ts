@@ -51,6 +51,19 @@ process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
 
 initializeEventSourcingForTesting();
 
+// Mock @copilotkit/react-ui to avoid @react-aria/interactions crash in vmThreads.
+// React-aria's useFocusVisible.mjs has a top-level side effect that patches
+// HTMLElement.prototype.focus, which fails in vmThreads external module context.
+// No tests exercise CopilotKit features, so this mock is safe.
+vi.mock("@copilotkit/react-ui", () => {
+  const Noop = () => null;
+  return {
+    CopilotChat: Noop,
+    AssistantMessage: Noop,
+    UserMessage: Noop,
+  };
+});
+
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
