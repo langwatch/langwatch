@@ -15,7 +15,7 @@ import { createTenantId, EventUtils } from "../../../library";
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
-} from "../projections/experimentRunState.projection.handler";
+} from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;

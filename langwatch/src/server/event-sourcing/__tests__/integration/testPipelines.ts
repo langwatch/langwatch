@@ -9,12 +9,11 @@ import {
   EventUtils,
 } from "../../library";
 import type { Command, CommandHandler } from "../../library/commands/command";
-import type { EventHandler } from "../../library/domain/handlers/eventHandler";
-import type { ProjectionHandler } from "../../library/domain/handlers/projectionHandler";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { Projection } from "../../library/domain/types";
-import type { ProjectionStore } from "../../library/stores/projectionStore.types";
-import type { EventStream } from "../../library/streams/eventStream";
+import type { FoldProjectionDefinition, FoldProjectionStore } from "../../library/projections/foldProjection.types";
+import type { AppendStore, MapProjectionDefinition } from "../../library/projections/mapProjection.types";
+import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
 import { getTestClickHouseClient } from "./testContainers";
 
 const logger = createLogger(
@@ -54,6 +53,7 @@ export interface TestEvent {
   aggregateType: "test_aggregate";
   tenantId: TenantId;
   timestamp: number;
+  version: string;
   type: typeof TEST_EVENT_TYPE;
   data: TestEventData;
   metadata?: Record<string, unknown>;
@@ -106,24 +106,32 @@ export class TestCommandHandler implements CommandHandler<
 }
 
 // ============================================================================
-// Event Handler
+// Map Projection (replaces TestEventHandler)
 // ============================================================================
 
 /**
- * Test event handler that writes processed events to a ClickHouse table.
+ * Record produced by the test map projection for storage in ClickHouse.
  */
-export class TestEventHandler implements EventHandler<any> {
+export interface TestEventHandlerRecord {
+  TenantId: string;
+  AggregateId: string;
+  EventId: string;
+  EventTimestamp: number;
+  Value: number;
+  Message: string;
+}
+
+/**
+ * AppendStore that writes mapped records to a ClickHouse table.
+ */
+class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord> {
   private clickHouseClient: ClickHouseClient | null = null;
 
   constructor() {
     this.clickHouseClient = getTestClickHouseClient();
   }
 
-  static getEventTypes() {
-    return [TEST_EVENT_TYPE] as const;
-  }
-
-  async handle(event: TestEvent): Promise<void> {
+  async append(record: TestEventHandlerRecord, _context: ProjectionStoreContext): Promise<void> {
     if (!this.clickHouseClient) {
       throw new Error("ClickHouse client not available");
     }
@@ -145,101 +153,92 @@ export class TestEventHandler implements EventHandler<any> {
     });
 
     // Insert processed event
-    // Use the same approach as eventRepositoryClickHouse.ts - pass timestamp as number
-    // The ClickHouse client handles DateTime64(3) columns correctly with numbers
     await this.clickHouseClient.insert({
       table: "test_langwatch.test_event_handler_log",
-      values: [
-        {
-          TenantId: String(event.tenantId),
-          AggregateId: event.aggregateId,
-          EventId: event.id,
-          EventTimestamp: event.timestamp, // Number (Unix timestamp in milliseconds) - same as eventRepositoryClickHouse.ts
-          Value: Number(event.data.value),
-          Message: String(event.data.message ?? ""),
-        },
-      ],
+      values: [record],
       format: "JSONEachRow",
     });
 
     logger.debug(
       {
-        tenantId: String(event.tenantId),
-        aggregateId: event.aggregateId,
-        eventId: event.id,
-        value: event.data.value,
+        tenantId: record.TenantId,
+        aggregateId: record.AggregateId,
+        eventId: record.EventId,
+        value: record.Value,
       },
-      "[TestEventHandler] Inserted event handler log",
+      "[TestEventHandlerAppendStore] Inserted event handler log",
     );
   }
 }
 
+/**
+ * Test map projection that transforms events into records for ClickHouse storage.
+ */
+export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, TestEvent> = {
+  name: "testHandler",
+  eventTypes: [TEST_EVENT_TYPE],
+  map(event: TestEvent): TestEventHandlerRecord {
+    return {
+      TenantId: String(event.tenantId),
+      AggregateId: event.aggregateId,
+      EventId: event.id,
+      EventTimestamp: event.timestamp,
+      Value: Number(event.data.value),
+      Message: String(event.data.message ?? ""),
+    };
+  },
+  store: new TestEventHandlerAppendStore(),
+};
+
 // ============================================================================
-// Projection Handler
+// Fold Projection (replaces TestProjectionHandler)
 // ============================================================================
 
 /**
- * In-memory projection store for tests.
+ * In-memory fold projection store for tests.
  */
-class TestProjectionStore implements ProjectionStore<TestProjection> {
-  private store = new Map<string, TestProjection>();
+class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData> {
+  private data = new Map<string, TestProjectionData>();
 
-  async getProjection(
-    aggregateId: string,
-    context: { tenantId: TenantId },
-  ): Promise<TestProjection | null> {
+  async get(aggregateId: string, context: ProjectionStoreContext): Promise<TestProjectionData | null> {
     const key = `${context.tenantId}:${aggregateId}`;
-    return this.store.get(key) ?? null;
+    return this.data.get(key) ?? null;
   }
 
-  async storeProjection(
-    projection: TestProjection,
-    context: { tenantId: TenantId },
-  ): Promise<void> {
-    const key = `${context.tenantId}:${projection.aggregateId}`;
-    this.store.set(key, projection);
+  async store(state: TestProjectionData, context: ProjectionStoreContext): Promise<void> {
+    const key = `${context.tenantId}:${context.aggregateId}`;
+    this.data.set(key, state);
   }
 }
 
 /**
- * Test projection handler that aggregates events into a projection.
+ * Test fold projection that aggregates events into accumulated state.
  */
-export class TestProjectionHandler implements ProjectionHandler<
-  any,
-  TestProjection
-> {
-  static readonly store = new TestProjectionStore();
+export const testFoldProjection: FoldProjectionDefinition<TestProjectionData, TestEvent> = {
+  name: "testProjection",
+  eventTypes: [TEST_EVENT_TYPE],
 
-  handle(stream: EventStream<TenantId, any>): TestProjection {
-    const events = stream.getEvents() as TestEvent[];
-    const aggregateId = stream.getAggregateId();
-    const tenantId = stream.getTenantId();
+  init(): TestProjectionData {
+    return {
+      totalValue: 0,
+      eventCount: 0,
+      lastMessage: undefined,
+    };
+  },
 
-    let totalValue = 0;
-    let lastMessage: string | undefined;
-
-    for (const event of events) {
-      // Ensure value is coerced to number (ClickHouse may return strings)
-      const value =
-        typeof event.data.value === "number"
-          ? event.data.value
-          : Number(event.data.value);
-      totalValue += value;
-      if (event.data.message) {
-        lastMessage = event.data.message;
-      }
-    }
+  apply(state: TestProjectionData, event: TestEvent): TestProjectionData {
+    // Ensure value is coerced to number (ClickHouse may return strings)
+    const value =
+      typeof event.data.value === "number"
+        ? event.data.value
+        : Number(event.data.value);
 
     return {
-      id: `test:${aggregateId}`,
-      aggregateId,
-      tenantId,
-      version: "2025-12-17",
-      data: {
-        totalValue,
-        eventCount: events.length,
-        lastMessage,
-      },
+      totalValue: state.totalValue + value,
+      eventCount: state.eventCount + 1,
+      lastMessage: event.data.message ?? state.lastMessage,
     };
-  }
-}
+  },
+
+  store: new TestFoldProjectionStore(),
+};

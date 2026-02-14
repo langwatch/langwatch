@@ -1,6 +1,6 @@
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../library";
-import { createTenantId } from "../../library";
+import { createTenantId, definePipeline } from "../../library";
 import { buildCheckpointKey } from "../../library/utils/checkpointKey";
 import { EventSourcing } from "../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
@@ -21,8 +21,8 @@ import {
 } from "./testContainers";
 import {
   TestCommandHandler,
-  TestEventHandler,
-  TestProjectionHandler,
+  testFoldProjection,
+  testMapProjection,
 } from "./testPipelines";
 
 const logger = createLogger(
@@ -123,8 +123,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   // Create EventSourcing instance with the runtime
   const eventSourcing = new EventSourcing(runtime);
 
-  // Build pipeline
-  // Note: TestProjectionHandler has a static store property, so we don't need to pass it
+  // Build pipeline using static definition
   // Using test aggregate type (now included in production schemas)
   // Use event-based deduplication for tests to ensure each event gets its own job.
   // In production, aggregate-based deduplication is used for debouncing, but the batch
@@ -135,18 +134,17 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     ttlMs: 100,
   };
 
-  const pipeline = eventSourcing
-    .registerPipeline<any>()
+  const pipelineDefinition = definePipeline<any>()
     .withName(pipelineName)
     .withAggregateType("test_aggregate" as AggregateType)
     .withCommand("testCommand", TestCommandHandler as any)
-    .withEventHandler("testHandler", TestEventHandler as any, {
-      deduplication: eventBasedDeduplication,
-    })
-    .withProjection("testProjection", TestProjectionHandler as any, {
+    .withMapProjection("testHandler", testMapProjection as any)
+    .withFoldProjection("testProjection", testFoldProjection as any, {
       deduplication: eventBasedDeduplication,
     })
     .build();
+
+  const pipeline = eventSourcing.register(pipelineDefinition);
 
   return {
     ...pipeline,

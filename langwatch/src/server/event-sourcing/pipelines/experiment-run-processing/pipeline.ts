@@ -3,9 +3,8 @@ import { CompleteExperimentRunCommand } from "./commands/completeExperimentRun.c
 import { RecordEvaluatorResultCommand } from "./commands/recordEvaluatorResult.command";
 import { RecordTargetResultCommand } from "./commands/recordTargetResult.command";
 import { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
-import { ExperimentRunResultStorageHandler } from "./handlers";
-import { ExperimentRunStateProjectionHandler } from "./projections";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "./schemas/constants";
+import { experimentRunResultStorageMapProjection } from "./handlers/experimentRunResultStorage.mapProjection";
+import { experimentRunStateFoldProjection } from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 /**
@@ -15,11 +14,11 @@ import type { ExperimentRunProcessingEvent } from "./schemas/events";
  * It tracks the lifecycle of experiment runs:
  * - started -> target results received -> evaluator results received -> completed
  *
- * Projection: experimentRunState
+ * Fold Projection: experimentRunState
  * - Computes summary statistics (progress, costs, scores, pass rate)
  * - Stored in experiment_runs ClickHouse table
  *
- * Event Handler: experimentRunResultStorage
+ * Map Projection: experimentRunResultStorage
  * - Writes individual results to experiment_run_items for query-optimized access
  * - Enables efficient filtering/sorting of detailed results
  *
@@ -33,19 +32,13 @@ export const experimentRunProcessingPipelineDefinition =
   definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withProjection("experimentRunState", ExperimentRunStateProjectionHandler, {
+    .withFoldProjection("experimentRunState", experimentRunStateFoldProjection, {
       deduplication: "aggregate",
       delay: 500,
     })
-    .withEventHandler(
+    .withMapProjection(
       "experimentRunResultStorage",
-      ExperimentRunResultStorageHandler,
-      {
-        eventTypes: [
-          EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
-          EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
-        ],
-      },
+      experimentRunResultStorageMapProjection,
     )
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)

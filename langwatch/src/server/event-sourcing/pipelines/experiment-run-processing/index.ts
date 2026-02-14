@@ -5,7 +5,7 @@ export { RecordEvaluatorResultCommand } from "./commands/recordEvaluatorResult.c
 export { RecordTargetResultCommand } from "./commands/recordTargetResult.command";
 export { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
 
-export { ExperimentRunResultStorageHandler } from "./handlers";
+export { experimentRunResultStorageMapProjection } from "./handlers";
 
 export * from "./projections";
 export * from "./repositories";

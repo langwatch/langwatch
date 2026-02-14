@@ -16,7 +16,7 @@ import { createTenantId, EventUtils } from "../../../library";
 import type {
   EvaluationState,
   EvaluationStateData,
-} from "../projections/evaluationState.projection.handler";
+} from "../projections/evaluationState.foldProjection";
 import type { EvaluationStateRepository } from "./evaluationState.repository";
 
 const TABLE_NAME = "evaluation_states" as const;

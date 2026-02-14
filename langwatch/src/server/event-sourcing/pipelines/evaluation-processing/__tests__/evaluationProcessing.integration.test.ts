@@ -10,7 +10,7 @@ import {
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
 import type { AggregateType } from "../../../library";
-import { createTenantId } from "../../../library";
+import { createTenantId, definePipeline } from "../../../library";
 import { EventSourcing } from "../../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../../runtime/eventSourcingRuntime";
 import type { PipelineWithCommandHandlers } from "../../../runtime/pipeline/types";
@@ -29,7 +29,8 @@ import { CompleteEvaluationCommand } from "../commands/completeEvaluation.comman
 import { ScheduleEvaluationCommand } from "../commands/scheduleEvaluation.command";
 import { StartEvaluationCommand } from "../commands/startEvaluation.command";
 import type { EvaluationState } from "../projections";
-import { EvaluationStateProjectionHandler } from "../projections";
+import { evaluationStateFoldProjection } from "../projections";
+import type { EvaluationProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:evaluation-processing:integration",
@@ -215,22 +216,23 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     ttlMs: 100,
   };
 
-  // Build pipeline using the existing pipeline definition's handlers
-  const pipeline = eventSourcing
-    .registerPipeline<any>()
+  // Build pipeline using static definition with definePipeline + register
+  const pipelineDefinition = definePipeline<EvaluationProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("evaluation" as AggregateType)
     .withCommand("scheduleEvaluation", ScheduleEvaluationCommand as any)
     .withCommand("startEvaluation", StartEvaluationCommand as any)
     .withCommand("completeEvaluation", CompleteEvaluationCommand as any)
-    .withProjection(
+    .withFoldProjection(
       "evaluationState",
-      EvaluationStateProjectionHandler as any,
+      evaluationStateFoldProjection as any,
       {
         deduplication: eventBasedDeduplication,
       },
     )
     .build();
+
+  const pipeline = eventSourcing.register(pipelineDefinition);
 
   return {
     ...pipeline,

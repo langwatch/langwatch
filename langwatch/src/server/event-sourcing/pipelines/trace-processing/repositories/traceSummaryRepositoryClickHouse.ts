@@ -17,7 +17,7 @@ import { createTenantId, EventUtils } from "../../../library";
 import type {
   TraceSummary,
   TraceSummaryData,
-} from "../projections/traceSummaryProjection";
+} from "../projections/traceSummary.foldProjection";
 import type { TraceSummaryRepository } from "./traceSummaryRepository";
 
 const TABLE_NAME = "trace_summaries" as const;
