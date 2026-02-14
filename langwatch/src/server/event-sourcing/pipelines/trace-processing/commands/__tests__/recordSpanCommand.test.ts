@@ -52,16 +52,22 @@ function createMockCommand(
 function createMockDependencies(): {
   deps: RecordSpanCommandDependencies;
   mockRedactSpan: ReturnType<typeof vi.fn>;
+  mockEnrichSpan: ReturnType<typeof vi.fn>;
 } {
   const mockRedactSpan = vi.fn();
+  const mockEnrichSpan = vi.fn();
 
   return {
     deps: {
       piiRedactionService: {
         redactSpan: mockRedactSpan,
       },
+      costEnrichmentService: {
+        enrichSpan: mockEnrichSpan,
+      },
     },
     mockRedactSpan,
+    mockEnrichSpan,
   };
 }
 
@@ -73,6 +79,7 @@ describe("RecordSpanCommand", () => {
     vi.clearAllMocks();
     const { deps, mockRedactSpan: mock } = createMockDependencies();
     mockRedactSpan = mock;
+    // mockEnrichSpan is available via deps but not needed in most tests
     handler = new RecordSpanCommand(deps);
   });
 

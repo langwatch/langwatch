@@ -356,10 +356,10 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:metrics.completionTokens`);
         }
 
-        // Extract cost (always set — this is the only source of cost data)
+        // Extract cost (setAttrIfAbsent — custom cost rates from enrichment take precedence)
         const cost = metricsValue.cost;
         if (typeof cost === "number" && cost > 0) {
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, cost);
+          ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_SPAN_COST, cost);
           ctx.recordRule(`${this.id}:metrics.cost`);
         }
 

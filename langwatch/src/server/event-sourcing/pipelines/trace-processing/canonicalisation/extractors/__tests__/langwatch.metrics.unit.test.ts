@@ -9,7 +9,7 @@ describe("LangWatchExtractor", () => {
 
   describe("metrics extraction (langwatch.metrics)", () => {
     describe("when langwatch.metrics has valid cost", () => {
-      it("sets langwatch.span.cost", () => {
+      it("sets langwatch.span.cost via setAttrIfAbsent", () => {
         const ctx = createExtractorContext({
           [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
             type: "json",
@@ -19,7 +19,7 @@ describe("LangWatchExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.setAttr).toHaveBeenCalledWith(
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
           ATTR_KEYS.LANGWATCH_SPAN_COST,
           0.005,
         );
@@ -127,6 +127,24 @@ describe("LangWatchExtractor", () => {
           true,
         );
         expect(ctx.out[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED]).toBe(true);
+      });
+    });
+
+    describe("when langwatch.span.cost is already in the bag", () => {
+      it("does not override (setAttrIfAbsent)", () => {
+        const ctx = createExtractorContext({
+          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+            type: "json",
+            value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
+          }),
+        });
+        // Pre-set cost (as if enrichment or another extractor already set it)
+        ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST] = 0.010;
+
+        extractor.apply(ctx);
+
+        // setAttrIfAbsent should not override existing value
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST]).toBe(0.010);
       });
     });
 

@@ -1,3 +1,8 @@
+import {
+  estimateCost,
+  matchingLLMModelCost,
+} from "~/server/background/workers/collector/cost";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import type { Projection } from "../../../library";
 import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
@@ -130,6 +135,7 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
   let cost = 0;
   let estimated = false;
 
+  // Token counts
   const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
   const genAiPromptTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS];
   if (typeof inputTokens === "number" && inputTokens > 0) {
@@ -146,9 +152,39 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
     completionTokens = genAiCompletionTokens;
   }
 
-  const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-  if (typeof spanCost === "number" && spanCost > 0) {
-    cost = spanCost;
+  // Cost: compute from model pricing instead of reading SDK cost directly
+  const models = extractModelsFromSpan(span);
+  const model = models[0];
+  if (model && (promptTokens > 0 || completionTokens > 0)) {
+    // Check span for custom cost rates (set by enrichment service)
+    const rawInputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
+    const rawOutputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
+    const hasCustomRates =
+      typeof rawInputRate === "number" || typeof rawOutputRate === "number";
+
+    if (hasCustomRates) {
+      const inputRate = typeof rawInputRate === "number" ? rawInputRate : 0;
+      const outputRate = typeof rawOutputRate === "number" ? rawOutputRate : 0;
+      cost = promptTokens * inputRate + completionTokens * outputRate;
+    } else {
+      // Fallback: static registry lookup (sync, cached at module level)
+      const staticCosts = getStaticModelCosts();
+      const matched = matchingLLMModelCost(model, staticCosts);
+      if (matched) {
+        const computed = estimateCost({
+          llmModelCost: matched,
+          inputTokens: promptTokens,
+          outputTokens: completionTokens,
+        });
+        if (computed !== undefined) cost = computed;
+      }
+    }
+  } else {
+    // No model or no tokens — fall back to SDK cost if available
+    const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
+    if (typeof spanCost === "number" && spanCost > 0) {
+      cost = spanCost;
+    }
   }
 
   if (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true) {
