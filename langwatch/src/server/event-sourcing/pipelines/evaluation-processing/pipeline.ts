@@ -21,12 +21,7 @@ export const evaluationProcessingPipelineDefinition =
   definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
-    .withFoldProjection("evaluationState", evaluationStateFoldProjection, {
-      // Dedupe by aggregate to process only the latest event per evaluation
-      deduplication: "aggregate",
-      // Small delay to batch multiple rapid updates to the same evaluation
-      delay: 500,
-    })
+    .withFoldProjection("evaluationState", evaluationStateFoldProjection)
     .withCommand("scheduleEvaluation", ScheduleEvaluationCommand)
     .withCommand("startEvaluation", StartEvaluationCommand)
     .withCommand("completeEvaluation", CompleteEvaluationCommand)

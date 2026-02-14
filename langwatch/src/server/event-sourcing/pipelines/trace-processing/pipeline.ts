@@ -19,13 +19,7 @@ export const traceProcessingPipelineDefinition =
   definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withFoldProjection("traceSummary", traceSummaryFoldProjection, {
-      // Dedupe by aggregate to process only the latest event per trace
-      deduplication: "aggregate",
-      // This reduces strain of computationally heavy trace summary projections being done
-      // unnecessarily due to the burst-heavy nature of span collection.
-      delay: 1500,
-    })
+    .withFoldProjection("traceSummary", traceSummaryFoldProjection)
     .withMapProjection("spanStorage", spanStorageMapProjection)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)

@@ -8,9 +8,16 @@ import {
   isEvaluatorResultEvent,
   isTargetResultEvent,
 } from "../schemas/events";
-import type { ExperimentRunTarget } from "../schemas/shared";
 import { experimentRunStateFoldStore } from "../repositories/experimentRunStateFoldStore";
 
+/**
+ * State data for an experiment run.
+ * Matches the experiment_runs ClickHouse table schema.
+ *
+ * This is both the fold state and the stored data — one type, not two.
+ * `apply()` does all computation using simple counters (no Sets/arrays).
+ * Store is a dumb read/write layer.
+ */
 export interface ExperimentRunStateData {
   RunId: string;
   ExperimentId: string;
@@ -28,6 +35,12 @@ export interface ExperimentRunStateData {
   UpdatedAt: number;
   FinishedAt: number | null;
   StoppedAt: number | null;
+
+  // Raw counters for incremental aggregation
+  TotalScoreSum: number;
+  ScoreCount: number;
+  PassedCount: number;
+  PassFailCount: number;
 }
 
 export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
@@ -35,164 +48,133 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
 }
 
 /**
- * Intermediate fold state for computing experiment run state from events.
- *
- * Includes both output fields (matching ExperimentRunStateData) and intermediate
- * bookkeeping fields (Sets, arrays) that the apply function needs to progressively
- * compute aggregates one event at a time.
- */
-export interface ExperimentRunFoldState {
-  // Output fields
-  runId: string;
-  experimentId: string;
-  workflowVersionId: string | null;
-  total: number;
-  targets: ExperimentRunTarget[];
-  totalCost: number;
-  totalDurationMs: number;
-  hasCostData: boolean;
-  hasDurationData: boolean;
-  createdAt: number;
-  updatedAt: number;
-  finishedAt: number | null;
-  stoppedAt: number | null;
-
-  // Intermediate fields for progressive computation
-  completedCells: Set<string>;
-  failedCells: Set<string>;
-  scores: number[];
-  passedCount: number;
-  passFailCount: number;
-}
-
-/**
  * FoldProjection definition for experiment run state.
  *
- * Extracts the init/apply logic from ExperimentRunStateProjectionHandler.handle()
- * into a pure functional fold. Each event is applied one at a time to produce
- * the next state, enabling incremental processing.
+ * Fold state = stored data. Uses simple counters instead of Sets/arrays
+ * so state round-trips through the store without loss.
  */
 export const experimentRunStateFoldProjection: FoldProjectionDefinition<
-  ExperimentRunFoldState,
+  ExperimentRunStateData,
   ExperimentRunProcessingEvent
 > = {
   name: "experimentRunState",
   eventTypes: EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 
-  init(): ExperimentRunFoldState {
+  init(): ExperimentRunStateData {
     return {
-      runId: "",
-      experimentId: "",
-      workflowVersionId: null,
-      total: 0,
-      targets: [],
-      totalCost: 0,
-      totalDurationMs: 0,
-      hasCostData: false,
-      hasDurationData: false,
-      createdAt: 0,
-      updatedAt: 0,
-      finishedAt: null,
-      stoppedAt: null,
-      completedCells: new Set<string>(),
-      failedCells: new Set<string>(),
-      scores: [],
-      passedCount: 0,
-      passFailCount: 0,
+      RunId: "",
+      ExperimentId: "",
+      WorkflowVersionId: null,
+      Total: 0,
+      Progress: 0,
+      CompletedCount: 0,
+      FailedCount: 0,
+      TotalCost: null,
+      TotalDurationMs: null,
+      AvgScore: null,
+      PassRate: null,
+      Targets: "[]",
+      CreatedAt: 0,
+      UpdatedAt: 0,
+      FinishedAt: null,
+      StoppedAt: null,
+      TotalScoreSum: 0,
+      ScoreCount: 0,
+      PassedCount: 0,
+      PassFailCount: 0,
     };
   },
 
   apply(
-    state: ExperimentRunFoldState,
+    state: ExperimentRunStateData,
     event: ExperimentRunProcessingEvent,
-  ): ExperimentRunFoldState {
+  ): ExperimentRunStateData {
     if (isExperimentRunStartedEvent(event)) {
       return {
         ...state,
-        runId: event.data.runId,
-        experimentId: event.data.experimentId,
-        workflowVersionId: event.data.workflowVersionId ?? null,
-        total: event.data.total,
-        targets: event.data.targets,
-        createdAt: event.timestamp,
-        updatedAt: event.timestamp,
+        RunId: event.data.runId,
+        ExperimentId: event.data.experimentId,
+        WorkflowVersionId: event.data.workflowVersionId ?? null,
+        Total: event.data.total,
+        Targets: JSON.stringify(event.data.targets),
+        CreatedAt: event.timestamp,
+        UpdatedAt: event.timestamp,
       };
     }
 
     if (isTargetResultEvent(event)) {
-      const cellKey = `${event.data.index}:${event.data.targetId}`;
-
-      // Clone sets to maintain immutability
-      const completedCells = new Set(state.completedCells);
-      const failedCells = new Set(state.failedCells);
+      let completedCount = state.CompletedCount;
+      let failedCount = state.FailedCount;
 
       if (event.data.error) {
-        failedCells.add(cellKey);
-        completedCells.delete(cellKey);
+        failedCount += 1;
       } else {
-        completedCells.add(cellKey);
-        failedCells.delete(cellKey);
+        completedCount += 1;
       }
 
-      let { totalCost, hasCostData, totalDurationMs, hasDurationData } = state;
-
+      let totalCost = state.TotalCost;
       if (event.data.cost != null) {
-        totalCost += event.data.cost;
-        hasCostData = true;
+        totalCost = (totalCost ?? 0) + event.data.cost;
       }
+
+      let totalDurationMs = state.TotalDurationMs;
       if (event.data.duration != null) {
-        totalDurationMs += event.data.duration;
-        hasDurationData = true;
+        totalDurationMs = (totalDurationMs ?? 0) + event.data.duration;
       }
+
+      const progress = completedCount + failedCount;
 
       return {
         ...state,
-        completedCells,
-        failedCells,
-        totalCost,
-        hasCostData,
-        totalDurationMs,
-        hasDurationData,
-        updatedAt: event.timestamp,
+        CompletedCount: completedCount,
+        FailedCount: failedCount,
+        Progress: progress,
+        TotalCost: totalCost,
+        TotalDurationMs: totalDurationMs,
+        UpdatedAt: event.timestamp,
       };
     }
 
     if (isEvaluatorResultEvent(event)) {
-      const scores = [...state.scores];
-      let { passedCount, passFailCount, totalCost, hasCostData } = state;
+      let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, PassFailCount: passFailCount, TotalCost: totalCost } = state;
 
       if (event.data.status === "processed") {
         if (event.data.score != null) {
-          scores.push(event.data.score);
+          totalScoreSum += event.data.score;
+          scoreCount += 1;
         }
         if (event.data.passed != null) {
-          passFailCount++;
-          if (event.data.passed) passedCount++;
+          passFailCount += 1;
+          if (event.data.passed) passedCount += 1;
         }
       }
 
       if (event.data.cost != null) {
-        totalCost += event.data.cost;
-        hasCostData = true;
+        totalCost = (totalCost ?? 0) + event.data.cost;
       }
+
+      const avgScore = scoreCount > 0 ? totalScoreSum / scoreCount : null;
+      const passRate = passFailCount > 0 ? passedCount / passFailCount : null;
 
       return {
         ...state,
-        scores,
-        passedCount,
-        passFailCount,
-        totalCost,
-        hasCostData,
-        updatedAt: event.timestamp,
+        TotalScoreSum: totalScoreSum,
+        ScoreCount: scoreCount,
+        PassedCount: passedCount,
+        PassFailCount: passFailCount,
+        TotalCost: totalCost,
+        AvgScore: avgScore,
+        PassRate: passRate,
+        UpdatedAt: event.timestamp,
       };
     }
 
     if (isExperimentRunCompletedEvent(event)) {
       return {
         ...state,
-        finishedAt: event.data.finishedAt ?? null,
-        stoppedAt: event.data.stoppedAt ?? null,
-        updatedAt: event.timestamp,
+        FinishedAt: event.data.finishedAt ?? null,
+        StoppedAt: event.data.stoppedAt ?? null,
+        UpdatedAt: event.timestamp,
       };
     }
 

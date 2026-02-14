@@ -45,6 +45,10 @@ interface ClickHouseExperimentRunRecord {
   FinishedAt: string | null;
   StoppedAt: string | null;
   LastProcessedEventId: string;
+  TotalScoreSum: number;
+  ScoreCount: number;
+  PassedCount: number;
+  PassFailCount: number;
 }
 
 function timestampToDateTime64(timestampMs: number | null): string | null {
@@ -85,6 +89,10 @@ export class ExperimentRunStateRepositoryClickHouse<
       UpdatedAt: dateTime64ToTimestamp(record.UpdatedAt) ?? 0,
       FinishedAt: dateTime64ToTimestamp(record.FinishedAt),
       StoppedAt: dateTime64ToTimestamp(record.StoppedAt),
+      TotalScoreSum: record.TotalScoreSum ?? 0,
+      ScoreCount: record.ScoreCount ?? 0,
+      PassedCount: record.PassedCount ?? 0,
+      PassFailCount: record.PassFailCount ?? 0,
     };
   }
 
@@ -116,6 +124,10 @@ export class ExperimentRunStateRepositoryClickHouse<
       FinishedAt: timestampToDateTime64(data.FinishedAt),
       StoppedAt: timestampToDateTime64(data.StoppedAt),
       LastProcessedEventId: lastProcessedEventId,
+      TotalScoreSum: data.TotalScoreSum,
+      ScoreCount: data.ScoreCount,
+      PassedCount: data.PassedCount,
+      PassFailCount: data.PassFailCount,
     };
   }
 
@@ -142,7 +154,8 @@ export class ExperimentRunStateRepositoryClickHouse<
             toString(UpdatedAt) AS UpdatedAt,
             toString(FinishedAt) AS FinishedAt,
             toString(StoppedAt) AS StoppedAt,
-            LastProcessedEventId
+            LastProcessedEventId,
+            TotalScoreSum, ScoreCount, PassedCount, PassFailCount
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
           ORDER BY UpdatedAt DESC

@@ -13,7 +13,7 @@ import type {
 } from "../../schemas/events";
 import {
   experimentRunStateFoldProjection,
-  type ExperimentRunFoldState,
+  type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
@@ -112,7 +112,7 @@ function createCompletedEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(events: ExperimentRunProcessingEvent[]): ExperimentRunFoldState {
+function foldEvents(events: ExperimentRunProcessingEvent[]): ExperimentRunStateData {
   let state = experimentRunStateFoldProjection.init();
   for (const event of events) {
     state = experimentRunStateFoldProjection.apply(state, event);
@@ -124,11 +124,11 @@ describe("experimentRunStateFoldProjection", () => {
   it("initializes run state from ExperimentRunStartedEvent", () => {
     const state = foldEvents([createStartedEvent()]);
 
-    expect(state.runId).toBe("run-123");
-    expect(state.experimentId).toBe("exp-1");
-    expect(state.total).toBe(10);
-    expect(state.completedCells.size).toBe(0);
-    expect(state.failedCells.size).toBe(0);
+    expect(state.RunId).toBe("run-123");
+    expect(state.ExperimentId).toBe("exp-1");
+    expect(state.Total).toBe(10);
+    expect(state.CompletedCount).toBe(0);
+    expect(state.FailedCount).toBe(0);
   });
 
   it("tracks progress from TargetResultEvent", () => {
@@ -138,10 +138,9 @@ describe("experimentRunStateFoldProjection", () => {
       createTargetResultEvent({ index: 1 }, { id: "event-2b", timestamp: 2100 }),
     ]);
 
-    const progress = state.completedCells.size + state.failedCells.size;
-    expect(progress).toBe(2);
-    expect(state.completedCells.size).toBe(2);
-    expect(state.failedCells.size).toBe(0);
+    expect(state.Progress).toBe(2);
+    expect(state.CompletedCount).toBe(2);
+    expect(state.FailedCount).toBe(0);
   });
 
   it("tracks failed results separately", () => {
@@ -154,10 +153,9 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    const progress = state.completedCells.size + state.failedCells.size;
-    expect(progress).toBe(2);
-    expect(state.completedCells.size).toBe(1);
-    expect(state.failedCells.size).toBe(1);
+    expect(state.Progress).toBe(2);
+    expect(state.CompletedCount).toBe(1);
+    expect(state.FailedCount).toBe(1);
   });
 
   it("computes average score from EvaluatorResultEvents", () => {
@@ -175,10 +173,7 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    const avgScore = state.scores.length > 0
-      ? state.scores.reduce((a, b) => a + b, 0) / state.scores.length
-      : null;
-    expect(avgScore).toBeCloseTo(0.8, 5);
+    expect(state.AvgScore).toBeCloseTo(0.8, 5);
   });
 
   it("computes pass rate from evaluator results", () => {
@@ -196,10 +191,7 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    const passRate = state.passFailCount > 0
-      ? state.passedCount / state.passFailCount
-      : null;
-    expect(passRate).toBeCloseTo(2 / 3, 5);
+    expect(state.PassRate).toBeCloseTo(2 / 3, 5);
   });
 
   it("marks completion from ExperimentRunCompletedEvent", () => {
@@ -209,8 +201,8 @@ describe("experimentRunStateFoldProjection", () => {
       createCompletedEvent({ finishedAt: 5000 }),
     ]);
 
-    expect(state.finishedAt).toBe(5000);
-    expect(state.stoppedAt).toBeNull();
+    expect(state.FinishedAt).toBe(5000);
+    expect(state.StoppedAt).toBeNull();
   });
 
   it("marks stopped when stoppedAt is provided", () => {
@@ -219,8 +211,8 @@ describe("experimentRunStateFoldProjection", () => {
       createCompletedEvent({ finishedAt: null, stoppedAt: 5000 }),
     ]);
 
-    expect(state.finishedAt).toBeNull();
-    expect(state.stoppedAt).toBe(5000);
+    expect(state.FinishedAt).toBeNull();
+    expect(state.StoppedAt).toBe(5000);
   });
 
   it("excludes skipped and error evaluator results from pass rate", () => {
@@ -243,10 +235,7 @@ describe("experimentRunStateFoldProjection", () => {
     ]);
 
     // Only 2 processed evaluators (1 passed, 1 failed), skipped/error excluded
-    const passRate = state.passFailCount > 0
-      ? state.passedCount / state.passFailCount
-      : null;
-    expect(passRate).toBeCloseTo(1 / 2, 5);
+    expect(state.PassRate).toBeCloseTo(1 / 2, 5);
   });
 
   it("excludes score-only evaluators from pass rate denominator", () => {
@@ -266,15 +255,9 @@ describe("experimentRunStateFoldProjection", () => {
     ]);
 
     // pass rate: 1/2 (score-only eval excluded from denominator)
-    const passRate = state.passFailCount > 0
-      ? state.passedCount / state.passFailCount
-      : null;
-    expect(passRate).toBeCloseTo(1 / 2, 5);
+    expect(state.PassRate).toBeCloseTo(1 / 2, 5);
     // avg score still includes all 3
-    const avgScore = state.scores.length > 0
-      ? state.scores.reduce((a, b) => a + b, 0) / state.scores.length
-      : null;
-    expect(avgScore).toBeCloseTo((0.8 + 0.8 + 0.9) / 3, 5);
+    expect(state.AvgScore).toBeCloseTo((0.8 + 0.8 + 0.9) / 3, 5);
   });
 
   it("accumulates costs from target and evaluator results", () => {
@@ -284,6 +267,6 @@ describe("experimentRunStateFoldProjection", () => {
       createEvaluatorResultEvent({ cost: 0.005 }),
     ]);
 
-    expect(state.totalCost).toBeCloseTo(0.015, 5);
+    expect(state.TotalCost).toBeCloseTo(0.015, 5);
   });
 });

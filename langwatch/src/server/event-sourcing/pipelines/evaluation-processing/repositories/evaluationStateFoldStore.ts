@@ -1,6 +1,5 @@
 import type { FoldProjectionStore } from "../../../library/projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../library/projections/projectionStoreContext";
-import type { EvaluationStateFoldState } from "../projections/evaluationState.foldProjection";
 import type {
   EvaluationState,
   EvaluationStateData,
@@ -10,49 +9,28 @@ import { IdUtils } from "../utils/id.utils";
 import { getEvaluationStateRepository } from "./index";
 
 /**
- * FoldProjectionStore wrapper for evaluation state.
- *
- * Adapts the existing EvaluationStateRepository to the FoldProjectionStore
- * interface by converting between EvaluationStateFoldState and the
- * Projection<EvaluationStateData> format expected by the repository.
+ * Dumb read/write store for evaluation state.
+ * No transformation — state IS the data.
  */
-export const evaluationStateFoldStore: FoldProjectionStore<EvaluationStateFoldState> = {
+export const evaluationStateFoldStore: FoldProjectionStore<EvaluationStateData> = {
   async store(
-    state: EvaluationStateFoldState,
+    state: EvaluationStateData,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const projectionId = state.firstEventTimestamp
+    const projectionId = state.ScheduledAt
       ? IdUtils.generateDeterministicEvaluationStateId(
           String(context.tenantId),
-          state.evaluationId,
-          state.firstEventTimestamp,
+          state.EvaluationId,
+          state.ScheduledAt,
         )
-      : `evaluation_state:${context.tenantId}:${state.evaluationId}`;
-
-    const data: EvaluationStateData = {
-      EvaluationId: state.evaluationId,
-      EvaluatorId: state.evaluatorId,
-      EvaluatorType: state.evaluatorType,
-      EvaluatorName: state.evaluatorName,
-      TraceId: state.traceId,
-      IsGuardrail: state.isGuardrail,
-      Status: state.status,
-      Score: state.score,
-      Passed: state.passed,
-      Label: state.label,
-      Details: state.details,
-      Error: state.error,
-      ScheduledAt: state.scheduledAt,
-      StartedAt: state.startedAt,
-      CompletedAt: state.completedAt,
-    };
+      : `evaluation_state:${context.tenantId}:${state.EvaluationId}`;
 
     const projection: EvaluationState = {
       id: projectionId,
       aggregateId: context.aggregateId,
       tenantId: context.tenantId,
       version: EVALUATION_PROJECTION_VERSIONS.STATE,
-      data,
+      data: state,
     };
 
     const repository = getEvaluationStateRepository();
@@ -62,36 +40,12 @@ export const evaluationStateFoldStore: FoldProjectionStore<EvaluationStateFoldSt
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<EvaluationStateFoldState | null> {
+  ): Promise<EvaluationStateData | null> {
     const repository = getEvaluationStateRepository();
     const projection = await repository.getProjection(aggregateId, {
       tenantId: context.tenantId,
     });
 
-    if (!projection) {
-      return null;
-    }
-
-    const data = projection.data as EvaluationStateData;
-
-    return {
-      evaluationId: data.EvaluationId,
-      evaluatorId: data.EvaluatorId,
-      evaluatorType: data.EvaluatorType,
-      evaluatorName: data.EvaluatorName,
-      traceId: data.TraceId,
-      isGuardrail: data.IsGuardrail,
-      status: data.Status,
-      score: data.Score,
-      passed: data.Passed,
-      label: data.Label,
-      details: data.Details,
-      error: data.Error,
-      scheduledAt: data.ScheduledAt,
-      startedAt: data.StartedAt,
-      completedAt: data.CompletedAt,
-      // Cannot reconstruct from stored data; rebuild replays all events
-      firstEventTimestamp: null,
-    };
+    return (projection?.data as EvaluationStateData) ?? null;
   },
 };

@@ -12,6 +12,9 @@ import { evaluationStateFoldStore } from "../repositories/evaluationStateFoldSto
 /**
  * State data for an evaluation.
  * Matches the evaluation_states ClickHouse table schema.
+ *
+ * This is both the fold state and the stored data — one type, not two.
+ * `apply()` does all computation. Store is a dumb read/write layer.
  */
 export interface EvaluationStateData {
   EvaluationId: string;
@@ -39,119 +42,86 @@ export interface EvaluationState extends Projection<EvaluationStateData> {
 }
 
 /**
- * Intermediate fold state for computing evaluation state from lifecycle events.
- *
- * Tracks the evaluation's progression through scheduled -> in_progress -> completed states.
- */
-export interface EvaluationStateFoldState {
-  evaluationId: string;
-  evaluatorId: string;
-  evaluatorType: string;
-  evaluatorName: string | null;
-  traceId: string | null;
-  isGuardrail: boolean;
-  status: "scheduled" | "in_progress" | "processed" | "error" | "skipped";
-  score: number | null;
-  passed: boolean | null;
-  label: string | null;
-  details: string | null;
-  error: string | null;
-  scheduledAt: number | null;
-  startedAt: number | null;
-  completedAt: number | null;
-  firstEventTimestamp: number | null;
-}
-
-/**
  * FoldProjection definition for evaluation state.
  *
- * Extracts the init/apply logic from EvaluationStateProjectionHandler.handle()
- * into a pure functional fold. Events are applied in order:
+ * Fold state = stored data. `apply()` writes PascalCase fields directly.
+ * Events are applied in order:
  * - EvaluationScheduledEvent -> status: "scheduled"
  * - EvaluationStartedEvent -> status: "in_progress"
  * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
  */
 export const evaluationStateFoldProjection: FoldProjectionDefinition<
-  EvaluationStateFoldState,
+  EvaluationStateData,
   EvaluationProcessingEvent
 > = {
   name: "evaluationState",
   eventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
 
-  init(): EvaluationStateFoldState {
+  init(): EvaluationStateData {
     return {
-      evaluationId: "",
-      evaluatorId: "",
-      evaluatorType: "",
-      evaluatorName: null,
-      traceId: null,
-      isGuardrail: false,
-      status: "scheduled",
-      score: null,
-      passed: null,
-      label: null,
-      details: null,
-      error: null,
-      scheduledAt: null,
-      startedAt: null,
-      completedAt: null,
-      firstEventTimestamp: null,
+      EvaluationId: "",
+      EvaluatorId: "",
+      EvaluatorType: "",
+      EvaluatorName: null,
+      TraceId: null,
+      IsGuardrail: false,
+      Status: "scheduled",
+      Score: null,
+      Passed: null,
+      Label: null,
+      Details: null,
+      Error: null,
+      ScheduledAt: null,
+      StartedAt: null,
+      CompletedAt: null,
     };
   },
 
   apply(
-    state: EvaluationStateFoldState,
+    state: EvaluationStateData,
     event: EvaluationProcessingEvent,
-  ): EvaluationStateFoldState {
-    // Track the first event timestamp for deterministic ID generation
-    const firstEventTimestamp = state.firstEventTimestamp ?? event.timestamp;
-
+  ): EvaluationStateData {
     if (isEvaluationScheduledEvent(event)) {
       return {
         ...state,
-        evaluationId: event.data.evaluationId,
-        evaluatorId: event.data.evaluatorId,
-        evaluatorType: event.data.evaluatorType,
-        evaluatorName: event.data.evaluatorName ?? null,
-        traceId: event.data.traceId ?? null,
-        isGuardrail: event.data.isGuardrail ?? false,
-        status: "scheduled",
-        scheduledAt: event.timestamp,
-        firstEventTimestamp,
+        EvaluationId: event.data.evaluationId,
+        EvaluatorId: event.data.evaluatorId,
+        EvaluatorType: event.data.evaluatorType,
+        EvaluatorName: event.data.evaluatorName ?? null,
+        TraceId: event.data.traceId ?? null,
+        IsGuardrail: event.data.isGuardrail ?? false,
+        Status: "scheduled",
+        ScheduledAt: event.timestamp,
       };
     }
 
     if (isEvaluationStartedEvent(event)) {
       return {
         ...state,
-        // Merge metadata fields individually to allow backfilling from start event
-        // when schedule event had partial or missing data
-        evaluatorId: state.evaluatorId || event.data.evaluatorId,
-        evaluatorType: state.evaluatorType || event.data.evaluatorType,
-        evaluatorName: state.evaluatorName ?? (event.data.evaluatorName ?? null),
-        traceId: state.traceId ?? (event.data.traceId ?? null),
-        isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
-        status: "in_progress",
-        startedAt: event.timestamp,
-        firstEventTimestamp,
+        EvaluatorId: state.EvaluatorId || event.data.evaluatorId,
+        EvaluatorType: state.EvaluatorType || event.data.evaluatorType,
+        EvaluatorName: state.EvaluatorName ?? (event.data.evaluatorName ?? null),
+        TraceId: state.TraceId ?? (event.data.traceId ?? null),
+        IsGuardrail: event.data.isGuardrail ?? state.IsGuardrail,
+        Status: "in_progress",
+        StartedAt: event.timestamp,
       };
     }
 
     if (isEvaluationCompletedEvent(event)) {
       return {
         ...state,
-        status: event.data.status,
-        score: event.data.score ?? null,
-        passed: event.data.passed ?? null,
-        label: event.data.label ?? null,
-        details: event.data.details ?? null,
-        error: event.data.error ?? null,
-        completedAt: event.timestamp,
-        firstEventTimestamp,
+        Status: event.data.status,
+        Score: event.data.score ?? null,
+        Passed: event.data.passed ?? null,
+        Label: event.data.label ?? null,
+        Details: event.data.details ?? null,
+        Error: event.data.error ?? null,
+        CompletedAt: event.timestamp,
       };
     }
 
-    return { ...state, firstEventTimestamp };
+    return state;
   },
 
   store: evaluationStateFoldStore,

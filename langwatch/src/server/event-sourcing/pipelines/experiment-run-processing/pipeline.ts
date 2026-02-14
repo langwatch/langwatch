@@ -32,10 +32,7 @@ export const experimentRunProcessingPipelineDefinition =
   definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withFoldProjection("experimentRunState", experimentRunStateFoldProjection, {
-      deduplication: "aggregate",
-      delay: 500,
-    })
+    .withFoldProjection("experimentRunState", experimentRunStateFoldProjection)
     .withMapProjection(
       "experimentRunResultStorage",
       experimentRunResultStorageMapProjection,
