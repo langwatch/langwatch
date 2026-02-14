@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
+import type { LocalPromptConfig } from "~/evaluations-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
@@ -115,7 +116,14 @@ export const llmConfigSchema = z.object({
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
-export type Signature = BaseComponent;
+export type Signature = BaseComponent & {
+  /** Local prompt config for unsaved prompt changes */
+  localPromptConfig?: LocalPromptConfig;
+  /** Reference to saved DB prompt */
+  promptId?: string;
+  /** Specific version reference */
+  promptVersionId?: string;
+};
 
 type StronglyTypedFieldBase = Omit<Field, "value" | "type" | "identifier">;
 /**
@@ -232,6 +240,8 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   evaluator?: EvaluatorTypes | `custom/${string}` | `evaluators/${string}`;
   workflowId?: string;
   data?: any;
+  /** Local config for unsaved evaluator changes */
+  localConfig?: { name?: string; settings?: Record<string, unknown> };
 };
 
 export type End = BaseComponent & {

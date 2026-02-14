@@ -21,7 +21,7 @@ const defaultOutput = defaults.outputs[0];
  * Playground, Evaluations V3, and Optimization Studio.
  */
 const signature: Signature = {
-  name: "LLM",
+  name: "New Prompt",
   description: "LLM calling node",
   parameters: [
     {

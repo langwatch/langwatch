@@ -1,10 +1,12 @@
-import { HStack, Spinner, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
+import { useShallow } from "zustand/react/shallow";
 import { z } from "zod";
 import DynamicZodForm from "../../../components/checks/DynamicZodForm";
+import type { EvaluatorMappingsConfig } from "../../../components/evaluators/EvaluatorEditorDrawer";
 import { EvaluatorEditorContent } from "../../../components/evaluators/EvaluatorEditorContent";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -17,6 +19,12 @@ import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEval
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Evaluator, Field } from "../../types/dsl";
+import {
+  buildAvailableSources,
+  buildInputMappingsFromEdges,
+  applyMappingChangeToEdges,
+} from "../../utils/edgeMappingUtils";
+import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**
@@ -62,6 +70,19 @@ function DbEvaluatorPanel({
   evaluatorRef: string;
 }) {
   const { project } = useOrganizationTeamProject();
+  const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } =
+    useWorkflowStore(
+      useShallow(
+        ({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
+          nodes: getWorkflow().nodes,
+          edges: getWorkflow().edges,
+          setNode,
+          setEdges,
+          getWorkflow,
+          deselectAllNodes,
+        }),
+      ),
+    );
   const evaluatorId = extractEvaluatorId(evaluatorRef);
 
   const evaluatorQuery = api.evaluators.getById.useQuery(
@@ -77,6 +98,8 @@ function DbEvaluatorPanel({
   } | null;
 
   const evaluatorType = config?.evaluatorType;
+  const dbName = evaluatorQuery.data?.name ?? "";
+  const dbSettings = config?.settings ?? {};
 
   const evaluatorDef = evaluatorType
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
@@ -120,33 +143,105 @@ function DbEvaluatorPanel({
         }
       : undefined;
 
+  // Local config from node data (unsaved changes)
+  const localConfig = node.data.localConfig;
+  const initialName = localConfig?.name ?? dbName;
+  const initialSettings = localConfig?.settings ?? dbSettings;
+
   // Form for name + settings
   const form = useForm<{ name: string; settings: Record<string, unknown> }>({
     defaultValues: {
-      name: evaluatorQuery.data?.name ?? "",
-      settings: config?.settings ?? {},
+      name: initialName,
+      settings: initialSettings,
     },
   });
 
-  // Reset form when evaluator data loads
+  // Reset form when evaluator data loads, respecting localConfig
   useEffect(() => {
     if (evaluatorQuery.data) {
-      const loadedConfig = evaluatorQuery.data.config as {
-        settings?: Record<string, unknown>;
-      } | null;
+      const lc = node.data.localConfig;
       form.reset({
-        name: evaluatorQuery.data.name,
-        settings: loadedConfig?.settings ?? {},
+        name: lc?.name ?? evaluatorQuery.data.name,
+        settings:
+          lc?.settings ??
+          (evaluatorQuery.data.config as any)?.settings ??
+          {},
       });
     }
   }, [evaluatorQuery.data, form]);
 
-  // Debounced save to DB
-  const saveToDb = useCallback(
-    (formValues: { name: string; settings: Record<string, unknown> }) => {
-      if (!project?.id || !evaluatorType) return;
+  // Watch form changes and persist to node.data.localConfig (debounced to
+  // avoid flooding the store on every keystroke).
+  const debouncedSetLocalConfig = useDebouncedCallback(
+    (formValues: { name?: string; settings?: Record<string, unknown> }) => {
+      setNode({
+        id: node.id,
+        data: {
+          localConfig: {
+            name: formValues.name as string,
+            settings: formValues.settings as Record<string, unknown>,
+          },
+        },
+      });
+    },
+    300,
+    { trailing: true },
+  );
 
-      updateMutation.mutate({
+  useEffect(() => {
+    const subscription = form.watch((formValues) => {
+      if (formValues.name !== undefined && formValues.settings !== undefined) {
+        debouncedSetLocalConfig(formValues);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, debouncedSetLocalConfig]);
+
+  // Build mappingsConfig from workflow graph
+  const availableSources = useMemo(
+    () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
+    [edges, nodes, node.id],
+  );
+
+  const inputMappings = useMemo(
+    () => buildInputMappingsFromEdges({ nodeId: node.id, edges }),
+    [edges, node.id],
+  );
+
+  const handleInputMappingChange = useCallback(
+    (identifier: string, mapping: any) => {
+      const currentEdges = getWorkflow().edges;
+      const newEdges = applyMappingChangeToEdges({
+        nodeId: node.id,
+        identifier,
+        mapping,
+        currentEdges,
+      });
+      setEdges(newEdges);
+    },
+    [getWorkflow, node.id, setEdges],
+  );
+
+  const mappingsConfig: EvaluatorMappingsConfig = useMemo(
+    () => ({
+      availableSources,
+      initialMappings: inputMappings,
+      onMappingChange: handleInputMappingChange,
+    }),
+    [availableSources, inputMappings, handleInputMappingChange],
+  );
+
+  // Action handlers
+  const handleApply = useCallback(
+    () => deselectAllNodes(),
+    [deselectAllNodes],
+  );
+
+  const handleSave = useCallback(() => {
+    if (!project?.id || !evaluatorType) return;
+    const formValues = form.getValues();
+    updateMutation.mutate(
+      {
         id: evaluatorId,
         projectId: project.id,
         name: formValues.name.trim(),
@@ -154,57 +249,84 @@ function DbEvaluatorPanel({
           evaluatorType,
           settings: formValues.settings,
         },
-      });
-    },
-    [project?.id, evaluatorId, evaluatorType, updateMutation],
+      },
+      {
+        onSuccess: () =>
+          setNode({ id: node.id, data: { localConfig: undefined } }),
+      },
+    );
+  }, [
+    project?.id,
+    evaluatorId,
+    evaluatorType,
+    form,
+    updateMutation,
+    setNode,
+    node.id,
+  ]);
+
+  const handleDiscard = useCallback(() => {
+    form.reset({ name: dbName, settings: dbSettings });
+    setNode({ id: node.id, data: { localConfig: undefined } });
+  }, [form, dbName, dbSettings, setNode, node.id]);
+
+  // Register footer with the drawer wrapper
+  const footerContent = useMemo(
+    () => (
+      <HStack width="full">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDiscard}
+          data-testid="evaluator-discard-button"
+        >
+          Discard
+        </Button>
+        <Spacer />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleApply}
+          data-testid="evaluator-apply-button"
+        >
+          Apply
+        </Button>
+        <Button
+          colorPalette="blue"
+          size="sm"
+          onClick={handleSave}
+          loading={updateMutation.isPending}
+          data-testid="evaluator-save-button"
+        >
+          Save
+        </Button>
+      </HStack>
+    ),
+    [handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
-
-  const debouncedSave = useDebouncedCallback(saveToDb, 500, {
-    leading: false,
-    trailing: true,
-  });
-
-  // Watch form changes and auto-save
-  useEffect(() => {
-    const subscription = form.watch((formValues) => {
-      if (formValues.name !== undefined && formValues.settings !== undefined) {
-        debouncedSave(
-          formValues as { name: string; settings: Record<string, unknown> },
-        );
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, debouncedSave]);
+  useRegisterDrawerFooter(footerContent);
 
   if (evaluatorQuery.isLoading) {
     return (
-      <BasePropertiesPanel node={node}>
-        <HStack justify="center" paddingY={8} width="full">
-          <Spinner size="md" />
-        </HStack>
-      </BasePropertiesPanel>
+      <HStack justify="center" paddingY={8} width="full">
+        <Spinner size="md" />
+      </HStack>
     );
   }
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      inputsReadOnly
-      outputsReadOnly
-    >
-      <EvaluatorEditorContent
-        evaluatorType={evaluatorType}
-        description={evaluatorDef?.description}
-        isWorkflowEvaluator={isWorkflowEvaluator}
-        workflow={workflow}
-        form={form}
-        settingsSchema={settingsSchema}
-        hasSettings={hasSettings}
-        effectiveEvaluatorDef={effectiveEvaluatorDef}
-        variant="studio"
-      />
-    </BasePropertiesPanel>
+    <EvaluatorEditorContent
+      evaluatorType={evaluatorType}
+      description={evaluatorDef?.description}
+      isWorkflowEvaluator={isWorkflowEvaluator}
+      workflow={workflow}
+      form={form}
+      settingsSchema={settingsSchema}
+      hasSettings={hasSettings}
+      effectiveEvaluatorDef={effectiveEvaluatorDef}
+      mappingsConfig={mappingsConfig}
+      variant="studio"
+    />
   );
 }
 
@@ -333,5 +455,58 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
         </FormProvider>
       )}
     </BasePropertiesPanel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Exported footer for use by StudioDrawerWrapper (wired in a later task)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reusable footer with Discard / Apply / Save buttons for evaluator drawers.
+ *
+ * Rendered outside the properties panel so it can be placed in a drawer footer
+ * slot without interfering with the panel's inputs/outputs layout.
+ */
+export function EvaluatorDrawerFooter({
+  onApply,
+  onSave,
+  onDiscard,
+  isSaving,
+}: {
+  onApply: () => void;
+  onSave: () => void;
+  onDiscard: () => void;
+  isSaving: boolean;
+}) {
+  return (
+    <HStack width="full" paddingY={3} paddingX={4}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onDiscard}
+        data-testid="evaluator-discard-button"
+      >
+        Discard
+      </Button>
+      <Spacer />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onApply}
+        data-testid="evaluator-apply-button"
+      >
+        Apply
+      </Button>
+      <Button
+        colorPalette="blue"
+        size="sm"
+        onClick={onSave}
+        loading={isSaving}
+        data-testid="evaluator-save-button"
+      >
+        Save
+      </Button>
+    </HStack>
   );
 }

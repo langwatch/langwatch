@@ -3,6 +3,7 @@ import {
   Button,
   type ButtonProps,
   Center,
+  Circle,
   HStack,
   Spacer,
   Spinner,
@@ -45,10 +46,12 @@ import type {
   LLMConfig,
 } from "../../types/dsl";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
+import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
-  return node.data.name ?? node.data.cls ?? node.id;
+  const data = node.data as any;
+  return data.localConfig?.name ?? data.name ?? data.cls ?? node.id;
 }
 
 function NodeInputs({
@@ -346,6 +349,11 @@ export const ComponentNode = forwardRef(function ComponentNode(
         >
           {getNodeDisplayName(props)}
         </Text>
+        {hasUnsavedChanges(props.data) && (
+          <Tooltip content="Unsaved changes" positioning={{ placement: "top" }} openDelay={0} showArrow>
+            <Circle size="8px" bg="orange.solid" flexShrink={0} data-testid="unsaved-changes-indicator" />
+          </Tooltip>
+        )}
         {node && isExecutableComponent(node) && !isInsideWizard ? (
           <ComponentExecutionButton
             node={node}

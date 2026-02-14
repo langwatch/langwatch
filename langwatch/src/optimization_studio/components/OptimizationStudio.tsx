@@ -59,7 +59,7 @@ import { NodeComponents } from "./nodes";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { Publish } from "./Publish";
-import { PropertiesPanel } from "./properties/PropertiesPanel";
+import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 
@@ -368,7 +368,7 @@ export default function OptimizationStudio() {
                         />
                       </Panel>
                     </PanelGroup>
-                    <PropertiesPanel />
+                    <StudioNodeDrawer />
                   </Flex>
                 </Box>
               </VStack>

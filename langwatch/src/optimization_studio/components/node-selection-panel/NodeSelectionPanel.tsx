@@ -65,12 +65,13 @@ export const NodeSelectionPanel = ({
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }) => {
-  const { propertiesExpanded, getWorkflow, setNode, deleteNode } =
+  const { propertiesExpanded, getWorkflow, setNode, deleteNode, setSelectedNode } =
     useWorkflowStore((state) => ({
       propertiesExpanded: state.propertiesExpanded,
       getWorkflow: state.getWorkflow,
       setNode: state.setNode,
       deleteNode: state.deleteNode,
+      setSelectedNode: state.setSelectedNode,
     }));
 
   const workflow = getWorkflow();
@@ -219,6 +220,19 @@ export const NodeSelectionPanel = ({
     [openDrawer, configureEvaluatorNode],
   );
 
+  /**
+   * When an LLM signature node is dropped on the canvas, automatically
+   * select it so the PromptEditorDrawer opens for editing.
+   */
+  const handleLlmDragEnd = useCallback(
+    (item: { node?: { id?: string } }) => {
+      const nodeId = item.node?.id;
+      if (!nodeId) return;
+      setSelectedNode(nodeId);
+    },
+    [setSelectedNode],
+  );
+
   return (
     <Box
       display={isOpen ? "block" : "none"}
@@ -252,7 +266,7 @@ export const NodeSelectionPanel = ({
             Components
           </Text>
 
-          <LlmSignatureNodeDraggable />
+          <LlmSignatureNodeDraggable onDragEnd={handleLlmDragEnd} />
 
           <NodeDraggable component={MODULES.code} type="code" />
 
