@@ -14,8 +14,8 @@ import pytest
 from langevals import expect
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("AZURE_API_KEY"),
-    reason="Azure OpenAI credentials not set",
+    not os.environ.get("AZURE_API_KEY") or not os.environ.get("AZURE_DEPLOYMENT_NAME"),
+    reason="Azure OpenAI credentials or deployment name not set",
 )
 
 
