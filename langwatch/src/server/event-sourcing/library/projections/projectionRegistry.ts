@@ -51,6 +51,13 @@ export class ProjectionRegistry<EventType extends Event = Event> {
    * Initialize queue infrastructure. Call after registering projections.
    */
   initialize(queueFactory: QueueProcessorFactory): void {
+    if (this.queueManager) {
+      throw new ConfigurationError(
+        "ProjectionRegistry",
+        "Already initialized. Call close() before re-initializing.",
+      );
+    }
+
     const aggregateType: AggregateType = "global";
     this.queueManager = new QueueManager<EventType>({
       aggregateType,

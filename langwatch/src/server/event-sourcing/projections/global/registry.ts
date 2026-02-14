@@ -1,6 +1,6 @@
 import type { Event } from "../../library/domain/types";
 import { ProjectionRegistry } from "../../library/projections/projectionRegistry";
-import { tenantDailyEventCountProjection } from "./tenantDailyEventCount.foldProjection";
+import { tenantDailyBillableEventsProjection } from "./tenantDailyEventCount.foldProjection";
 
 /**
  * Global projection registry singleton.
@@ -11,7 +11,10 @@ let globalRegistry: ProjectionRegistry<Event> | null = null;
 export function getGlobalProjectionRegistry(): ProjectionRegistry<Event> {
   if (!globalRegistry) {
     globalRegistry = new ProjectionRegistry<Event>();
-    globalRegistry.registerFoldProjection(tenantDailyEventCountProjection);
+
+    if (process.env.IS_SAAS) {
+      globalRegistry.registerFoldProjection(tenantDailyBillableEventsProjection);
+    }
   }
   return globalRegistry;
 }
