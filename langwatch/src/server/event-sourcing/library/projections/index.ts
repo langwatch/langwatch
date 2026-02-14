@@ -11,4 +11,5 @@ export type {
 export type { ProjectionStoreContext } from "./projectionStoreContext";
 export { FoldProjectionExecutor } from "./foldProjectionExecutor";
 export { MapProjectionExecutor } from "./mapProjectionExecutor";
+export { ProjectionRegistry } from "./projectionRegistry";
 export { ProjectionRouter } from "./projectionRouter";

@@ -1,0 +1,132 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  tenantDailyEventCountProjection,
+  tenantDailyEventCountStore,
+} from "../tenantDailyEventCount.foldProjection";
+import type { Event } from "../../../library/domain/types";
+import {
+  createTestEvent,
+  createTestTenantId,
+  TEST_CONSTANTS,
+} from "../../../library/services/__tests__/testHelpers";
+import type { ProjectionStoreContext } from "../../../library/projections/projectionStoreContext";
+
+describe("tenantDailyEventCountProjection", () => {
+  const tenantId = createTestTenantId();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("definition", () => {
+    it("subscribes to all event types", () => {
+      expect(tenantDailyEventCountProjection.eventTypes).toEqual([]);
+    });
+  });
+
+  describe("key function", () => {
+    it("produces tenantId:date key", () => {
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        undefined,
+        // Jan 12, 1970 (1000000 ms from epoch)
+        1000000,
+      );
+
+      const key = tenantDailyEventCountProjection.key!(event as Event);
+      expect(key).toBe(`${tenantId}:1970-01-01`);
+    });
+
+    it("groups events from the same day together", () => {
+      const dayMs = 1_700_000_000_000; // Nov 14, 2023
+      const event1 = createTestEvent(
+        "agg-1",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        undefined,
+        dayMs,
+      );
+      const event2 = createTestEvent(
+        "agg-2",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        undefined,
+        dayMs + 3600_000, // 1 hour later, same day
+      );
+
+      const key1 = tenantDailyEventCountProjection.key!(event1 as Event);
+      const key2 = tenantDailyEventCountProjection.key!(event2 as Event);
+      expect(key1).toBe(key2);
+    });
+  });
+
+  describe("apply function", () => {
+    it("increments count and sets tenantId/date", () => {
+      const state = tenantDailyEventCountProjection.init();
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        undefined,
+        1_700_000_000_000,
+      );
+
+      const newState = tenantDailyEventCountProjection.apply(state, event as Event);
+
+      expect(newState.count).toBe(1);
+      expect(newState.tenantId).toBe(String(tenantId));
+      expect(newState.date).toBe("2023-11-14");
+    });
+
+    it("accumulates count across events", () => {
+      let state = tenantDailyEventCountProjection.init();
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        undefined,
+        1_700_000_000_000,
+      );
+
+      state = tenantDailyEventCountProjection.apply(state, event as Event);
+      state = tenantDailyEventCountProjection.apply(state, event as Event);
+      state = tenantDailyEventCountProjection.apply(state, event as Event);
+
+      expect(state.count).toBe(3);
+    });
+  });
+
+  describe("store", () => {
+    it("stores and retrieves state by key", async () => {
+      const context: ProjectionStoreContext = {
+        aggregateId: "ignored",
+        tenantId,
+        key: `${tenantId}:2023-11-14`,
+      };
+
+      const state = { tenantId: String(tenantId), date: "2023-11-14", count: 42 };
+      await tenantDailyEventCountStore.store(state, context);
+
+      const retrieved = await tenantDailyEventCountStore.get(context.key!, context);
+      expect(retrieved).toEqual(state);
+    });
+
+    it("returns null for unknown keys", async () => {
+      const context: ProjectionStoreContext = {
+        aggregateId: "ignored",
+        tenantId,
+      };
+
+      const result = await tenantDailyEventCountStore.get("nonexistent", context);
+      expect(result).toBeNull();
+    });
+  });
+});

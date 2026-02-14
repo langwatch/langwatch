@@ -57,5 +57,6 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trace",
   "evaluation",
   "experiment_run",
+  "global",
   TEST_AGGREGATE_TYPE,
 ] as const;
