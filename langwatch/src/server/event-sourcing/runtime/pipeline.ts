@@ -27,7 +27,6 @@ export class EventSourcingPipeline<
       metadata?: PipelineMetadata;
     },
   ) {
-    // Ensure metadata exists
     if (!definition.metadata) {
       definition.metadata = {
         name: definition.name,
@@ -38,7 +37,6 @@ export class EventSourcingPipeline<
       };
     }
 
-    // Use Object.defineProperty to make properties truly readonly at runtime
     Object.defineProperty(this, "name", {
       value: definition.name,
       writable: false,
@@ -82,9 +80,9 @@ export class EventSourcingPipeline<
         pipelineName: definition.name,
         aggregateType: definition.aggregateType,
         eventStore: definition.eventStore,
-        projections: definition.projections,
+        foldProjections: definition.foldProjections,
+        mapProjections: definition.mapProjections,
         eventPublisher: definition.eventPublisher,
-        eventHandlers: definition.eventHandlers,
         checkpointStore: definition.processorCheckpointStore,
         queueFactory: definition.queueProcessorFactory,
         featureFlagService: definition.featureFlagService,

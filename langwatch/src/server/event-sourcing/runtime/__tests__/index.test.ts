@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AggregateType, Event, Projection } from "../../library";
 import { EventSourcingService } from "../../library";
+import type { FoldProjectionDefinition } from "../../library/projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../../library/projections/mapProjection.types";
 import {
-  createMockEventHandlerDefinition,
   createMockEventPublisher,
   createMockEventStore,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
   createTestAggregateType,
 } from "../../library/services/__tests__/testHelpers";
 import { EventSourcingPipeline } from "../pipeline";
@@ -67,26 +66,30 @@ describe("EventSourcingPipeline", () => {
     });
 
     it("creates service with all optional fields when provided", () => {
-      const projectionStore = createMockProjectionStore<Projection>();
-      const projectionHandler = createMockProjectionDefinition(
-        "test-projection",
-        undefined,
-        projectionStore,
-      );
+      const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
+        name: "test-fold",
+        eventTypes: ["test.event"],
+        init: () => ({}),
+        apply: (state) => state,
+        store: { store: vi.fn(), get: vi.fn() },
+      };
+
+      const mockMapProjection: MapProjectionDefinition<any, Event> = {
+        name: "test-map",
+        eventTypes: ["test.event"],
+        map: () => ({}),
+        store: { append: vi.fn() },
+      };
+
       const eventPublisher = createMockEventPublisher<Event>();
-      const eventHandler = createMockEventHandlerDefinition("test-handler");
 
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
-        projections: {
-          "test-projection": projectionHandler,
-        },
+        foldProjections: [mockFoldProjection],
+        mapProjections: [mockMapProjection],
         eventPublisher,
-        eventHandlers: {
-          "test-handler": eventHandler,
-        },
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -225,26 +228,30 @@ describe("EventSourcingPipeline", () => {
     });
 
     it("works with full definition containing all optional fields", () => {
-      const projectionStore = createMockProjectionStore<Projection>();
-      const projectionHandler = createMockProjectionDefinition(
-        "test-projection",
-        undefined,
-        projectionStore,
-      );
+      const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
+        name: "test-fold",
+        eventTypes: ["test.event"],
+        init: () => ({}),
+        apply: (state) => state,
+        store: { store: vi.fn(), get: vi.fn() },
+      };
+
+      const mockMapProjection: MapProjectionDefinition<any, Event> = {
+        name: "test-map",
+        eventTypes: ["test.event"],
+        map: () => ({}),
+        store: { append: vi.fn() },
+      };
+
       const eventPublisher = createMockEventPublisher<Event>();
-      const eventHandler = createMockEventHandlerDefinition("test-handler");
 
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "full-pipeline",
         aggregateType,
         eventStore: mockEventStore,
-        projections: {
-          "test-projection": projectionHandler,
-        },
+        foldProjections: [mockFoldProjection],
+        mapProjections: [mockMapProjection],
         eventPublisher,
-        eventHandlers: {
-          "test-handler": eventHandler,
-        },
       };
 
       const pipeline = new EventSourcingPipeline(definition);

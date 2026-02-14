@@ -11,10 +11,9 @@ import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
 import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
 import { experimentRunProcessingPipelineDefinition } from "../pipelines/experiment-run-processing/pipeline";
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
-import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
+import { DisabledPipeline } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
-import { PipelineBuilder } from "./index";
 import { EventSourcingPipeline } from "./pipeline";
 import type {
   PipelineWithCommandHandlers,
@@ -26,8 +25,6 @@ const logger = createLogger("langwatch:event-sourcing:register");
 
 /**
  * Type helper to convert registered commands union to a record of queue processors.
- * Transforms `{ name: "foo", payload: FooPayload } | { name: "bar", payload: BarPayload }`
- * into `{ foo: EventSourcedQueueProcessor<FooPayload>, bar: EventSourcedQueueProcessor<BarPayload> }`
  */
 type CommandsToProcessors<Commands extends RegisteredCommand> = {
   [K in Commands as K["name"]]: EventSourcedQueueProcessor<K["payload"]>;
@@ -35,8 +32,6 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
 
 /**
  * Singleton that manages shared event sourcing infrastructure.
- * Provides a single event store instance that can be used by all pipelines,
- * since the database partitions by tenantId + aggregateType.
  */
 export class EventSourcing {
   private static instance: EventSourcing | null = null;
@@ -47,18 +42,10 @@ export class EventSourcing {
     private readonly runtime: EventSourcingRuntime = getEventSourcingRuntime(),
   ) {}
 
-  /**
-   * Whether event sourcing is enabled.
-   * When false, pipelines will be no-ops that log warnings.
-   */
   get isEnabled(): boolean {
     return this.runtime.isEnabled;
   }
 
-  /**
-   * Returns the singleton instance of EventSourcing.
-   * Creates a new instance with auto-selected stores on first call.
-   */
   static getInstance(): EventSourcing {
     if (!EventSourcing.instance) {
       EventSourcing.instance = new EventSourcing();
@@ -66,74 +53,18 @@ export class EventSourcing {
     return EventSourcing.instance;
   }
 
-  /**
-   * Resets the singleton instance. Only use in tests.
-   */
   static resetInstance(): void {
     EventSourcing.instance = null;
   }
 
-  /**
-   * Returns the shared event store instance.
-   *
-   * This single instance handles all aggregate types by accepting aggregateType as a method parameter.
-   * The store partitions data by tenantId + aggregateType internally, allowing a single instance
-   * to serve multiple pipelines efficiently.
-   *
-   * Returns undefined if event sourcing is disabled.
-   */
   getEventStore<EventType extends Event>(): EventStore<EventType> | undefined {
     return this.runtime.eventStore as EventStore<EventType> | undefined;
-  }
-
-  /**
-   * Creates a pipeline builder for registering a new pipeline.
-   * Use this method to build and register pipelines programmatically.
-   *
-   * @returns A pipeline builder instance
-   * @throws Error if event store is not available
-   *
-   * @example
-   * ```typescript
-   * const pipeline = eventSourcing.registerPipeline<Event>()
-   *   .withName("my-pipeline")
-   *   .withAggregateType("entity")
-   *   .withProjection("summary", SummaryHandler)
-   *   .build();
-   * ```
-   */
-  registerPipeline<EventType extends Event>() {
-    if (!this.runtime.eventStore) {
-      return new DisabledPipelineBuilder<EventType>();
-    }
-
-    return new PipelineBuilder<EventType>({
-      eventStore: this.runtime.eventStore as EventStore<EventType>,
-      queueProcessorFactory: this.runtime.queueProcessorFactory,
-      processorCheckpointStore: this.runtime.checkpointStore,
-    });
   }
 
   /**
    * Registers a static pipeline definition with the runtime infrastructure.
    * Takes a static definition (created with `definePipeline()`) and connects it
    * to ClickHouse, Redis, and other runtime dependencies.
-   *
-   * @param definition - Static pipeline definition to register
-   * @returns Registered pipeline with runtime connections, or disabled pipeline if runtime unavailable
-   *
-   * @example
-   * ```typescript
-   * // In pipeline.ts (static, no side effects)
-   * export const myPipeline = definePipeline<MyEvent>()
-   *   .withName("my-pipeline")
-   *   .withAggregateType("entity")
-   *   .withProjection("summary", SummaryHandler)
-   *   .build();
-   *
-   * // In eventSourcing.ts (runtime registration)
-   * const registered = eventSourcing.register(myPipeline);
-   * ```
    */
   register<
     EventType extends Event,
@@ -143,8 +74,6 @@ export class EventSourcing {
     definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
   ): PipelineWithCommandHandlers<
     RegisteredPipeline<EventType, ProjectionTypes>,
-    // Use [Commands] to prevent distributive conditional type behavior
-    // This ensures CommandsToProcessors receives the full union type, not each member individually
     [Commands] extends [NoCommands]
       ? Record<string, EventSourcedQueueProcessor<any>>
       : CommandsToProcessors<Commands>
@@ -159,7 +88,6 @@ export class EventSourcing {
         },
       },
       () => {
-        // Define the return type for cleaner code
         type ReturnType = PipelineWithCommandHandlers<
           RegisteredPipeline<EventType, ProjectionTypes>,
           [Commands] extends [NoCommands]
@@ -167,12 +95,10 @@ export class EventSourcing {
             : CommandsToProcessors<Commands>
         >;
 
-        // Return disabled pipeline if event sourcing is disabled
         if (
           !this.runtime.isEnabled ||
           !this.runtime.eventStore
         ) {
-          // Log detailed reason for disabled state
           logger.warn(
             {
               pipeline: definition.metadata.name,
@@ -191,46 +117,23 @@ export class EventSourcing {
           ) as ReturnType;
         }
 
-        // Convert static definition to runtime pipeline
         const eventStore = this.runtime.eventStore as EventStore<EventType>;
 
-        // Instantiate handlers
-        const projections = new Map();
-        for (const [
-          name,
-          { handlerClass, options },
-        ] of definition.projections) {
-          projections.set(name, {
-            name,
-            store: handlerClass.store,
-            handler: new handlerClass(),
-            options,
-          });
-        }
+        // Convert fold projection definitions to arrays for the service
+        const foldProjections = Array.from(definition.foldProjections.values()).map(
+          ({ definition: fold, options }) => ({
+            ...fold,
+            options: options ?? fold.options,
+          }),
+        );
 
-        const eventHandlers = new Map();
-        for (const [
-          name,
-          { handlerClass: HandlerClass, options },
-        ] of definition.eventHandlers) {
-          eventHandlers.set(name, {
-            name,
-            handler: new HandlerClass(),
-            options,
-          });
-        }
-
-        // Build projection definitions object
-        const projectionsObject =
-          projections.size > 0
-            ? Object.fromEntries(Array.from(projections))
-            : undefined;
-
-        // Build event handlers object
-        const eventHandlersObject =
-          eventHandlers.size > 0
-            ? Object.fromEntries(Array.from(eventHandlers))
-            : undefined;
+        // Convert map projection definitions to arrays for the service
+        const mapProjections = Array.from(definition.mapProjections.values()).map(
+          ({ definition: mapProj, options }) => ({
+            ...mapProj,
+            options: options ?? mapProj.options,
+          }),
+        );
 
         // Build command registrations for the service
         const commandRegistrations =
@@ -242,13 +145,13 @@ export class EventSourcing {
               }))
             : undefined;
 
-        // Create the pipeline
+        // Create the pipeline using the new service options
         const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
           name: definition.metadata.name,
           aggregateType: definition.metadata.aggregateType,
           eventStore,
-          projections: projectionsObject,
-          eventHandlers: eventHandlersObject,
+          foldProjections: foldProjections.length > 0 ? foldProjections : undefined,
+          mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
           queueProcessorFactory: this.runtime.queueProcessorFactory,
           processorCheckpointStore: this.runtime.checkpointStore,
           parentLinks:
@@ -267,7 +170,6 @@ export class EventSourcing {
           dispatchers[commandName] = processor;
         }
 
-        // Return pipeline with commands attached
         return Object.assign(pipeline, {
           commands: dispatchers,
         }) as ReturnType;
@@ -276,14 +178,8 @@ export class EventSourcing {
   }
 }
 
-// Lazy singleton getter to avoid triggering env validation at module load time.
-// This allows importing the EventSourcing class in tests without needing all env vars.
 let _eventSourcingInstance: EventSourcing | null = null;
 
-/**
- * Returns the singleton EventSourcing instance.
- * Uses lazy initialization to avoid env validation at module load time.
- */
 export function getEventSourcing(): EventSourcing {
   if (!_eventSourcingInstance) {
     _eventSourcingInstance = EventSourcing.getInstance();
@@ -291,7 +187,6 @@ export function getEventSourcing(): EventSourcing {
   return _eventSourcingInstance;
 }
 
-// Creates a lazily initialized singleton, avoiding env validation at module load time.
 function createLazyPipeline<T>(factory: () => T): () => T {
   let instance: T | null = null;
   return () => {
@@ -310,10 +205,6 @@ export const getEvaluationProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(evaluationProcessingPipelineDefinition),
 );
 
-/**
- * Returns the experiment run processing pipeline.
- * Lazily initialized to avoid env validation at module load time.
- */
 export const getExperimentRunProcessingPipeline = createLazyPipeline(() =>
   getEventSourcing().register(experimentRunProcessingPipelineDefinition),
 );

@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import { z } from "zod";
 import type { AggregateType } from "~/server/event-sourcing/library";
+import { definePipeline } from "~/server/event-sourcing/library";
 import type { Command } from "../../../library/commands/command";
 import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
 import type { CommandSchema } from "../../../library/commands/commandSchema";
@@ -8,13 +9,11 @@ import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import type { CommandType } from "../../../library/domain/commandType";
 import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
-import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
-import type { EventHandlerClass } from "../../../library/domain/handlers/eventHandlerClass";
-import type { ProjectionHandler } from "../../../library/domain/handlers/projectionHandler";
-import type { ProjectionHandlerClass } from "../../../library/domain/handlers/projectionHandlerClass";
 import { createTenantId } from "../../../library/domain/tenantId";
 import type { Event, Projection } from "../../../library/domain/types";
 import type { EventPublisher } from "../../../library/eventPublisher.types";
+import type { FoldProjectionDefinition, FoldProjectionStore } from "../../../library/projections/foldProjection.types";
+import type { AppendStore, MapProjectionDefinition } from "../../../library/projections/mapProjection.types";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
@@ -23,7 +22,6 @@ import { createTestEvent } from "../../../library/services/__tests__/testHelpers
 import type { EventStore } from "../../../library/stores/eventStore.types";
 import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
 import type { QueueProcessorFactory } from "../../../library/queues";
-import { PipelineBuilder } from "../builder";
 
 /**
  * Creates a mock EventStore with spyable methods.
@@ -198,20 +196,50 @@ export function createTestCommandHandlerClass<
 }
 
 /**
- * Creates a test PipelineBuilder with mock dependencies.
+ * Creates a mock FoldProjectionDefinition for testing.
  */
-export function createTestPipelineBuilder<EventType extends Event = Event>(
-  eventStore?: EventStore<EventType>,
-  queueProcessorFactory?: QueueProcessorFactory,
-): PipelineBuilder<EventType> {
-  const mockEventStore = eventStore ?? createMockEventStore<EventType>();
-  const mockFactory =
-    queueProcessorFactory ?? createMockQueueProcessorFactory();
+export function createMockFoldProjection<
+  State = unknown,
+  E extends Event = Event,
+>(config?: {
+  name?: string;
+  eventTypes?: readonly string[];
+  init?: () => State;
+  apply?: (state: State, event: E) => State;
+  store?: FoldProjectionStore<State>;
+}): FoldProjectionDefinition<State, E> {
+  return {
+    name: config?.name ?? "test-fold-projection",
+    eventTypes: config?.eventTypes ?? [EVENT_TYPES[0]],
+    init: config?.init ?? (() => ({}) as State),
+    apply: config?.apply ?? ((state) => state),
+    store: config?.store ?? {
+      store: vi.fn().mockResolvedValue(void 0),
+      get: vi.fn().mockResolvedValue(null),
+    },
+  };
+}
 
-  return new PipelineBuilder<EventType>({
-    eventStore: mockEventStore,
-    queueProcessorFactory: mockFactory,
-  });
+/**
+ * Creates a mock MapProjectionDefinition for testing.
+ */
+export function createMockMapProjection<
+  Record = unknown,
+  E extends Event = Event,
+>(config?: {
+  name?: string;
+  eventTypes?: readonly string[];
+  map?: (event: E) => Record | null;
+  store?: AppendStore<Record>;
+}): MapProjectionDefinition<Record, E> {
+  return {
+    name: config?.name ?? "test-map-projection",
+    eventTypes: config?.eventTypes ?? [EVENT_TYPES[0]],
+    map: config?.map ?? (() => ({}) as Record),
+    store: config?.store ?? {
+      append: vi.fn().mockResolvedValue(void 0),
+    },
+  };
 }
 
 /**
@@ -224,92 +252,6 @@ export function createMockProjectionStore<
     getProjection: vi.fn().mockResolvedValue(null),
     storeProjection: vi.fn().mockResolvedValue(void 0),
   };
-}
-
-/**
- * Creates a mock ProjectionHandler for projections.
- */
-export function createMockEventHandler<
-  TEvent extends Event,
-  TProjection extends Projection,
->(): ProjectionHandler<TEvent, TProjection> {
-  return {
-    handle: vi.fn().mockResolvedValue({
-      id: "test-projection-id",
-      aggregateId: "test-aggregate",
-      tenantId: createTenantId("test-tenant"),
-      version: TEST_CONSTANTS.PROJECTION_VERSION,
-      data: {},
-    } as TProjection),
-  };
-}
-
-/**
- * Creates a mock EventHandler.
- */
-export function createMockEventReactionHandler<
-  T extends Event,
->(): EventHandler<T> {
-  return {
-    handle: vi.fn().mockResolvedValue(void 0),
-    getEventTypes: vi.fn().mockReturnValue(void 0),
-  };
-}
-
-/**
- * Creates a test event handler class with configurable properties.
- */
-export function createTestEventHandlerClass<
-  T extends Event = TestEvent,
->(config?: {
-  getEventTypes?: () => readonly T["type"][] | undefined;
-  handleImpl?: (event: T) => Promise<void>;
-}): EventHandlerClass<T> {
-  class TestEventHandler {
-    static getEventTypes() {
-      return config?.getEventTypes?.();
-    }
-
-    async handle(event: T): Promise<void> {
-      if (config?.handleImpl) {
-        return config.handleImpl(event);
-      }
-    }
-  }
-
-  return TestEventHandler as EventHandlerClass<T>;
-}
-
-/**
- * Creates a test projection handler class with configurable properties.
- */
-export function createTestProjectionHandlerClass<
-  TEvent extends Event = TestEvent,
-  TProjection extends Projection = Projection,
->(config?: {
-  store?: ProjectionStore<TProjection>;
-  handleImpl?: (stream: any) => Promise<TProjection> | TProjection;
-}): ProjectionHandlerClass<TEvent, TProjection> {
-  const store = config?.store ?? createMockProjectionStore<TProjection>();
-
-  class TestProjectionHandler {
-    static readonly store = store;
-
-    handle(stream: any): Promise<TProjection> | TProjection {
-      if (config?.handleImpl) {
-        return config.handleImpl(stream);
-      }
-      return {
-        id: "test-projection-id",
-        aggregateId: "test-aggregate",
-        tenantId: createTenantId("test-tenant"),
-        version: TEST_CONSTANTS.PROJECTION_VERSION,
-        data: {},
-      } as TProjection;
-    }
-  }
-
-  return TestProjectionHandler as ProjectionHandlerClass<TEvent, TProjection>;
 }
 
 /**
@@ -378,10 +320,10 @@ export const BASE_COMMAND_HANDLER_SCHEMA = defineCommandSchema(
 );
 
 /**
- * Creates a minimal pipeline builder setup for common test patterns.
- * Returns eventStore, factory, and a helper function to build a pipeline with a handler.
+ * Creates a minimal pipeline definition setup for common test patterns.
+ * Returns eventStore, factory, and a helper function to build a pipeline definition with a handler.
  */
-export function createMinimalPipelineBuilder() {
+export function createMinimalPipelineDefinition() {
   const eventStore = createMockEventStore<TestEvent>();
   const factory = createMockQueueProcessorFactory();
 
@@ -392,10 +334,7 @@ export function createMinimalPipelineBuilder() {
       TestEvent
     >,
   ) => {
-    return new PipelineBuilder<TestEvent>({
-      eventStore,
-      queueProcessorFactory: factory,
-    })
+    return definePipeline<TestEvent>()
       .withName("test-pipeline")
       .withAggregateType("trace")
       .withCommand("testCommand", HandlerClass)

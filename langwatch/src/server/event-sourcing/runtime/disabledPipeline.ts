@@ -4,7 +4,6 @@ import type { EventSourcedQueueProcessor } from "../library/queues";
 import type { EventSourcingService } from "../library/services/eventSourcingService";
 import type {
   PipelineMetadata,
-  PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
 
@@ -98,110 +97,5 @@ export class DisabledPipeline<
         },
       },
     );
-  }
-}
-
-/**
- * Builder that mimics PipelineBuilder API but builds DisabledPipeline.
- * Allows code to use the same builder pattern without errors when event sourcing is disabled.
- */
-export class DisabledPipelineBuilder<
-  EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
-> {
-  private _name = "unknown";
-  private _aggregateType: AggregateType = "unknown" as AggregateType;
-  private _hasLoggedWarning = false;
-  private _projections: Array<{ name: string; handlerClassName: string }> = [];
-  private _eventHandlers: Array<{
-    name: string;
-    handlerClassName: string;
-    eventTypes?: string[];
-  }> = [];
-  private _commands: Array<{ name: string; handlerClassName: string }> = [];
-
-  private logWarningOnce(): void {
-    if (!this._hasLoggedWarning) {
-      logger.info(
-        { pipeline: this._name, aggregateType: this._aggregateType },
-        "Building disabled pipeline: event sourcing is disabled",
-      );
-      this._hasLoggedWarning = true;
-    }
-  }
-
-  withName(name: string): this {
-    this._name = name;
-    return this;
-  }
-
-  withAggregateType(aggregateType: AggregateType): this {
-    this._aggregateType = aggregateType;
-    return this;
-  }
-
-  withProjection(name: string, HandlerClass: { name: string }): this {
-    this._projections.push({
-      name,
-      handlerClassName: HandlerClass.name,
-    });
-    return this;
-  }
-
-  withEventPublisher(): this {
-    return this;
-  }
-
-  withEventHandler(
-    name: string,
-    HandlerClass: { name: string },
-    options?: { eventTypes?: string[] },
-  ): this {
-    this._eventHandlers.push({
-      name,
-      handlerClassName: HandlerClass.name,
-      eventTypes: options?.eventTypes,
-    });
-    return this;
-  }
-
-  withCommand(name: string, HandlerClass: { name: string }): this {
-    this._commands.push({
-      name,
-      handlerClassName: HandlerClass.name,
-    });
-    return this;
-  }
-
-  withParentLink(): this {
-    return this;
-  }
-
-  build(): PipelineWithCommandHandlers<
-    RegisteredPipeline<EventType, ProjectionTypes>,
-    Record<string, EventSourcedQueueProcessor<any>>
-  > {
-    this.logWarningOnce();
-
-    const metadata: PipelineMetadata = {
-      name: this._name,
-      aggregateType: this._aggregateType,
-      projections: this._projections,
-      eventHandlers: this._eventHandlers,
-      commands: this._commands,
-    };
-
-    const pipeline = new DisabledPipeline<EventType, ProjectionTypes>(
-      this._name,
-      this._aggregateType,
-      metadata,
-    );
-    return pipeline as PipelineWithCommandHandlers<
-      RegisteredPipeline<EventType, ProjectionTypes>,
-      Record<string, EventSourcedQueueProcessor<any>>
-    >;
   }
 }
