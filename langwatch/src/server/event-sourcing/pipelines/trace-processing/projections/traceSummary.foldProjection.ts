@@ -146,12 +146,12 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
     completionTokens = genAiCompletionTokens;
   }
 
-  const spanCost = attrs["langwatch.span.cost"];
+  const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
   if (typeof spanCost === "number" && spanCost > 0) {
     cost = spanCost;
   }
 
-  if (attrs["langwatch.tokens.estimated"] === true) {
+  if (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true) {
     estimated = true;
   }
 
