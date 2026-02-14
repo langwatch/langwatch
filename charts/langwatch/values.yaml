@@ -102,8 +102,8 @@ images:
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: latest
-    pullPolicy: Always
+    tag: 2.2.0 # x-release-please-version
+    pullPolicy: IfNotPresent
 
 # =============================================================================
 # LangWatch Main Application Configuration

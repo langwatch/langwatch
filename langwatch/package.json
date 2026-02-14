@@ -39,7 +39,7 @@
     "elastic:migrate": "sh -c 'if [ \"$SKIP_ELASTIC_MIGRATE\" != \"true\" ]; then pnpm run task elasticMigrate; else echo \"Skipping Elasticsearch migrations\"; fi'",
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "types:zod:generate": "./scripts/generate-zod-types.sh",
-    "copy:langevals-types": "cd src/server/evaluations && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts",
+    "copy:langevals-types": "cp ../langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",
     "copy:llm-model-costs": "cd src/server/modelProviders && curl -L \"https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json\" -o llmModelCosts.json",
     "setup:quickwit": "./scripts/install-quickwit.sh",
     "tsc-watch": "tsc --noEmit --watch",

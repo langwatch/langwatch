@@ -1,0 +1,87 @@
+[project]
+name = "langevals"
+version = "2.2.0"
+description = "A platform to evaluate LLM outputs using various evaluators."
+authors = [{name = "Rogerio Chaves", email = "rogerio@langwatch.ai"}]
+license = {text = "MIT"}
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pytest>=8.1.2",
+    "fastapi>=0.115.11",
+    "pydantic>=2.4.0",
+    "python-dotenv==1.0.1",
+    "mangum>=0.17.0",
+    "pandas>=2.2.2",
+    "markdown>=3.6",
+    "uvicorn>=0.29.0",
+    "gunicorn>=23.0.0",
+    "nest-asyncio>=1.6.0",
+    "pip-licenses>=5.5.0",
+    "langevals-core",
+]
+
+[project.optional-dependencies]
+azure = ["langevals-azure"]
+openai = ["langevals-openai"]
+ragas = ["langevals-ragas"]
+lingua = ["langevals-lingua"]
+langevals = ["langevals-langevals"]
+presidio = ["langevals-presidio"]
+legacy = ["langevals-legacy"]
+all = [
+    "langevals-azure",
+    "langevals-langevals",
+    "langevals-legacy",
+    "langevals-lingua",
+    "langevals-ragas",
+    "langevals-presidio",
+    "langevals-openai",
+]
+
+[project.scripts]
+langevals-server = "langevals.server:main"
+
+[project.entry-points.pytest11]
+pass_rate_plugin = "langevals.pytest_plugins.pass_rate_plugin"
+
+[dependency-groups]
+dev = [
+    "toml>=0.10.2",
+    "tomli-w>=1.0.0",
+    "grevillea>=0.0.1",
+    "litellm>=1.79.0",
+    "instructor>=1.2.2",
+    "pytest-xdist>=3.5.0",
+    "flaky>=3.8.1",
+    "ipykernel>=6.29.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["langevals"]
+
+[tool.uv.workspace]
+members = [
+    "langevals_core",
+    "evaluators/*",
+    "notebooks",
+]
+
+[tool.uv.sources]
+langevals-core = { workspace = true }
+langevals-azure = { workspace = true }
+langevals-openai = { workspace = true }
+langevals-ragas = { workspace = true }
+langevals-lingua = { workspace = true }
+langevals-langevals = { workspace = true }
+langevals-presidio = { workspace = true }
+langevals-legacy = { workspace = true }
+
+# PyTorch CPU index for Linux
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

@@ -1,0 +1,28 @@
+LangEvals is a monorepo and has many subpackages with different dependencies for each evaluator library or provider. We use poetry to install all dependencies and create a virtual env for each sub-package to make sure they are fully isolated. Given this complexity, to make it easier to contribute to LangEvals we recomend using VS Code for the development. Before opening up on VS Code though, you need to make sure to install all dependencies, generating thus the .venv for each package:
+
+```
+make install
+```
+
+This will also generate the `langevals.code-workspace` file, creating a different workspace per evaluator and telling VS Code which venv to use for each. Then, open this file on vscode and click the "Open Workspace" button
+
+## Adding New Evaluators
+
+To add a completely new evaluator for a library or API that is not already implemented, create a new folder in `evaluators/` following the structure of existing evaluator packages. You'll need to:
+
+1. Create a new package directory (e.g., `evaluators/your_library/`)
+2. Implement your evaluator by extending `BaseEvaluator` from `langevals_core.base_evaluator`
+3. Add the necessary dependencies to `pyproject.toml`
+4. Create corresponding tests following the testing patterns used in other evaluator packages
+
+You can reference existing evaluators like `langevals/langevals_langevals/basic.py` or `azure/langevals_azure/content_safety.py` as examples of the structure and patterns to follow.
+
+If you want to add a new evaluator to an existing evaluator package (say, if OpenAI launches a new API for example), simply create a new Python file next to the existing ones in that package.
+
+To test it all together, run:
+
+```
+make lock
+make install
+make test
+```

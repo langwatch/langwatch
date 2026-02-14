@@ -1,0 +1,85 @@
+name: Publish LangEvals to PyPI
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-pypi:
+    if: startsWith(github.event.release.tag_name, 'langevals@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: langevals
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Check if main langevals package needs publishing
+        id: check_main_version
+        run: |
+          PACKAGE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          RESPONSE=$(curl -s --head https://pypi.org/pypi/langevals/$PACKAGE_VERSION/json)
+          if [[ $RESPONSE == *"HTTP/2 200"* ]]; then
+            echo "NEW_VERSION=false" >> $GITHUB_ENV
+          else
+            echo "NEW_VERSION=true" >> $GITHUB_ENV
+          fi
+
+      - name: Publish langevals-core
+        run: |
+          cd langevals_core
+          PACKAGE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          RESPONSE=$(curl -s --head https://pypi.org/pypi/langevals-core/$PACKAGE_VERSION/json)
+          if [[ $RESPONSE == *"HTTP/2 200"* ]]; then
+            echo "langevals-core $PACKAGE_VERSION already exists on PyPI, skipping"
+          else
+            echo "Publishing langevals-core $PACKAGE_VERSION"
+            uv build
+            uv publish --token ${{ secrets.PYPI_API_TOKEN }}
+          fi
+
+      - name: Publish evaluator packages
+        run: |
+          for dir in evaluators/*; do
+            if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
+              cd "$dir"
+              DIR_NAME=$(basename "$dir")
+              PACKAGE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+              RESPONSE=$(curl -s --head "https://pypi.org/pypi/langevals-$DIR_NAME/$PACKAGE_VERSION/json")
+              if [[ $RESPONSE == *"HTTP/2 200"* ]]; then
+                echo "langevals-$DIR_NAME $PACKAGE_VERSION already exists on PyPI, skipping"
+              else
+                echo "Publishing langevals-$DIR_NAME $PACKAGE_VERSION"
+                uv build
+                uv publish --token ${{ secrets.PYPI_API_TOKEN }}
+              fi
+              cd ../..
+            fi
+          done
+
+      - name: Publish main langevals package
+        run: |
+          if [ "${{ env.NEW_VERSION }}" == "false" ]; then
+            echo "langevals version already exists on PyPI, skipping"
+          else
+            echo "Publishing langevals"
+            uv build
+            uv publish --token ${{ secrets.PYPI_API_TOKEN }}
+          fi
