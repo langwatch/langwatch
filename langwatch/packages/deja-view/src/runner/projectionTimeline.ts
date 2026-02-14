@@ -1,13 +1,9 @@
 import type { Event } from "../../../../src/server/event-sourcing/library/domain/types";
-import * as eventSourcingLibrary from "../../../../src/server/event-sourcing/library/index.js";
 import type { ProjectionTimelineTypes } from "./projectionTimeline.types";
 
-// ESM importing CJS - the module might be wrapped in a default export. hacky
-const lib = (eventSourcingLibrary as any).default ?? eventSourcingLibrary;
-const EventStream = lib.EventStream;
-
 /**
- * Builds projection timelines by replaying events through discovered projection handlers.
+ * Builds projection timelines by replaying events through fold projection definitions.
+ * Uses the pure init() + apply() functions to compute state at each step.
  * Tracks staleness when events don't affect a projection (carry forward previous state).
  *
  * @example
@@ -23,7 +19,7 @@ export function buildProjectionTimelines({
   const orderedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
 
   return projections.map((projection) => {
-    const handler = new projection.HandlerClass();
+    const fold = projection.definition;
     const eventsByAggregate: Record<string, Event[]> = {};
     const steps: ProjectionTimelineTypes["Step"][] = [];
 
@@ -39,7 +35,7 @@ export function buildProjectionTimelines({
         !expectedAggregateType || event.aggregateType === expectedAggregateType;
 
       if (eventAffectsProjection) {
-        // Event affects this projection - compute new state
+        // Event affects this projection - compute new state via fold
         const aggregateEvents = eventsByAggregate[event.aggregateId] ?? [];
         aggregateEvents.push(event);
         eventsByAggregate[event.aggregateId] = aggregateEvents;
@@ -47,36 +43,19 @@ export function buildProjectionTimelines({
         const projectionStateByAggregate: ProjectionTimelineTypes["Snapshot"][] =
           Object.entries(eventsByAggregate).map(
             ([aggregateId, aggregateEventList]) => {
-              const stream = new EventStream(
-                aggregateId,
-                aggregateEventList[0]?.tenantId ?? event.tenantId,
-                aggregateEventList,
-                { ordering: "timestamp" },
-              );
-              const value = handler.handle(stream);
-
-              // Handle both sync and async results
-              if (value instanceof Promise) {
-                // For async, we can't await here, so return a placeholder
-                // In practice, projection handlers should be synchronous for deja-view
-                throw new Error(
-                  "Async projection handlers are not supported in deja-view",
-                );
+              // Replay all events through the fold: init() then apply() each event
+              let state = fold.init();
+              for (const evt of aggregateEventList) {
+                if (fold.eventTypes.includes(evt.type)) {
+                  state = fold.apply(state, evt);
+                }
               }
 
-              // TypeScript narrowing: value is now definitely not a Promise
-              const projection = value as {
-                aggregateId: string;
-                tenantId: string;
-                version: string;
-                data: unknown;
-              };
-
               return {
-                aggregateId: projection.aggregateId,
-                tenantId: projection.tenantId,
-                version: projection.version,
-                data: projection.data,
+                aggregateId,
+                tenantId: String(aggregateEventList[0]?.tenantId ?? event.tenantId),
+                version: "computed",
+                data: state,
               };
             },
           );
