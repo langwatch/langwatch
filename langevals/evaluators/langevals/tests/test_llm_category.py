@@ -1,5 +1,6 @@
 import os
 import dotenv
+import pytest
 
 dotenv.load_dotenv()
 
@@ -72,6 +73,7 @@ def test_custom_llm_category_evaluator_skips_if_context_is_too_large():
     assert "Total tokens exceed the maximum of 2048" in result.details
 
 
+@pytest.mark.skipif(not os.environ.get("ATLA_API_KEY"), reason="ATLA_API_KEY not set")
 def test_llm_as_judge_atla_ai():
     vegetarian_checker = CustomLLMCategoryEvaluator(
         settings=CustomLLMCategorySettings(

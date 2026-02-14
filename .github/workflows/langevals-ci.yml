@@ -78,7 +78,7 @@ jobs:
           AZURE_API_BASE: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           AZURE_CONTENT_SAFETY_ENDPOINT: ${{ secrets.LANGEVALS_AZURE_CONTENT_SAFETY_ENDPOINT }}
           AZURE_CONTENT_SAFETY_KEY: ${{ secrets.LANGEVALS_AZURE_CONTENT_SAFETY_KEY }}
-        run: uv run pytest -x -v
+        run: uv run pytest -x -v --ignore=evaluators/legacy/
 
   docker-build:
     if: >

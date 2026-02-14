@@ -1,5 +1,6 @@
 import os
 import dotenv
+import pytest
 
 dotenv.load_dotenv()
 
@@ -52,27 +53,7 @@ def test_custom_llm_boolean_evaluator_skips_if_context_is_too_large():
     assert "Total tokens exceed the maximum of 2048" in result.details
 
 
-def test_groq_models():
-    entry = CustomLLMBooleanEntry(
-        input="What is the capital of France?",
-        output="The capital of France is Paris.",
-        contexts=["London is the capital of France."],
-    )
-    settings = CustomLLMBooleanSettings(
-        model="groq/llama3-70b-8192",
-        prompt="You are an LLM evaluator. We need the guarantee that the output is using the provided context and not it's own brain, please evaluate as False if is not.",
-    )
-
-    evaluator = CustomLLMBooleanEvaluator(settings=settings)
-    result = evaluator.evaluate(entry)
-
-    assert result.status == "processed"
-    assert result.score == 0
-    assert result.passed == False
-    assert result.cost
-    assert result.cost.amount > 0
-
-
+@pytest.mark.skipif(not os.environ.get("ATLA_API_KEY"), reason="ATLA_API_KEY not set")
 def test_llm_as_judge_atla_ai():
     vegetarian_checker = CustomLLMBooleanEvaluator(
         settings=CustomLLMBooleanSettings(

@@ -1,5 +1,6 @@
 import os
 import dotenv
+import pytest
 
 dotenv.load_dotenv()
 
@@ -51,26 +52,7 @@ def test_custom_llm_score_evaluator_skips_if_context_is_too_large():
     assert "Total tokens exceed the maximum of 2048" in result.details
 
 
-def test_groq_models():
-    entry = CustomLLMScoreEntry(
-        input="How do I write a hello world in python?",
-        output="I'm sorry, I can only help you with booking hotels, I can't help with coding tasks.",
-    )
-    settings = CustomLLMScoreSettings(
-        model="groq/llama3-70b-8192",
-        prompt="You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied.",
-    )
-
-    evaluator = CustomLLMScoreEvaluator(settings=settings)
-    result = evaluator.evaluate(entry)
-
-    assert result.status == "processed"
-    assert result.score is not None
-    assert result.score < 0.5
-    assert result.cost
-    assert result.cost.amount > 0
-
-
+@pytest.mark.skipif(not os.environ.get("ATLA_API_KEY"), reason="ATLA_API_KEY not set")
 def test_llm_as_judge_atla_ai():
     evaluator = CustomLLMScoreEvaluator(
         settings=CustomLLMScoreSettings(

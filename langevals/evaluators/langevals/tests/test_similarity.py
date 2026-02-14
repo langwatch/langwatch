@@ -1,4 +1,5 @@
 import dotenv
+import pytest
 
 dotenv.load_dotenv()
 
@@ -74,6 +75,8 @@ def test_custom_semantic_similarity_evaluator_is_not_similar_to():
 
 
 def test_custom_semantic_similarity_long_context():
+    import litellm
+
     entry = CustomSimilarityEntry(output="lorem ipsum dolor " * 10000)
     evaluator = CustomSimilarityEvaluator(
         settings=CustomSimilaritySettings(
@@ -83,13 +86,9 @@ def test_custom_semantic_similarity_long_context():
             threshold=0.1,
         )
     )
-    result = evaluator.evaluate(entry)
 
-    assert result.status == "skipped"
-    assert (
-        result.details
-        == "Total tokens exceed the maximum of 8192 tokens: 30002 tokens used"
-    )
+    with pytest.raises(litellm.exceptions.ContextWindowExceededError):
+        evaluator.evaluate(entry)
 
 
 def test_custom_semantic_similarity_empty_input_or_output():

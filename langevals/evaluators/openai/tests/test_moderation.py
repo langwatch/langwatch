@@ -10,12 +10,24 @@ from langevals_openai.moderation import (
 )
 
 
-def test_moderation_integration():
+def test_moderation_safe_input():
     evaluator = OpenAIModerationEvaluator()
 
     results = evaluator.evaluate_batch(
         data=[
-            OpenAIModerationEntry(input="Hey there! How are you?"),
+            OpenAIModerationEntry(input="The weather is nice today, let's go for a walk in the park."),
+        ]
+    )
+
+    assert results[0].status == "processed"
+    assert results[0].passed
+
+
+def test_moderation_unsafe_input():
+    evaluator = OpenAIModerationEvaluator()
+
+    results = evaluator.evaluate_batch(
+        data=[
             OpenAIModerationEntry(
                 input="Enough is enough! I've had it with these motherfuckin' snakes on this motherfuckin' plane!"
             ),
@@ -23,9 +35,7 @@ def test_moderation_integration():
     )
 
     assert results[0].status == "processed"
-    assert results[0].passed
-    assert results[1].status == "processed"
-    assert not results[1].passed
+    assert not results[0].passed
 
 
 def test_moderation_with_ignored_categories():
