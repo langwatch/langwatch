@@ -1082,6 +1082,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             mappings={inputMappings}
             onMappingChange={onInputMappingsChange}
             missingMappingIds={missingMappingIds}
+            showMissingMappingsError={!props.headless}
             lockedVariables={new Set(["input"])}
             variableInfo={{
               input:

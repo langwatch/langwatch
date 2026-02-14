@@ -1,5 +1,5 @@
 import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
@@ -70,6 +70,7 @@ function DbEvaluatorPanel({
   evaluatorRef: string;
 }) {
   const { project } = useOrganizationTeamProject();
+  const updateNodeInternals = useUpdateNodeInternals();
   const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } =
     useWorkflowStore(
       useShallow(
@@ -227,8 +228,9 @@ function DbEvaluatorPanel({
         currentEdges,
       });
       setEdges(newEdges);
+      updateNodeInternals(node.id);
     },
-    [getWorkflow, node.id, setEdges],
+    [getWorkflow, node.id, setEdges, updateNodeInternals],
   );
 
   const mappingsConfig: EvaluatorMappingsConfig = useMemo(

@@ -275,7 +275,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       color="fg.muted"
       fontSize="11px"
       minWidth={
-        120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
+        140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
       }
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
@@ -344,6 +344,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           minWidth="0"
           flexShrink={1}
           lineClamp={1}
+          wordBreak="break-all"
           width="full"
         >
           {getNodeDisplayName(props)}
@@ -440,7 +441,7 @@ export function ComponentExecutionButton({
   const shouldOpenExecutionResults =
     node?.data.execution_state && !propertiesExpanded;
 
-  const Wrapper = isInsideNode ? NodeToolbar : Box;
+  const Wrapper = isInsideNode ? NodeToolbar : React.Fragment;
 
   return (
     <>
@@ -537,7 +538,7 @@ export function ComponentExecutionButton({
             </Button>
           </Menu.Trigger>
           <Wrapper>
-            <Menu.Content>
+            <Menu.Content zIndex="popover">
               <Menu.Item
                 value="run-manual"
                 onClick={() => node && startComponentExecution({ node })}

@@ -107,6 +107,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
           variables={inputs}
           onChange={handleInputsChange}
           showMappings={false}
+          isMappingDisabled={true}
           canAddRemove={true}
           readOnly={false}
           title="Inputs"

@@ -39,6 +39,8 @@ type FormVariablesSectionProps = {
   disabledMappings?: Set<string>;
   /** Whether to show the Add button (defaults to true) */
   showAddButton?: boolean;
+  /** Whether to show the validation error message for missing mappings (defaults to true) */
+  showMissingMappingsError?: boolean;
 };
 
 // ============================================================================
@@ -71,6 +73,7 @@ export const FormVariablesSection = ({
   variableInfo,
   disabledMappings,
   showAddButton = true,
+  showMissingMappingsError,
 }: FormVariablesSectionProps) => {
   const { control, getValues } = useFormContext<PromptConfigFormValues>();
 
@@ -157,6 +160,7 @@ export const FormVariablesSection = ({
       showAddButton={showAddButton}
       title={title}
       missingMappingIds={missingMappingIds}
+      showMissingMappingsError={showMissingMappingsError}
       lockedVariables={lockedVariables}
       variableInfo={variableInfo}
       disabledMappings={disabledMappings}
