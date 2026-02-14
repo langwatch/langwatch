@@ -1,6 +1,8 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import bundleAnalyser from "@next/bundle-analyzer";
+const bundleAnalyser = process.env.ANALYZE === "true"
+  ? (await import("@next/bundle-analyzer")).default
+  : null;
 import fs from "fs";
 import path from "path";
 
@@ -208,6 +210,6 @@ const config = {
   },
 };
 
-export default bundleAnalyser({ enabled: process.env.ANALYZE === "true" })(
-  config,
-);
+export default bundleAnalyser
+  ? bundleAnalyser({ enabled: true })(config)
+  : config;
