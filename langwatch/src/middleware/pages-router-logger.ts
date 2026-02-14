@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createLogger } from "../utils/logger";
+import { createLogger } from "../utils/logger/server";
 import {
   createContextFromNextApiRequest,
   runWithContext,

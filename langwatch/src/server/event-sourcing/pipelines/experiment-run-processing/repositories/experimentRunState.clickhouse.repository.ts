@@ -5,7 +5,7 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/library/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger/server";
 import type {
   Projection,
   ProjectionStoreReadContext,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createLogger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger/server";
 import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 import { datasetSpanSchema } from "../datasets/types";
 import type {
