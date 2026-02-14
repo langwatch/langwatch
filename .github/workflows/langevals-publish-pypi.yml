@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish-pypi:
-    if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: startsWith(github.event.release.tag_name, 'langevals@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     defaults:
       run:

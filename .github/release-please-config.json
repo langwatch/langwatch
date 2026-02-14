@@ -76,6 +76,63 @@
         }
       ]
     },
+    "langevals": {
+      "release-type": "python",
+      "package-name": "langevals",
+      "prerelease": true,
+      "component": "langevals",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": false },
+        { "type": "docs", "section": "Documentation", "hidden": false },
+        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+      ],
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "langevals_core/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/azure/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/openai/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/ragas/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/lingua/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/langevals/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/presidio/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "evaluators/legacy/pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ]
+    },
     ".": {
       "release-type": "simple",
       "package-name": "langwatch",
@@ -87,6 +144,7 @@
         "typescript-sdk",
         "sdk-go",
         "mcp-server",
+        "langevals",
         ".github",
         ".cursor",
         "assets"
@@ -102,51 +160,6 @@
         {
           "type": "toml",
           "path": "pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/langevals_core/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/azure/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/openai/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/ragas/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/lingua/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/langevals/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/presidio/pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "langevals/evaluators/legacy/pyproject.toml",
           "jsonpath": "$.project.version"
         },
         "charts/langwatch/Chart.yaml",
