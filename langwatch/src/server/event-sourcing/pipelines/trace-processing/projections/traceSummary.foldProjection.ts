@@ -72,6 +72,8 @@ export interface TraceSummaryData {
   TokensEstimated: boolean;
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
+  OutputFromRootSpan: boolean;
+  OutputSpanEndTimeMs: number;
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: boolean | null;
@@ -333,7 +335,8 @@ function extractAttributesFromSpan(span: NormalizedSpan): Record<string, string>
 // Incremental apply
 // ============================================================================
 
-function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan): TraceSummaryData {
+/** @internal Exported for unit testing */
+export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan): TraceSummaryData {
   const hasValidTimestamps = isValidTimestamp(span.startTimeUnixMs) && isValidTimestamp(span.endTimeUnixMs);
 
   // Timing
@@ -392,23 +395,41 @@ function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan): Trac
       : null;
 
   // I/O extraction (per-span heuristic)
-  let computedInput = state.ComputedInput;
-  const inputResult = traceIOExtractionService.extractRichIOFromSpan(span, "input");
-  if (inputResult) {
-    const isRootSpan = !span.parentSpanId;
-    // Root span input always overrides; otherwise set once from first span with input
-    if (isRootSpan || computedInput === null) {
-      const raw = inputResult.raw;
-      computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
-    }
-  }
+  // Exclude evaluation and guardrail spans from I/O extraction (matches batch logic)
+  const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
+  const isExcludedType = spanType === "evaluation" || spanType === "guardrail";
 
+  let computedInput = state.ComputedInput;
   let computedOutput = state.ComputedOutput;
-  const outputResult = traceIOExtractionService.extractRichIOFromSpan(span, "output");
-  if (outputResult) {
-    // Always overwrite — spans arrive incrementally, so each new span with output is "latest"
-    const raw = outputResult.raw;
-    computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+  let outputFromRoot = state.OutputFromRootSpan;
+  let outputSpanEndTimeMs = state.OutputSpanEndTimeMs;
+
+  if (!isExcludedType) {
+    const inputResult = traceIOExtractionService.extractRichIOFromSpan(span, "input");
+    if (inputResult) {
+      const isRootSpan = !span.parentSpanId;
+      // Root span input always overrides; otherwise set once from first span with input
+      if (isRootSpan || computedInput === null) {
+        const raw = inputResult.raw;
+        computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+      }
+    }
+
+    const outputResult = traceIOExtractionService.extractRichIOFromSpan(span, "output");
+    if (outputResult) {
+      const isRootSpan = !span.parentSpanId;
+      // Root always wins; among non-root, last-finishing wins (matches batch logic)
+      const shouldOverride =
+        isRootSpan ||
+        (!outputFromRoot && span.endTimeUnixMs >= outputSpanEndTimeMs);
+
+      if (shouldOverride) {
+        const raw = outputResult.raw;
+        computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        outputFromRoot = isRootSpan;
+        outputSpanEndTimeMs = span.endTimeUnixMs;
+      }
+    }
   }
 
   // Attributes (first-wins per key)
@@ -424,6 +445,8 @@ function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan): Trac
     ComputedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
     ComputedInput: computedInput,
     ComputedOutput: computedOutput,
+    OutputFromRootSpan: outputFromRoot,
+    OutputSpanEndTimeMs: outputSpanEndTimeMs,
     Models: models,
     TotalPromptTokenCount: totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
     TotalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
@@ -479,6 +502,8 @@ export const traceSummaryFoldProjection: FoldProjectionDefinition<
       TokensEstimated: false,
       TotalPromptTokenCount: null,
       TotalCompletionTokenCount: null,
+      OutputFromRootSpan: false,
+      OutputSpanEndTimeMs: 0,
       TopicId: null,
       SubTopicId: null,
       HasAnnotation: null,

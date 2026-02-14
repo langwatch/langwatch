@@ -107,6 +107,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 
   async close(): Promise<void> {
     await this.queueManager?.close();
+    this.queueManager = undefined;
+    this.router = undefined;
   }
 
   async waitUntilReady(): Promise<void> {

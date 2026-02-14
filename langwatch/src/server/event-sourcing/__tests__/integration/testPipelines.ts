@@ -200,8 +200,8 @@ export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, 
 class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData> {
   private data = new Map<string, TestProjectionData>();
 
-  async get(aggregateId: string, context: ProjectionStoreContext): Promise<TestProjectionData | null> {
-    const key = `${context.tenantId}:${aggregateId}`;
+  async get(_aggregateId: string, context: ProjectionStoreContext): Promise<TestProjectionData | null> {
+    const key = `${context.tenantId}:${context.aggregateId}`;
     return this.data.get(key) ?? null;
   }
 

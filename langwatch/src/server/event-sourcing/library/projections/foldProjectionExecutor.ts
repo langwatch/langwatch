@@ -29,12 +29,12 @@ export class FoldProjectionExecutor {
     event: E,
     context: ProjectionStoreContext,
   ): Promise<State> {
+    if (!this.matchesEventTypes(projection, event)) {
+      return projection.init();
+    }
+
     const key = context.key ?? context.aggregateId;
     let state = await projection.store.get(key, context) ?? projection.init();
-
-    if (!this.matchesEventTypes(projection, event)) {
-      return state;
-    }
 
     state = projection.apply(state, event);
     await projection.store.store(state, context);

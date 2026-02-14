@@ -226,8 +226,25 @@ export class EventSourcingService<
           (this.router.hasFoldProjections || this.router.hasMapProjections)
         ) {
           span.addEvent("projection.dispatch.start");
-          await this.router.dispatch(enrichedEvents, context);
-          span.addEvent("projection.dispatch.complete");
+          try {
+            await this.router.dispatch(enrichedEvents, context);
+            span.addEvent("projection.dispatch.complete");
+          } catch (error) {
+            span.addEvent("projection.dispatch.error", {
+              "error.message":
+                error instanceof Error ? error.message : String(error),
+            });
+            if (this.logger) {
+              this.logger.error(
+                {
+                  aggregateType: this.aggregateType,
+                  eventCount: enrichedEvents.length,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                "Failed to dispatch events to projections",
+              );
+            }
+          }
         }
 
         // Dispatch to global projection registry (cross-pipeline projections)

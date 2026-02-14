@@ -12,7 +12,8 @@ export function getGlobalProjectionRegistry(): ProjectionRegistry<Event> {
   if (!globalRegistry) {
     globalRegistry = new ProjectionRegistry<Event>();
 
-    if (process.env.IS_SAAS) {
+    const isSaas = process.env.IS_SAAS === "1" || process.env.IS_SAAS?.toLowerCase() === "true";
+    if (isSaas) {
       globalRegistry.registerFoldProjection(tenantDailyBillableEventsProjection);
     }
   }

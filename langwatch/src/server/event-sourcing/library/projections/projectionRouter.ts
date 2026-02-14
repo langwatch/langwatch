@@ -204,6 +204,7 @@ export class ProjectionRouter<
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     const hasProjectionQueues = this.queueManager.hasProjectionQueues();
+    const errors: Error[] = [];
 
     if (hasProjectionQueues) {
       // Async dispatch via queues
@@ -222,6 +223,7 @@ export class ProjectionRouter<
                 },
                 "Failed to dispatch event to fold projection queue",
               );
+              errors.push(error instanceof Error ? error : new Error(String(error)));
             }
           }
         }
@@ -244,9 +246,14 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: context.tenantId,
             });
+            errors.push(error instanceof Error ? error : new Error(String(error)));
           }
         }
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `${errors.length} fold projection(s) failed during dispatch`);
     }
   }
 
@@ -255,6 +262,7 @@ export class ProjectionRouter<
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     const hasHandlerQueues = this.queueManager.hasHandlerQueues();
+    const errors: Error[] = [];
 
     if (hasHandlerQueues) {
       // Async dispatch via queues
@@ -291,6 +299,7 @@ export class ProjectionRouter<
                 },
                 "Failed to dispatch event to map projection queue",
               );
+              errors.push(error instanceof Error ? error : new Error(String(error)));
             }
           }
         }
@@ -329,9 +338,14 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             });
+            errors.push(error instanceof Error ? error : new Error(String(error)));
           }
         }
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `${errors.length} map projection(s) failed during dispatch`);
     }
   }
 

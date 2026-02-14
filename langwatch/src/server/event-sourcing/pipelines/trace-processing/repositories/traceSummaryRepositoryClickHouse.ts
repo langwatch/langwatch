@@ -60,6 +60,10 @@ interface ClickHouseSummaryRecord {
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
 
+  // Output tracking
+  OutputFromRootSpan: number; // stored as Bool in ClickHouse
+  OutputSpanEndTimeMs: number;
+
   // Trace intelligence
   TopicId: string | null;
   SubTopicId: string | null;
@@ -107,6 +111,9 @@ export class TraceSummaryRepositoryClickHouse<
       TokensEstimated: record.TokensEstimated,
       TotalPromptTokenCount: record.TotalPromptTokenCount,
       TotalCompletionTokenCount: record.TotalCompletionTokenCount,
+
+      OutputFromRootSpan: record.OutputFromRootSpan === 1,
+      OutputSpanEndTimeMs: record.OutputSpanEndTimeMs,
 
       TopicId: record.TopicId,
       SubTopicId: record.SubTopicId,
@@ -158,6 +165,9 @@ export class TraceSummaryRepositoryClickHouse<
       TokensEstimated: data.TokensEstimated,
       TotalPromptTokenCount: data.TotalPromptTokenCount,
       TotalCompletionTokenCount: data.TotalCompletionTokenCount,
+
+      OutputFromRootSpan: data.OutputFromRootSpan ? 1 : 0,
+      OutputSpanEndTimeMs: data.OutputSpanEndTimeMs,
 
       TopicId: data.TopicId,
       SubTopicId: data.SubTopicId,
@@ -214,6 +224,8 @@ export class TraceSummaryRepositoryClickHouse<
                 TokensEstimated,
                 TotalPromptTokenCount,
                 TotalCompletionTokenCount,
+                OutputFromRootSpan,
+                OutputSpanEndTimeMs,
                 TopicId,
                 SubTopicId,
                 HasAnnotation

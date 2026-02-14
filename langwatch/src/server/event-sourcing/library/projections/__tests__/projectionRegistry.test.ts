@@ -80,6 +80,37 @@ describe("ProjectionRegistry", () => {
     });
   });
 
+  describe("initialize", () => {
+    describe("when called twice without close", () => {
+      it("throws ConfigurationError", () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+
+        const queueFactory = createMockQueueFactory();
+        registry.initialize(queueFactory);
+
+        expect(() => registry.initialize(queueFactory)).toThrow(
+          /Already initialized/,
+        );
+      });
+    });
+
+    describe("when called after close", () => {
+      it("re-initializes successfully", async () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+
+        const queueFactory = createMockQueueFactory();
+        registry.initialize(queueFactory);
+        await registry.close();
+
+        expect(() => registry.initialize(queueFactory)).not.toThrow();
+      });
+    });
+  });
+
   describe("dispatch", () => {
     describe("when not initialized", () => {
       it("logs warning and drops events", async () => {
