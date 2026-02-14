@@ -18,7 +18,7 @@
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.203.0",
     "@vercel/otel": "^1.13.0",
-    "ai": "^5.0.8",
+    "ai": "^5.0.52",
     "cli-markdown": "^3.5.1",
     "dotenv-cli": "^10.0.0",
     "langwatch": "file:../../"
