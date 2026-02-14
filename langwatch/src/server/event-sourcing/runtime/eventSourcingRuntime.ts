@@ -1,18 +1,11 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
-import type { CheckpointStore } from "../library/stores/checkpointStore.types";
 import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
 import { DefaultQueueProcessorFactory } from "./queue";
-import { CheckpointCacheRedis } from "./stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
-import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
-import { ProcessorCheckpointStoreMemory } from "./stores/processorCheckpointStoreMemory";
-import { CheckpointRepositoryClickHouse } from "./stores/repositories/checkpointRepositoryClickHouse";
-import { CheckpointRepositoryMemory } from "./stores/repositories/checkpointRepositoryMemory";
 import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 import { getClickHouseClient } from "../../clickhouse/client";
@@ -25,7 +18,6 @@ const logger = createLogger("langwatch:event-sourcing:runtime");
  */
 export interface RuntimeStores {
   eventStore: EventStore;
-  checkpointStore?: CheckpointStore;
   queueProcessorFactory?: QueueProcessorFactory;
 }
 
@@ -40,7 +32,6 @@ export interface RuntimeStores {
  */
 export class EventSourcingRuntime {
   private _eventStore?: EventStore;
-  private _checkpointStore?: CheckpointStore;
   private _queueProcessorFactory?: QueueProcessorFactory;
   private _initialized = false;
   private _loggedDisabledWarning = false;
@@ -68,14 +59,6 @@ export class EventSourcingRuntime {
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
     return this._eventStore;
-  }
-
-  /**
-   * The checkpoint store instance. Returns undefined if event sourcing is disabled.
-   */
-  get checkpointStore(): CheckpointStore | undefined {
-    this.ensureInitialized();
-    return this._checkpointStore;
   }
 
   /**
@@ -125,8 +108,6 @@ export class EventSourcingRuntime {
       clickHouseEnabled,
       clickHouseClient,
       redisConnection,
-      isTestEnvironment,
-      forceClickHouseInTests,
     } = this.config;
 
     const isProduction = process.env.NODE_ENV === "production";
@@ -150,14 +131,6 @@ export class EventSourcingRuntime {
       return;
     }
 
-    // Create checkpoint store with test environment handling
-    this._checkpointStore = this.createCheckpointStore(
-      clickHouseEnabled,
-      clickHouseClient,
-      isTestEnvironment,
-      forceClickHouseInTests,
-    );
-
     // Create queue processor factory
     this._queueProcessorFactory = new DefaultQueueProcessorFactory(
       redisConnection,
@@ -166,63 +139,10 @@ export class EventSourcingRuntime {
     logger.info(
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
-        checkpointStore: this._checkpointStore?.constructor.name ?? "none",
         queueProcessor: redisConnection ? "GroupQueue" : "Memory",
       },
       "Event sourcing runtime initialized",
     );
-  }
-
-  private createCheckpointStore(
-    clickHouseEnabled: boolean,
-    clickHouseClient: ClickHouseClient | undefined,
-    isTestEnvironment: boolean,
-    forceClickHouseInTests: boolean,
-  ): CheckpointStore | undefined {
-    const isProduction = process.env.NODE_ENV === "production";
-
-    // In test environment, use memory unless forced to use ClickHouse
-    if (isTestEnvironment && !forceClickHouseInTests) {
-      logger.debug("Using in-memory checkpoint store (test environment)");
-      return new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-    }
-
-    // Use ClickHouse if available and enabled
-    if (clickHouseEnabled && clickHouseClient) {
-      logger.debug("Using ClickHouse checkpoint store");
-
-      // Create Redis cache if Redis connection is available
-      const cache = this.config.redisConnection
-        ? new CheckpointCacheRedis(this.config.redisConnection)
-        : undefined;
-
-      if (cache) {
-        logger.info(
-          "Redis checkpoint cache enabled for fast checkpoint visibility",
-        );
-      } else {
-        logger.warn(
-          "Redis checkpoint cache disabled (no Redis connection) - may cause ordering retries",
-        );
-      }
-
-      return new ProcessorCheckpointStoreClickHouse(
-        new CheckpointRepositoryClickHouse(clickHouseClient),
-        cache,
-      );
-    }
-
-    // In production without ClickHouse, return undefined
-    if (isProduction) {
-      logger.warn("No checkpoint store in production without ClickHouse");
-      return void 0;
-    }
-
-    // Fallback to memory in non-production
-    logger.debug("Using in-memory checkpoint store (non-production)");
-    return new ProcessorCheckpointStoreMemory(new CheckpointRepositoryMemory());
   }
 
   /**
@@ -245,7 +165,6 @@ export class EventSourcingRuntime {
     // Mark as initialized and inject stores directly
     runtime._initialized = true;
     runtime._eventStore = stores.eventStore;
-    runtime._checkpointStore = stores.checkpointStore;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
 
     return runtime;
@@ -258,7 +177,6 @@ export class EventSourcingRuntime {
     config: EventSourcingConfig,
     stores: {
       eventStore: EventStore;
-      checkpointStore: CheckpointStore;
       queueProcessorFactory: QueueProcessorFactory;
     },
   ): EventSourcingRuntime {
@@ -266,7 +184,6 @@ export class EventSourcingRuntime {
 
     runtime._initialized = true;
     runtime._eventStore = stores.eventStore;
-    runtime._checkpointStore = stores.checkpointStore;
     runtime._queueProcessorFactory = stores.queueProcessorFactory;
 
     return runtime;

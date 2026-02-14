@@ -1,5 +1,4 @@
 import {
-  DelayedError,
   type Job,
   type JobsOptions,
   Queue,
@@ -32,10 +31,9 @@ import type {
 } from "../../../library/queues";
 import {
   ConfigurationError,
-  isNoEventsFoundError,
   QueueError,
 } from "../../../library/services/errorHandling";
-import { calculateExponentialBackoff } from "../calculateDelays";
+
 import { GroupStagingScripts } from "./scripts";
 import {
   gqActiveGroups,
@@ -55,7 +53,7 @@ const JOB_RETRY_CONFIG = {
   maxAttempts: 15,
   backoffDelayMs: 2000,
   removeOnCompleteAgeSec: 3600,
-  removeOnCompleteCount: 1000,
+  removeOnCompleteCount: 100,
   removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
 } as const;
 
@@ -104,9 +102,9 @@ type LegacyJobContainer<Payload> = {
  * - Per-group sequential processing eliminates ordering errors and distributed lock contention
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  */
-export class GroupQueueProcessorBullMq<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class GroupQueueProcessorBullMq<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
@@ -161,7 +159,8 @@ export class GroupQueueProcessorBullMq<Payload>
     this.redisConnection = effectiveConnection;
     // Dedicated connection for BRPOP to avoid blocking the shared connection
     this.blockingConnection =
-      "duplicate" in effectiveConnection && typeof effectiveConnection.duplicate === "function"
+      "duplicate" in effectiveConnection &&
+      typeof effectiveConnection.duplicate === "function"
         ? effectiveConnection.duplicate()
         : effectiveConnection;
     this.spanAttributes = spanAttributes;
@@ -175,7 +174,10 @@ export class GroupQueueProcessorBullMq<Payload>
       options?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
 
     // Initialize Lua scripts wrapper
-    this.scripts = new GroupStagingScripts(this.redisConnection, this.queueName);
+    this.scripts = new GroupStagingScripts(
+      this.redisConnection,
+      this.queueName,
+    );
 
     // BullMQ Queue for job persistence
     const queueOptions: QueueOptions = {
@@ -221,18 +223,6 @@ export class GroupQueueProcessorBullMq<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
-      if (isNoEventsFoundError(error)) {
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job?.id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Job delayed due to events not yet visible in ClickHouse",
-        );
-        return;
-      }
-
       this.logger.error(
         {
           queueName: this.queueName,
@@ -546,28 +536,7 @@ export class GroupQueueProcessorBullMq<Payload>
           "Group queue job processed successfully",
         );
       } catch (error) {
-        // For "no events found" errors (ClickHouse replication lag), use exponential backoff
-        if (isNoEventsFoundError(error)) {
-          const exponentialDelayMs = calculateExponentialBackoff(
-            job.attemptsStarted,
-          );
-
-          this.logger.debug(
-            {
-              queueName: this.queueName,
-              jobId: job.id,
-              delayMs: exponentialDelayMs,
-              attemptsStarted: job.attemptsStarted,
-            },
-            "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
-          );
-
-          const targetTimestamp = Date.now() + exponentialDelayMs;
-          await job.moveToDelayed(targetTimestamp, token);
-          throw new DelayedError();
-        }
-
-        // All other errors: let BullMQ's retry mechanism handle them
+        // Let BullMQ's retry mechanism handle errors
         throw error;
       }
     });
@@ -631,9 +600,7 @@ export class GroupQueueProcessorBullMq<Payload>
   /**
    * Extract group metadata from a BullMQ job.
    */
-  private extractGroupMetadata(
-    job: Job<Payload>,
-  ): GroupJobMetadata | null {
+  private extractGroupMetadata(job: Job<Payload>): GroupJobMetadata | null {
     const data = job.data as Record<string, unknown>;
     const groupId = data.__groupId;
     const stagedJobId = data.__stagedJobId;
@@ -695,15 +662,9 @@ export class GroupQueueProcessorBullMq<Payload>
         this.redisConnection.scard(blockedKey),
       ]);
 
-      gqPendingGroups.set(
-        { queue_name: this.queueName },
-        pendingGroupCount,
-      );
+      gqPendingGroups.set({ queue_name: this.queueName }, pendingGroupCount);
       // Active groups = BullMQ active jobs
-      gqActiveGroups.set(
-        { queue_name: this.queueName },
-        counts.active ?? 0,
-      );
+      gqActiveGroups.set({ queue_name: this.queueName }, counts.active ?? 0);
     } catch (error) {
       this.logger.debug(
         {
@@ -757,10 +718,7 @@ export class GroupQueueProcessorBullMq<Payload>
 
       if (this.queueEvents) {
         await this.queueEvents.close();
-        this.logger.debug(
-          { queueName: this.queueName },
-          "Queue events closed",
-        );
+        this.logger.debug({ queueName: this.queueName }, "Queue events closed");
       }
 
       // Close the dedicated blocking connection if it was duplicated

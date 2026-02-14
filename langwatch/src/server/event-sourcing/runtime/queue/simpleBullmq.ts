@@ -1,5 +1,4 @@
 import {
-  DelayedError,
   type Job,
   type JobsOptions,
   Queue,
@@ -31,10 +30,9 @@ import type {
 } from "../../library/queues";
 import {
   ConfigurationError,
-  isNoEventsFoundError,
   QueueError,
 } from "../../library/services/errorHandling";
-import { calculateExponentialBackoff } from "./calculateDelays";
+
 import { trace } from "@opentelemetry/api";
 
 /**
@@ -168,18 +166,6 @@ export class SimpleBullmqQueueProcessor<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
-      if (isNoEventsFoundError(error)) {
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job?.id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Job delayed due to events not yet visible in ClickHouse",
-        );
-        return;
-      }
-
       this.logger.error(
         {
           queueName: this.queueName,
@@ -325,28 +311,7 @@ export class SimpleBullmqQueueProcessor<Payload>
           "Simple queue job processed successfully",
         );
       } catch (error) {
-        // For "no events found" errors (ClickHouse replication lag), use exponential backoff
-        if (isNoEventsFoundError(error)) {
-          const exponentialDelayMs = calculateExponentialBackoff(
-            job.attemptsStarted,
-          );
-
-          this.logger.debug(
-            {
-              queueName: this.queueName,
-              jobId: job.id,
-              delayMs: exponentialDelayMs,
-              attemptsStarted: job.attemptsStarted,
-            },
-            "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
-          );
-
-          const targetTimestamp = Date.now() + exponentialDelayMs;
-          await job.moveToDelayed(targetTimestamp, token);
-          throw new DelayedError();
-        }
-
-        // All other errors: let BullMQ's retry mechanism handle them
+        // Let BullMQ's retry mechanism handle errors
         throw error;
       }
     });

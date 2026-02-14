@@ -7,6 +7,7 @@ import type {
   Projection,
   StaticPipelineDefinition,
 } from "../library";
+
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
 import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
 import { experimentRunProcessingPipelineDefinition } from "../pipelines/experiment-run-processing/pipeline";
@@ -14,6 +15,7 @@ import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing
 import { DisabledPipeline } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
+import { getGlobalProjectionRegistry } from "../projections/global/registry";
 import { EventSourcingPipeline } from "./pipeline";
 import type {
   PipelineWithCommandHandlers,
@@ -153,7 +155,6 @@ export class EventSourcing {
           foldProjections: foldProjections.length > 0 ? foldProjections : undefined,
           mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
           queueProcessorFactory: this.runtime.queueProcessorFactory,
-          processorCheckpointStore: this.runtime.checkpointStore,
           parentLinks:
             definition.parentLinks.length > 0
               ? definition.parentLinks
@@ -161,6 +162,7 @@ export class EventSourcing {
           metadata: definition.metadata,
           featureFlagService: definition.featureFlagService,
           commandRegistrations,
+          globalRegistry: getGlobalProjectionRegistry(),
         });
 
         // Get command dispatchers

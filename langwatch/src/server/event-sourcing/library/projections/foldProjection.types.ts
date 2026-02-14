@@ -1,20 +1,19 @@
 import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/types";
-import type { DeduplicationStrategy } from "../queues";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 /**
  * A stateful projection that folds events into accumulated state.
  *
- * FoldProjection replaces the old ProjectionHandler interface with a pure
- * functional approach: `init()` provides the initial state, and `apply()`
- * produces new state from old state + event. The framework handles the
- * rebuild loop and persistence.
+ * FoldProjection uses a pure functional approach: `init()` provides the
+ * initial state, and `apply()` produces new state from old state + event.
+ * The framework loads existing state via `store.get()`, applies the event,
+ * and persists via `store.store()`.
+ *
+ * All projections are incremental: the event arrives in the job payload,
+ * existing state is loaded (or initialized), and the single event is applied.
  *
  * State = Output: what `apply` produces is exactly what gets stored.
- * If a projection needs internal bookkeeping (e.g., intermediate normalized
- * spans), include it in the state type — the store can choose to omit
- * fields that are not needed for querying.
  *
  * @example
  * ```typescript
@@ -53,23 +52,21 @@ export interface FoldProjectionDefinition<
   /** Store for persisting and retrieving the fold state. */
   store: FoldProjectionStore<State>;
 
-  /** Execution strategy. Default: "rebuild" (replays all events). */
-  strategy?: "rebuild" | "incremental";
+  /**
+   * Custom key extractor. Defaults to aggregateId.
+   * Useful for cross-cutting projections that group by something other than aggregateId
+   * (e.g., tenantId:date for daily counts).
+   */
+  key?: (event: E) => string;
 
   /** Optional processing behavior configuration. */
-  options?: FoldProjectionOptions<E>;
+  options?: FoldProjectionOptions;
 }
 
 /**
  * Options for configuring fold projection processing behavior.
  */
-export interface FoldProjectionOptions<E extends Event = Event> {
-  /** Delay in milliseconds before processing the job. */
-  delay?: number;
-
-  /** Deduplication strategy for this projection. */
-  deduplication?: DeduplicationStrategy<E>;
-
+export interface FoldProjectionOptions {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
 }

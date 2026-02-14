@@ -101,43 +101,6 @@ export abstract class NonCriticalError extends BaseEventSourcingError {
 }
 
 /**
- * Error thrown when event ordering is violated.
- * Indicates that a previous event has not been processed yet.
- */
-export class SequentialOrderingError extends CriticalError {
-  override readonly name = "SequentialOrderingError";
-  readonly previousSequenceNumber: number;
-  readonly currentSequenceNumber: number;
-  readonly eventId: string;
-  readonly aggregateId: string;
-  readonly tenantId: string;
-
-  constructor(
-    previousSequenceNumber: number,
-    currentSequenceNumber: number,
-    eventId: string,
-    aggregateId: string,
-    tenantId: string,
-    context: Record<string, unknown> = {},
-  ) {
-    const message = `Previous event (sequence ${previousSequenceNumber}) has not been processed yet. Processing stopped to maintain event ordering.`;
-    super(message, {
-      ...context,
-      previousSequenceNumber,
-      currentSequenceNumber,
-      eventId,
-      aggregateId,
-      tenantId,
-    });
-    this.previousSequenceNumber = previousSequenceNumber;
-    this.currentSequenceNumber = currentSequenceNumber;
-    this.eventId = eventId;
-    this.aggregateId = aggregateId;
-    this.tenantId = tenantId;
-  }
-}
-
-/**
  * Error thrown for security violations, particularly tenant isolation issues.
  */
 export class SecurityError extends CriticalError {
@@ -215,30 +178,6 @@ export class ConfigurationError extends CriticalError {
 }
 
 /**
- * Error thrown for checkpoint key validation and format errors.
- */
-export class CheckpointError extends CriticalError {
-  override readonly name = "CheckpointError";
-  readonly component: string;
-  readonly value: string;
-
-  constructor(
-    component: string,
-    value: string,
-    message: string,
-    context: Record<string, unknown> = {},
-  ) {
-    super(message, {
-      ...context,
-      component,
-      value,
-    });
-    this.component = component;
-    this.value = value;
-  }
-}
-
-/**
  * Error thrown for event store operation failures.
  * Can be critical or recoverable depending on the operation.
  */
@@ -267,31 +206,6 @@ export class StoreError extends BaseEventSourcingError {
     );
     this.operation = operation;
     this.store = store;
-  }
-}
-
-/**
- * Error thrown when no events are found for an aggregate.
- * This typically occurs due to ClickHouse replication lag - events exist
- * but aren't yet visible. This is a recoverable condition that should be retried.
- */
-export class NoEventsFoundError extends RecoverableError {
-  override readonly name = "NoEventsFoundError";
-  readonly aggregateId: string;
-  readonly tenantId: string;
-
-  constructor(
-    aggregateId: string,
-    tenantId: string,
-    context: Record<string, unknown> = {},
-  ) {
-    super(`No events found for aggregate ${aggregateId}`, {
-      ...context,
-      aggregateId,
-      tenantId,
-    });
-    this.aggregateId = aggregateId;
-    this.tenantId = tenantId;
   }
 }
 
@@ -412,66 +326,6 @@ export class PublishingError extends NonCriticalError {
 }
 
 /**
- * Determines if an error is a sequential ordering violation.
- * These are critical errors that must cause the operation to fail.
- *
- * Note: Uses property checks in addition to instanceof to handle cases where
- * bundling/code-splitting causes class identity issues across module boundaries.
- */
-export function isSequentialOrderingError(
-  error: unknown,
-): error is SequentialOrderingError {
-  if (error instanceof SequentialOrderingError) {
-    return true;
-  }
-  // Fallback: check for unique property that only SequentialOrderingError has
-  return (
-    error instanceof Error &&
-    "previousSequenceNumber" in error &&
-    typeof (error as SequentialOrderingError).previousSequenceNumber === "number"
-  );
-}
-
-/**
- * Extracts the previous sequence number from an ordering error.
- * Returns null if the error is not an ordering error.
- *
- * @param error - The error to extract the sequence number from
- * @returns The previous sequence number, or null if not found
- */
-export function extractPreviousSequenceNumber(error: unknown): number | null {
-  if (isSequentialOrderingError(error)) {
-    return error.previousSequenceNumber;
-  }
-  return null;
-}
-
-/**
- * Type guard to check if an error is a NoEventsFoundError.
- * This error occurs when events haven't yet become visible in ClickHouse
- * due to replication lag, even though a checkpoint was created for them.
- *
- * Note: Uses property checks in addition to instanceof to handle cases where
- * bundling/code-splitting causes class identity issues across module boundaries.
- */
-export function isNoEventsFoundError(
-  error: unknown,
-): error is NoEventsFoundError {
-  if (error instanceof NoEventsFoundError) {
-    return true;
-  }
-  // Fallback: check for unique combination of properties
-  // NoEventsFoundError has aggregateId but NOT lockKey or previousSequenceNumber
-  return (
-    error instanceof Error &&
-    "aggregateId" in error &&
-    typeof (error as NoEventsFoundError).aggregateId === "string" &&
-    !("lockKey" in error) &&
-    !("previousSequenceNumber" in error)
-  );
-}
-
-/**
  * Handles an error according to its category.
  * If the error is a BaseEventSourcingError, uses its category and context.
  * Otherwise, uses the provided category and context.
@@ -568,10 +422,6 @@ export function handleError(
 export function categorizeError(error: unknown): ErrorCategory {
   if (error instanceof BaseEventSourcingError) {
     return error.category;
-  }
-
-  if (isSequentialOrderingError(error)) {
-    return ErrorCategory.CRITICAL;
   }
 
   // Default to recoverable for unknown errors, so they can be retried by default and

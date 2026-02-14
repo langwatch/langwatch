@@ -65,12 +65,6 @@ export class EventSourcingPipeline<
     pipelineLogger.debug(
       {
         pipelineName: definition.name,
-        checkpointStoreType: definition.processorCheckpointStore
-          ? definition.processorCheckpointStore.constructor.name
-          : "none",
-        checkpointStoreSource: definition.processorCheckpointStore
-          ? "provided"
-          : "none",
       },
       "Initialized event-sourcing pipeline",
     );
@@ -83,10 +77,10 @@ export class EventSourcingPipeline<
         foldProjections: definition.foldProjections,
         mapProjections: definition.mapProjections,
         eventPublisher: definition.eventPublisher,
-        checkpointStore: definition.processorCheckpointStore,
         queueFactory: definition.queueProcessorFactory,
         featureFlagService: definition.featureFlagService,
         commandRegistrations: definition.commandRegistrations,
+        globalRegistry: definition.globalRegistry,
       }),
       writable: false,
       enumerable: true,

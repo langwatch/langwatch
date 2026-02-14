@@ -71,7 +71,7 @@ export interface StaticPipelineDefinition<
     string,
     {
       definition: FoldProjectionDefinition<any, EventType>;
-      options?: FoldProjectionOptions<EventType>;
+      options?: FoldProjectionOptions;
     }
   >;
 

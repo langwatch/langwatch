@@ -5,10 +5,10 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { EventPublisher } from "../eventPublisher.types";
 import type { QueueProcessorFactory } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
-import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 
 /**
@@ -20,22 +20,6 @@ export interface EventSourcingOptions<EventType extends Event = Event> {
    * Defaults to "timestamp" (chronological order).
    */
   ordering?: EventOrderingStrategy<EventType>;
-}
-
-/**
- * Options for updating a projection.
- */
-export interface UpdateProjectionOptions<EventType extends Event = Event> {
-  /**
-   * Optional projection store context. If not provided, defaults to eventStoreContext.
-   * Useful when projection store requires different tenant isolation or permissions.
-   */
-  projectionStoreContext?: ProjectionStoreReadContext;
-  /**
-   * Pre-fetched events to avoid duplicate query.
-   * If provided, updateProjectionByName will use these events instead of fetching from the event store.
-   */
-  events?: readonly EventType[];
 }
 
 /**
@@ -93,4 +77,10 @@ export interface EventSourcingServiceOptions<
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
   }>;
+  /**
+   * Optional global projection registry for cross-pipeline projections.
+   * When provided, events are dispatched to global projections after local dispatch.
+   * Uses base Event type because the registry receives events from all pipelines.
+   */
+  globalRegistry?: ProjectionRegistry<Event>;
 }

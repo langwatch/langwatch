@@ -131,11 +131,8 @@ export class QueueManager<EventType extends Event = Event> {
   initializeProjectionQueues(
     projections: Record<string, {
       name: string;
-      store: any;
-      handler: { handle: (stream: any) => any };
+      groupKeyFn?: (event: EventType) => string;
       options?: {
-        delay?: number;
-        deduplication?: DeduplicationStrategy<EventType>;
         killSwitch?: KillSwitchOptions;
       };
     }>,
@@ -161,19 +158,15 @@ export class QueueManager<EventType extends Event = Event> {
 
       const queueProcessor = this.queueFactory.create<EventType>({
         name: queueName,
-        delay: projectionDef.options?.delay,
-        deduplication: resolveDeduplicationStrategy(
-          projectionDef.options?.deduplication,
-          this.createDefaultDeduplicationId.bind(this),
-        ),
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
           "event.id": event.id,
           "event.aggregate_id": String(event.aggregateId),
         }),
-        groupKey: (event: EventType) =>
-          `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        groupKey: projectionDef.groupKeyFn
+          ? (event: EventType) => `${String(event.tenantId)}:${projectionDef.groupKeyFn!(event)}`
+          : (event: EventType) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
         process: async (event: EventType) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,

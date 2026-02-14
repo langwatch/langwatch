@@ -3,43 +3,51 @@ import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 /**
- * Executes a fold projection for an aggregate by replaying all events.
+ * Executes a fold projection incrementally by applying a single event to existing state.
  *
  * Flow:
- * 1. `state = projection.init()`
- * 2. `for (event of events) state = projection.apply(state, event)`
+ * 1. Load existing state via `store.get()` (or `init()` if none)
+ * 2. `state = projection.apply(state, event)`
  * 3. `projection.store.store(state, context)`
  *
- * The executor is stateless — it receives events and context each time.
+ * The executor is stateless — it receives event and context each time.
  */
 export class FoldProjectionExecutor {
   /**
-   * Executes a fold projection by reducing all events into state and storing it.
+   * Executes an incremental fold projection by applying a single event to existing state.
+   *
+   * Loads the current stored state (or initializes if none exists), applies the
+   * single event, and stores the result.
    *
    * @param projection - The fold projection definition
-   * @param events - All events for the aggregate, in chronological order
-   * @param context - Store context with aggregateId and tenantId
-   * @returns The computed state, or null if no events matched
+   * @param event - The single event to apply
+   * @param context - Store context with aggregateId, tenantId, and optional key
+   * @returns The updated state
    */
   async execute<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
-    events: readonly E[],
+    event: E,
     context: ProjectionStoreContext,
-  ): Promise<State | null> {
-    if (events.length === 0) {
-      return null;
-    }
+  ): Promise<State> {
+    const key = context.key ?? context.aggregateId;
+    let state = await projection.store.get(key, context) ?? projection.init();
 
-    let state = projection.init();
-
-    for (const event of events) {
-      if (projection.eventTypes.includes(event.type)) {
-        state = projection.apply(state, event);
-      }
+    if (this.matchesEventTypes(projection, event)) {
+      state = projection.apply(state, event);
     }
 
     await projection.store.store(state, context);
-
     return state;
+  }
+
+  /**
+   * Checks if an event matches the projection's eventTypes filter.
+   * Empty eventTypes array means "all events".
+   */
+  private matchesEventTypes<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    event: E,
+  ): boolean {
+    return projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type);
   }
 }

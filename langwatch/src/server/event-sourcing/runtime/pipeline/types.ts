@@ -11,7 +11,7 @@ import type {
 } from "../../library/queues";
 import type { CommandHandlerOptions } from "../../library/services/commands/commandDispatcher";
 import type { EventSourcingService } from "../../library/services/eventSourcingService";
-import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
+import type { ProjectionRegistry } from "../../library/projections/projectionRegistry";
 import type { EventStore } from "../../library/stores/eventStore.types";
 
 /**
@@ -46,7 +46,6 @@ export interface EventSourcingPipelineDefinition<
   mapProjections?: MapProjectionDefinition<any, EventType>[];
   eventPublisher?: EventPublisher<EventType>;
   queueProcessorFactory?: QueueProcessorFactory;
-  processorCheckpointStore?: CheckpointStore;
   parentLinks?: ParentLink<EventType>[];
   featureFlagService?: FeatureFlagServiceInterface;
   commandRegistrations?: Array<{
@@ -54,6 +53,7 @@ export interface EventSourcingPipelineDefinition<
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
   }>;
+  globalRegistry?: ProjectionRegistry<Event>;
 }
 
 export interface RegisteredPipeline<

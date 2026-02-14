@@ -7,23 +7,20 @@ import type { Event, Projection } from "../domain/types";
 import type { EventPublisher } from "../eventPublisher.types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { CheckpointStore } from "../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
 } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
-import { ProjectionBatchProcessor } from "./batch/projectionBatchProcessor";
 import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-  UpdateProjectionOptions,
 } from "./eventSourcingService.types";
 import { QueueManager } from "./queues/queueManager";
-import { ProjectionValidator } from "./validation/projectionValidator";
 
 /**
  * Main service that orchestrates event sourcing.
@@ -51,7 +48,7 @@ export class EventSourcingService<
   private readonly queueManager: QueueManager<EventType>;
   private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly checkpointStore?: CheckpointStore;
+  private readonly globalRegistry?: ProjectionRegistry<Event>;
 
   constructor({
     pipelineName,
@@ -60,15 +57,13 @@ export class EventSourcingService<
     foldProjections,
     mapProjections,
     eventPublisher,
-    checkpointStore,
     serviceOptions,
     logger,
     queueFactory,
     featureFlagService,
     commandRegistrations,
-  }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
-    checkpointStore?: CheckpointStore;
-  }) {
+    globalRegistry,
+  }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
     this.eventStore = eventStore;
@@ -78,7 +73,7 @@ export class EventSourcingService<
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
     this.featureFlagService = featureFlagService;
-    this.checkpointStore = checkpointStore;
+    this.globalRegistry = globalRegistry;
 
     // Warn in production if queue factory is not provided
     if (
@@ -93,14 +88,6 @@ export class EventSourcingService<
       );
     }
 
-    // Initialize components
-    const validator = new ProjectionValidator({
-      eventStore,
-      aggregateType,
-      checkpointStore,
-      pipelineName: this.pipelineName,
-    });
-
     this.queueManager = new QueueManager<EventType>({
       aggregateType,
       pipelineName: this.pipelineName,
@@ -108,16 +95,12 @@ export class EventSourcingService<
       featureFlagService: this.featureFlagService,
     });
 
-    // Create ProjectionRouter
+    // Create ProjectionRouter (no event store needed — incremental only)
     this.router = new ProjectionRouter<EventType, ProjectionTypes>(
       aggregateType,
-      eventStore,
       pipelineName,
       this.queueManager,
-      checkpointStore,
       featureFlagService,
-      validator,
-      (this.options.ordering ?? "timestamp") as "timestamp" | "as-is",
     );
 
     // Register fold projections
@@ -141,13 +124,7 @@ export class EventSourcingService<
 
     // Initialize queue processors for fold projections (projection queues)
     if (queueFactory && foldProjections && foldProjections.length > 0) {
-      const batchProcessor = new ProjectionBatchProcessor<EventType>(
-        eventStore,
-        checkpointStore,
-        this.pipelineName,
-        aggregateType,
-      );
-      this.router.initializeFoldQueues(batchProcessor);
+      this.router.initializeFoldQueues();
     }
 
     // Initialize command queues (after all fields are set so storeEvents works)
@@ -252,29 +229,29 @@ export class EventSourcingService<
           await this.router.dispatch(enrichedEvents, context);
           span.addEvent("projection.dispatch.complete");
         }
-      },
-    );
-  }
 
-  /**
-   * Updates a specific fold projection by name for a given aggregate.
-   */
-  async updateProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: UpdateProjectionOptions<EventType>,
-  ): Promise<{
-    projection: ProjectionTypes[ProjectionName];
-    events: readonly EventType[];
-  } | null> {
-    return await this.router.updateProjectionByName(
-      projectionName,
-      aggregateId,
-      context,
-      options,
+        // Dispatch to global projection registry (cross-pipeline projections)
+        if (this.globalRegistry && enrichedEvents.length > 0) {
+          span.addEvent("global_projection.dispatch.start");
+          try {
+            await this.globalRegistry.dispatch(enrichedEvents, context);
+            span.addEvent("global_projection.dispatch.complete");
+          } catch (error) {
+            span.addEvent("global_projection.dispatch.error", {
+              "error.message":
+                error instanceof Error ? error.message : String(error),
+            });
+            this.logger.error(
+              {
+                aggregateType: this.aggregateType,
+                eventCount: enrichedEvents.length,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to dispatch events to global projection registry",
+            );
+          }
+        }
+      },
     );
   }
 

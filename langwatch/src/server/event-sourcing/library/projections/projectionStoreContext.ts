@@ -10,4 +10,7 @@ export interface ProjectionStoreContext {
 
   /** Tenant identifier for multi-tenant isolation. */
   tenantId: TenantId;
+
+  /** Custom projection key. Defaults to aggregateId when not set. */
+  key?: string;
 }

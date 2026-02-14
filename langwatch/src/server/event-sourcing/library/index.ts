@@ -61,7 +61,6 @@ export type {
   EventMetadataBase,
   EventOrderingStrategy,
   ParentLink,
-  ProcessorCheckpoint,
   Projection,
   ProjectionEnvelope,
   ProjectionMetadata,
@@ -71,7 +70,6 @@ export {
   createProjectionEnvelopeSchema,
   EventMetadataBaseSchema,
   EventSchema,
-  ProcessorCheckpointSchema,
   ProjectionEnvelopeSchema,
   ProjectionMetadataSchema,
   ProjectionSchema,
@@ -95,13 +93,7 @@ export type {
 export { EventSourcingService } from "./services/eventSourcingService";
 export type {
   EventSourcingOptions,
-  UpdateProjectionOptions,
 } from "./services/eventSourcingService.types";
-export type { CheckpointStore } from "./stores/checkpointStore.types";
-/**
- * @deprecated Use CheckpointStore instead
- */
-export type { CheckpointStore as ProcessorCheckpointStore } from "./stores/checkpointStore.types";
 export type {
   EventStore,
   EventStoreReadContext,

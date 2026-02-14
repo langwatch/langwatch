@@ -73,7 +73,7 @@ export class StaticPipelineBuilderWithNameAndType<
     string,
     {
       definition: FoldProjectionDefinition<any, EventType>;
-      options?: FoldProjectionOptions<EventType>;
+      options?: FoldProjectionOptions;
     }
   >();
   private mapProjections = new Map<
@@ -107,7 +107,7 @@ export class StaticPipelineBuilderWithNameAndType<
   withFoldProjection<ProjectionName extends string>(
     name: ProjectionName,
     definition: FoldProjectionDefinition<any, EventType>,
-    options?: FoldProjectionOptions<EventType>,
+    options?: FoldProjectionOptions,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
