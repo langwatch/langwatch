@@ -1,6 +1,6 @@
 # ADR-002: Event Sourcing for Traces and Evaluations
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-007](./007-event-sourcing-architecture.md)
 
 ## Context
 

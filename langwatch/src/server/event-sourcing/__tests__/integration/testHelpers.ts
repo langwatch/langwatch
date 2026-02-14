@@ -1,4 +1,3 @@
-import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../library";
 import { createTenantId, definePipeline } from "../../library";
 import { EventSourcing } from "../../runtime/eventSourcing";
@@ -21,10 +20,6 @@ import {
   testMapProjection,
 } from "./testPipelines";
 import type { TestProjection } from "./testPipelines";
-
-const logger = createLogger(
-  "langwatch:event-sourcing:tests:integration:test-helpers",
-);
 
 /**
  * Gracefully closes a pipeline and waits for cleanup to complete.
@@ -277,45 +272,6 @@ export function getTenantIdString(
   tenantId: ReturnType<typeof createTenantId>,
 ): string {
   return String(tenantId);
-}
-
-/**
- * Helper to verify event handler processed an event.
- */
-export async function verifyEventHandlerProcessed(
-  eventId: string,
-  tenantId: string,
-): Promise<boolean> {
-  const clickHouseClient = getTestClickHouseClient();
-  if (!clickHouseClient) {
-    return false;
-  }
-
-  const result = await clickHouseClient.query({
-    query: `
-      SELECT COUNT(*) as count
-      FROM "test_langwatch".test_event_handler_log
-      WHERE EventId = {eventId:String}
-        AND TenantId = {tenantId:String}
-    `,
-    query_params: { eventId, tenantId },
-    format: "JSONEachRow",
-  });
-
-  const rows = await result.json<{ count: number | string }>();
-  const processedCount = Number(rows[0]?.count ?? 0);
-  const processed = processedCount > 0;
-  if (!processed) {
-    logger.debug(
-      {
-        eventId,
-        tenantId,
-        processedCount,
-      },
-      "[verifyEventHandlerProcessed] Missing event handler record",
-    );
-  }
-  return processed;
 }
 
 /**
