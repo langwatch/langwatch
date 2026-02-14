@@ -1,0 +1,59 @@
+{
+  "predict": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "output": "The Xiaomi 14 Pro comes in several elegant color options, including Black, Ceramic White, and a unique Light Blue variant. These choices provide a range of styles to match users' preferences, from classic and sophisticated to modern and stylish. Each color option features a premium finish that complements the phone's design.",
+        "reasoning": "The output describes the Xiaomi 14 Pro's color options in a positive light, highlighting the variety and premium finish of each option. It emphasizes the elegance and style of the phone, which would appeal to potential buyers.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "The iPhone 15 introduced a couple of new security features, such as advanced biometric authentication with improved Face ID and enhanced encryption protocols. While these are nice improvements, they don\u2019t represent a massive leap forward in smartphone security. Other brands offer similar, if not superior, security measures. Still, it's a decent upgrade for existing Apple users.",
+        "reasoning": "The output acknowledges the new security features of the iPhone 15 but downplays their significance by stating that they don't represent a massive leap forward and that other brands offer similar or superior measures. It concludes that the upgrade is decent but not exceptional.",
+        "sentiment": "subtly_negative"
+      },
+      {
+        "augmented": true,
+        "output": "The Galaxy S24 claims IP68 water and dust resistance, yet Samsung's track record shows issues with claims not holding up under real-world conditions. Users have repeatedly faced problems with water damage despite complying with the IP rating's limits. Additionally, the plastic components often harbor dust over time, undermining long-term durability. Don't let the marketing hype alone dictate your choices.",
+        "reasoning": "The output highlights several negative aspects of the Galaxy S24, including issues with water damage and dust accumulation despite the IP68 rating. It also suggests that Samsung's marketing claims may not be reliable, which can be seen as a significant drawback for potential buyers.",
+        "sentiment": "very_negative"
+      },
+      {
+        "augmented": true,
+        "output": "The Pixel 8 offers improved multi-tasking capabilities over the Pixel 7, thanks to its upgraded Tensor G3 chip and increased RAM. Users will notice smoother transitions between apps and quicker load times, enhancing overall efficiency. While the Pixel 7 already provided a solid performance, the Pixel 8\u2019s optimizations make handling complex tasks more seamless.",
+        "reasoning": "The output highlights the improvements in multi-tasking capabilities of the Pixel 8 over the Pixel 7, emphasizing the upgraded Tensor G3 chip and increased RAM. It mentions smoother transitions between apps and quicker load times, which enhance overall efficiency. The tone is positive as it focuses on the benefits and optimizations of the Pixel 8.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "The Xiaomi 14 Pro's fingerprint sensor can be inconsistent. Users report delays and failures in recognition, especially with wet or slightly dirty fingers. While Xiaomi claims it has improved, the reliability still lags behind competitors like Samsung and Apple. If fingerprint sensor accuracy is crucial for you, you might want to consider these alternative brands.",
+        "reasoning": "The output highlights a significant drawback of the Xiaomi 14 Pro's fingerprint sensor, mentioning delays and failures in recognition. It also compares the sensor unfavorably to competitors like Samsung and Apple, suggesting that users might want to consider alternative brands if fingerprint sensor accuracy is important to them. This indicates a negative sentiment towards the product's fingerprint sensor feature.",
+        "sentiment": "very_negative"
+      },
+      {
+        "augmented": true,
+        "output": "The Pixel 8 offers a user-friendly interface that is particularly welcoming to first-time Android users. Its clean, intuitive layout, coupled with the helpful, AI-driven Assistant, ensures a smooth user experience. The interface is straightforward, and features like Now Playing and Live Caption add convenience, making the transition to Android effortless.",
+        "reasoning": "The output highlights the Pixel 8's user-friendly interface, especially for first-time Android users. It emphasizes the clean and intuitive layout, AI-driven Assistant, and convenient features like Now Playing and Live Caption, all of which contribute to a smooth user experience. The tone is positive and focuses on the ease of use and helpful features.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "Some tips for reducing stress include practicing deep breathing exercises, engaging in regular physical activity, maintaining a well-balanced diet, getting enough sleep, setting realistic goals, taking time for hobbies and interests, practicing mindfulness or meditation, and seeking social support by talking to friends or family.",
+        "reasoning": "The output provides practical advice on reducing stress through various methods such as deep breathing, physical activity, and mindfulness. It is informative and focuses on well-being, but it does not pertain to a product or service.",
+        "sentiment": "skipped"
+      },
+      {
+        "augmented": true,
+        "output": "While OnePlus 12 may tout a \"unique\" design, it's hard to overlook how it borrows heavily from previous models and even competitors like Samsung. The minor tweaks don't justify the hefty price tag. The plastic feel, despite being marketed as premium, and glaring inconsistencies in build quality are disappointing. It's just another iterative, uninspired update.",
+        "reasoning": "The output highlights several negative aspects of the OnePlus 12, such as its design being unoriginal, the high price not being justified by the minor changes, the plastic feel despite being marketed as premium, and inconsistencies in build quality. These points collectively convey a strong negative sentiment towards the product.",
+        "sentiment": "very_negative"
+      }
+    ],
+    "signature_instructions": "You are given `output`, which is an in-depth review or commentary on products. Your task is to analyze this review to produce two fields: `reasoning` and `sentiment`.\n1. **Reasoning**: Extract the core arguments, evidences, and justifications provided in the review. This should include detailed assessments of features such as chipset performance, battery longevity, camera quality, build design, and any comparisons made with other smartphone models.\n2. **Sentiment**: Determine the overall sentiment of the review towards the product. This can range from very positive to very negative. Pay attention to the nuanced language and phrases that indicate the reviewer's satisfaction or dissatisfaction. Only skip if this is not talking about a product.\n**Ensure that the reasoning is precise and adequately supports the identified sentiment. Maintain a professional and technical tone in your output to reflect the style of the reviews.**",
+    "signature_prefix": "The review provides insights on..."
+  }
+}

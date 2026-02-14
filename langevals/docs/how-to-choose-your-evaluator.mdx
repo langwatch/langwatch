@@ -1,0 +1,97 @@
+---
+title: "How to Choose Your Evaluator Guide"
+---
+
+On this page, you can find an elaborate explanation on how to choose the right evaluator depending on the issue that you want to mitigate. Try answering the questions in the proposed order, and you will be able to find yourself with interesting conclusions.
+
+## RAG Quality
+
+![How to choose RAGAS evaluator](/images/how-to-choose-ragas.png)
+Assuming that you have an unsatisfying response by an LLM, you can follow this schema for finding a weak spot in your system. With proper LangWatch integration into your software, you can keep track of both retrieved contexts and the generated responses. Those pieces are crucial for evaluating your RAG system.
+
+The first thing to check is if the generated answer is faithful to the retrieved contexts. If not, your way to go is a **Faithfulness** evaluator that will fail on every generated answer that is not true to the contexts. This is an important evaluator because it shows if your RAG actually works, and if your LLM is actually using the retrieved context to produce the answer. If this evaluation is failing, it can signalize a bug where the contexts are not being properly used while generating the response.
+
+In case the responses are faithful, but hallucination persists, the next question to ask is if the answer is relevant to the question that was asked. If it is not, but the retrieved contexts are relevant to the question, then the problem is perhaps in the generation of the answer. Here, the **Answer Relevancy** evaluator comes in handy. It evaluates how relevant the generated response is to the given question.
+
+However, if the retrieved contexts are not relevant to the question, we need to check if there are any better contexts available in the knowledge base. If there are, here comes into play the **Context Recall** evaluator and the expected outputs also know as ground truths. With the help of the Context Recall evaluator and a set of predefined outputs, we can evaluate to what extent the retrieved contexts match the best possible answer. This gives a good insight into the retrieval capabilities of our RAG.
+
+At the same time, if there are no better contexts available, we need to check if we don't confuse the model by retrieving too many contexts. If that is the case, the **Context Precision** evaluator is the best option. Some other strategies to mitigate this problem would be to experiment with a different number of retrieved chunks of text or change the length of each chunk while embedding them into a vector database.
+
+Finally, if you are sure that the amount of retrieved context is fine but the hallucination still persists, maybe you have to ask yourself if a real human was able to respond correctly to your question. At this point you either need to switch the model and improve your prompt or spend more time building a better knowledge base.
+
+## Security
+
+![How to choose safeguards](/images/how-to-choose-safeguards.jpg)
+In case you have no security measures on your chatbot taken, start from the top.
+The first important security check to implement is the PII evaluation.
+If you do not want to share any personal data of your users with any third parties, you can use the PII Detection evaluator.
+The next step is to let your chatbot detect unsafe contents.
+Most of the recent LLMs have in-built capabilities to prevent the production of unsafe contents, however, some older versions have a certain level of vulnerability.
+You can build a layer that will prevent your LLM from generating any harmful content.
+
+Follow this schema to ensure your chatbot is safeguarded effectively:
+
+### Guide to Ensuring Your Chatbot is Safeguarded
+
+Assume that your chatbot is not safeguarded! Follow the steps below to determine the necessary measures to secure your chatbot effectively.
+
+#### Step 1: Detection of Personally Identifiable Information (PII)
+
+- **Question:** Does your chatbot detect Personally Identifiable Information?
+  - **Explanation:** Identifying and managing PII is crucial to protecting user privacy and complying with data protection regulations.
+    If your chatbot does not have this capability, it is essential to implement **PII Detection** to ensure sensitive information is handled appropriately. This would prevent sharing real names, card numbers, email addresses and other personal data with third parties.
+
+#### Step 2: Detection of Unsafe Contents
+
+- **Question:** Does your chatbot detect unsafe contents?
+  - **Explanation:** Detecting unsafe content helps prevent the dissemination of harmful, offensive, or inappropriate information. Most of the modern LLMs have in-built capabilities to detect and ignore requests to produce harmful content. However you have to pay extra attention to this in case you are using an older version of an LLM or if you trained the model yourself.
+
+#### Step 3: Evaluating Content Safety and Moderation
+
+- **Question:** Does the severity level of unsafe content matter?
+  - **Explanation:**
+    - If the severity level is important (you need to distinguish between different levels of unsafe content, e.g., low vs. high severity), implement **Azure Content Safety** (`azure/content_safety`). This evaluator provides a 0-7 severity scale and allows you to customize the threshold and specific categories (Hate, SelfHarm, Sexual, Violence).
+    - If severity levels are not a concern and you just need to detect unsafe content, implement **OpenAI Moderation** (`openai/moderation`). This evaluator detects harmful content but doesn't provide granular severity levels.
+
+#### Step 4: Connection to Other Data Sources
+
+- **Question:** Does your chatbot have a connection to other data sources (e.g., databases, email inbox)?
+  - **Explanation:** Connecting to other data sources can introduce additional risks. If your chatbot has such connections and is also able to perform actions on the internet or inside of your system - you are in danger zone. Implementing **Prompt Injection** safeguards is crucial to protect against malicious data inputs.
+    This guardrail can prevent your chatbot from being hijacked by inputting malicious prompts and contents.
+
+#### Step 5: Protection Against User Jailbreaks
+
+- **Question:** Is your chatbot secure from user jailbreaks (forcing it to produce unethical or criminal content)?
+  - **Explanation:** Ensuring your chatbot is secure from user jailbreaks is essential for maintaining ethical standards and preventing misuse. If your chatbot is not secure, implementing **Jailbreak Detection** is necessary to prevent and mitigate attempts to bypass security measures. This guardrail is different from Prompt Injection in a way that it protects from forcing the chatbot to reveal its system prompt or acting against any default settings.
+
+## Enterprise Readiness
+
+![How to choose enterprise evaluators](/images/how-to-choose-enterprise.jpg)
+Many businesses try to meet their goals with the help of chatbots. However, there are many aspects that should be taken care of to make sure these goals can be reached in a coordinated way.
+
+### Guide to Ensuring Your Chatbot is Enterprise Ready
+
+First, lets assume that your chatbot is not enterprise ready! Follow the steps below to ensure it meets enterprise standards effectively.
+
+#### Step 1: Control Over Topics
+
+- **Question:** Can you control the topics that your chatbot talks about?
+  - **Explanation:** Controlling the topics your chatbot discusses is vital to maintaining focus and relevance.
+    If you cannot control the topics, use **Off Topic Evaluator** to manage and restrict the chatbot's discussion topics.
+    This is helpful for preventing malicious users exploiting your chatbot and its tokens for unrelated tasks such as code generation or helping with cooking recipes.
+
+#### Step 2: Competitor Discussions
+
+- **Question:** Does the chatbot answer questions about your competitors?
+
+  - **Explanation:** Answering questions about competitors can be risky.
+    If your chatbot does this, you need to assess if you know all your competitors by name to implement appropriate measures.
+
+  - **Question:** Do you know all your competitors by name?
+    - **Explanation:** Knowing all your competitors by name allows you to implement a **Competitor Blocklist**, restricting discussions about them. It will detect every mention of the predefined competitor with regex and block the message from appearing on user's screen.
+      If you do not know all your competitors or you work in an industry with a huge competition, you should use **Competitor LLM Check** to identify and manage competitors automatically. This evaluator will leverage the power of LLM to realise if the message is explicitly or implicitly mentions a competitor of your business.
+
+#### Step 3: Positive Mentions of Your Company or Product
+
+- **Question:** Does your chatbot mention your company or product only in a positive sense?
+  - **Explanation:** Ensuring that your chatbot only mentions your company or product positively is crucial for maintaining a good reputation. If it does not, implement **Product Sentiment Polarity** to ensure positive mentions only. This evaluator is a LangWatch in-house development that was built with a curated dataset consisting of very positive, subtly positive, subtly negative, very negative product reviews.

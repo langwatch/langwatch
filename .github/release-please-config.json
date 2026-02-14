@@ -104,6 +104,51 @@
           "path": "pyproject.toml",
           "jsonpath": "$.project.version"
         },
+        {
+          "type": "toml",
+          "path": "langevals/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/langevals_core/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/azure/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/openai/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/ragas/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/lingua/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/langevals/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/presidio/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "langevals/evaluators/legacy/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
         "charts/langwatch/Chart.yaml",
         "charts/langwatch/values.yaml"
       ]

@@ -52,3 +52,4 @@ package = false
 
 [tool.uv.sources]
 langwatch = { path = "../python-sdk", editable = true }
+langevals-core = { path = "../langevals/langevals_core" }

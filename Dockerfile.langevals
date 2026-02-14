@@ -1,0 +1,33 @@
+FROM python:3.11.6-slim
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /usr/src/app
+
+RUN pip install --target . awslambdaric
+
+# Copy workspace config and lock file
+COPY langevals/pyproject.toml langevals/uv.lock ./
+
+# Copy workspace members
+COPY langevals/langevals_core/ langevals_core/
+COPY langevals/evaluators/ evaluators/
+COPY langevals/notebooks/pyproject.toml notebooks/
+
+# Install dependencies (frozen from lock file, no dev deps, all extras)
+RUN uv sync --frozen --no-dev --all-extras
+
+# Copy application code
+COPY langevals/langevals/ langevals/
+
+# Preload evaluators
+RUN PYTHONPATH="." uv run python langevals/server.py --preload
+
+ENV RUNNING_IN_DOCKER=true
+
+# Copy remaining project files (scripts, docs, etc.)
+COPY langevals/scripts/ scripts/
+COPY langevals/Makefile langevals/README.md langevals/LICENSE.md ./
+
+CMD ["uv", "run", "python", "langevals/server.py"]

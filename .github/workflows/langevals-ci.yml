@@ -1,0 +1,101 @@
+name: LangEvals CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "langevals/**"
+      - ".github/workflows/langevals-ci.yml"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - "langevals/**"
+      - ".github/workflows/langevals-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "langevals/uv.lock"
+
+      - name: Install dependencies
+        working-directory: langevals
+        run: uv sync --all-extras --all-groups
+
+      - name: Run type checking
+        working-directory: langevals
+        run: uv run python -m py_compile langevals/server.py
+
+  test:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "langevals/uv.lock"
+
+      - name: Install dependencies
+        working-directory: langevals
+        run: uv sync --all-extras --all-groups
+
+      - name: Run tests (collect only, most tests require API keys)
+        working-directory: langevals
+        run: uv run pytest --collect-only
+
+  docker-build:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.langevals
+          push: false
+          tags: langwatch/langevals:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
