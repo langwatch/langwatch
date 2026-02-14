@@ -2,11 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockCheckpointStore,
   createMockEventPublisher,
   createMockEventStore,
   createMockFoldProjectionDefinition,
-  createMockFoldProjectionStore,
   createMockMapProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
@@ -330,28 +328,17 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("individual fold projection errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
-      const logger = {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        fatal: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn().mockReturnThis(),
-        level: "info",
-        silent: false,
-      };
 
       const projectionError = new Error("Projection update failed");
-      eventStore.getEvents = vi.fn().mockRejectedValue(projectionError);
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw projectionError;
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
         foldProjections: [foldDef],
-        logger: logger as any,
       });
 
       const events = [
@@ -377,7 +364,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         ),
       ];
 
-      eventStore.getEvents = vi.fn().mockResolvedValue(events);
       (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
         throw new Error("Projection1 failed");
       });
@@ -386,7 +372,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
         foldProjections: [foldDef1, foldDef2],
       });
 
@@ -408,15 +393,14 @@ describe("EventSourcingService - Error Handling Flows", () => {
         ),
       ];
 
-      eventStore.getEvents = vi
-        .fn()
-        .mockRejectedValue(new Error("Projection failed"));
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Projection failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
         foldProjections: [foldDef],
       });
 
@@ -435,114 +419,29 @@ describe("EventSourcingService - Error Handling Flows", () => {
         createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
-      eventStore.getEvents = vi.fn().mockImplementation((aggId) => {
-        if (aggId === aggregate1) {
-          return Promise.reject(new Error("Aggregate1 failed"));
+      // Fail apply only for the first event (aggregate-1)
+      let callCount = 0;
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error("Aggregate1 failed");
         }
-        return Promise.resolve(events.filter((e) => e.aggregateId === aggId));
+        return {};
       });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
         foldProjections: [foldDef],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
-      // Should attempt to update both aggregates
-      expect(eventStore.getEvents).toHaveBeenCalledWith(
-        aggregate1,
-        context,
-        aggregateType,
-      );
-      expect(eventStore.getEvents).toHaveBeenCalledWith(
-        aggregate2,
-        context,
-        aggregateType,
-      );
-      // Should succeed for aggregate2
-      expect(foldDef.apply).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("checkpoint errors", () => {
-    it("checkpoint save errors are caught and logged", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = createMockCheckpointStore();
-      const logger = {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        fatal: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn().mockReturnThis(),
-        level: "info",
-        silent: false,
-      };
-
-      const checkpointError = new Error("Checkpoint save failed");
-      checkpointStore.saveCheckpoint = vi
-        .fn()
-        .mockRejectedValue(checkpointError);
-
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-
-        mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
-        logger: logger as any,
-      });
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-      );
-
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
-
-      // Map projections dispatch events independently, verify map was called
-      expect(mapDef.map).toHaveBeenCalledTimes(1);
-    });
-
-    it("map projection execution succeeds despite checkpoint failure", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = createMockCheckpointStore();
-
-      checkpointStore.saveCheckpoint = vi
-        .fn()
-        .mockRejectedValue(new Error("Checkpoint failed"));
-
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-
-        mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-      );
-
-      await expect(
-        service.storeEvents([event], context),
-      ).resolves.not.toThrow();
-
-      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      // Both events should be attempted
+      expect(foldDef.apply).toHaveBeenCalledTimes(2);
+      // Store should succeed for aggregate2
+      expect(foldDef.store.store).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -595,14 +494,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-
         foldProjections: [
           createMockFoldProjectionDefinition("projection"),
         ],
       });
 
       await expect(
-        service.updateProjectionByName(
+        service.getProjectionByName(
           "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,

@@ -7,7 +7,7 @@ import {
   createTestTenantId,
   generateTestAggregateId,
   getTenantIdString,
-  waitForCheckpoint,
+  waitForProjection,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 
@@ -57,16 +57,14 @@ describe("Projections - Integration Tests", () => {
       tenantId,
     });
 
-    // Wait for projection checkpoint at sequence 2
-    await waitForCheckpoint(
-      pipeline.pipelineName,
+    // Wait for fold projection to reach expected event count
+    await waitForProjection(
+      pipeline,
       "testProjection",
       aggregateId,
-      tenantIdString,
+      tenantId,
       2,
-      15000, // 15 second timeout for sequential event processing
-      100,
-      pipeline.processorCheckpointStore,
+      15000,
     );
 
     // Verify projection

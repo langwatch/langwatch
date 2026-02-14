@@ -46,18 +46,15 @@ function createMockEventHandlerDefinition(
  */
 function createMockProjectionDefinition(
   name: string,
-  _handler?: any,
-  _store?: any,
   options?: {
-    delay?: number;
-    deduplication?: DeduplicationStrategy<Event>;
+    groupKeyFn?: (event: Event) => string;
+    killSwitch?: { customKey?: string };
   },
 ) {
   return {
     name,
-    store: _store ?? { getProjection: vi.fn(), storeProjection: vi.fn() },
-    handler: _handler ?? { handle: vi.fn().mockResolvedValue(null) },
-    options,
+    groupKeyFn: options?.groupKeyFn,
+    options: options?.killSwitch ? { killSwitch: options.killSwitch } : undefined,
   };
 }
 
@@ -357,7 +354,7 @@ describe("QueueManager", () => {
       );
     });
 
-    it("uses no deduplication by default for projections", () => {
+    it("uses default groupKey based on aggregate for projections", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -385,185 +382,17 @@ describe("QueueManager", () => {
       );
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
-      // With the new opt-in strategy, no deduplication is used by default
-      expect(createCall?.deduplication).toBeUndefined();
-    });
-
-    it('uses aggregate deduplication when strategy is "aggregate"', () => {
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-        waitUntilReady: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueFactory = {
-        create: vi.fn().mockReturnValue(mockQueueProcessor),
-      };
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        queueFactory: queueFactory as any,
-      });
-
-      const projections = {
-        projection1: createMockProjectionDefinition(
-          "projection1",
-          void 0,
-          void 0,
-          {
-            deduplication: "aggregate",
-          },
-        ),
-      };
-      const processProjectionEventCallback = vi.fn();
-
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
-
-      const createCall = queueFactory.create.mock.calls[0]?.[0];
-      expect(createCall?.deduplication).toBeDefined();
-      expect(typeof createCall?.deduplication?.makeId).toBe("function");
+      expect(createCall?.groupKey).toBeDefined();
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
       );
-      const dedupId = createCall?.deduplication?.makeId?.(event);
-      // Aggregate format: ${tenantId}:${aggregateType}:${aggregateId}
-      expect(dedupId).toBe(
+      const groupKey = createCall?.groupKey?.(event);
+      expect(groupKey).toBe(
         `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
-    });
-
-    it("uses custom deduplication config when provided", () => {
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-        waitUntilReady: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueFactory = {
-        create: vi.fn().mockReturnValue(mockQueueProcessor),
-      };
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        queueFactory: queueFactory as any,
-      });
-
-      const customDeduplicationId = vi.fn(
-        (event: Event) => `custom-${event.aggregateId}`,
-      );
-
-      const projections = {
-        projection1: createMockProjectionDefinition(
-          "projection1",
-          void 0,
-          void 0,
-          {
-            deduplication: { makeId: customDeduplicationId },
-          },
-        ),
-      };
-      const processProjectionEventCallback = vi.fn();
-
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
-
-      const createCall = queueFactory.create.mock.calls[0]?.[0];
-      expect(createCall?.deduplication?.makeId).toBe(customDeduplicationId);
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-      const dedupId = createCall?.deduplication?.makeId?.(event);
-      expect(dedupId).toBe(`custom-${TEST_CONSTANTS.AGGREGATE_ID}`);
-      expect(customDeduplicationId).toHaveBeenCalledWith(event);
-    });
-
-    it("uses no deduplication when deduplication options is an empty object", () => {
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-        waitUntilReady: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueFactory = {
-        create: vi.fn().mockReturnValue(mockQueueProcessor),
-      };
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        queueFactory: queueFactory as any,
-      });
-
-      const projections = {
-        projection1: createMockProjectionDefinition(
-          "projection1",
-          void 0,
-          void 0,
-          {},
-        ),
-      };
-      const processProjectionEventCallback = vi.fn();
-
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
-
-      const createCall = queueFactory.create.mock.calls[0]?.[0];
-      // With opt-in strategy, empty options means no deduplication
-      expect(createCall?.deduplication).toBeUndefined();
-    });
-
-    it("uses no deduplication when strategy is explicitly undefined", () => {
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-        waitUntilReady: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueFactory = {
-        create: vi.fn().mockReturnValue(mockQueueProcessor),
-      };
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        queueFactory: queueFactory as any,
-      });
-
-      const projections = {
-        projection1: createMockProjectionDefinition(
-          "projection1",
-          void 0,
-          void 0,
-          {
-            deduplication: undefined,
-          },
-        ),
-      };
-      const processProjectionEventCallback = vi.fn();
-
-      manager.initializeProjectionQueues(
-        projections,
-        processProjectionEventCallback,
-      );
-
-      const createCall = queueFactory.create.mock.calls[0]?.[0];
-      // Explicit undefined should result in no deduplication
-      expect(createCall?.deduplication).toBeUndefined();
     });
   });
 

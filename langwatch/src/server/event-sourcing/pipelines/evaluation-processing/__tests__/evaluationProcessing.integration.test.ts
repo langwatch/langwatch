@@ -15,10 +15,7 @@ import { EventSourcing } from "../../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../../runtime/eventSourcingRuntime";
 import type { PipelineWithCommandHandlers } from "../../../runtime/pipeline/types";
 import { BullmqQueueProcessorFactory } from "../../../runtime/queue/factory";
-import { CheckpointCacheRedis } from "../../../runtime/stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "../../../runtime/stores/eventStoreClickHouse";
-import { ProcessorCheckpointStoreClickHouse } from "../../../runtime/stores/processorCheckpointStoreClickHouse";
-import { CheckpointRepositoryClickHouse } from "../../../runtime/stores/repositories/checkpointRepositoryClickHouse";
 import { EventRepositoryClickHouse } from "../../../runtime/stores/repositories/eventRepositoryClickHouse";
 import type {
   CompleteEvaluationCommandData,
@@ -150,7 +147,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   }
 > & {
   eventStore: EventStoreClickHouse;
-  processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
   pipelineName: string;
   /** Wait for BullMQ workers to be ready before sending commands */
   ready: () => Promise<void>;
@@ -176,13 +172,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
-  const checkpointCache = new CheckpointCacheRedis(redisConnection);
-
-  const processorCheckpointStore = new ProcessorCheckpointStoreClickHouse(
-    new CheckpointRepositoryClickHouse(clickHouseClient),
-    checkpointCache,
-  );
-
   // Create queue factory that uses BullMQ with test Redis connection
   const queueProcessorFactory = new BullmqQueueProcessorFactory(
     redisConnection,
@@ -201,20 +190,12 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     },
     {
       eventStore,
-      checkpointStore: processorCheckpointStore,
       queueProcessorFactory,
     },
   );
 
   // Create EventSourcing instance with the runtime
   const eventSourcing = new EventSourcing(runtime);
-
-  // Use event-based deduplication for tests.
-  // Each event gets its own unique job ID, avoiding deduplication conflicts.
-  const eventBasedDeduplication = {
-    makeId: (event: { id: string }) => event.id,
-    ttlMs: 100,
-  };
 
   // Build pipeline using static definition with definePipeline + register
   const pipelineDefinition = definePipeline<EvaluationProcessingEvent>()
@@ -226,9 +207,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     .withFoldProjection(
       "evaluationState",
       evaluationStateFoldProjection as any,
-      {
-        deduplication: eventBasedDeduplication,
-      },
     )
     .build();
 
@@ -237,7 +215,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
-    processorCheckpointStore,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
     ready: () => new Promise((resolve) => setTimeout(resolve, 200)),
@@ -250,7 +227,6 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     }
   > & {
     eventStore: EventStoreClickHouse;
-    processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
     pipelineName: string;
     ready: () => Promise<void>;
   };
@@ -272,54 +248,53 @@ async function waitForClickHouseConsistency(): Promise<void> {
 }
 
 /**
- * Waits for evaluation state projection checkpoint.
+ * Waits for the evaluation fold projection to reach the expected status.
+ * The fold projection state IS the checkpoint — no separate checkpoint store needed.
  */
-async function waitForEvaluationCheckpoint(
-  pipelineName: string,
-  aggregateId: string,
-  tenantIdString: string,
-  expectedSequenceNumber: number,
-  processorCheckpointStore: ProcessorCheckpointStoreClickHouse,
+async function waitForEvaluationState(
+  pipeline: ReturnType<typeof createEvaluationTestPipeline>,
+  evaluationId: string,
+  tenantId: ReturnType<typeof createTenantId>,
+  expectedStatus: string,
   timeoutMs = 15000,
 ): Promise<void> {
-  // Note: The checkpoint verification uses "test_aggregate" in the testHelpers.
-  // We need to pass the correct aggregateType for evaluation pipeline.
-  // For now, we use a custom wait implementation.
   const startTime = Date.now();
   const pollIntervalMs = 100;
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const tenantId = createTenantId(tenantIdString);
-      const checkpoint =
-        await processorCheckpointStore.getCheckpointBySequenceNumber(
-          pipelineName,
-          "evaluationState",
-          "projection",
-          tenantId,
-          "evaluation" as AggregateType,
-          aggregateId,
-          expectedSequenceNumber,
-        );
+      const projection = (await pipeline.service.getProjectionByName(
+        "evaluationState",
+        evaluationId,
+        { tenantId },
+      )) as EvaluationState | null;
 
-      if (checkpoint && checkpoint.status === "processed") {
+      if (projection && projection.data.Status === expectedStatus) {
         // Add a delay for ClickHouse eventual consistency
-        // The projection data might not be visible immediately after checkpoint
+        // The projection data might not be fully visible immediately
         await new Promise((resolve) => setTimeout(resolve, 500));
         return;
       }
     } catch (error) {
       logger.debug(
         { error: error instanceof Error ? error.message : String(error) },
-        "Error checking checkpoint, retrying...",
+        "Error checking evaluation state, retrying...",
       );
     }
 
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    // Adaptive polling: start fast, increase interval as time passes
+    const elapsed = Date.now() - startTime;
+    const currentInterval =
+      elapsed < 500
+        ? pollIntervalMs
+        : elapsed < 1500
+          ? pollIntervalMs * 2
+          : Math.min(pollIntervalMs * 3, 300);
+    await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
   throw new Error(
-    `Timeout waiting for evaluation checkpoint. Expected sequence ${expectedSequenceNumber}`,
+    `Timeout waiting for evaluation state. Expected status "${expectedStatus}" for evaluation ${evaluationId}`,
   );
 }
 
@@ -391,13 +366,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         // Verify final projection state
@@ -449,13 +423,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "error",
         );
 
         // Verify final error state
@@ -501,13 +474,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "skipped",
         );
 
         // Verify skipped state
@@ -544,12 +516,11 @@ describe.skipIf(!hasTestcontainers)(
             isGuardrail: true,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          1,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "in_progress",
         );
 
         // Verify projection populated evaluator info from start event
@@ -594,13 +565,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          2,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         // Verify final state (preserving evaluator info from start)
@@ -641,13 +611,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          2,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "error",
         );
 
         // Verify error state
@@ -680,12 +649,11 @@ describe.skipIf(!hasTestcontainers)(
             evaluatorId,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          1,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "scheduled",
         );
 
         const projection = (await pipeline.service.getProjectionByName(
@@ -715,12 +683,11 @@ describe.skipIf(!hasTestcontainers)(
             evaluatorId,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          2,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "in_progress",
         );
 
         const projection = (await pipeline.service.getProjectionByName(
@@ -757,12 +724,11 @@ describe.skipIf(!hasTestcontainers)(
             evaluationId,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         const projection = (await pipeline.service.getProjectionByName(
@@ -808,13 +774,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         // Verify evaluator info preserved
@@ -858,13 +823,12 @@ describe.skipIf(!hasTestcontainers)(
           }),
         );
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         // Verify timestamps are in correct order
@@ -922,13 +886,12 @@ describe.skipIf(!hasTestcontainers)(
           details: errorDetails,
         });
 
-        // Wait for final checkpoint only
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        // Wait for fold projection to reach final status
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          3,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "error",
         );
 
         // Verify error fields
@@ -956,12 +919,11 @@ describe.skipIf(!hasTestcontainers)(
             score: 0.5,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          1,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "processed",
         );
 
         // Verify projection still works
@@ -1018,26 +980,23 @@ describe.skipIf(!hasTestcontainers)(
 
         // Wait for all to be processed
         await Promise.all([
-          waitForEvaluationCheckpoint(
-            pipeline.pipelineName,
+          waitForEvaluationState(
+            pipeline,
             evaluation1Id,
-            tenantIdString,
-            1,
-            pipeline.processorCheckpointStore,
+            tenantId,
+            "scheduled",
           ),
-          waitForEvaluationCheckpoint(
-            pipeline.pipelineName,
+          waitForEvaluationState(
+            pipeline,
             evaluation2Id,
-            tenantIdString,
-            1,
-            pipeline.processorCheckpointStore,
+            tenantId,
+            "scheduled",
           ),
-          waitForEvaluationCheckpoint(
-            pipeline.pipelineName,
+          waitForEvaluationState(
+            pipeline,
             evaluation3Id,
-            tenantIdString,
-            1,
-            pipeline.processorCheckpointStore,
+            tenantId,
+            "scheduled",
           ),
         ]);
 
@@ -1092,12 +1051,11 @@ describe.skipIf(!hasTestcontainers)(
             isGuardrail: true,
           }),
         );
-        await waitForEvaluationCheckpoint(
-          pipeline.pipelineName,
+        await waitForEvaluationState(
+          pipeline,
           evaluationId,
-          tenantIdString,
-          1,
-          pipeline.processorCheckpointStore,
+          tenantId,
+          "scheduled",
         );
 
         // Verify isGuardrail is true

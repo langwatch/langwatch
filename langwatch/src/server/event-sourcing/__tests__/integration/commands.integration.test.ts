@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { AggregateType } from "../../library";
 import {
   cleanupTestDataForTenant,
   closePipelineGracefully,
@@ -6,7 +7,7 @@ import {
   createTestTenantId,
   generateTestAggregateId,
   getTenantIdString,
-  waitForCheckpoint,
+  waitForEventHandler,
 } from "./testHelpers";
 
 describe("Command Processing - Integration Tests", () => {
@@ -61,26 +62,12 @@ describe("Command Processing - Integration Tests", () => {
     // Both commands should complete successfully
     await Promise.all([command1Promise, command2Promise]);
 
-    // Wait for first checkpoint, then second (sequential processing)
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      1,
-      15000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
+    // Wait for both events to be processed by the handler
+    await waitForEventHandler(
       aggregateId,
       tenantIdString,
       2,
       15000,
-      100,
-      pipeline.processorCheckpointStore,
     );
 
     // Verify events were stored (commands create events)

@@ -7,9 +7,9 @@ import {
   createTestTenantId,
   generateTestAggregateId,
   getTenantIdString,
-  verifyCheckpoint,
   verifyEventHandlerProcessed,
-  waitForCheckpoint,
+  waitForEventHandler,
+  waitForProjection,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 
@@ -44,27 +44,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "test message",
     });
 
-    // Wait for handler and projection checkpoints
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      1,
-      5000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      1,
-      5000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
+    // Wait for handler and projection to process
+    await waitForEventHandler(aggregateId, tenantIdString, 1, 5000);
+    await waitForProjection(pipeline, "testProjection", aggregateId, tenantId, 1, 5000);
 
     // Verify event was stored
     const events = await pipeline.eventStore.getEvents(
@@ -122,29 +104,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "third",
     });
 
-    // Wait for handler checkpoint at sequence 3
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      3,
-      20000, // 20 second timeout for 3 sequential events
-      100,
-      pipeline.processorCheckpointStore,
-    );
-
-    // Wait for projection checkpoint at sequence 3 to ensure all events are processed
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      3,
-      20000, // 20 second timeout for 3 sequential events
-      100,
-      pipeline.processorCheckpointStore,
-    );
+    // Wait for all events to be processed
+    await waitForEventHandler(aggregateId, tenantIdString, 3, 20000);
+    await waitForProjection(pipeline, "testProjection", aggregateId, tenantId, 3, 20000);
 
     // Verify events were stored in order
     const events = await pipeline.eventStore.getEvents(
@@ -174,59 +136,6 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     expect(projection?.data.lastMessage).toBe("third");
   });
 
-  it("maintains checkpoints across queue processing", async () => {
-    const aggregateId = generateTestAggregateId();
-
-    // Send command
-    await pipeline.commands.testCommand.send({
-      tenantId: tenantIdString,
-      aggregateId,
-      value: 20,
-    });
-
-    // Wait for checkpoints with longer timeout for ClickHouse consistency
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      1,
-      10000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      1,
-      10000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
-
-    // Verify handler checkpoint
-    const handlerCheckpoint = await verifyCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      1,
-    );
-    expect(handlerCheckpoint).toBe(true);
-
-    // Verify projection checkpoint
-    const projectionCheckpoint = await verifyCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      1,
-    );
-    expect(projectionCheckpoint).toBe(true);
-  });
-
   it("processes multiple aggregates concurrently", async () => {
     const aggregateIds = [
       generateTestAggregateId("concurrent-1"),
@@ -246,19 +155,10 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       ),
     );
 
-    // Wait for checkpoints for all aggregates (use longer timeout for concurrent processing)
+    // Wait for all aggregates to be processed
     await Promise.all(
       aggregateIds.map((aggregateId) =>
-        waitForCheckpoint(
-          pipeline.pipelineName,
-          "testHandler",
-          aggregateId,
-          tenantIdString,
-          1,
-          10000,
-          100,
-          pipeline.processorCheckpointStore,
-        ),
+        waitForEventHandler(aggregateId, tenantIdString, 1, 10000),
       ),
     );
 
@@ -291,16 +191,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "first",
     });
 
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      1,
-      5000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
+    await waitForProjection(pipeline, "testProjection", aggregateId, tenantId, 1, 5000);
 
     // Verify initial projection
     let projection = await pipeline.service.getProjectionByName(
@@ -319,16 +210,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "second",
     });
 
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      2,
-      5000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
+    await waitForProjection(pipeline, "testProjection", aggregateId, tenantId, 2, 5000);
 
     // Verify projection was rebuilt with all events
     projection = await pipeline.service.getProjectionByName(
@@ -374,29 +256,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     // Wait for all commands to be sent
     await Promise.all(promises);
 
-    // Wait for all 3 events to be processed
-    // The batch processor should process all events even if only one queue job triggers
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
-      aggregateId,
-      tenantIdString,
-      3,
-      30000, // Longer timeout for dedup scenario
-      100,
-      pipeline.processorCheckpointStore,
-    );
-
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testProjection",
-      aggregateId,
-      tenantIdString,
-      3,
-      30000,
-      100,
-      pipeline.processorCheckpointStore,
-    );
+    // Wait for all events to be processed
+    await waitForEventHandler(aggregateId, tenantIdString, 3, 30000);
+    await waitForProjection(pipeline, "testProjection", aggregateId, tenantId, 3, 30000);
 
     // Verify all events were stored
     const events = await pipeline.eventStore.getEvents(

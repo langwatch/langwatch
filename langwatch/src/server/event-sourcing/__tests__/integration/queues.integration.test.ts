@@ -8,7 +8,7 @@ import {
   createTestTenantId,
   generateTestAggregateId,
   getTenantIdString,
-  waitForCheckpoint,
+  waitForEventHandler,
 } from "./testHelpers";
 
 describe("BullMQ Queue - Integration Tests", () => {
@@ -46,16 +46,12 @@ describe("BullMQ Queue - Integration Tests", () => {
       value: 1,
     });
 
-    // Wait for processing to complete via checkpoint
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
+    // Wait for processing to complete via event handler log
+    await waitForEventHandler(
       aggregateId,
       tenantIdString,
       1,
       5000,
-      100,
-      pipeline.processorCheckpointStore,
     );
 
     // Check that queues exist in Redis (using unique pipeline name)
@@ -93,17 +89,12 @@ describe("BullMQ Queue - Integration Tests", () => {
       value: 1,
     });
 
-    // Wait for processing to complete via checkpoint
-    // Using longer timeout (15s) because checkpoints may take time to be visible in ClickHouse
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
+    // Wait for processing to complete via event handler log
+    await waitForEventHandler(
       aggregateId,
       tenantIdString,
       1,
       15000,
-      100,
-      pipeline.processorCheckpointStore,
     );
 
     // Verify job was processed (no failures in normal case)
@@ -125,16 +116,12 @@ describe("BullMQ Queue - Integration Tests", () => {
       value: 1,
     });
 
-    // Wait for processing to complete via checkpoint
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
+    // Wait for processing to complete via event handler log
+    await waitForEventHandler(
       aggregateId,
       tenantIdString,
       1,
       5000,
-      100,
-      pipeline.processorCheckpointStore,
     );
 
     // Close pipeline

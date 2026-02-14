@@ -1,19 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventStoreMemory } from "../../../runtime/stores/eventStoreMemory";
-import { ProcessorCheckpointStoreMemory } from "../../../runtime/stores/processorCheckpointStoreMemory";
-import { CheckpointRepositoryMemory } from "../../../runtime/stores/repositories/checkpointRepositoryMemory";
 import { EventRepositoryMemory } from "../../../runtime/stores/repositories/eventRepositoryMemory";
 import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
-import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
   createTestContext,
   createTestEvent,
-  createTestProjection,
   setupTestEnvironment,
   TEST_CONSTANTS,
 } from "./testHelpers";
@@ -36,15 +31,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -84,15 +75,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -143,15 +130,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -171,82 +154,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Verify handler was called
       expect(mapDef.map).toHaveBeenCalledTimes(1);
       expect(mapDef.map).toHaveBeenCalledWith(event1);
-
-      // Handlers no longer create checkpoints
-      const checkpointKey1 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).toBeNull();
-    });
-
-    it("does not create handler checkpoints when processing events", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-      const event3 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 2000,
-      );
-
-      // Store all events
-      await eventStore.storeEvents(
-        [event1, event2, event3],
-        context,
-        aggregateType,
-      );
-
-      // Process events in order
-      await service.storeEvents([event1], context);
-      await service.storeEvents([event2], context);
-      await service.storeEvents([event3], context);
-
-      // Verify handler was called for all events
-      expect(mapDef.map).toHaveBeenCalledTimes(3);
-
-      // Verify no handler checkpoint was created
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint).toBeNull();
     });
 
     it("handles concurrent events with same timestamp independently", async () => {
@@ -254,15 +161,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       // Create events with same timestamp but different IDs
@@ -305,7 +208,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Process all events - handlers process independently, no checkpoints
+      // Process all events - handlers process independently
       await service.storeEvents([event1], context);
       await service.storeEvents([event2], context);
       await service.storeEvents([event3], context);
@@ -314,523 +217,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(mapDef.map).toHaveBeenCalledWith(event1);
       expect(mapDef.map).toHaveBeenCalledWith(event2);
       expect(mapDef.map).toHaveBeenCalledWith(event3);
-
-      // Verify no handler checkpoint was created
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint).toBeNull();
-    });
-  });
-
-  describe("sequential ordering enforcement for projections", () => {
-    it("event N+1 waits for event N to be processed for projections", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-
-      // Store all events
-      await eventStore.storeEvents([event1, event2], context, aggregateType);
-
-      // Mock fold apply to return a projection-like state
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      // Try to process event2 before event1 - should fail
-      await expect(service.storeEvents([event2], context)).rejects.toThrow(
-        "Previous event (sequence 1) has not been processed yet",
-      );
-
-      // Verify fold apply was not called
-      expect(foldDef.apply).not.toHaveBeenCalled();
-
-      // Process event1 - should succeed
-      await service.storeEvents([event1], context);
-
-      // Verify fold was applied (rebuild replays ALL events in the aggregate)
-      // Both event1 and event2 are in the event store (stored at line 364),
-      // so the fold executor applies both events during rebuild
-      expect(foldDef.apply).toHaveBeenCalledTimes(2);
-      const checkpointKey1 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.status).toBe("processed");
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-
-      // Now process event2 - should succeed
-      await service.storeEvents([event2], context);
-
-      // Verify fold was applied again (another full rebuild of 2 events)
-      expect(foldDef.apply).toHaveBeenCalledTimes(4);
-      const checkpointKey2 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey2);
-      expect(checkpoint2).not.toBeNull();
-      expect(checkpoint2?.status).toBe("processed");
-      expect(checkpoint2?.sequenceNumber).toBe(2);
-    });
-
-    it("first event (sequence 1) doesn't check for previous event for projections", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-
-      // Store event
-      await eventStore.storeEvents([event1], context, aggregateType);
-
-      // Mock fold apply
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      // Process first event - should succeed without checking for previous
-      await service.storeEvents([event1], context);
-
-      // Verify fold was applied
-      expect(foldDef.apply).toHaveBeenCalledTimes(1);
-
-      // Verify checkpoint was saved
-      const checkpointKey1 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.status).toBe("processed");
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-    });
-  });
-
-  describe("sequence number edge cases", () => {
-    it("events with identical timestamps get sequential numbers based on ID for projections", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
-      // Create events with same timestamp, IDs will determine order
-      const eventA = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `event-a-${sameTimestamp}`,
-      );
-      const eventB = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `event-b-${sameTimestamp}`,
-      );
-      const eventC = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `event-c-${sameTimestamp}`,
-      );
-
-      // Store all events
-      await eventStore.storeEvents(
-        [eventA, eventB, eventC],
-        context,
-        aggregateType,
-      );
-
-      // Mock fold apply
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      // Process events and verify projection sequence numbers after each
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-
-      // Process eventA and verify sequence number is 1 (a < b < c)
-      await service.storeEvents([eventA], context);
-      const checkpointA = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpointA).not.toBeNull();
-      expect(checkpointA?.sequenceNumber).toBe(1);
-      expect(checkpointA?.status).toBe("processed");
-
-      // Process eventB and verify sequence number is 2
-      await service.storeEvents([eventB], context);
-      const checkpointB = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpointB).not.toBeNull();
-      expect(checkpointB?.sequenceNumber).toBe(2);
-      expect(checkpointB?.status).toBe("processed");
-
-      // Process eventC and verify sequence number is 3
-      await service.storeEvents([eventC], context);
-      const checkpointC = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpointC).not.toBeNull();
-      expect(checkpointC?.sequenceNumber).toBe(3);
-      expect(checkpointC?.status).toBe("processed");
-    });
-
-    it("sequence numbers are deterministic for projections (same events = same sequence numbers)", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      // Mock fold apply
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-
-      // Store events
-      await eventStore.storeEvents([event1, event2], context, aggregateType);
-
-      // Process events and capture sequence numbers
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-
-      await service.storeEvents([event1], context);
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq1 = checkpoint1?.sequenceNumber;
-
-      await service.storeEvents([event2], context);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq2 = checkpoint2?.sequenceNumber;
-
-      // Verify sequence numbers are as expected
-      expect(seq1).toBe(1);
-      expect(seq2).toBe(2);
-
-      // Create a new service instance and process same events
-      const eventStore2 = new EventStoreMemory<Event>();
-      const checkpointStore2 = new ProcessorCheckpointStoreMemory();
-      const foldDef2 = createMockFoldProjectionDefinition("projection");
-      (foldDef2.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-      const service2 = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore: eventStore2,
-        foldProjections: [foldDef2],
-        checkpointStore: checkpointStore2,
-      });
-
-      // Store same events
-      await eventStore2.storeEvents([event1, event2], context, aggregateType);
-
-      // Process events and check sequence numbers after each
-      await service2.storeEvents([event1], context);
-      const checkpoint1_2 =
-        await checkpointStore2.loadCheckpoint(checkpointKey);
-      const seq1_2 = checkpoint1_2?.sequenceNumber;
-
-      await service2.storeEvents([event2], context);
-      const checkpoint2_2 =
-        await checkpointStore2.loadCheckpoint(checkpointKey);
-      const seq2_2 = checkpoint2_2?.sequenceNumber;
-
-      // Verify sequence numbers are the same
-      expect(seq1_2).toBe(1);
-      expect(seq2_2).toBe(2);
-    });
-
-    it("sequence numbers are stable across rebuilds", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-
-      // Store events
-      await eventStore.storeEvents([event1, event2], context, aggregateType);
-
-      // Mock fold apply
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      // Process events and get sequence numbers after each
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-
-      // Process event1 and get sequence number
-      await service.storeEvents([event1], context);
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq1 = checkpoint1?.sequenceNumber;
-
-      // Process event2 and get sequence number
-      await service.storeEvents([event2], context);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq2 = checkpoint2?.sequenceNumber;
-
-      // Clear checkpoint and rebuild
-      await checkpointStore.clearCheckpoint(tenantId, checkpointKey);
-
-      // Rebuild projections (process events again) and check sequence numbers after each
-      await service.storeEvents([event1], context);
-      const checkpoint1_2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq1_2 = checkpoint1_2?.sequenceNumber;
-
-      await service.storeEvents([event2], context);
-      const checkpoint2_2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      const seq2_2 = checkpoint2_2?.sequenceNumber;
-
-      // Verify sequence numbers are the same
-      expect(seq1_2).toBe(seq1);
-      expect(seq2_2).toBe(seq2);
-    });
-
-    it("multiple events with same timestamp processed correctly for projections", async () => {
-      const eventStore = new EventStoreMemory<Event>(
-        new EventRepositoryMemory(),
-      );
-      const foldDef = createMockFoldProjectionDefinition("projection");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        foldProjections: [foldDef],
-        checkpointStore: checkpointStore,
-      });
-
-      // Mock fold apply
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) =>
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
-
-      const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `id-1-${sameTimestamp}`,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `id-2-${sameTimestamp}`,
-      );
-      const event3 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `id-3-${sameTimestamp}`,
-      );
-
-      // Store all events
-      await eventStore.storeEvents(
-        [event1, event2, event3],
-        context,
-        aggregateType,
-      );
-
-      // Process events in order and verify projection sequence numbers after each
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-
-      // Process event1 and verify sequence number is 1
-      await service.storeEvents([event1], context);
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint1).not.toBeNull();
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-      expect(checkpoint1?.status).toBe("processed");
-
-      // Process event2 and verify sequence number is 2
-      await service.storeEvents([event2], context);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint2).not.toBeNull();
-      expect(checkpoint2?.sequenceNumber).toBe(2);
-      expect(checkpoint2?.status).toBe("processed");
-
-      // Process event3 and verify sequence number is 3
-      await service.storeEvents([event3], context);
-      const checkpoint3 = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint3).not.toBeNull();
-      expect(checkpoint3?.sequenceNumber).toBe(3);
-      expect(checkpoint3?.status).toBe("processed");
-
-      // Verify fold was applied for all events
-      // Fold rebuild strategy replays ALL events each time:
-      // storeEvents([event1]): replays 3 events → 3 apply calls (total: 3)
-      // storeEvents([event2]): replays 3 events → 3 apply calls (total: 6)
-      // storeEvents([event3]): replays 3 events → 3 apply calls (total: 9)
-      expect(foldDef.apply).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -840,15 +226,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -874,7 +256,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
-      // Handlers no longer use checkpoints - they process each event independently
+      // Handlers process each event independently (no checkpoint-based idempotency)
       // Event is dispatched twice (once per storeEvents call), so handler is called twice
       expect(mapDef.map).toHaveBeenCalledTimes(2);
     });
@@ -884,15 +266,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -921,17 +299,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Handler is called once (from the service.storeEvents call)
       expect(mapDef.map).toHaveBeenCalledTimes(1);
       expect(mapDef.map).toHaveBeenCalledWith(event1);
-
-      // Handlers no longer create checkpoints
-      const checkpointKey1 = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      expect(checkpoint1).toBeNull();
     });
 
     it("handles batch storage with duplicates correctly", async () => {
@@ -939,15 +306,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -978,8 +341,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
 
-      // Verify handler was called for each event in the batch (including duplicate)
-      // Handlers no longer use checkpoints for idempotency - they process each event independently
+      // Handlers process each event in the batch independently (including duplicate)
       expect(mapDef.map).toHaveBeenCalledTimes(3);
       expect(mapDef.map).toHaveBeenCalledWith(event1);
       expect(mapDef.map).toHaveBeenCalledWith(event2);
@@ -991,15 +353,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
       const mapDef1 = createMockMapProjectionDefinition("handler1");
       const mapDef2 = createMockMapProjectionDefinition("handler2");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef1, mapDef2],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -1025,7 +383,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
-      // Handlers no longer use checkpoints - they process each event independently
+      // Handlers process each event independently (no checkpoint-based idempotency)
       // Event is dispatched twice (once per storeEvents call), so each handler is called twice
       expect(mapDef1.map).toHaveBeenCalledTimes(2);
       expect(mapDef2.map).toHaveBeenCalledTimes(2);
@@ -1038,15 +396,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const aggregateId1 = "aggregate-1";
@@ -1098,28 +452,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(mapDef.map).toHaveBeenCalledTimes(2);
       expect(mapDef.map).toHaveBeenCalledWith(event1_agg1);
       expect(mapDef.map).toHaveBeenCalledWith(event1_agg2);
-
-      // Handlers no longer create checkpoints - verify they're absent
-      const checkpoint1 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(
-          tenantId,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "handler",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          aggregateId1,
-        ),
-      );
-      const checkpoint2 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(
-          tenantId,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          "handler",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          aggregateId2,
-        ),
-      );
-      expect(checkpoint1).toBeNull();
-      expect(checkpoint2).toBeNull();
     });
 
     it("handles batch with mixed duplicates correctly - dispatches all events to handlers", async () => {
@@ -1127,15 +459,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         new EventRepositoryMemory(),
       );
       const mapDef = createMockMapProjectionDefinition("handler");
-      const checkpointStore = new ProcessorCheckpointStoreMemory(
-        new CheckpointRepositoryMemory(),
-      );
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        checkpointStore: checkpointStore,
       });
 
       const event1 = createTestEvent(
@@ -1178,23 +506,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event3.id)).toBeDefined();
 
-      // Handlers process all dispatched events independently - no checkpoint-based idempotency
+      // Handlers process all dispatched events independently
       // Total calls: 1 (initial event1) + 3 (event1 duplicate + event2 + event3) = 4
       expect(mapDef.map).toHaveBeenCalledTimes(4);
       expect(mapDef.map).toHaveBeenCalledWith(event1);
       expect(mapDef.map).toHaveBeenCalledWith(event2);
       expect(mapDef.map).toHaveBeenCalledWith(event3);
-
-      // Handlers no longer create checkpoints
-      const checkpointKey = buildCheckpointKey(
-        tenantId,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        "handler",
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.AGGREGATE_ID,
-      );
-      const checkpoint = await checkpointStore.loadCheckpoint(checkpointKey);
-      expect(checkpoint).toBeNull();
     });
   });
 });

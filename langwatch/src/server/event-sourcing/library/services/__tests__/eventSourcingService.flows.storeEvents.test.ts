@@ -149,31 +149,15 @@ describe("EventSourcingService - Store Events Flow", () => {
         ),
       ];
 
-      // Mock getEvents for projection update
-      eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => ({
-          id: "proj-id",
-          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        }),
-      );
-
       await service.storeEvents(events, context);
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
-      expect(eventStore.getEvents).toHaveBeenCalledWith(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context,
-        aggregateType,
-      );
+      // Incremental: apply is called once per event, no event store query
       expect(foldDef.apply).toHaveBeenCalledTimes(1);
       expect(foldDef.store.store).toHaveBeenCalledTimes(1);
     });
 
-    it("groups events by aggregateId and updates each aggregate once", async () => {
+    it("applies each event incrementally to fold projections", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
@@ -191,34 +175,11 @@ describe("EventSourcingService - Store Events Flow", () => {
         createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId), // Same aggregate again
       ];
 
-      // Mock getEvents to return events for each aggregate
-      eventStore.getEvents = vi.fn().mockImplementation((aggId) => {
-        return Promise.resolve(events.filter((e) => e.aggregateId === aggId));
-      });
-      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
-        (_state: any) => ({
-          id: "proj-id",
-          aggregateId: aggregate1,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        }),
-      );
-
       await service.storeEvents(events, context);
 
-      // Should update projection for aggregate1 twice (once per event)
-      // and aggregate2 once
-      expect(eventStore.getEvents).toHaveBeenCalledWith(
-        aggregate1,
-        context,
-        aggregateType,
-      );
-      expect(eventStore.getEvents).toHaveBeenCalledWith(
-        aggregate2,
-        context,
-        aggregateType,
-      );
+      // Incremental: apply is called once per event (3 events = 3 apply calls)
+      expect(foldDef.apply).toHaveBeenCalledTimes(3);
+      expect(foldDef.store.store).toHaveBeenCalledTimes(3);
     });
 
     it("updates all projections for affected aggregates", async () => {

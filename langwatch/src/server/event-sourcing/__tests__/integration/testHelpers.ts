@@ -1,7 +1,6 @@
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../../library";
 import { createTenantId, definePipeline } from "../../library";
-import { buildCheckpointKey } from "../../library/utils/checkpointKey";
 import { EventSourcing } from "../../runtime/eventSourcing";
 import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
 import type {
@@ -9,10 +8,7 @@ import type {
   RegisteredPipeline,
 } from "../../runtime/pipeline/types";
 import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
-import { CheckpointCacheRedis } from "../../runtime/stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
-import { ProcessorCheckpointStoreClickHouse } from "../../runtime/stores/processorCheckpointStoreClickHouse";
-import { CheckpointRepositoryClickHouse } from "../../runtime/stores/repositories/checkpointRepositoryClickHouse";
 import { EventRepositoryClickHouse } from "../../runtime/stores/repositories/eventRepositoryClickHouse";
 import {
   cleanupTestData,
@@ -24,6 +20,7 @@ import {
   testFoldProjection,
   testMapProjection,
 } from "./testPipelines";
+import type { TestProjection } from "./testPipelines";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:integration:test-helpers",
@@ -62,7 +59,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   { testCommand: any }
 > & {
   eventStore: EventStoreClickHouse;
-  processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
   pipelineName: string;
   /** Wait for BullMQ workers to be ready before sending commands */
   ready: () => Promise<void>;
@@ -90,13 +86,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
-  const checkpointCache = new CheckpointCacheRedis(redisConnection);
-
-  const processorCheckpointStore = new ProcessorCheckpointStoreClickHouse(
-    new CheckpointRepositoryClickHouse(clickHouseClient),
-    checkpointCache,
-  );
-
   // Create queue factory that uses BullMQ with test Redis connection
   const queueProcessorFactory = new BullmqQueueProcessorFactory(
     redisConnection,
@@ -115,7 +104,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     },
     {
       eventStore,
-      checkpointStore: processorCheckpointStore,
       queueProcessorFactory,
     },
   );
@@ -125,23 +113,12 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 
   // Build pipeline using static definition
   // Using test aggregate type (now included in production schemas)
-  // Use event-based deduplication for tests to ensure each event gets its own job.
-  // In production, aggregate-based deduplication is used for debouncing, but the batch
-  // processor handles fetching all events. For tests, we want each event processed
-  // independently to verify the pipeline behavior.
-  const eventBasedDeduplication = {
-    makeId: (event: { id: string }) => event.id,
-    ttlMs: 100,
-  };
-
   const pipelineDefinition = definePipeline<any>()
     .withName(pipelineName)
     .withAggregateType("test_aggregate" as AggregateType)
     .withCommand("testCommand", TestCommandHandler as any)
     .withMapProjection("testHandler", testMapProjection as any)
-    .withFoldProjection("testProjection", testFoldProjection as any, {
-      deduplication: eventBasedDeduplication,
-    })
+    .withFoldProjection("testProjection", testFoldProjection as any)
     .build();
 
   const pipeline = eventSourcing.register(pipelineDefinition);
@@ -149,7 +126,6 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
-    processorCheckpointStore,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
@@ -158,59 +134,39 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     { testCommand: any }
   > & {
     eventStore: EventStoreClickHouse;
-    processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
     pipelineName: string;
     ready: () => Promise<void>;
   };
 }
 
 /**
- * Waits for a checkpoint to reach the expected sequence number.
- * This is the most reliable way to ensure handlers have processed events.
+ * Waits for a fold projection to reach the expected event count.
+ * Replaces checkpoint-based waiting — the fold state IS the checkpoint.
  */
-export async function waitForCheckpoint(
-  pipelineName: string,
-  processorName: string,
+export async function waitForProjection(
+  pipeline: { service: { getProjectionByName: (name: string, aggregateId: string, context: any) => Promise<any> } },
+  projectionName: string,
   aggregateId: string,
-  tenantId: string,
-  expectedSequenceNumber: number,
+  tenantId: ReturnType<typeof createTenantId>,
+  expectedEventCount: number,
   timeoutMs = 5000,
   pollIntervalMs = 100,
-  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
 ): Promise<void> {
   const startTime = Date.now();
 
-  // Check immediately first - handlers might already be done
-  let checkpoint = await verifyCheckpoint(
-    pipelineName,
-    processorName,
-    aggregateId,
-    tenantId,
-    expectedSequenceNumber,
-    processorCheckpointStore,
-  );
-
-  if (checkpoint) {
-    return;
-  }
-
-  // If not found, wait briefly then poll aggressively
-  // Give handlers a moment to start processing (but not too long)
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  // Poll with increasing intervals - start fast, slow down over time
   while (Date.now() - startTime < timeoutMs) {
-    checkpoint = await verifyCheckpoint(
-      pipelineName,
-      processorName,
-      aggregateId,
-      tenantId,
-      expectedSequenceNumber,
-      processorCheckpointStore,
-    );
+    try {
+      const projection = (await pipeline.service.getProjectionByName(
+        projectionName,
+        aggregateId,
+        { tenantId },
+      )) as TestProjection | null;
 
-    if (checkpoint) {
-      return;
+      if (projection && projection.data.eventCount >= expectedEventCount) {
+        return;
+      }
+    } catch {
+      // Projection not ready yet, keep polling
     }
 
     // Adaptive polling: start fast, increase interval as time passes
@@ -224,23 +180,70 @@ export async function waitForCheckpoint(
     await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
-  const finalCheckpoint = await verifyCheckpoint(
-    pipelineName,
-    processorName,
-    aggregateId,
-    tenantId,
-    expectedSequenceNumber,
-    processorCheckpointStore,
-  );
+  // Final attempt
+  try {
+    const projection = (await pipeline.service.getProjectionByName(
+      projectionName,
+      aggregateId,
+      { tenantId },
+    )) as TestProjection | null;
 
-  // If checkpoint exists in final check, return successfully
-  // This handles ClickHouse eventual consistency where data might not be immediately visible
-  if (finalCheckpoint) {
+    if (projection && projection.data.eventCount >= expectedEventCount) {
+      return;
+    }
+
+    throw new Error(
+      `Timeout waiting for projection "${projectionName}". ` +
+      `Expected eventCount >= ${expectedEventCount}, ` +
+      `got ${projection?.data.eventCount ?? "null"}`,
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Timeout waiting")) {
+      throw error;
+    }
+    throw new Error(
+      `Timeout waiting for projection "${projectionName}". ` +
+      `Expected eventCount >= ${expectedEventCount}, got error: ${error}`,
+    );
+  }
+}
+
+/**
+ * Waits for an event handler (map projection) to process an event.
+ * Polls the test_event_handler_log table in ClickHouse.
+ */
+export async function waitForEventHandler(
+  aggregateId: string,
+  tenantId: string,
+  expectedCount: number,
+  timeoutMs = 5000,
+  pollIntervalMs = 100,
+): Promise<void> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const count = await getEventHandlerCount(aggregateId, tenantId);
+    if (count >= expectedCount) {
+      return;
+    }
+
+    const elapsed = Date.now() - startTime;
+    const currentInterval =
+      elapsed < 500
+        ? pollIntervalMs
+        : elapsed < 1500
+          ? pollIntervalMs * 2
+          : Math.min(pollIntervalMs * 3, 300);
+    await new Promise((resolve) => setTimeout(resolve, currentInterval));
+  }
+
+  const finalCount = await getEventHandlerCount(aggregateId, tenantId);
+  if (finalCount >= expectedCount) {
     return;
   }
 
   throw new Error(
-    `Timeout waiting for checkpoint. Expected sequence ${expectedSequenceNumber}, checkpoint exists: ${finalCheckpoint}`,
+    `Timeout waiting for event handler. Expected ${expectedCount} processed events for aggregate ${aggregateId}, got ${finalCount}`,
   );
 }
 
@@ -274,155 +277,6 @@ export function getTenantIdString(
   tenantId: ReturnType<typeof createTenantId>,
 ): string {
   return String(tenantId);
-}
-
-/**
- * Helper to verify checkpoint state.
- * Uses the ProcessorCheckpointStore which checks Redis cache first, then ClickHouse.
- * This matches production behavior and avoids ClickHouse eventual consistency issues.
- */
-export async function verifyCheckpoint(
-  pipelineName: string,
-  processorName: string,
-  aggregateId: string,
-  tenantId: string,
-  expectedSequenceNumber?: number,
-  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
-): Promise<boolean> {
-  const tenantIdObj = createTenantId(tenantId);
-
-  // If checkpoint store is provided, use it (preferred - checks Redis cache first)
-  if (processorCheckpointStore && expectedSequenceNumber !== void 0) {
-    try {
-      // Infer processor type from processor name
-      // Convention: handlers end with "Handler", projections end with "Projection"
-      const processorType = processorName.endsWith("Handler")
-        ? ("handler" as const)
-        : ("projection" as const);
-
-      const checkpoint =
-        await processorCheckpointStore.getCheckpointBySequenceNumber(
-          pipelineName,
-          processorName,
-          processorType,
-          tenantIdObj,
-          "test_aggregate" as AggregateType,
-          aggregateId,
-          expectedSequenceNumber,
-        );
-
-      logger.debug(
-        {
-          pipelineName,
-          processorName,
-          aggregateId,
-          tenantId,
-          expectedSequenceNumber,
-          checkpoint: checkpoint
-            ? {
-                sequenceNumber: checkpoint.sequenceNumber,
-                status: checkpoint.status,
-              }
-            : null,
-        },
-        "[verifyCheckpoint] Result from checkpoint store",
-      );
-
-      return checkpoint !== null && checkpoint.status === "processed";
-    } catch (error) {
-      logger.error(
-        {
-          pipelineName,
-          processorName,
-          aggregateId,
-          tenantId,
-          expectedSequenceNumber,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "[verifyCheckpoint] Error checking checkpoint store",
-      );
-      return false;
-    }
-  }
-
-  // Fallback to direct ClickHouse query if checkpoint store not provided
-  const clickHouseClient = getTestClickHouseClient();
-  if (!clickHouseClient) {
-    logger.debug(
-      {
-        pipelineName,
-        processorName,
-        aggregateId,
-        tenantId,
-        expectedSequenceNumber,
-      },
-      "[verifyCheckpoint] ClickHouse client unavailable for checkpoint check",
-    );
-    return false;
-  }
-
-  const checkpointKey = buildCheckpointKey(
-    tenantIdObj,
-    pipelineName,
-    processorName,
-    "test_aggregate",
-    aggregateId,
-  );
-
-  const result = await clickHouseClient.query({
-    query: `
-      SELECT SequenceNumber, Status, EventId
-      FROM processor_checkpoints
-      WHERE CheckpointKey = {checkpointKey:String}
-        AND Status = 'processed'
-        AND SequenceNumber >= {expectedSequence:UInt32}
-      ORDER BY SequenceNumber DESC
-      LIMIT 1
-    `,
-    query_params: {
-      checkpointKey,
-      expectedSequence: expectedSequenceNumber ?? 0,
-    },
-    format: "JSONEachRow",
-  });
-
-  const rows = await result.json<{
-    SequenceNumber: number | string;
-    Status: string;
-    EventId: string;
-  }>();
-
-  logger.debug(
-    {
-      checkpointKey,
-      rows,
-      expectedSequenceNumber,
-    },
-    "[verifyCheckpoint] Result from ClickHouse",
-  );
-
-  if (rows.length === 0) {
-    return false;
-  }
-
-  const checkpoint = rows[0];
-  if (!checkpoint) {
-    return false;
-  }
-
-  const checkpointSequenceNumber = Number(checkpoint.SequenceNumber);
-  if (Number.isNaN(checkpointSequenceNumber)) {
-    return false;
-  }
-
-  if (
-    expectedSequenceNumber !== void 0 &&
-    checkpointSequenceNumber < expectedSequenceNumber
-  ) {
-    return false;
-  }
-
-  return checkpoint.Status === "processed";
 }
 
 /**
@@ -462,4 +316,35 @@ export async function verifyEventHandlerProcessed(
     );
   }
   return processed;
+}
+
+/**
+ * Gets the count of processed events for an aggregate from the handler log.
+ */
+async function getEventHandlerCount(
+  aggregateId: string,
+  tenantId: string,
+): Promise<number> {
+  const clickHouseClient = getTestClickHouseClient();
+  if (!clickHouseClient) {
+    return 0;
+  }
+
+  try {
+    const result = await clickHouseClient.query({
+      query: `
+        SELECT COUNT(*) as count
+        FROM "test_langwatch".test_event_handler_log
+        WHERE AggregateId = {aggregateId:String}
+          AND TenantId = {tenantId:String}
+      `,
+      query_params: { aggregateId, tenantId },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{ count: number | string }>();
+    return Number(rows[0]?.count ?? 0);
+  } catch {
+    return 0;
+  }
 }

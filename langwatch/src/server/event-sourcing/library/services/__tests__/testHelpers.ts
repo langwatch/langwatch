@@ -16,7 +16,6 @@ import type {
 } from "../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import type { EventPublisher } from "../../eventPublisher.types";
-import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -153,21 +152,6 @@ export function createMockMapProjectionDefinition<
     map: overrides?.map ?? vi.fn().mockImplementation((event: TEvent) => event),
     store,
     options: overrides?.options,
-  };
-}
-
-/**
- * Creates a mock CheckpointStore with default implementations.
- */
-export function createMockCheckpointStore(): CheckpointStore {
-  return {
-    saveCheckpoint: vi.fn().mockResolvedValue(void 0),
-    loadCheckpoint: vi.fn().mockResolvedValue(null),
-    getLastProcessedEvent: vi.fn().mockResolvedValue(null),
-    getCheckpointBySequenceNumber: vi.fn().mockResolvedValue(null),
-    hasFailedEvents: vi.fn().mockResolvedValue(false),
-    getFailedEvents: vi.fn().mockResolvedValue([]),
-    clearCheckpoint: vi.fn().mockResolvedValue(void 0),
   };
 }
 

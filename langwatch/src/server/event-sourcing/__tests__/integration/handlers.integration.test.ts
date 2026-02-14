@@ -7,8 +7,7 @@ import {
   createTestTenantId,
   generateTestAggregateId,
   getTenantIdString,
-  verifyCheckpoint,
-  waitForCheckpoint,
+  waitForEventHandler,
 } from "./testHelpers";
 
 describe("Event Handlers - Integration Tests", () => {
@@ -31,11 +30,8 @@ describe("Event Handlers - Integration Tests", () => {
     await cleanupTestDataForTenant(tenantIdString);
   });
 
-  it("skips processing when previous events haven't been processed", async () => {
+  it("processes multiple events for the same aggregate", async () => {
     const aggregateId = generateTestAggregateId("handler");
-
-    // This test verifies that sequential ordering is enforced
-    // If event 2 arrives before event 1 is processed, event 2 should wait
 
     // Send first command
     await pipeline.commands.testCommand.send({
@@ -51,20 +47,15 @@ describe("Event Handlers - Integration Tests", () => {
       value: 2,
     });
 
-    // Wait for handler to process both events (checks checkpoint directly, much faster)
-    await waitForCheckpoint(
-      pipeline.pipelineName,
-      "testHandler",
+    // Wait for handler to process both events
+    await waitForEventHandler(
       aggregateId,
       tenantIdString,
       2,
-      15000, // 15 second timeout for sequential event processing
-      100,
-      pipeline.processorCheckpointStore,
+      15000,
     );
 
-    // Checkpoint verification above already confirms both events were processed
-    // Optionally verify events were stored (but this is redundant since checkpoint confirms processing)
+    // Verify events were stored
     const events = await pipeline.eventStore.getEvents(
       aggregateId,
       { tenantId },
